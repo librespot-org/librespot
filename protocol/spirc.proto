@@ -1,0 +1,92 @@
+enum MessageType {
+    kMessageTypeHello = 1;
+    kMessageTypeGoodbye = 2;
+    kMessageTypeNotify = 10;
+    kMessageTypeLoad = 20;
+    kMessageTypePlay = 21;
+    kMessageTypePause = 22;
+//    kMessageTypePlayPause = 23;
+    kMessageTypeSeek = 24;
+    kMessageTypePrev = 25;
+    kMessageTypeNext = 26;
+    kMessageTypeVolume = 27;
+    kMessageTypeShuffle = 28;
+    kMessageTypeRepeat = 29;
+    kMessageTypeQueue = 30;
+    kMessageTypeVolumeDown = 31;
+    kMessageTypeVolumeUp = 32;
+    kMessageTypeAddToQueue = 33;
+}
+enum PlayStatus {
+    kPlayStatusStop = 0;
+    kPlayStatusPlay = 1;
+    kPlayStatusPause = 2;
+    kPlayStatusLoading = 3;
+    kPlayStatusError = 4;
+}
+message Goodbye {
+    required string reason = 1;
+}
+message State {
+    optional string contextURI = 0x2;
+    optional uint32 index = 0x3;
+    optional uint32 position = 0x4;
+    optional PlayStatus status = 0x5;
+
+    optional uint64 timestamp = 0x7;
+    optional string context_name = 0x8;
+    optional uint32 duration = 0x9;
+    optional uint32 data9 = 0xa;
+    repeated uint64 data10 = 0xb;
+    optional bool shuffle = 0xd;
+    optional bool repeat = 0xe;
+
+    optional string data12 = 0x14;
+    optional uint32 data13 = 0x15;
+    optional uint32 data14 = 0x18;
+    optional uint32 data15 = 0x19;
+    optional uint32 data16 = 0x1a;
+    repeated QueuedTrack queued = 0x1b;
+    message QueuedTrack {
+        optional bytes  gid = 0x1;
+        optional string local_uri = 0x2;
+        optional uint32 data1 = 0x3;
+    }
+}
+
+message Frame {
+    required uint32 version = 1;
+    required string source = 2;
+    required string version_string = 3;
+    required uint32 msgid = 4;
+    required uint32 type = 5;
+
+    required DeviceInfo device = 0x7;
+
+    //required Goodbye goodbye = 0xb;
+    optional State state = 0xc;
+
+    optional uint32 position = 0xd;
+    optional uint32 volume = 0xe;
+
+    optional uint64 timestamp = 0x11;
+    optional string destination = 0x12;
+
+    message DeviceInfo {
+        optional string version    = 0x1;
+        required bool   active     = 0xa;
+        required bool   foreground = 0xb;
+        required uint32 volume     = 0xc;
+        required string name       = 0xd;
+        optional uint32 data15     = 0xe;
+        required uint64 activeTime = 0xf;
+        repeated Data17 data17     = 0x11;
+
+        message Data17 {
+            required uint32 data0 = 0x1;
+            optional uint32 data1 = 0x2;
+            repeated string data2 = 0x3;
+        }
+    }
+}
+

@@ -1,0 +1,49 @@
+message MercuryRequest {
+    required string url = 0x01;
+    optional string mime = 0x02;
+    required string method = 0x03;
+}
+
+message MercuryReply {
+    required string url = 0x01;
+    required string mime = 0x02;
+    required sint32 code = 0x04;
+    repeated Header header = 0x06;
+
+    message Header {
+        required string key = 0x01;
+        required bytes value = 0x02;
+    }
+}
+
+message MercuryGetRequest {
+    required string url = 0x01;
+    optional string method = 0x03;
+}
+
+message MercuryMultiGetRequest {
+    repeated MercuryGetRequest request = 0x01;
+}
+
+message MercuryGetReply {
+    enum CachePolicy {
+        CACHE_NO = 1;
+        CACHE_PRIVATE = 2;
+        CACHE_PUBLIC = 3;
+    }
+    optional sint32 code = 0x01;
+    optional CachePolicy cache_policy = 0x03;
+    optional uint32 ttl = 0x04;
+    optional bytes etag = 0x05;
+    optional string mime = 0x06;
+    optional bytes body = 0x07;
+}
+
+message MercuryMultiGetReply {
+    repeated MercuryGetReply reply = 0x1;
+}
+
+message MercurySubscribed {
+    required string url = 0x1;
+}
+

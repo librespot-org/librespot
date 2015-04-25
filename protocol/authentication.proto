@@ -1,0 +1,51 @@
+message AuthRequest {
+    enum LoginMethod {
+        PASSWORD = 0x0;
+        TOKEN = 0x3;
+    }
+
+    message Credentials {
+        optional string username = 0x0a;
+        required LoginMethod method = 0x14;
+        required bytes  password = 0x1e;
+    }
+    required Credentials credentials = 0x0a;
+
+    message Data1 {
+        required uint32 data0 = 0x0a;
+        required uint32 data1 = 0x3c;
+        required string partner = 0x5a; // "Partner %s %s;%s" % ("lenbrook_bluesound", brand, model)
+        required string deviceid = 0x64; // sha1(os_device_id).hexdigest()
+    }
+    required Data1 data1 = 0x32;
+
+    required string version = 0x46;
+
+    message Data3 {
+        required uint32 data0 = 0x01;
+        required bytes  appkey1 = 0x02;
+        required bytes  appkey2 = 0x03;
+        required string data3 = 0x04;
+        required bytes  data4 = 0x05;
+    }
+    required Data3 data3 = 0x50;
+}
+
+message AuthSuccess {
+    required string username = 0x0a;
+    required uint32 data1 = 0x14;
+    required uint32 data2 = 0x19;
+    required uint32 data3 = 0x1e;
+    required bytes  data4 = 0x28;
+    required bytes  data5 = 0x32;
+}
+
+message AuthFailure {
+    required uint32 code = 0x0a;
+    required Data1 data1 = 0x32;
+
+    message Data1 {
+        required string data0 = 0x01;
+    }
+}
+
