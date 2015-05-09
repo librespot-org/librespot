@@ -1,6 +1,6 @@
 use rand;
 use gmp::Mpz;
-use std::num::FromPrimitive;
+use num::FromPrimitive;
 use crypto;
 use crypto::mac::Mac;
 use std::io::Write;
@@ -23,69 +23,80 @@ lazy_static! {
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff ]);
 }
 
-pub struct Crypto {
+pub struct PrivateKeys {
     private_key: Mpz,
     public_key: Mpz,
-    shared: Option<SharedKeys>,
 }
 
 pub struct SharedKeys {
-    pub challenge: Vec<u8>,
-    pub send_key: Vec<u8>,
-    pub recv_key: Vec<u8>
+    private: PrivateKeys,
+    challenge: Vec<u8>,
+    send_key: Vec<u8>,
+    recv_key: Vec<u8>
 }
 
-impl Crypto {
-    pub fn new() -> Crypto {
+impl PrivateKeys {
+    pub fn new() -> PrivateKeys {
         let key_data = util::rand_vec(&mut rand::thread_rng(), 95);
         Self::new_with_key(&key_data)
     }
 
-    pub fn new_with_key(key_data: &[u8]) -> Crypto {
+    pub fn new_with_key(key_data: &[u8]) -> PrivateKeys {
         let private_key = Mpz::from_bytes_be(key_data);
         let public_key = DH_GENERATOR.powm(&private_key, &DH_PRIME);
 
-        Crypto {
+        PrivateKeys {
             private_key: private_key,
             public_key: public_key,
-            shared: None,
         }
     }
 
-    pub fn setup(&mut self, remote_key: &[u8], client_packet: &[u8], server_packet: &[u8]) {
-        let shared_key = Mpz::from_bytes_be(remote_key).powm(&self.private_key, &DH_PRIME);
-
-        let mut data = Vec::with_capacity(0x54);
-        let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &shared_key.to_bytes_be());
-
-        for i in 1..6 {
-            h.input(client_packet);
-            h.input(server_packet);
-            h.input(&[i]);
-            data.write(&h.result().code()).unwrap();
-            h.reset();
-        }
-
-        h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &data[..0x14]);
-        h.input(client_packet);
-        h.input(server_packet);
-
-        self.shared = Some(SharedKeys{
-            challenge: h.result().code().to_vec(),
-            send_key: data[0x14..0x34].to_vec(),
-            recv_key: data[0x34..0x54].to_vec()
-        });
+    pub fn private_key(&self) -> Vec<u8> {
+        return self.private_key.to_bytes_be();
     }
 
     pub fn public_key(&self) -> Vec<u8> {
         return self.public_key.to_bytes_be();
     }
 
-    pub fn shared(&self) -> &SharedKeys {
-        match self.shared {
-            Some(ref shared) => shared,
-            None => panic!("ABC")
+    pub fn add_remote_key(self, remote_key: &[u8], client_packet: &[u8], server_packet: &[u8]) -> SharedKeys {
+        let shared_key = Mpz::from_bytes_be(remote_key).powm(&self.private_key, &DH_PRIME);
+
+        let mut data = Vec::with_capacity(0x64);
+        let mut mac = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &shared_key.to_bytes_be());
+
+        for i in 1..6 {
+            mac.input(client_packet);
+            mac.input(server_packet);
+            mac.input(&[i]);
+            data.write(&mac.result().code()).unwrap();
+            mac.reset();
         }
+
+        mac = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &data[..0x14]);
+        mac.input(client_packet);
+        mac.input(server_packet);
+
+        SharedKeys {
+            private: self,
+            challenge: mac.result().code().to_vec(),
+            send_key: data[0x14..0x34].to_vec(),
+            recv_key: data[0x34..0x54].to_vec(),
+        }
+    }
+}
+
+impl SharedKeys {
+    pub fn challenge(&self) -> &[u8] {
+        &self.challenge
+    }
+
+    pub fn send_key(&self) -> &[u8] {
+        &self.send_key
+    }
+    
+    pub fn recv_key(&self) -> &[u8] {
+        &self.recv_key
     }
 }
 

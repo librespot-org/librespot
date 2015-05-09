@@ -3,11 +3,9 @@ name = "librespot"
 version = "0.1.0"
 authors = ["Paul Liétar <paul@lietar.net>"]
 build = "build.rs"
-links = "gmp"
 
-#[[bin]]
-#name = "librespot"
-#path = "src/main.rs"
+[dependencies.librespot-protocol]
+path = "protocol"
 
 [dependencies]
 mod_path = "*"
@@ -18,7 +16,7 @@ lazy_static = "0.1.*"
 rust-crypto = "*"
 
 [dependencies.protobuf]
-git = "https://github.com/plietar/rust-protobuf.git"
+git = "https://github.com/stepancheg/rust-protobuf.git"
 
 [dependencies.protobuf_macros]
 git = "https://github.com/plietar/rust-protobuf-macros.git"
@@ -26,3 +24,11 @@ git = "https://github.com/plietar/rust-protobuf-macros.git"
 [dependencies.rust-gmp]
 git = "https://github.com/plietar/rust-gmp.git"
 
+[dependencies.shannon]
+git = "https://github.com/plietar/rust-shannon.git"
+
+[dependencies.readall]
+git = "https://github.com/plietar/rust-readall.git"
+
+[build-dependencies]
+vergen = "*"

@@ -1,0 +1,165 @@
+//  size=30
+message ClientResponseEncrypted {
+    required LoginCredentials login_credentials = 0xa; // idx=0 offset=c
+    optional AccountCreation account_creation = 0x14; // idx=1 offset=10
+    optional FingerprintResponseUnion fingerprint_response = 0x1e; // idx=2 offset=14
+    optional PeerTicketUnion peer_ticket = 0x28; // idx=3 offset=18
+    required SystemInfo system_info = 0x32; // idx=4 offset=1c
+    optional string platform_model = 0x3c; // idx=5 offset=20
+    optional string version_string = 0x46; // idx=6 offset=24
+    optional LibspotifyAppKey appkey = 0x50; // idx=7 offset=28
+    optional ClientInfo client_info = 0x5a; // idx=8 offset=2c
+}
+
+//  size=18
+message LoginCredentials {
+    optional string username = 0xa; // idx=0 offset=c
+    required Type typ = 0x14; // idx=1 offset=10
+    optional bytes auth_data = 0x1e; // idx=2 offset=14
+}
+
+enum Type {
+    AUTHENTICATION_USER_PASS = 0x0;
+    AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS = 0x1;
+    AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS = 0x2;
+    AUTHENTICATION_SPOTIFY_TOKEN = 0x3;
+    AUTHENTICATION_FACEBOOK_TOKEN = 0x4;
+}
+
+enum AccountCreation {
+    ACCOUNT_CREATION_ALWAYS_PROMPT = 0x1;
+    ACCOUNT_CREATION_ALWAYS_CREATE = 0x3;
+}
+
+//  size=14
+message FingerprintResponseUnion {
+    optional FingerprintGrainResponse grain = 0xa; // idx=0 offset=c
+    optional FingerprintHmacRipemdResponse hmac_ripemd = 0x14; // idx=1 offset=10
+}
+
+//  size=1c
+message FingerprintGrainResponse {
+    required bytes encrypted_key = 0xa; // idx=0 offset=c size=f
+}
+
+//  size=20
+message FingerprintHmacRipemdResponse {
+    required bytes hmac = 0xa; // idx=0 offset=c size=13
+}
+
+//  size=14
+message PeerTicketUnion {
+    optional PeerTicketPublicKey public_key = 0xa; // idx=0 offset=c
+    optional PeerTicketOld old_ticket = 0x14; // idx=1 offset=10
+}
+
+//  size=8c
+message PeerTicketPublicKey {
+    required bytes public_key = 0xa; // idx=0 offset=c size=7f
+}
+
+//  size=90
+message PeerTicketOld {
+    required bytes peer_ticket = 0xa; // idx=0 offset=c
+    required bytes peer_ticket_signature = 0x14; // idx=1 offset=10 size=7f
+}
+
+//  size=34
+message SystemInfo {
+    required CpuFamily cpu_family = 0xa; // idx=0 offset=c
+    optional uint32 cpu_subtype = 0x14; // idx=1 offset=10
+    optional uint32 cpu_ext = 0x1e; // idx=2 offset=14
+    optional Brand brand = 0x28; // idx=3 offset=18
+    optional uint32 brand_flags = 0x32; // idx=4 offset=1c
+    required Os os = 0x3c; // idx=5 offset=20
+    optional uint32 os_version = 0x46; // idx=6 offset=24
+    optional uint32 os_ext = 0x50; // idx=7 offset=28
+    optional string system_information_string = 0x5a; // idx=8 offset=2c
+    optional string device_id = 0x64; // idx=9 offset=30
+}
+
+enum CpuFamily {
+    CPU_UNKNOWN = 0x0;
+    CPU_X86 = 0x1;
+    CPU_X86_64 = 0x2;
+    CPU_PPC = 0x3;
+    CPU_PPC_64 = 0x4;
+    CPU_ARM = 0x5;
+    CPU_IA64 = 0x6;
+    CPU_SH = 0x7;
+    CPU_MIPS = 0x8;
+    CPU_BLACKFIN = 0x9;
+}
+
+enum Brand {
+    BRAND_UNBRANDED = 0x0;
+    BRAND_INQ = 0x1;
+    BRAND_HTC = 0x2;
+    BRAND_NOKIA = 0x3;
+}
+
+enum Os {
+    OS_UNKNOWN = 0x0;
+    OS_WINDOWS = 0x1;
+    OS_OSX = 0x2;
+    OS_IPHONE = 0x3;
+    OS_S60 = 0x4;
+    OS_LINUX = 0x5;
+    OS_WINDOWS_CE = 0x6;
+    OS_ANDROID = 0x7;
+    OS_PALM = 0x8;
+    OS_FREEBSD = 0x9;
+    OS_BLACKBERRY = 0xa;
+    OS_SONOS = 0xb;
+    OS_LOGITECH = 0xc;
+    OS_WP7 = 0xd;
+    OS_ONKYO = 0xe;
+    OS_PHILIPS = 0xf;
+    OS_WD = 0x10;
+    OS_VOLVO = 0x11;
+    OS_TIVO = 0x12;
+    OS_AWOX = 0x13;
+    OS_MEEGO = 0x14;
+    OS_QNXNTO = 0x15;
+    OS_BCO = 0x16;
+}
+
+//  size=168
+message LibspotifyAppKey {
+    required uint32 version = 0x1; // idx=0 offset=c
+    required bytes devkey = 0x2; // idx=1 offset=10 size=7f
+    required bytes signature = 0x3; // idx=2 offset=90 size=bf
+    required string useragent = 0x4; // idx=3 offset=150
+    required bytes callback_hash = 0x5; // idx=4 offset=154 size=13
+}
+
+//  size=18
+message ClientInfo {
+    optional bool limited = 0x1; // idx=0 offset=c
+    optional ClientInfoFacebook fb = 0x2; // idx=1 offset=10
+    optional string language = 0x3; // idx=2 offset=14
+}
+
+//  size=10
+message ClientInfoFacebook {
+    optional string machine_id = 0x1; // idx=0 offset=c
+}
+
+message AuthSuccess {
+    required string username = 0x0a;
+    required uint32 data1 = 0x14;
+    required uint32 data2 = 0x19;
+    required uint32 data3 = 0x1e;
+    required bytes  data4 = 0x28;
+    required bytes  data5 = 0x32;
+}
+
+message AuthFailure {
+    required uint32 code = 0x0a;
+    required Data1 data1 = 0x32;
+
+    message Data1 {
+        required string data0 = 0x01;
+    }
+}
+
