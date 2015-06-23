@@ -1,7 +1,4 @@
-use util;
-
-use byteorder::{self, ReadBytesExt, WriteBytesExt, BigEndian, ByteOrder};
-use keys::SharedKeys;
+use byteorder::{self, BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
 use readall::ReadAllExt;
 use shannon::ShannonStream;
 use std::convert;
@@ -9,6 +6,10 @@ use std::io;
 use std::io::Write;
 use std::net::TcpStream;
 use std::result;
+use std::sync::mpsc;
+
+use keys::SharedKeys;
+use util;
 
 #[derive(Debug)]
 pub enum Error {
@@ -37,6 +38,7 @@ pub struct PlainConnection {
     stream: TcpStream
 }
 
+#[derive(Clone)]
 pub struct CipherConnection {
     stream: ShannonStream<TcpStream>,
 }
@@ -106,5 +108,70 @@ impl CipherConnection {
     }
 }
 
+pub struct Packet {
+    pub cmd: u8,
+    pub data: Vec<u8>
+}
 
+pub struct SendThread {
+    connection: CipherConnection,
+    receiver: mpsc::Receiver<Packet>,
+}
+impl SendThread {
+    pub fn new(connection: CipherConnection)
+      -> (SendThread, mpsc::Sender<Packet>) {
+        let (tx, rx) = mpsc::channel();
+        (SendThread {
+            connection: connection,
+            receiver: rx
+        }, tx)
+    }
+
+    pub fn run(mut self) {
+        for req in self.receiver {
+            self.connection.send_encrypted_packet(
+                req.cmd, &req.data).unwrap();
+        }
+    }
+}
+
+pub struct PacketDispatch {
+    pub main: mpsc::Sender<Packet>,
+    pub stream: mpsc::Sender<Packet>,
+    pub mercury: mpsc::Sender<Packet>,
+    pub audio_key: mpsc::Sender<Packet>,
+}
+
+pub struct RecvThread {
+    connection: CipherConnection,
+    dispatch: PacketDispatch
+}
+
+impl RecvThread {
+    pub fn new(connection: CipherConnection, dispatch: PacketDispatch)
+        -> RecvThread {
+        RecvThread {
+            connection: connection,
+            dispatch: dispatch
+        }
+    }
+
+    pub fn run(mut self) {
+        loop {
+            let (cmd, data) = self.connection.recv_packet().unwrap();
+            let packet = Packet {
+                cmd: cmd,
+                data: data
+            };
+
+            match packet.cmd {
+                0x09 => &self.dispatch.stream,
+                0xd | 0xe => &self.dispatch.audio_key,
+                0xb2...0xb6 => &self.dispatch.mercury,
+                _ => &self.dispatch.main,
+            }.send(packet).unwrap();
+
+        }
+    }
+}
 

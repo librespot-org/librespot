@@ -1,0 +1,31 @@
+import "playlist4meta.proto";
+import "playlist4issues.proto";
+
+message Item {
+  required string uri = 1;
+  optional ItemAttributes attributes = 2;
+}
+message ListItems {
+  required int32 pos = 1;
+  required bool truncated = 2;
+  repeated Item items = 3;
+}
+message ContentRange {
+  required int32 pos = 1;
+  optional int32 length = 2;
+}
+message ListContentSelection {
+  optional bool wantRevision = 1;
+  optional bool wantLength = 2;
+  optional bool wantAttributes = 3;
+  optional bool wantChecksum = 4;
+  optional bool wantContent = 5;
+  optional ContentRange contentRange = 6;
+  optional bool wantDiff = 7;
+  optional bytes baseRevision = 8;
+  optional bytes hintRevision = 9;
+  optional bool wantNothingIfUpToDate = 10;
+  optional bool wantResolveAction = 12;
+  repeated ClientIssue issues = 13;
+  repeated ClientResolveAction resolveAction = 14;
+}

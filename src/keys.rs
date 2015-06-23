@@ -1,8 +1,8 @@
-use rand;
-use gmp::Mpz;
-use num::FromPrimitive;
 use crypto;
 use crypto::mac::Mac;
+use gmp::Mpz;
+use num::FromPrimitive;
+use rand;
 use std::io::Write;
 
 use util;
@@ -29,7 +29,7 @@ pub struct PrivateKeys {
 }
 
 pub struct SharedKeys {
-    private: PrivateKeys,
+    //private: PrivateKeys,
     challenge: Vec<u8>,
     send_key: Vec<u8>,
     recv_key: Vec<u8>
@@ -51,9 +51,11 @@ impl PrivateKeys {
         }
     }
 
+    /*
     pub fn private_key(&self) -> Vec<u8> {
         return self.private_key.to_bytes_be();
     }
+    */
 
     pub fn public_key(&self) -> Vec<u8> {
         return self.public_key.to_bytes_be();
@@ -78,7 +80,7 @@ impl PrivateKeys {
         mac.input(server_packet);
 
         SharedKeys {
-            private: self,
+            //private: self,
             challenge: mac.result().code().to_vec(),
             send_key: data[0x14..0x34].to_vec(),
             recv_key: data[0x34..0x54].to_vec(),
@@ -94,7 +96,7 @@ impl SharedKeys {
     pub fn send_key(&self) -> &[u8] {
         &self.send_key
     }
-    
+
     pub fn recv_key(&self) -> &[u8] {
         &self.recv_key
     }

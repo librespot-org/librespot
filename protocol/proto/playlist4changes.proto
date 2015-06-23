@@ -1,0 +1,80 @@
+import "playlist4content.proto";
+import "playlist4issues.proto";
+import "playlist4meta.proto";
+import "playlist4ops.proto";
+
+message ChangeInfo {
+  optional string user = 1;
+  optional int32 timestamp = 2;
+  optional bool admin = 3;
+  optional bool undo = 4;
+  optional bool redo = 5;
+  optional bool merge = 6;
+  optional bool compressed = 7;
+  optional bool migration = 8;
+}
+message Delta {
+  optional bytes base_version = 1;
+  repeated Op ops = 2;
+  optional ChangeInfo info = 4;
+}
+message Merge {
+  optional bytes base_version = 1;
+  optional bytes merge_version = 2;
+  optional ChangeInfo info = 4;
+}
+message ChangeSet {
+  enum Kind {
+    KIND_UNKNOWN = 0;
+    DELTA = 2;
+    MERGE = 3;
+  };
+  required Kind kind = 1;
+  optional Delta delta = 2;
+  optional Merge merge = 3;
+}
+message RevisionTaggedChangeSet {
+  required bytes revision = 1;
+  required ChangeSet change_set = 2;
+}
+message Diff {
+  required bytes from_revision = 1;
+  repeated Op ops = 2;
+  required bytes to_revision = 3;
+}
+message ListDump {
+  optional bytes latestRevision = 1;
+  optional int32 length = 2;
+  optional ListAttributes attributes = 3;
+  optional ListChecksum checksum = 4;
+  optional ListItems contents = 5;
+  repeated Delta pendingDeltas = 7;
+}
+message ListChanges {
+  optional bytes baseRevision = 1;
+  repeated Delta deltas = 2;
+  optional bool wantResultingRevisions = 3;
+  optional bool wantSyncResult = 4;
+  optional ListDump dump = 5;
+  repeated int32 nonces = 6;
+}
+message SelectedListContent {
+  optional bytes revision = 1;
+  optional int32 length = 2;
+  optional ListAttributes attributes = 3;
+  optional ListChecksum checksum = 4;
+  optional ListItems contents = 5;
+  optional Diff diff = 6;
+
+  optional Diff syncResult = 7;
+  repeated bytes resultingRevisions = 8;
+
+  optional bool multipleHeads = 9;
+
+  optional bool upToDate = 10;
+
+  repeated ClientResolveAction resolveAction = 12;
+  repeated ClientIssue issues = 13;
+
+  repeated int32 nonces = 14;
+}

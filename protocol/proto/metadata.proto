@@ -43,7 +43,7 @@ message Album {
     optional bytes gid = 1;
     optional string name = 2;
     repeated Artist artist = 3;
-    optional Type type = 4;
+    optional Type typ = 4;
     optional string label = 5;
     optional Date date = 6;
     optional sint32 popularity = 7;
@@ -106,7 +106,7 @@ message Copyright {
         P = 0;
         C = 1;
     }
-    optional Type type = 1;
+    optional Type typ = 1;
     optional string text = 2;
 }
 message Restriction {
@@ -122,7 +122,7 @@ message Restriction {
     repeated Catalogue catalogue = 1;
     optional string countries_allowed = 2;
     optional string countries_forbidden = 3;
-    optional Type type = 4;
+    optional Type typ = 4;
     repeated string usage = 5;
 }
 
@@ -133,7 +133,7 @@ message SalePeriod {
 }
 
 message ExternalId {
-    optional string type = 1;
+    optional string typ = 1;
     optional string id = 2;
 }
 

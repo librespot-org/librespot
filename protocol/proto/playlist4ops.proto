@@ -1,0 +1,68 @@
+import "playlist4content.proto";
+import "playlist4meta.proto";
+
+message Add {
+  optional int32 fromIndex = 1;
+  repeated Item items = 2;
+  optional ListChecksum list_checksum = 3;
+  optional bool addLast = 4;
+  optional bool addFirst = 5;
+}
+message Rem {
+  optional int32 fromIndex = 1;
+  optional int32 length = 2;
+  repeated Item items = 3;
+  optional ListChecksum list_checksum = 4;
+  optional ListChecksum items_checksum = 5;
+  optional ListChecksum uris_checksum = 6;
+  optional bool itemsAsKey = 7;
+}
+message Mov {
+  required int32 fromIndex = 1;
+  required int32 length = 2;
+  required int32 toIndex = 3;
+  optional ListChecksum list_checksum = 4;
+  optional ListChecksum items_checksum = 5;
+  optional ListChecksum uris_checksum = 6;
+}
+message ItemAttributesPartialState {
+  required ItemAttributes values = 1;
+  repeated ItemAttributeKind no_value = 2;
+}
+message ListAttributesPartialState {
+  required ListAttributes values = 1;
+  repeated ListAttributeKind no_value = 2;
+}
+message UpdateItemAttributes {
+  required int32 index = 1;
+  required ItemAttributesPartialState new_attributes = 2;
+  optional ItemAttributesPartialState old_attributes = 3;
+  optional ListChecksum list_checksum = 4;
+  optional ListChecksum old_attributes_checksum = 5;
+}
+message UpdateListAttributes {
+  required ListAttributesPartialState new_attributes = 1;
+  optional ListAttributesPartialState old_attributes = 2;
+  optional ListChecksum list_checksum = 3;
+  optional ListChecksum old_attributes_checksum = 4;
+}
+message Op {
+  enum Kind {
+    KIND_UNKNOWN = 0;
+    ADD = 2;
+    REM = 3;
+    MOV = 4;
+    UPDATE_ITEM_ATTRIBUTES = 5;
+    UPDATE_LIST_ATTRIBUTES = 6;
+  };
+  required Kind kind = 1;
+  optional Add add = 2;
+  optional Rem rem = 3;
+  optional Mov mov = 4;
+  optional UpdateItemAttributes update_item_attributes = 5;
+  optional UpdateListAttributes update_list_attributes = 6;
+}
+
+message OpList {
+  repeated Op ops = 1;
+}

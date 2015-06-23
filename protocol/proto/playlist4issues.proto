@@ -1,0 +1,40 @@
+message ClientIssue {
+  enum Level {
+    LEVEL_UNKNOWN = 0;
+    LEVEL_DEBUG = 1;
+    LEVEL_INFO = 2;
+    LEVEL_NOTICE = 3;
+    LEVEL_WARNING = 4;
+    LEVEL_ERROR = 5;
+  }
+  enum Code {
+    CODE_UNKNOWN = 0;
+    CODE_INDEX_OUT_OF_BOUNDS = 1;
+    CODE_VERSION_MISMATCH = 2;
+    CODE_CACHED_CHANGE = 3;
+    CODE_OFFLINE_CHANGE = 4;
+    CODE_CONCURRENT_CHANGE = 5;
+  }
+  optional Level level = 1;
+  optional Code code = 2;
+  optional int32 repeatCount = 3;
+}
+
+message ClientResolveAction {
+  enum Code {
+    CODE_UNKNOWN = 0;
+    CODE_NO_ACTION = 1;
+    CODE_RETRY = 2;
+    CODE_RELOAD = 3;
+    CODE_DISCARD_LOCAL_CHANGES = 4;
+    CODE_SEND_DUMP = 5;
+    CODE_DISPLAY_ERROR_MESSAGE = 6;
+  }
+  enum Initiator {
+    INITIATOR_UNKNOWN = 0;
+    INITIATOR_SERVER = 1;
+    INITIATOR_CLIENT = 2;
+  }
+  optional Code code = 1;
+  optional Initiator initiator = 2;
+}

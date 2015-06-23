@@ -17,18 +17,18 @@ rust-crypto = "*"
 
 [dependencies.protobuf]
 git = "https://github.com/stepancheg/rust-protobuf.git"
-
 [dependencies.protobuf_macros]
 git = "https://github.com/plietar/rust-protobuf-macros.git"
-
 [dependencies.rust-gmp]
 git = "https://github.com/plietar/rust-gmp.git"
-
 [dependencies.shannon]
 git = "https://github.com/plietar/rust-shannon.git"
-
 [dependencies.readall]
 git = "https://github.com/plietar/rust-readall.git"
+[dependencies.portaudio]
+git = "https://github.com/mvdnes/portaudio-rs"
+[dependencies.vorbis]
+git = "https://github.com/plietar/vorbis-rs"
 
 [build-dependencies]
 vergen = "*"

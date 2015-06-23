@@ -37,9 +37,18 @@ fn compile(prefix : &Path, files : &[&Path]) -> Result<(),ProtobufError>{
 fn main() {
     let root = PathBuf::from(&env::var("CARGO_MANIFEST_DIR").unwrap());
     let proto = root.join("proto");
+
     compile(&proto, &[
             &proto.join("keyexchange.proto"),
-            &proto.join("authentication.proto")
+            &proto.join("authentication.proto"),
+            &proto.join("mercury.proto"),
+            &proto.join("metadata.proto"),
+            &proto.join("playlist4changes.proto"),
+            &proto.join("playlist4content.proto"),
+            &proto.join("playlist4issues.proto"),
+            &proto.join("playlist4meta.proto"),
+            &proto.join("playlist4ops.proto"),
+            &proto.join("playlist4service.proto"),
     ]).unwrap();
 }
 

@@ -1,0 +1,58 @@
+message ListChecksum {
+  required int32 version = 1;
+  optional bytes sha1 = 4;
+}
+message DownloadFormat {
+  enum Codec {
+    CODEC_UNKNOWN = 0;
+    OGG_VORBIS = 1;
+    FLAC = 2;
+    MPEG_1_LAYER_3 = 3;
+  }
+  required Codec codec = 1;
+}
+enum ListAttributeKind {
+  LIST_UNKNOWN = 0;
+  LIST_NAME = 1;
+  LIST_DESCRIPTION = 2;
+  LIST_PICTURE = 3;
+  LIST_COLLABORATIVE = 4;
+  LIST_PL3_VERSION = 5;
+  LIST_DELETED_BY_OWNER = 6;
+  LIST_RESTRICTED_COLLABORATIVE = 7;
+}
+message ListAttributes {
+  optional string name = 1;
+  optional string description = 2;
+  optional bytes picture = 3;
+  optional bool collaborative = 4;
+  optional string pl3_version = 5;
+  optional bool deleted_by_owner = 6;
+  optional bool restricted_collaborative = 7;
+}
+enum ItemAttributeKind {
+  ITEM_UNKNOWN = 0;
+  ITEM_ADDED_BY = 1;
+  ITEM_TIMESTAMP = 2;
+  ITEM_MESSAGE = 3;
+  ITEM_SEEN = 4;
+  ITEM_DOWNLOAD_COUNT = 5;
+  ITEM_DOWNLOAD_FORMAT = 6;
+  ITEM_SEVENDIGITAL_ID = 7;
+  ITEM_SEVENDIGITAL_LEFT = 8;
+  ITEM_SEEN_AT = 9;
+}
+message ItemAttributes {
+  optional string added_by = 1;
+  optional string message = 3;
+  optional bool seen = 4;
+  optional DownloadFormat download_format = 6;
+  optional string sevendigital_id = 7;
+}
+message StringAttribute {
+  required string key = 1;
+  required string value = 2;
+}
+message StringAttributes {
+  repeated StringAttribute attribute = 1;
+}

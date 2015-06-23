@@ -1,0 +1,118 @@
+import "playlist4changes.proto";
+import "playlist4content.proto";
+
+message RequestContext {
+  optional bool administrative = 2;
+  optional bool migration = 4;
+  optional string tag = 7;
+  optional bool useStarredView = 8;
+  optional bool syncWithPublished = 9;
+}
+message GetCurrentRevisionArgs {
+  optional bytes uri = 1;
+  optional RequestContext context = 2;
+}
+message GetChangesInSequenceRangeArgs {
+  optional bytes uri = 1;
+  optional RequestContext context = 2;
+  optional int32 fromSequenceNumber = 3;
+  optional int32 toSequenceNumber = 4;
+}
+message GetChangesInSequenceRangeMatchingPl3VersionArgs {
+  optional bytes uri = 1;
+  optional RequestContext context = 2;
+  optional int32 fromSequenceNumber = 3;
+  optional int32 toSequenceNumber = 4;
+  optional string pl3Version = 5;
+}
+message GetChangesInSequenceRangeReturn {
+  repeated RevisionTaggedChangeSet result = 1;
+}
+message ObliterateListArgs {
+  optional bytes uri = 1;
+  optional RequestContext context = 2;
+}
+message UpdatePublishedArgs {
+  optional bytes publishedUri = 1;
+  optional RequestContext context = 2;
+  optional bytes uri = 3;
+  optional bool isPublished = 4;
+}
+message SynchronizeArgs {
+  optional bytes uri = 1;
+  optional RequestContext context = 2;
+  optional ListContentSelection selection = 3;
+  optional ListChanges changes = 4;
+}
+message GetSnapshotAtRevisionArgs {
+  optional bytes uri = 1;
+  optional RequestContext context = 2;
+  optional bytes revision = 3;
+}
+message SubscribeRequest {
+  repeated bytes uris = 1;
+}
+message UnsubscribeRequest {
+  repeated bytes uris = 1;
+}
+enum Playlist4InboxErrorKind {
+  INBOX_NOT_ALLOWED = 2;
+  INBOX_INVALID_USER = 3;
+  INBOX_INVALID_URI = 4;
+  INBOX_LIST_TOO_LONG = 5;
+}
+message Playlist4ServiceException {
+  optional string why = 1;
+  optional string symbol = 2;
+  optional bool permanent = 3;
+  optional string serviceErrorClass = 4;
+  optional Playlist4InboxErrorKind inboxErrorKind = 5;
+}
+message SynchronizeReturn {
+  optional SelectedListContent result = 1;
+  optional Playlist4ServiceException exception = 4;
+}
+enum Playlist4ServiceMethodKind {
+  METHOD_UNKNOWN = 0;
+  METHOD_GET_CURRENT_REVISION = 2;
+  METHOD_GET_CHANGES_IN_SEQUENCE_RANGE = 3;
+  METHOD_OBLITERATE_LIST = 4;
+  METHOD_SYNCHRONIZE = 5;
+  METHOD_UPDATE_PUBLISHED = 6;
+  METHOD_GET_CHANGES_IN_SEQUENCE_RANGE_MATCHING_PL3_VERSION = 7;
+  METHOD_GET_SNAPSHOT_AT_REVISION = 8;
+}
+message Playlist4ServiceCall {
+  optional Playlist4ServiceMethodKind kind = 1;
+  optional GetCurrentRevisionArgs getCurrentRevisionArgs = 2;
+  optional GetChangesInSequenceRangeArgs getChangesInSequenceRangeArgs = 3;
+  optional ObliterateListArgs obliterateListArgs = 4;
+  optional SynchronizeArgs synchronizeArgs = 5;
+  optional UpdatePublishedArgs updatePublishedArgs = 6;
+  optional GetChangesInSequenceRangeMatchingPl3VersionArgs getChangesInSequenceRangeMatchingPl3VersionArgs = 7;
+  optional GetSnapshotAtRevisionArgs getSnapshotAtRevisionArgs = 8;
+}
+message Playlist4ServiceReturn {
+  optional Playlist4ServiceMethodKind kind = 1;
+  optional Playlist4ServiceException exception = 2;
+  optional bytes getCurrentRevisionReturn = 3;
+  optional GetChangesInSequenceRangeReturn getChangesInSequenceRangeReturn = 4;
+  optional bool obliterateListReturn = 5;
+  optional SynchronizeReturn synchronizeReturn = 6;
+  optional bool updatePublishedReturn = 7;
+  optional GetChangesInSequenceRangeReturn getChangesInSequenceRangeMatchingPl3VersionReturn = 8;
+  //optional RevisionTaggedListSnapshot getSnapshotAtRevisionReturn = 9;
+  optional bytes getSnapshotAtRevisionReturn = 9;
+}
+message CreateListReply {
+  required bytes uri = 1;
+  optional bytes revision = 2;
+}
+message ModifyReply {
+  required bytes uri = 1;
+  optional bytes revision = 2;
+}
+message PlaylistModificationInfo {
+  optional bytes uri = 1;
+  optional bytes new_revision = 2;
+}
