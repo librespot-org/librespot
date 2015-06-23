@@ -1,23 +1,24 @@
 use byteorder::{ByteOrder, BigEndian};
 use std::cmp::min;
 use std::collections::BitSet;
-use std::io;
+use std::io::{self, SeekFrom};
 use std::slice::bytes::copy_memory;
-use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
+use std::sync::mpsc::{self, TryRecvError};
 
 use stream::{StreamRequest, StreamEvent};
 use util::FileId;
+use std::thread;
 
-const CHUNK_SIZE: usize = 0x40000;
+const CHUNK_SIZE : usize = 0x40000;
+
 #[derive(Clone)]
-pub struct AudioFileRef(Arc<AudioFile>);
-
-struct AudioFile {
+pub struct AudioFile {
     file: FileId,
     size: usize,
+    seek: mpsc::Sender<u64>,
 
-    data: Mutex<AudioFileData>,
-    cond: Condvar
+    data: Arc<(Mutex<AudioFileData>, Condvar)>,
 }
 
 struct AudioFileData {
@@ -25,8 +26,8 @@ struct AudioFileData {
     bitmap: BitSet,
 }
 
-impl AudioFileRef {
-    pub fn new(file: FileId, streams: mpsc::Sender<StreamRequest>) -> AudioFileRef {
+impl AudioFile {
+    pub fn new(file: FileId, streams: mpsc::Sender<StreamRequest>) -> AudioFile {
         let (tx, rx) = mpsc::channel();
 
         streams.send(StreamRequest {
@@ -51,70 +52,99 @@ impl AudioFileRef {
             }
             size.unwrap() as usize
         };
+
+        let bufsize = size + (CHUNK_SIZE - size % CHUNK_SIZE); 
+        let (tx, rx) = mpsc::channel();
         
-        AudioFileRef(Arc::new(AudioFile {
+        let ret = AudioFile {
             file: file,
             size: size,
+            seek: tx,
 
-            data: Mutex::new(AudioFileData {
-                buffer: vec![0u8; size + (CHUNK_SIZE - size % CHUNK_SIZE)],
-                bitmap: BitSet::with_capacity(size / CHUNK_SIZE)
-            }),
-            cond: Condvar::new(),
-        }))
+            data: Arc::new((Mutex::new(AudioFileData {
+                buffer: vec![0u8; bufsize],
+                bitmap: BitSet::with_capacity(bufsize / CHUNK_SIZE as usize)
+            }), Condvar::new())),
+        };
+
+        let f = ret.clone();
+
+        thread::spawn( move || { f.fetch(streams, rx); });
+
+        ret
     }
     
-    pub fn fetch(&self, streams: mpsc::Sender<StreamRequest>) {
-        let &AudioFileRef(ref inner) = self;
+    fn fetch_chunk(&self, streams: &mpsc::Sender<StreamRequest>, index: usize) {
+        let (tx, rx) = mpsc::channel();
+        streams.send(StreamRequest {
+            id: self.file,
+            offset: (index * CHUNK_SIZE / 4) as u32,
+            size: (CHUNK_SIZE / 4) as u32,
+            callback: tx
+        }).unwrap();
 
-        let mut index : usize = 0;
+        let mut offset = 0usize;
+        for event in rx.iter() {
+            match event {
+                StreamEvent::Header(_,_) => (),
+                StreamEvent::Data(data) => {
+                    let mut handle = self.data.0.lock().unwrap();
+                    copy_memory(&data, &mut handle.buffer[index * CHUNK_SIZE + offset ..]);
+                    offset += data.len();
 
-        while index * CHUNK_SIZE < inner.size {
-            let (tx, rx) = mpsc::channel();
-
-            streams.send(StreamRequest {
-                id: inner.file,
-                offset: (index * CHUNK_SIZE / 4) as u32,
-                size: (CHUNK_SIZE / 4) as u32,
-                callback: tx
-            }).unwrap();
-
-            let mut offset = 0;
-            for event in rx.iter() {
-                match event {
-                    StreamEvent::Header(_,_) => (),
-                    StreamEvent::Data(data) => {
-                        let mut handle = inner.data.lock().unwrap();
-                        copy_memory(&data, &mut handle.buffer[index * CHUNK_SIZE + offset..]);
-                        offset += data.len();
-
-                        if offset >= CHUNK_SIZE {
-                            break
-                        }
+                    if offset >= CHUNK_SIZE {
+                        break
                     }
                 }
             }
-            
+        }
+        
+        {
+            let mut handle = self.data.0.lock().unwrap();
+            handle.bitmap.insert(index as usize);
+            self.data.1.notify_all();
+        }
+    }
+
+    fn fetch(&self, streams: mpsc::Sender<StreamRequest>, seek: mpsc::Receiver<u64>) {
+        let mut index = 0;
+        loop {
+            index = if index * CHUNK_SIZE < self.size {
+                match seek.try_recv() {
+                    Ok(position) => position as usize / CHUNK_SIZE,
+                    Err(TryRecvError::Empty) => index,
+                    Err(TryRecvError::Disconnected) => break
+                }
+            } else {
+                match seek.recv() {
+                    Ok(position) => position as usize / CHUNK_SIZE,
+                    Err(_) => break
+                }
+            };
+
             {
-                let mut handle = inner.data.lock().unwrap();
-                handle.bitmap.insert(index);
-                inner.cond.notify_all();
+                let handle = self.data.0.lock().unwrap();
+                while handle.bitmap.contains(&index) && index * CHUNK_SIZE < self.size {
+                    index += 1;
+                }
             }
 
-            index += 1;
+            if index * CHUNK_SIZE < self.size {
+                self.fetch_chunk(&streams, index) 
+            }
         }
     }
 }
 
 pub struct AudioFileReader {
-    file: AudioFileRef,
-    position: usize
+    file: AudioFile,
+    position: usize,
 }
 
 impl AudioFileReader {
-    pub fn new(file: &AudioFileRef) -> AudioFileReader {
+    pub fn new(file: AudioFile) -> AudioFileReader {
         AudioFileReader {
-            file: file.clone(),
+            file: file,
             position: 0
         }
     }
@@ -126,11 +156,10 @@ impl io::Read for AudioFileReader {
         let offset = self.position % CHUNK_SIZE;
         let len = min(output.len(), CHUNK_SIZE-offset);
 
-        let &AudioFileRef(ref inner) = &self.file;
-        let mut handle = inner.data.lock().unwrap();
+        let mut handle = self.file.data.0.lock().unwrap();
 
         while !handle.bitmap.contains(&index) {
-            handle = inner.cond.wait(handle).unwrap();
+            handle = self.file.data.1.wait(handle).unwrap();
         }
 
         copy_memory(&handle.buffer[self.position..self.position+len], output);
@@ -141,8 +170,16 @@ impl io::Read for AudioFileReader {
 }
 
 impl io::Seek for AudioFileReader {
-    fn seek(&mut self, _pos: io::SeekFrom) -> io::Result<u64> {
-        Err(io::Error::new(io::ErrorKind::Other, "Cannot seek"))
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        let newpos = match pos {
+            SeekFrom::Start(offset) => offset as i64,
+            SeekFrom::End(offset) => self.file.size as i64 + offset,
+            SeekFrom::Current(offset) => self.position as i64 + offset,
+        };
+
+        self.position = min(newpos as usize, self.file.size);
+        self.file.seek.send(self.position as u64).unwrap();
+        Ok(self.position as u64)
     }
 }
 

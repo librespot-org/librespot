@@ -1,7 +1,9 @@
 use crypto::aes;
 use crypto::symmetriccipher::SynchronousStreamCipher;
-use readall::ReadAllExt;
 use std::io;
+use std::ops::Add;
+use num::FromPrimitive;
+use gmp::Mpz;
 
 use audio_key::AudioKey;
 
@@ -16,16 +18,10 @@ pub struct AudioDecrypt<T : io::Read> {
 }
 
 impl <T : io::Read> AudioDecrypt<T> {
-    pub fn new(key: AudioKey, mut reader: T) -> AudioDecrypt<T> {
-        let mut cipher = aes::ctr(aes::KeySize::KeySize128,
+    pub fn new(key: AudioKey, reader: T) -> AudioDecrypt<T> {
+        let cipher = aes::ctr(aes::KeySize::KeySize128,
                               &key,
                               AUDIO_AESIV);
-
-        let mut buf = [0; 0xa7];
-        let mut buf2 = [0; 0xa7];
-        reader.read_all(&mut buf).unwrap();
-        cipher.process(&buf, &mut buf2);
-
         AudioDecrypt {
             cipher: cipher,
             key: key,
@@ -45,9 +41,23 @@ impl <T : io::Read> io::Read for AudioDecrypt<T> {
     }
 }
 
-impl <T : io::Read> io::Seek for AudioDecrypt<T> {
-    fn seek(&mut self, _pos: io::SeekFrom) -> io::Result<u64> {
-        Err(io::Error::new(io::ErrorKind::Other, "Cannot seek"))
+impl <T : io::Read + io::Seek> io::Seek for AudioDecrypt<T> {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        let newpos = try!(self.reader.seek(pos));
+        let skip = newpos % 16;
+
+        let iv = Mpz::from_bytes_be(AUDIO_AESIV)
+                    .add(Mpz::from_u64(newpos / 16).unwrap())
+                    .to_bytes_be();
+        self.cipher = aes::ctr(aes::KeySize::KeySize128,
+                               &self.key,
+                               &iv);
+
+        let buf = vec![0u8; skip as usize];
+        let mut buf2 = vec![0u8; skip as usize];
+        self.cipher.process(&buf, &mut buf2);
+
+        Ok(newpos as u64)
     }
 }
 

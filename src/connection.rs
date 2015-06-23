@@ -9,7 +9,6 @@ use std::result;
 use std::sync::mpsc;
 
 use keys::SharedKeys;
-use util;
 
 #[derive(Debug)]
 pub enum Error {
@@ -69,7 +68,7 @@ impl PlainConnection {
 
     pub fn recv_packet(&mut self) -> Result<Vec<u8>> {
         let size = try!(self.stream.read_u32::<BigEndian>()) as usize;
-        let mut buffer = util::alloc_buffer(size);
+        let mut buffer = vec![0u8; size];
 
         BigEndian::write_u32(&mut buffer, size as u32);
         try!(self.stream.read_all(&mut buffer[4..]));

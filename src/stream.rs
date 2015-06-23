@@ -92,43 +92,50 @@ impl StreamManager {
         let mut packet = Cursor::new(&data as &[u8]);
 
         let id : ChannelId = packet.read_u16::<BigEndian>().unwrap();
-        let channel = match self.channels.get_mut(&id) {
-            Some(ch) => ch,
-            None => { return; }
-        };
+        let mut close = false;
+        {
+            let channel = match self.channels.get_mut(&id) {
+                Some(ch) => ch,
+                None => { return; }
+            };
 
-        match channel.mode {
-            ChannelMode::Header => {
-                let mut length = 0;
+            match channel.mode {
+                ChannelMode::Header => {
+                    let mut length = 0;
 
-                while packet.position() < data.len() as u64 {
-                    length = packet.read_u16::<BigEndian>().unwrap();
-                    if length > 0 {
-                        let header_id = packet.read_u8().unwrap();
-                        channel.callback.send(StreamEvent::Header(
-                                header_id,
-                                data.clone()
-                                    .offset(packet.position() as usize)
-                                    .limit(length as usize - 1)
-                            )).unwrap();
+                    while packet.position() < data.len() as u64 {
+                        length = packet.read_u16::<BigEndian>().unwrap();
+                        if length > 0 {
+                            let header_id = packet.read_u8().unwrap();
+                            channel.callback.send(StreamEvent::Header(
+                                    header_id,
+                                    data.clone()
+                                        .offset(packet.position() as usize)
+                                        .limit(length as usize - 1)
+                                )).unwrap();
 
-                        packet.seek(SeekFrom::Current(length as i64 - 1)).unwrap();
+                            packet.seek(SeekFrom::Current(length as i64 - 1)).unwrap();
+                        }
+                    }
+                    
+                    if length == 0 {
+                        channel.mode = ChannelMode::Data;
                     }
                 }
-                
-                if length == 0 {
-                    channel.mode = ChannelMode::Data;
-                }
-            }
 
-            ChannelMode::Data => {
-                if packet.position() < data.len() as u64 {
-                    channel.callback.send(StreamEvent::Data(
-                            data.clone().offset(packet.position() as usize))).unwrap();
-                } else {
-                    // TODO: close the channel
+                ChannelMode::Data => {
+                    if packet.position() < data.len() as u64 {
+                        channel.callback.send(StreamEvent::Data(
+                                data.clone().offset(packet.position() as usize))).unwrap();
+                    } else {
+                        close = true;
+                    }
                 }
             }
+        }
+
+        if close {
+            self.channels.remove(&id);
         }
     }
 }

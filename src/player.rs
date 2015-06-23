@@ -1,13 +1,13 @@
 use portaudio;
 use std::sync::mpsc;
-use std::thread;
 use vorbis;
 
 use audio_key::{AudioKeyRequest, AudioKeyResponse};
 use metadata::TrackRef;
 use session::Session;
-use audio_file::{AudioFileRef, AudioFileReader};
+use audio_file::{AudioFile, AudioFileReader};
 use audio_decrypt::AudioDecrypt;
+use util::Subfile;
 
 pub struct Player;
 
@@ -28,14 +28,13 @@ impl Player {
             key
         };
 
-        let reader = {
-            let file = AudioFileRef::new(file_id, session.stream.clone());
-            let f = file.clone();
-            let s = session.stream.clone();
-            thread::spawn( move || { f.fetch(s) });
-            AudioDecrypt::new(key, AudioFileReader::new(&file))
-        };
-
+        let mut decoder = 
+            vorbis::Decoder::new(
+                Subfile::new(
+                        AudioDecrypt::new(key,
+                            AudioFileReader::new(
+                                AudioFile::new(file_id, session.stream.clone()))), 0xa7)).unwrap();
+        //decoder.time_seek(60f64).unwrap();
 
         portaudio::initialize().unwrap();
 
@@ -47,8 +46,6 @@ impl Player {
                 None
                 ).unwrap();
         stream.start().unwrap();
-
-        let mut decoder = vorbis::Decoder::new(reader).unwrap();
 
         for pkt in decoder.packets() {
             match pkt {

@@ -3,10 +3,12 @@ use rand::{Rng,Rand};
 mod int128;
 mod spotify_id;
 mod arcvec;
+mod subfile;
 
 pub use util::int128::u128;
 pub use util::spotify_id::{SpotifyId, FileId};
 pub use util::arcvec::ArcVec;
+pub use util::subfile::Subfile;
 
 #[macro_export]
 macro_rules! eprintln(
@@ -35,15 +37,6 @@ pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     }
 
     return vec
-}
-
-pub fn alloc_buffer(size: usize) -> Vec<u8> {
-    let mut vec = Vec::with_capacity(size);
-    unsafe {
-        vec.set_len(size);
-    }
-
-    vec
 }
 
 pub mod version {
