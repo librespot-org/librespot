@@ -5,7 +5,7 @@ use vorbis;
 use audio_key::{AudioKeyRequest, AudioKeyResponse};
 use metadata::TrackRef;
 use session::Session;
-use audio_file::{AudioFile, AudioFileReader};
+use audio_file::AudioFile;
 use audio_decrypt::AudioDecrypt;
 use util::Subfile;
 
@@ -32,8 +32,7 @@ impl Player {
             vorbis::Decoder::new(
                 Subfile::new(
                         AudioDecrypt::new(key,
-                            AudioFileReader::new(
-                                AudioFile::new(file_id, session.stream.clone()))), 0xa7)).unwrap();
+                            AudioFile::new(file_id, session.stream.clone())), 0xa7)).unwrap();
         //decoder.time_seek(60f64).unwrap();
 
         portaudio::initialize().unwrap();
