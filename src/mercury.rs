@@ -23,7 +23,7 @@ pub struct MercuryRequest {
     pub method: MercuryMethod,
     pub uri: String,
     pub content_type: Option<String>,
-    pub callback: MercuryCallback
+    pub callback: Option<MercuryCallback>
 }
 
 #[derive(Debug)]
@@ -32,17 +32,18 @@ pub struct MercuryResponse {
     pub payload: LinkedList<Vec<u8>>
 }
 
-pub type MercuryCallback = Option<mpsc::Sender<MercuryResponse>>;
+pub type MercuryCallback = mpsc::Sender<MercuryResponse>;
 
 pub struct MercuryPending {
     parts: LinkedList<Vec<u8>>,
     partial: Option<Vec<u8>>,
-    callback: MercuryCallback,
+    callback: Option<MercuryCallback>
 }
 
 pub struct MercuryManager {
     next_seq: u32,
     pending: HashMap<Vec<u8>, MercuryPending>,
+    subscriptions: HashMap<String, MercuryCallback>,
 
     requests: mpsc::Receiver<MercuryRequest>,
     packet_tx: mpsc::Sender<Packet>,
@@ -69,6 +70,7 @@ impl MercuryManager {
         (MercuryManager {
             next_seq: 0,
             pending: HashMap::new(),
+            subscriptions: HashMap::new(),
 
             requests: req_rx,
             packet_rx: pkt_rx,
@@ -93,11 +95,15 @@ impl MercuryManager {
             data: data
         }).unwrap();
 
-        self.pending.insert(seq.to_vec(), MercuryPending{
-            parts: LinkedList::new(),
-            partial: None,
-            callback: req.callback,
-        });
+        if req.method != MercuryMethod::SUB {
+            self.pending.insert(seq.to_vec(), MercuryPending{
+                parts: LinkedList::new(),
+                partial: None,
+                callback: req.callback,
+            });
+        } else if let Some(cb) = req.callback {
+            self.subscriptions.insert(req.uri, cb);
+        }
     }
 
     fn parse_part(mut s: &mut Read) -> Vec<u8> {
@@ -117,7 +123,13 @@ impl MercuryManager {
         let header : protocol::mercury::Header =
             protobuf::parse_from_bytes(&header_data).unwrap();
 
-        if let Some(ref ch) = pending.callback {
+        let callback = if cmd == 0xb5 {
+            self.subscriptions.get(header.get_uri())
+        } else {
+            pending.callback.as_ref()
+        };
+
+        if let Some(ref ch) = callback {
             ch.send(MercuryResponse{
                 uri: header.get_uri().to_string(),
                 payload: pending.parts

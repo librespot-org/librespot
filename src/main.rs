@@ -1,9 +1,11 @@
 #![crate_name = "librespot"]
 
 #![feature(plugin,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,mpsc_select,arc_weak,append)]
+#![allow(unused_imports,dead_code)]
 
 #![plugin(protobuf_macros)]
 #[macro_use] extern crate lazy_static;
+
 
 extern crate byteorder;
 extern crate crypto;
@@ -35,19 +37,20 @@ use std::clone::Clone;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::sync::mpsc;
 
 use metadata::{MetadataCache, AlbumRef, ArtistRef, TrackRef};
 use session::{Config, Session};
 use util::SpotifyId;
 use player::Player;
+use mercury::{MercuryRequest, MercuryMethod};
+use librespot_protocol as protocol;
 
 fn main() {
     let mut args = std::env::args().skip(1);
     let mut appkey_file = File::open(Path::new(&args.next().unwrap())).unwrap();
     let username = args.next().unwrap();
     let password = args.next().unwrap();
-    let track_uri = args.next().unwrap();
-    let track_id = SpotifyId::from_base62(track_uri.split(':').nth(2).unwrap());
 
     let mut appkey = Vec::new();
     appkey_file.read_to_end(&mut appkey).unwrap();
@@ -63,8 +66,28 @@ fn main() {
 
     let mut cache = MetadataCache::new(session.metadata.clone());
 
+    let (tx, rx) = mpsc::channel();
 
-    print_track(&mut cache, track_id);
+    session.mercury.send(MercuryRequest{
+        method: MercuryMethod::SUB,
+        uri: "hm://remote/user/lietar/v23".to_string(),
+        content_type: None,
+        callback: Some(tx)
+    }).unwrap();
+
+    for pkt in rx.iter() {
+        let frame : protocol::spirc::Frame =
+            protobuf::parse_from_bytes(pkt.payload.front().unwrap()).unwrap();
+
+        if frame.get_device_state().get_is_active() &&
+            frame.has_state() {
+            let index = frame.get_state().get_playing_track_index();
+            let ref track = frame.get_state().get_track()[index as usize];
+            println!("{}", frame.get_device_state().get_name());
+            print_track(&mut cache, SpotifyId::from_raw(track.get_gid()));
+            println!("");
+        }
+    }
 
     loop {
         session.poll();
