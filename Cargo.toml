@@ -14,6 +14,7 @@ num = "*"
 rand = "*"
 lazy_static = "0.1.*"
 rust-crypto = "*"
+time = "*"
 
 [dependencies.protobuf]
 git = "https://github.com/stepancheg/rust-protobuf.git"

@@ -22,7 +22,7 @@ pub struct Config {
 }
 
 pub struct Session {
-    config: Config,
+    pub config: Config,
 
     packet_rx: mpsc::Receiver<Packet>,
     pub packet_tx: mpsc::Sender<Packet>,

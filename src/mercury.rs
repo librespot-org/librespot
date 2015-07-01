@@ -17,13 +17,15 @@ pub enum MercuryMethod {
     GET,
     SUB,
     UNSUB,
+    SEND,
 }
 
 pub struct MercuryRequest {
     pub method: MercuryMethod,
     pub uri: String,
     pub content_type: Option<String>,
-    pub callback: Option<MercuryCallback>
+    pub callback: Option<MercuryCallback>,
+    pub payload: Vec<Vec<u8>>
 }
 
 #[derive(Debug)]
@@ -55,7 +57,8 @@ impl fmt::Display for MercuryMethod {
         formatter.write_str(match *self {
             MercuryMethod::GET => "GET",
             MercuryMethod::SUB => "SUB",
-            MercuryMethod::UNSUB => "UNSUB"
+            MercuryMethod::UNSUB => "UNSUB",
+            MercuryMethod::SEND => "SEND"
         })
     }
 }
@@ -188,7 +191,7 @@ impl MercuryManager {
         packet.write_u16::<BigEndian>(seq.len() as u16).unwrap();
         packet.write_all(seq).unwrap();
         packet.write_u8(1).unwrap(); // Flags: FINAL
-        packet.write_u16::<BigEndian>(1).unwrap(); // Part count. Only header
+        packet.write_u16::<BigEndian>(1 + req.payload.len() as u16).unwrap(); // Part count
 
         let mut header = protobuf_init!(protocol::mercury::Header::new(), {
             uri: req.uri.clone(),
@@ -200,6 +203,11 @@ impl MercuryManager {
 
         packet.write_u16::<BigEndian>(header.compute_size() as u16).unwrap();
         header.write_to_writer(&mut packet).unwrap();
+
+        for p in &req.payload {
+            packet.write_u16::<BigEndian>(p.len() as u16).unwrap();
+            packet.write(&p).unwrap();
+        }
 
         packet
     }

@@ -17,6 +17,7 @@ extern crate shannon;
 extern crate rand;
 extern crate readall;
 extern crate vorbis;
+extern crate time;
 
 extern crate librespot_protocol;
 
@@ -38,6 +39,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::mpsc;
+use protobuf::core::Message;
 
 use metadata::{MetadataCache, AlbumRef, ArtistRef, TrackRef};
 use session::{Config, Session};
@@ -64,34 +66,26 @@ fn main() {
     session.login(username, password);
     session.poll();
 
-    let mut cache = MetadataCache::new(session.metadata.clone());
+    let ident = session.config.device_id.clone();
+    SpircManager{
+        session: session,
+        state_update_id: 0,
+        seq_nr: 0,
 
-    let (tx, rx) = mpsc::channel();
+        name: "BlaBla".to_string(),
+        ident: ident,
+        device_type: 5,
+        volume: 0x8000,
+        can_play: true,
+        is_active: false,
+        became_active_at: 0,
+    }.run();
 
-    session.mercury.send(MercuryRequest{
-        method: MercuryMethod::SUB,
-        uri: "hm://remote/user/lietar/v23".to_string(),
-        content_type: None,
-        callback: Some(tx)
-    }).unwrap();
-
-    for pkt in rx.iter() {
-        let frame : protocol::spirc::Frame =
-            protobuf::parse_from_bytes(pkt.payload.front().unwrap()).unwrap();
-
-        if frame.get_device_state().get_is_active() &&
-            frame.has_state() {
-            let index = frame.get_state().get_playing_track_index();
-            let ref track = frame.get_state().get_track()[index as usize];
-            println!("{}", frame.get_device_state().get_name());
-            print_track(&mut cache, SpotifyId::from_raw(track.get_gid()));
-            println!("");
-        }
-    }
-
+    /*
     loop {
         session.poll();
     }
+    */
 }
 
 fn print_track(cache: &mut MetadataCache, track_id: SpotifyId) {
@@ -117,6 +111,157 @@ fn print_track(cache: &mut MetadataCache, track_id: SpotifyId) {
         let handle = artist.wait();
         let data = handle.unwrap();
         eprintln!("{}", data.name);
+    }
+}
+
+struct SpircManager {
+    session: Session,
+    state_update_id: i64,
+    seq_nr: u32,
+
+    name: String,
+    ident: String,
+    device_type: u8,
+
+    volume: u16,
+    can_play: bool,
+    is_active: bool,
+    became_active_at: i64,
+}
+
+impl SpircManager {
+    fn run(&mut self) {
+        let (tx, rx) = mpsc::channel();
+
+        self.session.mercury.send(MercuryRequest{
+            method: MercuryMethod::SUB,
+            uri: "hm://remote/user/lietar/v23".to_string(),
+            content_type: None,
+            callback: Some(tx),
+            payload: Vec::new()
+        }).unwrap();
+
+        self.notify(None);
+
+        for pkt in rx.iter() {
+            let frame : protocol::spirc::Frame =
+                protobuf::parse_from_bytes(pkt.payload.front().unwrap()).unwrap();
+
+            println!("{:?} {} {} {}",
+                     frame.get_typ(),
+                     frame.get_device_state().get_name(),
+                     frame.get_ident(),
+                     frame.get_device_state().get_became_active_at());
+
+            if frame.get_ident() == self.ident ||
+                (frame.get_recipient().len() > 0 &&
+                 !frame.get_recipient().contains(&self.ident)) {
+                    continue;
+                }
+
+            self.handle(frame);
+        }
+    }
+
+    fn handle(&mut self, frame: protocol::spirc::Frame) {
+        match frame.get_typ() {
+            protocol::spirc::MessageType::kMessageTypeHello => {
+                self.notify(Some(frame.get_ident()));
+            }
+            protocol::spirc::MessageType::kMessageTypeLoad => {
+                self.is_active = true;
+                self.became_active_at = {
+                    let ts = time::now_utc().to_timespec();
+                    ts.sec * 1000 + ts.nsec as i64 / 1000000
+                };
+                println!("{:?} {}", frame, self.became_active_at);
+                self.notify(None)
+            }
+            _ => ()
+        }
+    }
+
+    fn notify(&mut self, recipient: Option<&str>) {
+        let device_state = self.device_state();
+        self.session.mercury.send(MercuryRequest{
+            method: MercuryMethod::SEND,
+            uri: "hm://remote/user/lietar".to_string(),
+            content_type: None,
+            callback: None,
+            payload: vec![
+                protobuf_init!(protocol::spirc::Frame::new(), {
+                    version: 1,
+                    ident: self.ident.clone(),
+                    protocol_version: "2.0.0".to_string(),
+                    seq_nr: { self.seq_nr += 1; self.seq_nr  },
+                    typ: protocol::spirc::MessageType::kMessageTypeNotify,
+                    device_state: device_state,
+                    recipient: protobuf::RepeatedField::from_vec(
+                        recipient.map(|r| vec![r.to_string()] ).unwrap_or(vec![])
+                    )
+                }).write_to_bytes().unwrap()
+            ]
+        }).unwrap();
+    }
+
+    fn device_state(&mut self) -> protocol::spirc::DeviceState {
+        protobuf_init!(protocol::spirc::DeviceState::new(), {
+            sw_version: "librespot-0.1.0".to_string(),
+            is_active: self.is_active,
+            can_play: self.can_play,
+            volume: self.volume as u32,
+            name: self.name.clone(),
+            error_code: 0,
+            became_active_at: if self.is_active { self.became_active_at } else { 0 },
+            capabilities => [
+                @{
+                    typ: protocol::spirc::CapabilityType::kCanBePlayer,
+                    intValue => [0]
+                },
+                @{
+                    typ: protocol::spirc::CapabilityType::kDeviceType,
+                    intValue => [ self.device_type as i64 ]
+                },
+                @{
+                    typ: protocol::spirc::CapabilityType::kGaiaEqConnectId,
+                    intValue => [1]
+                },
+                @{
+                    typ: protocol::spirc::CapabilityType::kSupportsLogout,
+                    intValue => [0]
+                },
+                @{
+                    typ: protocol::spirc::CapabilityType::kIsObservable,
+                    intValue => [1]
+                },
+                @{
+                    typ: protocol::spirc::CapabilityType::kVolumeSteps,
+                    intValue => [10]
+                },
+                @{
+                    typ: protocol::spirc::CapabilityType::kSupportedContexts,
+                    stringValue => [
+                        "album".to_string(),
+                        "playlist".to_string(),
+                        "search".to_string(),
+                        "inbox".to_string(),
+                        "toplist".to_string(),
+                        "starred".to_string(),
+                        "publishedstarred".to_string(),
+                        "track".to_string(),
+                    ]
+                },
+                @{
+                    typ: protocol::spirc::CapabilityType::kSupportedTypes,
+                    stringValue => [
+                        "audio/local".to_string(),
+                        "audio/track".to_string(),
+                        "local".to_string(),
+                        "track".to_string(),
+                    ]
+                }
+            ],
+        })
     }
 }
 

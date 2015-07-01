@@ -237,7 +237,8 @@ impl MetadataManager {
                 method: MercuryMethod::GET,
                 uri: format!("{}/{}", T::base_url(), object.id.to_base16()),
                 content_type: None,
-                callback: Some(tx)
+                callback: Some(tx),
+                payload: Vec::new()
             }).unwrap();
 
             let response = rx.recv().unwrap();
