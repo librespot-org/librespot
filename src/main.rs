@@ -44,6 +44,7 @@ use protobuf::core::Message;
 use metadata::{MetadataCache, AlbumRef, ArtistRef, TrackRef};
 use session::{Config, Session};
 use util::SpotifyId;
+use util::version::version_string;
 use player::Player;
 use mercury::{MercuryRequest, MercuryMethod};
 use librespot_protocol as protocol;
@@ -53,28 +54,31 @@ fn main() {
     let mut appkey_file = File::open(Path::new(&args.next().unwrap())).unwrap();
     let username = args.next().unwrap();
     let password = args.next().unwrap();
+    let name = args.next().unwrap();
 
     let mut appkey = Vec::new();
     appkey_file.read_to_end(&mut appkey).unwrap();
 
     let config = Config {
         application_key: appkey,
-        user_agent: "ABC".to_string(),
-        device_id: "ABC".to_string()
+        user_agent: version_string(),
+        device_id: name.to_string()
     };
     let session = Session::new(config);
-    session.login(username, password);
+    session.login(username.clone(), password);
     session.poll();
 
     let ident = session.config.device_id.clone();
     SpircManager{
         session: session,
+        username: username.clone(),
+        name: name.clone(),
+        ident: ident,
+        device_type: 5,
+
         state_update_id: 0,
         seq_nr: 0,
 
-        name: "BlaBla".to_string(),
-        ident: ident,
-        device_type: 5,
         volume: 0x8000,
         can_play: true,
         is_active: false,
@@ -116,6 +120,7 @@ fn print_track(cache: &mut MetadataCache, track_id: SpotifyId) {
 
 struct SpircManager {
     session: Session,
+    username: String,
     state_update_id: i64,
     seq_nr: u32,
 
@@ -135,7 +140,7 @@ impl SpircManager {
 
         self.session.mercury.send(MercuryRequest{
             method: MercuryMethod::SUB,
-            uri: "hm://remote/user/lietar/v23".to_string(),
+            uri: format!("hm://remote/user/{}/v23", self.username).to_string(),
             content_type: None,
             callback: Some(tx),
             payload: Vec::new()
@@ -185,7 +190,7 @@ impl SpircManager {
         let device_state = self.device_state();
         self.session.mercury.send(MercuryRequest{
             method: MercuryMethod::SEND,
-            uri: "hm://remote/user/lietar".to_string(),
+            uri: format!("hm://remote/user/{}", self.username).to_string(),
             content_type: None,
             callback: None,
             payload: vec![
@@ -206,7 +211,7 @@ impl SpircManager {
 
     fn device_state(&mut self) -> protocol::spirc::DeviceState {
         protobuf_init!(protocol::spirc::DeviceState::new(), {
-            sw_version: "librespot-0.1.0".to_string(),
+            sw_version: version_string(),
             is_active: self.is_active,
             can_play: self.can_play,
             volume: self.volume as u32,

@@ -13,11 +13,11 @@ message ClientResponseEncrypted {
 
 message LoginCredentials {
     optional string username = 0xa; 
-    required Type typ = 0x14; 
+    required AuthenticationType typ = 0x14; 
     optional bytes auth_data = 0x1e; 
 }
 
-enum Type {
+enum AuthenticationType {
     AUTHENTICATION_USER_PASS = 0x0;
     AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS = 0x1;
     AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS = 0x2;
@@ -134,21 +134,31 @@ message ClientInfoFacebook {
     optional string machine_id = 0x1; 
 }
 
-message AuthSuccess {
-    required string username = 0x0a;
-    required uint32 data1 = 0x14;
-    required uint32 data2 = 0x19;
-    required uint32 data3 = 0x1e;
-    required bytes  data4 = 0x28;
-    required bytes  data5 = 0x32;
+message APWelcome {
+    required string canonical_username = 0xa;
+    required AccountType account_type_logged_in = 0x14;
+    required AccountType credentials_type_logged_in = 0x19;
+    required AuthenticationType reusable_auth_credentials_type = 0x1e;
+    required bytes reusable_auth_credentials = 0x28;
+    optional bytes lfs_secret = 0x32; 
+    optional AccountInfo account_info = 0x3c;
+    optional AccountInfoFacebook fb = 0x46;
 }
 
-message AuthFailure {
-    required uint32 code = 0x0a;
-    required Data1 data1 = 0x32;
-
-    message Data1 {
-        required string data0 = 0x01;
-    }
+enum AccountType {
+    Spotify = 0x0;
+    Facebook = 0x1;
 }
 
+message AccountInfo {
+    optional AccountInfoSpotify spotify = 0x1;
+    optional AccountInfoFacebook facebook = 0x2;
+}
+
+message AccountInfoSpotify {
+}
+
+message AccountInfoFacebook {
+    optional string access_token = 0x1;
+    optional string machine_id = 0x2;
+}

@@ -147,7 +147,7 @@ impl Session {
         let packet = protobuf_init!(protocol::authentication::ClientResponseEncrypted::new(), {
             login_credentials => {
                 username: username,
-                typ: protocol::authentication::Type::AUTHENTICATION_USER_PASS,
+                typ: protocol::authentication::AuthenticationType::AUTHENTICATION_USER_PASS,
                 auth_data: password.into_bytes(),
             },
             system_info => {

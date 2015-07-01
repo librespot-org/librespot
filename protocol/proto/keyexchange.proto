@@ -1,21 +1,21 @@
-//  size=80
+
 message ClientHello {
-    required BuildInfo build_info = 0xa; // idx=0 offset=c
-    repeated Fingerprint fingerprints_supported = 0x14; // idx=ffff offset=10
-    repeated Cryptosuite cryptosuites_supported = 0x1e; // idx=ffff offset=2c
-    repeated Powscheme powschemes_supported = 0x28; // idx=ffff offset=48
-    required LoginCryptoHelloUnion login_crypto_hello = 0x32; // idx=1 offset=64
-    required bytes client_nonce = 0x3c; // idx=2 offset=68 size=f
-    optional bytes padding = 0x46; // idx=3 offset=78
-    optional FeatureSet feature_set = 0x50; // idx=4 offset=7c
+    required BuildInfo build_info = 0xa; 
+    repeated Fingerprint fingerprints_supported = 0x14; 
+    repeated Cryptosuite cryptosuites_supported = 0x1e; 
+    repeated Powscheme powschemes_supported = 0x28; 
+    required LoginCryptoHelloUnion login_crypto_hello = 0x32; 
+    required bytes client_nonce = 0x3c; 
+    optional bytes padding = 0x46; 
+    optional FeatureSet feature_set = 0x50; 
 }
 
-//  size=38
+
 message BuildInfo {
-    required Product product = 0xa; // idx=0 offset=c
-    repeated ProductFlags product_flags = 0x14; // idx=ffff offset=10
-    required Platform platform = 0x1e; // idx=1 offset=2c
-    required uint64 version = 0x28; // idx=2 offset=30 extra=246558
+    required Product product = 0xa; 
+    repeated ProductFlags product_flags = 0x14; 
+    required Platform platform = 0x1e; 
+    required uint64 version = 0x28; 
 }
 
 enum Product {
@@ -72,108 +72,101 @@ enum Powscheme {
     POW_HASH_CASH = 0x0;
 }
 
-//  size=10
+
 message LoginCryptoHelloUnion {
-    optional LoginCryptoDiffieHellmanHello diffie_hellman = 0xa; // idx=0 offset=c
+    optional LoginCryptoDiffieHellmanHello diffie_hellman = 0xa; 
 }
 
-//  size=70
+
 message LoginCryptoDiffieHellmanHello {
-    required bytes gc = 0xa; // idx=0 offset=c size=5f
-    required uint32 server_keys_known = 0x14; // idx=1 offset=6c
+    required bytes gc = 0xa; 
+    required uint32 server_keys_known = 0x14; 
 }
 
-//  size=10
+
 message FeatureSet {
-    optional bool autoupdate2 = 0x1; // idx=0 offset=c
-    optional bool current_location = 0x2; // idx=1 offset=d
+    optional bool autoupdate2 = 0x1; 
+    optional bool current_location = 0x2; 
 }
 
 
-//  size=18
 message APResponseMessage {
-    optional APChallenge challenge = 0xa; // idx=0 offset=c
-    optional UpgradeRequiredMessage upgrade = 0x14; // idx=1 offset=10
-    optional APLoginFailed login_failed = 0x1e; // idx=2 offset=14
+    optional APChallenge challenge = 0xa; 
+    optional UpgradeRequiredMessage upgrade = 0x14; 
+    optional APLoginFailed login_failed = 0x1e; 
 }
 
-//  size=30
 message APChallenge {
-    required LoginCryptoChallengeUnion login_crypto_challenge = 0xa; // idx=0 offset=c
-    required FingerprintChallengeUnion fingerprint_challenge = 0x14; // idx=1 offset=10
-    required PoWChallengeUnion pow_challenge = 0x1e; // idx=2 offset=14
-    required CryptoChallengeUnion crypto_challenge = 0x28; // idx=3 offset=18
-    required bytes server_nonce = 0x32; // idx=4 offset=1c size=f
-    optional bytes padding = 0x3c; // idx=5 offset=2c
+    required LoginCryptoChallengeUnion login_crypto_challenge = 0xa; 
+    required FingerprintChallengeUnion fingerprint_challenge = 0x14; 
+    required PoWChallengeUnion pow_challenge = 0x1e; 
+    required CryptoChallengeUnion crypto_challenge = 0x28; 
+    required bytes server_nonce = 0x32; 
+    optional bytes padding = 0x3c; 
 }
 
-//  size=10
 message LoginCryptoChallengeUnion {
-    optional LoginCryptoDiffieHellmanChallenge diffie_hellman = 0xa; // idx=0 offset=c
+    optional LoginCryptoDiffieHellmanChallenge diffie_hellman = 0xa; 
 }
 
-//  size=170
 message LoginCryptoDiffieHellmanChallenge {
-    required bytes gs = 0xa; // idx=0 offset=c size=5f
-    required int32 server_signature_key = 0x14; // idx=1 offset=6c type=int8
-    required bytes gs_signature = 0x1e; // idx=2 offset=6d size=ff
+    required bytes gs = 0xa; 
+    required int32 server_signature_key = 0x14; 
+    required bytes gs_signature = 0x1e; 
 }
 
-//  size=14
 message FingerprintChallengeUnion {
-    optional FingerprintGrainChallenge grain = 0xa; // idx=0 offset=c
-    optional FingerprintHmacRipemdChallenge hmac_ripemd = 0x14; // idx=1 offset=10
+    optional FingerprintGrainChallenge grain = 0xa; 
+    optional FingerprintHmacRipemdChallenge hmac_ripemd = 0x14; 
 }
 
-//  size=1c
+
 message FingerprintGrainChallenge {
-    required bytes kek = 0xa; // idx=0 offset=c size=f
+    required bytes kek = 0xa; 
 }
 
-//  size=20
+
 message FingerprintHmacRipemdChallenge {
-    required bytes challenge = 0xa; // idx=0 offset=c size=13
+    required bytes challenge = 0xa; 
 }
 
-//  size=10
+
 message PoWChallengeUnion {
-    optional PoWHashCashChallenge hash_cash = 0xa; // idx=0 offset=c
+    optional PoWHashCashChallenge hash_cash = 0xa; 
 }
 
-//  size=24
 message PoWHashCashChallenge {
-    optional bytes prefix = 0xa; // idx=0 offset=c size=f
-    optional int32 length = 0x14; // idx=1 offset=1c type=int8
-    optional int32 target = 0x1e; // idx=2 offset=20
+    optional bytes prefix = 0xa; 
+    optional int32 length = 0x14; 
+    optional int32 target = 0x1e; 
 }
 
-//  size=14
+
 message CryptoChallengeUnion {
-    optional CryptoShannonChallenge shannon = 0xa; // idx=0 offset=c
-    optional CryptoRc4Sha1HmacChallenge rc4_sha1_hmac = 0x14; // idx=1 offset=10
+    optional CryptoShannonChallenge shannon = 0xa; 
+    optional CryptoRc4Sha1HmacChallenge rc4_sha1_hmac = 0x14; 
 }
 
-//  size=8
+
 message CryptoShannonChallenge {
 }
 
-//  size=8
+
 message CryptoRc4Sha1HmacChallenge {
 }
 
-//  size=18
+
 message UpgradeRequiredMessage {
-    required bytes upgrade_signed_part = 0xa; // idx=0 offset=c
-    required bytes signature = 0x14; // idx=1 offset=10
-    optional string http_suffix = 0x1e; // idx=2 offset=14
+    required bytes upgrade_signed_part = 0xa; 
+    required bytes signature = 0x14; 
+    optional string http_suffix = 0x1e; 
 }
 
-//  size=1c
 message APLoginFailed {
-    required ErrorCode error_code = 0xa; // idx=0 offset=c
-    optional int32 retry_delay = 0x14; // idx=1 offset=10
-    optional int32 expiry = 0x1e; // idx=2 offset=14
-    optional string error_description = 0x28; // idx=3 offset=18
+    required ErrorCode error_code = 0xa; 
+    optional int32 retry_delay = 0x14; 
+    optional int32 expiry = 0x1e; 
+    optional string error_description = 0x28; 
 }
 
 enum ErrorCode {
@@ -190,50 +183,45 @@ enum ErrorCode {
     ApplicationBanned = 0x11;
 }
 
-
-
-//  size=18
 message ClientResponsePlaintext {
-    required LoginCryptoResponseUnion login_crypto_response = 0xa; // idx=0 offset=c
-    required PoWResponseUnion pow_response = 0x14; // idx=1 offset=10
-    required CryptoResponseUnion crypto_response = 0x1e; // idx=2 offset=14
+    required LoginCryptoResponseUnion login_crypto_response = 0xa; 
+    required PoWResponseUnion pow_response = 0x14; 
+    required CryptoResponseUnion crypto_response = 0x1e; 
 }
 
-//  size=10
+
 message LoginCryptoResponseUnion {
-    optional LoginCryptoDiffieHellmanResponse diffie_hellman = 0xa; // idx=0 offset=c
+    optional LoginCryptoDiffieHellmanResponse diffie_hellman = 0xa; 
 }
 
-//  size=20
+
 message LoginCryptoDiffieHellmanResponse {
-    required bytes hmac = 0xa; // idx=0 offset=c size=13
+    required bytes hmac = 0xa; 
 }
 
-//  size=10
+
 message PoWResponseUnion {
-    optional PoWHashCashResponse hash_cash = 0xa; // idx=0 offset=c
+    optional PoWHashCashResponse hash_cash = 0xa; 
 }
 
-//  size=1c
+
 message PoWHashCashResponse {
-    required bytes hash_suffix = 0xa; // idx=0 offset=c size=f
+    required bytes hash_suffix = 0xa; 
 }
 
-//  size=14
+
 message CryptoResponseUnion {
-    optional CryptoShannonResponse shannon = 0xa; // idx=0 offset=c
-    optional CryptoRc4Sha1HmacResponse rc4_sha1_hmac = 0x14; // idx=1 offset=10
+    optional CryptoShannonResponse shannon = 0xa; 
+    optional CryptoRc4Sha1HmacResponse rc4_sha1_hmac = 0x14; 
 }
 
-//  size=10
+
 message CryptoShannonResponse {
-    optional int32 dummy = 0x1; // idx=0 offset=c type=uint8
+    optional int32 dummy = 0x1; 
 }
 
-//  size=10
+
 message CryptoRc4Sha1HmacResponse {
-    optional int32 dummy = 0x1; // idx=0 offset=c type=uint8
+    optional int32 dummy = 0x1; 
 }
-
-
 
