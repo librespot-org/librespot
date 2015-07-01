@@ -1,154 +1,159 @@
 message TopTracks {
-    optional string country = 1;
-    repeated Track track = 2;
+    optional string country = 0x1;
+    repeated Track track = 0x2;
 }
+
 message ActivityPeriod {
-    optional sint32 start_year = 1;
-    optional sint32 end_year = 2;
-    optional sint32 decade = 3;
+    optional sint32 start_year = 0x1;
+    optional sint32 end_year = 0x2;
+    optional sint32 decade = 0x3;
 }
+
 message Artist {
-    optional bytes gid = 1;
-    optional string name = 2;
-    optional sint32 popularity = 3;
-    repeated TopTracks top_track = 4;
-    repeated AlbumGroup album_group = 5;
-    repeated AlbumGroup single_group = 6;
-    repeated AlbumGroup compilation_group = 7;
-    repeated AlbumGroup appears_on_group = 8;
-    repeated string genre = 9;
-    repeated ExternalId external_id = 10;
-    repeated Image portrait = 11;
-    repeated Biography biography = 12;
-    repeated ActivityPeriod activity_period = 13;
-    repeated Restriction restriction = 14;
-    repeated Artist related = 15;
-    optional bool is_portrait_album_cover = 16;
-    optional ImageGroup portrait_group = 17;
+    optional bytes gid = 0x1;
+    optional string name = 0x2;
+    optional sint32 popularity = 0x3;
+    repeated TopTracks top_track = 0x4;
+    repeated AlbumGroup album_group = 0x5;
+    repeated AlbumGroup single_group = 0x6;
+    repeated AlbumGroup compilation_group = 0x7;
+    repeated AlbumGroup appears_on_group = 0x8;
+    repeated string genre = 0x9;
+    repeated ExternalId external_id = 0xa;
+    repeated Image portrait = 0xb;
+    repeated Biography biography = 0xc;
+    repeated ActivityPeriod activity_period = 0xd;
+    repeated Restriction restriction = 0xe;
+    repeated Artist related = 0xf;
+    optional bool is_portrait_album_cover = 0x10;
+    optional ImageGroup portrait_group = 0x11;
 }
+
 message AlbumGroup {
-    repeated Album album = 1;
+    repeated Album album = 0x1;
 }
+
 message Date {
-    optional sint32 year = 1;
-    optional sint32 month = 2;
-    optional sint32 day = 3;
+    optional sint32 year = 0x1;
+    optional sint32 month = 0x2;
+    optional sint32 day = 0x3;
 }
+
 message Album {
+    optional bytes gid = 0x1;
+    optional string name = 0x2;
+    repeated Artist artist = 0x3;
+    optional Type type = 0x4;
     enum Type {
-        ALBUM = 1;
-        SINGLE = 2;
-        COMPILATION = 3;
+        ALBUM = 0x1;
+        SINGLE = 0x2;
+        COMPILATION = 0x3;
     }
-    optional bytes gid = 1;
-    optional string name = 2;
-    repeated Artist artist = 3;
-    optional Type typ = 4;
-    optional string label = 5;
-    optional Date date = 6;
-    optional sint32 popularity = 7;
-    repeated string genre = 8;
-    repeated Image cover = 9;
-    repeated ExternalId external_id = 10;
-    repeated Disc disc = 11;
-    repeated string review = 12;
-    repeated Copyright copyright = 13;
-    repeated Restriction restriction = 14;
-    repeated Album related = 15;
-    repeated SalePeriod sale_period  = 16;
-    optional ImageGroup cover_group  = 17;
+    optional string label = 0x5;
+    optional Date date = 0x6;
+    optional sint32 popularity = 0x7;
+    repeated string genre = 0x8;
+    repeated Image cover = 0x9;
+    repeated ExternalId external_id = 0xa;
+    repeated Disc disc = 0xb;
+    repeated string review = 0xc;
+    repeated Copyright copyright = 0xd;
+    repeated Restriction restriction = 0xe;
+    repeated Album related = 0xf;
+    repeated SalePeriod sale_period = 0x10;
+    optional ImageGroup cover_group = 0x11;
 }
 
 message Track {
-    optional bytes gid = 1;
-    optional string name = 2;
-    optional Album album = 3;
-    repeated Artist artist = 4;
-    optional sint32 number = 5;
-    optional sint32 disc_number = 6;
-    optional sint32 duration = 7;
-    optional sint32 popularity = 8;
-    optional bool explicit = 9;
-    repeated ExternalId external_id = 10;
-    repeated Restriction restriction = 11;
-    repeated AudioFile file = 12;
-    repeated Track alternative = 13;
-    repeated SalePeriod sale_period = 14;
-    repeated AudioFile preview = 15;
+    optional bytes gid = 0x1;
+    optional string name = 0x2;
+    optional Album album = 0x3;
+    repeated Artist artist = 0x4;
+    optional sint32 number = 0x5;
+    optional sint32 disc_number = 0x6;
+    optional sint32 duration = 0x7;
+    optional sint32 popularity = 0x8;
+    optional bool explicit = 0x9;
+    repeated ExternalId external_id = 0xa;
+    repeated Restriction restriction = 0xb;
+    repeated AudioFile file = 0xc;
+    repeated Track alternative = 0xd;
+    repeated SalePeriod sale_period = 0xe;
+    repeated AudioFile preview = 0xf;
 }
+
 message Image {
+    optional bytes file_id = 0x1;
+    optional Size size = 0x2;
     enum Size {
-        DEFAULT = 0;
-        SMALL = 1;
-        LARGE = 2;
-        XLARGE = 3;
+        DEFAULT = 0x0;
+        SMALL = 0x1;
+        LARGE = 0x2;
+        XLARGE = 0x3;
     }
-    optional bytes file_id = 1;
-    optional Size size = 2;
-    optional sint32 width = 3;
-    optional sint32 height = 4;
+    optional sint32 width = 0x3;
+    optional sint32 height = 0x4;
 }
+
 message ImageGroup {
-    repeated Image image = 1;
+    repeated Image image = 0x1;
 }
+
 message Biography {
-    optional string text = 1;
-    repeated Image portrait = 2;
-    repeated ImageGroup portrait_group = 3;
+    optional string text = 0x1;
+    repeated Image portrait = 0x2;
+    repeated ImageGroup portrait_group = 0x3;
 }
+
 message Disc {
-    optional sint32 number = 1;
-    optional string name = 2;
-    repeated Track track = 3;
+    optional sint32 number = 0x1;
+    optional string name = 0x2;
+    repeated Track track = 0x3;
 }
+
 message Copyright {
+    optional Type type = 0x1;
     enum Type {
-        P = 0;
-        C = 1;
+        P = 0x0;
+        C = 0x1;
     }
-    optional Type typ = 1;
-    optional string text = 2;
+    optional string text = 0x2;
 }
+
 message Restriction {
-    enum Catalogue {
-        FREE = 0;
-        PREMIUM = 1;
-        SHUFFLE = 3;
-        COMMERCIAL = 4;
-    }
+    optional string countries_allowed = 0x2;
+    optional string countries_forbidden = 0x3;
+    optional Type type = 0x4;
     enum Type {
-        STREAMING = 0;
+        STREAMING = 0x0;
     }
-    repeated Catalogue catalogue = 1;
-    optional string countries_allowed = 2;
-    optional string countries_forbidden = 3;
-    optional Type typ = 4;
-    repeated string usage = 5;
+    repeated string catalogue_str = 0x5;
 }
 
 message SalePeriod {
-    repeated Restriction restriction = 1;
-    optional Date start = 2;
-    optional Date end = 3;
+    repeated Restriction restriction = 0x1;
+    optional Date start = 0x2;
+    optional Date end = 0x3;
 }
 
 message ExternalId {
-    optional string typ = 1;
-    optional string id = 2;
+    optional string type = 0x1;
+    optional string id = 0x2;
 }
 
 message AudioFile {
+    optional bytes file_id = 0x1;
+    optional Format format = 0x2;
     enum Format {
-        OGG_VORBIS_96 = 0;
-        OGG_VORBIS_160 = 1;
-        OGG_VORBIS_320 = 2;
-        MP3_256 = 3;
-        MP3_320 = 4;
-        MP3_160 = 5;
-        MP3_96 = 6;
-        OTHER1 = 7; // TODO
-        OTHER2 = 8; // TODO
+        OGG_VORBIS_96 = 0x0;
+        OGG_VORBIS_160 = 0x1;
+        OGG_VORBIS_320 = 0x2;
+        MP3_256 = 0x3;
+        MP3_320 = 0x4;
+        MP3_160 = 0x5;
+        MP3_96 = 0x6;
+        OTHER = 0x7;
+        OTHER2 = 0x8;
     }
-    optional bytes gid = 1;
-    optional Format format = 2;
 }
+

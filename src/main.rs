@@ -1,6 +1,6 @@
 #![crate_name = "librespot"]
 
-#![feature(alloc,plugin,core,collections,std_misc,zero_one)]
+#![feature(plugin,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,mpsc_select,arc_weak,append)]
 
 #![plugin(protobuf_macros)]
 #[macro_use] extern crate lazy_static;
@@ -62,6 +62,16 @@ fn main() {
     session.poll();
 
     let mut cache = MetadataCache::new(session.metadata.clone());
+
+
+    print_track(&mut cache, track_id);
+
+    loop {
+        session.poll();
+    }
+}
+
+fn print_track(cache: &mut MetadataCache, track_id: SpotifyId) {
     let track : TrackRef = cache.get(track_id);
 
     let album : AlbumRef = {
@@ -84,12 +94,6 @@ fn main() {
         let handle = artist.wait();
         let data = handle.unwrap();
         eprintln!("{}", data.name);
-    }
-    
-    Player::play(&session, track);
-
-    loop {
-        session.poll();
     }
 }
 

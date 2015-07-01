@@ -34,7 +34,7 @@ impl MetadataTrait for Track {
             files: msg.get_file().iter()
                 .map(|file| {
                     let mut dst = [0u8; 20];
-                    copy_memory(&file.get_gid(), &mut dst);
+                    copy_memory(&file.get_file_id(), &mut dst);
                     dst
                 })
                 .collect(),
@@ -235,8 +235,8 @@ impl MetadataManager {
             
             mercury.send(MercuryRequest {
                 method: MercuryMethod::GET,
-                url: format!("{}/{}", T::base_url(), object.id.to_base16()),
-                mime: None,
+                uri: format!("{}/{}", T::base_url(), object.id.to_base16()),
+                content_type: None,
                 callback: Some(tx)
             }).unwrap();
 

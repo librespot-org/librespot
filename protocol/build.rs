@@ -43,12 +43,7 @@ fn main() {
             &proto.join("authentication.proto"),
             &proto.join("mercury.proto"),
             &proto.join("metadata.proto"),
-            &proto.join("playlist4changes.proto"),
-            &proto.join("playlist4content.proto"),
-            &proto.join("playlist4issues.proto"),
-            &proto.join("playlist4meta.proto"),
-            &proto.join("playlist4ops.proto"),
-            &proto.join("playlist4service.proto"),
+            &proto.join("spirc.proto"),
     ]).unwrap();
 }
 

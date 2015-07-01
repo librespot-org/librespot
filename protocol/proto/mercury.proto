@@ -1,49 +1,44 @@
-message MercuryRequest {
-    required string url = 0x01;
-    optional string mime = 0x02;
-    required string method = 0x03;
-}
-
-message MercuryReply {
-    required string url = 0x01;
-    required string mime = 0x02;
-    required sint32 code = 0x04;
-    repeated Header header = 0x06;
-
-    message Header {
-        required string key = 0x01;
-        required bytes value = 0x02;
-    }
-}
-
-message MercuryGetRequest {
-    required string url = 0x01;
-    optional string method = 0x03;
-}
-
 message MercuryMultiGetRequest {
-    repeated MercuryGetRequest request = 0x01;
-}
-
-message MercuryGetReply {
-    enum CachePolicy {
-        CACHE_NO = 1;
-        CACHE_PRIVATE = 2;
-        CACHE_PUBLIC = 3;
-    }
-    optional sint32 code = 0x01;
-    optional CachePolicy cache_policy = 0x03;
-    optional uint32 ttl = 0x04;
-    optional bytes etag = 0x05;
-    optional string mime = 0x06;
-    optional bytes body = 0x07;
+    repeated MercuryRequest request = 0x1;
 }
 
 message MercuryMultiGetReply {
-    repeated MercuryGetReply reply = 0x1;
+    repeated MercuryReply reply = 0x1;
 }
 
-message MercurySubscribed {
-    required string url = 0x1;
+message MercuryRequest {
+    optional string uri = 0x1;
+    optional string content_type = 0x2;
+    optional bytes body = 0x3;
+    optional bytes etag = 0x4;
+}
+
+message MercuryReply {
+    optional sint32 status_code = 0x1;
+    optional string status_message = 0x2;
+    optional CachePolicy cache_policy = 0x3;
+    enum CachePolicy {
+        CACHE_NO = 0x1;
+        CACHE_PRIVATE = 0x2;
+        CACHE_PUBLIC = 0x3;
+    }
+    optional sint32 ttl = 0x4;
+    optional bytes etag = 0x5;
+    optional string content_type = 0x6;
+    optional bytes body = 0x7;
+}
+
+
+message Header {
+    optional string uri = 0x01;
+    optional string content_type = 0x02;
+    optional string method = 0x03;
+    optional sint32 status_code = 0x04;
+    repeated UserField user_fields = 0x06;
+}
+
+message UserField {
+    optional string key = 0x01;
+    optional bytes value = 0x02;
 }
 

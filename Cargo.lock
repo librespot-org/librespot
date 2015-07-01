@@ -26,7 +26,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bitflags"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -113,7 +113,7 @@ source = "git+https://github.com/stepancheg/rust-protobuf.git#d6e80593f38ce47dfa
 [[package]]
 name = "protobuf_macros"
 version = "0.1.0"
-source = "git+https://github.com/plietar/rust-protobuf-macros.git#5fa976178a48b01bdf2da6d5e7929367e348ea04"
+source = "git+https://github.com/plietar/rust-protobuf-macros.git#3b49de3937a34b7a21be1d13caea4348a93c6de4"
 
 [[package]]
 name = "rand"
@@ -143,7 +143,7 @@ dependencies = [
 [[package]]
 name = "rust-gmp"
 version = "0.2.0"
-source = "git+https://github.com/plietar/rust-gmp.git#db2bb627165b12ebe18a41a941ac6284ce9b895d"
+source = "git+https://github.com/plietar/rust-gmp.git#cc003c224559f6035cd34a7ed5c6284a49785816"
 dependencies = [
  "num 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -185,7 +185,7 @@ name = "vergen"
 version = "0.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "bitflags 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

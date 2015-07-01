@@ -1,58 +1,50 @@
 message ListChecksum {
-  required int32 version = 1;
-  optional bytes sha1 = 4;
+    optional int32 version = 0x1;
+    optional bytes sha1 = 0x4;
 }
+
 message DownloadFormat {
-  enum Codec {
-    CODEC_UNKNOWN = 0;
-    OGG_VORBIS = 1;
-    FLAC = 2;
-    MPEG_1_LAYER_3 = 3;
-  }
-  required Codec codec = 1;
+    optional Codec codec = 0x1;
+    enum Codec {
+        CODEC_UNKNOWN = 0x0;
+        OGG_VORBIS = 0x1;
+        FLAC = 0x2;
+        MPEG_1_LAYER_3 = 0x3;
+    }
 }
-enum ListAttributeKind {
-  LIST_UNKNOWN = 0;
-  LIST_NAME = 1;
-  LIST_DESCRIPTION = 2;
-  LIST_PICTURE = 3;
-  LIST_COLLABORATIVE = 4;
-  LIST_PL3_VERSION = 5;
-  LIST_DELETED_BY_OWNER = 6;
-  LIST_RESTRICTED_COLLABORATIVE = 7;
-}
+
 message ListAttributes {
-  optional string name = 1;
-  optional string description = 2;
-  optional bytes picture = 3;
-  optional bool collaborative = 4;
-  optional string pl3_version = 5;
-  optional bool deleted_by_owner = 6;
-  optional bool restricted_collaborative = 7;
+    optional string name = 0x1;
+    optional string description = 0x2;
+    optional bytes picture = 0x3;
+    optional bool collaborative = 0x4;
+    optional string pl3_version = 0x5;
+    optional bool deleted_by_owner = 0x6;
+    optional bool restricted_collaborative = 0x7;
+    optional int64 deprecated_client_id = 0x8;
+    optional bool public_starred = 0x9;
+    optional string client_id = 0xa;
 }
-enum ItemAttributeKind {
-  ITEM_UNKNOWN = 0;
-  ITEM_ADDED_BY = 1;
-  ITEM_TIMESTAMP = 2;
-  ITEM_MESSAGE = 3;
-  ITEM_SEEN = 4;
-  ITEM_DOWNLOAD_COUNT = 5;
-  ITEM_DOWNLOAD_FORMAT = 6;
-  ITEM_SEVENDIGITAL_ID = 7;
-  ITEM_SEVENDIGITAL_LEFT = 8;
-  ITEM_SEEN_AT = 9;
-}
+
 message ItemAttributes {
-  optional string added_by = 1;
-  optional string message = 3;
-  optional bool seen = 4;
-  optional DownloadFormat download_format = 6;
-  optional string sevendigital_id = 7;
+    optional string added_by = 0x1;
+    optional int64 timestamp = 0x2;
+    optional string message = 0x3;
+    optional bool seen = 0x4;
+    optional int64 download_count = 0x5;
+    optional DownloadFormat download_format = 0x6;
+    optional string sevendigital_id = 0x7;
+    optional int64 sevendigital_left = 0x8;
+    optional int64 seen_at = 0x9;
+    optional bool public = 0xa;
 }
+
 message StringAttribute {
-  required string key = 1;
-  required string value = 2;
+    optional string key = 0x1;
+    optional string value = 0x2;
 }
+
 message StringAttributes {
-  repeated StringAttribute attribute = 1;
+    repeated StringAttribute attribute = 0x1;
 }
+

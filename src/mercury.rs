@@ -12,23 +12,23 @@ use librespot_protocol as protocol;
 use subsystem::Subsystem;
 use util::Either::{Left, Right};
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
     GET,
-    GETX,
     SUB,
     UNSUB,
 }
 
 pub struct MercuryRequest {
     pub method: MercuryMethod,
-    pub url: String,
-    pub mime: Option<String>,
+    pub uri: String,
+    pub content_type: Option<String>,
     pub callback: MercuryCallback
 }
 
 #[derive(Debug)]
 pub struct MercuryResponse {
-    pub url: String,
+    pub uri: String,
     pub payload: LinkedList<Vec<u8>>
 }
 
@@ -53,7 +53,6 @@ impl fmt::Display for MercuryMethod {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         formatter.write_str(match *self {
             MercuryMethod::GET => "GET",
-            MercuryMethod::GETX => "GETX",
             MercuryMethod::SUB => "SUB",
             MercuryMethod::UNSUB => "UNSUB"
         })
@@ -83,8 +82,14 @@ impl MercuryManager {
         self.next_seq += 1;
         let data = self.encode_request(&seq, &req);
 
+        let cmd = match req.method {
+            MercuryMethod::SUB => 0xb3,
+            MercuryMethod::UNSUB => 0xb4,
+            _ => 0xb2,
+        };
+
         self.packet_tx.send(Packet {
-            cmd: 0xb2,
+            cmd: cmd,
             data: data
         }).unwrap();
 
@@ -103,29 +108,24 @@ impl MercuryManager {
         buffer
     }
 
-    fn complete_request(&mut self, seq: &[u8]) {
-        let mut pending = self.pending.remove(seq).unwrap();
-
+    fn complete_request(&mut self, cmd: u8, mut pending: MercuryPending) {
         let header_data = match pending.parts.pop_front() {
             Some(data) => data,
             None => panic!("No header part !")
         };
 
-        let header : protocol::mercury::MercuryReply =
+        let header : protocol::mercury::Header =
             protobuf::parse_from_bytes(&header_data).unwrap();
 
-        match pending.callback {
-            Some(ch) => {
-                ch.send(MercuryResponse{
-                    url: header.get_url().to_string(),
-                    payload: pending.parts
-                }).unwrap();
-            }
-            None => (),
+        if let Some(ref ch) = pending.callback {
+            ch.send(MercuryResponse{
+                uri: header.get_uri().to_string(),
+                payload: pending.parts
+            }).unwrap();
         }
     }
 
-    fn handle_packet(&mut self, _cmd: u8, data: Vec<u8>) {
+    fn handle_packet(&mut self, cmd: u8, data: Vec<u8>) {
         let mut packet = Cursor::new(data);
 
         let seq = {
@@ -137,30 +137,37 @@ impl MercuryManager {
         let flags = packet.read_u8().unwrap();
         let count = packet.read_u16::<BigEndian>().unwrap() as usize;
 
-        {
-            let pending : &mut MercuryPending = match self.pending.get_mut(&seq) {
-                Some(pending) => pending,
-                None => { return; }
-            };
+        let mut pending = if let Some(pending) = self.pending.remove(&seq) {
+            pending
+        } else if cmd == 0xb5 {
+            MercuryPending {
+                parts: LinkedList::new(),
+                partial: None,
+                callback: None,
+            }
+        } else {
+            println!("Ignore seq {:?} cmd {}", seq, cmd);
+            return
+        };
 
-            for i in 0..count {
-                let mut part = Self::parse_part(&mut packet);
-                if pending.partial.is_some() {
-                    let mut data = replace(&mut pending.partial, None).unwrap();
-                    data.append(&mut part);
-                    part = data;
-                }
+        for i in 0..count {
+            let mut part = Self::parse_part(&mut packet);
+            if let Some(mut data) = replace(&mut pending.partial, None) {
+                data.append(&mut part);
+                part = data;
+            }
 
-                if i == count -1 && (flags == 2) {
-                    pending.partial = Some(part)
-                } else {
-                    pending.parts.push_back(part);
-                }
+            if i == count - 1 && (flags == 2) {
+                pending.partial = Some(part)
+            } else {
+                pending.parts.push_back(part);
             }
         }
 
         if flags == 0x1 {
-            self.complete_request(&seq);
+            self.complete_request(cmd, pending);
+        } else {
+            self.pending.insert(seq, pending);
         }
     }
 
@@ -171,11 +178,13 @@ impl MercuryManager {
         packet.write_u8(1).unwrap(); // Flags: FINAL
         packet.write_u16::<BigEndian>(1).unwrap(); // Part count. Only header
 
-        let mut header = protobuf_init!(protocol::mercury::MercuryRequest::new(), {
-            url: req.url.clone(),
+        let mut header = protobuf_init!(protocol::mercury::Header::new(), {
+            uri: req.uri.clone(),
             method: req.method.to_string(),
         });
-        req.mime.clone().map(|mime| header.set_mime(mime));
+        if let Some(ref content_type) = req.content_type {
+            header.set_content_type(content_type.clone());
+        }
 
         packet.write_u16::<BigEndian>(header.compute_size() as u16).unwrap();
         header.write_to_writer(&mut packet).unwrap();
