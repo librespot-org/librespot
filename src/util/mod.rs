@@ -1,4 +1,5 @@
 use rand::{Rng,Rand};
+use time;
 
 mod int128;
 mod spotify_id;
@@ -66,3 +67,9 @@ impl <T, E> IgnoreExt for Result<T, E> {
         }
     }
 }
+
+pub fn now_ms() -> i64 {
+    let ts = time::now_utc().to_timespec();
+    ts.sec * 1000 + ts.nsec as i64 / 1000000
+}
+

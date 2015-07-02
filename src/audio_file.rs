@@ -11,7 +11,7 @@ use stream::StreamEvent;
 use util::FileId;
 use session::Session;
 
-const CHUNK_SIZE : usize = 0x40000;
+const CHUNK_SIZE : usize = 0x10000;
 
 pub struct AudioFile<'s> {
     position: usize,
