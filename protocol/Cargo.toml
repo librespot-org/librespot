@@ -8,5 +8,5 @@ build = "build.rs"
 mod_path = "*"
 
 [dependencies.protobuf]
-git = "https://github.com/stepancheg/rust-protobuf.git"
+git = "https://github.com/plietar/rust-protobuf.git"
 

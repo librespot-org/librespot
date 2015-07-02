@@ -17,7 +17,7 @@ rust-crypto = "*"
 time = "*"
 
 [dependencies.protobuf]
-git = "https://github.com/stepancheg/rust-protobuf.git"
+git = "https://github.com/plietar/rust-protobuf.git"
 [dependencies.protobuf_macros]
 git = "https://github.com/plietar/rust-protobuf-macros.git"
 [dependencies.rust-gmp]
