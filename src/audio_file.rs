@@ -5,22 +5,25 @@ use std::io::{self, SeekFrom};
 use std::slice::bytes::copy_memory;
 use std::sync::{Arc, Condvar, Mutex};
 use std::sync::mpsc::{self, TryRecvError};
-
-use stream::{StreamRequest, StreamEvent};
-use util::FileId;
 use std::thread;
+
+use stream::StreamEvent;
+use util::FileId;
+use session::Session;
 
 const CHUNK_SIZE : usize = 0x40000;
 
-#[derive(Clone)]
-pub struct AudioFile {
+pub struct AudioFile<'s> {
     position: usize,
     seek: mpsc::Sender<u64>,
     shared: Arc<AudioFileShared>,
+
+    #[allow(dead_code)]
+    thread: thread::JoinGuard<'s, ()>,
 }
 
 struct AudioFileShared {
-    fileid: FileId,
+    file_id: FileId,
     size: usize,
     data: Mutex<AudioFileData>,
     cond: Condvar
@@ -31,38 +34,24 @@ struct AudioFileData {
     bitmap: BitSet,
 }
 
-impl AudioFile {
-    pub fn new(fileid: FileId, streams: mpsc::Sender<StreamRequest>) -> AudioFile {
-        let (tx, rx) = mpsc::channel();
-
-        streams.send(StreamRequest {
-            id: fileid,
-            offset: 0,
-            size: 1,
-            callback: tx
-        }).unwrap();
-
-        let size = {
-            let mut size = None;
-            for event in rx.iter() {
+impl <'s> AudioFile <'s> {
+    pub fn new(session: &Session, file_id: FileId) -> AudioFile {
+        let mut it = session.stream(file_id, 0, 1).into_iter()
+            .filter_map(|event| {
                 match event {
-                    StreamEvent::Header(id, data) => {
-                        if id == 0x3 {
-                            size = Some(BigEndian::read_u32(&data) * 4);
-                            break;
-                        }
-                    },
-                    StreamEvent::Data(_) => break
+                    StreamEvent::Header(id, ref data) if id == 0x3 => {
+                        Some(BigEndian::read_u32(data) as usize * 4)
+                    }
+                    _ => None
                 }
-            }
-            size.unwrap() as usize
-        };
+            });
+        
+        let size = it.next().unwrap();
 
         let bufsize = size + (CHUNK_SIZE - size % CHUNK_SIZE); 
-        let (tx, rx) = mpsc::channel();
 
         let shared = Arc::new(AudioFileShared {
-            fileid: fileid,
+            file_id: file_id,
             size: size,
             data: Mutex::new(AudioFileData {
                 buffer: vec![0u8; bufsize],
@@ -71,25 +60,23 @@ impl AudioFile {
             cond: Condvar::new(),
         });
         
-        let file = AudioFile {
-            position: 0,
-            seek: tx,
-            shared: shared.clone(),
-        };
+        let shared_ = shared.clone();
+        let (seek_tx, seek_rx) = mpsc::channel();
 
-        thread::spawn( move || { AudioFile::fetch(shared, streams, rx); });
+        let file = AudioFile {
+            thread: thread::scoped( move || { AudioFile::fetch(session, shared_, seek_rx); }),
+            position: 0,
+            seek: seek_tx,
+            shared: shared,
+        };
 
         file
     }
 
-    fn fetch_chunk(shared: &Arc<AudioFileShared>, streams: &mpsc::Sender<StreamRequest>, index: usize) {
-        let (tx, rx) = mpsc::channel();
-        streams.send(StreamRequest {
-            id: shared.fileid,
-            offset: (index * CHUNK_SIZE / 4) as u32,
-            size: (CHUNK_SIZE / 4) as u32,
-            callback: tx
-        }).unwrap();
+    fn fetch_chunk(session: &Session, shared: &Arc<AudioFileShared>, index: usize) {
+        let rx = session.stream(shared.file_id,
+                     (index * CHUNK_SIZE / 4) as u32,
+                     (CHUNK_SIZE / 4) as u32);
 
         let mut offset = 0usize;
         for event in rx.iter() {
@@ -114,7 +101,7 @@ impl AudioFile {
         }
     }
 
-    fn fetch(shared: Arc<AudioFileShared>, streams: mpsc::Sender<StreamRequest>, seek: mpsc::Receiver<u64>) {
+    fn fetch(session: &Session, shared: Arc<AudioFileShared>, seek: mpsc::Receiver<u64>) {
         let mut index = 0;
         loop {
             index = if index * CHUNK_SIZE < shared.size {
@@ -138,13 +125,13 @@ impl AudioFile {
             }
 
             if index * CHUNK_SIZE < shared.size {
-                AudioFile::fetch_chunk(&shared, &streams, index) 
+                AudioFile::fetch_chunk(session, &shared, index) 
             }
         }
     }
 }
 
-impl io::Read for AudioFile {
+impl <'s> io::Read for AudioFile <'s> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         let index = self.position / CHUNK_SIZE;
         let offset = self.position % CHUNK_SIZE;
@@ -163,7 +150,7 @@ impl io::Read for AudioFile {
     }
 }
 
-impl io::Seek for AudioFile {
+impl <'s> io::Seek for AudioFile <'s> {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         let newpos = match pos {
             SeekFrom::Start(offset) => offset as i64,

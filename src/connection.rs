@@ -6,7 +6,6 @@ use std::io;
 use std::io::Write;
 use std::net::TcpStream;
 use std::result;
-use std::sync::mpsc;
 
 use keys::SharedKeys;
 
@@ -84,7 +83,7 @@ impl PlainConnection {
 }
 
 impl CipherConnection {
-    pub fn send_encrypted_packet(&mut self, cmd: u8, data: &[u8]) -> Result<()> {
+    pub fn send_packet(&mut self, cmd: u8, data: &[u8]) -> Result<()> {
         try!(self.stream.write_u8(cmd)); try!(self.stream.write_u16::<BigEndian>(data.len() as u16));
         try!(self.stream.write(data));
 
@@ -107,70 +106,15 @@ impl CipherConnection {
     }
 }
 
-pub struct Packet {
-    pub cmd: u8,
-    pub data: Vec<u8>
+pub trait PacketHandler {
+    fn handle(&mut self, cmd: u8, data: Vec<u8>);
 }
 
-pub struct SendThread {
-    connection: CipherConnection,
-    receiver: mpsc::Receiver<Packet>,
-}
-impl SendThread {
-    pub fn new(connection: CipherConnection)
-      -> (SendThread, mpsc::Sender<Packet>) {
-        let (tx, rx) = mpsc::channel();
-        (SendThread {
-            connection: connection,
-            receiver: rx
-        }, tx)
-    }
-
-    pub fn run(mut self) {
-        for req in self.receiver {
-            self.connection.send_encrypted_packet(
-                req.cmd, &req.data).unwrap();
-        }
-    }
-}
-
-pub struct PacketDispatch {
-    pub main: mpsc::Sender<Packet>,
-    pub stream: mpsc::Sender<Packet>,
-    pub mercury: mpsc::Sender<Packet>,
-    pub audio_key: mpsc::Sender<Packet>,
-}
-
-pub struct RecvThread {
-    connection: CipherConnection,
-    dispatch: PacketDispatch
-}
-
-impl RecvThread {
-    pub fn new(connection: CipherConnection, dispatch: PacketDispatch)
-        -> RecvThread {
-        RecvThread {
-            connection: connection,
-            dispatch: dispatch
-        }
-    }
-
-    pub fn run(mut self) {
-        loop {
-            let (cmd, data) = self.connection.recv_packet().unwrap();
-            let packet = Packet {
-                cmd: cmd,
-                data: data
-            };
-
+/*
             match packet.cmd {
                 0x09 => &self.dispatch.stream,
                 0xd | 0xe => &self.dispatch.audio_key,
                 0xb2...0xb6 => &self.dispatch.mercury,
                 _ => &self.dispatch.main,
             }.send(packet).unwrap();
-
-        }
-    }
-}
-
+            */

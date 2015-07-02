@@ -5,12 +5,12 @@ use std::collections::{HashMap, LinkedList};
 use std::io::{Cursor, Read, Write};
 use std::fmt;
 use std::mem::replace;
-use std::sync::mpsc;
+use std::sync::{mpsc, Future};
 
-use connection::Packet;
 use librespot_protocol as protocol;
-use subsystem::Subsystem;
-use util::Either::{Left, Right};
+use session::Session;
+use connection::PacketHandler;
+use util::IgnoreExt;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
@@ -24,7 +24,6 @@ pub struct MercuryRequest {
     pub method: MercuryMethod,
     pub uri: String,
     pub content_type: Option<String>,
-    pub callback: Option<MercuryCallback>,
     pub payload: Vec<Vec<u8>>
 }
 
@@ -34,22 +33,16 @@ pub struct MercuryResponse {
     pub payload: LinkedList<Vec<u8>>
 }
 
-pub type MercuryCallback = mpsc::Sender<MercuryResponse>;
-
 pub struct MercuryPending {
     parts: LinkedList<Vec<u8>>,
     partial: Option<Vec<u8>>,
-    callback: Option<MercuryCallback>
+    callback: Option<mpsc::Sender<MercuryResponse>>
 }
 
 pub struct MercuryManager {
     next_seq: u32,
     pending: HashMap<Vec<u8>, MercuryPending>,
-    subscriptions: HashMap<String, MercuryCallback>,
-
-    requests: mpsc::Receiver<MercuryRequest>,
-    packet_tx: mpsc::Sender<Packet>,
-    packet_rx: mpsc::Receiver<Packet>,
+    subscriptions: HashMap<String, mpsc::Sender<MercuryResponse>>,
 }
 
 impl fmt::Display for MercuryMethod {
@@ -64,24 +57,17 @@ impl fmt::Display for MercuryMethod {
 }
 
 impl MercuryManager {
-    pub fn new(tx: mpsc::Sender<Packet>) -> (MercuryManager,
-                                             mpsc::Sender<MercuryRequest>,
-                                             mpsc::Sender<Packet>) {
-        let (req_tx, req_rx) = mpsc::channel();
-        let (pkt_tx, pkt_rx) = mpsc::channel();
-
-        (MercuryManager {
+    pub fn new() -> MercuryManager {
+        MercuryManager {
             next_seq: 0,
             pending: HashMap::new(),
             subscriptions: HashMap::new(),
-
-            requests: req_rx,
-            packet_rx: pkt_rx,
-            packet_tx: tx,
-        }, req_tx, pkt_tx)
+        }
     }
 
-    fn request(&mut self, req: MercuryRequest) {
+    pub fn request(&mut self, session: &Session, req: MercuryRequest)
+        -> Future<MercuryResponse> {
+
         let mut seq = [0u8; 4];
         BigEndian::write_u32(&mut seq, self.next_seq);
         self.next_seq += 1;
@@ -93,20 +79,31 @@ impl MercuryManager {
             _ => 0xb2,
         };
 
-        self.packet_tx.send(Packet {
-            cmd: cmd,
-            data: data
-        }).unwrap();
+        session.send_packet(cmd, &data).unwrap();
 
-        if req.method != MercuryMethod::SUB {
-            self.pending.insert(seq.to_vec(), MercuryPending{
-                parts: LinkedList::new(),
-                partial: None,
-                callback: req.callback,
-            });
-        } else if let Some(cb) = req.callback {
-            self.subscriptions.insert(req.uri, cb);
-        }
+        let (tx, rx) = mpsc::channel();
+        self.pending.insert(seq.to_vec(), MercuryPending{
+            parts: LinkedList::new(),
+            partial: None,
+            callback: Some(tx),
+        });
+
+        Future::from_receiver(rx)
+    }
+
+    pub fn subscribe(&mut self, session: &Session, uri: String)
+        -> mpsc::Receiver<MercuryResponse> {
+        let (tx, rx) = mpsc::channel();
+        self.subscriptions.insert(uri.clone(), tx);
+
+        self.request(session, MercuryRequest{
+            method: MercuryMethod::SUB,
+            uri: uri,
+            content_type: None,
+            payload: Vec::new()
+        });
+
+        rx
     }
 
     fn parse_part(mut s: &mut Read) -> Vec<u8> {
@@ -133,14 +130,44 @@ impl MercuryManager {
         };
 
         if let Some(ref ch) = callback {
+             // Ignore send error.
+             // It simply means the receiver was closed
             ch.send(MercuryResponse{
                 uri: header.get_uri().to_string(),
                 payload: pending.parts
-            }).unwrap();
+            }).ignore();
         }
     }
 
-    fn handle_packet(&mut self, cmd: u8, data: Vec<u8>) {
+    fn encode_request(&self, seq: &[u8], req: &MercuryRequest) -> Vec<u8> {
+        let mut packet = Vec::new();
+        packet.write_u16::<BigEndian>(seq.len() as u16).unwrap();
+        packet.write_all(seq).unwrap();
+        packet.write_u8(1).unwrap(); // Flags: FINAL
+        packet.write_u16::<BigEndian>(1 + req.payload.len() as u16).unwrap(); // Part count
+
+        let mut header = protobuf_init!(protocol::mercury::Header::new(), {
+            uri: req.uri.clone(),
+            method: req.method.to_string(),
+        });
+        if let Some(ref content_type) = req.content_type {
+            header.set_content_type(content_type.clone());
+        }
+
+        packet.write_u16::<BigEndian>(header.compute_size() as u16).unwrap();
+        header.write_to_writer(&mut packet).unwrap();
+
+        for p in &req.payload {
+            packet.write_u16::<BigEndian>(p.len() as u16).unwrap();
+            packet.write(&p).unwrap();
+        }
+
+        packet
+    }
+}
+
+impl PacketHandler for MercuryManager {
+    fn handle(&mut self, cmd: u8, data: Vec<u8>) {
         let mut packet = Cursor::new(data);
 
         let seq = {
@@ -183,60 +210,6 @@ impl MercuryManager {
             self.complete_request(cmd, pending);
         } else {
             self.pending.insert(seq, pending);
-        }
-    }
-
-    fn encode_request(&self, seq: &[u8], req: &MercuryRequest) -> Vec<u8> {
-        let mut packet = Vec::new();
-        packet.write_u16::<BigEndian>(seq.len() as u16).unwrap();
-        packet.write_all(seq).unwrap();
-        packet.write_u8(1).unwrap(); // Flags: FINAL
-        packet.write_u16::<BigEndian>(1 + req.payload.len() as u16).unwrap(); // Part count
-
-        let mut header = protobuf_init!(protocol::mercury::Header::new(), {
-            uri: req.uri.clone(),
-            method: req.method.to_string(),
-        });
-        if let Some(ref content_type) = req.content_type {
-            header.set_content_type(content_type.clone());
-        }
-
-        packet.write_u16::<BigEndian>(header.compute_size() as u16).unwrap();
-        header.write_to_writer(&mut packet).unwrap();
-
-        for p in &req.payload {
-            packet.write_u16::<BigEndian>(p.len() as u16).unwrap();
-            packet.write(&p).unwrap();
-        }
-
-        packet
-    }
-}
-
-impl Subsystem for MercuryManager {
-    fn run(mut self) {
-        loop {
-            match {
-                let requests = &self.requests;
-                let packets = &self.packet_rx;
-
-                select!{
-                    r = requests.recv() => {
-                        Left(r.unwrap())
-                    },
-                    p = packets.recv() => {
-                        Right(p.unwrap())
-                    }
-                }
-            } {
-                Left(req) => {
-                    self.request(req);
-                }
-                Right(pkt) => {
-                    self.handle_packet(pkt.cmd, pkt.data);
-                }
-            }
-
         }
     }
 }

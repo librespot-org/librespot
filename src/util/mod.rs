@@ -47,11 +47,6 @@ pub mod version {
     }
 }
 
-pub enum Either<S,T> {
-    Left(S),
-    Right(T)
-}
-
 pub fn hexdump(data: &[u8]) {
     for b in data.iter() {
         eprint!("{:02X} ", b);
@@ -59,3 +54,15 @@ pub fn hexdump(data: &[u8]) {
     eprintln!("");
 }
 
+pub trait IgnoreExt {
+    fn ignore(self);
+}
+
+impl <T, E> IgnoreExt for Result<T, E> {
+    fn ignore(self) {
+        match self {
+            Ok(_)  => (),
+            Err(_) => (),
+        }
+    }
+}

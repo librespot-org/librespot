@@ -2,17 +2,19 @@ use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use protobuf::{self, Message};
 use rand::thread_rng;
-use std::sync::mpsc;
-use std::thread;
+use std::sync::{Mutex, Arc, Future, mpsc};
 
-use audio_key;
-use connection::{PlainConnection, Packet, PacketDispatch, SendThread, RecvThread};
+use connection::{self, PlainConnection, CipherConnection};
 use keys::PrivateKeys;
 use librespot_protocol as protocol;
-use mercury;
-use metadata;
-use stream;
-use subsystem::Subsystem;
+use util::{SpotifyId, FileId};
+
+use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
+use metadata::{MetadataManager, MetadataRef, MetadataTrait};
+use stream::{StreamManager, StreamEvent};
+use audio_key::{AudioKeyManager, AudioKey};
+use connection::PacketHandler;
+
 use util;
 
 pub struct Config {
@@ -24,14 +26,15 @@ pub struct Config {
 pub struct Session {
     pub config: Config,
 
-    packet_rx: mpsc::Receiver<Packet>,
-    pub packet_tx: mpsc::Sender<Packet>,
-
-    pub audio_key: mpsc::Sender<audio_key::AudioKeyRequest>,
-    pub mercury: mpsc::Sender<mercury::MercuryRequest>,
-    pub metadata: mpsc::Sender<metadata::MetadataRequest>,
-    pub stream: mpsc::Sender<stream::StreamRequest>,
+    mercury: Mutex<MercuryManager>,
+    metadata: Mutex<MetadataManager>,
+    stream: Mutex<StreamManager>,
+    audio_key: Mutex<AudioKeyManager>,
+    rx_connection: Mutex<CipherConnection>,
+    tx_connection: Mutex<CipherConnection>,
 }
+
+type SessionRef = Arc<Session>;
 
 impl Session {
     pub fn new(mut config: Config) -> Session {
@@ -105,41 +108,16 @@ impl Session {
 
         let cipher_connection = connection.setup_cipher(shared_keys);
 
-        let (send_thread, tx) = SendThread::new(cipher_connection.clone());
-
-        let (main_tx, rx) = mpsc::channel();
-        let (mercury, mercury_req, mercury_pkt)
-            = mercury::MercuryManager::new(tx.clone());
-        let (metadata, metadata_req)
-            = metadata::MetadataManager::new(mercury_req.clone());
-        let (stream, stream_req, stream_pkt)
-            = stream::StreamManager::new(tx.clone());
-        let (audio_key, audio_key_req, audio_key_pkt)
-            = audio_key::AudioKeyManager::new(tx.clone());
-
-        let recv_thread = RecvThread::new(cipher_connection, PacketDispatch {
-            main: main_tx,
-            stream: stream_pkt,
-            mercury: mercury_pkt,
-            audio_key: audio_key_pkt
-        });
-
-        thread::spawn(move || send_thread.run());
-        thread::spawn(move || recv_thread.run());
-
-        mercury.start();
-        metadata.start();
-        stream.start();
-        audio_key.start();
-
         Session {
             config: config,
-            packet_rx: rx,
-            packet_tx: tx,
-            mercury: mercury_req,
-            metadata: metadata_req,
-            stream: stream_req,
-            audio_key: audio_key_req,
+
+            rx_connection: Mutex::new(cipher_connection.clone()),
+            tx_connection: Mutex::new(cipher_connection),
+
+            mercury: Mutex::new(MercuryManager::new()),
+            metadata: Mutex::new(MetadataManager::new()),
+            stream: Mutex::new(StreamManager::new()),
+            audio_key: Mutex::new(AudioKeyManager::new()),
         }
     }
 
@@ -166,32 +144,47 @@ impl Session {
             }
         });
 
-        self.packet_tx.send(Packet {
-            cmd: 0xab,
-            data: packet.write_to_bytes().unwrap()
-        }).unwrap();
+        self.send_packet(0xab, &packet.write_to_bytes().unwrap()).unwrap();
     }
 
     pub fn poll(&self) {
-        let packet = self.packet_rx.recv().unwrap();
+        let (cmd, data) =
+            self.rx_connection.lock().unwrap().recv_packet().unwrap();
 
-        match packet.cmd {
-            0x4 => { // PING
-                self.packet_tx.send(Packet {
-                    cmd: 0x49,
-                    data: packet.data
-                }).unwrap();
-            }
-            0x4a => { // PONG
-            }
-            0xac => { // AUTHENTICATED
-                eprintln!("Authentication succeedded");
-            }
-            0xad => {
-                eprintln!("Authentication failed");
-            }
+        match cmd {
+            0x4 => self.send_packet(0x49, &data).unwrap(),
+            0x4a => (),
+            0x9  => self.stream.lock().unwrap().handle(cmd, data),
+            0xd | 0xe => self.audio_key.lock().unwrap().handle(cmd, data),
+            0xb2...0xb6 => self.mercury.lock().unwrap().handle(cmd, data),
+            0xac => eprintln!("Authentication succeedded"),
+            0xad => eprintln!("Authentication failed"),
             _ => ()
-        };
+        }
+    }
+
+    pub fn send_packet(&self, cmd: u8, data: &[u8]) -> connection::Result<()> {
+        self.tx_connection.lock().unwrap().send_packet(cmd, data)
+    }
+    
+    pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey> {
+        self.audio_key.lock().unwrap().request(self, track, file)
+    }
+
+    pub fn stream(&self, file: FileId, offset: u32, size: u32) -> mpsc::Receiver<StreamEvent> {
+        self.stream.lock().unwrap().request(self, file, offset, size)
+    }
+
+    pub fn metadata<T: MetadataTrait>(&self, id: SpotifyId) -> MetadataRef<T> {
+        self.metadata.lock().unwrap().get(self, id)
+    }
+
+    pub fn mercury(&self, req: MercuryRequest) -> Future<MercuryResponse> {
+        self.mercury.lock().unwrap().request(self, req)
+    }
+
+    pub fn mercury_sub(&self, uri: String) -> mpsc::Receiver<MercuryResponse> {
+        self.mercury.lock().unwrap().subscribe(self, uri)
     }
 }
 

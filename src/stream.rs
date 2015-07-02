@@ -3,18 +3,9 @@ use std::collections::HashMap;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 use std::sync::mpsc;
 
-use connection::Packet;
 use util::{ArcVec, FileId};
-use util::Either::{Left, Right};
-use subsystem::Subsystem;
-
-pub type StreamCallback = mpsc::Sender<StreamEvent>;
-pub struct StreamRequest {
-    pub id: FileId,
-    pub offset: u32,
-    pub size: u32,
-    pub callback: StreamCallback
-}
+use connection::PacketHandler;
+use session::Session;
 
 #[derive(Debug)]
 pub enum StreamEvent {
@@ -31,36 +22,28 @@ enum ChannelMode {
 
 struct Channel {
     mode: ChannelMode,
-    callback: StreamCallback
+    callback: mpsc::Sender<StreamEvent>
 }
 
 pub struct StreamManager {
     next_id: ChannelId,
     channels: HashMap<ChannelId, Channel>,
-
-    requests: mpsc::Receiver<StreamRequest>,
-    packet_rx: mpsc::Receiver<Packet>,
-    packet_tx: mpsc::Sender<Packet>,
 }
 
 impl StreamManager {
-    pub fn new(tx: mpsc::Sender<Packet>) -> (StreamManager,
-                                             mpsc::Sender<StreamRequest>,
-                                             mpsc::Sender<Packet>) {
-        let (req_tx, req_rx) = mpsc::channel();
-        let (pkt_tx, pkt_rx) = mpsc::channel();
-
-        (StreamManager {
+    pub fn new() -> StreamManager {
+        StreamManager {
             next_id: 0,
             channels: HashMap::new(),
-
-            requests: req_rx,
-            packet_rx: pkt_rx,
-            packet_tx: tx
-        }, req_tx, pkt_tx)
+        }
     }
 
-    fn request(&mut self, req: StreamRequest) {
+    pub fn request(&mut self, session: &Session,
+                   file: FileId, offset: u32, size: u32)
+        -> mpsc::Receiver<StreamEvent> {
+
+        let (tx, rx) = mpsc::channel();
+
         let channel_id = self.next_id;
         self.next_id += 1;
 
@@ -72,22 +55,23 @@ impl StreamManager {
         data.write_u32::<BigEndian>(0x00000000).unwrap();
         data.write_u32::<BigEndian>(0x00009C40).unwrap();
         data.write_u32::<BigEndian>(0x00020000).unwrap();
-        data.write(&req.id).unwrap();
-        data.write_u32::<BigEndian>(req.offset).unwrap();
-        data.write_u32::<BigEndian>(req.offset + req.size).unwrap();
+        data.write(&file).unwrap();
+        data.write_u32::<BigEndian>(offset).unwrap();
+        data.write_u32::<BigEndian>(offset + size).unwrap();
 
-        self.packet_tx.send(Packet {
-            cmd: 0x8,
-            data: data
-        }).unwrap();
+        session.send_packet(0x8, &data).unwrap();
 
         self.channels.insert(channel_id, Channel {
             mode: ChannelMode::Header,
-            callback: req.callback
+            callback: tx
         });
-    }
 
-    fn packet(&mut self, data: Vec<u8>) {
+        rx
+    }
+}
+
+impl PacketHandler for StreamManager {
+    fn handle(&mut self, _cmd: u8, data: Vec<u8>) {
         let data = ArcVec::new(data);
         let mut packet = Cursor::new(&data as &[u8]);
 
@@ -139,28 +123,4 @@ impl StreamManager {
         }
     }
 }
-
-impl Subsystem for StreamManager {
-    fn run(mut self) {
-        loop {
-            match {
-                let requests = &self.requests;
-                let packets = &self.packet_rx;
-
-                select!{
-                    r = requests.recv() => {
-                        Left(r.unwrap())
-                    },
-                    p = packets.recv() => {
-                        Right(p.unwrap())
-                    }
-                }
-            } {
-                Left(req) => self.request(req),
-                Right(pkt) => self.packet(pkt.data)
-            }
-        }
-    }
-}
-
 

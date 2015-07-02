@@ -3,13 +3,13 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt;
 use std::slice::bytes::copy_memory;
-use std::sync::{mpsc, Arc, Condvar, Mutex, MutexGuard, Weak};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::thread;
 
 use librespot_protocol as protocol;
 use mercury::{MercuryRequest, MercuryMethod};
-use subsystem::Subsystem;
 use util::{SpotifyId, FileId};
+use session::Session;
 
 pub trait MetadataTrait : Send + Any + 'static {
     type Message: protobuf::MessageStatic;
@@ -119,40 +119,6 @@ pub type TrackRef = MetadataRef<Track>;
 pub type AlbumRef = MetadataRef<Album>;
 pub type ArtistRef = MetadataRef<Artist>;
 
-pub struct MetadataCache {
-    metadata: mpsc::Sender<MetadataRequest>,
-    cache: HashMap<(SpotifyId, TypeId), Box<Any + 'static>>
-}
-
-impl MetadataCache {
-    pub fn new(metadata: mpsc::Sender<MetadataRequest>) -> MetadataCache {
-        MetadataCache {
-            metadata: metadata,
-            cache: HashMap::new()
-        }
-    }
-
-    pub fn get<T: MetadataTrait>(&mut self, id: SpotifyId)
-      -> MetadataRef<T> {
-        let key = (id, TypeId::of::<T>());
-
-        self.cache.get(&key)
-            .and_then(|x| x.downcast_ref::<Weak<Metadata<T>>>())
-            .and_then(|x| x.upgrade())
-            .unwrap_or_else(|| {
-                let x : MetadataRef<T> = Arc::new(Metadata{
-                    id: id,
-                    state: Mutex::new(MetadataState::Loading),
-                    cond: Condvar::new()
-                });
-
-                self.cache.insert(key, Box::new(x.downgrade()));
-                self.metadata.send(T::request(x.clone())).unwrap();
-                x
-            })
-    }
-}
-
 impl <T: MetadataTrait> Metadata<T> {
     pub fn id(&self) -> SpotifyId {
         self.id
@@ -214,58 +180,52 @@ pub enum MetadataRequest {
 }
 
 pub struct MetadataManager {
-    requests: mpsc::Receiver<MetadataRequest>,
-    mercury: mpsc::Sender<MercuryRequest>
+    cache: HashMap<(SpotifyId, TypeId), Box<Any + Send>>
 }
 
 impl MetadataManager {
-    pub fn new(mercury: mpsc::Sender<MercuryRequest>) -> (MetadataManager,
-                                                          mpsc::Sender<MetadataRequest>) {
-        let (tx, rx) = mpsc::channel();
-        (MetadataManager {
-            requests: rx,
-            mercury: mercury
-        }, tx)
+    pub fn new() -> MetadataManager {
+        MetadataManager {
+            cache: HashMap::new()
+        }
     }
 
-    fn load<T: MetadataTrait> (&self, object: MetadataRef<T>) {
-        let mercury = self.mercury.clone();
-        thread::spawn(move || {
-            let (tx, rx) = mpsc::channel();
-            
-            mercury.send(MercuryRequest {
-                method: MercuryMethod::GET,
-                uri: format!("{}/{}", T::base_url(), object.id.to_base16()),
-                content_type: None,
-                callback: Some(tx),
-                payload: Vec::new()
-            }).unwrap();
+    pub fn get<T: MetadataTrait>(&mut self, session: &Session, id: SpotifyId)
+      -> MetadataRef<T> {
+        let key = (id, TypeId::of::<T>());
 
-            let response = rx.recv().unwrap();
+        self.cache.get(&key)
+            .and_then(|x| x.downcast_ref::<Weak<Metadata<T>>>())
+            .and_then(|x| x.upgrade())
+            .unwrap_or_else(|| {
+                let x : MetadataRef<T> = Arc::new(Metadata{
+                    id: id,
+                    state: Mutex::new(MetadataState::Loading),
+                    cond: Condvar::new()
+                });
+
+                self.cache.insert(key, Box::new(x.downgrade()));
+                self.load(session, x.clone());
+                x
+            })
+    }
+
+    fn load<T: MetadataTrait> (&self, session: &Session, object: MetadataRef<T>) {
+        let rx = session.mercury(MercuryRequest {
+            method: MercuryMethod::GET,
+            uri: format!("{}/{}", T::base_url(), object.id.to_base16()),
+            content_type: None,
+            payload: Vec::new()
+        });
+
+        thread::spawn(move || {
+            let response = rx.into_inner();
 
             let msg : T::Message = protobuf::parse_from_bytes(
                 response.payload.front().unwrap()).unwrap();
 
             object.set(MetadataState::Loaded(T::from_msg(&msg)));
         });
-    }
-}
-
-impl Subsystem for MetadataManager {
-    fn run(self) {
-        for req in self.requests.iter() {
-            match req {
-                MetadataRequest::Artist(artist) => {
-                    self.load(artist)
-                }
-                MetadataRequest::Album(album) => {
-                    self.load(album)
-                }
-                MetadataRequest::Track(track) => {
-                    self.load(track)
-                }
-            }
-        }
     }
 }
 

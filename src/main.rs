@@ -1,7 +1,8 @@
 #![crate_name = "librespot"]
 
-#![feature(plugin,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,mpsc_select,arc_weak,append)]
-#![allow(unused_imports,dead_code)]
+#![feature(plugin,scoped,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,arc_weak,append,future)]
+#![allow(deprecated)]
+//#![allow(unused_imports,dead_code)]
 
 #![plugin(protobuf_macros)]
 #[macro_use] extern crate lazy_static;
@@ -38,10 +39,10 @@ use std::clone::Clone;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::sync::mpsc;
 use protobuf::core::Message;
+use std::thread;
 
-use metadata::{MetadataCache, AlbumRef, ArtistRef, TrackRef};
+use metadata::{AlbumRef, ArtistRef, TrackRef};
 use session::{Config, Session};
 use util::SpotifyId;
 use util::version::version_string;
@@ -69,12 +70,17 @@ fn main() {
     session.login(username.clone(), password);
     session.poll();
 
-    let ident = session.config.device_id.clone();
-    SpircManager{
-        session: session,
+    let poll_thread = thread::scoped(|| {
+        loop {
+            session.poll();
+        }
+    });
+
+    SpircManager {
+        session: &session,
         username: username.clone(),
         name: name.clone(),
-        ident: ident,
+        ident: session.config.device_id.clone(),
         device_type: 5,
 
         state_update_id: 0,
@@ -88,21 +94,17 @@ fn main() {
         state: PlayerState::new()
     }.run();
 
-    /*
-    loop {
-        session.poll();
-    }
-    */
+    poll_thread.join();
 }
 
-fn print_track(cache: &mut MetadataCache, track_id: SpotifyId) {
-    let track : TrackRef = cache.get(track_id);
+fn print_track(session: &Session, track_id: SpotifyId) {
+    let track : TrackRef = session.metadata(track_id);
 
     let album : AlbumRef = {
         let handle = track.wait();
         let data = handle.unwrap();
         eprintln!("{}", data.name);
-        cache.get(data.album)
+        session.metadata(data.album)
     };
 
     let artists : Vec<ArtistRef> = {
@@ -110,7 +112,7 @@ fn print_track(cache: &mut MetadataCache, track_id: SpotifyId) {
         let data = handle.unwrap();
         eprintln!("{}", data.name);
         data.artists.iter().map(|id| {
-            cache.get(*id)
+            session.metadata(*id)
         }).collect()
     };
 
@@ -159,7 +161,6 @@ impl PlayerState {
     }
 
     fn import(&mut self, state: &protocol::spirc::State) {
-        //println!("{:?}", state);
         self.status = state.get_status();
 
         self.context_uri = state.get_context_uri().to_string();
@@ -203,8 +204,8 @@ impl PlayerState {
     }
 }
 
-struct SpircManager {
-    session: Session,
+struct SpircManager<'s> {
+    session: &'s Session,
     username: String,
     state_update_id: i64,
     seq_nr: u32,
@@ -221,24 +222,16 @@ struct SpircManager {
     state: PlayerState
 }
 
-impl SpircManager {
+impl <'s> SpircManager<'s> {
     fn run(&mut self) {
-        let (tx, rx) = mpsc::channel();
-
-        self.session.mercury.send(MercuryRequest{
-            method: MercuryMethod::SUB,
-            uri: format!("hm://remote/user/{}/v23", self.username),
-            content_type: None,
-            callback: Some(tx),
-            payload: Vec::new()
-        }).unwrap();
+        let rx = self.session
+            .mercury_sub(format!("hm://remote/user/{}/v23", self.username))
+            .into_iter().map(|pkt| {
+            protobuf::parse_from_bytes::<protocol::spirc::Frame>(pkt.payload.front().unwrap()).unwrap()
+        });
 
         self.notify(None);
 
-        let rx = rx.into_iter().map(|pkt| {
-            protobuf::parse_from_bytes::<protocol::spirc::Frame>(pkt.payload.front().unwrap()).unwrap()
-        });
-        
         for frame in rx {
             println!("{:?} {} {} {} {}",
                      frame.get_typ(),
@@ -328,13 +321,12 @@ impl SpircManager {
             pkt.set_state(self.state.export());
         }
 
-        self.session.mercury.send(MercuryRequest{
+        self.session.mercury(MercuryRequest{
             method: MercuryMethod::SEND,
             uri: format!("hm://remote/user/{}", self.username),
             content_type: None,
-            callback: None,
             payload: vec![ pkt.write_to_bytes().unwrap() ]
-        }).unwrap();
+        });
     }
 
     fn device_state(&mut self) -> protocol::spirc::DeviceState {
