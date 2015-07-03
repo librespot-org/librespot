@@ -1,6 +1,6 @@
 use byteorder::{ByteOrder, BigEndian};
 use std::cmp::min;
-use std::collections::BitSet;
+use std::collections::{BitSet, HashMap};
 use std::io::{self, SeekFrom};
 use std::slice::bytes::copy_memory;
 use std::sync::{Arc, Condvar, Mutex};
@@ -35,31 +35,7 @@ struct AudioFileData {
 }
 
 impl <'s> AudioFile <'s> {
-    pub fn new(session: &Session, file_id: FileId) -> AudioFile {
-        let mut it = session.stream(file_id, 0, 1).into_iter()
-            .filter_map(|event| {
-                match event {
-                    StreamEvent::Header(id, ref data) if id == 0x3 => {
-                        Some(BigEndian::read_u32(data) as usize * 4)
-                    }
-                    _ => None
-                }
-            });
-        
-        let size = it.next().unwrap();
-
-        let bufsize = size + (CHUNK_SIZE - size % CHUNK_SIZE); 
-
-        let shared = Arc::new(AudioFileShared {
-            file_id: file_id,
-            size: size,
-            data: Mutex::new(AudioFileData {
-                buffer: vec![0u8; bufsize],
-                bitmap: BitSet::with_capacity(bufsize / CHUNK_SIZE as usize)
-            }),
-            cond: Condvar::new(),
-        });
-        
+    fn new(session: &Session, shared: Arc<AudioFileShared>) -> AudioFile {
         let shared_ = shared.clone();
         let (seek_tx, seek_rx) = mpsc::channel();
 
@@ -164,4 +140,54 @@ impl <'s> io::Seek for AudioFile <'s> {
     }
 }
 
+impl AudioFileShared {
+    fn new(session: &Session, file_id: FileId) -> Arc<AudioFileShared> {
+        let size = session.stream(file_id, 0, 1).into_iter()
+            .filter_map(|event| {
+                match event {
+                    StreamEvent::Header(id, ref data) if id == 0x3 => {
+                        Some(BigEndian::read_u32(data) as usize * 4)
+                    }
+                    _ => None
+                }
+            }).next().unwrap();
+
+        let bufsize = size + (CHUNK_SIZE - size % CHUNK_SIZE); 
+
+        Arc::new(AudioFileShared {
+            file_id: file_id,
+            size: size,
+            data: Mutex::new(AudioFileData {
+                buffer: vec![0u8; bufsize],
+                bitmap: BitSet::with_capacity(bufsize / CHUNK_SIZE as usize)
+            }),
+            cond: Condvar::new(),
+        })
+    }
+}
+
+pub struct AudioFileManager {
+    cache: HashMap<FileId, Arc<AudioFileShared>>
+}
+
+impl AudioFileManager {
+    pub fn new() -> AudioFileManager {
+        AudioFileManager {
+            cache: HashMap::new()
+        }
+    }
+
+    pub fn request<'a> (&mut self, session: &'a Session, file_id: FileId) -> AudioFile<'a> {
+        let shared = self.cache
+            .get(&file_id)
+            .cloned()
+            .unwrap_or_else(|| {
+                println!("Cache miss");
+                let shared = AudioFileShared::new(session, file_id.clone());
+                self.cache.insert(file_id, shared.clone());
+                shared
+            });
+        AudioFile::new(session, shared)
+    }
+}
 

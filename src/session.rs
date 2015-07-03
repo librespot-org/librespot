@@ -13,6 +13,7 @@ use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use stream::{StreamManager, StreamEvent};
 use audio_key::{AudioKeyManager, AudioKey};
+use audio_file::{AudioFileManager, AudioFile};
 use connection::PacketHandler;
 
 use util;
@@ -30,6 +31,7 @@ pub struct Session {
     metadata: Mutex<MetadataManager>,
     stream: Mutex<StreamManager>,
     audio_key: Mutex<AudioKeyManager>,
+    audio_file: Mutex<AudioFileManager>,
     rx_connection: Mutex<CipherConnection>,
     tx_connection: Mutex<CipherConnection>,
 }
@@ -118,6 +120,7 @@ impl Session {
             metadata: Mutex::new(MetadataManager::new()),
             stream: Mutex::new(StreamManager::new()),
             audio_key: Mutex::new(AudioKeyManager::new()),
+            audio_file: Mutex::new(AudioFileManager::new()),
         }
     }
 
@@ -169,6 +172,10 @@ impl Session {
     
     pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey> {
         self.audio_key.lock().unwrap().request(self, track, file)
+    }
+
+    pub fn audio_file(&self, file: FileId) -> AudioFile {
+        self.audio_file.lock().unwrap().request(self, file)
     }
 
     pub fn stream(&self, file: FileId, offset: u32, size: u32) -> mpsc::Receiver<StreamEvent> {

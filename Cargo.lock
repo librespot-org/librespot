@@ -203,7 +203,7 @@ dependencies = [
 [[package]]
 name = "vorbis"
 version = "0.0.11"
-source = "git+https://github.com/plietar/vorbis-rs#b28d0d14f623b0204b29cba435b3cf9be249290a"
+source = "git+https://github.com/plietar/vorbis-rs#78058c3341832969030f49cbc4b8bc9deb376776"
 dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "ogg-sys 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)",

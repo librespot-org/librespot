@@ -107,7 +107,7 @@ impl <'s> PlayerInternal<'s> {
                         vorbis::Decoder::new(
                         Subfile::new(
                         AudioDecrypt::new(key,
-                        AudioFile::new(self.session, file_id)), 0xa7)).unwrap());
+                        self.session.audio_file(file_id)), 0xa7)).unwrap());
                     decoder.as_mut().unwrap().time_seek(position as f64 / 1000f64).unwrap();
 
                     let mut h = self.state.0.lock().unwrap();

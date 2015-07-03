@@ -87,16 +87,20 @@ impl PacketHandler for StreamManager {
                 ChannelMode::Header => {
                     let mut length = 0;
 
-                    while packet.position() < data.len() as u64 {
+                    while packet.position() < data.len() as u64 && !close {
                         length = packet.read_u16::<BigEndian>().unwrap();
                         if length > 0 {
                             let header_id = packet.read_u8().unwrap();
-                            channel.callback.send(StreamEvent::Header(
-                                    header_id,
-                                    data.clone()
-                                        .offset(packet.position() as usize)
-                                        .limit(length as usize - 1)
-                                )).unwrap();
+                            channel.callback
+                                .send(StreamEvent::Header(
+                                        header_id,
+                                        data.clone()
+                                            .offset(packet.position() as usize)
+                                            .limit(length as usize - 1)
+                                            ))
+                                .unwrap_or_else(|_| {
+                                    close = true;
+                                });
 
                             packet.seek(SeekFrom::Current(length as i64 - 1)).unwrap();
                         }
@@ -109,8 +113,11 @@ impl PacketHandler for StreamManager {
 
                 ChannelMode::Data => {
                     if packet.position() < data.len() as u64 {
-                        channel.callback.send(StreamEvent::Data(
-                                data.clone().offset(packet.position() as usize))).unwrap();
+                        channel.callback
+                            .send(StreamEvent::Data(data.clone().offset(packet.position() as usize)))
+                            .unwrap_or_else(|_| {
+                                close = true;
+                            });
                     } else {
                         close = true;
                     }
