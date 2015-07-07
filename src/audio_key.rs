@@ -52,7 +52,7 @@ impl AudioKeyManager {
             self.next_seq += 1;
 
             let mut data : Vec<u8> = Vec::new();
-            data.write(&file).unwrap();
+            data.write(&file.0).unwrap();
             data.write(&track.to_raw()).unwrap();
             data.write_u32::<BigEndian>(seq).unwrap();
             data.write_u16::<BigEndian>(0x0000).unwrap();
@@ -84,7 +84,7 @@ impl PacketHandler for AudioKeyManager {
 
             if let AudioKeyStatus::Loading(cbs) = status {
                 for cb in cbs {
-                    cb.send(key).unwrap();
+                    cb.send(key).ignore();
                 }
             }
         }

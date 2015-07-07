@@ -3,10 +3,11 @@ use util::u128;
 use byteorder::{BigEndian,ByteOrder};
 use std::ascii::AsciiExt;
 
-pub type FileId = [u8; 20];
-
 #[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
 pub struct SpotifyId(u128);
+
+#[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
+pub struct FileId(pub [u8; 20]);
 
 const BASE62_DIGITS: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
@@ -74,6 +75,15 @@ impl SpotifyId {
         BigEndian::write_u64(&mut data[8..16], low);
 
         data
+    }
+}
+
+impl FileId {
+    pub fn to_base16(&self) -> String {
+        self.0.iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<Vec<String>>()
+            .concat()
     }
 }
 

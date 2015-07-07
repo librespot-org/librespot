@@ -2,7 +2,7 @@
 
 #![feature(plugin,scoped,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,arc_weak,append,future)]
 #![allow(deprecated)]
-#![allow(unused_imports,dead_code)]
+//#![allow(unused_imports,dead_code)]
 
 #![plugin(protobuf_macros)]
 #[macro_use] extern crate lazy_static;
@@ -19,6 +19,7 @@ extern crate rand;
 extern crate readall;
 extern crate vorbis;
 extern crate time;
+extern crate tempfile;
 
 extern crate librespot_protocol;
 
@@ -41,6 +42,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use protobuf::core::Message;
 use std::thread;
+use std::path::PathBuf;
 
 use metadata::{AlbumRef, ArtistRef, TrackRef};
 use session::{Config, Session};
@@ -56,6 +58,7 @@ fn main() {
     let mut appkey_file = File::open(Path::new(&args.next().unwrap())).unwrap();
     let username = args.next().unwrap();
     let password = args.next().unwrap();
+    let cache_location = args.next().unwrap();
     let name = args.next().unwrap();
 
     let mut appkey = Vec::new();
@@ -64,7 +67,8 @@ fn main() {
     let config = Config {
         application_key: appkey,
         user_agent: version_string(),
-        device_id: name.to_string()
+        device_id: name.clone(),
+        cache_location: PathBuf::from(cache_location)
     };
     let session = Session::new(config);
     session.login(username.clone(), password);
@@ -86,7 +90,7 @@ fn main() {
         state_update_id: 0,
         seq_nr: 0,
 
-        name: name.clone(),
+        name: name,
         ident: session.config.device_id.clone(),
         device_type: 5,
         can_play: true,

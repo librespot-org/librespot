@@ -55,7 +55,7 @@ impl StreamManager {
         data.write_u32::<BigEndian>(0x00000000).unwrap();
         data.write_u32::<BigEndian>(0x00009C40).unwrap();
         data.write_u32::<BigEndian>(0x00020000).unwrap();
-        data.write(&file).unwrap();
+        data.write(&file.0).unwrap();
         data.write_u32::<BigEndian>(offset).unwrap();
         data.write_u32::<BigEndian>(offset + size).unwrap();
 

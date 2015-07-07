@@ -3,11 +3,12 @@ use crypto::sha1::Sha1;
 use protobuf::{self, Message};
 use rand::thread_rng;
 use std::sync::{Mutex, Arc, Future, mpsc};
+use std::path::PathBuf;
 
 use connection::{self, PlainConnection, CipherConnection};
 use keys::PrivateKeys;
 use librespot_protocol as protocol;
-use util::{SpotifyId, FileId};
+use util::{SpotifyId, FileId, mkdir_existing};
 
 use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
@@ -22,6 +23,7 @@ pub struct Config {
     pub application_key: Vec<u8>,
     pub user_agent: String,
     pub device_id: String,
+    pub cache_location: PathBuf,
 }
 
 pub struct Session {
@@ -45,6 +47,8 @@ impl Session {
             h.input_str(&config.device_id);
             h.result_str()
         };
+
+        mkdir_existing(&config.cache_location).unwrap();
 
         let keys = PrivateKeys::new();
         let mut connection = PlainConnection::connect().unwrap();

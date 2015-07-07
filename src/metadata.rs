@@ -35,7 +35,7 @@ impl MetadataTrait for Track {
                 .map(|file| {
                     let mut dst = [0u8; 20];
                     copy_memory(&file.get_file_id(), &mut dst);
-                    dst
+                    FileId(dst)
                 })
                 .collect(),
         }
@@ -67,7 +67,7 @@ impl MetadataTrait for Album {
                 .map(|image| {
                     let mut dst = [0u8; 20];
                     copy_memory(&image.get_file_id(), &mut dst);
-                    dst
+                    FileId(dst)
                 })
                 .collect(),
         }
