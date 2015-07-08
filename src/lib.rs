@@ -33,5 +33,6 @@ pub mod mercury;
 pub mod metadata;
 pub mod player;
 pub mod session;
+pub mod spirc;
 pub mod stream;
 pub mod subsystem;
