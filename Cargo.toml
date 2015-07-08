@@ -4,6 +4,14 @@ version = "0.1.0"
 authors = ["Paul Liétar <paul@lietar.net>"]
 build = "build.rs"
 
+[lib]
+name = "librespot"
+path = "src/lib.rs"
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
 [dependencies.librespot-protocol]
 path = "protocol"
 

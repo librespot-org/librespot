@@ -20,7 +20,7 @@ pub enum AudioFile<'s> {
     Loading(AudioFileLoading<'s>)
 }
 
-struct AudioFileLoading<'s> {
+pub struct AudioFileLoading<'s> {
     read_file: TempFile,
 
     position: u64,

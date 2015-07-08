@@ -1,6 +1,4 @@
-#![crate_name = "librespot"]
-
-#![feature(plugin,scoped,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,arc_weak,append,future)]
+#![feature(plugin,scoped)]
 #![allow(deprecated)]
 //#![allow(unused_imports,dead_code)]
 
@@ -18,23 +16,9 @@ extern crate shannon;
 extern crate rand;
 extern crate readall;
 extern crate vorbis;
-extern crate time;
-extern crate tempfile;
 
 extern crate librespot_protocol;
-
-#[macro_use] mod util;
-mod audio_decrypt;
-mod audio_file;
-mod audio_key;
-mod connection;
-mod keys;
-mod mercury;
-mod metadata;
-mod player;
-mod session;
-mod stream;
-mod subsystem;
+#[macro_use] extern crate librespot;
 
 use std::clone::Clone;
 use std::fs::File;
@@ -44,12 +28,14 @@ use protobuf::core::Message;
 use std::thread;
 use std::path::PathBuf;
 
-use metadata::{AlbumRef, ArtistRef, TrackRef};
-use session::{Config, Session};
-use util::SpotifyId;
-use util::version::version_string;
-use player::{Player, PlayerCommand};
-use mercury::{MercuryRequest, MercuryMethod};
+use librespot::util;
+use librespot::metadata::{AlbumRef, ArtistRef, TrackRef};
+use librespot::session::{Config, Session};
+use librespot::util::SpotifyId;
+use librespot::util::version::version_string;
+use librespot::player::{Player, PlayerCommand};
+use librespot::mercury::{MercuryRequest, MercuryMethod};
+
 use librespot_protocol as protocol;
 use librespot_protocol::spirc::PlayStatus;
 
