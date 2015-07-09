@@ -1,11 +1,11 @@
 use protobuf::{self, Message};
+use std::sync::{mpsc, MutexGuard};
 
 use util;
 use session::Session;
 use util::SpotifyId;
 use util::version::version_string;
 use mercury::{MercuryRequest, MercuryMethod};
-use std::sync::MutexGuard;
 
 use librespot_protocol as protocol;
 pub use librespot_protocol::spirc::PlayStatus;
@@ -47,8 +47,7 @@ pub trait SpircDelegate {
     fn stop(&self);
 
     fn state(&self) -> MutexGuard<Self::State>;
-    fn wait_update<'a>(&'a self, guard: MutexGuard<'a, Self::State>)
-        -> MutexGuard<'a, Self::State>;
+    fn updates(&self) -> mpsc::Receiver<i64>;
 }
 
 pub trait SpircState {
@@ -89,32 +88,29 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
 
     pub fn run(&mut self) {
         let rx = self.session.mercury_sub(format!("hm://remote/user/{}/v23", self.username));
-
-        self.notify(None);
+        let updates = self.delegate.updates();
 
         loop {
-            if let Ok(pkt) = rx.try_recv() {
-                let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(
-                    pkt.payload.front().unwrap()).unwrap();
-                println!("{:?} {} {} {} {}",
-                         frame.get_typ(),
-                         frame.get_device_state().get_name(),
-                         frame.get_ident(),
-                         frame.get_seq_nr(),
-                         frame.get_state_update_id());
-                if frame.get_ident() != self.ident &&
-                    (frame.get_recipient().len() == 0 ||
-                     frame.get_recipient().contains(&self.ident)) {
-                    self.handle(frame);
+            select! {
+                pkt = rx.recv() => {
+                    let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(
+                        pkt.unwrap().payload.front().unwrap()).unwrap();
+                    println!("{:?} {} {} {} {}",
+                             frame.get_typ(),
+                             frame.get_device_state().get_name(),
+                             frame.get_ident(),
+                             frame.get_seq_nr(),
+                             frame.get_state_update_id());
+                    if frame.get_ident() != self.ident &&
+                        (frame.get_recipient().len() == 0 ||
+                         frame.get_recipient().contains(&self.ident)) {
+                            self.handle(frame);
+                        }
+                },
+                update_time = updates.recv() => {
+                    self.state_update_id = update_time.unwrap();
+                    self.notify(None);
                 }
-            }
-
-            if {
-                let state = self.delegate.state();
-                state.update_time() > self.state_update_id
-            } {
-                self.state_update_id = util::now_ms();
-                self.notify(None);
             }
         }
     }
@@ -170,7 +166,7 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
             recipient: protobuf::RepeatedField::from_vec(
                 recipient.map(|r| vec![r.to_string()] ).unwrap_or(vec![])
             ),
-            state_update_id: self.state_update_id
+            state_update_id: self.state_update_id as i64
         });
 
         if self.is_active {
@@ -219,7 +215,7 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
             volume: self.volume as u32,
             name: self.name.clone(),
             error_code: 0,
-            became_active_at: if self.is_active { self.became_active_at } else { 0 },
+            became_active_at: if self.is_active { self.became_active_at as i64 } else { 0 },
             capabilities => [
                 @{
                     typ: protocol::spirc::CapabilityType::kCanBePlayer,

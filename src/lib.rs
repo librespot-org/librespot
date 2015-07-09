@@ -1,6 +1,6 @@
 #![crate_name = "librespot"]
 
-#![feature(plugin,scoped,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,arc_weak,append,future)]
+#![feature(plugin,scoped,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,arc_weak,append,future,mpsc_select)]
 #![allow(deprecated)]
 //#![allow(unused_imports,dead_code)]
 

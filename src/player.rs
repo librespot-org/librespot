@@ -76,28 +76,25 @@ impl <'s> PlayerInternal<'s> {
         portaudio::initialize().unwrap();
 
         let stream = portaudio::stream::Stream::<i16>::open_default(
-                0,
-                2,
-                44100.0,
+                0, 2, 44100.0,
                 portaudio::stream::FRAMES_PER_BUFFER_UNSPECIFIED,
                 None
-                ).unwrap();
+        ).unwrap();
 
         let mut decoder = None;
 
         loop {
             match self.commands.try_recv() {
                 Ok(PlayerCommand::Load(id, play, position)) => {
-                    println!("Load");
-                    let mut h = self.state.0.lock().unwrap();
-                    if h.status == PlayStatus::kPlayStatusPlay {
-                        stream.stop().unwrap();
-                    }
-                    h.status = PlayStatus::kPlayStatusLoading;
-                    h.position_ms = position;
-                    h.position_measured_at = util::now_ms();
-                    h.update_time = util::now_ms();
-                    drop(h);
+                    self.update(|state| {
+                        if state.status == PlayStatus::kPlayStatusPlay {
+                            stream.stop().unwrap();
+                        }
+                        state.status = PlayStatus::kPlayStatusLoading;
+                        state.position_ms = position;
+                        state.position_measured_at = util::now_ms();
+                        return true;
+                    });
 
                     let track : TrackRef = self.session.metadata(id);
                     let file_id = *track.wait().unwrap().files.first().unwrap();
@@ -109,48 +106,54 @@ impl <'s> PlayerInternal<'s> {
                         self.session.audio_file(file_id)), 0xa7)).unwrap());
                     decoder.as_mut().unwrap().time_seek(position as f64 / 1000f64).unwrap();
 
-                    let mut h = self.state.0.lock().unwrap();
-                    h.status = if play {
-                        stream.start().unwrap();
-                        PlayStatus::kPlayStatusPlay
-                    } else {
-                        PlayStatus::kPlayStatusPause
-                    };
-                    h.position_ms = position;
-                    h.position_measured_at = util::now_ms();
-                    h.update_time = util::now_ms();
+                    self.update(|state| {
+                        state.status = if play {
+                            stream.start().unwrap();
+                            PlayStatus::kPlayStatusPlay
+                        } else {
+                            PlayStatus::kPlayStatusPause
+                        };
+                        state.position_ms = position;
+                        state.position_measured_at = util::now_ms();
+
+                        return true;
+                    });
                     println!("Load Done");
                 }
                 Ok(PlayerCommand::Seek(ms)) => {
-                    let mut h = self.state.0.lock().unwrap();
                     decoder.as_mut().unwrap().time_seek(ms as f64 / 1000f64).unwrap();
-                    h.position_ms = (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
-                    h.position_measured_at = util::now_ms();
-                    h.update_time = util::now_ms();
+                    self.update(|state| {
+                        state.position_ms = (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_measured_at = util::now_ms();
+                        return true;
+                    });
                 },
                 Ok(PlayerCommand::Play) => {
-                    println!("Play");
-                    let mut h = self.state.0.lock().unwrap();
-                    h.status = PlayStatus::kPlayStatusPlay;
-                    h.update_time = util::now_ms();
+                    self.update(|state| {
+                        state.status = PlayStatus::kPlayStatusPlay;
+                        return true;
+                    });
 
                     stream.start().unwrap();
                 },
                 Ok(PlayerCommand::Pause) => {
-                    let mut h = self.state.0.lock().unwrap();
-                    h.status = PlayStatus::kPlayStatusPause;
-                    h.update_time = util::now_ms();
+                    self.update(|state| {
+                        state.status = PlayStatus::kPlayStatusPause;
+                        state.update_time = util::now_ms();
+                        return true;
+                    });
 
                     stream.stop().unwrap();
                 },
                 Ok(PlayerCommand::Stop) => {
-                    let mut h = self.state.0.lock().unwrap();
-                    if h.status == PlayStatus::kPlayStatusPlay {
-                        stream.stop().unwrap();
-                    }
+                    self.update(|state| {
+                        if state.status == PlayStatus::kPlayStatusPlay {
+                            state.status = PlayStatus::kPlayStatusPause;
+                        }
+                        return true;
+                    });
 
-                    h.status = PlayStatus::kPlayStatusPause;
-                    h.update_time = util::now_ms();
+                    stream.stop().unwrap();
                     decoder = None;
                 },
                 Err(..) => (),
@@ -170,15 +173,34 @@ impl <'s> PlayerInternal<'s> {
                     Err(e) => panic!("Vorbis error {:?}", e)
                 }
 
-                let mut h = self.state.0.lock().unwrap();
-                h.position_ms = (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
-                h.position_measured_at = util::now_ms();
+                self.update(|state| {
+                    let now = util::now_ms();
+
+                    if now - state.position_measured_at > 5000 {
+                        state.position_ms = (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_measured_at = now;
+                        return true;
+                    } else {
+                        return false;
+                    }
+                });
             }
         }
 
         drop(stream);
 
         portaudio::terminate().unwrap();
+    }
+
+    fn update<F>(&self, f: F)
+        where F: FnOnce(&mut MutexGuard<PlayerState>) -> bool {
+        let mut guard = self.state.0.lock().unwrap();
+        let update = f(&mut guard);
+        if update {
+            guard.update_time = util::now_ms();
+            self.state.1.notify_all();
+
+        }
     }
 }
 
@@ -210,9 +232,24 @@ impl <'s> SpircDelegate for Player<'s> {
         self.state.0.lock().unwrap()
     }
 
-    fn wait_update<'a>(&'a self, guard: MutexGuard<'a, Self::State>)
-        -> MutexGuard<'a, Self::State> {
-        self.state.1.wait(guard).unwrap()
+    fn updates(&self) -> mpsc::Receiver<i64> {
+        let state = self.state.clone();
+        let (update_tx, update_rx) = mpsc::channel();
+
+        thread::spawn(move || {
+            let mut guard = state.0.lock().unwrap();
+            let mut last_update;
+            loop {
+                last_update = guard.update_time;
+                update_tx.send(guard.update_time).unwrap();
+
+                while last_update >= guard.update_time {
+                    guard = state.1.wait(guard).unwrap();
+                }
+            }
+        });
+
+        return update_rx;
     }
 }
 
