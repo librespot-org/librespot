@@ -160,8 +160,8 @@ impl <'s> PlayerInternal<'s> {
             }
 
             if self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
-                match decoder.as_mut().unwrap().packets().next().unwrap() {
-                    Ok(packet) => {
+                match decoder.as_mut().unwrap().packets().next() {
+                    Some(Ok(packet)) => {
                         match stream.write(&packet.data) {
                             Ok(_) => (),
                             Err(portaudio::PaError::OutputUnderflowed)
@@ -169,8 +169,17 @@ impl <'s> PlayerInternal<'s> {
                             Err(e) => panic!("PA Error {}", e)
                         };
                     },
-                    Err(vorbis::VorbisError::Hole) => (),
-                    Err(e) => panic!("Vorbis error {:?}", e)
+                    Some(Err(vorbis::VorbisError::Hole)) => (),
+                    Some(Err(e)) => panic!("Vorbis error {:?}", e),
+                    None => {
+                        self.update(|state| {
+                            state.status = PlayStatus::kPlayStatusStop;
+                            return true;
+                        });
+
+                        stream.stop().unwrap();
+                        decoder = None;
+                    }
                 }
 
                 self.update(|state| {
@@ -199,7 +208,6 @@ impl <'s> PlayerInternal<'s> {
         if update {
             guard.update_time = util::now_ms();
             self.state.1.notify_all();
-
         }
     }
 }
