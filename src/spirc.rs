@@ -33,7 +33,8 @@ pub struct SpircManager<'s, D: SpircDelegate> {
     last_command_ident: String,
     last_command_msgid: u32,
 
-    track: Option<SpotifyId>
+    tracks: Vec<SpotifyId>,
+    index: u32
 }
 
 pub trait SpircDelegate {
@@ -54,6 +55,7 @@ pub trait SpircState {
     fn status(&self) -> PlayStatus;
     fn position(&self) -> (u32, i64);
     fn update_time(&self) -> i64;
+    fn end_of_track(&self) -> bool;
 }
 
 impl <'s, D: SpircDelegate> SpircManager<'s, D> {
@@ -82,7 +84,8 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
             last_command_ident: String::new(),
             last_command_msgid: 0,
 
-            track: None
+            tracks: Vec::new(),
+            index: 0
         }
     }
 
@@ -108,8 +111,15 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
                         }
                 },
                 update_time = updates.recv() => {
-                    self.state_update_id = update_time.unwrap();
-                    self.notify(None);
+                    let end_of_track = self.delegate.state().end_of_track();
+                    if end_of_track {
+                        self.index = (self.index + 1) % self.tracks.len() as u32;
+                        let track = self.tracks[self.index as usize];
+                        self.delegate.load(track, true, 0);
+                    } else {
+                        self.state_update_id = update_time.unwrap();
+                        self.notify(None);
+                    }
                 }
             }
         }
@@ -130,11 +140,16 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
                     self.became_active_at = util::now_ms();
                 }
 
-                let index = frame.get_state().get_playing_track_index() as usize;
-                let track = SpotifyId::from_raw(frame.get_state().get_track()[index].get_gid());
+
+                self.index = frame.get_state().get_playing_track_index();
+                self.tracks = frame.get_state().get_track().iter()
+                    .map(|track| SpotifyId::from_raw(track.get_gid()))
+                    .collect();
+
                 let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
-                self.track = Some(track);
-                self.delegate.load(track, play, frame.get_state().get_position_ms());
+                let track = self.tracks[self.index as usize];
+                let position = frame.get_state().get_position_ms();
+                self.delegate.load(track, play, position);
             }
             protocol::spirc::MessageType::kMessageTypePlay => {
                 self.delegate.play();
@@ -190,12 +205,12 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
             position_ms: position_ms,
             position_measured_at: position_measured_at as u64,
 
-            playing_track_index: 0,
-            track => [
-                @{
-                    gid: self.track.unwrap().to_raw().to_vec()
-                }
-            ],
+            playing_track_index: self.index,
+            track: self.tracks.iter().map(|track| {
+                protobuf_init!(protocol::spirc::TrackRef::new(), {
+                    gid: track.to_raw().to_vec()
+                })
+            }).collect(),
 
             shuffle: self.shuffle,
             repeat: self.repeat,

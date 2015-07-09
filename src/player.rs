@@ -22,7 +22,9 @@ pub struct PlayerState {
     status: PlayStatus,
     position_ms: u32,
     position_measured_at: i64,
-    update_time: i64
+    update_time: i64,
+
+    end_of_track: bool
 }
 
 struct PlayerInternal<'s> {
@@ -49,6 +51,7 @@ impl <'s> Player<'s> {
             position_ms: 0,
             position_measured_at: 0,
             update_time: util::now_ms(),
+            end_of_track: false,
         }), Condvar::new()));
 
         let internal = PlayerInternal {
@@ -90,6 +93,7 @@ impl <'s> PlayerInternal<'s> {
                         if state.status == PlayStatus::kPlayStatusPlay {
                             stream.stop().unwrap();
                         }
+                        state.end_of_track = false;
                         state.status = PlayStatus::kPlayStatusLoading;
                         state.position_ms = position;
                         state.position_measured_at = util::now_ms();
@@ -174,6 +178,7 @@ impl <'s> PlayerInternal<'s> {
                     None => {
                         self.update(|state| {
                             state.status = PlayStatus::kPlayStatusStop;
+                            state.end_of_track = true;
                             return true;
                         });
 
@@ -272,6 +277,10 @@ impl SpircState for PlayerState {
 
     fn update_time(&self) -> i64 {
         return self.update_time;
+    }
+
+    fn end_of_track(&self) -> bool {
+        return self.end_of_track;
     }
 }
 
