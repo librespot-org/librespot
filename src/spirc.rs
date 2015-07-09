@@ -1,18 +1,17 @@
-
 use protobuf::{self, Message};
 
 use util;
-use session::{Config, Session};
+use session::Session;
 use util::SpotifyId;
 use util::version::version_string;
-use player::{Player, PlayerCommand};
 use mercury::{MercuryRequest, MercuryMethod};
+use std::sync::MutexGuard;
 
 use librespot_protocol as protocol;
-use librespot_protocol::spirc::PlayStatus;
+pub use librespot_protocol::spirc::PlayStatus;
 
-pub struct SpircManager<'s> {
-    player: &'s Player<'s>,
+pub struct SpircManager<'s, D: SpircDelegate> {
+    delegate: D,
     session: &'s Session,
 
     username: String,
@@ -37,11 +36,33 @@ pub struct SpircManager<'s> {
     track: Option<SpotifyId>
 }
 
-impl <'s> SpircManager<'s> {
-    pub fn new(session: &'s Session, player: &'s Player<'s>, username: String, name: String) -> SpircManager<'s> {
+pub trait SpircDelegate {
+    type State : SpircState;
+
+    fn load(&self, track: SpotifyId,
+            start_playing: bool, position_ms: u32);
+    fn play(&self);
+    fn pause(&self);
+    fn seek(&self, position_ms: u32);
+    fn stop(&self);
+
+    fn state(&self) -> MutexGuard<Self::State>;
+    fn wait_update<'a>(&'a self, guard: MutexGuard<'a, Self::State>)
+        -> MutexGuard<'a, Self::State>;
+}
+
+pub trait SpircState {
+    fn status(&self) -> PlayStatus;
+    fn position(&self) -> (u32, i64);
+    fn update_time(&self) -> i64;
+}
+
+impl <'s, D: SpircDelegate> SpircManager<'s, D> {
+    pub fn new(session: &'s Session, delegate: D,
+               username: String, name: String) -> SpircManager<'s, D> {
         SpircManager {
+            delegate: delegate,
             session: &session,
-            player: &player,
 
             username: username.clone(),
             state_update_id: 0,
@@ -88,10 +109,11 @@ impl <'s> SpircManager<'s> {
                 }
             }
 
-            let h = self.player.state.0.lock().unwrap();
-            if h.update_time > self.state_update_id {
+            if {
+                let state = self.delegate.state();
+                state.update_time() > self.state_update_id
+            } {
                 self.state_update_id = util::now_ms();
-                drop(h);
                 self.notify(None);
             }
         }
@@ -114,24 +136,23 @@ impl <'s> SpircManager<'s> {
 
                 let index = frame.get_state().get_playing_track_index() as usize;
                 let track = SpotifyId::from_raw(frame.get_state().get_track()[index].get_gid());
+                let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
                 self.track = Some(track);
-                self.player.command(PlayerCommand::Load(track,
-                                                        frame.get_state().get_status() == PlayStatus::kPlayStatusPlay,
-                                                        frame.get_state().get_position_ms()));
+                self.delegate.load(track, play, frame.get_state().get_position_ms());
             }
             protocol::spirc::MessageType::kMessageTypePlay => {
-                self.player.command(PlayerCommand::Play);
+                self.delegate.play();
             }
             protocol::spirc::MessageType::kMessageTypePause => {
-                self.player.command(PlayerCommand::Pause);
+                self.delegate.pause();
             }
             protocol::spirc::MessageType::kMessageTypeSeek => {
-                self.player.command(PlayerCommand::Seek(frame.get_position()));
+                self.delegate.seek(frame.get_position());
             }
             protocol::spirc::MessageType::kMessageTypeNotify => {
                 if self.is_active && frame.get_device_state().get_is_active() {
                     self.is_active = false;
-                    self.player.command(PlayerCommand::Stop);
+                    self.delegate.stop();
                 }
             }
             _ => ()
@@ -153,7 +174,7 @@ impl <'s> SpircManager<'s> {
         });
 
         if self.is_active {
-            pkt.set_state(self.state());
+            pkt.set_state(self.spirc_state());
         }
 
         self.session.mercury(MercuryRequest{
@@ -164,13 +185,14 @@ impl <'s> SpircManager<'s> {
         });
     }
 
-    fn state(&mut self) -> protocol::spirc::State {
-        let state = self.player.state.0.lock().unwrap();
+    fn spirc_state(&self) -> protocol::spirc::State {
+        let state = self.delegate.state();
+        let (position_ms, position_measured_at) = state.position();
 
         protobuf_init!(protocol::spirc::State::new(), {
-            status: state.status,
-            position_ms: state.position_ms,
-            position_measured_at: state.position_measured_at as u64,
+            status: state.status(),
+            position_ms: position_ms,
+            position_measured_at: position_measured_at as u64,
 
             playing_track_index: 0,
             track => [
@@ -189,7 +211,7 @@ impl <'s> SpircManager<'s> {
         })
     }
 
-    fn device_state(&mut self) -> protocol::spirc::DeviceState {
+    fn device_state(&self) -> protocol::spirc::DeviceState {
         protobuf_init!(protocol::spirc::DeviceState::new(), {
             sw_version: version_string(),
             is_active: self.is_active,

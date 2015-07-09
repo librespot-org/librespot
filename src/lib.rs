@@ -2,7 +2,7 @@
 
 #![feature(plugin,scoped,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,arc_weak,append,future)]
 #![allow(deprecated)]
-#![allow(unused_imports,dead_code)]
+//#![allow(unused_imports,dead_code)]
 
 #![plugin(protobuf_macros)]
 #[macro_use] extern crate lazy_static;

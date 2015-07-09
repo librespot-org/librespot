@@ -1,28 +1,28 @@
 use portaudio;
 use vorbis;
-use std::sync::{mpsc, Mutex, Arc, Condvar};
+use std::sync::{mpsc, Mutex, Arc, Condvar, MutexGuard};
 use std::thread;
 
 use metadata::TrackRef;
 use session::Session;
-use audio_file::AudioFile;
 use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
-use librespot_protocol::spirc::PlayStatus;
+use spirc::{SpircState, SpircDelegate, PlayStatus};
 
-pub enum PlayerCommand {
-    Load(SpotifyId, bool, u32),
-    Play,
-    Pause,
-    Stop,
-    Seek(u32)
+pub struct Player<'s> {
+    state: Arc<(Mutex<PlayerState>, Condvar)>,
+
+    commands: mpsc::Sender<PlayerCommand>,
+
+    #[allow(dead_code)]
+    thread: thread::JoinGuard<'s, ()>,
 }
 
 pub struct PlayerState {
-    pub status: PlayStatus,
-    pub position_ms: u32,
-    pub position_measured_at: i64,
-    pub update_time: i64
+    status: PlayStatus,
+    position_ms: u32,
+    position_measured_at: i64,
+    update_time: i64
 }
 
 struct PlayerInternal<'s> {
@@ -32,13 +32,12 @@ struct PlayerInternal<'s> {
     commands: mpsc::Receiver<PlayerCommand>,
 }
 
-pub struct Player<'s> {
-    pub state: Arc<(Mutex<PlayerState>, Condvar)>,
-
-    commands: mpsc::Sender<PlayerCommand>,
-
-    #[allow(dead_code)]
-    thread: thread::JoinGuard<'s, ()>,
+enum PlayerCommand {
+    Load(SpotifyId, bool, u32),
+    Play,
+    Pause,
+    Stop,
+    Seek(u32)
 }
 
 impl <'s> Player<'s> {
@@ -67,7 +66,7 @@ impl <'s> Player<'s> {
         }
     }
 
-    pub fn command(&self, cmd: PlayerCommand) {
+    fn command(&self, cmd: PlayerCommand) {
         self.commands.send(cmd).unwrap();
     }
 }
@@ -183,4 +182,51 @@ impl <'s> PlayerInternal<'s> {
     }
 }
 
+impl <'s> SpircDelegate for Player<'s> {
+    type State = PlayerState;
+
+    fn load(&self, track: SpotifyId,
+            start_playing: bool, position_ms: u32) {
+        self.command(PlayerCommand::Load(track, start_playing, position_ms));
+    }
+
+    fn play(&self) {
+        self.command(PlayerCommand::Play)
+    }
+
+    fn pause(&self) {
+        self.command(PlayerCommand::Pause)
+    }
+
+    fn stop(&self) {
+        self.command(PlayerCommand::Stop)
+    }
+
+    fn seek(&self, position_ms: u32) {
+        self.command(PlayerCommand::Seek(position_ms));
+    }
+
+    fn state(&self) -> MutexGuard<Self::State> {
+        self.state.0.lock().unwrap()
+    }
+
+    fn wait_update<'a>(&'a self, guard: MutexGuard<'a, Self::State>)
+        -> MutexGuard<'a, Self::State> {
+        self.state.1.wait(guard).unwrap()
+    }
+}
+
+impl SpircState for PlayerState {
+    fn status(&self) -> PlayStatus {
+        return self.status;
+    }
+
+    fn position(&self) -> (u32, i64) {
+        return (self.position_ms, self.position_measured_at);
+    }
+
+    fn update_time(&self) -> i64 {
+        return self.update_time;
+    }
+}
 

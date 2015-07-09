@@ -44,7 +44,7 @@ fn main() {
 
     let player = Player::new(&session);
 
-    let mut spirc_manager = SpircManager::new(&session, &player, username, name);
+    let mut spirc_manager = SpircManager::new(&session, player, username, name);
     spirc_manager.run();
 
     poll_thread.join();
