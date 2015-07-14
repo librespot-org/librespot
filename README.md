@@ -25,7 +25,7 @@ cargo build
 A sample program implementing a headless Spotify Connect receiver is provided.
 Once you've built *librespot*, run it using :
 ```shell
-target/release/main APPKEY USERNAME PASSWORD CACHEDIR DEVICENAME
+target/debug/main APPKEY USERNAME PASSWORD CACHEDIR DEVICENAME
 ```
 where `APPKEY` is the path to a Spotify application key file, `USERNAME` and
 `PASSWORD` are your Spotify credentials, `CACHEDIR` is the path to directory
