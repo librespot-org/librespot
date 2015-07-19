@@ -24,6 +24,8 @@ lazy_static = "0.1.*"
 rust-crypto = "*"
 time = "*"
 tempfile = "*"
+rpassword = "*"
+getopts = "0.2.4"
 
 [dependencies.protobuf]
 git = "https://github.com/plietar/rust-protobuf.git"

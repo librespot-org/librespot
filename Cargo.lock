@@ -3,6 +3,7 @@ name = "librespot"
 version = "0.1.0"
 dependencies = [
  "byteorder 0.3.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "getopts 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "librespot-protocol 0.1.0",
  "mod_path 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -12,6 +13,7 @@ dependencies = [
  "protobuf_macros 0.1.0 (git+https://github.com/plietar/rust-protobuf-macros.git)",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "readall 0.1.0 (git+https://github.com/plietar/rust-readall.git)",
+ "rpassword 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-gmp 0.2.0 (git+https://github.com/plietar/rust-gmp.git)",
  "shannon 0.1.0 (git+https://github.com/plietar/rust-shannon.git)",
@@ -42,6 +44,14 @@ version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "getopts"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "log 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "kernel32-sys"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -66,6 +76,14 @@ version = "0.1.0"
 dependencies = [
  "mod_path 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.0.1 (git+https://github.com/plietar/rust-protobuf.git)",
+]
+
+[[package]]
+name = "log"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -140,6 +158,17 @@ version = "0.1.0"
 source = "git+https://github.com/plietar/rust-readall.git#d2bcc1de325705230e79ba444cde2f39b469f891"
 
 [[package]]
+name = "rpassword"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "kernel32-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "termios 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "rust-crypto"
 version = "0.2.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -191,6 +220,14 @@ dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "termios"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -253,6 +290,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "winapi"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "winapi-build"
