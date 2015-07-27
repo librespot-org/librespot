@@ -31,6 +31,12 @@ where `APPKEY` is the path to a Spotify application key file, `USERNAME` is your
 Spotify username, `CACHEDIR` is the path to directory where data will be cached,
 and `DEVICENAME` is the name that will appear in the Spotify Connect menu.
 
+## Troubleshooting
+If you connect using a facebook account, librespot will not show up among the
+devices in the Spotify app. What you need to do is apply for a
+[device password](http://www.spotify.com/account/set-device-password/) and
+use that to sign in instead.
+
 ## Disclaimer
 Using this code to connect to Spotify's API is probably forbidden by them, and
 might result in you application key getting banned. Use at you own risk
