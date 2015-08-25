@@ -25,6 +25,8 @@ extern crate time;
 extern crate tempfile;
 extern crate url;
 
+#[macro_use] extern crate log;
+
 #[cfg(not(feature = "with-tremor"))]
 extern crate vorbis;
 #[cfg(feature = "with-tremor")]

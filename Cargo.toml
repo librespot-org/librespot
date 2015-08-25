@@ -33,6 +33,8 @@ rustc-serialize = "~0.3.16"
 tempfile        = "~2.0.0"
 time            = "~0.1.34"
 url             = "~0.5.2"
+log 		= "0.3"
+env_logger 	= "0.3"
 shannon         = { git = "https://github.com/plietar/rust-shannon" }
 
 vorbis          = "~0.0.14"

@@ -122,7 +122,7 @@ impl AudioFile {
                                 (index * CHUNK_SIZE / 4) as u32,
                                 (CHUNK_SIZE / 4) as u32);
 
-        println!("Chunk {}", index);
+        trace!("Chunk {}", index);
 
         write_file.seek(SeekFrom::Start((index * CHUNK_SIZE) as u64)).unwrap();
 
