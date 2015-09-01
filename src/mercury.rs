@@ -1,11 +1,10 @@
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
+use eventual;
 use protobuf::{self, Message};
-use readall::ReadAllExt;
-use std::collections::{HashMap, LinkedList};
+use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
-use std::fmt;
 use std::mem::replace;
-use std::sync::{mpsc, Future};
+use std::sync::mpsc;
 
 use librespot_protocol as protocol;
 use session::Session;
@@ -30,13 +29,13 @@ pub struct MercuryRequest {
 #[derive(Debug)]
 pub struct MercuryResponse {
     pub uri: String,
-    pub payload: LinkedList<Vec<u8>>
+    pub payload: Vec<Vec<u8>>
 }
 
 pub struct MercuryPending {
-    parts: LinkedList<Vec<u8>>,
+    parts: Vec<Vec<u8>>,
     partial: Option<Vec<u8>>,
-    callback: Option<mpsc::Sender<MercuryResponse>>
+    callback: Option<eventual::Complete<MercuryResponse, ()>>
 }
 
 pub struct MercuryManager {
@@ -45,14 +44,14 @@ pub struct MercuryManager {
     subscriptions: HashMap<String, mpsc::Sender<MercuryResponse>>,
 }
 
-impl fmt::Display for MercuryMethod {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        formatter.write_str(match *self {
+impl ToString for MercuryMethod {
+    fn to_string(&self) -> String {
+        match *self {
             MercuryMethod::GET => "GET",
             MercuryMethod::SUB => "SUB",
             MercuryMethod::UNSUB => "UNSUB",
             MercuryMethod::SEND => "SEND"
-        })
+        }.to_owned()
     }
 }
 
@@ -66,7 +65,7 @@ impl MercuryManager {
     }
 
     pub fn request(&mut self, session: &Session, req: MercuryRequest)
-        -> Future<MercuryResponse> {
+        -> eventual::Future<MercuryResponse, ()> {
 
         let mut seq = [0u8; 4];
         BigEndian::write_u32(&mut seq, self.next_seq);
@@ -81,14 +80,14 @@ impl MercuryManager {
 
         session.send_packet(cmd, &data).unwrap();
 
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = eventual::Future::pair();
         self.pending.insert(seq.to_vec(), MercuryPending{
-            parts: LinkedList::new(),
+            parts: Vec::new(),
             partial: None,
             callback: Some(tx),
         });
 
-        Future::from_receiver(rx)
+        rx
     }
 
     pub fn subscribe(&mut self, session: &Session, uri: String)
@@ -109,33 +108,25 @@ impl MercuryManager {
     fn parse_part(mut s: &mut Read) -> Vec<u8> {
         let size = s.read_u16::<BigEndian>().unwrap() as usize;
         let mut buffer = vec![0; size];
-        s.read_all(&mut buffer).unwrap();
+        s.read_exact(&mut buffer).unwrap();
 
         buffer
     }
 
     fn complete_request(&mut self, cmd: u8, mut pending: MercuryPending) {
-        let header_data = match pending.parts.pop_front() {
-            Some(data) => data,
-            None => panic!("No header part !")
-        };
-
+        let header_data = pending.parts.remove(0);
         let header : protocol::mercury::Header =
             protobuf::parse_from_bytes(&header_data).unwrap();
 
-        let callback = if cmd == 0xb5 {
-            self.subscriptions.get(header.get_uri())
-        } else {
-            pending.callback.as_ref()
+        let response = MercuryResponse {
+            uri: header.get_uri().to_owned(),
+            payload: pending.parts
         };
 
-        if let Some(ref ch) = callback {
-             // Ignore send error.
-             // It simply means the receiver was closed
-            ch.send(MercuryResponse{
-                uri: header.get_uri().to_string(),
-                payload: pending.parts
-            }).ignore();
+        if cmd == 0xb5 {
+            self.subscriptions.get(header.get_uri()).map(|ch| ch.send(response).ignore());
+        } else {
+            pending.callback.map(|cb| cb.complete(response));
         }
     }
 
@@ -173,7 +164,7 @@ impl PacketHandler for MercuryManager {
         let seq = {
             let seq_length = packet.read_u16::<BigEndian>().unwrap() as usize;
             let mut seq = vec![0; seq_length];
-            packet.read_all(&mut seq).unwrap();
+            packet.read_exact(&mut seq).unwrap();
             seq
         };
         let flags = packet.read_u8().unwrap();
@@ -183,7 +174,7 @@ impl PacketHandler for MercuryManager {
             pending
         } else if cmd == 0xb5 {
             MercuryPending {
-                parts: LinkedList::new(),
+                parts: Vec::new(),
                 partial: None,
                 callback: None,
             }
@@ -202,7 +193,7 @@ impl PacketHandler for MercuryManager {
             if i == count - 1 && (flags == 2) {
                 pending.partial = Some(part)
             } else {
-                pending.parts.push_back(part);
+                pending.parts.push(part);
             }
         }
 

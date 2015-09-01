@@ -1,7 +1,8 @@
+use eventual::Async;
 use portaudio;
-use vorbis;
 use std::sync::{mpsc, Mutex, Arc, Condvar, MutexGuard};
 use std::thread;
+use vorbis;
 
 use metadata::TrackRef;
 use session::Session;
@@ -9,13 +10,10 @@ use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
 use spirc::{SpircState, SpircDelegate, PlayStatus};
 
-pub struct Player<'s> {
+pub struct Player {
     state: Arc<(Mutex<PlayerState>, Condvar)>,
 
     commands: mpsc::Sender<PlayerCommand>,
-
-    #[allow(dead_code)]
-    thread: thread::JoinGuard<'s, ()>,
 }
 
 pub struct PlayerState {
@@ -27,10 +25,9 @@ pub struct PlayerState {
     end_of_track: bool
 }
 
-struct PlayerInternal<'s> {
+struct PlayerInternal {
     state: Arc<(Mutex<PlayerState>, Condvar)>,
-
-    session: &'s Session,
+    session: Session,
     commands: mpsc::Receiver<PlayerCommand>,
 }
 
@@ -42,7 +39,7 @@ enum PlayerCommand {
     Seek(u32)
 }
 
-impl <'s> Player<'s> {
+impl Player {
     pub fn new(session: &Session) -> Player {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
@@ -55,17 +52,18 @@ impl <'s> Player<'s> {
         }), Condvar::new()));
 
         let internal = PlayerInternal {
-            session: session,
+            session: session.clone(),
             commands: cmd_rx,
             state: state.clone()
         };
 
+        thread::spawn(move || {
+            internal.run()
+        });
+
         Player {
             commands: cmd_tx,
             state: state,
-            thread: thread::scoped(move || {
-                internal.run()
-            })
         }
     }
 
@@ -74,7 +72,7 @@ impl <'s> Player<'s> {
     }
 }
 
-impl <'s> PlayerInternal<'s> {
+impl PlayerInternal {
     fn run(self) {
         portaudio::initialize().unwrap();
 
@@ -102,7 +100,8 @@ impl <'s> PlayerInternal<'s> {
 
                     let track : TrackRef = self.session.metadata(id);
                     let file_id = *track.wait().unwrap().files.first().unwrap();
-                    let key = self.session.audio_key(track.id(), file_id).into_inner();
+
+                    let key = self.session.audio_key(track.id(), file_id).await().unwrap();
                     decoder = Some(
                         vorbis::Decoder::new(
                         Subfile::new(
@@ -217,7 +216,7 @@ impl <'s> PlayerInternal<'s> {
     }
 }
 
-impl <'s> SpircDelegate for Player<'s> {
+impl SpircDelegate for Player {
     type State = PlayerState;
 
     fn load(&self, track: SpotifyId,

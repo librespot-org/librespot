@@ -1,3 +1,4 @@
+use eventual::Async;
 use protobuf::{self, Message};
 use std::sync::{mpsc, MutexGuard};
 
@@ -70,7 +71,7 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
             seq_nr: 0,
 
             name: name,
-            ident: session.config.device_id.clone(),
+            ident: session.0.config.device_id.clone(),
             device_type: 5,
             can_play: true,
 
@@ -97,7 +98,8 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
             select! {
                 pkt = rx.recv() => {
                     let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(
-                        pkt.unwrap().payload.front().unwrap()).unwrap();
+                        pkt.unwrap().payload.first().unwrap()).unwrap();
+
                     println!("{:?} {} {} {} {}",
                              frame.get_typ(),
                              frame.get_device_state().get_name(),
@@ -127,7 +129,7 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
 
     fn handle(&mut self, frame: protocol::spirc::Frame) {
         if frame.get_recipient().len() > 0 {
-            self.last_command_ident = frame.get_ident().to_string();
+            self.last_command_ident = frame.get_ident().to_owned();
             self.last_command_msgid = frame.get_seq_nr();
         }
         match frame.get_typ() {
@@ -174,12 +176,12 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
         let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
             ident: self.ident.clone(),
-            protocol_version: "2.0.0".to_string(),
+            protocol_version: "2.0.0".to_owned(),
             seq_nr: { self.seq_nr += 1; self.seq_nr  },
             typ: protocol::spirc::MessageType::kMessageTypeNotify,
             device_state: self.device_state(),
             recipient: protobuf::RepeatedField::from_vec(
-                recipient.map(|r| vec![r.to_string()] ).unwrap_or(vec![])
+                recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
             ),
             state_update_id: self.state_update_id as i64
         });
@@ -193,7 +195,7 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
             uri: format!("hm://remote/user/{}", self.username),
             content_type: None,
             payload: vec![ pkt.write_to_bytes().unwrap() ]
-        });
+        }).await().unwrap();
     }
 
     fn spirc_state(&self) -> protocol::spirc::State {
@@ -259,23 +261,23 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
                 @{
                     typ: protocol::spirc::CapabilityType::kSupportedContexts,
                     stringValue => [
-                        "album".to_string(),
-                        "playlist".to_string(),
-                        "search".to_string(),
-                        "inbox".to_string(),
-                        "toplist".to_string(),
-                        "starred".to_string(),
-                        "publishedstarred".to_string(),
-                        "track".to_string(),
+                        "album".to_owned(),
+                        "playlist".to_owned(),
+                        "search".to_owned(),
+                        "inbox".to_owned(),
+                        "toplist".to_owned(),
+                        "starred".to_owned(),
+                        "publishedstarred".to_owned(),
+                        "track".to_owned(),
                     ]
                 },
                 @{
                     typ: protocol::spirc::CapabilityType::kSupportedTypes,
                     stringValue => [
-                        "audio/local".to_string(),
-                        "audio/track".to_string(),
-                        "local".to_string(),
-                        "track".to_string(),
+                        "audio/local".to_owned(),
+                        "audio/track".to_owned(),
+                        "local".to_owned(),
+                        "track".to_owned(),
                     ]
                 }
             ],

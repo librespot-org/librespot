@@ -16,17 +16,22 @@ path = "src/main.rs"
 path = "protocol"
 
 [dependencies]
-mod_path = "*"
-byteorder = "*"
-num = "*"
-rand = "*"
-lazy_static = "0.1.*"
-rust-crypto = "*"
-time = "*"
-tempfile = "*"
-rpassword = "*"
-getopts = "0.2.4"
+bit-set     = "~0.2.0"
+byteorder   = "~0.3.13"
+eventual    = "~0.1.4"
+getopts     = "~0.2.14"
+lazy_static = "~0.1.14"
+mod_path    = "~0.1.5"
+num         = "~0.1.27"
+rand        = "~0.3.11"
+rpassword   = "~0.0.5"
+rust-crypto = "~0.2.31"
+time        = "~0.1.32"
+tempfile    = "~1.1.1"
+vorbis      = "~0.0.12"
 
+[dependencies.clippy]
+git = "https://github.com/Manishearth/rust-clippy.git"
 [dependencies.protobuf]
 git = "https://github.com/plietar/rust-protobuf.git"
 [dependencies.protobuf_macros]
@@ -35,12 +40,9 @@ git = "https://github.com/plietar/rust-protobuf-macros.git"
 git = "https://github.com/plietar/rust-gmp.git"
 [dependencies.shannon]
 git = "https://github.com/plietar/rust-shannon.git"
-[dependencies.readall]
-git = "https://github.com/plietar/rust-readall.git"
 [dependencies.portaudio]
 git = "https://github.com/mvdnes/portaudio-rs"
-[dependencies.vorbis]
-git = "https://github.com/plietar/vorbis-rs"
 
 [build-dependencies]
-vergen = "*"
+vergen = "~0.0.16"
+

@@ -1,8 +1,9 @@
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
+use eventual::Future;
 use protobuf::{self, Message};
 use rand::thread_rng;
-use std::sync::{Mutex, Arc, Future, mpsc};
+use std::sync::{Mutex, Arc, mpsc};
 use std::path::PathBuf;
 
 use connection::{self, PlainConnection, CipherConnection};
@@ -26,7 +27,7 @@ pub struct Config {
     pub cache_location: PathBuf,
 }
 
-pub struct Session {
+pub struct SessionData {
     pub config: Config,
 
     mercury: Mutex<MercuryManager>,
@@ -38,7 +39,8 @@ pub struct Session {
     tx_connection: Mutex<CipherConnection>,
 }
 
-type SessionRef = Arc<Session>;
+#[derive(Clone)]
+pub struct Session(pub Arc<SessionData>);
 
 impl Session {
     pub fn new(mut config: Config) -> Session {
@@ -114,7 +116,7 @@ impl Session {
 
         let cipher_connection = connection.setup_cipher(shared_keys);
 
-        Session {
+        Session(Arc::new(SessionData {
             config: config,
 
             rx_connection: Mutex::new(cipher_connection.clone()),
@@ -125,7 +127,7 @@ impl Session {
             stream: Mutex::new(StreamManager::new()),
             audio_key: Mutex::new(AudioKeyManager::new()),
             audio_file: Mutex::new(AudioFileManager::new()),
-        }
+        }))
     }
 
     pub fn login(&self, username: String, password: String) {
@@ -138,15 +140,15 @@ impl Session {
             system_info => {
                 cpu_family: protocol::authentication::CpuFamily::CPU_UNKNOWN,
                 os: protocol::authentication::Os::OS_UNKNOWN,
-                system_information_string: "librespot".to_string(),
-                device_id: self.config.device_id.clone()
+                system_information_string: "librespot".to_owned(),
+                device_id: self.0.config.device_id.clone()
             },
             version_string: util::version::version_string(),
             appkey => {
-                version: self.config.application_key[0] as u32,
-                devkey: self.config.application_key[0x1..0x81].to_vec(),
-                signature: self.config.application_key[0x81..0x141].to_vec(),
-                useragent: self.config.user_agent.clone(),
+                version: self.0.config.application_key[0] as u32,
+                devkey: self.0.config.application_key[0x1..0x81].to_vec(),
+                signature: self.0.config.application_key[0x81..0x141].to_vec(),
+                useragent: self.0.config.user_agent.clone(),
                 callback_hash: vec![0; 20],
             }
         });
@@ -156,14 +158,14 @@ impl Session {
 
     pub fn poll(&self) {
         let (cmd, data) =
-            self.rx_connection.lock().unwrap().recv_packet().unwrap();
+            self.0.rx_connection.lock().unwrap().recv_packet().unwrap();
 
         match cmd {
             0x4 => self.send_packet(0x49, &data).unwrap(),
             0x4a => (),
-            0x9  => self.stream.lock().unwrap().handle(cmd, data),
-            0xd | 0xe => self.audio_key.lock().unwrap().handle(cmd, data),
-            0xb2...0xb6 => self.mercury.lock().unwrap().handle(cmd, data),
+            0x9  => self.0.stream.lock().unwrap().handle(cmd, data),
+            0xd | 0xe => self.0.audio_key.lock().unwrap().handle(cmd, data),
+            0xb2...0xb6 => self.0.mercury.lock().unwrap().handle(cmd, data),
             0xac => eprintln!("Authentication succeedded"),
             0xad => eprintln!("Authentication failed"),
             _ => ()
@@ -171,31 +173,31 @@ impl Session {
     }
 
     pub fn send_packet(&self, cmd: u8, data: &[u8]) -> connection::Result<()> {
-        self.tx_connection.lock().unwrap().send_packet(cmd, data)
+        self.0.tx_connection.lock().unwrap().send_packet(cmd, data)
     }
     
-    pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey> {
-        self.audio_key.lock().unwrap().request(self, track, file)
+    pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey, ()> {
+        self.0.audio_key.lock().unwrap().request(self, track, file)
     }
 
     pub fn audio_file(&self, file: FileId) -> AudioFile {
-        self.audio_file.lock().unwrap().request(self, file)
+        self.0.audio_file.lock().unwrap().request(self, file)
     }
 
     pub fn stream(&self, file: FileId, offset: u32, size: u32) -> mpsc::Receiver<StreamEvent> {
-        self.stream.lock().unwrap().request(self, file, offset, size)
+        self.0.stream.lock().unwrap().request(self, file, offset, size)
     }
 
     pub fn metadata<T: MetadataTrait>(&self, id: SpotifyId) -> MetadataRef<T> {
-        self.metadata.lock().unwrap().get(self, id)
+        self.0.metadata.lock().unwrap().get(self, id)
     }
 
-    pub fn mercury(&self, req: MercuryRequest) -> Future<MercuryResponse> {
-        self.mercury.lock().unwrap().request(self, req)
+    pub fn mercury(&self, req: MercuryRequest) -> Future<MercuryResponse, ()> {
+        self.0.mercury.lock().unwrap().request(self, req)
     }
 
     pub fn mercury_sub(&self, uri: String) -> mpsc::Receiver<MercuryResponse> {
-        self.mercury.lock().unwrap().subscribe(self, uri)
+        self.0.mercury.lock().unwrap().subscribe(self, uri)
     }
 }
 

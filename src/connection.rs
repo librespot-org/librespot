@@ -1,9 +1,8 @@
 use byteorder::{self, BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
-use readall::ReadAllExt;
 use shannon::ShannonStream;
 use std::convert;
 use std::io;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::result;
 
@@ -70,7 +69,7 @@ impl PlainConnection {
         let mut buffer = vec![0u8; size];
 
         BigEndian::write_u32(&mut buffer, size as u32);
-        try!(self.stream.read_all(&mut buffer[4..]));
+        try!(self.stream.read_exact(&mut buffer[4..]));
 
         Ok(buffer)
     }
@@ -98,7 +97,7 @@ impl CipherConnection {
         let size = try!(self.stream.read_u16::<BigEndian>()) as usize;
 
         let mut data = vec![0; size];
-        try!(self.stream.read_all(&mut data));
+        try!(self.stream.read_exact(&mut data));
 
         try!(self.stream.finish_recv());
 

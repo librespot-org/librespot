@@ -33,8 +33,8 @@ impl io::Read for ZeroFile {
     // TODO optimize with memset or similar
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         let len = min(output.len(), (self.size - self.position) as usize);
-        for i in 0..len {
-            output[i] = 0;
+        for b in output {
+            *b = 0;
         }
 
         self.position += len as u64;

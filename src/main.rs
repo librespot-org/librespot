@@ -1,4 +1,3 @@
-#![feature(scoped)]
 #![feature(result_expect)]
 #![allow(deprecated)]
 
@@ -71,9 +70,10 @@ fn main() {
     session.login(username.clone(), password);
     session.poll();
 
-    let poll_thread = thread::scoped(|| {
+    let _session = session.clone();
+    thread::spawn(move || {
         loop {
-            session.poll();
+            _session.poll();
         }
     });
 
@@ -81,7 +81,5 @@ fn main() {
 
     let mut spirc_manager = SpircManager::new(&session, player, username, name);
     spirc_manager.run();
-
-    poll_thread.join();
 }
 

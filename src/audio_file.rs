@@ -1,6 +1,6 @@
+use bit_set::BitSet;
 use byteorder::{ByteOrder, BigEndian};
 use std::cmp::min;
-use std::collections::BitSet;
 use std::sync::{Arc, Condvar, Mutex};
 use std::sync::mpsc::{self, TryRecvError};
 use std::thread;
@@ -9,27 +9,24 @@ use std::io::{self, Read, Write, Seek, SeekFrom};
 use std::path::PathBuf;
 use tempfile::TempFile;
 
-use stream::StreamEvent;
 use util::{FileId, IgnoreExt, ZeroFile, mkdir_existing};
 use session::Session;
+use stream::StreamEvent;
 
 const CHUNK_SIZE : usize = 0x20000;
 
-pub enum AudioFile<'s> {
+pub enum AudioFile {
     Direct(fs::File),
-    Loading(AudioFileLoading<'s>)
+    Loading(AudioFileLoading)
 }
 
-pub struct AudioFileLoading<'s> {
+pub struct AudioFileLoading {
     read_file: TempFile,
 
     position: u64,
     seek: mpsc::Sender<u64>,
 
     shared: Arc<AudioFileShared>,
-
-    #[allow(dead_code)]
-    thread: thread::JoinGuard<'s, ()>,
 }
 
 struct AudioFileShared {
@@ -40,7 +37,7 @@ struct AudioFileShared {
     bitmap: Mutex<BitSet>,
 }
 
-impl <'s> AudioFileLoading<'s> {
+impl AudioFileLoading {
     fn new(session: &Session, file_id: FileId) -> AudioFileLoading {
         let mut files_iter = TempFile::shared(2).unwrap().into_iter();
         let read_file = files_iter.next().unwrap();
@@ -70,17 +67,20 @@ impl <'s> AudioFileLoading<'s> {
 
         let (seek_tx, seek_rx) = mpsc::channel();
 
+        let _shared = shared.clone();
+        let _session = session.clone();
+
+        thread::spawn(move || {
+            AudioFileLoading::fetch(&_session, _shared, write_file, seek_rx)
+        });
+
         AudioFileLoading {
             read_file: read_file,
 
             position: 0,
             seek: seek_tx,
 
-            shared: shared.clone(),
-
-            thread: thread::scoped(move || {
-                AudioFileLoading::fetch(session, shared, write_file, seek_rx)
-            })
+            shared: shared
         }
     }
 
@@ -155,7 +155,7 @@ impl <'s> AudioFileLoading<'s> {
     }
 }
 
-impl <'s> Read for AudioFileLoading<'s> {
+impl Read for AudioFileLoading {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         let index = self.position as usize / CHUNK_SIZE;
         let offset = self.position as usize % CHUNK_SIZE;
@@ -167,15 +167,15 @@ impl <'s> Read for AudioFileLoading<'s> {
         }
         drop(bitmap);
 
-        let len = try!(self.read_file.read(&mut output[..len]));
+        let read_len = try!(self.read_file.read(&mut output[..len]));
 
-        self.position += len as u64;
+        self.position += read_len as u64;
 
-        Ok(len)
+        Ok(read_len)
     }
 }
 
-impl <'s> Seek for AudioFileLoading<'s> {
+impl Seek for AudioFileLoading {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.position = try!(self.read_file.seek(pos));
 
@@ -189,7 +189,7 @@ impl <'s> Seek for AudioFileLoading<'s> {
     }
 }
 
-impl <'s> Read for AudioFile<'s> {
+impl Read for AudioFile {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         match *self {
             AudioFile::Direct(ref mut file) => file.read(output),
@@ -198,7 +198,7 @@ impl <'s> Read for AudioFile<'s> {
     }
 }
 
-impl <'s> Seek for AudioFile<'s> {
+impl Seek for AudioFile {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         match *self {
             AudioFile::Direct(ref mut file) => file.seek(pos),
@@ -215,7 +215,7 @@ impl AudioFileManager {
 
     pub fn cache_dir(session: &Session, file_id: FileId) -> PathBuf {
         let name = file_id.to_base16();
-        session.config.cache_location.join(&name[0..2])
+        session.0.config.cache_location.join(&name[0..2])
     }
 
     pub fn cache_path(session: &Session, file_id: FileId) -> PathBuf {
@@ -223,7 +223,7 @@ impl AudioFileManager {
         AudioFileManager::cache_dir(session, file_id).join(&name[2..])
     }
 
-    pub fn request<'a> (&mut self, session: &'a Session, file_id: FileId) -> AudioFile<'a> {
+    pub fn request (&mut self, session: &Session, file_id: FileId) -> AudioFile {
         match fs::File::open(AudioFileManager::cache_path(session, file_id)) {
             Ok(f) => AudioFile::Direct(f),
             Err(..) => AudioFile::Loading(AudioFileLoading::new(session, file_id))

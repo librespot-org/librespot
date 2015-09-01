@@ -1,3 +1,4 @@
+use eventual::Async;
 use protobuf::{self, Message};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
@@ -11,7 +12,7 @@ use mercury::{MercuryRequest, MercuryMethod};
 use util::{SpotifyId, FileId};
 use session::Session;
 
-pub trait MetadataTrait : Send + Any + 'static {
+pub trait MetadataTrait : Send + Sized + Any + 'static {
     type Message: protobuf::MessageStatic;
     fn from_msg(msg: &Self::Message) -> Self;
     fn base_url() -> &'static str;
@@ -29,7 +30,7 @@ impl MetadataTrait for Track {
     type Message = protocol::metadata::Track;
     fn from_msg(msg: &Self::Message) -> Self {
         Track {
-            name: msg.get_name().to_string(),
+            name: msg.get_name().to_owned(),
             album: SpotifyId::from_raw(msg.get_album().get_gid()),
             files: msg.get_file().iter()
                 .map(|file| {
@@ -59,7 +60,7 @@ impl MetadataTrait for Album {
     type Message = protocol::metadata::Album;
     fn from_msg(msg: &Self::Message) -> Self {
         Album {
-            name: msg.get_name().to_string(),
+            name: msg.get_name().to_owned(),
             artists: msg.get_artist().iter()
                 .map(|a| SpotifyId::from_raw(a.get_gid()))
                 .collect(),
@@ -89,7 +90,7 @@ impl MetadataTrait for Artist {
     type Message = protocol::metadata::Artist;
     fn from_msg(msg: &Self::Message) -> Self {
         Artist {
-            name: msg.get_name().to_string(),
+            name: msg.get_name().to_owned(),
         }
     }
     fn base_url() -> &'static str {
@@ -164,7 +165,7 @@ impl <T: MetadataTrait> MetadataState<T> {
         }
     }
 
-    pub fn unwrap<'s>(&'s self) -> &'s T {
+    pub fn unwrap(&self) -> &T {
         match *self {
             MetadataState::Loaded(ref data) => data,
             _ => panic!("Not loaded")
@@ -180,7 +181,7 @@ pub enum MetadataRequest {
 }
 
 pub struct MetadataManager {
-    cache: HashMap<(SpotifyId, TypeId), Box<Any + Send>>
+    cache: HashMap<(SpotifyId, TypeId), Box<Any + Send + 'static>>
 }
 
 impl MetadataManager {
@@ -204,7 +205,7 @@ impl MetadataManager {
                     cond: Condvar::new()
                 });
 
-                self.cache.insert(key, Box::new(x.downgrade()));
+                self.cache.insert(key, Box::new(Arc::downgrade(&x)));
                 self.load(session, x.clone());
                 x
             })
@@ -219,10 +220,10 @@ impl MetadataManager {
         });
 
         thread::spawn(move || {
-            let response = rx.into_inner();
+            let response = rx.await().unwrap();
 
             let msg : T::Message = protobuf::parse_from_bytes(
-                response.payload.front().unwrap()).unwrap();
+                response.payload.first().unwrap()).unwrap();
 
             object.set(MetadataState::Loaded(T::from_msg(&msg)));
         });

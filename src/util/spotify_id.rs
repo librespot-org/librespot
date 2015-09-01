@@ -19,7 +19,7 @@ impl SpotifyId {
 
         let mut n : u128 = std::num::Zero::zero();
         for c in data {
-            let d = BASE16_DIGITS.position_elem(c).unwrap() as u8;
+            let d = BASE16_DIGITS.iter().position(|e| e == c).unwrap() as u8;
             n = n * u128::from(16);
             n = n + u128::from(d);
         }
@@ -33,7 +33,7 @@ impl SpotifyId {
 
         let mut n : u128 = std::num::Zero::zero();
         for c in data {
-            let d = BASE62_DIGITS.position_elem(c).unwrap() as u8;
+            let d = BASE62_DIGITS.iter().position(|e| e == c).unwrap() as u8;
             n = n * u128::from(62);
             n = n + u128::from(d);
         }
@@ -62,7 +62,7 @@ impl SpotifyId {
             data[15-i] = BASE16_DIGITS[(high.wrapping_shr(4 * i as u32) & 0xF) as usize];
         }
 
-        std::str::from_utf8(&data).unwrap().to_string()
+        std::str::from_utf8(&data).unwrap().to_owned()
     }
 
     pub fn to_raw(&self) -> [u8; 16] {

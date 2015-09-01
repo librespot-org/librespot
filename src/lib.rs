@@ -1,25 +1,25 @@
 #![crate_name = "librespot"]
 
-#![feature(plugin,scoped,zero_one,iter_arith,slice_position_elem,slice_bytes,bitset,arc_weak,append,future,mpsc_select)]
-#![allow(deprecated)]
-//#![allow(unused_imports,dead_code)]
+#![feature(plugin,read_exact,zero_one,iter_arith,slice_bytes,arc_weak,append,mpsc_select)]
+#![allow(needless_return)]
 
+#![plugin(clippy)]
 #![plugin(protobuf_macros)]
 #[macro_use] extern crate lazy_static;
 
-
+extern crate bit_set;
 extern crate byteorder;
 extern crate crypto;
+extern crate eventual;
 extern crate gmp;
 extern crate num;
 extern crate portaudio;
 extern crate protobuf;
 extern crate shannon;
 extern crate rand;
-extern crate readall;
-extern crate vorbis;
 extern crate time;
 extern crate tempfile;
+extern crate vorbis;
 
 extern crate librespot_protocol;
 
