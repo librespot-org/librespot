@@ -1,6 +1,3 @@
-#![feature(result_expect)]
-#![allow(deprecated)]
-
 extern crate getopts;
 extern crate librespot;
 extern crate rpassword;

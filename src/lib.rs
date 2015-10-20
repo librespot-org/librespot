@@ -1,9 +1,7 @@
 #![crate_name = "librespot"]
 
-#![feature(plugin,read_exact,zero_one,iter_arith,slice_bytes,arc_weak,append,mpsc_select)]
-#![allow(needless_return)]
+#![feature(plugin,read_exact,zero_one,iter_arith,slice_bytes,mpsc_select)]
 
-#![plugin(clippy)]
 #![plugin(protobuf_macros)]
 #[macro_use] extern crate lazy_static;
 

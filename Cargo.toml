@@ -21,8 +21,8 @@ byteorder   = "~0.3.13"
 eventual    = "~0.1.4"
 getopts     = "~0.2.14"
 lazy_static = "~0.1.14"
-mod_path    = "~0.1.5"
 num         = "~0.1.27"
+protobuf    = "~1.0.4"
 rand        = "~0.3.11"
 rpassword   = "~0.0.5"
 rust-crypto = "~0.2.31"
@@ -30,10 +30,6 @@ time        = "~0.1.32"
 tempfile    = "~1.1.1"
 vorbis      = "~0.0.12"
 
-[dependencies.clippy]
-git = "https://github.com/Manishearth/rust-clippy.git"
-[dependencies.protobuf]
-git = "https://github.com/plietar/rust-protobuf.git"
 [dependencies.protobuf_macros]
 git = "https://github.com/plietar/rust-protobuf-macros.git"
 [dependencies.rust-gmp]
