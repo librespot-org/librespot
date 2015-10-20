@@ -32,8 +32,6 @@ vorbis      = "~0.0.12"
 
 [dependencies.protobuf_macros]
 git = "https://github.com/plietar/rust-protobuf-macros.git"
-[dependencies.rust-gmp]
-git = "https://github.com/plietar/rust-gmp.git"
 [dependencies.shannon]
 git = "https://github.com/plietar/rust-shannon.git"
 [dependencies.portaudio]

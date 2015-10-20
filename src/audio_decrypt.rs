@@ -1,9 +1,8 @@
 use crypto::aes;
 use crypto::symmetriccipher::SynchronousStreamCipher;
+use num::{BigUint, FromPrimitive};
 use std::io;
 use std::ops::Add;
-use num::FromPrimitive;
-use gmp::Mpz;
 
 use audio_key::AudioKey;
 
@@ -46,8 +45,8 @@ impl <T : io::Read + io::Seek> io::Seek for AudioDecrypt<T> {
         let newpos = try!(self.reader.seek(pos));
         let skip = newpos % 16;
 
-        let iv = Mpz::from_bytes_be(AUDIO_AESIV)
-                    .add(Mpz::from_u64(newpos / 16).unwrap())
+        let iv = BigUint::from_bytes_be(AUDIO_AESIV)
+                    .add(BigUint::from_u64(newpos / 16).unwrap())
                     .to_bytes_be();
         self.cipher = aes::ctr(aes::KeySize::KeySize128,
                                &self.key,

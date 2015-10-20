@@ -15,7 +15,6 @@ dependencies = [
  "rand 0.3.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",
- "rust-gmp 0.2.0 (git+https://github.com/plietar/rust-gmp.git)",
  "shannon 0.1.0 (git+https://github.com/plietar/rust-shannon.git)",
  "tempfile 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.33 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -213,14 +212,6 @@ dependencies = [
  "rand 0.3.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.33 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "rust-gmp"
-version = "0.2.0"
-source = "git+https://github.com/plietar/rust-gmp.git#d1bb4448fdbfa2505edadb83b6aac6257fe08ba2"
-dependencies = [
- "num 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

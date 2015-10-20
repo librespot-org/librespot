@@ -1,15 +1,14 @@
 use crypto;
 use crypto::mac::Mac;
-use gmp::Mpz;
-use num::FromPrimitive;
+use num::{BigUint, FromPrimitive};
 use rand;
 use std::io::Write;
 
 use util;
 
 lazy_static! {
-    static ref DH_GENERATOR: Mpz = Mpz::from_u64(0x2).unwrap();
-    static ref DH_PRIME: Mpz = Mpz::from_bytes_be(&[
+    static ref DH_GENERATOR: BigUint = BigUint::from_u64(0x2).unwrap();
+    static ref DH_PRIME: BigUint = BigUint::from_bytes_be(&[
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc9,
         0x0f, 0xda, 0xa2, 0x21, 0x68, 0xc2, 0x34, 0xc4, 0xc6,
         0x62, 0x8b, 0x80, 0xdc, 0x1c, 0xd1, 0x29, 0x02, 0x4e,
@@ -24,8 +23,8 @@ lazy_static! {
 }
 
 pub struct PrivateKeys {
-    private_key: Mpz,
-    public_key: Mpz,
+    private_key: BigUint,
+    public_key: BigUint,
 }
 
 pub struct SharedKeys {
@@ -42,8 +41,8 @@ impl PrivateKeys {
     }
 
     pub fn new_with_key(key_data: &[u8]) -> PrivateKeys {
-        let private_key = Mpz::from_bytes_be(key_data);
-        let public_key = DH_GENERATOR.powm(&private_key, &DH_PRIME);
+        let private_key = BigUint::from_bytes_be(key_data);
+        let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
 
         PrivateKeys {
             private_key: private_key,
@@ -62,7 +61,7 @@ impl PrivateKeys {
     }
 
     pub fn add_remote_key(self, remote_key: &[u8], client_packet: &[u8], server_packet: &[u8]) -> SharedKeys {
-        let shared_key = Mpz::from_bytes_be(remote_key).powm(&self.private_key, &DH_PRIME);
+        let shared_key = util::powm(&BigUint::from_bytes_be(remote_key), &self.private_key, &DH_PRIME);
 
         let mut data = Vec::with_capacity(0x64);
         let mut mac = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &shared_key.to_bytes_be());

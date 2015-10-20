@@ -1,8 +1,10 @@
+use num::{BigUint, Integer, Zero, One};
 use rand::{Rng,Rand};
-use time;
 use std::io;
+use std::ops::{Mul, Rem, Shr};
 use std::fs;
 use std::path::Path;
+use time;
 
 mod int128;
 mod spotify_id;
@@ -79,11 +81,27 @@ pub fn now_ms() -> i64 {
 }
 
 pub fn mkdir_existing(path: &Path) -> io::Result<()> {
-        fs::create_dir(path)
-            .or_else(|err| if err.kind() == io::ErrorKind::AlreadyExists {
-                Ok(())
-            } else {
-                Err(err)
-            })
+    fs::create_dir(path)
+        .or_else(|err| if err.kind() == io::ErrorKind::AlreadyExists {
+            Ok(())
+        } else {
+            Err(err)
+        })
+}
+
+pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
+    let mut base = base.clone();
+    let mut exp = exp.clone();
+    let mut result : BigUint = One::one();
+
+    while !exp.is_zero() {
+        if exp.is_odd() {
+            result = result.mul(&base).rem(modulus);
+        }
+        exp = exp.shr(1);
+        base = (&base).mul(&base).rem(modulus);
+    }
+
+    return result;
 }
 

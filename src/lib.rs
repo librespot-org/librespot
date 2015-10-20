@@ -9,7 +9,6 @@ extern crate bit_set;
 extern crate byteorder;
 extern crate crypto;
 extern crate eventual;
-extern crate gmp;
 extern crate num;
 extern crate portaudio;
 extern crate protobuf;
