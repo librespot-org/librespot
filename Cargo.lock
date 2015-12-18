@@ -106,7 +106,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "librespot-protocol"
 version = "0.1.0"
 dependencies = [
- "mod_path 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mod_path 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -120,7 +120,7 @@ dependencies = [
 
 [[package]]
 name = "mod_path"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -174,7 +174,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "protobuf_macros"
 version = "0.1.0"
-source = "git+https://github.com/plietar/rust-protobuf-macros.git#2b6a8129e015945300cb2bb7efae2ed78042ed48"
+source = "git+https://github.com/plietar/rust-protobuf-macros.git#4f4a16e3e643caf0566ca0a97d65b46b509ee542"
 
 [[package]]
 name = "rand"

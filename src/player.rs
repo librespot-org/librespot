@@ -76,7 +76,7 @@ impl PlayerInternal {
     fn run(self) {
         portaudio::initialize().unwrap();
 
-        let stream = portaudio::stream::Stream::<i16>::open_default(
+        let stream = portaudio::stream::Stream::<i16, i16>::open_default(
                 0, 2, 44100.0,
                 portaudio::stream::FRAMES_PER_BUFFER_UNSPECIFIED,
                 None

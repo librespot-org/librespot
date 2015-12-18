@@ -16,6 +16,9 @@ You will also need the protobuf compiler, and the
 [rust-protobuf](https://github.com/stepancheg/rust-protobuf) plugin.
 `protoc-gen-rust` must be in your `$PATH`.
 
+Also required is an installation of [portaudio](http://portaudio.com/), which
+can be installed via `brew install portaudio` for an OS X machine.
+
 Once you've cloned this repository you can build *librespot* using `cargo`.
 ```shell
 cargo build
