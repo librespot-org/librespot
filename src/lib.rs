@@ -1,6 +1,6 @@
 #![crate_name = "librespot"]
 
-#![feature(plugin,read_exact,zero_one,iter_arith,slice_bytes,mpsc_select)]
+#![feature(plugin,zero_one,iter_arith,slice_bytes,mpsc_select)]
 
 #![plugin(protobuf_macros)]
 #[macro_use] extern crate lazy_static;

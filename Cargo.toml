@@ -17,14 +17,14 @@ path = "protocol"
 
 [dependencies]
 bit-set     = "~0.2.0"
-byteorder   = "~0.3.13"
-eventual    = "~0.1.4"
+byteorder   = "~0.4.2"
+#eventual    = "~0.1.4"
 getopts     = "~0.2.14"
 lazy_static = "~0.1.14"
 num         = "~0.1.27"
 protobuf    = "~1.0.4"
 rand        = "~0.3.11"
-rpassword   = "~0.0.5"
+rpassword   = "~0.1.0"
 rust-crypto = "~0.2.31"
 time        = "~0.1.32"
 tempfile    = "~1.1.1"
@@ -36,6 +36,8 @@ git = "https://github.com/plietar/rust-protobuf-macros.git"
 git = "https://github.com/plietar/rust-shannon.git"
 [dependencies.portaudio]
 git = "https://github.com/mvdnes/portaudio-rs"
+[dependencies.eventual]
+git = "https://github.com/carllerche/eventual.git"
 
 [build-dependencies]
 vergen = "~0.0.16"
