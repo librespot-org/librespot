@@ -1,10 +1,10 @@
-use eventual::Async;
+use eventual::{self, Async};
 use portaudio;
 use std::sync::{mpsc, Mutex, Arc, Condvar, MutexGuard};
 use std::thread;
 use vorbis;
 
-use metadata::Track;
+use metadata::{Track, TrackRef};
 use session::Session;
 use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
@@ -97,8 +97,17 @@ impl PlayerInternal {
                         state.position_measured_at = util::now_ms();
                         return true;
                     });
+                    drop(decoder);
 
-                    let track = self.session.metadata::<Track>(track_id).await().unwrap();
+                    let mut track = self.session.metadata::<Track>(track_id).await().unwrap();
+
+                    if !track.available {
+                        let alternatives = track.alternatives.iter()
+                            .map(|alt_id| self.session.metadata::<Track>(*alt_id))
+                            .collect::<Vec<TrackRef>>();
+
+                        track = eventual::sequence(alternatives.into_iter()).iter().find(|alt| alt.available).unwrap();
+                    }
 
                     let file_id = track.files[0];
 
