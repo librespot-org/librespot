@@ -1,9 +1,8 @@
 use eventual::Async;
-use protobuf::{self, Message};
+use protobuf;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt;
-use std::slice::bytes::copy_memory;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::thread;
 
@@ -35,7 +34,7 @@ impl MetadataTrait for Track {
             files: msg.get_file().iter()
                 .map(|file| {
                     let mut dst = [0u8; 20];
-                    copy_memory(&file.get_file_id(), &mut dst);
+                    dst.clone_from_slice(&file.get_file_id());
                     FileId(dst)
                 })
                 .collect(),
@@ -67,7 +66,7 @@ impl MetadataTrait for Album {
             covers: msg.get_cover_group().get_image().iter()
                 .map(|image| {
                     let mut dst = [0u8; 20];
-                    copy_memory(&image.get_file_id(), &mut dst);
+                    dst.clone_from_slice(&image.get_file_id());
                     FileId(dst)
                 })
                 .collect(),
