@@ -1,5 +1,5 @@
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
-use eventual;
+use eventual::{self, Async};
 use protobuf::{self, Message};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
@@ -100,7 +100,7 @@ impl MercuryManager {
             uri: uri,
             content_type: None,
             payload: Vec::new()
-        });
+        }).fire();
 
         rx
     }

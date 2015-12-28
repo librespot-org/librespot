@@ -85,8 +85,14 @@ impl PlayerInternal {
         let mut decoder = None;
 
         loop {
-            match self.commands.try_recv() {
-                Ok(PlayerCommand::Load(track_id, play, position)) => {
+            let cmd = if self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
+                self.commands.try_recv().ok()
+            } else {
+                Some(self.commands.recv().unwrap())
+            };
+
+            match cmd {
+                Some(PlayerCommand::Load(track_id, play, position)) => {
                     self.update(|state| {
                         if state.status == PlayStatus::kPlayStatusPlay {
                             stream.stop().unwrap();
@@ -133,7 +139,7 @@ impl PlayerInternal {
                     });
                     println!("Load Done");
                 }
-                Ok(PlayerCommand::Seek(ms)) => {
+                Some(PlayerCommand::Seek(ms)) => {
                     decoder.as_mut().unwrap().time_seek(ms as f64 / 1000f64).unwrap();
                     self.update(|state| {
                         state.position_ms = (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
@@ -141,7 +147,7 @@ impl PlayerInternal {
                         return true;
                     });
                 },
-                Ok(PlayerCommand::Play) => {
+                Some(PlayerCommand::Play) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPlay;
                         return true;
@@ -149,7 +155,7 @@ impl PlayerInternal {
 
                     stream.start().unwrap();
                 },
-                Ok(PlayerCommand::Pause) => {
+                Some(PlayerCommand::Pause) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPause;
                         state.update_time = util::now_ms();
@@ -158,7 +164,7 @@ impl PlayerInternal {
 
                     stream.stop().unwrap();
                 },
-                Ok(PlayerCommand::Stop) => {
+                Some(PlayerCommand::Stop) => {
                     self.update(|state| {
                         if state.status == PlayStatus::kPlayStatusPlay {
                             state.status = PlayStatus::kPlayStatusPause;
@@ -169,7 +175,7 @@ impl PlayerInternal {
                     stream.stop().unwrap();
                     decoder = None;
                 },
-                Err(..) => (),
+                None => (),
             }
 
             if self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
