@@ -91,7 +91,7 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
     }
 
     pub fn run(&mut self) {
-        let rx = self.session.mercury_sub(format!("hm://remote/user/{}/v23", self.username));
+        let rx = self.session.mercury_sub(format!("hm://remote/user/{}/", self.username));
         let updates = self.delegate.updates();
 
         loop {
