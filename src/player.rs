@@ -4,7 +4,7 @@ use std::sync::{mpsc, Mutex, Arc, Condvar, MutexGuard};
 use std::thread;
 use vorbis;
 
-use metadata::TrackRef;
+use metadata::Track;
 use session::Session;
 use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
@@ -86,7 +86,7 @@ impl PlayerInternal {
 
         loop {
             match self.commands.try_recv() {
-                Ok(PlayerCommand::Load(id, play, position)) => {
+                Ok(PlayerCommand::Load(track_id, play, position)) => {
                     self.update(|state| {
                         if state.status == PlayStatus::kPlayStatusPlay {
                             stream.stop().unwrap();
@@ -98,10 +98,11 @@ impl PlayerInternal {
                         return true;
                     });
 
-                    let track : TrackRef = self.session.metadata(id);
-                    let file_id = *track.wait().unwrap().files.first().unwrap();
+                    let track = self.session.metadata::<Track>(track_id).await().unwrap();
 
-                    let key = self.session.audio_key(track.id(), file_id).await().unwrap();
+                    let file_id = track.files[0];
+
+                    let key = self.session.audio_key(track.id, file_id).await().unwrap();
                     decoder = Some(
                         vorbis::Decoder::new(
                         Subfile::new(
