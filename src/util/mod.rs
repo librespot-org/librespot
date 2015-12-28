@@ -105,3 +105,29 @@ pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
     return result;
 }
 
+pub struct StrChunks<'s>(&'s str, usize);
+
+pub trait StrChunksExt {
+    fn chunks<'s>(&'s self, size: usize) -> StrChunks<'s>;
+}
+
+impl StrChunksExt for str {
+    fn chunks<'a>(&'a self, size: usize) -> StrChunks<'a> {
+        StrChunks(self, size)
+    }
+}
+
+impl <'s> Iterator for StrChunks<'s> {
+    type Item = &'s str;
+    fn next(&mut self) -> Option<&'s str> {
+        let &mut StrChunks(data, size) = self;
+        if data.is_empty() {
+            None
+        } else {
+            let ret = Some(&data[..size]);
+            self.0 = &data[size..];
+            ret
+        }
+    }
+}
+

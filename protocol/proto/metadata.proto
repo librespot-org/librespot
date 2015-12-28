@@ -43,7 +43,7 @@ message Album {
     optional bytes gid = 0x1;
     optional string name = 0x2;
     repeated Artist artist = 0x3;
-    optional Type type = 0x4;
+    optional Type typ = 0x4;
     enum Type {
         ALBUM = 0x1;
         SINGLE = 0x2;
@@ -112,7 +112,7 @@ message Disc {
 }
 
 message Copyright {
-    optional Type type = 0x1;
+    optional Type typ = 0x1;
     enum Type {
         P = 0x0;
         C = 0x1;
@@ -123,7 +123,7 @@ message Copyright {
 message Restriction {
     optional string countries_allowed = 0x2;
     optional string countries_forbidden = 0x3;
-    optional Type type = 0x4;
+    optional Type typ = 0x4;
     enum Type {
         STREAMING = 0x0;
     }
@@ -137,7 +137,7 @@ message SalePeriod {
 }
 
 message ExternalId {
-    optional string type = 0x1;
+    optional string typ = 0x1;
     optional string id = 0x2;
 }
 

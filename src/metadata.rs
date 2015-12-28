@@ -3,8 +3,21 @@ use protobuf;
 
 use librespot_protocol as protocol;
 use mercury::{MercuryRequest, MercuryMethod};
-use util::{SpotifyId, FileId};
+use util::{SpotifyId, FileId, StrChunksExt};
 use session::Session;
+
+fn countrylist_contains(list: &str, country: &str) -> bool {
+    list.chunks(2).any(|cc| cc == country)
+}
+
+fn parse_restrictions<'s, I>(restrictions: I, country: &str, catalogue: &str) -> bool
+        where I : Iterator<Item=&'s protocol::metadata::Restriction> {
+    restrictions
+        .filter(|r| r.get_catalogue_str().contains(&catalogue.to_owned()))
+        .all(|r| !countrylist_contains(r.get_countries_forbidden(), country)
+             && (!r.has_countries_allowed()
+                 || countrylist_contains(r.get_countries_allowed(), country)))
+}
 
 pub trait MetadataTrait : Send + 'static {
     type Message: protobuf::MessageStatic;
@@ -19,6 +32,8 @@ pub struct Track {
     pub name: String,
     pub album: SpotifyId,
     pub files: Vec<FileId>,
+    pub alternatives: Vec<SpotifyId>,
+    pub available: bool,
 }
 
 #[derive(Debug)]
@@ -59,6 +74,10 @@ impl MetadataTrait for Track {
                     FileId(dst)
                 })
                 .collect(),
+            alternatives: msg.get_alternative().iter()
+                .map(|alt| SpotifyId::from_raw(alt.get_gid()))
+                .collect(),
+            available: parse_restrictions(msg.get_restriction().iter(), "FR", "premium"),
         }
     }
 }
