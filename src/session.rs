@@ -14,7 +14,7 @@ use util::{SpotifyId, FileId, mkdir_existing};
 use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use stream::{StreamManager, StreamEvent};
-use audio_key::{AudioKeyManager, AudioKey};
+use audio_key::{AudioKeyManager, AudioKey, AudioKeyError};
 use audio_file::{AudioFileManager, AudioFile};
 use connection::PacketHandler;
 
@@ -189,7 +189,7 @@ impl Session {
         self.0.tx_connection.lock().unwrap().send_packet(cmd, data)
     }
 
-    pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey, ()> {
+    pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey, AudioKeyError> {
         self.0.audio_key.lock().unwrap().request(self, track, file)
     }
 

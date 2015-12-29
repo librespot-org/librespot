@@ -92,7 +92,7 @@ impl MetadataTrait for Album {
         "hm://metadata/3/album"
     }
 
-    fn parse(msg: &Self::Message, session: &Session) -> Self {
+    fn parse(msg: &Self::Message, _: &Session) -> Self {
         Album {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
@@ -118,7 +118,7 @@ impl MetadataTrait for Artist {
         "hm://metadata/3/artist"
     }
 
-    fn parse(msg: &Self::Message, session: &Session) -> Self {
+    fn parse(msg: &Self::Message, _: &Session) -> Self {
         Artist {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),

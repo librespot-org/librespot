@@ -9,13 +9,16 @@ use session::Session;
 use connection::PacketHandler;
 
 pub type AudioKey = [u8; 16];
+#[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
+pub struct AudioKeyError;
 
 #[derive(Debug,Hash,PartialEq,Eq,Clone)]
 struct AudioKeyId(SpotifyId, FileId);
 
 enum AudioKeyStatus {
-    Loading(Vec<eventual::Complete<AudioKey, ()>>),
-    Loaded(AudioKey)
+    Loading(Vec<eventual::Complete<AudioKey, AudioKeyError>>),
+    Loaded(AudioKey),
+    Failed(AudioKeyError)
 }
 
 pub struct AudioKeyManager {
@@ -34,12 +37,15 @@ impl AudioKeyManager {
     }
 
     pub fn request(&mut self, session: &Session, track: SpotifyId, file: FileId)
-        -> eventual::Future<AudioKey, ()> {
+        -> eventual::Future<AudioKey, AudioKeyError> {
 
         let id = AudioKeyId(track, file);
         self.cache.get_mut(&id).map(|status| match *status {
+            AudioKeyStatus::Failed(error) => {
+                eventual::Future::error(error)
+            }
             AudioKeyStatus::Loaded(key) => {
-                eventual::Future::of(key.clone())
+                eventual::Future::of(key)
             }
             AudioKeyStatus::Loading(ref mut req) => {
                 let (tx, rx) = eventual::Future::pair();
@@ -69,19 +75,29 @@ impl AudioKeyManager {
 
 impl PacketHandler for AudioKeyManager {
     fn handle(&mut self, cmd: u8, data: Vec<u8>) {
-        assert_eq!(cmd, 0xd);
-
         let mut data = Cursor::new(data);
         let seq = data.read_u32::<BigEndian>().unwrap();
-        let mut key = [0u8; 16];
-        data.read_exact(&mut key).unwrap();
 
         if let Some(status) = self.pending.remove(&seq).and_then(|id| { self.cache.get_mut(&id) }) {
-            let status = mem::replace(status, AudioKeyStatus::Loaded(key));
+            if cmd == 0xd {
+                let mut key = [0u8; 16];
+                data.read_exact(&mut key).unwrap();
 
-            if let AudioKeyStatus::Loading(cbs) = status {
-                for cb in cbs {
-                    cb.complete(key);
+                let status = mem::replace(status, AudioKeyStatus::Loaded(key));
+
+                if let AudioKeyStatus::Loading(cbs) = status {
+                    for cb in cbs {
+                        cb.complete(key);
+                    }
+                }
+            } else if cmd == 0xe {
+                let error = AudioKeyError;
+                let status = mem::replace(status, AudioKeyStatus::Failed(error));
+
+                if let AudioKeyStatus::Loading(cbs) = status {
+                    for cb in cbs {
+                        cb.fail(error);
+                    }
                 }
             }
         }
