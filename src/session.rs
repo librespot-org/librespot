@@ -3,7 +3,7 @@ use crypto::sha1::Sha1;
 use eventual::Future;
 use protobuf::{self, Message};
 use rand::thread_rng;
-use std::sync::{Mutex, Arc, mpsc};
+use std::sync::{Mutex, RwLock, Arc, mpsc};
 use std::path::PathBuf;
 
 use connection::{self, PlainConnection, CipherConnection};
@@ -28,7 +28,12 @@ pub struct Config {
 }
 
 pub struct SessionData {
+    pub country: String,
+}
+
+pub struct SessionInternal {
     pub config: Config,
+    pub data: RwLock<SessionData>,
 
     mercury: Mutex<MercuryManager>,
     metadata: Mutex<MetadataManager>,
@@ -40,7 +45,7 @@ pub struct SessionData {
 }
 
 #[derive(Clone)]
-pub struct Session(pub Arc<SessionData>);
+pub struct Session(pub Arc<SessionInternal>);
 
 impl Session {
     pub fn new(mut config: Config) -> Session {
@@ -116,8 +121,11 @@ impl Session {
 
         let cipher_connection = connection.setup_cipher(shared_keys);
 
-        Session(Arc::new(SessionData {
+        Session(Arc::new(SessionInternal {
             config: config,
+            data: RwLock::new(SessionData {
+                country: String::new(),
+            }),
 
             rx_connection: Mutex::new(cipher_connection.clone()),
             tx_connection: Mutex::new(cipher_connection),
@@ -165,6 +173,11 @@ impl Session {
             0x4a => (),
             0x9  => self.0.stream.lock().unwrap().handle(cmd, data),
             0xd | 0xe => self.0.audio_key.lock().unwrap().handle(cmd, data),
+            0x1b => {
+                self.0.data.write().unwrap().country =
+                    String::from_utf8(data).unwrap();
+            },
+
             0xb2...0xb6 => self.0.mercury.lock().unwrap().handle(cmd, data),
             0xac => eprintln!("Authentication succeedded"),
             0xad => eprintln!("Authentication failed"),
@@ -175,7 +188,7 @@ impl Session {
     pub fn send_packet(&self, cmd: u8, data: &[u8]) -> connection::Result<()> {
         self.0.tx_connection.lock().unwrap().send_packet(cmd, data)
     }
-    
+
     pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey, ()> {
         self.0.audio_key.lock().unwrap().request(self, track, file)
     }

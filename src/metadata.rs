@@ -23,7 +23,7 @@ pub trait MetadataTrait : Send + 'static {
     type Message: protobuf::MessageStatic;
 
     fn base_url() -> &'static str;
-    fn parse(msg: &Self::Message) -> Self;
+    fn parse(msg: &Self::Message, session: &Session) -> Self;
 }
 
 #[derive(Debug)]
@@ -62,7 +62,7 @@ impl MetadataTrait for Track {
         "hm://metadata/3/track"
     }
 
-    fn parse(msg: &Self::Message) -> Self {
+    fn parse(msg: &Self::Message, session: &Session) -> Self {
         Track {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
@@ -77,7 +77,10 @@ impl MetadataTrait for Track {
             alternatives: msg.get_alternative().iter()
                 .map(|alt| SpotifyId::from_raw(alt.get_gid()))
                 .collect(),
-            available: parse_restrictions(msg.get_restriction().iter(), "FR", "premium"),
+            available: parse_restrictions(
+                msg.get_restriction().iter(),
+                &session.0.data.read().unwrap().country,
+                "premium"),
         }
     }
 }
@@ -89,7 +92,7 @@ impl MetadataTrait for Album {
         "hm://metadata/3/album"
     }
 
-    fn parse(msg: &Self::Message) -> Self {
+    fn parse(msg: &Self::Message, session: &Session) -> Self {
         Album {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
@@ -115,7 +118,7 @@ impl MetadataTrait for Artist {
         "hm://metadata/3/artist"
     }
 
-    fn parse(msg: &Self::Message) -> Self {
+    fn parse(msg: &Self::Message, session: &Session) -> Self {
         Artist {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
@@ -131,18 +134,19 @@ impl MetadataManager {
     }
 
     pub fn get<T: MetadataTrait>(&mut self, session: &Session, id: SpotifyId)
-      -> MetadataRef<T> {
+          -> MetadataRef<T> {
 
+        let _session = session.clone();
         session.mercury(MercuryRequest {
             method: MercuryMethod::GET,
             uri: format!("{}/{}", T::base_url(), id.to_base16()),
             content_type: None,
             payload: Vec::new()
-        }).and_then(|response| {
+        }).and_then(move |response| {
             let msg : T::Message = protobuf::parse_from_bytes(
                 response.payload.first().unwrap()).unwrap();
 
-            Ok(T::parse(&msg))
+            Ok(T::parse(&msg, &_session))
         })
     }
 }
