@@ -8,6 +8,7 @@ use std::io::{stdout, Read, Write};
 use std::path::Path;
 use std::thread;
 use std::path::PathBuf;
+use std::env;
 
 use getopts::Options;
 use rpassword::read_password;
@@ -16,6 +17,8 @@ use librespot::session::{Config, Session};
 use librespot::util::version::version_string;
 use librespot::player::Player;
 use librespot::spirc::SpircManager;
+
+static PASSWORD_ENV_NAME: &'static str = "SPOTIFY_PASSWORD";
 
 fn usage(program: &str, opts: &Options) -> String {
     let brief = format!("Usage: {} [options]", program);
@@ -48,11 +51,24 @@ fn main() {
     let cache_location = matches.opt_str("c").unwrap();
     let name = matches.opt_str("n").unwrap();
 
-    let password = matches.opt_str("p").unwrap_or_else(|| {
-        print!("Password: "); 
-        stdout().flush().unwrap();
-        read_password().unwrap()
-    });
+    let password: String = match env::var(PASSWORD_ENV_NAME) {
+        Ok(val) => {
+            // unset password so e.g. child process can't leak it; but still appears in /proc/$PID/environ
+            env::remove_var(PASSWORD_ENV_NAME);
+            //assert!(env::var(PASSWORD_ENV_NAME).is_err());
+            val
+        },
+        Err(_) => {
+            match matches.opt_str("p") {
+                Some(val) => val,
+                None => {
+                    print!("Password not found in env var {} or param `-p`, please enter: ", PASSWORD_ENV_NAME);
+                    stdout().flush().unwrap();
+                    read_password().unwrap()
+                }
+            }
+        }
+    };
 
     let mut appkey = Vec::new();
     appkey_file.read_to_end(&mut appkey).unwrap();
