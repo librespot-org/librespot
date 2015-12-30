@@ -1,0 +1,15 @@
+language: rust
+rust:
+  - nightly
+
+addons:
+  apt:
+    packages:
+      - protobuf-compiler
+      - portaudio19-dev
+
+before_install:
+    - export PATH=$HOME/.cargo/bin:$PATH
+install:
+    - cargo install --git https://github.com/stepancheg/rust-protobuf --rev 921c69b protobuf
+
