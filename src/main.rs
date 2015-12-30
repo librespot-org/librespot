@@ -63,6 +63,7 @@ fn main() {
         device_id: name.clone(),
         cache_location: PathBuf::from(cache_location)
     };
+
     let session = Session::new(config);
     session.login(username.clone(), password);
     session.poll();
@@ -76,7 +77,7 @@ fn main() {
 
     let player = Player::new(&session);
 
-    let mut spirc_manager = SpircManager::new(&session, player, username, name);
+    let mut spirc_manager = SpircManager::new(&session, player, name);
     spirc_manager.run();
 }
 

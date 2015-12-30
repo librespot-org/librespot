@@ -15,7 +15,6 @@ pub struct SpircManager<'s, D: SpircDelegate> {
     delegate: D,
     session: &'s Session,
 
-    username: String,
     state_update_id: i64,
     seq_nr: u32,
 
@@ -61,12 +60,11 @@ pub trait SpircState {
 
 impl <'s, D: SpircDelegate> SpircManager<'s, D> {
     pub fn new(session: &'s Session, delegate: D,
-               username: String, name: String) -> SpircManager<'s, D> {
+               name: String) -> SpircManager<'s, D> {
         SpircManager {
             delegate: delegate,
             session: &session,
 
-            username: username.clone(),
             state_update_id: 0,
             seq_nr: 0,
 
@@ -91,7 +89,8 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
     }
 
     pub fn run(&mut self) {
-        let rx = self.session.mercury_sub(format!("hm://remote/3/user/{}/", self.username));
+        let rx = self.session.mercury_sub(format!("hm://remote/3/user/{}/", 
+                    self.session.0.data.read().unwrap().canonical_username.clone()));
         let updates = self.delegate.updates();
 
         loop {
@@ -192,7 +191,8 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
 
         self.session.mercury(MercuryRequest{
             method: MercuryMethod::SEND,
-            uri: format!("hm://remote/user/{}", self.username),
+            uri: format!("hm://remote/user/{}", 
+                         self.session.0.data.read().unwrap().canonical_username.clone()),
             content_type: None,
             payload: vec![ pkt.write_to_bytes().unwrap() ]
         }).await().unwrap();
