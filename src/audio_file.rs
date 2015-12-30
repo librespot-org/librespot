@@ -53,7 +53,7 @@ impl AudioFileLoading {
                 }
             }).next().unwrap();
 
-        let chunk_count = (size + CHUNK_SIZE / 2) / CHUNK_SIZE;
+        let chunk_count = (size + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
         let shared = Arc::new(AudioFileShared {
             file_id: file_id,
