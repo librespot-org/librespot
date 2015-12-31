@@ -29,6 +29,7 @@ pub struct Config {
 
 pub struct SessionData {
     pub country: String,
+    pub canonical_username: String,
 }
 
 pub struct SessionInternal {
@@ -125,6 +126,7 @@ impl Session {
             config: config,
             data: RwLock::new(SessionData {
                 country: String::new(),
+                canonical_username: String::new(),
             }),
 
             rx_connection: Mutex::new(cipher_connection.clone()),
@@ -179,7 +181,14 @@ impl Session {
             },
 
             0xb2...0xb6 => self.0.mercury.lock().unwrap().handle(cmd, data),
-            0xac => eprintln!("Authentication succeedded"),
+            0xac => {
+                let welcome_data : protocol::authentication::APWelcome = 
+                    protobuf::parse_from_bytes(&data).unwrap();
+                self.0.data.write().unwrap().canonical_username = 
+                    welcome_data.get_canonical_username().to_string();
+                eprintln!("Authentication succeeded")
+            },
+
             0xad => eprintln!("Authentication failed"),
             _ => ()
         }
