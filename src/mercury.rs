@@ -1,5 +1,5 @@
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
-use eventual::{self, Async};
+use eventual;
 use protobuf::{self, Message};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
@@ -9,7 +9,6 @@ use std::sync::mpsc;
 use librespot_protocol as protocol;
 use session::Session;
 use connection::PacketHandler;
-use util::IgnoreExt;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
@@ -32,10 +31,16 @@ pub struct MercuryResponse {
     pub payload: Vec<Vec<u8>>
 }
 
+enum MercuryCallback {
+    Future(eventual::Complete<MercuryResponse, ()>),
+    Subscription(mpsc::Sender<MercuryResponse>),
+    Channel,
+}
+
 pub struct MercuryPending {
     parts: Vec<Vec<u8>>,
     partial: Option<Vec<u8>>,
-    callback: Option<eventual::Complete<MercuryResponse, ()>>
+    callback: MercuryCallback
 }
 
 pub struct MercuryManager {
@@ -64,9 +69,10 @@ impl MercuryManager {
         }
     }
 
-    pub fn request(&mut self, session: &Session, req: MercuryRequest)
-        -> eventual::Future<MercuryResponse, ()> {
-
+    fn request_with_callback(&mut self,
+                             session: &Session,
+                             req: MercuryRequest, 
+                             cb: MercuryCallback) {
         let mut seq = [0u8; 4];
         BigEndian::write_u32(&mut seq, self.next_seq);
         self.next_seq += 1;
@@ -80,27 +86,30 @@ impl MercuryManager {
 
         session.send_packet(cmd, &data).unwrap();
 
-        let (tx, rx) = eventual::Future::pair();
         self.pending.insert(seq.to_vec(), MercuryPending{
             parts: Vec::new(),
             partial: None,
-            callback: Some(tx),
+            callback: cb,
         });
+    }
 
+    pub fn request(&mut self, session: &Session, req: MercuryRequest)
+            -> eventual::Future<MercuryResponse, ()> {
+        let (tx, rx) = eventual::Future::pair();
+        self.request_with_callback(session, req, MercuryCallback::Future(tx));
         rx
     }
 
     pub fn subscribe(&mut self, session: &Session, uri: String)
         -> mpsc::Receiver<MercuryResponse> {
         let (tx, rx) = mpsc::channel();
-        self.subscriptions.insert(uri.clone(), tx);
 
-        self.request(session, MercuryRequest{
+        self.request_with_callback(session, MercuryRequest{
             method: MercuryMethod::SUB,
             uri: uri,
             content_type: None,
             payload: Vec::new()
-        }).fire();
+        }, MercuryCallback::Subscription(tx));
 
         rx
     }
@@ -113,7 +122,17 @@ impl MercuryManager {
         buffer
     }
 
-    fn complete_request(&mut self, cmd: u8, mut pending: MercuryPending) {
+    fn complete_subscription(&mut self,
+                             response: MercuryResponse,
+                             tx: mpsc::Sender<MercuryResponse>) {
+        for sub_data in response.payload {
+            if let Ok(mut sub) = protobuf::parse_from_bytes::<protocol::pubsub::Subscription>(&sub_data) {
+                self.subscriptions.insert(sub.take_uri(), tx.clone());
+            }
+        }
+    }
+
+    fn complete_request(&mut self, mut pending: MercuryPending) {
         let header_data = pending.parts.remove(0);
         let header : protocol::mercury::Header =
             protobuf::parse_from_bytes(&header_data).unwrap();
@@ -123,10 +142,14 @@ impl MercuryManager {
             payload: pending.parts
         };
 
-        if cmd == 0xb5 {
-            self.subscriptions.get(header.get_uri()).map(|ch| ch.send(response).ignore());
-        } else {
-            pending.callback.map(|cb| cb.complete(response));
+        match pending.callback {
+            MercuryCallback::Future(tx) => tx.complete(response),
+            MercuryCallback::Subscription(tx) => self.complete_subscription(response, tx),
+            MercuryCallback::Channel => {
+                self.subscriptions
+                    .get(header.get_uri()).unwrap()
+                    .send(response).unwrap()
+            }
         }
     }
 
@@ -176,7 +199,7 @@ impl PacketHandler for MercuryManager {
             MercuryPending {
                 parts: Vec::new(),
                 partial: None,
-                callback: None,
+                callback: MercuryCallback::Channel,
             }
         } else {
             println!("Ignore seq {:?} cmd {}", seq, cmd);
@@ -198,7 +221,7 @@ impl PacketHandler for MercuryManager {
         }
 
         if flags == 0x1 {
-            self.complete_request(cmd, pending);
+            self.complete_request(pending);
         } else {
             self.pending.insert(seq, pending);
         }

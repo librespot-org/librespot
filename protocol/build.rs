@@ -43,6 +43,7 @@ fn main() {
             &proto.join("authentication.proto"),
             &proto.join("mercury.proto"),
             &proto.join("metadata.proto"),
+            &proto.join("pubsub.proto"),
             &proto.join("spirc.proto"),
     ]).unwrap();
 }
