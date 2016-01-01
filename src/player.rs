@@ -40,7 +40,7 @@ enum PlayerCommand {
 }
 
 impl Player {
-    pub fn new(session: &Session) -> Player {
+    pub fn new(session: Session) -> Player {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
         let state = Arc::new((Mutex::new(PlayerState {
@@ -52,7 +52,7 @@ impl Player {
         }), Condvar::new()));
 
         let internal = PlayerInternal {
-            session: session.clone(),
+            session: session,
             commands: cmd_rx,
             state: state.clone()
         };
@@ -85,7 +85,8 @@ impl PlayerInternal {
         let mut decoder = None;
 
         loop {
-            let cmd = if self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
+            let playing = self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay;
+            let cmd = if playing {
                 self.commands.try_recv().ok()
             } else {
                 Some(self.commands.recv().unwrap())
@@ -98,7 +99,11 @@ impl PlayerInternal {
                             stream.stop().unwrap();
                         }
                         state.end_of_track = false;
-                        state.status = PlayStatus::kPlayStatusLoading;
+                        state.status = if play {
+                            PlayStatus::kPlayStatusPlay
+                        } else {
+                            PlayStatus::kPlayStatusPause
+                        };
                         state.position_ms = position;
                         state.position_measured_at = util::now_ms();
                         return true;

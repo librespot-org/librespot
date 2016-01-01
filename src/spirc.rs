@@ -11,9 +11,9 @@ use mercury::{MercuryRequest, MercuryMethod};
 use librespot_protocol as protocol;
 pub use librespot_protocol::spirc::PlayStatus;
 
-pub struct SpircManager<'s, D: SpircDelegate> {
+pub struct SpircManager<D: SpircDelegate> {
     delegate: D,
-    session: &'s Session,
+    session: Session,
 
     state_update_id: i64,
     seq_nr: u32,
@@ -58,18 +58,22 @@ pub trait SpircState {
     fn end_of_track(&self) -> bool;
 }
 
-impl <'s, D: SpircDelegate> SpircManager<'s, D> {
-    pub fn new(session: &'s Session, delegate: D,
-               name: String) -> SpircManager<'s, D> {
+impl <D: SpircDelegate> SpircManager<D> {
+    pub fn new(session: Session, delegate: D)
+            -> SpircManager<D> {
+
+        let ident = session.0.data.read().unwrap().device_id.clone();
+        let name = session.0.config.device_name.clone();
+
         SpircManager {
             delegate: delegate,
-            session: &session,
+            session: session,
 
             state_update_id: 0,
             seq_nr: 0,
 
             name: name,
-            ident: session.0.config.device_id.clone(),
+            ident: ident,
             device_type: 5,
             can_play: true,
 
@@ -92,6 +96,8 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
         let rx = self.session.mercury_sub(format!("hm://remote/user/{}/",
                     self.session.0.data.read().unwrap().canonical_username.clone()));
         let updates = self.delegate.updates();
+
+        self.notify(true, None);
 
         loop {
             select! {
@@ -119,7 +125,7 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
                         self.delegate.load(track, true, 0);
                     } else {
                         self.state_update_id = update_time.unwrap();
-                        self.notify(None);
+                        self.notify(false, None);
                     }
                 }
             }
@@ -133,7 +139,7 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
         }
         match frame.get_typ() {
             protocol::spirc::MessageType::kMessageTypeHello => {
-                self.notify(Some(frame.get_ident()));
+                self.notify(false, Some(frame.get_ident()));
             }
             protocol::spirc::MessageType::kMessageTypeLoad => {
                 if !self.is_active {
@@ -171,13 +177,18 @@ impl <'s, D: SpircDelegate> SpircManager<'s, D> {
         }
     }
 
-    fn notify(&mut self, recipient: Option<&str>) {
+    fn notify(&mut self, hello: bool, recipient: Option<&str>) {
         let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
             ident: self.ident.clone(),
             protocol_version: "2.0.0".to_owned(),
             seq_nr: { self.seq_nr += 1; self.seq_nr  },
-            typ: protocol::spirc::MessageType::kMessageTypeNotify,
+            typ: if hello {
+                protocol::spirc::MessageType::kMessageTypeHello
+            } else {
+                protocol::spirc::MessageType::kMessageTypeNotify
+            },
+
             device_state: self.device_state(),
             recipient: protobuf::RepeatedField::from_vec(
                 recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])

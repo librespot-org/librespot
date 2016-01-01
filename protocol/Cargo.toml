@@ -6,5 +6,5 @@ build = "build.rs"
 
 [dependencies]
 mod_path = "~0.1.6"
-protobuf = "~1.0.4"
+protobuf = "~1.0.10"
 

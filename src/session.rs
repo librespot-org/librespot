@@ -1,35 +1,38 @@
 use crypto::digest::Digest;
+use crypto::mac::Mac;
 use crypto::sha1::Sha1;
+use crypto::hmac::Hmac;
 use eventual::Future;
 use protobuf::{self, Message};
 use rand::thread_rng;
-use std::sync::{Mutex, RwLock, Arc, mpsc};
+use std::io::Write;
 use std::path::PathBuf;
+use std::sync::{Mutex, RwLock, Arc, mpsc};
 
+use audio_key::{AudioKeyManager, AudioKey, AudioKeyError};
+use audio_file::{AudioFileManager, AudioFile};
 use connection::{self, PlainConnection, CipherConnection};
-use keys::PrivateKeys;
+use connection::PacketHandler;
+use diffie_hellman::DHLocalKeys;
 use librespot_protocol as protocol;
-use util::{SpotifyId, FileId, mkdir_existing};
-
 use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use stream::{StreamManager, StreamEvent};
-use audio_key::{AudioKeyManager, AudioKey, AudioKeyError};
-use audio_file::{AudioFileManager, AudioFile};
-use connection::PacketHandler;
+use util::{SpotifyId, FileId, mkdir_existing};
 
 use util;
 
 pub struct Config {
     pub application_key: Vec<u8>,
     pub user_agent: String,
-    pub device_id: String,
+    pub device_name: String,
     pub cache_location: PathBuf,
 }
 
 pub struct SessionData {
     pub country: String,
     pub canonical_username: String,
+    pub device_id: String,
 }
 
 pub struct SessionInternal {
@@ -41,24 +44,45 @@ pub struct SessionInternal {
     stream: Mutex<StreamManager>,
     audio_key: Mutex<AudioKeyManager>,
     audio_file: Mutex<AudioFileManager>,
-    rx_connection: Mutex<CipherConnection>,
-    tx_connection: Mutex<CipherConnection>,
+    rx_connection: Mutex<Option<CipherConnection>>,
+    tx_connection: Mutex<Option<CipherConnection>>,
 }
 
 #[derive(Clone)]
 pub struct Session(pub Arc<SessionInternal>);
 
 impl Session {
-    pub fn new(mut config: Config) -> Session {
-        config.device_id = {
+    pub fn new(config: Config) -> Session {
+        mkdir_existing(&config.cache_location).unwrap();
+
+        let device_id = {
             let mut h = Sha1::new();
-            h.input_str(&config.device_id);
+            h.input_str(&config.device_name);
             h.result_str()
         };
 
-        mkdir_existing(&config.cache_location).unwrap();
+        Session(Arc::new(SessionInternal {
+            config: config,
+            data: RwLock::new(SessionData {
+                country: String::new(),
+                canonical_username: String::new(),
+                device_id: device_id,
+            }),
 
-        let keys = PrivateKeys::new();
+            rx_connection: Mutex::new(None),
+            tx_connection: Mutex::new(None),
+
+            mercury: Mutex::new(MercuryManager::new()),
+            metadata: Mutex::new(MetadataManager::new()),
+            stream: Mutex::new(StreamManager::new()),
+            audio_key: Mutex::new(AudioKeyManager::new()),
+            audio_file: Mutex::new(AudioFileManager::new()),
+        }))
+    }
+
+    pub fn connect(&self) {
+        let local_keys = DHLocalKeys::random(&mut thread_rng());
+
         let mut connection = PlainConnection::connect().unwrap();
 
         let request = protobuf_init!(protocol::keyexchange::ClientHello::new(), {
@@ -82,7 +106,7 @@ impl Session {
             ],
             */
             login_crypto_hello.diffie_hellman => {
-                gc: keys.public_key(),
+                gc: local_keys.public_key(),
                 server_keys_known: 1,
             },
             client_nonce: util::rand_vec(&mut thread_rng(), 0x10),
@@ -100,75 +124,55 @@ impl Session {
         let response : protocol::keyexchange::APResponseMessage =
             protobuf::parse_from_bytes(&init_server_packet[4..]).unwrap();
 
-        protobuf_bind!(response, {
-            challenge => {
-                login_crypto_challenge.diffie_hellman => {
-                    gs: remote_key,
-                }
-            }
-        });
+        let remote_key = response.get_challenge()
+                                 .get_login_crypto_challenge()
+                                 .get_diffie_hellman()
+                                 .get_gs();
 
-        let shared_keys = keys.add_remote_key(remote_key, &init_client_packet, &init_server_packet);
+        let shared_secret = local_keys.shared_secret(remote_key);
+        let (challenge, send_key, recv_key) = {
+            let mut data = Vec::with_capacity(0x64);
+            let mut mac = Hmac::new(Sha1::new(), &shared_secret);
+
+            for i in 1..6 {
+                mac.input(&init_client_packet);
+                mac.input(&init_server_packet);
+                mac.input(&[i]);
+                data.write(&mac.result().code()).unwrap();
+                mac.reset();
+            }
+
+            mac = Hmac::new(Sha1::new(), &data[..0x14]);
+            mac.input(&init_client_packet);
+            mac.input(&init_server_packet);
+
+            (mac.result().code().to_vec(),
+             data[0x14..0x34].to_vec(),
+             data[0x34..0x54].to_vec())
+        };
 
         let packet = protobuf_init!(protocol::keyexchange::ClientResponsePlaintext::new(), {
             login_crypto_response.diffie_hellman => {
-                hmac: shared_keys.challenge().to_vec()
+                hmac: challenge 
             },
             pow_response => {},
             crypto_response => {},
         });
 
+
         connection.send_packet(&packet.write_to_bytes().unwrap()).unwrap();
 
-        let cipher_connection = connection.setup_cipher(shared_keys);
+        let cipher_connection = CipherConnection::new(
+            connection.into_stream(),
+            &send_key,
+            &recv_key);
 
-        Session(Arc::new(SessionInternal {
-            config: config,
-            data: RwLock::new(SessionData {
-                country: String::new(),
-                canonical_username: String::new(),
-            }),
-
-            rx_connection: Mutex::new(cipher_connection.clone()),
-            tx_connection: Mutex::new(cipher_connection),
-
-            mercury: Mutex::new(MercuryManager::new()),
-            metadata: Mutex::new(MetadataManager::new()),
-            stream: Mutex::new(StreamManager::new()),
-            audio_key: Mutex::new(AudioKeyManager::new()),
-            audio_file: Mutex::new(AudioFileManager::new()),
-        }))
-    }
-
-    pub fn login(&self, username: String, password: String) {
-        let packet = protobuf_init!(protocol::authentication::ClientResponseEncrypted::new(), {
-            login_credentials => {
-                username: username,
-                typ: protocol::authentication::AuthenticationType::AUTHENTICATION_USER_PASS,
-                auth_data: password.into_bytes(),
-            },
-            system_info => {
-                cpu_family: protocol::authentication::CpuFamily::CPU_UNKNOWN,
-                os: protocol::authentication::Os::OS_UNKNOWN,
-                system_information_string: "librespot".to_owned(),
-                device_id: self.0.config.device_id.clone()
-            },
-            version_string: util::version::version_string(),
-            appkey => {
-                version: self.0.config.application_key[0] as u32,
-                devkey: self.0.config.application_key[0x1..0x81].to_vec(),
-                signature: self.0.config.application_key[0x81..0x141].to_vec(),
-                useragent: self.0.config.user_agent.clone(),
-                callback_hash: vec![0; 20],
-            }
-        });
-
-        self.send_packet(0xab, &packet.write_to_bytes().unwrap()).unwrap();
+        *self.0.rx_connection.lock().unwrap() = Some(cipher_connection.clone());
+        *self.0.tx_connection.lock().unwrap() = Some(cipher_connection);
     }
 
     pub fn poll(&self) {
-        let (cmd, data) =
-            self.0.rx_connection.lock().unwrap().recv_packet().unwrap();
+        let (cmd, data) = self.recv();
 
         match cmd {
             0x4 => self.send_packet(0x49, &data).unwrap(),
@@ -179,23 +183,17 @@ impl Session {
                 self.0.data.write().unwrap().country =
                     String::from_utf8(data).unwrap();
             },
-
             0xb2...0xb6 => self.0.mercury.lock().unwrap().handle(cmd, data),
-            0xac => {
-                let welcome_data : protocol::authentication::APWelcome = 
-                    protobuf::parse_from_bytes(&data).unwrap();
-                self.0.data.write().unwrap().canonical_username = 
-                    welcome_data.get_canonical_username().to_string();
-                eprintln!("Authentication succeeded")
-            },
-
-            0xad => eprintln!("Authentication failed"),
             _ => ()
         }
     }
 
+    pub fn recv(&self) -> (u8, Vec<u8>) {
+        self.0.rx_connection.lock().unwrap().as_mut().unwrap().recv_packet().unwrap()
+    }
+
     pub fn send_packet(&self, cmd: u8, data: &[u8]) -> connection::Result<()> {
-        self.0.tx_connection.lock().unwrap().send_packet(cmd, data)
+        self.0.tx_connection.lock().unwrap().as_mut().unwrap().send_packet(cmd, data)
     }
 
     pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey, AudioKeyError> {

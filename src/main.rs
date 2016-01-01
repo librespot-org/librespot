@@ -2,20 +2,19 @@ extern crate getopts;
 extern crate librespot;
 extern crate rpassword;
 
+use getopts::Options;
+use rpassword::read_password;
 use std::clone::Clone;
 use std::fs::File;
 use std::io::{stdout, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::thread;
-use std::path::PathBuf;
 
-use getopts::Options;
-use rpassword::read_password;
-
-use librespot::session::{Config, Session};
-use librespot::util::version::version_string;
+use librespot::discovery::DiscoveryManager;
 use librespot::player::Player;
+use librespot::session::{Config, Session};
 use librespot::spirc::SpircManager;
+use librespot::util::version::version_string;
 
 fn usage(program: &str, opts: &Options) -> String {
     let brief = format!("Usage: {} [options]", program);
@@ -40,9 +39,16 @@ fn main() {
         }
     };
 
-    let mut appkey_file = File::open(
-                                    Path::new(&*matches.opt_str("a").unwrap())
-                                ).expect("Could not open app key.");
+    let appkey = {
+        let mut file = File::open(
+            Path::new(&*matches.opt_str("a").unwrap())
+        ).expect("Could not open app key.");
+
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+
+        data
+    };
 
     let username = matches.opt_str("u").unwrap();
     let cache_location = matches.opt_str("c").unwrap();
@@ -54,30 +60,26 @@ fn main() {
         read_password().unwrap()
     });
 
-    let mut appkey = Vec::new();
-    appkey_file.read_to_end(&mut appkey).unwrap();
-
     let config = Config {
         application_key: appkey,
         user_agent: version_string(),
-        device_id: name.clone(),
+        device_name: name,
         cache_location: PathBuf::from(cache_location)
     };
 
     let session = Session::new(config);
-    session.login(username.clone(), password);
-    session.poll();
+    //session.login_password(username, password).unwrap();
+    let mut discovery = DiscoveryManager::new(session.clone());
+    discovery.run();
 
-    let _session = session.clone();
+    let player = Player::new(session.clone());
+    let mut spirc = SpircManager::new(session.clone(), player);
     thread::spawn(move || {
-        loop {
-            _session.poll();
-        }
+        spirc.run()
     });
 
-    let player = Player::new(&session);
-
-    let mut spirc_manager = SpircManager::new(&session, player, name);
-    spirc_manager.run();
+    loop {
+        session.poll();
+    }
 }
 
