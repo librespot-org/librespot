@@ -4,7 +4,7 @@ version = "0.1.0"
 dependencies = [
  "bit-set 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "dns-sd 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dns-sd 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "eventual 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "json_macros 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -80,8 +80,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "dns-sd"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "pkg-config 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "encoding"

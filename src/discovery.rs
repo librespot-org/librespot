@@ -1,7 +1,7 @@
 use crypto;
 use crypto::mac::Mac;
 use crypto::digest::Digest;
-use dns_sd::DNSService;
+use zeroconf::DNSService;
 use tiny_http::{Method, Response, ResponseBox, Server};
 use num::BigUint;
 use url;

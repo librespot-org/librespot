@@ -18,7 +18,6 @@ path = "protocol"
 [dependencies]
 bit-set     = "~0.2.0"
 byteorder   = "~0.4.2"
-dns-sd      = "~0.1.0"
 eventual    = "~0.1.5"
 getopts     = "~0.2.14"
 json_macros = "~0.2.6"
@@ -35,6 +34,10 @@ tempfile    = "~1.1.3"
 url         = "~0.5.2"
 vorbis      = "~0.0.13"
 
+[dependencies.dns-sd]
+version  = "~0.1.1"
+optional = true
+
 [dependencies.protobuf_macros]
 git = "https://github.com/plietar/rust-protobuf-macros.git"
 [dependencies.shannon]
@@ -45,3 +48,5 @@ git = "https://github.com/mvdnes/portaudio-rs"
 [build-dependencies]
 vergen = "~0.0.16"
 
+[features]
+default = ["dns-sd"]

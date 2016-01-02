@@ -14,5 +14,5 @@ before_install:
 install:
     - cargo install --git https://github.com/stepancheg/rust-protobuf --rev 921c69b protobuf
 script:
-    - cargo build --verbose
-    - cargo test --verbose
+    - cargo build --no-default-features --verbose
+    - cargo test --no-default-features --verbose

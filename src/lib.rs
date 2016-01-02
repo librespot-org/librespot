@@ -9,7 +9,6 @@
 extern crate bit_set;
 extern crate byteorder;
 extern crate crypto;
-extern crate dns_sd;
 extern crate eventual;
 extern crate num;
 extern crate portaudio;
@@ -22,6 +21,9 @@ extern crate tiny_http;
 extern crate tempfile;
 extern crate url;
 extern crate vorbis;
+
+#[cfg(feature = "dns-sd")]
+extern crate dns_sd;
 
 extern crate librespot_protocol;
 
@@ -39,4 +41,5 @@ pub mod player;
 pub mod session;
 pub mod spirc;
 mod stream;
+mod zeroconf;
 
