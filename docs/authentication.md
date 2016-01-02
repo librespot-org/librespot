@@ -28,6 +28,9 @@ blob used to authenticate with Spotify's servers.
 The blob is decrypted using the following algorithm.
 
 ```
+# encrypted_blob is the blob sent by the controller, decoded using base64
+# shared_secret is the result of the DH key exchange
+
 IV = encrypted_blob[:0x10]
 expected_mac = encrypted_blob[-0x14:]
 encrypted = encrypted_blob[0x10:-0x14]
