@@ -22,11 +22,18 @@ use util::{SpotifyId, FileId, mkdir_existing};
 
 use util;
 
+pub enum Bitrate {
+    Bitrate96,
+    Bitrate160,
+    Bitrate320
+}
+
 pub struct Config {
     pub application_key: Vec<u8>,
     pub user_agent: String,
     pub device_name: String,
     pub cache_location: PathBuf,
+    pub bitrate: Bitrate,
 }
 
 pub struct SessionData {

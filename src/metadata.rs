@@ -6,6 +6,8 @@ use mercury::{MercuryRequest, MercuryMethod};
 use util::{SpotifyId, FileId, StrChunksExt};
 use session::Session;
 
+pub use librespot_protocol::metadata::AudioFile_Format as FileFormat;
+
 fn countrylist_contains(list: &str, country: &str) -> bool {
     list.chunks(2).any(|cc| cc == country)
 }
@@ -31,7 +33,7 @@ pub struct Track {
     pub id: SpotifyId,
     pub name: String,
     pub album: SpotifyId,
-    pub files: Vec<FileId>,
+    pub files: Vec<(FileId, FileFormat)>,
     pub alternatives: Vec<SpotifyId>,
     pub available: bool,
 }
@@ -71,7 +73,7 @@ impl MetadataTrait for Track {
                 .map(|file| {
                     let mut dst = [0u8; 20];
                     dst.clone_from_slice(&file.get_file_id());
-                    FileId(dst)
+                    (FileId(dst), file.get_format())
                 })
                 .collect(),
             alternatives: msg.get_alternative().iter()

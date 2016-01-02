@@ -4,8 +4,8 @@ use std::sync::{mpsc, Mutex, Arc, Condvar, MutexGuard};
 use std::thread;
 use vorbis;
 
-use metadata::{Track, TrackRef};
-use session::Session;
+use metadata::{FileFormat, Track, TrackRef};
+use session::{Bitrate, Session};
 use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
 use spirc::{SpircState, SpircDelegate, PlayStatus};
@@ -120,7 +120,12 @@ impl PlayerInternal {
                         track = eventual::sequence(alternatives.into_iter()).iter().find(|alt| alt.available).unwrap();
                     }
 
-                    let file_id = track.files[0];
+                    let format = match self.session.0.config.bitrate {
+                        Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
+                        Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
+                        Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
+                    };
+                    let (file_id, _) = track.files.into_iter().find(|&(_, f)| f == format).unwrap();
 
                     let key = self.session.audio_key(track.id, file_id).await().unwrap();
                     decoder = Some(

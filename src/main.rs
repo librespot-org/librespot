@@ -12,7 +12,7 @@ use std::thread;
 
 use librespot::discovery::DiscoveryManager;
 use librespot::player::Player;
-use librespot::session::{Config, Session};
+use librespot::session::{Bitrate, Config, Session};
 use librespot::spirc::SpircManager;
 use librespot::util::version::version_string;
 
@@ -28,11 +28,13 @@ fn main() {
     let program = args[0].clone();
 
     let mut opts = Options::new();
-    opts.reqopt("a", "appkey", "Path to a spotify appkey", "APPKEY");
-    opts.optopt("u", "username", "Username to sign in with (optional)", "USERNAME");
-    opts.optopt("p", "password", "Password (optional)", "PASSWORD");
-    opts.reqopt("c", "cache", "Path to a directory where files will be cached.", "CACHE");
-    opts.reqopt("n", "name", "Device name", "NAME");
+    opts.reqopt("a", "appkey", "Path to a spotify appkey", "APPKEY")
+        .optopt("u", "username", "Username to sign in with (optional)", "USERNAME")
+        .optopt("p", "password", "Password (optional)", "PASSWORD")
+        .reqopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
+        .reqopt("n", "name", "Device name", "NAME")
+        .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE");
+
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => { m },
         Err(f) => { 
@@ -67,14 +69,23 @@ fn main() {
 
         (u, password)
     });
-
     std::env::remove_var(PASSWORD_ENV_NAME);
+
+    let bitrate = match matches.opt_str("b").as_ref().map(String::as_ref) {
+        None        => Bitrate::Bitrate160, // default value
+
+        Some("96")  => Bitrate::Bitrate96,
+        Some("160") => Bitrate::Bitrate160,
+        Some("320") => Bitrate::Bitrate320,
+        Some(b)     => panic!("Invalid bitrate {}", b),
+    };
 
     let config = Config {
         application_key: appkey,
         user_agent: version_string(),
         device_name: name,
-        cache_location: PathBuf::from(cache_location)
+        cache_location: PathBuf::from(cache_location),
+        bitrate: bitrate
     };
 
     let session = Session::new(config);
