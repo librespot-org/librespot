@@ -75,7 +75,7 @@ impl Session {
                 let welcome_data: protocol::authentication::APWelcome =
                     protobuf::parse_from_bytes(&data).unwrap();
                 self.0.data.write().unwrap().canonical_username =
-                    welcome_data.get_canonical_username().to_string();
+                    welcome_data.get_canonical_username().to_owned();
 
                 eprintln!("Authenticated !");
                 Ok(())

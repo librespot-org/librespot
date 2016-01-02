@@ -70,10 +70,11 @@ impl AudioFileLoading {
 
         let (seek_tx, seek_rx) = mpsc::channel();
 
-        let _shared = shared.clone();
-        let _session = session.clone();
-
-        thread::spawn(move || AudioFileLoading::fetch(&_session, _shared, write_file, seek_rx));
+        {
+            let shared = shared.clone();
+            let session = session.clone();
+            thread::spawn(move || AudioFileLoading::fetch(&session, shared, write_file, seek_rx));
+        }
 
         AudioFileLoading {
             read_file: read_file,

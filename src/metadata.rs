@@ -142,8 +142,7 @@ impl MetadataManager {
     }
 
     pub fn get<T: MetadataTrait>(&mut self, session: &Session, id: SpotifyId) -> MetadataRef<T> {
-
-        let _session = session.clone();
+        let session = session.clone();
         session.mercury(MercuryRequest {
                    method: MercuryMethod::GET,
                    uri: format!("{}/{}", T::base_url(), id.to_base16()),
@@ -151,12 +150,10 @@ impl MetadataManager {
                    payload: Vec::new(),
                })
                .and_then(move |response| {
-                   let msg: T::Message = protobuf::parse_from_bytes(response.payload
-                                                                            .first()
-                                                                            .unwrap())
-                                             .unwrap();
+                   let data = response.payload.first().unwrap();
+                   let msg: T::Message = protobuf::parse_from_bytes(data).unwrap();
 
-                   Ok(T::parse(&msg, &_session))
+                   Ok(T::parse(&msg, &session))
                })
     }
 }

@@ -38,7 +38,7 @@ impl DHLocalKeys {
     }
 
     pub fn public_key(&self) -> Vec<u8> {
-        return self.public_key.to_bytes_be();
+        self.public_key.to_bytes_be()
     }
 
     pub fn shared_secret(&self, remote_key: &[u8]) -> Vec<u8> {

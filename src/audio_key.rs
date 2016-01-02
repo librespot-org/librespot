@@ -36,6 +36,21 @@ impl AudioKeyManager {
         }
     }
 
+    fn send_key_request(&mut self, session: &Session, track: SpotifyId, file: FileId) -> u32 {
+        let seq = self.next_seq;
+        self.next_seq += 1;
+
+        let mut data: Vec<u8> = Vec::new();
+        data.write(&file.0).unwrap();
+        data.write(&track.to_raw()).unwrap();
+        data.write_u32::<BigEndian>(seq).unwrap();
+        data.write_u16::<BigEndian>(0x0000).unwrap();
+
+        session.send_packet(0xc, &data).unwrap();
+
+        seq
+    }
+
     pub fn request(&mut self,
                    session: &Session,
                    track: SpotifyId,
@@ -57,17 +72,7 @@ impl AudioKeyManager {
                 }
             })
             .unwrap_or_else(|| {
-                let seq = self.next_seq;
-                self.next_seq += 1;
-
-                let mut data: Vec<u8> = Vec::new();
-                data.write(&file.0).unwrap();
-                data.write(&track.to_raw()).unwrap();
-                data.write_u32::<BigEndian>(seq).unwrap();
-                data.write_u16::<BigEndian>(0x0000).unwrap();
-
-                session.send_packet(0xc, &data).unwrap();
-
+                let seq = self.send_key_request(session, track, file);
                 self.pending.insert(seq, id.clone());
 
                 let (tx, rx) = eventual::Future::pair();

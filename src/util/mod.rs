@@ -44,7 +44,7 @@ pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
         vec.push(R::rand(rng));
     }
 
-    return vec;
+    vec
 }
 
 pub mod version {
@@ -103,17 +103,17 @@ pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
         base = (&base).mul(&base).rem(modulus);
     }
 
-    return result;
+    result
 }
 
 pub struct StrChunks<'s>(&'s str, usize);
 
 pub trait StrChunksExt {
-    fn chunks<'s>(&'s self, size: usize) -> StrChunks<'s>;
+    fn chunks(&self, size: usize) -> StrChunks;
 }
 
 impl StrChunksExt for str {
-    fn chunks<'a>(&'a self, size: usize) -> StrChunks<'a> {
+    fn chunks(&self, size: usize) -> StrChunks {
         StrChunks(self, size)
     }
 }

@@ -29,11 +29,10 @@ impl<T: Read + Seek> Seek for Subfile<T> {
         };
 
         let newpos = try!(self.stream.seek(pos));
-
         if newpos > self.offset {
-            return Ok(newpos - self.offset);
+            Ok(newpos - self.offset)
         } else {
-            return Ok(0);
+            Ok(0)
         }
     }
 }

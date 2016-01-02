@@ -96,7 +96,7 @@ impl DiscoveryManager {
             h.result().code().to_owned()
         };
 
-        assert_eq!(mac.as_slice(), cksum);
+        assert_eq!(&mac[..], cksum);
 
         let decrypted = {
             let mut data = vec![0u8; encrypted.len()];
@@ -128,8 +128,7 @@ impl DiscoveryManager {
 
         for mut request in server.incoming_requests() {
             let (_, query, _) = url::parse_path(request.url()).unwrap();
-            let mut params = query.map(|q| url::form_urlencoded::parse(q.as_bytes()))
-                                  .unwrap_or(Vec::new());
+            let mut params = query.map_or(vec![], |q| url::form_urlencoded::parse(q.as_bytes()));
 
             if *request.method() == Method::Post {
                 let mut body = Vec::new();

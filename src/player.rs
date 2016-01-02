@@ -105,7 +105,7 @@ impl PlayerInternal {
                         };
                         state.position_ms = position;
                         state.position_measured_at = util::now_ms();
-                        return true;
+                        true
                     });
                     drop(decoder);
 
@@ -150,7 +150,7 @@ impl PlayerInternal {
                         state.position_ms = position;
                         state.position_measured_at = util::now_ms();
 
-                        return true;
+                        true
                     });
                     println!("Load Done");
                 }
@@ -160,13 +160,14 @@ impl PlayerInternal {
                         state.position_ms =
                             (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
                         state.position_measured_at = util::now_ms();
-                        return true;
+
+                        true
                     });
                 }
                 Some(PlayerCommand::Play) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPlay;
-                        return true;
+                        true
                     });
 
                     stream.start().unwrap();
@@ -175,7 +176,7 @@ impl PlayerInternal {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPause;
                         state.update_time = util::now_ms();
-                        return true;
+                        true
                     });
 
                     stream.stop().unwrap();
@@ -185,7 +186,7 @@ impl PlayerInternal {
                         if state.status == PlayStatus::kPlayStatusPlay {
                             state.status = PlayStatus::kPlayStatusPause;
                         }
-                        return true;
+                        true
                     });
 
                     stream.stop().unwrap();
@@ -209,7 +210,7 @@ impl PlayerInternal {
                         self.update(|state| {
                             state.status = PlayStatus::kPlayStatusStop;
                             state.end_of_track = true;
-                            return true;
+                            true
                         });
 
                         stream.stop().unwrap();
@@ -224,9 +225,10 @@ impl PlayerInternal {
                         state.position_ms =
                             (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
                         state.position_measured_at = now;
-                        return true;
+
+                        true
                     } else {
-                        return false;
+                        false
                     }
                 });
             }
@@ -293,24 +295,24 @@ impl SpircDelegate for Player {
             }
         });
 
-        return update_rx;
+        update_rx
     }
 }
 
 impl SpircState for PlayerState {
     fn status(&self) -> PlayStatus {
-        return self.status;
+        self.status
     }
 
     fn position(&self) -> (u32, i64) {
-        return (self.position_ms, self.position_measured_at);
+        (self.position_ms, self.position_measured_at)
     }
 
     fn update_time(&self) -> i64 {
-        return self.update_time;
+        self.update_time
     }
 
     fn end_of_track(&self) -> bool {
-        return self.end_of_track;
+        self.end_of_track
     }
 }
