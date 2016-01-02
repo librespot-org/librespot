@@ -100,7 +100,7 @@ impl DiscoveryManager {
 
         let decrypted = {
             let mut data = vec![0u8; encrypted.len()];
-            let mut cipher = crypto::aes::ctr(crypto::aes::KeySize::KeySize128, &encryption_key, &iv);
+            let mut cipher = crypto::aes::ctr(crypto::aes::KeySize::KeySize128, &encryption_key[0..16], &iv);
             cipher.process(&encrypted, &mut data);
             String::from_utf8(data).unwrap()
         };
