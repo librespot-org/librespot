@@ -27,7 +27,7 @@ fn main() {
 
     let mut opts = Options::new();
     opts.reqopt("a", "appkey", "Path to a spotify appkey", "APPKEY");
-    opts.reqopt("u", "username", "Username to sign in with", "USERNAME");
+    opts.optopt("u", "username", "Username to sign in with (optional)", "USERNAME");
     opts.optopt("p", "password", "Password (optional)", "PASSWORD");
     opts.reqopt("c", "cache", "Path to a directory where files will be cached.", "CACHE");
     opts.reqopt("n", "name", "Device name", "NAME");
@@ -50,14 +50,18 @@ fn main() {
         data
     };
 
-    let username = matches.opt_str("u").unwrap();
+    let username = matches.opt_str("u");
     let cache_location = matches.opt_str("c").unwrap();
     let name = matches.opt_str("n").unwrap();
 
-    let password = matches.opt_str("p").unwrap_or_else(|| {
-        print!("Password: "); 
-        stdout().flush().unwrap();
-        read_password().unwrap()
+    let credentials = username.map(|u| {
+        let password = matches.opt_str("p").unwrap_or_else(|| {
+            print!("Password: ");
+            stdout().flush().unwrap();
+            read_password().unwrap()
+        });
+
+        (u, password)
     });
 
     let config = Config {
@@ -68,9 +72,13 @@ fn main() {
     };
 
     let session = Session::new(config);
-    //session.login_password(username, password).unwrap();
-    let mut discovery = DiscoveryManager::new(session.clone());
-    discovery.run();
+
+    if let Some((username, password)) = credentials {
+        session.login_password(username, password).unwrap();
+    } else {
+        let mut discovery = DiscoveryManager::new(session.clone());
+        discovery.run();
+    }
 
     let player = Player::new(session.clone());
     let mut spirc = SpircManager::new(session.clone(), player);
