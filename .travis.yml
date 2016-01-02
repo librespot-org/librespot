@@ -13,4 +13,6 @@ before_install:
     - export PATH=$HOME/.cargo/bin:$PATH
 install:
     - cargo install --git https://github.com/stepancheg/rust-protobuf --rev 921c69b protobuf
-
+script:
+    - cargo build --verbose
+    - cargo test --verbose
