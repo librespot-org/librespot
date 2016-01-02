@@ -24,7 +24,7 @@ fn read_u8<R: Read>(stream: &mut R) -> io::Result<u8> {
 fn read_int<R: Read>(stream: &mut R) -> io::Result<u32> {
     let lo = try!(read_u8(stream)) as u32;
     if lo & 0x80 == 0 {
-        return Ok(lo)
+        return Ok(lo);
     }
 
     let hi = try!(read_u8(stream)) as u32;
@@ -40,7 +40,11 @@ fn read_bytes<R: Read>(stream: &mut R) -> io::Result<Vec<u8>> {
 }
 
 impl Session {
-    fn login(&self, username: String, auth_data: Vec<u8>, typ: AuthenticationType) -> Result<(), ()> {
+    fn login(&self,
+             username: String,
+             auth_data: Vec<u8>,
+             typ: AuthenticationType)
+             -> Result<(), ()> {
         let packet = protobuf_init!(protocol::authentication::ClientResponseEncrypted::new(), {
             login_credentials => {
                 username: username,
@@ -68,9 +72,9 @@ impl Session {
         let (cmd, data) = self.recv();
         match cmd {
             0xac => {
-                let welcome_data : protocol::authentication::APWelcome = 
+                let welcome_data: protocol::authentication::APWelcome =
                     protobuf::parse_from_bytes(&data).unwrap();
-                self.0.data.write().unwrap().canonical_username = 
+                self.0.data.write().unwrap().canonical_username =
                     welcome_data.get_canonical_username().to_string();
 
                 eprintln!("Authenticated !");
@@ -78,8 +82,8 @@ impl Session {
             }
 
             0xad => {
-                let msg : protocol::keyexchange::APLoginFailed = 
-                    protobuf::parse_from_bytes(&data).unwrap();
+                let msg: protocol::keyexchange::APLoginFailed = protobuf::parse_from_bytes(&data)
+                                                                    .unwrap();
                 eprintln!("Authentication failed, {:?}", msg);
                 Err(())
             }
@@ -91,7 +95,8 @@ impl Session {
     }
 
     pub fn login_password(&self, username: String, password: String) -> Result<(), ()> {
-        self.login(username, password.into_bytes(),
+        self.login(username,
+                   password.into_bytes(),
                    AuthenticationType::AUTHENTICATION_USER_PASS)
     }
 
@@ -121,14 +126,16 @@ impl Session {
         let blob = {
             // Anyone know what this block mode is ?
             let mut data = vec![0u8; blob.len()];
-            let mut cipher = aes::ecb_decryptor(
-                aes::KeySize::KeySize192, &key, crypto::blockmodes::NoPadding);
+            let mut cipher = aes::ecb_decryptor(aes::KeySize::KeySize192,
+                                                &key,
+                                                crypto::blockmodes::NoPadding);
             cipher.decrypt(&mut crypto::buffer::RefReadBuffer::new(&blob),
                            &mut crypto::buffer::RefWriteBuffer::new(&mut data),
-                           true).unwrap();
+                           true)
+                  .unwrap();
 
             let l = blob.len();
-            for i in 0..l-0x10 {
+            for i in 0..l - 0x10 {
                 data[l - i - 1] ^= data[l - i - 0x11];
             }
 

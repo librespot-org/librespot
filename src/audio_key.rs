@@ -18,12 +18,12 @@ struct AudioKeyId(SpotifyId, FileId);
 enum AudioKeyStatus {
     Loading(Vec<eventual::Complete<AudioKey, AudioKeyError>>),
     Loaded(AudioKey),
-    Failed(AudioKeyError)
+    Failed(AudioKeyError),
 }
 
 pub struct AudioKeyManager {
     next_seq: u32,
-    pending: HashMap<u32, AudioKeyId>, 
+    pending: HashMap<u32, AudioKeyId>,
     cache: HashMap<AudioKeyId, AudioKeyStatus>,
 }
 
@@ -32,44 +32,48 @@ impl AudioKeyManager {
         AudioKeyManager {
             next_seq: 1,
             pending: HashMap::new(),
-            cache: HashMap::new()
+            cache: HashMap::new(),
         }
     }
 
-    pub fn request(&mut self, session: &Session, track: SpotifyId, file: FileId)
-        -> eventual::Future<AudioKey, AudioKeyError> {
+    pub fn request(&mut self,
+                   session: &Session,
+                   track: SpotifyId,
+                   file: FileId)
+                   -> eventual::Future<AudioKey, AudioKeyError> {
 
         let id = AudioKeyId(track, file);
-        self.cache.get_mut(&id).map(|status| match *status {
-            AudioKeyStatus::Failed(error) => {
-                eventual::Future::error(error)
-            }
-            AudioKeyStatus::Loaded(key) => {
-                eventual::Future::of(key)
-            }
-            AudioKeyStatus::Loading(ref mut req) => {
+        self.cache
+            .get_mut(&id)
+            .map(|status| {
+                match *status {
+                    AudioKeyStatus::Failed(error) => eventual::Future::error(error),
+                    AudioKeyStatus::Loaded(key) => eventual::Future::of(key),
+                    AudioKeyStatus::Loading(ref mut req) => {
+                        let (tx, rx) = eventual::Future::pair();
+                        req.push(tx);
+                        rx
+                    }
+                }
+            })
+            .unwrap_or_else(|| {
+                let seq = self.next_seq;
+                self.next_seq += 1;
+
+                let mut data: Vec<u8> = Vec::new();
+                data.write(&file.0).unwrap();
+                data.write(&track.to_raw()).unwrap();
+                data.write_u32::<BigEndian>(seq).unwrap();
+                data.write_u16::<BigEndian>(0x0000).unwrap();
+
+                session.send_packet(0xc, &data).unwrap();
+
+                self.pending.insert(seq, id.clone());
+
                 let (tx, rx) = eventual::Future::pair();
-                req.push(tx);
+                self.cache.insert(id, AudioKeyStatus::Loading(vec![tx]));
                 rx
-            }
-        }).unwrap_or_else(|| {
-            let seq = self.next_seq;
-            self.next_seq += 1;
-
-            let mut data : Vec<u8> = Vec::new();
-            data.write(&file.0).unwrap();
-            data.write(&track.to_raw()).unwrap();
-            data.write_u32::<BigEndian>(seq).unwrap();
-            data.write_u16::<BigEndian>(0x0000).unwrap();
-
-            session.send_packet(0xc, &data).unwrap();
-
-            self.pending.insert(seq, id.clone());
-
-            let (tx, rx) = eventual::Future::pair();
-            self.cache.insert(id, AudioKeyStatus::Loading(vec!{ tx }));
-            rx
-        })
+            })
     }
 }
 
@@ -78,7 +82,7 @@ impl PacketHandler for AudioKeyManager {
         let mut data = Cursor::new(data);
         let seq = data.read_u32::<BigEndian>().unwrap();
 
-        if let Some(status) = self.pending.remove(&seq).and_then(|id| { self.cache.get_mut(&id) }) {
+        if let Some(status) = self.pending.remove(&seq).and_then(|id| self.cache.get_mut(&id)) {
             if cmd == 0xd {
                 let mut key = [0u8; 16];
                 data.read_exact(&mut key).unwrap();
@@ -103,4 +107,3 @@ impl PacketHandler for AudioKeyManager {
         }
     }
 }
-

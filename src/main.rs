@@ -36,17 +36,16 @@ fn main() {
         .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE");
 
     let matches = match opts.parse(&args[1..]) {
-        Ok(m) => { m },
-        Err(f) => { 
-                print!("Error: {}\n{}", f.to_string(), usage(&*program, &opts));
-                return;
+        Ok(m) => m,
+        Err(f) => {
+            print!("Error: {}\n{}", f.to_string(), usage(&*program, &opts));
+            return;
         }
     };
 
     let appkey = {
-        let mut file = File::open(
-            Path::new(&*matches.opt_str("a").unwrap())
-        ).expect("Could not open app key.");
+        let mut file = File::open(Path::new(&*matches.opt_str("a").unwrap()))
+                           .expect("Could not open app key.");
 
         let mut data = Vec::new();
         file.read_to_end(&mut data).unwrap();
@@ -59,25 +58,25 @@ fn main() {
     let name = matches.opt_str("n").unwrap();
 
     let credentials = username.map(|u| {
-        let password = matches.opt_str("p").or_else(|| {
-            std::env::var(PASSWORD_ENV_NAME).ok()
-        }).unwrap_or_else(|| {
-            print!("Password: ");
-            stdout().flush().unwrap();
-            read_password().unwrap()
-        });
+        let password = matches.opt_str("p")
+                              .or_else(|| std::env::var(PASSWORD_ENV_NAME).ok())
+                              .unwrap_or_else(|| {
+                                  print!("Password: ");
+                                  stdout().flush().unwrap();
+                                  read_password().unwrap()
+                              });
 
         (u, password)
     });
     std::env::remove_var(PASSWORD_ENV_NAME);
 
     let bitrate = match matches.opt_str("b").as_ref().map(String::as_ref) {
-        None        => Bitrate::Bitrate160, // default value
+        None => Bitrate::Bitrate160, // default value
 
-        Some("96")  => Bitrate::Bitrate96,
+        Some("96") => Bitrate::Bitrate96,
         Some("160") => Bitrate::Bitrate160,
         Some("320") => Bitrate::Bitrate320,
-        Some(b)     => panic!("Invalid bitrate {}", b),
+        Some(b) => panic!("Invalid bitrate {}", b),
     };
 
     let config = Config {
@@ -85,7 +84,7 @@ fn main() {
         user_agent: version_string(),
         device_name: name,
         cache_location: PathBuf::from(cache_location),
-        bitrate: bitrate
+        bitrate: bitrate,
     };
 
     let session = Session::new(config);
@@ -99,12 +98,9 @@ fn main() {
 
     let player = Player::new(session.clone());
     let mut spirc = SpircManager::new(session.clone(), player);
-    thread::spawn(move || {
-        spirc.run()
-    });
+    thread::spawn(move || spirc.run());
 
     loop {
         session.poll();
     }
 }
-

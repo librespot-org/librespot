@@ -13,11 +13,11 @@ use util::{FileId, IgnoreExt, ZeroFile, mkdir_existing};
 use session::Session;
 use stream::StreamEvent;
 
-const CHUNK_SIZE : usize = 0x20000;
+const CHUNK_SIZE: usize = 0x20000;
 
 pub enum AudioFile {
     Direct(fs::File),
-    Loading(AudioFileLoading)
+    Loading(AudioFileLoading),
 }
 
 pub struct AudioFileLoading {
@@ -43,15 +43,18 @@ impl AudioFileLoading {
         let read_file = files_iter.next().unwrap();
         let mut write_file = files_iter.next().unwrap();
 
-        let size = session.stream(file_id, 0, 1).into_iter()
-            .filter_map(|event| {
-                match event {
-                    StreamEvent::Header(id, ref data) if id == 0x3 => {
-                        Some(BigEndian::read_u32(data) as usize * 4)
-                    }
-                    _ => None
-                }
-            }).next().unwrap();
+        let size = session.stream(file_id, 0, 1)
+                          .into_iter()
+                          .filter_map(|event| {
+                              match event {
+                                  StreamEvent::Header(id, ref data) if id == 0x3 => {
+                                      Some(BigEndian::read_u32(data) as usize * 4)
+                                  }
+                                  _ => None,
+                              }
+                          })
+                          .next()
+                          .unwrap();
 
         let chunk_count = (size + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
@@ -70,9 +73,7 @@ impl AudioFileLoading {
         let _shared = shared.clone();
         let _session = session.clone();
 
-        thread::spawn(move || {
-            AudioFileLoading::fetch(&_session, _shared, write_file, seek_rx)
-        });
+        thread::spawn(move || AudioFileLoading::fetch(&_session, _shared, write_file, seek_rx));
 
         AudioFileLoading {
             read_file: read_file,
@@ -80,12 +81,14 @@ impl AudioFileLoading {
             position: 0,
             seek: seek_tx,
 
-            shared: shared
+            shared: shared,
         }
     }
 
-    fn fetch(session: &Session, shared: Arc<AudioFileShared>,
-             mut write_file: TempFile, seek_rx: mpsc::Receiver<u64>) {
+    fn fetch(session: &Session,
+             shared: Arc<AudioFileShared>,
+             mut write_file: TempFile,
+             seek_rx: mpsc::Receiver<u64>) {
         let mut index = 0;
 
         loop {
@@ -113,12 +116,14 @@ impl AudioFileLoading {
         }
     }
 
-    fn fetch_chunk(session: &Session, shared: &Arc<AudioFileShared>,
-                   write_file: &mut TempFile, index: usize) {
+    fn fetch_chunk(session: &Session,
+                   shared: &Arc<AudioFileShared>,
+                   write_file: &mut TempFile,
+                   index: usize) {
 
         let rx = session.stream(shared.file_id,
-                     (index * CHUNK_SIZE / 4) as u32,
-                     (CHUNK_SIZE / 4) as u32);
+                                (index * CHUNK_SIZE / 4) as u32,
+                                (CHUNK_SIZE / 4) as u32);
 
         println!("Chunk {}", index);
 
@@ -133,7 +138,7 @@ impl AudioFileLoading {
 
                     size += data.len();
                     if size >= CHUNK_SIZE {
-                        break
+                        break;
                     }
                 }
             }
@@ -150,7 +155,8 @@ impl AudioFileLoading {
 
         mkdir_existing(&AudioFileManager::cache_dir(session, shared.file_id)).unwrap();
 
-        let mut f = fs::File::create(AudioFileManager::cache_path(session, shared.file_id)).unwrap();
+        let mut f = fs::File::create(AudioFileManager::cache_path(session, shared.file_id))
+                        .unwrap();
         io::copy(write_file, &mut f).unwrap();
     }
 }
@@ -159,7 +165,7 @@ impl Read for AudioFileLoading {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         let index = self.position as usize / CHUNK_SIZE;
         let offset = self.position as usize % CHUNK_SIZE;
-        let len = min(output.len(), CHUNK_SIZE-offset);
+        let len = min(output.len(), CHUNK_SIZE - offset);
 
         let mut bitmap = self.shared.bitmap.lock().unwrap();
         while !bitmap.contains(&index) {
@@ -179,11 +185,9 @@ impl Seek for AudioFileLoading {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.position = try!(self.read_file.seek(pos));
 
-        /*
-         * Notify the fetch thread to get the correct block
-         * This can fail if fetch thread has completed, in which case the
-         * block is ready. Just ignore the error.
-         */
+        // Notify the fetch thread to get the correct block
+        // This can fail if fetch thread has completed, in which case the
+        // block is ready. Just ignore the error.
         self.seek.send(self.position).ignore();
         Ok(self.position as u64)
     }
@@ -223,11 +227,10 @@ impl AudioFileManager {
         AudioFileManager::cache_dir(session, file_id).join(&name[2..])
     }
 
-    pub fn request (&mut self, session: &Session, file_id: FileId) -> AudioFile {
+    pub fn request(&mut self, session: &Session, file_id: FileId) -> AudioFile {
         match fs::File::open(AudioFileManager::cache_path(session, file_id)) {
             Ok(f) => AudioFile::Direct(f),
-            Err(..) => AudioFile::Loading(AudioFileLoading::new(session, file_id))
+            Err(..) => AudioFile::Loading(AudioFileLoading::new(session, file_id)),
         }
     }
 }
-

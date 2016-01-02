@@ -25,7 +25,7 @@ use util;
 pub enum Bitrate {
     Bitrate96,
     Bitrate160,
-    Bitrate320
+    Bitrate320,
 }
 
 pub struct Config {
@@ -123,12 +123,12 @@ impl Session {
             }
         });
 
-        let init_client_packet =
-            connection.send_packet_prefix(&[0,4], &request.write_to_bytes().unwrap()).unwrap();
-        let init_server_packet =
-            connection.recv_packet().unwrap();
+        let init_client_packet = connection.send_packet_prefix(&[0, 4],
+                                                               &request.write_to_bytes().unwrap())
+                                           .unwrap();
+        let init_server_packet = connection.recv_packet().unwrap();
 
-        let response : protocol::keyexchange::APResponseMessage =
+        let response: protocol::keyexchange::APResponseMessage =
             protobuf::parse_from_bytes(&init_server_packet[4..]).unwrap();
 
         let remote_key = response.get_challenge()
@@ -160,7 +160,7 @@ impl Session {
 
         let packet = protobuf_init!(protocol::keyexchange::ClientResponsePlaintext::new(), {
             login_crypto_response.diffie_hellman => {
-                hmac: challenge 
+                hmac: challenge
             },
             pow_response => {},
             crypto_response => {},
@@ -169,10 +169,9 @@ impl Session {
 
         connection.send_packet(&packet.write_to_bytes().unwrap()).unwrap();
 
-        let cipher_connection = CipherConnection::new(
-            connection.into_stream(),
-            &send_key,
-            &recv_key);
+        let cipher_connection = CipherConnection::new(connection.into_stream(),
+                                                      &send_key,
+                                                      &recv_key);
 
         *self.0.rx_connection.lock().unwrap() = Some(cipher_connection.clone());
         *self.0.tx_connection.lock().unwrap() = Some(cipher_connection);
@@ -184,14 +183,13 @@ impl Session {
         match cmd {
             0x4 => self.send_packet(0x49, &data).unwrap(),
             0x4a => (),
-            0x9  => self.0.stream.lock().unwrap().handle(cmd, data),
+            0x9 => self.0.stream.lock().unwrap().handle(cmd, data),
             0xd | 0xe => self.0.audio_key.lock().unwrap().handle(cmd, data),
             0x1b => {
-                self.0.data.write().unwrap().country =
-                    String::from_utf8(data).unwrap();
-            },
+                self.0.data.write().unwrap().country = String::from_utf8(data).unwrap();
+            }
             0xb2...0xb6 => self.0.mercury.lock().unwrap().handle(cmd, data),
-            _ => ()
+            _ => (),
         }
     }
 
@@ -227,4 +225,3 @@ impl Session {
         self.0.mercury.lock().unwrap().subscribe(self, uri)
     }
 }
-

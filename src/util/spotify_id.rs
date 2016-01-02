@@ -1,6 +1,6 @@
 use std;
 use util::u128;
-use byteorder::{BigEndian,ByteOrder};
+use byteorder::{BigEndian, ByteOrder};
 use std::ascii::AsciiExt;
 
 #[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
@@ -9,7 +9,8 @@ pub struct SpotifyId(u128);
 #[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
 pub struct FileId(pub [u8; 20]);
 
-const BASE62_DIGITS: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const BASE62_DIGITS: &'static [u8] =
+    b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
 
 impl SpotifyId {
@@ -17,7 +18,7 @@ impl SpotifyId {
         assert!(id.is_ascii());
         let data = id.as_bytes();
 
-        let mut n : u128 = std::num::Zero::zero();
+        let mut n: u128 = std::num::Zero::zero();
         for c in data {
             let d = BASE16_DIGITS.iter().position(|e| e == c).unwrap() as u8;
             n = n * u128::from(16);
@@ -31,7 +32,7 @@ impl SpotifyId {
         assert!(id.is_ascii());
         let data = id.as_bytes();
 
-        let mut n : u128 = std::num::Zero::zero();
+        let mut n: u128 = std::num::Zero::zero();
         for c in data {
             let d = BASE62_DIGITS.iter().position(|e| e == c).unwrap() as u8;
             n = n * u128::from(62);
@@ -56,10 +57,10 @@ impl SpotifyId {
 
         let mut data = [0u8; 32];
         for i in 0..16 {
-            data[31-i] = BASE16_DIGITS[(low.wrapping_shr(4 * i as u32) & 0xF) as usize];
+            data[31 - i] = BASE16_DIGITS[(low.wrapping_shr(4 * i as u32) & 0xF) as usize];
         }
         for i in 0..16 {
-            data[15-i] = BASE16_DIGITS[(high.wrapping_shr(4 * i as u32) & 0xF) as usize];
+            data[15 - i] = BASE16_DIGITS[(high.wrapping_shr(4 * i as u32) & 0xF) as usize];
         }
 
         std::str::from_utf8(&data).unwrap().to_owned()
@@ -71,7 +72,7 @@ impl SpotifyId {
 
         let mut data = [0u8; 16];
 
-        BigEndian::write_u64(&mut data[0..8],  high);
+        BigEndian::write_u64(&mut data[0..8], high);
         BigEndian::write_u64(&mut data[8..16], low);
 
         data
@@ -80,10 +81,10 @@ impl SpotifyId {
 
 impl FileId {
     pub fn to_base16(&self) -> String {
-        self.0.iter()
+        self.0
+            .iter()
             .map(|b| format!("{:02x}", b))
             .collect::<Vec<String>>()
             .concat()
     }
 }
-

@@ -4,7 +4,8 @@
 
 #![plugin(protobuf_macros)]
 #![plugin(json_macros)]
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 
 extern crate bit_set;
 extern crate byteorder;
@@ -27,7 +28,7 @@ extern crate dns_sd;
 
 extern crate librespot_protocol;
 
-#[macro_use] pub mod util;
+#[macro_use]pub mod util;
 mod audio_decrypt;
 mod audio_file;
 mod audio_key;
@@ -42,4 +43,3 @@ pub mod session;
 pub mod spirc;
 mod stream;
 mod zeroconf;
-

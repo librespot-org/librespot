@@ -3,14 +3,14 @@ use std::cmp::{min, max};
 
 pub struct ZeroFile {
     position: u64,
-    size: u64
+    size: u64,
 }
 
 impl ZeroFile {
     pub fn new(size: u64) -> ZeroFile {
         ZeroFile {
             position: 0,
-            size: size
+            size: size,
         }
     }
 }
@@ -41,4 +41,3 @@ impl io::Read for ZeroFile {
         Ok(len)
     }
 }
-

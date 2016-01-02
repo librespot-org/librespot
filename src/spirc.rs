@@ -34,14 +34,13 @@ pub struct SpircManager<D: SpircDelegate> {
     last_command_msgid: u32,
 
     tracks: Vec<SpotifyId>,
-    index: u32
+    index: u32,
 }
 
 pub trait SpircDelegate {
     type State : SpircState;
 
-    fn load(&self, track: SpotifyId,
-            start_playing: bool, position_ms: u32);
+    fn load(&self, track: SpotifyId, start_playing: bool, position_ms: u32);
     fn play(&self);
     fn pause(&self);
     fn seek(&self, position_ms: u32);
@@ -58,9 +57,8 @@ pub trait SpircState {
     fn end_of_track(&self) -> bool;
 }
 
-impl <D: SpircDelegate> SpircManager<D> {
-    pub fn new(session: Session, delegate: D)
-            -> SpircManager<D> {
+impl<D: SpircDelegate> SpircManager<D> {
+    pub fn new(session: Session, delegate: D) -> SpircManager<D> {
 
         let ident = session.0.data.read().unwrap().device_id.clone();
         let name = session.0.config.device_name.clone();
@@ -88,13 +86,19 @@ impl <D: SpircDelegate> SpircManager<D> {
             last_command_msgid: 0,
 
             tracks: Vec::new(),
-            index: 0
+            index: 0,
         }
     }
 
     pub fn run(&mut self) {
         let rx = self.session.mercury_sub(format!("hm://remote/user/{}/",
-                    self.session.0.data.read().unwrap().canonical_username.clone()));
+                                                  self.session
+                                                      .0
+                                                      .data
+                                                      .read()
+                                                      .unwrap()
+                                                      .canonical_username
+                                                      .clone()));
         let updates = self.delegate.updates();
 
         self.notify(true, None);
@@ -149,9 +153,11 @@ impl <D: SpircDelegate> SpircManager<D> {
 
 
                 self.index = frame.get_state().get_playing_track_index();
-                self.tracks = frame.get_state().get_track().iter()
-                    .map(|track| SpotifyId::from_raw(track.get_gid()))
-                    .collect();
+                self.tracks = frame.get_state()
+                                   .get_track()
+                                   .iter()
+                                   .map(|track| SpotifyId::from_raw(track.get_gid()))
+                                   .collect();
 
                 let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
                 let track = self.tracks[self.index as usize];
@@ -173,7 +179,7 @@ impl <D: SpircDelegate> SpircManager<D> {
                     self.delegate.stop();
                 }
             }
-            _ => ()
+            _ => (),
         }
     }
 
@@ -200,13 +206,16 @@ impl <D: SpircDelegate> SpircManager<D> {
             pkt.set_state(self.spirc_state());
         }
 
-        self.session.mercury(MercuryRequest{
-            method: MercuryMethod::SEND,
-            uri: format!("hm://remote/user/{}", 
-                         self.session.0.data.read().unwrap().canonical_username.clone()),
-            content_type: None,
-            payload: vec![ pkt.write_to_bytes().unwrap() ]
-        }).await().unwrap();
+        self.session
+            .mercury(MercuryRequest {
+                method: MercuryMethod::SEND,
+                uri: format!("hm://remote/user/{}",
+                             self.session.0.data.read().unwrap().canonical_username.clone()),
+                content_type: None,
+                payload: vec![pkt.write_to_bytes().unwrap()],
+            })
+            .await()
+            .unwrap();
     }
 
     fn spirc_state(&self) -> protocol::spirc::State {

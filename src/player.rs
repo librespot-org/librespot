@@ -22,7 +22,7 @@ pub struct PlayerState {
     position_measured_at: i64,
     update_time: i64,
 
-    end_of_track: bool
+    end_of_track: bool,
 }
 
 struct PlayerInternal {
@@ -36,7 +36,7 @@ enum PlayerCommand {
     Play,
     Pause,
     Stop,
-    Seek(u32)
+    Seek(u32),
 }
 
 impl Player {
@@ -49,17 +49,16 @@ impl Player {
             position_measured_at: 0,
             update_time: util::now_ms(),
             end_of_track: false,
-        }), Condvar::new()));
+        }),
+                              Condvar::new()));
 
         let internal = PlayerInternal {
             session: session,
             commands: cmd_rx,
-            state: state.clone()
+            state: state.clone(),
         };
 
-        thread::spawn(move || {
-            internal.run()
-        });
+        thread::spawn(move || internal.run());
 
         Player {
             commands: cmd_tx,
@@ -113,11 +112,17 @@ impl PlayerInternal {
                     let mut track = self.session.metadata::<Track>(track_id).await().unwrap();
 
                     if !track.available {
-                        let alternatives = track.alternatives.iter()
-                            .map(|alt_id| self.session.metadata::<Track>(*alt_id))
-                            .collect::<Vec<TrackRef>>();
+                        let alternatives = track.alternatives
+                                                .iter()
+                                                .map(|alt_id| {
+                                                    self.session.metadata::<Track>(*alt_id)
+                                                })
+                                                .collect::<Vec<TrackRef>>();
 
-                        track = eventual::sequence(alternatives.into_iter()).iter().find(|alt| alt.available).unwrap();
+                        track = eventual::sequence(alternatives.into_iter())
+                                    .iter()
+                                    .find(|alt| alt.available)
+                                    .unwrap();
                     }
 
                     let format = match self.session.0.config.bitrate {
@@ -152,11 +157,12 @@ impl PlayerInternal {
                 Some(PlayerCommand::Seek(ms)) => {
                     decoder.as_mut().unwrap().time_seek(ms as f64 / 1000f64).unwrap();
                     self.update(|state| {
-                        state.position_ms = (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_ms =
+                            (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
                         state.position_measured_at = util::now_ms();
                         return true;
                     });
-                },
+                }
                 Some(PlayerCommand::Play) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPlay;
@@ -164,7 +170,7 @@ impl PlayerInternal {
                     });
 
                     stream.start().unwrap();
-                },
+                }
                 Some(PlayerCommand::Pause) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPause;
@@ -173,7 +179,7 @@ impl PlayerInternal {
                     });
 
                     stream.stop().unwrap();
-                },
+                }
                 Some(PlayerCommand::Stop) => {
                     self.update(|state| {
                         if state.status == PlayStatus::kPlayStatusPlay {
@@ -184,7 +190,7 @@ impl PlayerInternal {
 
                     stream.stop().unwrap();
                     decoder = None;
-                },
+                }
                 None => (),
             }
 
@@ -193,11 +199,10 @@ impl PlayerInternal {
                     Some(Ok(packet)) => {
                         match stream.write(&packet.data) {
                             Ok(_) => (),
-                            Err(portaudio::PaError::OutputUnderflowed)
-                                => eprintln!("Underflow"),
-                            Err(e) => panic!("PA Error {}", e)
+                            Err(portaudio::PaError::OutputUnderflowed) => eprintln!("Underflow"),
+                            Err(e) => panic!("PA Error {}", e),
                         };
-                    },
+                    }
                     Some(Err(vorbis::VorbisError::Hole)) => (),
                     Some(Err(e)) => panic!("Vorbis error {:?}", e),
                     None => {
@@ -216,7 +221,8 @@ impl PlayerInternal {
                     let now = util::now_ms();
 
                     if now - state.position_measured_at > 5000 {
-                        state.position_ms = (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_ms =
+                            (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
                         state.position_measured_at = now;
                         return true;
                     } else {
@@ -232,7 +238,8 @@ impl PlayerInternal {
     }
 
     fn update<F>(&self, f: F)
-        where F: FnOnce(&mut MutexGuard<PlayerState>) -> bool {
+        where F: FnOnce(&mut MutexGuard<PlayerState>) -> bool
+    {
         let mut guard = self.state.0.lock().unwrap();
         let update = f(&mut guard);
         if update {
@@ -245,8 +252,7 @@ impl PlayerInternal {
 impl SpircDelegate for Player {
     type State = PlayerState;
 
-    fn load(&self, track: SpotifyId,
-            start_playing: bool, position_ms: u32) {
+    fn load(&self, track: SpotifyId, start_playing: bool, position_ms: u32) {
         self.command(PlayerCommand::Load(track, start_playing, position_ms));
     }
 
@@ -308,4 +314,3 @@ impl SpircState for PlayerState {
         return self.end_of_track;
     }
 }
-

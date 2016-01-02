@@ -17,12 +17,12 @@ type ChannelId = u16;
 
 enum ChannelMode {
     Header,
-    Data
+    Data,
 }
 
 struct Channel {
     mode: ChannelMode,
-    callback: mpsc::Sender<StreamEvent>
+    callback: mpsc::Sender<StreamEvent>,
 }
 
 pub struct StreamManager {
@@ -38,16 +38,19 @@ impl StreamManager {
         }
     }
 
-    pub fn request(&mut self, session: &Session,
-                   file: FileId, offset: u32, size: u32)
-        -> mpsc::Receiver<StreamEvent> {
+    pub fn request(&mut self,
+                   session: &Session,
+                   file: FileId,
+                   offset: u32,
+                   size: u32)
+                   -> mpsc::Receiver<StreamEvent> {
 
         let (tx, rx) = mpsc::channel();
 
         let channel_id = self.next_id;
         self.next_id += 1;
 
-        let mut data : Vec<u8> = Vec::new();
+        let mut data: Vec<u8> = Vec::new();
         data.write_u16::<BigEndian>(channel_id).unwrap();
         data.write_u8(0).unwrap();
         data.write_u8(1).unwrap();
@@ -61,10 +64,11 @@ impl StreamManager {
 
         session.send_packet(0x8, &data).unwrap();
 
-        self.channels.insert(channel_id, Channel {
-            mode: ChannelMode::Header,
-            callback: tx
-        });
+        self.channels.insert(channel_id,
+                             Channel {
+                                 mode: ChannelMode::Header,
+                                 callback: tx,
+                             });
 
         rx
     }
@@ -75,12 +79,14 @@ impl PacketHandler for StreamManager {
         let data = ArcVec::new(data);
         let mut packet = Cursor::new(&data as &[u8]);
 
-        let id : ChannelId = packet.read_u16::<BigEndian>().unwrap();
+        let id: ChannelId = packet.read_u16::<BigEndian>().unwrap();
         let mut close = false;
         {
             let channel = match self.channels.get_mut(&id) {
                 Some(ch) => ch,
-                None => { return; }
+                None => {
+                    return;
+                }
             };
 
             match channel.mode {
@@ -105,7 +111,7 @@ impl PacketHandler for StreamManager {
                             packet.seek(SeekFrom::Current(length as i64 - 1)).unwrap();
                         }
                     }
-                    
+
                     if length == 0 {
                         channel.mode = ChannelMode::Data;
                     }
@@ -114,10 +120,11 @@ impl PacketHandler for StreamManager {
                 ChannelMode::Data => {
                     if packet.position() < data.len() as u64 {
                         channel.callback
-                            .send(StreamEvent::Data(data.clone().offset(packet.position() as usize)))
-                            .unwrap_or_else(|_| {
-                                close = true;
-                            });
+                               .send(StreamEvent::Data(data.clone()
+                                                           .offset(packet.position() as usize)))
+                               .unwrap_or_else(|_| {
+                                   close = true;
+                               });
                     } else {
                         close = true;
                     }
@@ -130,4 +137,3 @@ impl PacketHandler for StreamManager {
         }
     }
 }
-

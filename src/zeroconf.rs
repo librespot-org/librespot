@@ -22,7 +22,8 @@ pub mod stub {
                         _: &[&str])
                         -> std::result::Result<DNSService, DNSError> {
             writeln!(&mut std::io::stderr(),
-                     "WARNING: dns-sd is not enabled. Service will probably not be visible").unwrap();
+                     "WARNING: dns-sd is not enabled. Service will probably not be visible")
+                .unwrap();
             Ok(DNSService)
         }
     }

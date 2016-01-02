@@ -15,7 +15,7 @@ use util;
 pub struct DiscoveryManager {
     session: Session,
     private_key: BigUint,
-    public_key: BigUint
+    public_key: BigUint,
 }
 
 fn not_found() -> ResponseBox {
@@ -55,10 +55,10 @@ impl DiscoveryManager {
     }
 
     fn add_user(&self, params: &[(String, String)]) -> ResponseBox {
-        let &(_, ref username) = params.iter().find(|& &(ref key, _)| key == "userName").unwrap();
-        let &(_, ref encrypted_blob) = params.iter().find(|& &(ref key, _)| key == "blob").unwrap();
-        let &(_, ref client_key) = params.iter().find(|& &(ref key, _)| key == "clientKey").unwrap();
-        
+        let &(_, ref username) = params.iter().find(|&&(ref key, _)| key == "userName").unwrap();
+        let &(_, ref encrypted_blob) = params.iter().find(|&&(ref key, _)| key == "blob").unwrap();
+        let &(_, ref client_key) = params.iter().find(|&&(ref key, _)| key == "clientKey").unwrap();
+
         let encrypted_blob = encrypted_blob.from_base64().unwrap();
 
         let client_key = client_key.from_base64().unwrap();
@@ -67,8 +67,8 @@ impl DiscoveryManager {
         let shared_key = util::powm(&client_key, &self.private_key, &DH_PRIME);
 
         let iv = &encrypted_blob[0..16];
-        let encrypted = &encrypted_blob[16..encrypted_blob.len()-20];
-        let cksum = &encrypted_blob[encrypted_blob.len()-20..encrypted_blob.len()];
+        let encrypted = &encrypted_blob[16..encrypted_blob.len() - 20];
+        let cksum = &encrypted_blob[encrypted_blob.len() - 20..encrypted_blob.len()];
 
         let base_key = {
             let mut data = [0u8; 20];
@@ -100,7 +100,9 @@ impl DiscoveryManager {
 
         let decrypted = {
             let mut data = vec![0u8; encrypted.len()];
-            let mut cipher = crypto::aes::ctr(crypto::aes::KeySize::KeySize128, &encryption_key[0..16], &iv);
+            let mut cipher = crypto::aes::ctr(crypto::aes::KeySize::KeySize128,
+                                              &encryption_key[0..16],
+                                              &iv);
             cipher.process(&encrypted, &mut data);
             String::from_utf8(data).unwrap()
         };
@@ -126,7 +128,8 @@ impl DiscoveryManager {
 
         for mut request in server.incoming_requests() {
             let (_, query, _) = url::parse_path(request.url()).unwrap();
-            let mut params = query.map(|q| url::form_urlencoded::parse(q.as_bytes())).unwrap_or(Vec::new());
+            let mut params = query.map(|q| url::form_urlencoded::parse(q.as_bytes()))
+                                  .unwrap_or(Vec::new());
 
             if *request.method() == Method::Post {
                 let mut body = Vec::new();
@@ -137,7 +140,7 @@ impl DiscoveryManager {
 
             println!("{:?}", params);
 
-            let &(_, ref action) = params.iter().find(|& &(ref key, _)| key == "action").unwrap();
+            let &(_, ref action) = params.iter().find(|&&(ref key, _)| key == "action").unwrap();
             match action.as_ref() {
                 "getInfo" => request.respond(self.get_info()).unwrap(),
                 "addUser" => {
@@ -151,4 +154,3 @@ impl DiscoveryManager {
         drop(svc);
     }
 }
-

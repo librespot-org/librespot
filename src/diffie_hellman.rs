@@ -48,4 +48,3 @@ impl DHLocalKeys {
         shared_key.to_bytes_be()
     }
 }
-

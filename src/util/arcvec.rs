@@ -9,13 +9,13 @@ pub struct ArcVec<T> {
     length: usize,
 }
 
-impl <T> ArcVec<T> {
+impl<T> ArcVec<T> {
     pub fn new(data: Vec<T>) -> ArcVec<T> {
         let length = data.len();
         ArcVec {
             data: Arc::new(data),
             offset: 0,
-            length: length
+            length: length,
         }
     }
 
@@ -40,13 +40,12 @@ impl<T> Deref for ArcVec<T> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
-        &self.data[self.offset..self.offset+self.length]
+        &self.data[self.offset..self.offset + self.length]
     }
 }
 
-impl<T : fmt::Debug> fmt::Debug for ArcVec<T> {
+impl<T: fmt::Debug> fmt::Debug for ArcVec<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         self.deref().fmt(formatter)
     }
 }
-

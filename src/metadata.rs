@@ -13,12 +13,14 @@ fn countrylist_contains(list: &str, country: &str) -> bool {
 }
 
 fn parse_restrictions<'s, I>(restrictions: I, country: &str, catalogue: &str) -> bool
-        where I : Iterator<Item=&'s protocol::metadata::Restriction> {
-    restrictions
-        .filter(|r| r.get_catalogue_str().contains(&catalogue.to_owned()))
-        .all(|r| !countrylist_contains(r.get_countries_forbidden(), country)
-             && (!r.has_countries_allowed()
-                 || countrylist_contains(r.get_countries_allowed(), country)))
+    where I: Iterator<Item = &'s protocol::metadata::Restriction>
+{
+    restrictions.filter(|r| r.get_catalogue_str().contains(&catalogue.to_owned()))
+                .all(|r| {
+                    !countrylist_contains(r.get_countries_forbidden(), country) &&
+                    (!r.has_countries_allowed() ||
+                     countrylist_contains(r.get_countries_allowed(), country))
+                })
 }
 
 pub trait MetadataTrait : Send + 'static {
@@ -43,7 +45,7 @@ pub struct Album {
     pub id: SpotifyId,
     pub name: String,
     pub artists: Vec<SpotifyId>,
-    pub covers: Vec<FileId>
+    pub covers: Vec<FileId>,
 }
 
 #[derive(Debug)]
@@ -69,20 +71,21 @@ impl MetadataTrait for Track {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
             album: SpotifyId::from_raw(msg.get_album().get_gid()),
-            files: msg.get_file().iter()
-                .map(|file| {
-                    let mut dst = [0u8; 20];
-                    dst.clone_from_slice(&file.get_file_id());
-                    (FileId(dst), file.get_format())
-                })
-                .collect(),
-            alternatives: msg.get_alternative().iter()
-                .map(|alt| SpotifyId::from_raw(alt.get_gid()))
-                .collect(),
-            available: parse_restrictions(
-                msg.get_restriction().iter(),
-                &session.0.data.read().unwrap().country,
-                "premium"),
+            files: msg.get_file()
+                      .iter()
+                      .map(|file| {
+                          let mut dst = [0u8; 20];
+                          dst.clone_from_slice(&file.get_file_id());
+                          (FileId(dst), file.get_format())
+                      })
+                      .collect(),
+            alternatives: msg.get_alternative()
+                             .iter()
+                             .map(|alt| SpotifyId::from_raw(alt.get_gid()))
+                             .collect(),
+            available: parse_restrictions(msg.get_restriction().iter(),
+                                          &session.0.data.read().unwrap().country,
+                                          "premium"),
         }
     }
 }
@@ -98,16 +101,19 @@ impl MetadataTrait for Album {
         Album {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
-            artists: msg.get_artist().iter()
-                .map(|a| SpotifyId::from_raw(a.get_gid()))
-                .collect(),
-            covers: msg.get_cover_group().get_image().iter()
-                .map(|image| {
-                    let mut dst = [0u8; 20];
-                    dst.clone_from_slice(&image.get_file_id());
-                    FileId(dst)
-                })
-                .collect(),
+            artists: msg.get_artist()
+                        .iter()
+                        .map(|a| SpotifyId::from_raw(a.get_gid()))
+                        .collect(),
+            covers: msg.get_cover_group()
+                       .get_image()
+                       .iter()
+                       .map(|image| {
+                           let mut dst = [0u8; 20];
+                           dst.clone_from_slice(&image.get_file_id());
+                           FileId(dst)
+                       })
+                       .collect(),
         }
     }
 }
@@ -135,21 +141,22 @@ impl MetadataManager {
         MetadataManager
     }
 
-    pub fn get<T: MetadataTrait>(&mut self, session: &Session, id: SpotifyId)
-          -> MetadataRef<T> {
+    pub fn get<T: MetadataTrait>(&mut self, session: &Session, id: SpotifyId) -> MetadataRef<T> {
 
         let _session = session.clone();
         session.mercury(MercuryRequest {
-            method: MercuryMethod::GET,
-            uri: format!("{}/{}", T::base_url(), id.to_base16()),
-            content_type: None,
-            payload: Vec::new()
-        }).and_then(move |response| {
-            let msg : T::Message = protobuf::parse_from_bytes(
-                response.payload.first().unwrap()).unwrap();
+                   method: MercuryMethod::GET,
+                   uri: format!("{}/{}", T::base_url(), id.to_base16()),
+                   content_type: None,
+                   payload: Vec::new(),
+               })
+               .and_then(move |response| {
+                   let msg: T::Message = protobuf::parse_from_bytes(response.payload
+                                                                            .first()
+                                                                            .unwrap())
+                                             .unwrap();
 
-            Ok(T::parse(&msg, &_session))
-        })
+                   Ok(T::parse(&msg, &_session))
+               })
     }
 }
-
