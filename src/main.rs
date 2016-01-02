@@ -16,6 +16,8 @@ use librespot::session::{Config, Session};
 use librespot::spirc::SpircManager;
 use librespot::util::version::version_string;
 
+static PASSWORD_ENV_NAME: &'static str = "SPOTIFY_PASSWORD";
+
 fn usage(program: &str, opts: &Options) -> String {
     let brief = format!("Usage: {} [options]", program);
     format!("{}", opts.usage(&brief))
@@ -55,7 +57,9 @@ fn main() {
     let name = matches.opt_str("n").unwrap();
 
     let credentials = username.map(|u| {
-        let password = matches.opt_str("p").unwrap_or_else(|| {
+        let password = matches.opt_str("p").or_else(|| {
+            std::env::var(PASSWORD_ENV_NAME).ok()
+        }).unwrap_or_else(|| {
             print!("Password: ");
             stdout().flush().unwrap();
             read_password().unwrap()
@@ -63,6 +67,8 @@ fn main() {
 
         (u, password)
     });
+
+    std::env::remove_var(PASSWORD_ENV_NAME);
 
     let config = Config {
         application_key: appkey,
