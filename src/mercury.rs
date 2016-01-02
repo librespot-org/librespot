@@ -147,8 +147,8 @@ impl MercuryManager {
             MercuryCallback::Subscription(tx) => self.complete_subscription(response, tx),
             MercuryCallback::Channel => {
                 self.subscriptions
-                    .get(header.get_uri()).unwrap()
-                    .send(response).unwrap()
+                    .get(header.get_uri())
+                    .map(|tx| tx.send(response).unwrap());
             }
         }
     }
