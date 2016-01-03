@@ -24,7 +24,7 @@ dependencies = [
  "tiny_http 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "vergen 0.0.16 (registry+https://github.com/rust-lang/crates.io-index)",
- "vorbis 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vorbis 0.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -261,19 +261,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "portaudio"
 version = "0.1.2"
-source = "git+https://github.com/mvdnes/portaudio-rs#fe7c38fd61814c6426a41cd0b95c0b17e0130cd7"
+source = "git+https://github.com/mvdnes/portaudio-rs#f49d9e1652f88083b9ea0fe021cca6ee3f57fa32"
 dependencies = [
  "bitflags 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "portaudio_sys 0.1.1 (git+https://github.com/mvdnes/portaudio-rs)",
 ]
 
 [[package]]
 name = "portaudio_sys"
 version = "0.1.1"
-source = "git+https://github.com/mvdnes/portaudio-rs#fe7c38fd61814c6426a41cd0b95c0b17e0130cd7"
+source = "git+https://github.com/mvdnes/portaudio-rs#f49d9e1652f88083b9ea0fe021cca6ee3f57fa32"
 dependencies = [
- "libc 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -433,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "vorbis"
-version = "0.0.13"
+version = "0.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
