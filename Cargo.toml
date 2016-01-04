@@ -9,7 +9,7 @@ name = "librespot"
 path = "src/lib.rs"
 
 [[bin]]
-name = "main"
+name = "librespot"
 path = "src/main.rs"
 
 [dependencies.librespot-protocol]
