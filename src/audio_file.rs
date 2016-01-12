@@ -7,9 +7,9 @@ use std::thread;
 use std::fs;
 use std::io::{self, Read, Write, Seek, SeekFrom};
 use std::path::PathBuf;
-use tempfile::TempFile;
+use tempfile::NamedTempFile;
 
-use util::{FileId, IgnoreExt, ZeroFile, mkdir_existing};
+use util::{FileId, IgnoreExt, mkdir_existing};
 use session::Session;
 use stream::StreamEvent;
 
@@ -21,7 +21,7 @@ pub enum AudioFile {
 }
 
 pub struct AudioFileLoading {
-    read_file: TempFile,
+    read_file: fs::File,
 
     position: u64,
     seek: mpsc::Sender<u64>,
@@ -39,10 +39,6 @@ struct AudioFileShared {
 
 impl AudioFileLoading {
     fn new(session: &Session, file_id: FileId) -> AudioFileLoading {
-        let mut files_iter = TempFile::shared(2).unwrap().into_iter();
-        let read_file = files_iter.next().unwrap();
-        let mut write_file = files_iter.next().unwrap();
-
         let size = session.stream(file_id, 0, 1)
                           .into_iter()
                           .filter_map(|event| {
@@ -58,6 +54,7 @@ impl AudioFileLoading {
 
         let chunk_count = (size + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
+
         let shared = Arc::new(AudioFileShared {
             file_id: file_id,
             size: size,
@@ -66,7 +63,9 @@ impl AudioFileLoading {
             bitmap: Mutex::new(BitSet::with_capacity(chunk_count)),
         });
 
-        io::copy(&mut ZeroFile::new(size as u64), &mut write_file).unwrap();
+        let write_file = NamedTempFile::new().unwrap();
+        write_file.set_len(size as u64).unwrap();
+        let read_file = write_file.reopen().unwrap();
 
         let (seek_tx, seek_rx) = mpsc::channel();
 
@@ -88,7 +87,7 @@ impl AudioFileLoading {
 
     fn fetch(session: &Session,
              shared: Arc<AudioFileShared>,
-             mut write_file: TempFile,
+             mut write_file: NamedTempFile,
              seek_rx: mpsc::Receiver<u64>) {
         let mut index = 0;
 
@@ -119,7 +118,7 @@ impl AudioFileLoading {
 
     fn fetch_chunk(session: &Session,
                    shared: &Arc<AudioFileShared>,
-                   write_file: &mut TempFile,
+                   write_file: &mut NamedTempFile,
                    index: usize) {
 
         let rx = session.stream(shared.file_id,
@@ -151,7 +150,7 @@ impl AudioFileLoading {
         shared.cond.notify_all();
     }
 
-    fn store(session: &Session, shared: &AudioFileShared, write_file: &mut TempFile) {
+    fn store(session: &Session, shared: &AudioFileShared, write_file: &mut NamedTempFile) {
         write_file.seek(SeekFrom::Start(0)).unwrap();
 
         mkdir_existing(&AudioFileManager::cache_dir(session, shared.file_id)).unwrap();

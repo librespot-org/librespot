@@ -7,23 +7,23 @@ dependencies = [
  "dns-sd 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "eventual 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "json_macros 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "json_macros 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "librespot-protocol 0.1.0",
- "num 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
- "portaudio 0.1.2 (git+https://github.com/mvdnes/portaudio-rs)",
+ "num 0.1.30 (registry+https://github.com/rust-lang/crates.io-index)",
+ "portaudio 0.2.0 (git+https://github.com/mvdnes/portaudio-rs)",
  "protobuf 1.0.15 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf_macros 0.1.1 (git+https://github.com/plietar/rust-protobuf-macros.git)",
- "rand 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protobuf_macros 0.1.2 (git+https://github.com/plietar/rust-protobuf-macros.git)",
+ "rand 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "shannon 0.1.1 (git+https://github.com/plietar/rust-shannon.git)",
- "tempfile 1.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tempfile 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiny_http 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "vergen 0.0.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vergen 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vorbis 0.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -60,6 +60,11 @@ version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "blastfig"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "byteorder"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -69,7 +74,7 @@ name = "chrono"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "num 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num 0.1.30 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -169,7 +174,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "json_macros"
-version = "0.2.6"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rustc-serialize 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -237,10 +242,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "num"
-version = "0.1.29"
+version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -261,8 +266,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "portaudio"
-version = "0.1.2"
-source = "git+https://github.com/mvdnes/portaudio-rs#f49d9e1652f88083b9ea0fe021cca6ee3f57fa32"
+version = "0.2.0"
+source = "git+https://github.com/mvdnes/portaudio-rs#6a5d4ffaa9a2564d79391b6994ea69358bfe6b22"
 dependencies = [
  "bitflags 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -272,7 +277,7 @@ dependencies = [
 [[package]]
 name = "portaudio_sys"
 version = "0.1.1"
-source = "git+https://github.com/mvdnes/portaudio-rs#f49d9e1652f88083b9ea0fe021cca6ee3f57fa32"
+source = "git+https://github.com/mvdnes/portaudio-rs#6a5d4ffaa9a2564d79391b6994ea69358bfe6b22"
 dependencies = [
  "libc 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -296,12 +301,12 @@ dependencies = [
 
 [[package]]
 name = "protobuf_macros"
-version = "0.1.1"
-source = "git+https://github.com/plietar/rust-protobuf-macros.git#ade4282d3570304e967e5ab7a677d97cfd8586e0"
+version = "0.1.2"
+source = "git+https://github.com/plietar/rust-protobuf-macros.git#aede2228ead6aa4da28cbc300440aaecefe0ad86"
 
 [[package]]
 name = "rand"
-version = "0.3.12"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "advapi32-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -327,7 +332,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "gcc 0.3.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -365,12 +370,12 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "1.1.3"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "kernel32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -430,16 +435,16 @@ name = "uuid"
 version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "rand 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "vergen"
-version = "0.0.16"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "bitflags 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blastfig 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

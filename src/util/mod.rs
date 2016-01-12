@@ -10,13 +10,11 @@ mod int128;
 mod spotify_id;
 mod arcvec;
 mod subfile;
-mod zerofile;
 
 pub use util::int128::u128;
 pub use util::spotify_id::{SpotifyId, FileId};
 pub use util::arcvec::ArcVec;
 pub use util::subfile::Subfile;
-pub use util::zerofile::ZeroFile;
 
 #[macro_export]
 macro_rules! eprintln(
