@@ -8,3 +8,5 @@ build = "build.rs"
 mod_path = "~0.1.6"
 protobuf = "~1.0.10"
 
+[build-dependencies.protobuf_build]
+git = "https://github.com/plietar/rust-protobuf-build.git"
