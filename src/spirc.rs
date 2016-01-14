@@ -156,6 +156,7 @@ impl<D: SpircDelegate> SpircManager<D> {
                 self.tracks = frame.get_state()
                                    .get_track()
                                    .iter()
+                                   .filter(|track| track.get_gid().len()==16)
                                    .map(|track| SpotifyId::from_raw(track.get_gid()))
                                    .collect();
 
@@ -169,6 +170,16 @@ impl<D: SpircDelegate> SpircManager<D> {
             }
             protocol::spirc::MessageType::kMessageTypePause => {
                 self.delegate.pause();
+            }
+            protocol::spirc::MessageType::kMessageTypeNext => {
+            	self.index = (self.index + 1) % self.tracks.len() as u32;
+                let track = self.tracks[self.index as usize];
+                self.delegate.load(track, true, 0);
+            }
+            protocol::spirc::MessageType::kMessageTypePrev => {
+            	self.index = (self.index - 1) % self.tracks.len() as u32;
+                let track = self.tracks[self.index as usize];
+                self.delegate.load(track, true, 0);
             }
             protocol::spirc::MessageType::kMessageTypeSeek => {
                 self.delegate.seek(frame.get_position());
