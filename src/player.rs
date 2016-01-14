@@ -21,6 +21,7 @@ pub struct PlayerState {
     position_ms: u32,
     position_measured_at: i64,
     update_time: i64,
+    volume:u16,
 
     end_of_track: bool,
 }
@@ -35,6 +36,7 @@ enum PlayerCommand {
     Load(SpotifyId, bool, u32),
     Play,
     Pause,
+    Volume(u16),
     Stop,
     Seek(u32),
 }
@@ -48,6 +50,7 @@ impl Player {
             position_ms: 0,
             position_measured_at: 0,
             update_time: util::now_ms(),
+            volume: 5000,
             end_of_track: false,
         }),
                               Condvar::new()));
@@ -181,6 +184,12 @@ impl PlayerInternal {
 
                     stream.stop().unwrap();
                 }
+                Some(PlayerCommand::Volume(vol)) =>{
+                		self.update(|state| {
+                				state.volume = vol;
+                				true
+                		});
+                }
                 Some(PlayerCommand::Stop) => {
                     self.update(|state| {
                         if state.status == PlayStatus::kPlayStatusPlay {
@@ -198,7 +207,8 @@ impl PlayerInternal {
             if self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
                 match decoder.as_mut().unwrap().packets().next() {
                     Some(Ok(packet)) => {
-                        match stream.write(&packet.data) {
+                    				let buffer = packet.data.iter().map(|x| x/100*(self.state.0.lock().unwrap().volume/655) as i16).collect::<Vec<i16>>();
+                    		    match stream.write(&buffer) {
                             Ok(_) => (),
                             Err(portaudio::PaError::OutputUnderflowed) => eprintln!("Underflow"),
                             Err(e) => panic!("PA Error {}", e),
@@ -276,6 +286,10 @@ impl SpircDelegate for Player {
 
     fn state(&self) -> MutexGuard<Self::State> {
         self.state.0.lock().unwrap()
+    }
+    
+    fn volume(&self, vol:u16){
+    		self.command(PlayerCommand::Volume(vol));
     }
 
     fn updates(&self) -> mpsc::Receiver<i64> {

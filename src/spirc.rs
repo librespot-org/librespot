@@ -44,6 +44,7 @@ pub trait SpircDelegate {
     fn play(&self);
     fn pause(&self);
     fn seek(&self, position_ms: u32);
+    fn volume(&self, vol:u16);
     fn stop(&self);
 
     fn state(&self) -> MutexGuard<Self::State>;
@@ -77,7 +78,7 @@ impl<D: SpircDelegate> SpircManager<D> {
 
             repeat: false,
             shuffle: false,
-            volume: 0x8000,
+            volume:	32767,
 
             is_active: false,
             became_active_at: 0,
@@ -189,6 +190,11 @@ impl<D: SpircDelegate> SpircManager<D> {
                     self.is_active = false;
                     self.delegate.stop();
                 }
+            }
+            protocol::spirc::MessageType::kMessageTypeVolume =>{
+            	println!("{:?}",frame.get_volume());
+            	self.volume=frame.get_volume() as u16;
+            	self.delegate.volume(self.volume);
             }
             _ => (),
         }
