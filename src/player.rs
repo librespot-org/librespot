@@ -21,7 +21,7 @@ pub struct PlayerState {
     position_ms: u32,
     position_measured_at: i64,
     update_time: i64,
-    volume:u16,
+    volume:i32,
 
     end_of_track: bool,
 }
@@ -36,7 +36,7 @@ enum PlayerCommand {
     Load(SpotifyId, bool, u32),
     Play,
     Pause,
-    Volume(u16),
+    Volume(i32),
     Stop,
     Seek(u32),
 }
@@ -50,7 +50,7 @@ impl Player {
             position_ms: 0,
             position_measured_at: 0,
             update_time: util::now_ms(),
-            volume: 5000,
+            volume: 0x8000,
             end_of_track: false,
         }),
                               Condvar::new()));
@@ -207,7 +207,7 @@ impl PlayerInternal {
             if self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
                 match decoder.as_mut().unwrap().packets().next() {
                     Some(Ok(packet)) => {
-                    				let buffer = packet.data.iter().map(|x| x/100*(self.state.0.lock().unwrap().volume/655) as i16).collect::<Vec<i16>>();
+                    				let buffer = packet.data.iter().map(|&x| ((x as i32*self.state.0.lock().unwrap().volume)/0xFFFF) as i16).collect::<Vec<i16>>();
                     		    match stream.write(&buffer) {
                             Ok(_) => (),
                             Err(portaudio::PaError::OutputUnderflowed) => eprintln!("Underflow"),
@@ -288,7 +288,7 @@ impl SpircDelegate for Player {
         self.state.0.lock().unwrap()
     }
     
-    fn volume(&self, vol:u16){
+    fn volume(&self, vol:i32){
     		self.command(PlayerCommand::Volume(vol));
     }
 
@@ -320,6 +320,10 @@ impl SpircState for PlayerState {
 
     fn position(&self) -> (u32, i64) {
         (self.position_ms, self.position_measured_at)
+    }
+    
+    fn volume(&self) -> u32{
+    	self.volume as u32
     }
 
     fn update_time(&self) -> i64 {

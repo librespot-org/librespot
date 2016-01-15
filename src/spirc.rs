@@ -25,7 +25,6 @@ pub struct SpircManager<D: SpircDelegate> {
 
     repeat: bool,
     shuffle: bool,
-    volume: u16,
 
     is_active: bool,
     became_active_at: i64,
@@ -44,7 +43,7 @@ pub trait SpircDelegate {
     fn play(&self);
     fn pause(&self);
     fn seek(&self, position_ms: u32);
-    fn volume(&self, vol:u16);
+    fn volume(&self, vol:i32);
     fn stop(&self);
 
     fn state(&self) -> MutexGuard<Self::State>;
@@ -56,6 +55,7 @@ pub trait SpircState {
     fn position(&self) -> (u32, i64);
     fn update_time(&self) -> i64;
     fn end_of_track(&self) -> bool;
+    fn volume(&self) -> u32;
 }
 
 impl<D: SpircDelegate> SpircManager<D> {
@@ -78,7 +78,6 @@ impl<D: SpircDelegate> SpircManager<D> {
 
             repeat: false,
             shuffle: false,
-            volume:	32767,
 
             is_active: false,
             became_active_at: 0,
@@ -192,9 +191,7 @@ impl<D: SpircDelegate> SpircManager<D> {
                 }
             }
             protocol::spirc::MessageType::kMessageTypeVolume =>{
-            	println!("{:?}",frame.get_volume());
-            	self.volume=frame.get_volume() as u16;
-            	self.delegate.volume(self.volume);
+            	self.delegate.volume(frame.get_volume() as i32);
             }
             _ => (),
         }
@@ -266,7 +263,7 @@ impl<D: SpircDelegate> SpircManager<D> {
             sw_version: version_string(),
             is_active: self.is_active,
             can_play: self.can_play,
-            volume: self.volume as u32,
+            volume: self.delegate.state().volume(),
             name: self.name.clone(),
             error_code: 0,
             became_active_at: if self.is_active { self.became_active_at as i64 } else { 0 },
