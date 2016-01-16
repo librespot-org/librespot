@@ -151,14 +151,7 @@ impl<D: SpircDelegate> SpircManager<D> {
                     self.became_active_at = util::now_ms();
                 }
 
-
-                self.index = frame.get_state().get_playing_track_index();
-                self.tracks = frame.get_state()
-                                   .get_track()
-                                   .iter()
-                                   .filter(|track| track.get_gid().len()==16)
-                                   .map(|track| SpotifyId::from_raw(track.get_gid()))
-                                   .collect();
+                self.reload_tracks(&frame);
 
                 let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
                 let track = self.tracks[self.index as usize];
@@ -184,6 +177,9 @@ impl<D: SpircDelegate> SpircManager<D> {
             protocol::spirc::MessageType::kMessageTypeSeek => {
                 self.delegate.seek(frame.get_position());
             }
+            protocol::spirc::MessageType::kMessageTypeReplace => {
+                self.reload_tracks(&frame);
+            }
             protocol::spirc::MessageType::kMessageTypeNotify => {
                 if self.is_active && frame.get_device_state().get_is_active() {
                     self.is_active = false;
@@ -197,6 +193,15 @@ impl<D: SpircDelegate> SpircManager<D> {
         }
     }
 
+	fn reload_tracks(&mut self, ref frame: &protocol::spirc::Frame){
+	    self.index = frame.get_state().get_playing_track_index();
+        self.tracks = frame.get_state()
+                                   .get_track()
+                                   .iter()
+                                   .filter(|track| track.get_gid().len()==16)
+                                   .map(|track| SpotifyId::from_raw(track.get_gid()))
+                                   .collect();
+	}
     fn notify(&mut self, hello: bool, recipient: Option<&str>) {
         let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
