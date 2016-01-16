@@ -19,6 +19,9 @@ You will also need the protobuf compiler, and the
 Also required is an installation of [portaudio](http://portaudio.com/), which
 can be installed via `brew install portaudio` for an OS X machine.
 
+On debian / ubuntu the following dependencies need to be installed:
+`libavahi-compat-libdnssd-dev`, `portaudio19-dev`, `libprotoc-dev`, `libprotobuf-dev`
+
 Once you've cloned this repository you can build *librespot* using `cargo`.
 ```shell
 cargo build
