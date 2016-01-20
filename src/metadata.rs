@@ -73,6 +73,7 @@ impl MetadataTrait for Track {
             album: SpotifyId::from_raw(msg.get_album().get_gid()),
             files: msg.get_file()
                       .iter()
+                      .filter(|file| file.has_file_id())
                       .map(|file| {
                           let mut dst = [0u8; 20];
                           dst.clone_from_slice(&file.get_file_id());
@@ -108,6 +109,7 @@ impl MetadataTrait for Album {
             covers: msg.get_cover_group()
                        .get_image()
                        .iter()
+                       .filter(|image| image.has_file_id())
                        .map(|image| {
                            let mut dst = [0u8; 20];
                            dst.clone_from_slice(&image.get_file_id());

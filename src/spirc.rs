@@ -156,7 +156,7 @@ impl<D: SpircDelegate> SpircManager<D> {
                 self.tracks = frame.get_state()
                                    .get_track()
                                    .iter()
-                                   .filter(|track| track.get_gid().len()==16)
+                                   .filter(|track| track.has_gid())
                                    .map(|track| SpotifyId::from_raw(track.get_gid()))
                                    .collect();
 
