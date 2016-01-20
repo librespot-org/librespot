@@ -1,6 +1,6 @@
 use eventual::{self, Async};
 use portaudio;
-use std::sync::{mpsc, Mutex, Arc, Condvar, MutexGuard};
+use std::sync::{mpsc, Mutex, Arc, MutexGuard};
 use std::thread;
 use vorbis;
 
@@ -10,8 +10,11 @@ use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
 use spirc::PlayStatus;
 
+pub type PlayerObserver = Box<Fn(&PlayerState) + Send>;
+
 pub struct Player {
-    state: Arc<(Mutex<PlayerState>, Condvar)>,
+    state: Arc<Mutex<PlayerState>>,
+    observers: Arc<Mutex<Vec<PlayerObserver>>>,
 
     commands: mpsc::Sender<PlayerCommand>,
 }
@@ -27,7 +30,9 @@ pub struct PlayerState {
 }
 
 struct PlayerInternal {
-    state: Arc<(Mutex<PlayerState>, Condvar)>,
+    state: Arc<Mutex<PlayerState>>,
+    observers: Arc<Mutex<Vec<PlayerObserver>>>,
+
     session: Session,
     commands: mpsc::Receiver<PlayerCommand>,
 }
@@ -45,20 +50,22 @@ impl Player {
     pub fn new(session: Session) -> Player {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
-        let state = Arc::new((Mutex::new(PlayerState {
+        let state = Arc::new(Mutex::new(PlayerState {
             status: PlayStatus::kPlayStatusStop,
             position_ms: 0,
             position_measured_at: 0,
             update_time: util::now_ms(),
             volume: 0x8000,
             end_of_track: false,
-        }),
-                              Condvar::new()));
+        }));
+
+        let observers = Arc::new(Mutex::new(Vec::new()));
 
         let internal = PlayerInternal {
             session: session,
             commands: cmd_rx,
             state: state.clone(),
+            observers: observers.clone(),
         };
 
         thread::spawn(move || internal.run());
@@ -66,6 +73,7 @@ impl Player {
         Player {
             commands: cmd_tx,
             state: state,
+            observers: observers,
         }
     }
 
@@ -94,31 +102,15 @@ impl Player {
     }
 
     pub fn state(&self) -> MutexGuard<PlayerState> {
-        self.state.0.lock().unwrap()
+        self.state.lock().unwrap()
     }
 
     pub fn volume(&self, vol: u16) {
         self.command(PlayerCommand::Volume(vol));
     }
 
-    pub fn updates(&self) -> mpsc::Receiver<i64> {
-        let state = self.state.clone();
-        let (update_tx, update_rx) = mpsc::channel();
-
-        thread::spawn(move || {
-            let mut guard = state.0.lock().unwrap();
-            let mut last_update;
-            loop {
-                last_update = guard.update_time;
-                update_tx.send(guard.update_time).unwrap();
-
-                while last_update >= guard.update_time {
-                    guard = state.1.wait(guard).unwrap();
-                }
-            }
-        });
-
-        update_rx
+    pub fn add_observer(&self, observer: PlayerObserver) {
+        self.observers.lock().unwrap().push(observer);
     }
 }
 
@@ -135,7 +127,7 @@ impl PlayerInternal {
         let mut decoder = None;
 
         loop {
-            let playing = self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay;
+            let playing = self.state.lock().unwrap().status == PlayStatus::kPlayStatusPlay;
             let cmd = if playing {
                 self.commands.try_recv().ok()
             } else {
@@ -252,14 +244,14 @@ impl PlayerInternal {
                 None => (),
             }
 
-            if self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
+            if self.state.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
                 match decoder.as_mut().unwrap().packets().next() {
                     Some(Ok(packet)) => {
                         let buffer = packet.data
                                            .iter()
                                            .map(|&x| {
                                                (x as i32
-                                                * self.state.0.lock().unwrap().volume as i32
+                                                * self.state.lock().unwrap().volume as i32
                                                 / 0xFFFF) as i16
                                            })
                                            .collect::<Vec<i16>>();
@@ -307,11 +299,15 @@ impl PlayerInternal {
     fn update<F>(&self, f: F)
         where F: FnOnce(&mut MutexGuard<PlayerState>) -> bool
     {
-        let mut guard = self.state.0.lock().unwrap();
+        let mut guard = self.state.lock().unwrap();
         let update = f(&mut guard);
+
+        let observers = self.observers.lock().unwrap();
         if update {
             guard.update_time = util::now_ms();
-            self.state.1.notify_all();
+            for observer in observers.iter() {
+                observer(&guard);
+            }
         }
     }
 }

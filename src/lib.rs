@@ -1,6 +1,6 @@
 #![crate_name = "librespot"]
 
-#![feature(plugin,zero_one,iter_arith,mpsc_select)]
+#![feature(plugin,zero_one,iter_arith)]
 
 #![plugin(protobuf_macros)]
 #![plugin(json_macros)]
