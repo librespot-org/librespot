@@ -5,10 +5,9 @@ rust:
 addons:
   apt:
     packages:
-      - protobuf-compiler
       - libprotoc-dev
       - portaudio19-dev
 
 script:
-    - cargo build --no-default-features --verbose
-    - cargo test --no-default-features --verbose
+    - cargo build --verbose
+    - cargo test --verbose

@@ -49,4 +49,5 @@ git = "https://github.com/mvdnes/portaudio-rs"
 vergen = "~0.1.0"
 
 [features]
-default = ["dns-sd"]
+discovery = ["dns-sd"]
+
