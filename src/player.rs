@@ -21,7 +21,7 @@ pub struct PlayerState {
     position_ms: u32,
     position_measured_at: i64,
     update_time: i64,
-    volume:i32,
+    volume: u16,
 
     end_of_track: bool,
 }
@@ -36,7 +36,7 @@ enum PlayerCommand {
     Load(SpotifyId, bool, u32),
     Play,
     Pause,
-    Volume(i32),
+    Volume(u16),
     Stop,
     Seek(u32),
 }
@@ -184,11 +184,11 @@ impl PlayerInternal {
 
                     stream.stop().unwrap();
                 }
-                Some(PlayerCommand::Volume(vol)) =>{
-                		self.update(|state| {
-                				state.volume = vol;
-                				true
-                		});
+                Some(PlayerCommand::Volume(vol)) => {
+                    self.update(|state| {
+                        state.volume = vol;
+                        true
+                    });
                 }
                 Some(PlayerCommand::Stop) => {
                     self.update(|state| {
@@ -207,8 +207,15 @@ impl PlayerInternal {
             if self.state.0.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
                 match decoder.as_mut().unwrap().packets().next() {
                     Some(Ok(packet)) => {
-                    				let buffer = packet.data.iter().map(|&x| ((x as i32*self.state.0.lock().unwrap().volume)/0xFFFF) as i16).collect::<Vec<i16>>();
-                    		    match stream.write(&buffer) {
+                        let buffer = packet.data
+                                           .iter()
+                                           .map(|&x| {
+                                               (x as i32
+                                                * self.state.0.lock().unwrap().volume as i32
+                                                / 0xFFFF) as i16
+                                           })
+                                           .collect::<Vec<i16>>();
+                        match stream.write(&buffer) {
                             Ok(_) => (),
                             Err(portaudio::PaError::OutputUnderflowed) => eprintln!("Underflow"),
                             Err(e) => panic!("PA Error {}", e),
@@ -287,9 +294,9 @@ impl SpircDelegate for Player {
     fn state(&self) -> MutexGuard<Self::State> {
         self.state.0.lock().unwrap()
     }
-    
-    fn volume(&self, vol:i32){
-    		self.command(PlayerCommand::Volume(vol));
+
+    fn volume(&self, vol: u16) {
+        self.command(PlayerCommand::Volume(vol));
     }
 
     fn updates(&self) -> mpsc::Receiver<i64> {
@@ -321,9 +328,9 @@ impl SpircState for PlayerState {
     fn position(&self) -> (u32, i64) {
         (self.position_ms, self.position_measured_at)
     }
-    
-    fn volume(&self) -> u32{
-    	self.volume as u32
+
+    fn volume(&self) -> u16 {
+        self.volume
     }
 
     fn update_time(&self) -> i64 {

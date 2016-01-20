@@ -43,7 +43,7 @@ pub trait SpircDelegate {
     fn play(&self);
     fn pause(&self);
     fn seek(&self, position_ms: u32);
-    fn volume(&self, vol: i32);
+    fn volume(&self, vol: u16);
     fn stop(&self);
 
     fn state(&self) -> MutexGuard<Self::State>;
@@ -55,7 +55,7 @@ pub trait SpircState {
     fn position(&self) -> (u32, i64);
     fn update_time(&self) -> i64;
     fn end_of_track(&self) -> bool;
-    fn volume(&self) -> u32;
+    fn volume(&self) -> u16;
 }
 
 impl<D: SpircDelegate> SpircManager<D> {
@@ -187,7 +187,7 @@ impl<D: SpircDelegate> SpircManager<D> {
                 }
             }
             protocol::spirc::MessageType::kMessageTypeVolume => {
-                self.delegate.volume(frame.get_volume() as i32);
+                self.delegate.volume(frame.get_volume() as u16);
             }
             _ => (),
         }
@@ -268,7 +268,7 @@ impl<D: SpircDelegate> SpircManager<D> {
             sw_version: version_string(),
             is_active: self.is_active,
             can_play: self.can_play,
-            volume: self.delegate.state().volume(),
+            volume: self.delegate.state().volume() as u32,
             name: self.name.clone(),
             error_code: 0,
             became_active_at: if self.is_active { self.became_active_at as i64 } else { 0 },
