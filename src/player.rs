@@ -8,7 +8,7 @@ use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
 use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
-use spirc::{SpircState, SpircDelegate, PlayStatus};
+use spirc::PlayStatus;
 
 pub struct Player {
     state: Arc<(Mutex<PlayerState>, Condvar)>,
@@ -71,6 +71,54 @@ impl Player {
 
     fn command(&self, cmd: PlayerCommand) {
         self.commands.send(cmd).unwrap();
+    }
+
+    pub fn load(&self, track: SpotifyId, start_playing: bool, position_ms: u32) {
+        self.command(PlayerCommand::Load(track, start_playing, position_ms));
+    }
+
+    pub fn play(&self) {
+        self.command(PlayerCommand::Play)
+    }
+
+    pub fn pause(&self) {
+        self.command(PlayerCommand::Pause)
+    }
+
+    pub fn stop(&self) {
+        self.command(PlayerCommand::Stop)
+    }
+
+    pub fn seek(&self, position_ms: u32) {
+        self.command(PlayerCommand::Seek(position_ms));
+    }
+
+    pub fn state(&self) -> MutexGuard<PlayerState> {
+        self.state.0.lock().unwrap()
+    }
+
+    pub fn volume(&self, vol: u16) {
+        self.command(PlayerCommand::Volume(vol));
+    }
+
+    pub fn updates(&self) -> mpsc::Receiver<i64> {
+        let state = self.state.clone();
+        let (update_tx, update_rx) = mpsc::channel();
+
+        thread::spawn(move || {
+            let mut guard = state.0.lock().unwrap();
+            let mut last_update;
+            loop {
+                last_update = guard.update_time;
+                update_tx.send(guard.update_time).unwrap();
+
+                while last_update >= guard.update_time {
+                    guard = state.1.wait(guard).unwrap();
+                }
+            }
+        });
+
+        update_rx
     }
 }
 
@@ -268,76 +316,24 @@ impl PlayerInternal {
     }
 }
 
-impl SpircDelegate for Player {
-    type State = PlayerState;
-
-    fn load(&self, track: SpotifyId, start_playing: bool, position_ms: u32) {
-        self.command(PlayerCommand::Load(track, start_playing, position_ms));
-    }
-
-    fn play(&self) {
-        self.command(PlayerCommand::Play)
-    }
-
-    fn pause(&self) {
-        self.command(PlayerCommand::Pause)
-    }
-
-    fn stop(&self) {
-        self.command(PlayerCommand::Stop)
-    }
-
-    fn seek(&self, position_ms: u32) {
-        self.command(PlayerCommand::Seek(position_ms));
-    }
-
-    fn state(&self) -> MutexGuard<Self::State> {
-        self.state.0.lock().unwrap()
-    }
-
-    fn volume(&self, vol: u16) {
-        self.command(PlayerCommand::Volume(vol));
-    }
-
-    fn updates(&self) -> mpsc::Receiver<i64> {
-        let state = self.state.clone();
-        let (update_tx, update_rx) = mpsc::channel();
-
-        thread::spawn(move || {
-            let mut guard = state.0.lock().unwrap();
-            let mut last_update;
-            loop {
-                last_update = guard.update_time;
-                update_tx.send(guard.update_time).unwrap();
-
-                while last_update >= guard.update_time {
-                    guard = state.1.wait(guard).unwrap();
-                }
-            }
-        });
-
-        update_rx
-    }
-}
-
-impl SpircState for PlayerState {
-    fn status(&self) -> PlayStatus {
+impl PlayerState {
+    pub fn status(&self) -> PlayStatus {
         self.status
     }
 
-    fn position(&self) -> (u32, i64) {
+    pub fn position(&self) -> (u32, i64) {
         (self.position_ms, self.position_measured_at)
     }
 
-    fn volume(&self) -> u16 {
+    pub fn volume(&self) -> u16 {
         self.volume
     }
 
-    fn update_time(&self) -> i64 {
+    pub fn update_time(&self) -> i64 {
         self.update_time
     }
 
-    fn end_of_track(&self) -> bool {
+    pub fn end_of_track(&self) -> bool {
         self.end_of_track
     }
 }
