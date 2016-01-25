@@ -13,9 +13,10 @@ fn countrylist_contains(list: &str, country: &str) -> bool {
 }
 
 fn parse_restrictions<'s, I>(restrictions: I, country: &str, catalogue: &str) -> bool
-    where I: Iterator<Item = &'s protocol::metadata::Restriction>
+    where I: IntoIterator<Item = &'s protocol::metadata::Restriction>
 {
-    restrictions.filter(|r| r.get_catalogue_str().contains(&catalogue.to_owned()))
+    restrictions.into_iter()
+                .filter(|r| r.get_catalogue_str().contains(&catalogue.to_owned()))
                 .all(|r| {
                     !countrylist_contains(r.get_countries_forbidden(), country) &&
                     (!r.has_countries_allowed() ||
@@ -35,6 +36,7 @@ pub struct Track {
     pub id: SpotifyId,
     pub name: String,
     pub album: SpotifyId,
+    pub artists: Vec<SpotifyId>,
     pub files: Vec<(FileId, FileFormat)>,
     pub alternatives: Vec<SpotifyId>,
     pub available: bool,
@@ -45,6 +47,7 @@ pub struct Album {
     pub id: SpotifyId,
     pub name: String,
     pub artists: Vec<SpotifyId>,
+    pub tracks: Vec<SpotifyId>,
     pub covers: Vec<FileId>,
 }
 
@@ -52,6 +55,7 @@ pub struct Album {
 pub struct Artist {
     pub id: SpotifyId,
     pub name: String,
+    pub top_tracks: Vec<SpotifyId>,
 }
 
 pub type MetadataRef<T> = Future<T, ()>;
@@ -67,25 +71,36 @@ impl MetadataTrait for Track {
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
+        let country = session.0.data.read().unwrap().country.clone();
+
+        let artists = msg.get_artist()
+                         .iter()
+                         .filter(|artist| artist.has_gid())
+                         .map(|artist| SpotifyId::from_raw(artist.get_gid()))
+                         .collect::<Vec<_>>();
+
+        let files = msg.get_file()
+                       .iter()
+                       .filter(|file| file.has_file_id())
+                       .map(|file| {
+                           let mut dst = [0u8; 20];
+                           dst.clone_from_slice(&file.get_file_id());
+                           (FileId(dst), file.get_format())
+                       })
+                       .collect();
+
         Track {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
             album: SpotifyId::from_raw(msg.get_album().get_gid()),
-            files: msg.get_file()
-                      .iter()
-                      .filter(|file| file.has_file_id())
-                      .map(|file| {
-                          let mut dst = [0u8; 20];
-                          dst.clone_from_slice(&file.get_file_id());
-                          (FileId(dst), file.get_format())
-                      })
-                      .collect(),
+            artists: artists,
+            files: files,
             alternatives: msg.get_alternative()
                              .iter()
                              .map(|alt| SpotifyId::from_raw(alt.get_gid()))
                              .collect(),
-            available: parse_restrictions(msg.get_restriction().iter(),
-                                          &session.0.data.read().unwrap().country,
+            available: parse_restrictions(msg.get_restriction(),
+                                          &country,
                                           "premium"),
         }
     }
@@ -99,23 +114,36 @@ impl MetadataTrait for Album {
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
+        let artists = msg.get_artist()
+                         .iter()
+                         .filter(|artist| artist.has_gid())
+                         .map(|artist| SpotifyId::from_raw(artist.get_gid()))
+                         .collect::<Vec<_>>();
+
+        let tracks = msg.get_disc()
+                        .iter()
+                        .flat_map(|disc| disc.get_track())
+                        .filter(|track| track.has_gid())
+                        .map(|track| SpotifyId::from_raw(track.get_gid()))
+                        .collect::<Vec<_>>();
+
+        let covers = msg.get_cover_group()
+                        .get_image()
+                        .iter()
+                        .filter(|image| image.has_file_id())
+                        .map(|image| {
+                            let mut dst = [0u8; 20];
+                            dst.clone_from_slice(&image.get_file_id());
+                            FileId(dst)
+                        })
+                        .collect::<Vec<_>>();
+
         Album {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
-            artists: msg.get_artist()
-                        .iter()
-                        .map(|a| SpotifyId::from_raw(a.get_gid()))
-                        .collect(),
-            covers: msg.get_cover_group()
-                       .get_image()
-                       .iter()
-                       .filter(|image| image.has_file_id())
-                       .map(|image| {
-                           let mut dst = [0u8; 20];
-                           dst.clone_from_slice(&image.get_file_id());
-                           FileId(dst)
-                       })
-                       .collect(),
+            artists: artists,
+            tracks: tracks,
+            covers: covers,
         }
     }
 }
@@ -128,10 +156,25 @@ impl MetadataTrait for Artist {
         "hm://metadata/3/artist"
     }
 
-    fn parse(msg: &Self::Message, _: &Session) -> Self {
+    fn parse(msg: &Self::Message, session: &Session) -> Self {
+        let country = session.0.data.read().unwrap().country.clone();
+
+        let top_tracks = msg.get_top_track()
+                            .iter()
+                            .filter(|tt| !tt.has_country() ||
+                                         countrylist_contains(tt.get_country(), &country))
+                            .next()
+                            .unwrap()
+                            .get_track()
+                            .iter()
+                            .filter(|track| track.has_gid())
+                            .map(|track| SpotifyId::from_raw(track.get_gid()))
+                            .collect::<Vec<_>>();
+
         Artist {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
+            top_tracks: top_tracks
         }
     }
 }
