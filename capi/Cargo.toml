@@ -1,0 +1,16 @@
+[package]
+name = "librespot_capi"
+version = "0.1.0"
+authors = ["Paul Liétar <paul@lietar.net>"]
+
+[lib]
+name = "librespot_capi"
+crate-type = ["staticlib"]
+
+[dependencies]
+libc = "0.2"
+eventual    = "~0.1.5"
+owning_ref = "0.1.*"
+
+[dependencies.librespot]
+path = "../"
