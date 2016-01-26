@@ -41,8 +41,8 @@ struct SpircInternal {
 
 impl SpircManager {
     pub fn new(session: Session, player: Player) -> SpircManager {
-        let ident = session.0.data.read().unwrap().device_id.clone();
-        let name = session.0.config.device_name.clone();
+        let ident = session.device_id();
+        let name = session.config().device_name.clone();
 
         SpircManager(Arc::new(Mutex::new(SpircInternal {
             player: player,
@@ -350,7 +350,6 @@ impl SpircInternal {
     }
 
     fn uri(&self) -> String {
-        format!("hm://remote/user/{}",
-                self.session.0.data.read().unwrap().canonical_username.clone())
+        format!("hm://remote/user/{}", self.session.username())
     }
 }

@@ -43,7 +43,7 @@ pub struct SessionData {
 }
 
 pub struct SessionInternal {
-    pub config: Config,
+    config: Config,
     pub data: RwLock<SessionData>,
 
     mercury: Mutex<MercuryManager>,
@@ -223,5 +223,21 @@ impl Session {
 
     pub fn mercury_sub(&self, uri: String) -> mpsc::Receiver<MercuryResponse> {
         self.0.mercury.lock().unwrap().subscribe(self, uri)
+    }
+
+    pub fn config(&self) -> &Config {
+        &self.0.config
+    }
+
+    pub fn username(&self) -> String {
+        self.0.data.read().unwrap().canonical_username.clone()
+    }
+
+    pub fn country(&self) -> String {
+        self.0.data.read().unwrap().country.clone()
+    }
+
+    pub fn device_id(&self) -> String {
+        self.0.data.read().unwrap().device_id.clone()
     }
 }

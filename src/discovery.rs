@@ -42,8 +42,8 @@ impl DiscoveryManager {
             "statusString": "ERROR-OK",
             "spotifyError": 0,
             "version": "2.1.0",
-            "deviceID": (self.session.0.data.read().unwrap().device_id),
-            "remoteName": (self.session.0.config.device_name),
+            "deviceID": (self.session.device_id()),
+            "remoteName": (self.session.config().device_name),
             "activeUser": "",
             "publicKey": (public_key),
             "deviceType": "UNKNOWN",
@@ -118,7 +118,7 @@ impl DiscoveryManager {
 
     pub fn run(&mut self) {
         let server = Server::http("0.0.0.0:8000").unwrap();
-        let svc = DNSService::register(Some(&self.session.0.config.device_name),
+        let svc = DNSService::register(Some(&self.session.config().device_name),
                                        "_spotify-connect._tcp",
                                        None,
                                        None,

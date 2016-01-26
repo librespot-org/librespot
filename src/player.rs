@@ -168,7 +168,7 @@ impl PlayerInternal {
                                     .unwrap();
                     }
 
-                    let format = match self.session.0.config.bitrate {
+                    let format = match self.session.config().bitrate {
                         Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
                         Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
                         Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,

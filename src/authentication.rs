@@ -55,14 +55,14 @@ impl Session {
                 cpu_family: protocol::authentication::CpuFamily::CPU_UNKNOWN,
                 os: protocol::authentication::Os::OS_UNKNOWN,
                 system_information_string: "librespot".to_owned(),
-                device_id: self.0.data.read().unwrap().device_id.clone()
+                device_id: self.device_id().clone()
             },
             version_string: util::version::version_string(),
             appkey => {
-                version: self.0.config.application_key[0] as u32,
-                devkey: self.0.config.application_key[0x1..0x81].to_vec(),
-                signature: self.0.config.application_key[0x81..0x141].to_vec(),
-                useragent: self.0.config.user_agent.clone(),
+                version: self.config().application_key[0] as u32,
+                devkey: self.config().application_key[0x1..0x81].to_vec(),
+                signature: self.config().application_key[0x81..0x141].to_vec(),
+                useragent: self.config().user_agent.clone(),
                 callback_hash: vec![0; 20],
             }
         });
@@ -106,7 +106,7 @@ impl Session {
         let secret = {
             let mut data = [0u8; 20];
             let mut h = crypto::sha1::Sha1::new();
-            h.input(&self.0.data.read().unwrap().device_id.as_bytes());
+            h.input(&self.device_id().as_bytes());
             h.result(&mut data);
             data
         };

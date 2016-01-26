@@ -71,7 +71,7 @@ impl MetadataTrait for Track {
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
-        let country = session.0.data.read().unwrap().country.clone();
+        let country = session.country();
 
         let artists = msg.get_artist()
                          .iter()
@@ -157,7 +157,7 @@ impl MetadataTrait for Artist {
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
-        let country = session.0.data.read().unwrap().country.clone();
+        let country = session.country();
 
         let top_tracks = msg.get_top_track()
                             .iter()

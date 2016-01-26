@@ -219,7 +219,7 @@ impl AudioFileManager {
 
     pub fn cache_dir(session: &Session, file_id: FileId) -> PathBuf {
         let name = file_id.to_base16();
-        session.0.config.cache_location.join(&name[0..2])
+        session.config().cache_location.join(&name[0..2])
     }
 
     pub fn cache_path(session: &Session, file_id: FileId) -> PathBuf {
