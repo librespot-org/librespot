@@ -1,12 +1,12 @@
 use crypto;
 use crypto::mac::Mac;
 use crypto::digest::Digest;
-use zeroconf::DNSService;
-use tiny_http::{Method, Response, ResponseBox, Server};
 use num::BigUint;
 use url;
 use rand;
 use rustc_serialize::base64::{self, ToBase64, FromBase64};
+use tiny_http::{Method, Response, ResponseBox, Server};
+use zeroconf::DNSService;
 
 use session::Session;
 use diffie_hellman::{DH_GENERATOR, DH_PRIME};
