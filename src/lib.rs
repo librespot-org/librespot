@@ -41,5 +41,6 @@ pub mod metadata;
 pub mod player;
 pub mod session;
 pub mod spirc;
+pub mod link;
 mod stream;
 mod zeroconf;
