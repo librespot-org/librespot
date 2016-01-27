@@ -48,7 +48,13 @@ blob = AES128-CTR-DECRYPT(encryption_key, IV, encrypted)
 The blob is then used as described in the next section.
 
 ## Blob based Authentication
-TODO
 
+```
+data = b64_decode(blob)
+base_key = PBKDF2(SHA1(deviceID), username, 0x100, 1)
+key = SHA1(base_key) || htonl(len(base_key))
+login_data = AES192-DECRYPT(key, data)
+```
 ## Facebook based Authentication
 TODO
+
