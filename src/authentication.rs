@@ -14,8 +14,8 @@ use rustc_serialize::base64::FromBase64;
 
 use connection::{PlainConnection, CipherConnection};
 use diffie_hellman::DHLocalKeys;
-use librespot_protocol as protocol;
-use librespot_protocol::authentication::AuthenticationType;
+use protocol;
+use protocol::authentication::AuthenticationType;
 use session::Session;
 use util;
 

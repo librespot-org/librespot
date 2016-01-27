@@ -1,12 +1,12 @@
 use eventual::{Async, Future};
 use protobuf;
 
-use librespot_protocol as protocol;
+use protocol;
 use mercury::{MercuryRequest, MercuryMethod};
 use util::{SpotifyId, FileId, StrChunksExt};
 use session::Session;
 
-pub use librespot_protocol::metadata::AudioFile_Format as FileFormat;
+pub use protocol::metadata::AudioFile_Format as FileFormat;
 
 fn countrylist_contains(list: &str, country: &str) -> bool {
     list.chunks(2).any(|cc| cc == country)

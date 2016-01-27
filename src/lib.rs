@@ -26,7 +26,7 @@ extern crate vorbis;
 #[cfg(feature = "dns-sd")]
 extern crate dns_sd;
 
-extern crate librespot_protocol;
+extern crate librespot_protocol as protocol;
 
 #[macro_use]pub mod util;
 mod audio_decrypt;

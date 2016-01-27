@@ -10,8 +10,8 @@ use player::{Player, PlayerState};
 
 use std::sync::{Mutex, Arc};
 
-use librespot_protocol as protocol;
-pub use librespot_protocol::spirc::PlayStatus;
+use protocol;
+pub use protocol::spirc::PlayStatus;
 
 pub struct SpircManager(Arc<Mutex<SpircInternal>>);
 

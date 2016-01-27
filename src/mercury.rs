@@ -6,7 +6,7 @@ use std::io::{Cursor, Read, Write};
 use std::mem::replace;
 use std::sync::mpsc;
 
-use librespot_protocol as protocol;
+use protocol;
 use session::Session;
 use connection::PacketHandler;
 
