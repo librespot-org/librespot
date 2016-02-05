@@ -1,6 +1,4 @@
 use libc::c_char;
-use std::ffi::CString;
-use std::mem;
 
 use librespot::metadata::Artist;
 
@@ -17,17 +15,11 @@ pub unsafe extern "C" fn sp_artist_is_loaded(c_artist: *mut sp_artist) -> bool {
 
 #[no_mangle]
 pub unsafe extern "C" fn sp_artist_name(c_artist: *mut sp_artist) -> *const c_char {
-    let artist = &*c_artist;
+    let artist = &mut *c_artist;
 
     let name = artist.get()
-                     .map(|metadata| metadata.name.clone())
-                     .unwrap_or("".to_owned());
+                     .map(|metadata| &metadata.name as &str)
+                     .unwrap_or("");
 
-    let name = CString::new(name).unwrap();
-    let c_name = name.as_ptr();
-
-    // FIXME
-    mem::forget(name);
-
-    c_name
+    artist.intern(name).as_ptr()
 }

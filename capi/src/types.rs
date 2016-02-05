@@ -1,8 +1,7 @@
-#![allow(non_camel_case_types)]
+#![allow(non_camel_case_types, dead_code)]
 
-use libc::size_t;
-
-pub enum sp_session_callbacks {}
+use libc::{size_t, c_int, c_char, c_void};
+use session::sp_session;
 
 #[derive(Clone, Copy)]
 #[repr(u32)]
@@ -48,21 +47,102 @@ pub enum sp_error {
 #[repr(C)]
 #[derive(Copy,Clone)]
 pub struct sp_session_config {
-    pub api_version: ::std::os::raw::c_int,
-    pub cache_location: *const ::std::os::raw::c_char,
-    pub settings_location: *const ::std::os::raw::c_char,
-    pub application_key: *const ::std::os::raw::c_void,
+    pub api_version: c_int,
+    pub cache_location: *const c_char,
+    pub settings_location: *const c_char,
+    pub application_key: *const c_void,
     pub application_key_size: size_t,
-    pub user_agent: *const ::std::os::raw::c_char,
+    pub user_agent: *const c_char,
     pub callbacks: *const sp_session_callbacks,
-    pub userdata: *mut ::std::os::raw::c_void,
+    pub userdata: *mut c_void,
     pub compress_playlists: bool,
     pub dont_save_metadata_for_playlists: bool,
     pub initially_unload_playlists: bool,
-    pub device_id: *const ::std::os::raw::c_char,
-    pub proxy: *const ::std::os::raw::c_char,
-    pub proxy_username: *const ::std::os::raw::c_char,
-    pub proxy_password: *const ::std::os::raw::c_char,
-    pub tracefile: *const ::std::os::raw::c_char,
+    pub device_id: *const c_char,
+    pub proxy: *const c_char,
+    pub proxy_username: *const c_char,
+    pub proxy_password: *const c_char,
+    pub tracefile: *const c_char,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct sp_session_callbacks {
+    pub logged_in: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                               error: sp_error)>,
+
+    pub logged_out: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub metadata_updated: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub connection_error: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                      error: sp_error)>,
+
+    pub message_to_user: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                     message: *const c_char)>,
+
+    pub notify_main_thread: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub music_delivery: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                                   format: *const sp_audioformat,
+                                                                   frames: *const c_void,
+                                                                   num_frames: c_int)
+                                                                   -> c_int>,
+
+    pub play_token_lost: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub log_message: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                                data: *const c_char)>,
+
+    pub end_of_track: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub streaming_error: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                                    error: sp_error)>,
+
+    pub userinfo_updated: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub start_playback: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub stop_playback: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub get_audio_buffer_stats: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                            stats: *mut sp_audio_buffer_stats)>,
+
+    pub offline_status_updated: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub offline_error: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                   error: sp_error)>,
+
+    pub credentials_blob_updated: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                              blob: *const c_char)>,
+
+    pub connectionstate_updated: Option<unsafe extern "C" fn(session: *mut sp_session)>,
+
+    pub scrobble_error: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                    error: sp_error)>,
+
+    pub private_session_mode_changed: Option<unsafe extern "C" fn(session: *mut sp_session,
+                                                                  is_private: bool)>,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct sp_audioformat {
+    pub sample_type: sp_sampletype,
+    pub sample_rate: c_int,
+    pub channels: c_int,
+}
+
+#[derive(Clone, Copy)]
+#[repr(u32)]
+pub enum sp_sampletype {
+    SP_SAMPLETYPE_INT16_NATIVE_ENDIAN = 0,
+    _Dummy // rust #10292
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct sp_audio_buffer_stats {
+    pub samples: c_int,
+    pub stutter: c_int,
+}

@@ -1,5 +1,5 @@
 use metadata::SpMetadata;
-use session::global_session;
+use session::SpSession;
 use track::sp_track;
 use types::sp_error;
 use types::sp_error::*;
@@ -29,8 +29,8 @@ pub unsafe extern "C" fn sp_link_release(c_link: *mut sp_link) -> sp_error {
 #[no_mangle]
 pub unsafe extern "C" fn sp_link_as_track(c_link: *mut sp_link) -> *mut sp_track {
     let link = &*c_link;
-    let session = &*global_session.unwrap();
+    let session = SpSession::global();
 
-    let track = SpMetadata::from_future(link.as_track(session).unwrap());
+    let track = SpMetadata::from_future(link.as_track(&session.session).unwrap());
     Box::into_raw(Box::new(track))
 }

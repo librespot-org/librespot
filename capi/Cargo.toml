@@ -10,7 +10,6 @@ crate-type = ["staticlib"]
 [dependencies]
 libc = "0.2"
 eventual    = "~0.1.5"
-owning_ref = "0.1.*"
 
 [dependencies.librespot]
 path = "../"

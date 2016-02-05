@@ -1,11 +1,9 @@
 use libc::{c_int, c_char};
-use std::ffi::CString;
-use std::mem;
 use std::ptr::null_mut;
 
 use artist::sp_artist;
 use metadata::SpMetadata;
-use session::global_session;
+use session::SpSession;
 
 use librespot::metadata::{Track, Artist};
 
@@ -20,19 +18,13 @@ pub unsafe extern "C" fn sp_track_is_loaded(c_track: *mut sp_track) -> bool {
 
 #[no_mangle]
 pub unsafe extern "C" fn sp_track_name(c_track: *mut sp_track) -> *const c_char {
-    let track = &*c_track;
+    let track = &mut *c_track;
 
     let name = track.get()
-                    .map(|metadata| metadata.name.clone())
-                    .unwrap_or("".to_owned());
+                    .map(|metadata| &metadata.name as &str)
+                    .unwrap_or("");
 
-    let name = CString::new(name).unwrap();
-    let c_name = name.as_ptr();
-
-    // FIXME
-    mem::forget(name);
-
-    c_name
+    track.intern(name).as_ptr()
 }
 
 #[no_mangle]
@@ -47,14 +39,12 @@ pub unsafe extern "C" fn sp_track_num_artists(c_track: *mut sp_track) -> c_int {
 #[no_mangle]
 pub unsafe extern "C" fn sp_track_artist(c_track: *mut sp_track, index: c_int) -> *mut sp_artist {
     let track = &*c_track;
-    let session = &*global_session.unwrap();
+    let session = SpSession::global();
 
     track.get()
          .and_then(|metadata| metadata.artists.get(index as usize).map(|x| *x))
-         .map(|artist_id| {
-             let artist = SpMetadata::from_future(session.metadata::<Artist>(artist_id));
-             Box::into_raw(Box::new(artist))
-         })
+         .map(|artist_id| session.session.metadata::<Artist>(artist_id))
+         .map(|artist| Box::into_raw(Box::new(SpMetadata::from_future(artist))))
          .unwrap_or(null_mut())
 }
 
