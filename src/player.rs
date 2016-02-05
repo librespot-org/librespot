@@ -1,5 +1,6 @@
 use eventual::{self, Async};
 use portaudio;
+use std::borrow::Cow;
 use std::sync::{mpsc, Mutex, Arc, MutexGuard};
 use std::thread;
 use vorbis;
@@ -55,7 +56,7 @@ impl Player {
             position_ms: 0,
             position_measured_at: 0,
             update_time: util::now_ms(),
-            volume: 0x8000,
+            volume: 0xFFFF,
             end_of_track: false,
         }));
 
@@ -111,6 +112,21 @@ impl Player {
 
     pub fn add_observer(&self, observer: PlayerObserver) {
         self.observers.lock().unwrap().push(observer);
+    }
+}
+
+fn apply_volume(volume: u16, data: &[i16]) -> Cow<[i16]> {
+    // Fast path when volume is 100%
+    if volume == 0xFFFF {
+        Cow::Borrowed(data)
+    } else {
+        Cow::Owned(data.iter()
+                       .map(|&x| {
+                           (x as i32
+                            * volume as i32
+                            / 0xFFFF) as i16
+                       })
+                       .collect())
     }
 }
 
@@ -247,14 +263,8 @@ impl PlayerInternal {
             if self.state.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
                 match decoder.as_mut().unwrap().packets().next() {
                     Some(Ok(packet)) => {
-                        let buffer = packet.data
-                                           .iter()
-                                           .map(|&x| {
-                                               (x as i32
-                                                * self.state.lock().unwrap().volume as i32
-                                                / 0xFFFF) as i16
-                                           })
-                                           .collect::<Vec<i16>>();
+                        let buffer = apply_volume(self.state.lock().unwrap().volume,
+                                                  &packet.data);
                         match stream.write(&buffer) {
                             Ok(_) => (),
                             Err(portaudio::PaError::OutputUnderflowed) => eprintln!("Underflow"),
