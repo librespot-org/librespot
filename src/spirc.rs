@@ -9,6 +9,7 @@ use mercury::{MercuryRequest, MercuryMethod};
 use player::{Player, PlayerState};
 
 use std::sync::{Mutex, Arc};
+use std::collections::HashMap;
 
 use protocol;
 pub use protocol::spirc::PlayStatus;
@@ -37,6 +38,8 @@ struct SpircInternal {
 
     tracks: Vec<SpotifyId>,
     index: u32,
+
+    devices: HashMap<String, String>,
 }
 
 impl SpircManager {
@@ -66,6 +69,8 @@ impl SpircManager {
 
             tracks: Vec::new(),
             index: 0,
+
+            devices: HashMap::new(),
         })))
     }
 
@@ -118,7 +123,7 @@ impl SpircInternal {
         }
     }
 
-    fn handle(&mut self, frame: protocol::spirc::Frame) {
+    fn handle(&mut self, mut frame: protocol::spirc::Frame) {
         if frame.get_ident() == self.ident ||
            (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident)) {
             return;
@@ -128,6 +133,11 @@ impl SpircInternal {
             self.last_command_ident = frame.get_ident().to_owned();
             self.last_command_msgid = frame.get_seq_nr();
         }
+
+        if frame.has_ident() && !frame.has_goodbye() && frame.has_device_state() {
+            self.devices.insert(frame.take_ident(), frame.take_device_state().take_name());
+        }
+
         match frame.get_typ() {
             protocol::spirc::MessageType::kMessageTypeHello => {
                 self.notify(false, Some(frame.get_ident()));
@@ -171,6 +181,10 @@ impl SpircInternal {
                 if self.is_active && frame.get_device_state().get_is_active() {
                     self.is_active = false;
                     self.player.stop();
+                }
+
+                if frame.has_ident() && frame.has_goodbye() {
+                    self.devices.remove(&frame.take_ident());
                 }
             }
             protocol::spirc::MessageType::kMessageTypeVolume => {
