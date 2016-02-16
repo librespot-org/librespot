@@ -109,6 +109,10 @@ impl SpircManager {
             self.0.lock().unwrap().handle(frame);
         }
     }
+
+    pub fn devices(&self) -> HashMap<String, String> {
+        self.0.lock().unwrap().devices.clone()
+    }
 }
 
 impl SpircInternal {
