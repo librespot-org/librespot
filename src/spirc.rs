@@ -12,7 +12,7 @@ use std::sync::{Mutex, Arc};
 use std::collections::HashMap;
 
 use protocol;
-pub use protocol::spirc::PlayStatus;
+pub use protocol::spirc::{PlayStatus, MessageType};
 
 pub struct SpircManager(Arc<Mutex<SpircInternal>>);
 
@@ -204,78 +204,29 @@ impl SpircInternal {
                            .collect();
     }
 
-    // FIXME: this entire function is duplicated in notify_with_player_state, but the borrow
-    // checker makes it hard to refactor
     fn notify(&mut self, hello: bool, recipient: Option<&str>) {
-        let player_state = self.player.state();
-
-        let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
-            version: 1,
-            ident: self.ident.clone(),
-            protocol_version: "2.0.0".to_owned(),
-            seq_nr: { self.seq_nr += 1; self.seq_nr  },
-            typ: if hello {
-                protocol::spirc::MessageType::kMessageTypeHello
-            } else {
-                protocol::spirc::MessageType::kMessageTypeNotify
-            },
-
-            device_state: self.device_state(&player_state),
-            recipient: protobuf::RepeatedField::from_vec(
-                recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
-            ),
-            state_update_id: player_state.update_time() as i64
-        });
-
-        if self.is_active {
-            pkt.set_state(self.spirc_state(&player_state));
-        }
-
-        self.session
-            .mercury(MercuryRequest {
-                method: MercuryMethod::SEND,
-                uri: self.uri(),
-                content_type: None,
-                payload: vec![pkt.write_to_bytes().unwrap()],
-            })
-            .await()
-            .unwrap();
+        send_cmd(self,
+                 if hello {
+                     MessageType::kMessageTypeHello
+                 } else {
+                     MessageType::kMessageTypeNotify
+                 },
+                 recipient,
+                 None);
     }
 
     fn notify_with_player_state(&mut self,
                                 hello: bool,
                                 recipient: Option<&str>,
                                 player_state: &PlayerState) {
-        let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
-            version: 1,
-            ident: self.ident.clone(),
-            protocol_version: "2.0.0".to_owned(),
-            seq_nr: { self.seq_nr += 1; self.seq_nr  },
-            typ: if hello {
-                protocol::spirc::MessageType::kMessageTypeHello
-            } else {
-                protocol::spirc::MessageType::kMessageTypeNotify
-            },
-
-            device_state: self.device_state(&player_state),
-            recipient: protobuf::RepeatedField::from_vec(
-                recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
-            ),
-            state_update_id: player_state.update_time() as i64
-        });
-
-        if self.is_active {
-            pkt.set_state(self.spirc_state(&player_state));
-        }
-
-        self.session
-            .mercury(MercuryRequest {
-                method: MercuryMethod::SEND,
-                uri: self.uri(),
-                content_type: None,
-                payload: vec![pkt.write_to_bytes().unwrap()],
-            })
-            .fire();
+        send_cmd(self,
+                 if hello {
+                     MessageType::kMessageTypeHello
+                 } else {
+                     MessageType::kMessageTypeNotify
+                 },
+                 recipient,
+                 Some(player_state));
     }
 
     fn spirc_state(&self, player_state: &PlayerState) -> protocol::spirc::State {
@@ -366,4 +317,44 @@ impl SpircInternal {
     fn uri(&self) -> String {
         format!("hm://remote/user/{}", self.session.username())
     }
+}
+
+fn send_cmd(spirc_internal: &mut SpircInternal,
+            cmd: protocol::spirc::MessageType,
+            recipient: Option<&str>,
+            player_state: Option<&PlayerState>) {
+    let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
+        version: 1,
+        ident: spirc_internal.ident.clone(),
+        protocol_version: "2.0.0".to_owned(),
+        seq_nr: { spirc_internal.seq_nr += 1; spirc_internal.seq_nr  },
+        typ: cmd,
+        recipient: protobuf::RepeatedField::from_vec(
+            recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
+        ),
+    });
+
+    if let Some(s) = player_state {
+        pkt.set_device_state(spirc_internal.device_state(s));
+        pkt.set_state_update_id(s.update_time() as i64);
+        if spirc_internal.is_active {
+            pkt.set_state(spirc_internal.spirc_state(s));
+        }
+    } else {
+        let s = &*spirc_internal.player.state();
+        pkt.set_device_state(spirc_internal.device_state(s));
+        pkt.set_state_update_id(s.update_time() as i64);
+        if spirc_internal.is_active {
+            pkt.set_state(spirc_internal.spirc_state(s));
+        }
+    }
+
+    spirc_internal.session
+                  .mercury(MercuryRequest {
+                      method: MercuryMethod::SEND,
+                      uri: spirc_internal.uri(),
+                      content_type: None,
+                      payload: vec![pkt.write_to_bytes().unwrap()],
+                  })
+                  .fire();
 }
