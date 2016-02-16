@@ -113,6 +113,38 @@ impl SpircManager {
     pub fn devices(&self) -> HashMap<String, String> {
         self.0.lock().unwrap().devices.clone()
     }
+
+    pub fn send_play(&mut self, recipient: &str) {
+        let mut internal = self.0.lock().unwrap();
+        send_cmd(&mut *internal,
+                 protocol::spirc::MessageType::kMessageTypePlay,
+                 Some(recipient),
+                 None);
+    }
+
+    pub fn send_pause(&mut self, recipient: &str) {
+        let mut internal = self.0.lock().unwrap();
+        send_cmd(&mut *internal,
+                 protocol::spirc::MessageType::kMessageTypePause,
+                 Some(recipient),
+                 None);
+    }
+
+    pub fn send_prev(&mut self, recipient: &str) {
+        let mut internal = self.0.lock().unwrap();
+        send_cmd(&mut *internal,
+                 protocol::spirc::MessageType::kMessageTypePrev,
+                 Some(recipient),
+                 None);
+    }
+
+    pub fn send_next(&mut self, recipient: &str) {
+        let mut internal = self.0.lock().unwrap();
+        send_cmd(&mut *internal,
+                 protocol::spirc::MessageType::kMessageTypeNext,
+                 Some(recipient),
+                 None);
+    }
 }
 
 impl SpircInternal {
