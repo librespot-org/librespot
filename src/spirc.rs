@@ -1,5 +1,5 @@
 use eventual::Async;
-use protobuf::{self, Message};
+use protobuf::{self, Message, RepeatedField};
 
 use util;
 use session::Session;
@@ -116,34 +116,54 @@ impl SpircManager {
 
     pub fn send_play(&mut self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
-        send_cmd(&mut *internal,
-                 protocol::spirc::MessageType::kMessageTypePlay,
-                 Some(recipient),
-                 None);
+        CommandSender::new(&mut *internal,
+                           protocol::spirc::MessageType::kMessageTypePlay)
+            .recipient(recipient)
+            .send();
     }
 
     pub fn send_pause(&mut self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
-        send_cmd(&mut *internal,
-                 protocol::spirc::MessageType::kMessageTypePause,
-                 Some(recipient),
-                 None);
+        CommandSender::new(&mut *internal,
+                           protocol::spirc::MessageType::kMessageTypePause)
+            .recipient(recipient)
+            .send();
     }
 
     pub fn send_prev(&mut self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
-        send_cmd(&mut *internal,
-                 protocol::spirc::MessageType::kMessageTypePrev,
-                 Some(recipient),
-                 None);
+        CommandSender::new(&mut *internal,
+                           protocol::spirc::MessageType::kMessageTypePrev)
+            .recipient(recipient)
+            .send();
     }
 
     pub fn send_next(&mut self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
-        send_cmd(&mut *internal,
-                 protocol::spirc::MessageType::kMessageTypeNext,
-                 Some(recipient),
-                 None);
+        CommandSender::new(&mut *internal,
+                           protocol::spirc::MessageType::kMessageTypeNext)
+            .recipient(recipient)
+            .send();
+    }
+
+    pub fn send_replace_tracks<S: AsRef<str>, I: Iterator<Item = S>>(&mut self,
+                                                                     recipient: &str,
+                                                                     track_ids: I) {
+        let tracks: Vec<protocol::spirc::TrackRef> = track_ids.map(|i| {
+                    protobuf_init!(protocol::spirc::TrackRef::new(), { gid: SpotifyId::from_base62(i.as_ref()).to_raw().to_vec()})
+                })
+                .collect();
+
+        let state = protobuf_init!(protocol::spirc::State::new(), {
+                    track: RepeatedField::from_vec(tracks)
+                });
+
+        let mut internal = self.0.lock().unwrap();
+        CommandSender::new(&mut *internal,
+                           protocol::spirc::MessageType::kMessageTypeReplace)
+            .recipient(recipient)
+            .state(state)
+            .send();
     }
 }
 
@@ -241,28 +261,37 @@ impl SpircInternal {
     }
 
     fn notify(&mut self, hello: bool, recipient: Option<&str>) {
-        send_cmd(self,
-                 if hello {
-                     MessageType::kMessageTypeHello
-                 } else {
-                     MessageType::kMessageTypeNotify
-                 },
-                 recipient,
-                 None);
+        let cs = CommandSender::new(self,
+                                    if hello {
+                                        MessageType::kMessageTypeHello
+                                    } else {
+                                        MessageType::kMessageTypeNotify
+                                    });
+        if let Some(s) = recipient {
+            cs.recipient(&s)
+              .send()
+        } else {
+            cs.send()
+        }
     }
 
     fn notify_with_player_state(&mut self,
                                 hello: bool,
                                 recipient: Option<&str>,
                                 player_state: &PlayerState) {
-        send_cmd(self,
-                 if hello {
-                     MessageType::kMessageTypeHello
-                 } else {
-                     MessageType::kMessageTypeNotify
-                 },
-                 recipient,
-                 Some(player_state));
+        let cs = CommandSender::new(self,
+                                    if hello {
+                                        MessageType::kMessageTypeHello
+                                    } else {
+                                        MessageType::kMessageTypeNotify
+                                    })
+                     .player_state(player_state);
+        if let Some(s) = recipient {
+            cs.recipient(&s)
+              .send()
+        } else {
+            cs.send()
+        }
     }
 
     fn spirc_state(&self, player_state: &PlayerState) -> protocol::spirc::State {
@@ -355,42 +384,81 @@ impl SpircInternal {
     }
 }
 
-fn send_cmd(spirc_internal: &mut SpircInternal,
-            cmd: protocol::spirc::MessageType,
-            recipient: Option<&str>,
-            player_state: Option<&PlayerState>) {
-    let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
-        version: 1,
-        ident: spirc_internal.ident.clone(),
-        protocol_version: "2.0.0".to_owned(),
-        seq_nr: { spirc_internal.seq_nr += 1; spirc_internal.seq_nr  },
-        typ: cmd,
-        recipient: protobuf::RepeatedField::from_vec(
-            recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
-        ),
-    });
+struct CommandSender<'a> {
+    spirc_internal: &'a mut SpircInternal,
+    cmd: protocol::spirc::MessageType,
+    recipient: Option<&'a str>,
+    player_state: Option<&'a PlayerState>,
+    state: Option<protocol::spirc::State>,
+}
 
-    if let Some(s) = player_state {
-        pkt.set_device_state(spirc_internal.device_state(s));
-        pkt.set_state_update_id(s.update_time() as i64);
-        if spirc_internal.is_active {
-            pkt.set_state(spirc_internal.spirc_state(s));
-        }
-    } else {
-        let s = &*spirc_internal.player.state();
-        pkt.set_device_state(spirc_internal.device_state(s));
-        pkt.set_state_update_id(s.update_time() as i64);
-        if spirc_internal.is_active {
-            pkt.set_state(spirc_internal.spirc_state(s));
+impl<'a> CommandSender<'a> {
+    fn new(spirc_internal: &'a mut SpircInternal,
+           cmd: protocol::spirc::MessageType)
+           -> CommandSender {
+        CommandSender {
+            spirc_internal: spirc_internal,
+            cmd: cmd,
+            recipient: None,
+            player_state: None,
+            state: None,
         }
     }
 
-    spirc_internal.session
-                  .mercury(MercuryRequest {
-                      method: MercuryMethod::SEND,
-                      uri: spirc_internal.uri(),
-                      content_type: None,
-                      payload: vec![pkt.write_to_bytes().unwrap()],
-                  })
-                  .fire();
+    fn recipient(mut self, r: &'a str) -> CommandSender {
+        self.recipient = Some(r);
+        self
+    }
+
+    fn player_state(mut self, s: &'a PlayerState) -> CommandSender {
+        self.player_state = Some(s);
+        self
+    }
+
+    fn state(mut self, s: protocol::spirc::State) -> CommandSender<'a> {
+        self.state = Some(s);
+        self
+    }
+
+    fn send(self) {
+        let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
+            version: 1,
+            ident: self.spirc_internal.ident.clone(),
+            protocol_version: "2.0.0".to_owned(),
+            seq_nr: { self.spirc_internal.seq_nr += 1; self.spirc_internal.seq_nr  },
+            typ: self.cmd,
+            recipient: protobuf::RepeatedField::from_vec(
+                self.recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
+                ),
+        });
+
+        if let Some(s) = self.player_state {
+            pkt.set_device_state(self.spirc_internal.device_state(s));
+            pkt.set_state_update_id(s.update_time() as i64);
+            if self.spirc_internal.is_active {
+                pkt.set_state(self.spirc_internal.spirc_state(s));
+            }
+        } else {
+            let s = &*self.spirc_internal.player.state();
+            pkt.set_device_state(self.spirc_internal.device_state(s));
+            pkt.set_state_update_id(s.update_time() as i64);
+            if self.spirc_internal.is_active {
+                pkt.set_state(self.spirc_internal.spirc_state(s));
+            }
+        }
+
+        if let Some(s) = self.state {
+            pkt.set_state(s);
+        }
+
+        self.spirc_internal
+            .session
+            .mercury(MercuryRequest {
+                method: MercuryMethod::SEND,
+                uri: self.spirc_internal.uri(),
+                content_type: None,
+                payload: vec![pkt.write_to_bytes().unwrap()],
+            })
+            .fire();
+    }
 }
