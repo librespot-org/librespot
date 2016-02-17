@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use protocol;
 pub use protocol::spirc::{PlayStatus, MessageType};
 
+#[derive(Clone)]
 pub struct SpircManager(Arc<Mutex<SpircInternal>>);
 
 struct SpircInternal {
