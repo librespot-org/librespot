@@ -169,6 +169,10 @@ impl SpircManager {
             .state(state)
             .send();
     }
+
+    pub fn get_queue(&self) -> Vec<SpotifyId> {
+        self.0.lock().unwrap().tracks.clone()
+    }
 }
 
 impl SpircInternal {
