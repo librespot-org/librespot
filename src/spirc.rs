@@ -146,21 +146,25 @@ impl SpircManager {
             .send();
     }
 
-    pub fn send_replace_tracks<S: AsRef<str>, I: Iterator<Item = S>>(&mut self,
-                                                                     recipient: &str,
-                                                                     track_ids: I) {
-        let tracks: Vec<protocol::spirc::TrackRef> = track_ids.map(|i| {
-                    protobuf_init!(protocol::spirc::TrackRef::new(), { gid: SpotifyId::from_base62(i.as_ref()).to_raw().to_vec()})
-                })
-                .collect();
-
-        let state = protobuf_init!(protocol::spirc::State::new(), {
-                    track: RepeatedField::from_vec(tracks)
-                });
-
+    pub fn send_replace_tracks<I: Iterator<Item = SpotifyId>>(&mut self,
+                                                              recipient: &str,
+                                                              track_ids: I) {
+        let state = track_ids_to_state(track_ids);
         let mut internal = self.0.lock().unwrap();
         CommandSender::new(&mut *internal,
                            protocol::spirc::MessageType::kMessageTypeReplace)
+            .recipient(recipient)
+            .state(state)
+            .send();
+    }
+
+    pub fn send_load_tracks<I: Iterator<Item = SpotifyId>>(&mut self,
+                                                           recipient: &str,
+                                                           track_ids: I) {
+        let state = track_ids_to_state(track_ids);
+        let mut internal = self.0.lock().unwrap();
+        CommandSender::new(&mut *internal,
+                           protocol::spirc::MessageType::kMessageTypeLoad)
             .recipient(recipient)
             .state(state)
             .send();
@@ -461,4 +465,15 @@ impl<'a> CommandSender<'a> {
             })
             .fire();
     }
+}
+
+fn track_ids_to_state<I: Iterator<Item = SpotifyId>>(track_ids: I) -> protocol::spirc::State {
+    let tracks: Vec<protocol::spirc::TrackRef> =
+        track_ids.map(|i| {
+                     protobuf_init!(protocol::spirc::TrackRef::new(), { gid: i.to_raw().to_vec()})
+                 })
+                 .collect();
+    protobuf_init!(protocol::spirc::State::new(), {
+                    track: RepeatedField::from_vec(tracks)
+                })
 }
