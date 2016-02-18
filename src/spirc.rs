@@ -117,32 +117,28 @@ impl SpircManager {
 
     pub fn send_play(&mut self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal,
-                           protocol::spirc::MessageType::kMessageTypePlay)
+        CommandSender::new(&mut *internal, MessageType::kMessageTypePlay)
             .recipient(recipient)
             .send();
     }
 
     pub fn send_pause(&mut self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal,
-                           protocol::spirc::MessageType::kMessageTypePause)
+        CommandSender::new(&mut *internal, MessageType::kMessageTypePause)
             .recipient(recipient)
             .send();
     }
 
     pub fn send_prev(&mut self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal,
-                           protocol::spirc::MessageType::kMessageTypePrev)
+        CommandSender::new(&mut *internal, MessageType::kMessageTypePrev)
             .recipient(recipient)
             .send();
     }
 
     pub fn send_next(&mut self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal,
-                           protocol::spirc::MessageType::kMessageTypeNext)
+        CommandSender::new(&mut *internal, MessageType::kMessageTypeNext)
             .recipient(recipient)
             .send();
     }
@@ -152,8 +148,7 @@ impl SpircManager {
                                                               track_ids: I) {
         let state = track_ids_to_state(track_ids);
         let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal,
-                           protocol::spirc::MessageType::kMessageTypeReplace)
+        CommandSender::new(&mut *internal, MessageType::kMessageTypeReplace)
             .recipient(recipient)
             .state(state)
             .send();
@@ -164,8 +159,7 @@ impl SpircManager {
                                                            track_ids: I) {
         let state = track_ids_to_state(track_ids);
         let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal,
-                           protocol::spirc::MessageType::kMessageTypeLoad)
+        CommandSender::new(&mut *internal, MessageType::kMessageTypeLoad)
             .recipient(recipient)
             .state(state)
             .send();
@@ -188,7 +182,7 @@ impl SpircInternal {
         }
     }
 
-    fn handle(&mut self, mut frame: protocol::spirc::Frame) {
+    fn handle(&mut self, frame: protocol::spirc::Frame) {
         if frame.get_ident() == self.ident ||
            (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident)) {
             return;
@@ -200,14 +194,15 @@ impl SpircInternal {
         }
 
         if frame.has_ident() && !frame.has_goodbye() && frame.has_device_state() {
-            self.devices.insert(frame.take_ident(), frame.take_device_state().take_name());
+            self.devices.insert(frame.get_ident().into(),
+                                frame.get_device_state().get_name().into());
         }
 
         match frame.get_typ() {
-            protocol::spirc::MessageType::kMessageTypeHello => {
+            MessageType::kMessageTypeHello => {
                 self.notify(false, Some(frame.get_ident()));
             }
-            protocol::spirc::MessageType::kMessageTypeLoad => {
+            MessageType::kMessageTypeLoad => {
                 if !self.is_active {
                     self.is_active = true;
                     self.became_active_at = util::now_ms();
@@ -220,40 +215,41 @@ impl SpircInternal {
                 let position = frame.get_state().get_position_ms();
                 self.player.load(track, play, position);
             }
-            protocol::spirc::MessageType::kMessageTypePlay => {
+            MessageType::kMessageTypePlay => {
                 self.player.play();
             }
-            protocol::spirc::MessageType::kMessageTypePause => {
+            MessageType::kMessageTypePause => {
                 self.player.pause();
             }
-            protocol::spirc::MessageType::kMessageTypeNext => {
+            MessageType::kMessageTypeNext => {
                 self.index = (self.index + 1) % self.tracks.len() as u32;
                 let track = self.tracks[self.index as usize];
                 self.player.load(track, true, 0);
             }
-            protocol::spirc::MessageType::kMessageTypePrev => {
+            MessageType::kMessageTypePrev => {
                 self.index = (self.index - 1) % self.tracks.len() as u32;
                 let track = self.tracks[self.index as usize];
                 self.player.load(track, true, 0);
             }
-            protocol::spirc::MessageType::kMessageTypeSeek => {
+            MessageType::kMessageTypeSeek => {
                 self.player.seek(frame.get_position());
             }
-            protocol::spirc::MessageType::kMessageTypeReplace => {
+            MessageType::kMessageTypeReplace => {
                 self.reload_tracks(&frame);
             }
-            protocol::spirc::MessageType::kMessageTypeNotify => {
+            MessageType::kMessageTypeNotify => {
                 if self.is_active && frame.get_device_state().get_is_active() {
                     self.is_active = false;
                     self.player.stop();
                 }
-
-                if frame.has_ident() && frame.has_goodbye() {
-                    self.devices.remove(&frame.take_ident());
-                }
             }
-            protocol::spirc::MessageType::kMessageTypeVolume => {
+            MessageType::kMessageTypeVolume => {
                 self.player.volume(frame.get_volume() as u16);
+            }
+            MessageType::kMessageTypeGoodbye => {
+                if frame.has_ident() {
+                    self.devices.remove(frame.get_ident());
+                }
             }
             _ => (),
         }
@@ -270,37 +266,33 @@ impl SpircInternal {
     }
 
     fn notify(&mut self, hello: bool, recipient: Option<&str>) {
-        let cs = CommandSender::new(self,
-                                    if hello {
-                                        MessageType::kMessageTypeHello
-                                    } else {
-                                        MessageType::kMessageTypeNotify
-                                    });
+        let mut cs = CommandSender::new(self,
+                                        if hello {
+                                            MessageType::kMessageTypeHello
+                                        } else {
+                                            MessageType::kMessageTypeNotify
+                                        });
         if let Some(s) = recipient {
-            cs.recipient(&s)
-              .send()
-        } else {
-            cs.send()
+            cs = cs.recipient(&s);
         }
+        cs.send();
     }
 
     fn notify_with_player_state(&mut self,
                                 hello: bool,
                                 recipient: Option<&str>,
                                 player_state: &PlayerState) {
-        let cs = CommandSender::new(self,
-                                    if hello {
-                                        MessageType::kMessageTypeHello
-                                    } else {
-                                        MessageType::kMessageTypeNotify
-                                    })
-                     .player_state(player_state);
+        let mut cs = CommandSender::new(self,
+                                        if hello {
+                                            MessageType::kMessageTypeHello
+                                        } else {
+                                            MessageType::kMessageTypeNotify
+                                        })
+                         .player_state(player_state);
         if let Some(s) = recipient {
-            cs.recipient(&s)
-              .send()
-        } else {
-            cs.send()
+            cs = cs.recipient(&s);
         }
+        cs.send();
     }
 
     fn spirc_state(&self, player_state: &PlayerState) -> protocol::spirc::State {
@@ -395,16 +387,14 @@ impl SpircInternal {
 
 struct CommandSender<'a> {
     spirc_internal: &'a mut SpircInternal,
-    cmd: protocol::spirc::MessageType,
+    cmd: MessageType,
     recipient: Option<&'a str>,
     player_state: Option<&'a PlayerState>,
     state: Option<protocol::spirc::State>,
 }
 
 impl<'a> CommandSender<'a> {
-    fn new(spirc_internal: &'a mut SpircInternal,
-           cmd: protocol::spirc::MessageType)
-           -> CommandSender {
+    fn new(spirc_internal: &'a mut SpircInternal, cmd: MessageType) -> CommandSender {
         CommandSender {
             spirc_internal: spirc_internal,
             cmd: cmd,
@@ -430,34 +420,24 @@ impl<'a> CommandSender<'a> {
     }
 
     fn send(self) {
+        let internal_player_state = self.spirc_internal.player.state();
+        let s = self.player_state.unwrap_or(&*internal_player_state);
+
         let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
             ident: self.spirc_internal.ident.clone(),
             protocol_version: "2.0.0".to_owned(),
             seq_nr: { self.spirc_internal.seq_nr += 1; self.spirc_internal.seq_nr  },
             typ: self.cmd,
-            recipient: protobuf::RepeatedField::from_vec(
+            recipient: RepeatedField::from_vec(
                 self.recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
                 ),
+            device_state: self.spirc_internal.device_state(s),
+            state_update_id: s.update_time() as i64,
         });
 
-        if let Some(s) = self.player_state {
-            pkt.set_device_state(self.spirc_internal.device_state(s));
-            pkt.set_state_update_id(s.update_time() as i64);
-            if self.spirc_internal.is_active {
-                pkt.set_state(self.spirc_internal.spirc_state(s));
-            }
-        } else {
-            let s = &*self.spirc_internal.player.state();
-            pkt.set_device_state(self.spirc_internal.device_state(s));
-            pkt.set_state_update_id(s.update_time() as i64);
-            if self.spirc_internal.is_active {
-                pkt.set_state(self.spirc_internal.spirc_state(s));
-            }
-        }
-
-        if let Some(s) = self.state {
-            pkt.set_state(s);
+        if self.spirc_internal.is_active {
+            pkt.set_state(self.spirc_internal.spirc_state(s));
         }
 
         self.spirc_internal
