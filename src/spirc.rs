@@ -75,7 +75,7 @@ impl SpircManager {
         })))
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&self) {
         let rx = {
             let mut internal = self.0.lock().unwrap();
 
@@ -115,28 +115,28 @@ impl SpircManager {
         self.0.lock().unwrap().devices.clone()
     }
 
-    pub fn send_play(&mut self, recipient: &str) {
+    pub fn send_play(&self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
         CommandSender::new(&mut *internal, MessageType::kMessageTypePlay)
             .recipient(recipient)
             .send();
     }
 
-    pub fn send_pause(&mut self, recipient: &str) {
+    pub fn send_pause(&self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
         CommandSender::new(&mut *internal, MessageType::kMessageTypePause)
             .recipient(recipient)
             .send();
     }
 
-    pub fn send_prev(&mut self, recipient: &str) {
+    pub fn send_prev(&self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
         CommandSender::new(&mut *internal, MessageType::kMessageTypePrev)
             .recipient(recipient)
             .send();
     }
 
-    pub fn send_next(&mut self, recipient: &str) {
+    pub fn send_next(&self, recipient: &str) {
         let mut internal = self.0.lock().unwrap();
         CommandSender::new(&mut *internal, MessageType::kMessageTypeNext)
             .recipient(recipient)
