@@ -358,23 +358,23 @@ impl SpircInternal {
                 @{
                     typ: protocol::spirc::CapabilityType::kSupportedContexts,
                     stringValue => [
-                        "album".to_owned(),
-                        "playlist".to_owned(),
-                        "search".to_owned(),
-                        "inbox".to_owned(),
-                        "toplist".to_owned(),
-                        "starred".to_owned(),
-                        "publishedstarred".to_owned(),
-                        "track".to_owned(),
+                        "album",
+                        "playlist",
+                        "search",
+                        "inbox",
+                        "toplist",
+                        "starred",
+                        "publishedstarred",
+                        "track",
                     ]
                 },
                 @{
                     typ: protocol::spirc::CapabilityType::kSupportedTypes,
                     stringValue => [
-                        "audio/local".to_owned(),
-                        "audio/track".to_owned(),
-                        "local".to_owned(),
-                        "track".to_owned(),
+                        "audio/local",
+                        "audio/track",
+                        "local",
+                        "track",
                     ]
                 }
             ],
@@ -430,7 +430,7 @@ impl<'a> CommandSender<'a> {
         let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
             ident: self.spirc_internal.ident.clone(),
-            protocol_version: "2.0.0".to_owned(),
+            protocol_version: "2.0.0",
             seq_nr: { self.spirc_internal.seq_nr += 1; self.spirc_internal.seq_nr  },
             typ: self.cmd,
             recipient: RepeatedField::from_vec(

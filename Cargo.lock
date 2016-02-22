@@ -13,7 +13,7 @@ dependencies = [
  "num 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "portaudio 0.2.0 (git+https://github.com/mvdnes/portaudio-rs)",
  "protobuf 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf_macros 0.1.2 (git+https://github.com/plietar/rust-protobuf-macros.git)",
+ "protobuf_macros 0.2.0 (git+https://github.com/plietar/rust-protobuf-macros.git)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.34 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -30,6 +30,11 @@ dependencies = [
 [[package]]
 name = "ascii"
 version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "aster"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -279,8 +284,11 @@ dependencies = [
 
 [[package]]
 name = "protobuf_macros"
-version = "0.1.2"
-source = "git+https://github.com/plietar/rust-protobuf-macros.git#37c6a34e6024059e1781058a0f0a3af7a783b094"
+version = "0.2.0"
+source = "git+https://github.com/plietar/rust-protobuf-macros.git#5853fc344d506728fa497eaccb83f0a8a82f9150"
+dependencies = [
+ "aster 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "rand"
