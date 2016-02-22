@@ -20,6 +20,7 @@ pub struct Player {
     commands: mpsc::Sender<PlayerCommand>,
 }
 
+#[derive(Clone)]
 pub struct PlayerState {
     status: PlayStatus,
     position_ms: u32,
@@ -38,6 +39,7 @@ struct PlayerInternal {
     commands: mpsc::Receiver<PlayerCommand>,
 }
 
+#[derive(Debug)]
 enum PlayerCommand {
     Load(SpotifyId, bool, u32),
     Play,
@@ -102,8 +104,8 @@ impl Player {
         self.command(PlayerCommand::Seek(position_ms));
     }
 
-    pub fn state(&self) -> MutexGuard<PlayerState> {
-        self.state.lock().unwrap()
+    pub fn state(&self) -> PlayerState {
+        self.state.lock().unwrap().clone()
     }
 
     pub fn volume(&self, vol: u16) {
@@ -315,8 +317,11 @@ impl PlayerInternal {
         let observers = self.observers.lock().unwrap();
         if update {
             guard.update_time = util::now_ms();
+            let state = guard.clone();
+            drop(guard);
+
             for observer in observers.iter() {
-                observer(&guard);
+                observer(&state);
             }
         }
     }

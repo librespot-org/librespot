@@ -8,6 +8,7 @@ use util::version::version_string;
 use mercury::{MercuryRequest, MercuryMethod};
 use player::{Player, PlayerState};
 
+use std::borrow::Cow;
 use std::sync::{Mutex, Arc};
 use std::collections::HashMap;
 
@@ -420,8 +421,11 @@ impl<'a> CommandSender<'a> {
     }
 
     fn send(self) {
-        let internal_player_state = self.spirc_internal.player.state();
-        let s = self.player_state.unwrap_or(&*internal_player_state);
+        let state = self.player_state.map_or_else(|| {
+            Cow::Owned(self.spirc_internal.player.state())
+        }, |s| {
+            Cow::Borrowed(s)
+        });
 
         let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
@@ -432,12 +436,12 @@ impl<'a> CommandSender<'a> {
             recipient: RepeatedField::from_vec(
                 self.recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
                 ),
-            device_state: self.spirc_internal.device_state(s),
-            state_update_id: s.update_time() as i64,
+            device_state: self.spirc_internal.device_state(&state),
+            state_update_id: state.update_time()
         });
 
         if self.spirc_internal.is_active {
-            pkt.set_state(self.spirc_internal.spirc_state(s));
+            pkt.set_state(self.spirc_internal.spirc_state(&state));
         }
 
         self.spirc_internal
