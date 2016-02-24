@@ -159,11 +159,7 @@ impl PlayerInternal {
                             stream.stop().unwrap();
                         }
                         state.end_of_track = false;
-                        state.status = if play {
-                            PlayStatus::kPlayStatusPlay
-                        } else {
-                            PlayStatus::kPlayStatusPause
-                        };
+                        state.status = PlayStatus::kPlayStatusPause;
                         state.position_ms = position;
                         state.position_measured_at = util::now_ms();
                         true
@@ -228,6 +224,9 @@ impl PlayerInternal {
                 Some(PlayerCommand::Play) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPlay;
+                        state.position_ms =
+                            (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_measured_at = util::now_ms();
                         true
                     });
 
@@ -237,6 +236,9 @@ impl PlayerInternal {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPause;
                         state.update_time = util::now_ms();
+                        state.position_ms =
+                            (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_measured_at = util::now_ms();
                         true
                     });
 
@@ -253,6 +255,8 @@ impl PlayerInternal {
                         if state.status == PlayStatus::kPlayStatusPlay {
                             state.status = PlayStatus::kPlayStatusPause;
                         }
+                        state.position_ms = 0;
+                        state.position_measured_at = util::now_ms();
                         true
                     });
 
@@ -286,20 +290,6 @@ impl PlayerInternal {
                         decoder = None;
                     }
                 }
-
-                self.update(|state| {
-                    let now = util::now_ms();
-
-                    if now - state.position_measured_at > 5000 {
-                        state.position_ms =
-                            (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
-                        state.position_measured_at = now;
-
-                        true
-                    } else {
-                        false
-                    }
-                });
             }
         }
 
