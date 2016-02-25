@@ -26,14 +26,14 @@ brew install portaudio protobuf
 
 Once you've cloned this repository you can build *librespot* using `cargo`.
 ```shell
-cargo build
+cargo build --release
 ```
 
 ## Usage
 A sample program implementing a headless Spotify Connect receiver is provided.
 Once you've built *librespot*, run it using :
 ```shell
-target/debug/librespot --appkey APPKEY --username USERNAME --cache CACHEDIR --name DEVICENAME
+target/release/librespot --appkey APPKEY --username USERNAME --cache CACHEDIR --name DEVICENAME
 ```
 
 ## Discovery mode
@@ -43,7 +43,7 @@ dns-sd or avahi's compatibility layer is required for this. On debian/ubuntu thi
 
 It must be enabled at build time :
 ```shell
-cargo build --features discovery
+cargo build --release --features discovery
 ```
 
 When running *librespot* simply omit the `--username` argument.
