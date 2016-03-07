@@ -7,18 +7,19 @@ dependencies = [
  "dns-sd 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "eventual 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "json_macros 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "json_macros 0.3.0 (git+https://github.com/plietar/json_macros)",
  "lazy_static 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "librespot-protocol 0.1.0",
  "num 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "portaudio 0.2.0 (git+https://github.com/mvdnes/portaudio-rs)",
  "protobuf 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf_macros 0.2.0 (git+https://github.com/plietar/rust-protobuf-macros.git)",
+ "protobuf_macros 0.3.0 (git+https://github.com/plietar/rust-protobuf-macros)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "shannon 0.1.1 (git+https://github.com/plietar/rust-shannon.git)",
+ "shannon 0.1.1 (git+https://github.com/plietar/rust-shannon)",
+ "syntex 0.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiny_http 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -36,6 +37,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "aster"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "syntex_syntax 0.29.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "bit-set"
@@ -167,9 +171,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "json_macros"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/plietar/json_macros#1aa21f6c1c08ac1e9d5b21447edd6c4f34f2a1dd"
 dependencies = [
+ "quasi 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quasi_codegen 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex 0.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex_syntax 0.29.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -200,7 +208,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "librespot-protocol"
 version = "0.1.0"
 dependencies = [
- "mod_path 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf_build 0.1.1 (git+https://github.com/plietar/rust-protobuf-build.git)",
 ]
@@ -216,11 +223,6 @@ dependencies = [
 [[package]]
 name = "matches"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "mod_path"
-version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -284,10 +286,30 @@ dependencies = [
 
 [[package]]
 name = "protobuf_macros"
-version = "0.2.0"
-source = "git+https://github.com/plietar/rust-protobuf-macros.git#5853fc344d506728fa497eaccb83f0a8a82f9150"
+version = "0.3.0"
+source = "git+https://github.com/plietar/rust-protobuf-macros#27e273a3b335a8a6a1c0139bb67d1fe4ba765b20"
 dependencies = [
  "aster 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex 0.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex_syntax 0.29.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "quasi"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "syntex_syntax 0.29.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "quasi_codegen"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "aster 0.13.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex 0.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex_syntax 0.29.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -329,18 +351,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "shannon"
 version = "0.1.1"
-source = "git+https://github.com/plietar/rust-shannon.git#ed87ffd2cf09a2a99871900e81ecfaaac117b790"
+source = "git+https://github.com/plietar/rust-shannon#7000b3e49a53daaa890727ba2b2bd5a43cc4ffef"
 dependencies = [
  "byteorder 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "shannon-sys 0.1.0 (git+https://github.com/plietar/rust-shannon.git)",
+ "libc 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shannon-sys 0.1.0 (git+https://github.com/plietar/rust-shannon)",
 ]
 
 [[package]]
 name = "shannon-sys"
 version = "0.1.0"
-source = "git+https://github.com/plietar/rust-shannon.git#ed87ffd2cf09a2a99871900e81ecfaaac117b790"
+source = "git+https://github.com/plietar/rust-shannon#7000b3e49a53daaa890727ba2b2bd5a43cc4ffef"
 dependencies = [
  "gcc 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -353,6 +377,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "syntex"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "syntex_syntax 0.29.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "syntex_syntax"
+version = "0.29.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc-serialize 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "term 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "unicode-xid 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "tempfile"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -360,6 +405,15 @@ dependencies = [
  "kernel32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "term"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "kernel32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -405,6 +459,11 @@ dependencies = [
 [[package]]
 name = "unicode-normalization"
 version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "unicode-xid"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]

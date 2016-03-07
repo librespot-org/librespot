@@ -195,7 +195,7 @@ impl MetadataManager {
                    payload: Vec::new(),
                })
                .and_then(move |response| {
-                   let data = response.payload.first().unwrap();
+                   let data = response.payload.first().expect("Empty payload");
                    let msg: T::Message = protobuf::parse_from_bytes(data).unwrap();
 
                    Ok(T::parse(&msg, &session))

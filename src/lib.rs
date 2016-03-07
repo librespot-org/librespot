@@ -1,9 +1,9 @@
 #![crate_name = "librespot"]
 
-#![feature(plugin,zero_one,iter_arith)]
+#![cfg_attr(not(feature = "with-syntex"), feature(plugin))]
+#![cfg_attr(not(feature = "with-syntex"), plugin(protobuf_macros))]
+#![cfg_attr(not(feature = "with-syntex"), plugin(json_macros))]
 
-#![plugin(protobuf_macros)]
-#![plugin(json_macros)]
 #[macro_use]
 extern crate lazy_static;
 
@@ -28,19 +28,8 @@ extern crate dns_sd;
 
 extern crate librespot_protocol as protocol;
 
-#[macro_use]pub mod util;
-mod audio_decrypt;
-mod audio_file;
-mod audio_key;
-mod authentication;
-mod connection;
-mod diffie_hellman;
-pub mod discovery;
-pub mod mercury;
-pub mod metadata;
-pub mod player;
-pub mod session;
-pub mod spirc;
-pub mod link;
-mod stream;
-mod zeroconf;
+#[cfg(feature = "with-syntex")]
+include!(concat!(env!("OUT_DIR"), "/lib.rs"));
+
+#[cfg(not(feature = "with-syntex"))]
+include!("lib.in.rs");

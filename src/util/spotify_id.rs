@@ -18,7 +18,7 @@ impl SpotifyId {
         assert!(id.is_ascii());
         let data = id.as_bytes();
 
-        let mut n: u128 = std::num::Zero::zero();
+        let mut n: u128 = u128::zero();
         for c in data {
             let d = BASE16_DIGITS.iter().position(|e| e == c).unwrap() as u8;
             n = n * u128::from(16);
@@ -32,7 +32,7 @@ impl SpotifyId {
         assert!(id.is_ascii());
         let data = id.as_bytes();
 
-        let mut n: u128 = std::num::Zero::zero();
+        let mut n: u128 = u128::zero();
         for c in data {
             let d = BASE62_DIGITS.iter().position(|e| e == c).unwrap() as u8;
             n = n * u128::from(62);

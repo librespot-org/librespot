@@ -8,6 +8,10 @@ pub struct u128 {
 }
 
 impl u128 {
+    pub fn zero() -> u128 {
+        u128::from_parts(0, 0)
+    }
+
     pub fn from_parts(high: u64, low: u64) -> u128 {
         u128 {
             high: high,
@@ -17,12 +21,6 @@ impl u128 {
 
     pub fn parts(&self) -> (u64, u64) {
         (self.high, self.low)
-    }
-}
-
-impl std::num::Zero for u128 {
-    fn zero() -> u128 {
-        u128::from_parts(0, 0)
     }
 }
 
@@ -77,7 +75,7 @@ impl std::ops::Mul<u128> for u128 {
                                 rhs.low >> 32,
                                 rhs.low & 0xFFFFFFFF];
 
-        let mut rows = [std::num::Zero::zero(); 16];
+        let mut rows = [u128::zero(); 16];
         for i in 0..4 {
             for j in 0..4 {
                 let shift = i + j;
@@ -99,6 +97,6 @@ impl std::ops::Mul<u128> for u128 {
             }
         }
 
-        rows.iter().sum::<u128>()
+        rows.iter().fold(u128::zero(), std::ops::Add::add)
     }
 }

@@ -1,5 +1,7 @@
 language: rust
 rust:
+  - stable
+  - beta
   - nightly
 
 addons:
@@ -10,4 +12,10 @@ addons:
 
 script:
     - cargo build --verbose
-    - cargo test --verbose
+    - cargo build --no-default-features --verbose
+
+matrix:
+  allow_failures:
+    - rust:
+      - stable
+      - beta

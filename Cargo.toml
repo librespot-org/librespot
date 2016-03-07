@@ -16,38 +16,39 @@ path = "src/main.rs"
 path = "protocol"
 
 [dependencies]
-bit-set     = "~0.2.0"
-byteorder   = "~0.4.2"
-eventual    = "~0.1.5"
-getopts     = "~0.2.14"
-json_macros = "~0.3.0"
-lazy_static = "~0.1.15"
-num         = "~0.1.30"
-protobuf    = "~1.0.15"
-rand        = "~0.3.13"
-rpassword   = "~0.1.1"
-rust-crypto = "~0.2.34"
+bit-set         = "~0.2.0"
+byteorder       = "~0.4.2"
+eventual        = "~0.1.5"
+getopts         = "~0.2.14"
+#json_macros     = "~0.3.0"
+lazy_static     = "~0.1.15"
+num             = "~0.1.30"
+protobuf        = "~1.0.15"
+rand            = "~0.3.13"
+rpassword       = "~0.1.1"
+rust-crypto     = "~0.2.34"
 rustc-serialize = "~0.3.16"
-tempfile    = "~2.0.0"
-time        = "~0.1.34"
-tiny_http   = "~0.5.1"
-url         = "~0.5.2"
-vorbis      = "~0.0.14"
+tempfile        = "~2.0.0"
+time            = "~0.1.34"
+tiny_http       = "~0.5.1"
+url             = "~0.5.2"
+vorbis          = "~0.0.14"
 
-[dependencies.dns-sd]
-version  = "~0.1.1"
-optional = true
+dns-sd          = { version  = "~0.1.1", optional = true }
 
-[dependencies.protobuf_macros]
-git = "https://github.com/plietar/rust-protobuf-macros.git"
-[dependencies.shannon]
-git = "https://github.com/plietar/rust-shannon.git"
-[dependencies.portaudio]
-git = "https://github.com/mvdnes/portaudio-rs"
+portaudio       = { git = "https://github.com/mvdnes/portaudio-rs" }
+
+json_macros     = { git = "https://github.com/plietar/json_macros" }
+protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
+shannon         = { git = "https://github.com/plietar/rust-shannon" }
 
 [build-dependencies]
-vergen = "~0.1.0"
+vergen          = "~0.1.0"
+syntex          = { version = "*", optional = true }
+protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
+json_macros     = { git = "https://github.com/plietar/json_macros" }
 
 [features]
 discovery = ["dns-sd"]
-
+with-syntex = ["syntex", "protobuf_macros/with-syntex", "json_macros/with-syntex"]
+default = ["with-syntex"]
