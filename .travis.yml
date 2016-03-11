@@ -12,10 +12,7 @@ addons:
 
 script:
     - cargo build --verbose
-    - cargo build --no-default-features --verbose
-
-matrix:
-  allow_failures:
-    - rust:
-      - stable
-      - beta
+    # Building without syntex only works on nightly
+    - if [[ $(rustc --version) == *"nightly"* ]]; then
+        cargo build --no-default-features --verbose;
+      fi
