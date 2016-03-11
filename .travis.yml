@@ -11,8 +11,8 @@ addons:
       - portaudio19-dev
 
 script:
-    - cargo build --verbose
+    - cargo build
     # Building without syntex only works on nightly
     - if [[ $(rustc --version) == *"nightly"* ]]; then
-        cargo build --no-default-features --verbose;
+        cargo build --no-default-features;
       fi
