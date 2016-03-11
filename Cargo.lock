@@ -172,7 +172,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "json_macros"
 version = "0.3.0"
-source = "git+https://github.com/plietar/json_macros#1aa21f6c1c08ac1e9d5b21447edd6c4f34f2a1dd"
+source = "git+https://github.com/plietar/json_macros#f86189836f13376d104494530b25c983a33922cf"
 dependencies = [
  "quasi 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "quasi_codegen 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",

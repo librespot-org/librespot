@@ -9,8 +9,7 @@ which are not available in the official library.
 are however welcome to experiment with it.
 
 ## Building
-Building *librespot* requires rust nightly. It will not work on rust stable or
-beta.
+Rust 1.7.0 or later is required to build librespot.
 
 It also requires a C and C++ toolchain, with libprotoc and portaudio.
 
@@ -47,6 +46,14 @@ cargo build --release --features discovery
 ```
 
 When running *librespot* simply omit the `--username` argument.
+
+## Development
+When developing *librespot*, it is preferable to use Rust nightly, and build it using the following :
+```shell
+cargo build --no-default-features
+```
+
+This produces better compilation error messages than with the default configuration.
 
 ## Facebook Accounts
 If you connect using a facebook account, librespot will not show up among the
