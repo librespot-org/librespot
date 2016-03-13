@@ -5,9 +5,10 @@ use num::BigUint;
 use url;
 use rand;
 use rustc_serialize::base64::{self, ToBase64, FromBase64};
-use tiny_http::{Method, Response, ResponseBox, Server};
+use tiny_http::{Method, Request, Response, ResponseBox, Server};
 use zeroconf::DNSService;
 
+use authentication::Credentials;
 use session::Session;
 use diffie_hellman::{DH_GENERATOR, DH_PRIME};
 use util;
@@ -54,7 +55,7 @@ impl DiscoveryManager {
         }).to_string()).boxed()
     }
 
-    fn add_user(&self, params: &[(String, String)]) -> ResponseBox {
+    fn add_user(&self, params: &[(String, String)]) -> (ResponseBox, Credentials) {
         let &(_, ref username) = params.iter().find(|&&(ref key, _)| key == "userName").unwrap();
         let &(_, ref encrypted_blob) = params.iter().find(|&&(ref key, _)| key == "blob").unwrap();
         let &(_, ref client_key) = params.iter().find(|&&(ref key, _)| key == "clientKey").unwrap();
@@ -107,49 +108,60 @@ impl DiscoveryManager {
             String::from_utf8(data).unwrap()
         };
 
-        self.session.login_blob(username.to_owned(), &decrypted).unwrap();
-
-        Response::from_string(json!({
+        let response = Response::from_string(json!({
             "status": 101,
             "spotifyError": 0,
             "statusString": "ERROR-OK"
-        }).to_string()).boxed()
+        }).to_string()).boxed();
+
+        let credentials = Credentials::with_blob(username.to_owned(), &decrypted, &self.session.device_id());
+
+        (response, credentials)
     }
 
-    pub fn run(&mut self) {
-        let server = Server::http("0.0.0.0:8000").unwrap();
-        let svc = DNSService::register(Some(&self.session.config().device_name),
-                                       "_spotify-connect._tcp",
-                                       None,
-                                       None,
-                                       8000,
-                                       &["VERSION=1.0", "CPath=/"]
-                                       ).unwrap();
+    fn handle_request(&self, mut request: Request) -> Option<Credentials> {
+        let (_, query, _) = url::parse_path(request.url()).unwrap();
+        let mut params = query.map_or(vec![], |q| url::form_urlencoded::parse(q.as_bytes()));
 
-        for mut request in server.incoming_requests() {
-            let (_, query, _) = url::parse_path(request.url()).unwrap();
-            let mut params = query.map_or(vec![], |q| url::form_urlencoded::parse(q.as_bytes()));
-
-            if *request.method() == Method::Post {
-                let mut body = Vec::new();
-                request.as_reader().read_to_end(&mut body).unwrap();
-                let form = url::form_urlencoded::parse(&body);
-                params.extend(form);
-            }
-
-            println!("{:?}", params);
-
-            let &(_, ref action) = params.iter().find(|&&(ref key, _)| key == "action").unwrap();
-            match action.as_ref() {
-                "getInfo" => request.respond(self.get_info()).unwrap(),
-                "addUser" => {
-                    request.respond(self.add_user(&params)).unwrap();
-                    break;
-                }
-                _ => request.respond(not_found()).unwrap(),
-            };
+        if *request.method() == Method::Post {
+            let mut body = Vec::new();
+            request.as_reader().read_to_end(&mut body).unwrap();
+            let form = url::form_urlencoded::parse(&body);
+            params.extend(form);
         }
 
-        drop(svc);
+        println!("{:?}", params);
+
+        let &(_, ref action) = params.iter().find(|&&(ref key, _)| key == "action").unwrap();
+        let (response, credentials) = match action.as_ref() {
+            "getInfo" => (self.get_info(), None),
+            "addUser" => {
+                let (response, credentials) = self.add_user(&params);
+                (response, Some(credentials))
+            }
+            _ => (not_found(), None)
+        };
+
+        request.respond(response).unwrap();
+        credentials
+    }
+
+    pub fn run(&mut self) -> Credentials {
+        let server = Server::http("0.0.0.0:8000").unwrap();
+        let _svc = DNSService::register(Some(&self.session.config().device_name),
+                                        "_spotify-connect._tcp",
+                                        None,
+                                        None,
+                                        8000,
+                                        &["VERSION=1.0", "CPath=/"]
+                                        ).unwrap();
+
+        for request in server.incoming_requests() {
+            if let Some(credentials) = self.handle_request(request) {
+                return credentials;
+            }
+        }
+
+        panic!("No credentials obtained !");
     }
 }

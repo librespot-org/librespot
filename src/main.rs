@@ -10,6 +10,7 @@ use std::io::{stdout, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 
+use librespot::authentication::Credentials;
 use librespot::discovery::DiscoveryManager;
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
@@ -89,12 +90,14 @@ fn main() {
 
     let session = Session::new(config);
 
-    if let Some((username, password)) = credentials {
-        session.login_password(username, password).unwrap();
-    } else {
+    let credentials = credentials.map_or_else(|| {
         let mut discovery = DiscoveryManager::new(session.clone());
-        discovery.run();
-    }
+        discovery.run()
+    }, |(username, password)| {
+        Credentials::with_password(username, password)
+    });
+
+    session.login(credentials).unwrap();
 
     let player = Player::new(session.clone());
     let mut spirc = SpircManager::new(session.clone(), player);

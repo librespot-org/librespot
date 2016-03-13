@@ -1,18 +1,28 @@
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
+use crypto::hmac::Hmac;
+use crypto::mac::Mac;
 use eventual::Future;
-use std::io::Write;
+use protobuf::{self, Message};
+use rand::thread_rng;
+use rand::Rng;
+use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::result::Result;
 use std::sync::{Mutex, RwLock, Arc, mpsc};
 
+use apresolve::apresolve;
 use audio_key::{AudioKeyManager, AudioKey, AudioKeyError};
 use audio_file::{AudioFileManager, AudioFile};
-use connection::{self, CipherConnection};
-use connection::PacketHandler;
+use authentication::Credentials;
+use connection::{self, PlainConnection, CipherConnection, PacketHandler};
+use diffie_hellman::DHLocalKeys;
 use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
+use protocol;
 use stream::{StreamManager, StreamEvent};
-use util::{SpotifyId, FileId, mkdir_existing};
+use util::{self, SpotifyId, FileId, mkdir_existing};
+
 
 pub enum Bitrate {
     Bitrate96,
@@ -79,10 +89,149 @@ impl Session {
         }))
     }
 
-    pub fn authenticated(&self, username: String, connection: CipherConnection) {
-        self.0.data.write().unwrap().canonical_username = username;
-        *self.0.rx_connection.lock().unwrap() = Some(connection.clone());
-        *self.0.tx_connection.lock().unwrap() = Some(connection);
+    fn connect(&self) -> CipherConnection {
+        let local_keys = DHLocalKeys::random(&mut thread_rng());
+
+        let aps = apresolve().unwrap();
+        let ap = thread_rng().choose(&aps).expect("No APs found");
+
+        println!("Connecting to AP {}", ap);
+        let mut connection = PlainConnection::connect(ap).unwrap();
+
+        let request = protobuf_init!(protocol::keyexchange::ClientHello::new(), {
+            build_info => {
+                product: protocol::keyexchange::Product::PRODUCT_LIBSPOTIFY_EMBEDDED,
+                platform: protocol::keyexchange::Platform::PLATFORM_LINUX_X86,
+                version: 0x10800000000,
+            },
+            /*
+            fingerprints_supported => [
+                protocol::keyexchange::Fingerprint::FINGERPRINT_GRAIN
+            ],
+            */
+            cryptosuites_supported => [
+                protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON,
+                //protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_RC4_SHA1_HMAC
+            ],
+            /*
+            powschemes_supported => [
+                protocol::keyexchange::Powscheme::POW_HASH_CASH
+            ],
+            */
+            login_crypto_hello.diffie_hellman => {
+                gc: local_keys.public_key(),
+                server_keys_known: 1,
+            },
+            client_nonce: util::rand_vec(&mut thread_rng(), 0x10),
+            padding: vec![0x1e],
+            feature_set => {
+                autoupdate2: true,
+            }
+        });
+
+        let init_client_packet = connection.send_packet_prefix(&[0, 4],
+                                                               &request.write_to_bytes().unwrap())
+                                           .unwrap();
+        let init_server_packet = connection.recv_packet().unwrap();
+
+        let response: protocol::keyexchange::APResponseMessage =
+            protobuf::parse_from_bytes(&init_server_packet[4..]).unwrap();
+
+        let remote_key = response.get_challenge()
+                                 .get_login_crypto_challenge()
+                                 .get_diffie_hellman()
+                                 .get_gs();
+
+        let shared_secret = local_keys.shared_secret(remote_key);
+        let (challenge, send_key, recv_key) = {
+            let mut data = Vec::with_capacity(0x64);
+            let mut mac = Hmac::new(Sha1::new(), &shared_secret);
+
+            for i in 1..6 {
+                mac.input(&init_client_packet);
+                mac.input(&init_server_packet);
+                mac.input(&[i]);
+                data.write(&mac.result().code()).unwrap();
+                mac.reset();
+            }
+
+            mac = Hmac::new(Sha1::new(), &data[..0x14]);
+            mac.input(&init_client_packet);
+            mac.input(&init_server_packet);
+
+            (mac.result().code().to_vec(),
+             data[0x14..0x34].to_vec(),
+             data[0x34..0x54].to_vec())
+        };
+
+        let packet = protobuf_init!(protocol::keyexchange::ClientResponsePlaintext::new(), {
+            login_crypto_response.diffie_hellman => {
+                hmac: challenge
+            },
+            pow_response => {},
+            crypto_response => {},
+        });
+
+
+        connection.send_packet(&packet.write_to_bytes().unwrap()).unwrap();
+
+        CipherConnection::new(connection.into_stream(),
+                              &send_key,
+                              &recv_key)
+    }
+
+    pub fn login(&self, credentials: Credentials) -> Result<(), ()> {
+        let packet = protobuf_init!(protocol::authentication::ClientResponseEncrypted::new(), {
+            login_credentials => {
+                username: credentials.username,
+                typ: credentials.auth_type,
+                auth_data: credentials.auth_data,
+            },
+            system_info => {
+                cpu_family: protocol::authentication::CpuFamily::CPU_UNKNOWN,
+                os: protocol::authentication::Os::OS_UNKNOWN,
+                system_information_string: "librespot".to_owned(),
+                device_id: self.device_id(),
+            },
+            version_string: util::version::version_string(),
+            appkey => {
+                version: self.config().application_key[0] as u32,
+                devkey: self.config().application_key[0x1..0x81].to_vec(),
+                signature: self.config().application_key[0x81..0x141].to_vec(),
+                useragent: self.config().user_agent.clone(),
+                callback_hash: vec![0; 20],
+            }
+        });
+
+        let mut connection = self.connect();
+        connection.send_packet(0xab, &packet.write_to_bytes().unwrap()).unwrap();
+        let (cmd, data) = connection.recv_packet().unwrap();
+
+        match cmd {
+            0xac => {
+                let welcome_data: protocol::authentication::APWelcome =
+                    protobuf::parse_from_bytes(&data).unwrap();
+
+                let username = welcome_data.get_canonical_username().to_owned();
+                self.0.data.write().unwrap().canonical_username = username;
+                *self.0.rx_connection.lock().unwrap() = Some(connection.clone());
+                *self.0.tx_connection.lock().unwrap() = Some(connection);
+
+                eprintln!("Authenticated !");
+                Ok(())
+            }
+
+            0xad => {
+                let msg: protocol::keyexchange::APLoginFailed =
+                    protobuf::parse_from_bytes(&data).unwrap();
+                eprintln!("Authentication failed, {:?}", msg);
+                Err(())
+            }
+            _ => {
+                println!("Unexpected message {:x}", cmd);
+                Err(())
+            }
+        }
     }
 
     pub fn poll(&self) {
