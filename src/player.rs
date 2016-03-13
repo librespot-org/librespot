@@ -217,7 +217,7 @@ impl PlayerInternal {
                         AudioDecrypt::new(key,
                         self.session.audio_file(file_id)), 0xa7)).unwrap());
 
-                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap()
+                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();
 
                     self.update(|state| {
                         state.status = if play {
@@ -234,7 +234,7 @@ impl PlayerInternal {
                     println!("Load Done");
                 }
                 Some(PlayerCommand::Seek(position)) => {
-                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap()
+                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();
                     self.update(|state| {
                         state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
                         state.position_measured_at = util::now_ms();
