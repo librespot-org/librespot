@@ -39,9 +39,9 @@ pub struct CipherConnection {
 }
 
 impl PlainConnection {
-    pub fn connect() -> Result<PlainConnection> {
+    pub fn connect(ap: &str) -> Result<PlainConnection> {
         Ok(PlainConnection {
-            stream: try!(TcpStream::connect("lon3-accesspoint-a26.ap.spotify.com:4070")),
+            stream: try!(TcpStream::connect(ap)),
         })
     }
 

@@ -13,4 +13,5 @@ pub mod session;
 pub mod spirc;
 pub mod link;
 mod stream;
+pub mod apresolve;
 mod zeroconf;

@@ -1,3 +1,4 @@
+use apresolve::apresolve;
 use byteorder::{BigEndian, ByteOrder};
 use crypto;
 use crypto::aes;
@@ -8,6 +9,7 @@ use crypto::pbkdf2::pbkdf2;
 use crypto::sha1::Sha1;
 use protobuf::{self, Message, ProtobufEnum};
 use rand::thread_rng;
+use rand::Rng;
 use std::io::{self, Read, Write};
 use std::result::Result;
 use rustc_serialize::base64::FromBase64;
@@ -47,7 +49,11 @@ impl Session {
     pub fn connect(&self) -> CipherConnection {
         let local_keys = DHLocalKeys::random(&mut thread_rng());
 
-        let mut connection = PlainConnection::connect().unwrap();
+        let aps = apresolve().unwrap();
+        let ap = thread_rng().choose(&aps).expect("No APs found");
+
+        println!("Connecting to AP {}", ap);
+        let mut connection = PlainConnection::connect(ap).unwrap();
 
         let request = protobuf_init!(protocol::keyexchange::ClientHello::new(), {
             build_info => {

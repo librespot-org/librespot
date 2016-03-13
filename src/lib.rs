@@ -11,6 +11,7 @@ extern crate bit_set;
 extern crate byteorder;
 extern crate crypto;
 extern crate eventual;
+extern crate hyper;
 extern crate num;
 extern crate portaudio;
 extern crate protobuf;
