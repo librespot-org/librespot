@@ -12,6 +12,7 @@ addons:
 
 script:
     - cargo build
+    - cargo build --features with-tremor
     # Building without syntex only works on nightly
     - if [[ $(rustc --version) == *"nightly"* ]]; then
         cargo build --no-default-features;

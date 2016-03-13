@@ -3,6 +3,7 @@ use portaudio;
 use std::borrow::Cow;
 use std::sync::{mpsc, Mutex, Arc, MutexGuard};
 use std::thread;
+use std::io::{Read, Seek};
 use vorbis;
 
 use metadata::{FileFormat, Track, TrackRef};
@@ -10,6 +11,26 @@ use session::{Bitrate, Session};
 use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
 use spirc::PlayStatus;
+
+#[cfg(not(feature = "with-tremor"))]
+fn vorbis_time_seek_ms<R>(decoder: &mut vorbis::Decoder<R>, ms: i64) -> Result<(), vorbis::VorbisError> where R: Read + Seek {
+    decoder.time_seek(ms as f64 / 1000f64)
+}
+
+#[cfg(not(feature = "with-tremor"))]
+fn vorbis_time_tell_ms<R>(decoder: &mut vorbis::Decoder<R>) -> Result<i64, vorbis::VorbisError> where R: Read + Seek {
+    decoder.time_tell().map(|t| (t / 1000f64) as i64)
+}
+
+#[cfg(feature = "with-tremor")]
+fn vorbis_time_seek_ms<R>(decoder: &mut vorbis::Decoder<R>, ms: i64) -> Result<(), vorbis::VorbisError> where R: Read + Seek {
+    decoder.time_seek(ms)
+}
+
+#[cfg(feature = "with-tremor")]
+fn vorbis_time_tell_ms<R>(decoder: &mut vorbis::Decoder<R>) -> Result<i64, vorbis::VorbisError> where R: Read + Seek {
+    decoder.time_tell()
+}
 
 pub type PlayerObserver = Box<Fn(&PlayerState) + Send>;
 
@@ -195,7 +216,8 @@ impl PlayerInternal {
                         Subfile::new(
                         AudioDecrypt::new(key,
                         self.session.audio_file(file_id)), 0xa7)).unwrap());
-                    decoder.as_mut().unwrap().time_seek(position as f64 / 1000f64).unwrap();
+
+                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap()
 
                     self.update(|state| {
                         state.status = if play {
@@ -211,11 +233,10 @@ impl PlayerInternal {
                     });
                     println!("Load Done");
                 }
-                Some(PlayerCommand::Seek(ms)) => {
-                    decoder.as_mut().unwrap().time_seek(ms as f64 / 1000f64).unwrap();
+                Some(PlayerCommand::Seek(position)) => {
+                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap()
                     self.update(|state| {
-                        state.position_ms =
-                            (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
                         state.position_measured_at = util::now_ms();
 
                         true
@@ -224,8 +245,7 @@ impl PlayerInternal {
                 Some(PlayerCommand::Play) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPlay;
-                        state.position_ms =
-                            (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
                         state.position_measured_at = util::now_ms();
                         true
                     });
@@ -236,8 +256,7 @@ impl PlayerInternal {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPause;
                         state.update_time = util::now_ms();
-                        state.position_ms =
-                            (decoder.as_mut().unwrap().time_tell().unwrap() * 1000f64) as u32;
+                        state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
                         state.position_measured_at = util::now_ms();
                         true
                     });

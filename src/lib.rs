@@ -21,7 +21,11 @@ extern crate time;
 extern crate tiny_http;
 extern crate tempfile;
 extern crate url;
+
+#[cfg(not(feature = "with-tremor"))]
 extern crate vorbis;
+#[cfg(feature = "with-tremor")]
+extern crate tremor as vorbis;
 
 #[cfg(feature = "dns-sd")]
 extern crate dns_sd;
