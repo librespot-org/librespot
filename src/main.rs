@@ -55,7 +55,7 @@ fn main() {
     };
 
     let username = matches.opt_str("u");
-    let cache_location = matches.opt_str("c").unwrap();
+    let cache_location = PathBuf::from(matches.opt_str("c").unwrap());
     let name = matches.opt_str("n").unwrap();
 
     let credentials = username.map(|u| {
@@ -84,23 +84,30 @@ fn main() {
         application_key: appkey,
         user_agent: version_string(),
         device_name: name,
-        cache_location: PathBuf::from(cache_location),
+        cache_location: cache_location.clone(),
         bitrate: bitrate,
     };
 
     let session = Session::new(config);
 
-    let credentials = credentials.map_or_else(|| {
+    let credentials_path = cache_location.join("credentials.json");
+
+    let credentials = credentials.map(|(username, password)| {
+        Credentials::with_password(username, password)
+    }).or_else(|| {
+        File::open(&credentials_path).map(|file| {
+            Credentials::from_reader(file)
+        }).ok()
+    }).unwrap_or_else(|| {
         let mut discovery = DiscoveryManager::new(session.clone());
         discovery.run()
-    }, |(username, password)| {
-        Credentials::with_password(username, password)
     });
 
-    session.login(credentials).unwrap();
+    let reusable_credentials = session.login(credentials).unwrap();
+    reusable_credentials.save_to_file(credentials_path);
 
     let player = Player::new(session.clone());
-    let mut spirc = SpircManager::new(session.clone(), player);
+    let spirc = SpircManager::new(session.clone(), player);
     thread::spawn(move || spirc.run());
 
     loop {

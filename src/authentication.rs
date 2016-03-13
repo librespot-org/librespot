@@ -7,15 +7,27 @@ use crypto::mac::Mac;
 use crypto::pbkdf2::pbkdf2;
 use crypto::sha1::Sha1;
 use protobuf::ProtobufEnum;
-use std::io::{self, Read};
-use rustc_serialize::base64::FromBase64;
+use std::io::{self, Read, Write};
+use std::fs::File;
+use std::path::Path;
+use rustc_serialize::base64::{self, FromBase64, ToBase64};
+use rustc_serialize::json;
 
 use protocol::authentication::AuthenticationType;
 
+#[derive(Debug, Clone)]
 pub struct Credentials {
     pub username: String,
     pub auth_type: AuthenticationType,
     pub auth_data: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+#[derive(RustcDecodable, RustcEncodable)]
+struct StoredCredentials {
+    pub username: String,
+    pub auth_type: i32,
+    pub auth_data: String,
 }
 
 impl Credentials {
@@ -108,4 +120,47 @@ impl Credentials {
             auth_data: auth_data,
         }
     }
+
+    pub fn from_reader<R: Read>(mut reader: R) -> Credentials {
+        let mut contents = String::new();
+        reader.read_to_string(&mut contents).unwrap();
+
+        json::decode::<StoredCredentials>(&contents).unwrap().into()
+    }
+
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Credentials {
+        let file = File::open(path).unwrap();
+        Credentials::from_reader(file)
+    }
+
+    pub fn save_to_writer<W: Write>(&self, writer: &mut W) {
+        let contents = json::encode::<StoredCredentials>(&self.clone().into()).unwrap();
+        writer.write_all(contents.as_bytes()).unwrap();
+    }
+
+    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) {
+        let mut file = File::create(path).unwrap();
+        self.save_to_writer(&mut file)
+    }
 }
+
+impl From<Credentials> for StoredCredentials {
+    fn from(credentials: Credentials) -> StoredCredentials {
+        StoredCredentials {
+            username: credentials.username,
+            auth_type: credentials.auth_type.value(),
+            auth_data: credentials.auth_data.to_base64(base64::STANDARD),
+        }
+    }
+}
+
+impl From<StoredCredentials> for Credentials {
+    fn from(credentials: StoredCredentials) -> Credentials {
+        Credentials {
+            username: credentials.username,
+            auth_type: AuthenticationType::from_i32(credentials.auth_type).unwrap(),
+            auth_data: credentials.auth_data.from_base64().unwrap(),
+        }
+    }
+}
+

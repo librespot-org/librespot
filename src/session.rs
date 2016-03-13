@@ -180,7 +180,7 @@ impl Session {
                               &recv_key)
     }
 
-    pub fn login(&self, credentials: Credentials) -> Result<(), ()> {
+    pub fn login(&self, credentials: Credentials) -> Result<Credentials, ()> {
         let packet = protobuf_init!(protocol::authentication::ClientResponseEncrypted::new(), {
             login_credentials => {
                 username: credentials.username,
@@ -213,12 +213,19 @@ impl Session {
                     protobuf::parse_from_bytes(&data).unwrap();
 
                 let username = welcome_data.get_canonical_username().to_owned();
-                self.0.data.write().unwrap().canonical_username = username;
+                self.0.data.write().unwrap().canonical_username = username.clone();
                 *self.0.rx_connection.lock().unwrap() = Some(connection.clone());
                 *self.0.tx_connection.lock().unwrap() = Some(connection);
 
                 eprintln!("Authenticated !");
-                Ok(())
+
+                let reusable_credentials = Credentials {
+                    username: username,
+                    auth_type: welcome_data.get_reusable_auth_credentials_type(),
+                    auth_data: welcome_data.get_reusable_auth_credentials().to_owned(),
+                };
+
+                Ok(reusable_credentials)
             }
 
             0xad => {
