@@ -40,7 +40,7 @@ struct AudioFileShared {
 impl AudioFileLoading {
     fn new(session: &Session, file_id: FileId) -> AudioFileLoading {
         let size = session.stream(file_id, 0, 1)
-                          .into_iter()
+                          .iter()
                           .filter_map(|event| {
                               match event {
                                   StreamEvent::Header(id, ref data) if id == 0x3 => {

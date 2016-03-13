@@ -2,6 +2,7 @@ use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use crypto::hmac::Hmac;
 use crypto::mac::Mac;
+use eventual;
 use eventual::Future;
 use protobuf::{self, Message};
 use rand::thread_rng;
@@ -20,9 +21,8 @@ use diffie_hellman::DHLocalKeys;
 use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use protocol;
-use stream::{StreamManager, StreamEvent};
+use stream::{ChannelId, StreamManager, StreamEvent, StreamError};
 use util::{self, SpotifyId, FileId, mkdir_existing};
-
 
 pub enum Bitrate {
     Bitrate96,
@@ -249,7 +249,7 @@ impl Session {
         match cmd {
             0x4 => self.send_packet(0x49, &data).unwrap(),
             0x4a => (),
-            0x9 => self.0.stream.lock().unwrap().handle(cmd, data),
+            0x9 | 0xa => self.0.stream.lock().unwrap().handle(cmd, data),
             0xd | 0xe => self.0.audio_key.lock().unwrap().handle(cmd, data),
             0x1b => {
                 self.0.data.write().unwrap().country = String::from_utf8(data).unwrap();
@@ -275,8 +275,12 @@ impl Session {
         self.0.audio_file.lock().unwrap().request(self, file)
     }
 
-    pub fn stream(&self, file: FileId, offset: u32, size: u32) -> mpsc::Receiver<StreamEvent> {
+    pub fn stream(&self, file: FileId, offset: u32, size: u32) -> eventual::Stream<StreamEvent, StreamError> {
         self.0.stream.lock().unwrap().request(self, file, offset, size)
+    }
+
+    pub fn allocate_stream(&self) -> (ChannelId, eventual::Stream<StreamEvent, StreamError>) {
+        self.0.stream.lock().unwrap().allocate_stream()
     }
 
     pub fn metadata<T: MetadataTrait>(&self, id: SpotifyId) -> MetadataRef<T> {

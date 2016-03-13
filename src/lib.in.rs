@@ -1,4 +1,5 @@
 #[macro_use] pub mod util;
+mod album_cover;
 mod audio_decrypt;
 mod audio_file;
 mod audio_key;
@@ -13,6 +14,8 @@ pub mod player;
 pub mod session;
 pub mod spirc;
 pub mod link;
-mod stream;
+pub mod stream;
 pub mod apresolve;
 mod zeroconf;
+
+pub use album_cover::get_album_cover;
