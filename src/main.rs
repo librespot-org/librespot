@@ -33,7 +33,7 @@ fn main() {
     opts.reqopt("a", "appkey", "Path to a spotify appkey", "APPKEY")
         .optopt("u", "username", "Username to sign in with (optional)", "USERNAME")
         .optopt("p", "password", "Password (optional)", "PASSWORD")
-        .reqopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
+        .optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .reqopt("n", "name", "Device name", "NAME")
         .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE");
 
@@ -56,7 +56,7 @@ fn main() {
     };
 
     let username = matches.opt_str("u");
-    let cache_location = PathBuf::from(matches.opt_str("c").unwrap());
+    let cache_location = matches.opt_str("c").map(PathBuf::from);
     let name = matches.opt_str("n").unwrap();
 
     let credentials = username.map(|u| {
@@ -91,21 +91,23 @@ fn main() {
 
     let session = Session::new(config);
 
-    let credentials_path = cache_location.join("credentials.json");
+    let credentials_path = cache_location.map(|c| c.join("credentials.json"));
 
     let credentials = credentials.map(|(username, password)| {
         Credentials::with_password(username, password)
     }).or_else(|| {
-        File::open(&credentials_path).map(|file| {
-            Credentials::from_reader(file)
-        }).ok()
+        credentials_path.as_ref()
+                        .and_then(|p| File::open(p).ok())
+                        .map(Credentials::from_reader)
     }).unwrap_or_else(|| {
         let mut discovery = DiscoveryManager::new(session.clone());
         discovery.run()
     });
 
     let reusable_credentials = session.login(credentials).unwrap();
-    reusable_credentials.save_to_file(credentials_path);
+    if let Some(path) = credentials_path {
+        reusable_credentials.save_to_file(path);
+    }
 
     let player = Player::new(session.clone(), || DefaultSink::open());
     let spirc = SpircManager::new(session.clone(), player);

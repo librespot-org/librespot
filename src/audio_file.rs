@@ -103,7 +103,7 @@ impl AudioFileLoading {
             let bitmap = shared.bitmap.lock().unwrap();
             if bitmap.len() >= shared.chunk_count {
                 drop(bitmap);
-                AudioFileLoading::store(session, &shared, &mut write_file);
+                AudioFileLoading::persist_to_cache(session, &shared, &mut write_file);
                 break;
             }
 
@@ -150,14 +150,14 @@ impl AudioFileLoading {
         shared.cond.notify_all();
     }
 
-    fn store(session: &Session, shared: &AudioFileShared, write_file: &mut NamedTempFile) {
-        write_file.seek(SeekFrom::Start(0)).unwrap();
+    fn persist_to_cache(session: &Session, shared: &AudioFileShared, write_file: &mut NamedTempFile) {
+        if let Some(path) = AudioFileManager::cache_path(session, shared.file_id) {
+            write_file.seek(SeekFrom::Start(0)).unwrap();
+            mkdir_existing(path.parent().unwrap()).unwrap();
 
-        mkdir_existing(&AudioFileManager::cache_dir(session, shared.file_id)).unwrap();
-
-        let mut f = fs::File::create(AudioFileManager::cache_path(session, shared.file_id))
-                        .unwrap();
-        io::copy(write_file, &mut f).unwrap();
+            let mut cache_file = fs::File::create(path).unwrap();
+            io::copy(write_file, &mut cache_file).unwrap();
+        }
     }
 }
 
@@ -217,20 +217,19 @@ impl AudioFileManager {
         AudioFileManager
     }
 
-    pub fn cache_dir(session: &Session, file_id: FileId) -> PathBuf {
-        let name = file_id.to_base16();
-        session.config().cache_location.join(&name[0..2])
-    }
-
-    pub fn cache_path(session: &Session, file_id: FileId) -> PathBuf {
-        let name = file_id.to_base16();
-        AudioFileManager::cache_dir(session, file_id).join(&name[2..])
+    pub fn cache_path(session: &Session, file_id: FileId) -> Option<PathBuf> {
+        session.config().cache_location.as_ref().map(|cache| {
+            let name = file_id.to_base16();
+            cache.join(&name[0..2]).join(&name[2..])
+        })
     }
 
     pub fn request(&mut self, session: &Session, file_id: FileId) -> AudioFile {
-        match fs::File::open(AudioFileManager::cache_path(session, file_id)) {
-            Ok(f) => AudioFile::Direct(f),
-            Err(..) => AudioFile::Loading(AudioFileLoading::new(session, file_id)),
-        }
+        let cache_path = AudioFileManager::cache_path(session, file_id);
+        let cache_file = cache_path.and_then(|p| fs::File::open(p).ok());
+
+        cache_file.map(AudioFile::Direct).unwrap_or_else(|| {
+            AudioFile::Loading(AudioFileLoading::new(session, file_id))
+        })
     }
 }

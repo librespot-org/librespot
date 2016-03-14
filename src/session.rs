@@ -34,7 +34,7 @@ pub struct Config {
     pub application_key: Vec<u8>,
     pub user_agent: String,
     pub device_name: String,
-    pub cache_location: PathBuf,
+    pub cache_location: Option<PathBuf>,
     pub bitrate: Bitrate,
 }
 
@@ -62,7 +62,9 @@ pub struct Session(pub Arc<SessionInternal>);
 
 impl Session {
     pub fn new(config: Config) -> Session {
-        mkdir_existing(&config.cache_location).unwrap();
+        if let Some(cache_location) = config.cache_location.as_ref() {
+            mkdir_existing(cache_location).unwrap();
+        }
 
         let device_id = {
             let mut h = Sha1::new();
