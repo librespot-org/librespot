@@ -10,6 +10,7 @@ use std::io::{stdout, Read, Write};
 use std::path::{Path, PathBuf};
 use std::thread;
 
+use librespot::audio_sink::DefaultSink;
 use librespot::authentication::Credentials;
 use librespot::discovery::DiscoveryManager;
 use librespot::player::Player;
@@ -106,9 +107,13 @@ fn main() {
     let reusable_credentials = session.login(credentials).unwrap();
     reusable_credentials.save_to_file(credentials_path);
 
-    let player = Player::new(session.clone());
+    portaudio::initialize().unwrap();
+
+    let player = Player::new(session.clone(), || DefaultSink::open());
     let spirc = SpircManager::new(session.clone(), player);
     thread::spawn(move || spirc.run());
+
+    portaudio::terminate().unwrap();
 
     loop {
         session.poll();

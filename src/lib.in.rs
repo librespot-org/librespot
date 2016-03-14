@@ -2,6 +2,7 @@
 mod audio_decrypt;
 mod audio_file;
 mod audio_key;
+pub mod audio_sink;
 pub mod authentication;
 mod connection;
 mod diffie_hellman;

@@ -1,14 +1,14 @@
 use eventual::{self, Async};
-use portaudio;
 use std::borrow::Cow;
 use std::sync::{mpsc, Mutex, Arc, MutexGuard};
 use std::thread;
 use std::io::{Read, Seek};
 use vorbis;
 
+use audio_decrypt::AudioDecrypt;
+use audio_sink::Sink;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
-use audio_decrypt::AudioDecrypt;
 use util::{self, SpotifyId, Subfile};
 use spirc::PlayStatus;
 
@@ -71,7 +71,8 @@ enum PlayerCommand {
 }
 
 impl Player {
-    pub fn new(session: Session) -> Player {
+    pub fn new<S, F>(session: Session, sink_builder: F) -> Player
+        where S: Sink, F: FnOnce() -> S + Send + 'static {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
         let state = Arc::new(Mutex::new(PlayerState {
@@ -92,7 +93,7 @@ impl Player {
             observers: observers.clone(),
         };
 
-        thread::spawn(move || internal.run());
+        thread::spawn(move || internal.run(sink_builder()));
 
         Player {
             commands: cmd_tx,
@@ -154,15 +155,7 @@ fn apply_volume(volume: u16, data: &[i16]) -> Cow<[i16]> {
 }
 
 impl PlayerInternal {
-    fn run(self) {
-        portaudio::initialize().unwrap();
-
-        let stream = portaudio::stream::Stream::<i16, i16>::open_default(
-                0, 2, 44100.0,
-                portaudio::stream::FRAMES_PER_BUFFER_UNSPECIFIED,
-                None
-        ).unwrap();
-
+    fn run<S: Sink>(self, sink: S) {
         let mut decoder = None;
 
         loop {
@@ -177,7 +170,7 @@ impl PlayerInternal {
                 Some(PlayerCommand::Load(track_id, play, position)) => {
                     self.update(|state| {
                         if state.status == PlayStatus::kPlayStatusPlay {
-                            stream.stop().unwrap();
+                            sink.stop().unwrap();
                         }
                         state.end_of_track = false;
                         state.status = PlayStatus::kPlayStatusPause;
@@ -221,7 +214,7 @@ impl PlayerInternal {
 
                     self.update(|state| {
                         state.status = if play {
-                            stream.start().unwrap();
+                            sink.start().unwrap();
                             PlayStatus::kPlayStatusPlay
                         } else {
                             PlayStatus::kPlayStatusPause
@@ -250,7 +243,7 @@ impl PlayerInternal {
                         true
                     });
 
-                    stream.start().unwrap();
+                    sink.start().unwrap();
                 }
                 Some(PlayerCommand::Pause) => {
                     self.update(|state| {
@@ -261,7 +254,7 @@ impl PlayerInternal {
                         true
                     });
 
-                    stream.stop().unwrap();
+                    sink.stop().unwrap();
                 }
                 Some(PlayerCommand::Volume(vol)) => {
                     self.update(|state| {
@@ -279,22 +272,20 @@ impl PlayerInternal {
                         true
                     });
 
-                    stream.stop().unwrap();
+                    sink.stop().unwrap();
                     decoder = None;
                 }
                 None => (),
             }
 
             if self.state.lock().unwrap().status == PlayStatus::kPlayStatusPlay {
-                match decoder.as_mut().unwrap().packets().next() {
+                let packet = decoder.as_mut().unwrap().packets().next();
+
+                match packet {
                     Some(Ok(packet)) => {
                         let buffer = apply_volume(self.state.lock().unwrap().volume,
                                                   &packet.data);
-                        match stream.write(&buffer) {
-                            Ok(_) => (),
-                            Err(portaudio::PaError::OutputUnderflowed) => eprintln!("Underflow"),
-                            Err(e) => panic!("PA Error {}", e),
-                        };
+                        sink.write(&buffer).unwrap();
                     }
                     Some(Err(vorbis::VorbisError::Hole)) => (),
                     Some(Err(e)) => panic!("Vorbis error {:?}", e),
@@ -305,16 +296,12 @@ impl PlayerInternal {
                             true
                         });
 
-                        stream.stop().unwrap();
+                        sink.stop().unwrap();
                         decoder = None;
                     }
                 }
             }
         }
-
-        drop(stream);
-
-        portaudio::terminate().unwrap();
     }
 
     fn update<F>(&self, f: F)
