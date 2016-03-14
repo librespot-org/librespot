@@ -42,6 +42,9 @@ extern crate tremor as vorbis;
 #[cfg(feature = "openssl")]
 extern crate openssl;
 
+#[cfg(feature = "alsa-backend")]
+extern crate alsa;
+
 #[cfg(feature = "portaudio")]
 extern crate portaudio;
 

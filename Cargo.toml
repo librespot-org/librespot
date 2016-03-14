@@ -48,6 +48,7 @@ shannon         = { git = "https://github.com/plietar/rust-shannon" }
 vorbis          = "~0.0.14"
 tremor          = { git = "https://github.com/plietar/rust-tremor", optional = true }
 
+alsa            = { git = "https://github.com/plietar/rust-alsa", optional = true }
 portaudio       = { git = "https://github.com/mvdnes/portaudio-rs", optional = true }
 libpulse-sys    = { git = "https://github.com/astro/libpulse-sys", optional = true }
 
@@ -72,6 +73,7 @@ nightly           = ["serde_macros"]
 
 with-tremor       = ["tremor"]
 facebook          = ["hyper/ssl", "openssl"]
+alsa-backend      = ["alsa"]
 portaudio-backend = ["portaudio"]
 pulseaudio-backend= ["libpulse-sys"]
 default           = ["with-syntex", "portaudio-backend"]
