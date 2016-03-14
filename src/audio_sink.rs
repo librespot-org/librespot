@@ -53,7 +53,5 @@ mod portaudio_sink {
     }
 }
 
-}
-
 pub type DefaultSink = portaudio_sink::PortAudioSink<'static>;
 
