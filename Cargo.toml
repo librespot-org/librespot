@@ -54,4 +54,5 @@ json_macros     = { git = "https://github.com/plietar/json_macros" }
 discovery = ["dns-sd"]
 with-syntex = ["syntex", "protobuf_macros/with-syntex", "json_macros/with-syntex"]
 with-tremor = ["tremor"]
+static-appkey = []
 default = ["with-syntex"]

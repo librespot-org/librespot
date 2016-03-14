@@ -2,12 +2,11 @@ extern crate getopts;
 extern crate librespot;
 extern crate rpassword;
 
-use getopts::Options;
 use rpassword::read_password;
 use std::clone::Clone;
 use std::fs::File;
 use std::io::{stdout, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::thread;
 
 use librespot::audio_sink::DefaultSink;
@@ -20,22 +19,32 @@ use librespot::util::version::version_string;
 
 static PASSWORD_ENV_NAME: &'static str = "SPOTIFY_PASSWORD";
 
-fn usage(program: &str, opts: &Options) -> String {
+fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
     format!("{}", opts.usage(&brief))
 }
+
+#[cfg(feature = "static-appkey")]
+static APPKEY: Option<&'static [u8]> = Some(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/spotify_appkey.key")));
+#[cfg(not(feature = "static-appkey"))]
+static APPKEY: Option<&'static [u8]> = None;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
 
-    let mut opts = Options::new();
-    opts.reqopt("a", "appkey", "Path to a spotify appkey", "APPKEY")
-        .optopt("u", "username", "Username to sign in with (optional)", "USERNAME")
-        .optopt("p", "password", "Password (optional)", "PASSWORD")
+    let mut opts = getopts::Options::new();
+    opts.optopt("u", "username", "Username to sign in with", "USERNAME")
+        .optopt("p", "password", "Password", "PASSWORD")
         .optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .reqopt("n", "name", "Device name", "NAME")
         .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE");
+
+    if APPKEY.is_none() {
+        opts.reqopt("a", "appkey", "Path to a spotify appkey", "APPKEY");
+    } else {
+        opts.optopt("a", "appkey", "Path to a spotify appkey", "APPKEY");
+    };
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -45,15 +54,15 @@ fn main() {
         }
     };
 
-    let appkey = {
-        let mut file = File::open(Path::new(&*matches.opt_str("a").unwrap()))
-                           .expect("Could not open app key.");
+    let appkey = matches.opt_str("a").map(|appkey_path| {
+        let mut file = File::open(appkey_path)
+                            .expect("Could not open app key.");
 
         let mut data = Vec::new();
         file.read_to_end(&mut data).unwrap();
 
         data
-    };
+    }).or_else(|| APPKEY.map(ToOwned::to_owned)).unwrap();
 
     let username = matches.opt_str("u");
     let cache_location = matches.opt_str("c").map(PathBuf::from);
@@ -100,6 +109,8 @@ fn main() {
                         .and_then(|p| File::open(p).ok())
                         .map(Credentials::from_reader)
     }).unwrap_or_else(|| {
+        println!("No username provided and no stored credentials, starting discovery ...");
+
         let mut discovery = DiscoveryManager::new(session.clone());
         discovery.run()
     });
