@@ -55,6 +55,22 @@ base_key = PBKDF2(SHA1(deviceID), username, 0x100, 1)
 key = SHA1(base_key) || htonl(len(base_key))
 login_data = AES192-DECRYPT(key, data)
 ```
+
 ## Facebook based Authentication
-TODO
+The client starts an HTTPS server, and makes the user visit
+`https://login.spotify.com/login-facebook-sso/?csrf=CSRF&port=PORT`
+in their browser, where CSRF is a random token, and PORT is the HTTPS server's port.
+
+This will redirect to Facebook, where the user must login and authorize Spotify, and
+finally make a GET request to
+`https://login.spotilocal.com:PORT/login/facebook_login_sso.json?csrf=CSRF&access_token=TOKEN`,
+where CSRF is the same string sent earlier, and TOKEN is the facebook authentication token.
+
+Since `login.spotilocal.com` resolves the 127.0.0.1, the request is received by the client.
+
+The client must then contact Facebook's API at
+`https://graph.facebook.com/me?fields=id&access_token=TOKEN`
+in order to retrieve the user's Facebook ID.
+
+The Facebook ID is the `username`, the TOKEN the `auth_data`, and `auth_type` is set to `AUTHENTICATION_FACEBOOK_TOKEN`.
 
