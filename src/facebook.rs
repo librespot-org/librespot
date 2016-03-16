@@ -1,5 +1,6 @@
 use hyper;
 use hyper::net::Openssl;
+use hyper::net::NetworkListener;
 use hyper::server::Request;
 use hyper::server::Response;
 use hyper::uri::RequestUri;
@@ -93,12 +94,15 @@ pub fn facebook_login() -> Result<Credentials, ()> {
     };
 
     let ssl = spotilocal_ssl_context().unwrap();
-    let mut server = hyper::Server::https("127.0.0.1:8001", ssl).unwrap().handle(handler).unwrap();
+
+    let mut listener = hyper::net::HttpsListener::new("127.0.0.1:0", ssl).unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    let mut server = hyper::Server::new(listener).handle(handler).unwrap();
 
     println!("Logging in using Facebook, please visit https://login.spotify.com/login-facebook-sso/?csrf={}&port={} in your browser.",
-             csrf, 8001);
+             csrf, port);
 
-    //a2c27234068bbe05d22c1b930b3bc2f5
     let token = rx.recv().unwrap();
     let user_id = facebook_get_me_id(&token).unwrap();
     let cred = Credentials {

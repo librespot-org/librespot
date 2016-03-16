@@ -64,7 +64,7 @@ in their browser, where CSRF is a random token, and PORT is the HTTPS server's p
 This will redirect to Facebook, where the user must login and authorize Spotify, and
 finally make a GET request to
 `https://login.spotilocal.com:PORT/login/facebook_login_sso.json?csrf=CSRF&access_token=TOKEN`,
-where CSRF is the same string sent earlier, and TOKEN is the facebook authentication token.
+where PORT and CSRF are the same as sent earlier, and TOKEN is the facebook authentication token.
 
 Since `login.spotilocal.com` resolves the 127.0.0.1, the request is received by the client.
 
