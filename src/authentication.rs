@@ -128,9 +128,8 @@ impl Credentials {
         json::decode::<StoredCredentials>(&contents).unwrap().into()
     }
 
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Credentials {
-        let file = File::open(path).unwrap();
-        Credentials::from_reader(file)
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Credentials> {
+        File::open(path).ok().map(Credentials::from_reader)
     }
 
     pub fn save_to_writer<W: Write>(&self, writer: &mut W) {

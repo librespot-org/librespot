@@ -129,3 +129,7 @@ impl<'s> Iterator for StrChunks<'s> {
         }
     }
 }
+
+pub trait ReadSeek : ::std::io::Read + ::std::io::Seek { }
+impl <T: ::std::io::Read + ::std::io::Seek> ReadSeek for T { }
+

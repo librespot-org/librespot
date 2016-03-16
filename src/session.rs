@@ -4,25 +4,27 @@ use crypto::hmac::Hmac;
 use crypto::mac::Mac;
 use eventual;
 use eventual::Future;
+use eventual::Async;
 use protobuf::{self, Message};
 use rand::thread_rng;
 use rand::Rng;
-use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::io::{Read, Write, Cursor};
 use std::result::Result;
 use std::sync::{Mutex, RwLock, Arc, mpsc};
 
+use album_cover::get_album_cover;
 use apresolve::apresolve;
 use audio_key::{AudioKeyManager, AudioKey, AudioKeyError};
-use audio_file::{AudioFileManager, AudioFile};
+use audio_file::AudioFile;
 use authentication::Credentials;
+use cache::Cache;
 use connection::{self, PlainConnection, CipherConnection, PacketHandler};
 use diffie_hellman::DHLocalKeys;
 use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use protocol;
 use stream::{ChannelId, StreamManager, StreamEvent, StreamError};
-use util::{self, SpotifyId, FileId, mkdir_existing};
+use util::{self, SpotifyId, FileId, ReadSeek};
 
 pub enum Bitrate {
     Bitrate96,
@@ -34,7 +36,6 @@ pub struct Config {
     pub application_key: Vec<u8>,
     pub user_agent: String,
     pub device_name: String,
-    pub cache_location: Option<PathBuf>,
     pub bitrate: Bitrate,
 }
 
@@ -48,11 +49,11 @@ pub struct SessionInternal {
     config: Config,
     data: RwLock<SessionData>,
 
+    cache: Box<Cache + Send + Sync>,
     mercury: Mutex<MercuryManager>,
     metadata: Mutex<MetadataManager>,
     stream: Mutex<StreamManager>,
     audio_key: Mutex<AudioKeyManager>,
-    audio_file: Mutex<AudioFileManager>,
     rx_connection: Mutex<Option<CipherConnection>>,
     tx_connection: Mutex<Option<CipherConnection>>,
 }
@@ -61,11 +62,7 @@ pub struct SessionInternal {
 pub struct Session(pub Arc<SessionInternal>);
 
 impl Session {
-    pub fn new(config: Config) -> Session {
-        if let Some(cache_location) = config.cache_location.as_ref() {
-            mkdir_existing(cache_location).unwrap();
-        }
-
+    pub fn new(config: Config, cache: Box<Cache + Send + Sync>) -> Session {
         let device_id = {
             let mut h = Sha1::new();
             h.input_str(&config.device_name);
@@ -83,11 +80,11 @@ impl Session {
             rx_connection: Mutex::new(None),
             tx_connection: Mutex::new(None),
 
+            cache: cache,
             mercury: Mutex::new(MercuryManager::new()),
             metadata: Mutex::new(MetadataManager::new()),
             stream: Mutex::new(StreamManager::new()),
             audio_key: Mutex::new(AudioKeyManager::new()),
-            audio_file: Mutex::new(AudioFileManager::new()),
         }))
     }
 
@@ -267,12 +264,52 @@ impl Session {
         self.0.tx_connection.lock().unwrap().as_mut().unwrap().send_packet(cmd, data)
     }
 
-    pub fn audio_key(&self, track: SpotifyId, file: FileId) -> Future<AudioKey, AudioKeyError> {
-        self.0.audio_key.lock().unwrap().request(self, track, file)
+    pub fn audio_key(&self, track: SpotifyId, file_id: FileId) -> Future<AudioKey, AudioKeyError> {
+        self.0.cache
+            .get_audio_key(track, file_id)
+            .map(Future::of)
+            .unwrap_or_else(|| {
+                let self_ = self.clone();
+                self.0.audio_key.lock().unwrap()
+                    .request(self, track, file_id)
+                    .map(move |key| {
+                        self_.0.cache.put_audio_key(track, file_id, key);
+                        key
+                    })
+            })
     }
 
-    pub fn audio_file(&self, file: FileId) -> AudioFile {
-        self.0.audio_file.lock().unwrap().request(self, file)
+    pub fn audio_file(&self, file_id: FileId) -> Box<ReadSeek> {
+        self.0.cache
+            .get_file(file_id)
+            .unwrap_or_else(|| {
+                let (audio_file, complete_rx) = AudioFile::new(self, file_id);
+
+                let self_ = self.clone();
+                complete_rx.map(move |mut complete_file| {
+                    self_.0.cache.put_file(file_id, &mut complete_file)
+                }).fire();
+
+                Box::new(audio_file)
+            })
+    }
+
+    pub fn album_cover(&self, file_id: FileId) -> eventual::Future<Vec<u8>, ()> {
+        self.0.cache
+            .get_file(file_id)
+            .map(|mut f| {
+                let mut data = Vec::new();
+                f.read_to_end(&mut data).unwrap();
+                Future::of(data)
+            })
+            .unwrap_or_else(|| {
+                  let self_ = self.clone();
+                  get_album_cover(self, file_id)
+                      .map(move |data| {
+                          self_.0.cache.put_file(file_id, &mut Cursor::new(&data));
+                          data
+                      })
+              })
     }
 
     pub fn stream(&self, file: FileId, offset: u32, size: u32) -> eventual::Stream<StreamEvent, StreamError> {
@@ -293,6 +330,10 @@ impl Session {
 
     pub fn mercury_sub(&self, uri: String) -> mpsc::Receiver<MercuryResponse> {
         self.0.mercury.lock().unwrap().subscribe(self, uri)
+    }
+
+    pub fn cache(&self) -> &Cache {
+        self.0.cache.as_ref()
     }
 
     pub fn config(&self) -> &Config {

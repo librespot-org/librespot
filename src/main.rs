@@ -16,6 +16,7 @@ use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
 use librespot::spirc::SpircManager;
 use librespot::util::version::version_string;
+use librespot::cache::{Cache, DefaultCache, NoCache};
 
 #[cfg(feature = "facebook")]
 use librespot::facebook::facebook_login;
@@ -76,8 +77,11 @@ fn main() {
     }).or_else(|| APPKEY.map(ToOwned::to_owned)).unwrap();
 
     let username = matches.opt_str("u");
-    let cache_location = matches.opt_str("c").map(PathBuf::from);
     let name = matches.opt_str("n").unwrap();
+
+    let cache = matches.opt_str("c").map(|cache_location| {
+        Box::new(DefaultCache::new(PathBuf::from(cache_location)).unwrap()) as Box<Cache + Send + Sync>
+    }).unwrap_or_else(|| Box::new(NoCache) as Box<Cache + Send + Sync>);
 
     let bitrate = match matches.opt_str("b").as_ref().map(String::as_ref) {
         None => Bitrate::Bitrate160, // default value
@@ -92,13 +96,10 @@ fn main() {
         application_key: appkey,
         user_agent: version_string(),
         device_name: name,
-        cache_location: cache_location.clone(),
         bitrate: bitrate,
     };
 
-    let session = Session::new(config);
-
-    let credentials_path = cache_location.map(|c| c.join("credentials.json"));
+    let session = Session::new(config, cache);
 
     let credentials = username.map(|username| {
         let password = matches.opt_str("p")
@@ -109,7 +110,6 @@ fn main() {
                                   read_password().unwrap()
                               });
 
-
         Credentials::with_password(username, password)
     }).or_else(|| {
         if cfg!(feature = "facebook") && matches.opt_present("facebook") {
@@ -117,11 +117,8 @@ fn main() {
         } else {
             None
         }
-    }).or_else(|| {
-        credentials_path.as_ref()
-                        .and_then(|p| File::open(p).ok())
-                        .map(Credentials::from_reader)
-    }).unwrap_or_else(|| {
+    }).or_else(|| session.cache().get_credentials())
+      .unwrap_or_else(|| {
         println!("No username provided and no stored credentials, starting discovery ...");
 
         let mut discovery = DiscoveryManager::new(session.clone());
@@ -131,9 +128,7 @@ fn main() {
     std::env::remove_var(PASSWORD_ENV_NAME);
 
     let reusable_credentials = session.login(credentials).unwrap();
-    if let Some(path) = credentials_path {
-        reusable_credentials.save_to_file(path);
-    }
+    session.cache().put_credentials(&reusable_credentials);
 
     let player = Player::new(session.clone(), || DefaultSink::open());
     let spirc = SpircManager::new(session.clone(), player);

@@ -2,7 +2,6 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
 use eventual;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
-use std::mem;
 
 use util::{SpotifyId, FileId};
 use session::Session;
@@ -12,19 +11,13 @@ pub type AudioKey = [u8; 16];
 #[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
 pub struct AudioKeyError;
 
-#[derive(Debug,Hash,PartialEq,Eq,Clone)]
+#[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
 struct AudioKeyId(SpotifyId, FileId);
-
-enum AudioKeyStatus {
-    Loading(Vec<eventual::Complete<AudioKey, AudioKeyError>>),
-    Loaded(AudioKey),
-    Failed(AudioKeyError),
-}
 
 pub struct AudioKeyManager {
     next_seq: u32,
     pending: HashMap<u32, AudioKeyId>,
-    cache: HashMap<AudioKeyId, AudioKeyStatus>,
+    cache: HashMap<AudioKeyId, Vec<eventual::Complete<AudioKey, AudioKeyError>>>,
 }
 
 impl AudioKeyManager {
@@ -60,23 +53,17 @@ impl AudioKeyManager {
         let id = AudioKeyId(track, file);
         self.cache
             .get_mut(&id)
-            .map(|status| {
-                match *status {
-                    AudioKeyStatus::Failed(error) => eventual::Future::error(error),
-                    AudioKeyStatus::Loaded(key) => eventual::Future::of(key),
-                    AudioKeyStatus::Loading(ref mut req) => {
-                        let (tx, rx) = eventual::Future::pair();
-                        req.push(tx);
-                        rx
-                    }
-                }
+            .map(|ref mut requests| {
+                let (tx, rx) = eventual::Future::pair();
+                requests.push(tx);
+                rx
             })
             .unwrap_or_else(|| {
                 let seq = self.send_key_request(session, track, file);
                 self.pending.insert(seq, id.clone());
 
                 let (tx, rx) = eventual::Future::pair();
-                self.cache.insert(id, AudioKeyStatus::Loading(vec![tx]));
+                self.cache.insert(id, vec![tx]);
                 rx
             })
     }
@@ -87,26 +74,18 @@ impl PacketHandler for AudioKeyManager {
         let mut data = Cursor::new(data);
         let seq = data.read_u32::<BigEndian>().unwrap();
 
-        if let Some(status) = self.pending.remove(&seq).and_then(|id| self.cache.get_mut(&id)) {
+        if let Some(callbacks) = self.pending.remove(&seq).and_then(|id| self.cache.remove(&id)) {
             if cmd == 0xd {
                 let mut key = [0u8; 16];
                 data.read_exact(&mut key).unwrap();
 
-                let status = mem::replace(status, AudioKeyStatus::Loaded(key));
-
-                if let AudioKeyStatus::Loading(cbs) = status {
-                    for cb in cbs {
-                        cb.complete(key);
-                    }
+                for cb in callbacks {
+                    cb.complete(key);
                 }
             } else if cmd == 0xe {
                 let error = AudioKeyError;
-                let status = mem::replace(status, AudioKeyStatus::Failed(error));
-
-                if let AudioKeyStatus::Loading(cbs) = status {
-                    for cb in cbs {
-                        cb.fail(error);
-                    }
+                for cb in callbacks {
+                    cb.fail(error);
                 }
             }
         }
