@@ -44,6 +44,8 @@ protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
 shannon         = { git = "https://github.com/plietar/rust-shannon" }
 tremor          = { git = "https://github.com/plietar/rust-tremor", optional = true }
 
+clippy          = { version = "*", optional = true }
+
 openssl         = { version = "0.7", optional = true }
 
 [build-dependencies]
