@@ -17,6 +17,13 @@ use librespot::session::{Bitrate, Config, Session};
 use librespot::spirc::SpircManager;
 use librespot::util::version::version_string;
 
+#[cfg(feature = "facebook")]
+use librespot::facebook::facebook_login;
+#[cfg(not(feature = "facebook"))]
+fn facebook_login() -> Result<Credentials, ()> {
+    Err(())
+}
+
 static PASSWORD_ENV_NAME: &'static str = "SPOTIFY_PASSWORD";
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
@@ -46,6 +53,10 @@ fn main() {
         opts.optopt("a", "appkey", "Path to a spotify appkey", "APPKEY");
     };
 
+    if cfg!(feature = "facebook") {
+        opts.optflag("", "facebook", "Login with a Facebook account");
+    }
+
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
@@ -68,19 +79,6 @@ fn main() {
     let cache_location = matches.opt_str("c").map(PathBuf::from);
     let name = matches.opt_str("n").unwrap();
 
-    let credentials = username.map(|u| {
-        let password = matches.opt_str("p")
-                              .or_else(|| std::env::var(PASSWORD_ENV_NAME).ok())
-                              .unwrap_or_else(|| {
-                                  print!("Password: ");
-                                  stdout().flush().unwrap();
-                                  read_password().unwrap()
-                              });
-
-        (u, password)
-    });
-    std::env::remove_var(PASSWORD_ENV_NAME);
-
     let bitrate = match matches.opt_str("b").as_ref().map(String::as_ref) {
         None => Bitrate::Bitrate160, // default value
 
@@ -102,8 +100,23 @@ fn main() {
 
     let credentials_path = cache_location.map(|c| c.join("credentials.json"));
 
-    let credentials = credentials.map(|(username, password)| {
+    let credentials = username.map(|username| {
+        let password = matches.opt_str("p")
+                              .or_else(|| std::env::var(PASSWORD_ENV_NAME).ok())
+                              .unwrap_or_else(|| {
+                                  print!("Password: ");
+                                  stdout().flush().unwrap();
+                                  read_password().unwrap()
+                              });
+
+
         Credentials::with_password(username, password)
+    }).or_else(|| {
+        if cfg!(feature = "facebook") && matches.opt_present("facebook") {
+            Some(facebook_login().unwrap())
+        } else {
+            None
+        }
     }).or_else(|| {
         credentials_path.as_ref()
                         .and_then(|p| File::open(p).ok())
@@ -114,6 +127,8 @@ fn main() {
         let mut discovery = DiscoveryManager::new(session.clone());
         discovery.run()
     });
+
+    std::env::remove_var(PASSWORD_ENV_NAME);
 
     let reusable_credentials = session.login(credentials).unwrap();
     if let Some(path) = credentials_path {

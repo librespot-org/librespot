@@ -44,6 +44,8 @@ protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
 shannon         = { git = "https://github.com/plietar/rust-shannon" }
 tremor          = { git = "https://github.com/plietar/rust-tremor", optional = true }
 
+openssl         = { version = "0.7", optional = true }
+
 [build-dependencies]
 vergen          = "~0.1.0"
 syntex          = { version = "*", optional = true }
@@ -51,8 +53,9 @@ protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
 json_macros     = { git = "https://github.com/plietar/json_macros" }
 
 [features]
-discovery = ["dns-sd"]
-with-syntex = ["syntex", "protobuf_macros/with-syntex", "json_macros/with-syntex"]
-with-tremor = ["tremor"]
+discovery     = ["dns-sd"]
+with-syntex   = ["syntex", "protobuf_macros/with-syntex", "json_macros/with-syntex"]
+with-tremor   = ["tremor"]
+facebook      = ["hyper/ssl", "openssl"]
 static-appkey = []
-default = ["with-syntex"]
+default       = ["with-syntex"]

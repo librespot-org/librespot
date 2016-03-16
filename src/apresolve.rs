@@ -11,13 +11,12 @@ pub struct APResolveData {
 
 pub fn apresolve() -> Result<Vec<String>, ()> {
     let client = hyper::client::Client::new();
-    let mut res = String::new();
     
-    client.get(APRESOLVE_ENDPOINT)
-          .send().unwrap()
-          .read_to_string(&mut res).unwrap();
+    let mut response = client.get(APRESOLVE_ENDPOINT).send().unwrap();
+    let mut data = String::new();
+    response.read_to_string(&mut data).unwrap();
 
-    let data : APResolveData = json::decode(&res).unwrap();
+    let data : APResolveData = json::decode(&data).unwrap();
 
     Ok(data.ap_list)
 }

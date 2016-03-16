@@ -4,6 +4,9 @@
 #![cfg_attr(not(feature = "with-syntex"), plugin(protobuf_macros))]
 #![cfg_attr(not(feature = "with-syntex"), plugin(json_macros))]
 
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+
 #[macro_use]
 extern crate lazy_static;
 
@@ -30,6 +33,9 @@ extern crate tremor as vorbis;
 
 #[cfg(feature = "dns-sd")]
 extern crate dns_sd;
+
+#[cfg(feature = "openssl")]
+extern crate openssl;
 
 extern crate librespot_protocol as protocol;
 

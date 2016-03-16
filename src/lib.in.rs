@@ -18,4 +18,7 @@ pub mod stream;
 pub mod apresolve;
 mod zeroconf;
 
+#[cfg(feature = "facebook")]
+pub mod facebook;
+
 pub use album_cover::get_album_cover;

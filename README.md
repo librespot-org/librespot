@@ -47,6 +47,16 @@ cargo build --release --features discovery
 
 When running *librespot* simply omit the `--username` argument.
 
+## Facebook Accounts
+*librespot* can be built with Facebook authentication support. OpenSSL is required for this.
+
+```shell
+cargo build --release --features facebook
+target/release/librespot --appkey APPKEY --cache CACHEDIR --name DEVICENAME --facebook
+```
+
+This will print a link to the console, which must be visited on the same computer *librespot* is running on.
+
 ## Development
 When developing *librespot*, it is preferable to use Rust nightly, and build it using the following :
 ```shell
@@ -54,12 +64,6 @@ cargo build --no-default-features
 ```
 
 This produces better compilation error messages than with the default configuration.
-
-## Facebook Accounts
-If you connect using a facebook account, librespot will not show up among the
-devices in the Spotify app. What you need to do is apply for a
-[device password](http://www.spotify.com/account/set-device-password/) and
-use that to sign in instead.
 
 ## Disclaimer
 Using this code to connect to Spotify's API is probably forbidden by them, and

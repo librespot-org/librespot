@@ -36,13 +36,7 @@ macro_rules! eprint(
 );
 
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
-    let mut vec = Vec::with_capacity(size);
-
-    for _ in 0..size {
-        vec.push(R::rand(rng));
-    }
-
-    vec
+    rng.gen_iter().take(size).collect()
 }
 
 
