@@ -8,7 +8,6 @@ pub mod authentication;
 pub mod cache;
 mod connection;
 mod diffie_hellman;
-pub mod discovery;
 pub mod mercury;
 pub mod metadata;
 pub mod player;
@@ -17,9 +16,5 @@ pub mod spirc;
 pub mod link;
 pub mod stream;
 pub mod apresolve;
-mod zeroconf;
-
-#[cfg(feature = "facebook")]
-pub mod facebook;
 
 pub use album_cover::get_album_cover;

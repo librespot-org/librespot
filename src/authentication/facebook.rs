@@ -72,7 +72,7 @@ impl hyper::server::Handler for ServerHandler {
     }
 }
 
-pub fn facebook_get_me_id(token: &str) -> Result<String, ()> {
+fn facebook_get_me_id(token: &str) -> Result<String, ()> {
     let url = format!("https://graph.facebook.com/me?fields=id&access_token={}", token);
 
     let client = hyper::Client::new();

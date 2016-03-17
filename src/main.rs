@@ -10,20 +10,12 @@ use std::path::PathBuf;
 use std::thread;
 
 use librespot::audio_sink::DefaultSink;
-use librespot::authentication::Credentials;
-use librespot::discovery::DiscoveryManager;
+use librespot::authentication::{Credentials, facebook_login, discovery_login};
+use librespot::cache::{Cache, DefaultCache, NoCache};
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
 use librespot::spirc::SpircManager;
 use librespot::util::version::version_string;
-use librespot::cache::{Cache, DefaultCache, NoCache};
-
-#[cfg(feature = "facebook")]
-use librespot::facebook::facebook_login;
-#[cfg(not(feature = "facebook"))]
-fn facebook_login() -> Result<Credentials, ()> {
-    Err(())
-}
 
 static PASSWORD_ENV_NAME: &'static str = "SPOTIFY_PASSWORD";
 
@@ -117,13 +109,15 @@ fn main() {
         } else {
             None
         }
-    }).or_else(|| session.cache().get_credentials())
-      .unwrap_or_else(|| {
-        println!("No username provided and no stored credentials, starting discovery ...");
-
-        let mut discovery = DiscoveryManager::new(session.clone());
-        discovery.run()
-    });
+    }).or_else(|| {
+        if cfg!(feature = "discovery") {
+            println!("No username provided and no stored credentials, starting discovery ...");
+            Some(discovery_login(&session.config().device_name,
+                                 session.device_id()).unwrap())
+        } else {
+            None
+        }
+    }).expect("No username provided and no stored credentials.");
 
     std::env::remove_var(PASSWORD_ENV_NAME);
 

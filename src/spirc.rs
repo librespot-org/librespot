@@ -46,7 +46,7 @@ struct SpircInternal {
 
 impl SpircManager {
     pub fn new(session: Session, player: Player) -> SpircManager {
-        let ident = session.device_id();
+        let ident = session.device_id().to_owned();
         let name = session.config().device_name.clone();
 
         SpircManager(Arc::new(Mutex::new(SpircInternal {

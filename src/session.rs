@@ -42,11 +42,11 @@ pub struct Config {
 pub struct SessionData {
     country: String,
     canonical_username: String,
-    device_id: String,
 }
 
 pub struct SessionInternal {
     config: Config,
+    device_id: String,
     data: RwLock<SessionData>,
 
     cache: Box<Cache + Send + Sync>,
@@ -71,10 +71,10 @@ impl Session {
 
         Session(Arc::new(SessionInternal {
             config: config,
+            device_id: device_id,
             data: RwLock::new(SessionData {
                 country: String::new(),
                 canonical_username: String::new(),
-                device_id: device_id,
             }),
 
             rx_connection: Mutex::new(None),
@@ -190,7 +190,7 @@ impl Session {
                 cpu_family: protocol::authentication::CpuFamily::CPU_UNKNOWN,
                 os: protocol::authentication::Os::OS_UNKNOWN,
                 system_information_string: "librespot".to_owned(),
-                device_id: self.device_id(),
+                device_id: self.device_id().to_owned(),
             },
             version_string: util::version::version_string(),
             appkey => {
@@ -348,7 +348,7 @@ impl Session {
         self.0.data.read().unwrap().country.clone()
     }
 
-    pub fn device_id(&self) -> String {
-        self.0.data.read().unwrap().device_id.clone()
+    pub fn device_id(&self) -> &str {
+        &self.0.device_id
     }
 }

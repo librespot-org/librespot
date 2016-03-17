@@ -32,7 +32,6 @@ rust-crypto     = "~0.2.34"
 rustc-serialize = "~0.3.16"
 tempfile        = "~2.0.0"
 time            = "~0.1.34"
-tiny_http       = "~0.5.1"
 url             = "~0.5.2"
 vorbis          = "~0.0.14"
 

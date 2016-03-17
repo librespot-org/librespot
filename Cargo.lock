@@ -26,7 +26,6 @@ dependencies = [
  "syntex 0.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
- "tiny_http 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tremor 0.1.0 (git+https://github.com/plietar/rust-tremor)",
  "url 0.5.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "vergen 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -40,11 +39,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "memchr 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "ascii"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "aster"
@@ -93,20 +87,6 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "chrono"
-version = "0.2.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "num 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
- "time 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "chunked_transfer"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "clippy"
 version = "0.0.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -136,63 +116,6 @@ dependencies = [
  "libc 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "encoding"
-version = "0.2.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "encoding-index-japanese 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "encoding-index-korean 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "encoding-index-simpchinese 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "encoding-index-singlebyte 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "encoding-index-tradchinese 1.20141219.5 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "encoding-index-japanese"
-version = "1.20141219.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "encoding-index-korean"
-version = "1.20141219.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "encoding-index-simpchinese"
-version = "1.20141219.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "encoding-index-singlebyte"
-version = "1.20141219.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "encoding-index-tradchinese"
-version = "1.20141219.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "encoding_index_tests 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "encoding_index_tests"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "eventual"
@@ -692,19 +615,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tiny_http"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "ascii 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "chrono 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
- "chunked_transfer 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "encoding 0.2.32 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-serialize 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "url 0.2.38 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "toml"
 version = "0.1.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -766,16 +676,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "unicode-xid"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "url"
-version = "0.2.38"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "matches 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-serialize 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "uuid 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "url"

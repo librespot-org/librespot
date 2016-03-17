@@ -23,7 +23,6 @@ extern crate shannon;
 extern crate rand;
 extern crate rustc_serialize;
 extern crate time;
-extern crate tiny_http;
 extern crate tempfile;
 extern crate url;
 
