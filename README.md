@@ -18,6 +18,11 @@ On debian / ubuntu, the following command will install these dependencies :
 sudo apt-get install build-essential portaudio19-dev libprotoc-dev
 ```
 
+On Fedora systems, the following command will install these dependencies :
+```shell
+sudo dnf install portaudio-devel libprotoc-dev make gcc gcc-c++
+```
+
 On OS X, using homebrew :
 ```shell
 brew install portaudio protobuf
@@ -38,7 +43,8 @@ target/release/librespot --appkey APPKEY --username USERNAME --cache CACHEDIR --
 ## Discovery mode
 *librespot* can be run in discovery mode, in which case no password is required at startup.
 dns-sd or avahi's compatibility layer is required for this. On debian/ubuntu this is the
-`libavahi-compat-libdnssd-dev` package. It come preinstalled on OS X.
+`libavahi-compat-libdnssd-dev` package. On Fedora, this is the
+`avahi-compat-libdns_sd-devel` package. It come preinstalled on OS X.
 
 It must be enabled at build time :
 ```shell
