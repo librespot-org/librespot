@@ -172,10 +172,11 @@ pub fn discovery_login(device_name: &str, device_id: &str) -> Result<Credentials
     Err(())
 }
 
-#[cfg(feature = "facebook")]
-mod facebook;
-#[cfg(feature = "facebook")]
-pub use self::facebook::facebook_login;
+//FIXME
+//#[cfg(feature = "facebook")]
+//mod facebook;
+//#[cfg(feature = "facebook")]
+//pub use self::facebook::facebook_login;
 #[cfg(not(feature = "facebook"))]
 pub fn facebook_login() -> Result<Credentials, ()> {
     Err(())
