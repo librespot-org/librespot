@@ -15,7 +15,7 @@ use librespot::cache::{Cache, DefaultCache, NoCache};
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
 use librespot::spirc::SpircManager;
-use librespot::util::version::version_string;
+use librespot::version;
 
 static PASSWORD_ENV_NAME: &'static str = "SPOTIFY_PASSWORD";
 
@@ -30,6 +30,11 @@ static APPKEY: Option<&'static [u8]> = Some(include_bytes!(concat!(env!("CARGO_M
 static APPKEY: Option<&'static [u8]> = None;
 
 fn main() {
+    println!("librespot {} ({}). Built on {}.",
+             version::short_sha(),
+             version::commit_date(),
+             version::short_now());
+
     let args: Vec<String> = std::env::args().collect();
     let program = args[0].clone();
 
@@ -86,7 +91,7 @@ fn main() {
 
     let config = Config {
         application_key: appkey,
-        user_agent: version_string(),
+        user_agent: version::version_string(),
         device_name: name,
         bitrate: bitrate,
     };

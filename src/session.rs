@@ -25,6 +25,7 @@ use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use protocol;
 use stream::{ChannelId, StreamManager, StreamEvent, StreamError};
 use util::{self, SpotifyId, FileId, ReadSeek};
+use version;
 
 pub enum Bitrate {
     Bitrate96,
@@ -192,7 +193,7 @@ impl Session {
                 system_information_string: "librespot".to_owned(),
                 device_id: self.device_id().to_owned(),
             },
-            version_string: util::version::version_string(),
+            version_string: version::version_string(),
             appkey => {
                 version: self.config().application_key[0] as u32,
                 devkey: self.config().application_key[0x1..0x81].to_vec(),

@@ -21,7 +21,7 @@ fn codegen() {
 fn codegen() { }
 
 fn main() {
-    vergen::vergen(vergen::SHORT_SHA).unwrap();
+    vergen::vergen(vergen::OutputFns::all()).unwrap();
     codegen();
 }
 

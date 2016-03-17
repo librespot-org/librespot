@@ -39,20 +39,6 @@ pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
 }
 
-
-pub mod version {
-    // FIXME: Unfortunately, this doesn't work when using syntex
-    // And for some reason, cfg-gating it doesn't work
-    //include!(concat!(env!("OUT_DIR"), "/version.rs"));
-    pub fn short_sha() -> String {
-        "unknown".to_owned()
-    }
-
-    pub fn version_string() -> String {
-        format!("librespot-{}", short_sha())
-    }
-}
-
 pub fn hexdump(data: &[u8]) {
     for b in data.iter() {
         eprint!("{:02X} ", b);

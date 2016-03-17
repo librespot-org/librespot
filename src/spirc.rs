@@ -1,16 +1,15 @@
 use eventual::Async;
 use protobuf::{self, Message, RepeatedField};
-
-use util;
-use session::Session;
-use util::SpotifyId;
-use util::version::version_string;
-use mercury::{MercuryRequest, MercuryMethod};
-use player::{Player, PlayerState};
-
 use std::borrow::Cow;
 use std::sync::{Mutex, Arc};
 use std::collections::HashMap;
+
+use mercury::{MercuryRequest, MercuryMethod};
+use player::{Player, PlayerState};
+use session::Session;
+use util;
+use util::SpotifyId;
+use version;
 
 use protocol;
 pub use protocol::spirc::{PlayStatus, MessageType};
@@ -323,7 +322,7 @@ impl SpircInternal {
 
     fn device_state(&self, player_state: &PlayerState) -> protocol::spirc::DeviceState {
         protobuf_init!(protocol::spirc::DeviceState::new(), {
-            sw_version: version_string(),
+            sw_version: version::version_string(),
             is_active: self.is_active,
             can_play: self.can_play,
             volume: player_state.volume() as u32,

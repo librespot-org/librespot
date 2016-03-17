@@ -39,6 +39,15 @@ extern crate openssl;
 
 extern crate librespot_protocol as protocol;
 
+// This doesn't play nice with syntex, so place it here
+pub mod version {
+    include!(concat!(env!("OUT_DIR"), "/version.rs"));
+
+    pub fn version_string() -> String {
+        format!("librespot-{}", short_sha())
+    }
+}
+
 #[cfg(feature = "with-syntex")]
 include!(concat!(env!("OUT_DIR"), "/lib.rs"));
 
