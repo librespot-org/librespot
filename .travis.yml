@@ -18,3 +18,7 @@ script:
     - if [[ $(rustc --version) == *"nightly"* ]]; then
         cargo build --no-default-features;
       fi
+
+matrix:
+  allow_failures:
+    - rust: nightly
