@@ -11,6 +11,7 @@ dependencies = [
  "hyper 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "json_macros 0.3.0 (git+https://github.com/plietar/json_macros)",
  "lazy_static 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libpulse-sys 0.0.0 (git+https://github.com/astro/libpulse-sys)",
  "librespot-protocol 0.1.0",
  "lmdb-rs 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.31 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -231,6 +232,14 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "libpulse-sys"
+version = "0.0.0"
+source = "git+https://github.com/astro/libpulse-sys#3e167c0d75dae1ce3946eec7526f6afd92adda0f"
+dependencies = [
+ "libc 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
