@@ -11,9 +11,10 @@ addons:
       - portaudio19-dev
 
 script:
-    - cargo build
-    - cargo build --features with-tremor
-    - cargo build --features facebook
+    - cargo build --no-default-features --features "with-syntex"
+    - cargo build --no-default-features --features "with-syntex with-tremor"
+    - cargo build --no-default-features --features "with-syntex facebook"
+    - cargo build --no-default-features --features "with-syntex portaudio-backend"
     # Building without syntex only works on nightly
     - if [[ $(rustc --version) == *"nightly"* ]]; then
         cargo build --no-default-features;

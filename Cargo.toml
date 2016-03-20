@@ -33,16 +33,17 @@ rustc-serialize = "~0.3.16"
 tempfile        = "~2.0.0"
 time            = "~0.1.34"
 url             = "~0.5.2"
+shannon         = { git = "https://github.com/plietar/rust-shannon" }
+
 vorbis          = "~0.0.14"
+tremor          = { git = "https://github.com/plietar/rust-tremor", optional = true }
 
 dns-sd          = { version  = "~0.1.1", optional = true }
 
-portaudio       = { git = "https://github.com/mvdnes/portaudio-rs" }
+portaudio       = { git = "https://github.com/mvdnes/portaudio-rs", optional = true }
 
 json_macros     = { git = "https://github.com/plietar/json_macros" }
 protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
-shannon         = { git = "https://github.com/plietar/rust-shannon" }
-tremor          = { git = "https://github.com/plietar/rust-tremor", optional = true }
 
 clippy          = { version = "*", optional = true }
 
@@ -55,9 +56,10 @@ protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
 json_macros     = { git = "https://github.com/plietar/json_macros" }
 
 [features]
-discovery     = ["dns-sd"]
-with-syntex   = ["syntex", "protobuf_macros/with-syntex", "json_macros/with-syntex"]
-with-tremor   = ["tremor"]
-facebook      = ["hyper/ssl", "openssl"]
-static-appkey = []
-default       = ["with-syntex"]
+discovery         = ["dns-sd"]
+with-syntex       = ["syntex", "protobuf_macros/with-syntex", "json_macros/with-syntex"]
+with-tremor       = ["tremor"]
+facebook          = ["hyper/ssl", "openssl"]
+portaudio-backend = ["portaudio"]
+static-appkey     = []
+default           = ["with-syntex"]

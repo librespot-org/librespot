@@ -9,7 +9,7 @@ use std::io::{stdout, Read, Write};
 use std::path::PathBuf;
 use std::thread;
 
-use librespot::audio_sink::DefaultSink;
+use librespot::audio_backend::BACKENDS;
 use librespot::authentication::{Credentials, facebook_login, discovery_login};
 use librespot::cache::{Cache, DefaultCache, NoCache};
 use librespot::player::Player;
@@ -43,7 +43,8 @@ fn main() {
         .optopt("p", "password", "Password", "PASSWORD")
         .optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .reqopt("n", "name", "Device name", "NAME")
-        .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE");
+        .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE")
+        .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND");
 
     if APPKEY.is_none() {
         opts.reqopt("a", "appkey", "Path to a spotify appkey", "APPKEY");
@@ -60,6 +61,27 @@ fn main() {
         Err(f) => {
             print!("Error: {}\n{}", f.to_string(), usage(&*program, &opts));
             return;
+        }
+    };
+
+    let make_backend = match matches.opt_str("backend").as_ref().map(AsRef::as_ref) {
+        Some("?") => {
+            println!("Available Backends : ");
+            for (&(name, _), idx) in BACKENDS.iter().zip(0..) {
+                if idx == 0 {
+                    println!("- {} (default)", name);
+                } else {
+                    println!("- {}", name);
+                }
+            }
+
+            return;
+        },
+        Some(name) => {
+            BACKENDS.iter().find(|backend| name == backend.0).expect("Unknown backend").1
+        },
+        None => {
+            BACKENDS.first().expect("No backends were enabled at build time").1
         }
     };
 
@@ -96,6 +118,8 @@ fn main() {
         bitrate: bitrate,
     };
 
+    let stored_credentials = cache.get_credentials();
+
     let session = Session::new(config, cache);
 
     let credentials = username.map(|username| {
@@ -114,7 +138,8 @@ fn main() {
         } else {
             None
         }
-    }).or_else(|| {
+    }).or(stored_credentials)
+      .or_else(|| {
         if cfg!(feature = "discovery") {
             println!("No username provided and no stored credentials, starting discovery ...");
             Some(discovery_login(&session.config().device_name,
@@ -129,7 +154,8 @@ fn main() {
     let reusable_credentials = session.login(credentials).unwrap();
     session.cache().put_credentials(&reusable_credentials);
 
-    let player = Player::new(session.clone(), || DefaultSink::open());
+    let player = Player::new(session.clone(), move || make_backend());
+
     let spirc = SpircManager::new(session.clone(), player);
     thread::spawn(move || spirc.run());
 

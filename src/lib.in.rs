@@ -4,7 +4,7 @@ pub mod apresolve;
 mod audio_decrypt;
 mod audio_file;
 mod audio_key;
-pub mod audio_sink;
+pub mod audio_backend;
 pub mod authentication;
 pub mod cache;
 mod connection;

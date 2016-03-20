@@ -6,7 +6,7 @@ use std::io::{Read, Seek};
 use vorbis;
 
 use audio_decrypt::AudioDecrypt;
-use audio_sink::Sink;
+use audio_backend::Sink;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
 use util::{self, SpotifyId, Subfile};
@@ -71,8 +71,8 @@ enum PlayerCommand {
 }
 
 impl Player {
-    pub fn new<S, F>(session: Session, sink_builder: F) -> Player
-        where S: Sink, F: FnOnce() -> S + Send + 'static {
+    pub fn new<F>(session: Session, sink_builder: F) -> Player
+        where F: FnOnce() -> Box<Sink> + Send + 'static {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
         let state = Arc::new(Mutex::new(PlayerState {
@@ -155,7 +155,7 @@ fn apply_volume(volume: u16, data: &[i16]) -> Cow<[i16]> {
 }
 
 impl PlayerInternal {
-    fn run<S: Sink>(self, sink: S) {
+    fn run(self, sink: Box<Sink>) {
         let mut decoder = None;
 
         loop {

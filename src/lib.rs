@@ -17,7 +17,6 @@ extern crate eventual;
 extern crate hyper;
 extern crate lmdb_rs;
 extern crate num;
-extern crate portaudio;
 extern crate protobuf;
 extern crate shannon;
 extern crate rand;
@@ -36,6 +35,9 @@ extern crate dns_sd;
 
 #[cfg(feature = "openssl")]
 extern crate openssl;
+
+#[cfg(feature = "portaudio")]
+extern crate portaudio;
 
 extern crate librespot_protocol as protocol;
 

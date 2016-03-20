@@ -63,10 +63,24 @@ target/release/librespot --appkey APPKEY --cache CACHEDIR --name DEVICENAME --fa
 
 This will print a link to the console, which must be visited on the same computer *librespot* is running on.
 
+## Audio Backends
+*librespot* supports various audio backends. Multiple backends can be enabled at compile time by enabling the
+corresponding cargo feature. By default, only PortAudio is enabled.
+
+A specific backend can selected at runtime using the `--backend` switch.
+
+```shell
+cargo build --features portaudio-backend
+target/release/librespot [...] --backend portaudio
+```
+
+The following backends are currently available :
+- PortAudio
+
 ## Development
 When developing *librespot*, it is preferable to use Rust nightly, and build it using the following :
 ```shell
-cargo build --no-default-features
+cargo build --no-default-features --features portaudio-backend
 ```
 
 This produces better compilation error messages than with the default configuration.
