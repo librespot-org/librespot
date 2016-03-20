@@ -1,38 +1,19 @@
 use hyper;
-use hyper::net::Openssl;
 use hyper::net::NetworkListener;
 use hyper::server::Request;
 use hyper::server::Response;
 use hyper::uri::RequestUri;
 use hyper::header::AccessControlAllowOrigin;
-use openssl::ssl::{SslContext, SslMethod, SSL_VERIFY_NONE};
-use openssl::ssl::error::SslError;
-use openssl::crypto::pkey::PKey;
-use openssl::x509::X509;
 use rand::{self, Rng};
 use rustc_serialize::json;
 use std::collections::BTreeMap;
-use std::io::{Cursor, Read};
-use std::sync::{mpsc, Arc, Mutex};
+use std::io::Read;
+use std::sync::{mpsc, Mutex};
 use url;
 
 use protocol::authentication::AuthenticationType;
 use authentication::Credentials;
-
-static SPOTILOCAL_CERT : &'static [u8] = include_bytes!("data/spotilocal.cert");
-static SPOTILOCAL_KEY : &'static [u8] = include_bytes!("data/spotilocal.key");
-
-fn spotilocal_ssl_context() -> Result<Openssl, SslError> {
-    let cert = try!(X509::from_pem(&mut Cursor::new(SPOTILOCAL_CERT)));
-    let key = try!(PKey::private_key_from_pem(&mut Cursor::new(SPOTILOCAL_KEY)));
-
-    let mut ctx = try!(SslContext::new(SslMethod::Sslv23));
-    try!(ctx.set_cipher_list("DEFAULT"));
-    try!(ctx.set_private_key(&key));
-    try!(ctx.set_certificate(&cert));
-    ctx.set_verify(SSL_VERIFY_NONE, None);
-    Ok(Openssl { context: Arc::new(ctx) })
-}
+use ::spotilocal::ssl_context;
 
 struct ServerHandler {
     token_tx: Mutex<mpsc::Sender<String>>,
@@ -93,7 +74,7 @@ pub fn facebook_login() -> Result<Credentials, ()> {
         csrf: csrf.clone()
     };
 
-    let ssl = spotilocal_ssl_context().unwrap();
+    let ssl = ssl_context().unwrap();
 
     let mut listener = hyper::net::HttpsListener::new("127.0.0.1:0", ssl).unwrap();
     let port = listener.local_addr().unwrap().port();

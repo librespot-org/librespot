@@ -13,7 +13,7 @@ addons:
 script:
     - cargo build
     - cargo build --features with-tremor
-    #- cargo build --features facebook
+    - cargo build --features facebook
     # Building without syntex only works on nightly
     - if [[ $(rustc --version) == *"nightly"* ]]; then
         cargo build --no-default-features;
