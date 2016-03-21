@@ -75,7 +75,8 @@ target/release/librespot [...] --backend portaudio
 ```
 
 The following backends are currently available :
-- PortAudio
+- PortAudio 
+- PulseAudio (feature pulseaudio-backend, --backend pulseaudio)
 
 ## Development
 When developing *librespot*, it is preferable to use Rust nightly, and build it using the following :

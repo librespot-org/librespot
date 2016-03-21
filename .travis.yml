@@ -10,12 +10,14 @@ addons:
     packages:
       - libprotoc-dev
       - portaudio19-dev
-
+      - libpulse-dev 
+      
 script:
     - cargo build --no-default-features --features "with-syntex"
     - cargo build --no-default-features --features "with-syntex with-tremor"
     - cargo build --no-default-features --features "with-syntex facebook"
     - cargo build --no-default-features --features "with-syntex portaudio-backend"
+    - cargo build --no-default-features --features "with-syntex pulseaudio-backend"
     # Building without syntex only works on nightly
     - if [[ $TRAVIS_RUST_VERSION == *"nightly"* ]]; then
         cargo build --no-default-features;
