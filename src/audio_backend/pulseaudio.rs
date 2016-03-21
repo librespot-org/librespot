@@ -50,7 +50,7 @@ impl Sink for PulseAudioSink {
     fn write(&self, data: &[i16]) -> io::Result<()> {
         unsafe {
             let ptr = transmute(data.as_ptr());
-            let bytes = data.len() as u64 * 2;
+            let bytes = data.len() as usize * 2;
             pa_simple_write(self.0, ptr, bytes, null_mut());
         };
         
