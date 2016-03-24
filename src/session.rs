@@ -95,7 +95,7 @@ impl Session {
         let aps = apresolve().unwrap();
         let ap = thread_rng().choose(&aps).expect("No APs found");
 
-        println!("Connecting to AP {}", ap);
+        info!("Connecting to AP {}", ap);
         let mut connection = PlainConnection::connect(ap).unwrap();
 
         let request = protobuf_init!(protocol::keyexchange::ClientHello::new(), {
@@ -217,7 +217,7 @@ impl Session {
                 *self.0.rx_connection.lock().unwrap() = Some(connection.clone());
                 *self.0.tx_connection.lock().unwrap() = Some(connection);
 
-                eprintln!("Authenticated !");
+                info!("Authenticated !");
 
                 let reusable_credentials = Credentials {
                     username: username,
@@ -231,11 +231,11 @@ impl Session {
             0xad => {
                 let msg: protocol::keyexchange::APLoginFailed =
                     protobuf::parse_from_bytes(&data).unwrap();
-                eprintln!("Authentication failed, {:?}", msg);
+                error!("Authentication failed, {:?}", msg);
                 Err(())
             }
             _ => {
-                println!("Unexpected message {:x}", cmd);
+                error!("Unexpected message {:x}", cmd);
                 Err(())
             }
         }

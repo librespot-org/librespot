@@ -30,7 +30,7 @@ impl <'a> Sink for PortAudioSink<'a> {
     fn write(&self, data: &[i16]) -> io::Result<()> {
         match self.0.write(&data) {
             Ok(_) => (),
-            Err(portaudio::PaError::OutputUnderflowed) => eprintln!("Underflow"),
+            Err(portaudio::PaError::OutputUnderflowed) => error!("PortAudio write underflow"),
             Err(e) => panic!("PA Error {}", e),
         };
 
