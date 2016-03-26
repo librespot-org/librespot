@@ -20,7 +20,7 @@ sudo apt-get install build-essential portaudio19-dev libprotoc-dev
 
 On Fedora systems, the following command will install these dependencies :
 ```shell
-sudo dnf install portaudio-devel libprotoc-dev make gcc gcc-c++
+sudo dnf install portaudio-devel protobuf-devel make gcc gcc-c++
 ```
 
 On OS X, using homebrew :
