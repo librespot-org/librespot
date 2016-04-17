@@ -18,7 +18,7 @@ path = "protocol"
 [dependencies]
 bit-set         = "~0.2.0"
 byteorder       = "~0.4.2"
-eventual        = "~0.1.5"
+eventual        = "~0.1.6"
 getopts         = "~0.2.14"
 hyper           = { version = "0.7.2", default-features = false }
 #json_macros     = "~0.3.0"
