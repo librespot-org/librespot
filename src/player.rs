@@ -19,7 +19,7 @@ fn vorbis_time_seek_ms<R>(decoder: &mut vorbis::Decoder<R>, ms: i64) -> Result<(
 
 #[cfg(not(feature = "with-tremor"))]
 fn vorbis_time_tell_ms<R>(decoder: &mut vorbis::Decoder<R>) -> Result<i64, vorbis::VorbisError> where R: Read + Seek {
-    decoder.time_tell().map(|t| (t / 1000f64) as i64)
+    decoder.time_tell().map(|t| (t * 1000f64) as i64)
 }
 
 #[cfg(feature = "with-tremor")]
