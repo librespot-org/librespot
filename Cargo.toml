@@ -52,7 +52,7 @@ openssl         = { version = "0.7", optional = true }
 
 [build-dependencies]
 vergen          = "~0.1.0"
-syntex          = { version = "^0.30.0", optional = true }
+syntex          = { version = "^0.31.0", optional = true }
 protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
 json_macros     = { git = "https://github.com/plietar/json_macros" }
 
