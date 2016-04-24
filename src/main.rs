@@ -34,11 +34,9 @@ static APPKEY: Option<&'static [u8]> = Some(include_bytes!(concat!(env!("CARGO_M
 static APPKEY: Option<&'static [u8]> = None;
 
 fn main() {
-    let rust_log = "RUST_LOG";
-    if let Err(_) = env::var(rust_log) {
-        env::set_var(rust_log, "debug")
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "debug")
     }
-
     env_logger::init().unwrap();
 
     info!("librespot {} ({}). Built on {}.",
