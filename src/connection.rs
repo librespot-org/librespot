@@ -1,4 +1,4 @@
-use byteorder::{self, BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
 use shannon::ShannonStream;
 use std::convert;
 use std::io;
@@ -17,15 +17,6 @@ pub type Result<T> = result::Result<T, Error>;
 impl convert::From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::IoError(err)
-    }
-}
-
-impl convert::From<byteorder::Error> for Error {
-    fn from(err: byteorder::Error) -> Error {
-        match err {
-            byteorder::Error::Io(e) => Error::IoError(e),
-            _ => Error::Other,
-        }
     }
 }
 

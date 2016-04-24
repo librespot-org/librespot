@@ -104,7 +104,7 @@ impl AudioFile {
                 break;
             }
 
-            while bitmap.contains(&index) {
+            while bitmap.contains(index) {
                 index = (index + 1) % shared.chunk_count;
             }
             drop(bitmap);
@@ -155,7 +155,7 @@ impl Read for AudioFile {
         let len = min(output.len(), CHUNK_SIZE - offset);
 
         let mut bitmap = self.shared.bitmap.lock().unwrap();
-        while !bitmap.contains(&index) {
+        while !bitmap.contains(index) {
             bitmap = self.shared.cond.wait(bitmap).unwrap();
         }
         drop(bitmap);
