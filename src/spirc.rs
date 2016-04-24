@@ -100,7 +100,7 @@ impl SpircManager {
             let data = pkt.payload.first().unwrap();
             let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(data).unwrap();
 
-            debug!("{:?} {} {} {} {}",
+            debug!("{:?} {:?} {} {} {}",
                      frame.get_typ(),
                      frame.get_device_state().get_name(),
                      frame.get_ident(),

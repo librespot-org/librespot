@@ -143,6 +143,8 @@ impl hyper::server::Handler for ServerHandler {
                 params.extend(form);
             }
 
+            debug!("{:?} {:?} {:?}", request.method, path, params);
+
             match params.get("action").map(AsRef::as_ref) {
                 Some("getInfo") => self.handle_get_info(&params, response),
                 Some("addUser") => self.handle_add_user(&params, response),

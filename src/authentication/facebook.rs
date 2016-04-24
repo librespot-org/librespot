@@ -42,6 +42,8 @@ impl hyper::server::Handler for ServerHandler {
             let params = query.map_or(vec![], |q| url::form_urlencoded::parse(q.as_bytes()))
                               .into_iter().collect::<BTreeMap<_,_>>();
 
+            debug!("{:?} {:?} {:?}", request.method, path, params);
+
             if request.method == hyper::method::Method::Get && path == vec!["login", "facebook_login_sso.json"] {
                 self.handle_login(&params)
             } else {

@@ -33,7 +33,7 @@ static APPKEY: Option<&'static [u8]> = None;
 
 fn main() {
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "debug")
+        env::set_var("RUST_LOG", "info,librespot=trace")
     }
     env_logger::init().unwrap();
 
@@ -51,7 +51,8 @@ fn main() {
         .optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .reqopt("n", "name", "Device name", "NAME")
         .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE")
-        .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND");
+        .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
+        .optflag("", "facebook", "Login with a Facebook account");
 
     if APPKEY.is_none() {
         opts.reqopt("a", "appkey", "Path to a spotify appkey", "APPKEY");
@@ -59,14 +60,10 @@ fn main() {
         opts.optopt("a", "appkey", "Path to a spotify appkey", "APPKEY");
     };
 
-    if cfg!(feature = "facebook") {
-        opts.optflag("", "facebook", "Login with a Facebook account");
-    }
-
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            print!("Error: {}\n{}", f.to_string(), usage(&*program, &opts));
+            error!("Error: {}\n{}", f.to_string(), usage(&*program, &opts));
             return;
         }
     };
@@ -129,31 +126,36 @@ fn main() {
 
     let session = Session::new(config, cache);
 
-    let credentials = username.map(|username| {
-        let password = matches.opt_str("p")
-                              .unwrap_or_else(|| {
-                                  print!("Password: ");
-                                  stdout().flush().unwrap();
-                                  read_password().unwrap()
-                              });
+    let credentials = match (username, matches.opt_str("p"), stored_credentials) {
+        (Some(username), Some(password), _)
+            => Credentials::with_password(username, password),
 
-        Credentials::with_password(username, password)
-    }).or_else(|| {
-        if cfg!(feature = "facebook") && matches.opt_present("facebook") {
-            Some(facebook_login().unwrap())
-        } else {
-            None
+        (Some(ref username), _, Some(ref credentials)) if *username == credentials.username
+            => credentials.clone(),
+
+        (Some(username), None, _) => {
+            print!("Password for {}: ", username);
+            stdout().flush().unwrap();
+            let password = read_password().unwrap();
+            Credentials::with_password(username.clone(), password)
         }
-    }).or(stored_credentials)
-      .or_else(|| {
-        if cfg!(feature = "discovery") {
+
+        (None, _, _) if matches.opt_present("facebook")
+            => facebook_login().unwrap(),
+
+        (None, _, Some(credentials))
+            => credentials,
+
+        (None, _, None) if cfg!(feature = "discovery") => {
             info!("No username provided and no stored credentials, starting discovery ...");
-            Some(discovery_login(&session.config().device_name,
-                                 session.device_id()).unwrap())
-        } else {
-            None
+            discovery_login(&session.config().device_name, session.device_id()).unwrap()
         }
-    }).expect("No username provided and no stored credentials.");
+
+        (None, _, None) => {
+            error!("No credentials provided");
+            return
+        }
+    };
 
     let reusable_credentials = session.login(credentials).unwrap();
     session.cache().put_credentials(&reusable_credentials);
