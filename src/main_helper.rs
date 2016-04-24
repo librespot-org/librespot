@@ -12,11 +12,7 @@ use cache::{Cache, DefaultCache, NoCache};
 use player::Player;
 use session::{Bitrate, Config, Session};
 use version;
-
-#[cfg(feature = "static-appkey")]
-static APPKEY: Option<&'static [u8]> = Some(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/spotify_appkey.key")));
-#[cfg(not(feature = "static-appkey"))]
-static APPKEY: Option<&'static [u8]> = None;
+use APPKEY;
 
 pub fn find_backend(name: Option<&str>) -> &'static (Fn() -> Box<Sink> + Send + Sync) {
     match name {

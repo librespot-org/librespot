@@ -49,7 +49,7 @@ extern crate libpulse_sys;
 
 extern crate librespot_protocol as protocol;
 
-// This doesn't play nice with syntex, so place it here
+// include!/include_bytes! don't play nice with syntex, so place these here
 pub mod version {
     include!(concat!(env!("OUT_DIR"), "/version.rs"));
 
@@ -57,6 +57,11 @@ pub mod version {
         format!("librespot-{}", short_sha())
     }
 }
+
+#[cfg(feature = "static-appkey")]
+static APPKEY: Option<&'static [u8]> = Some(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/spotify_appkey.key")));
+#[cfg(not(feature = "static-appkey"))]
+static APPKEY: Option<&'static [u8]> = None;
 
 #[cfg(feature = "with-syntex")]
 include!(concat!(env!("OUT_DIR"), "/lib.rs"));
