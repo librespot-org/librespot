@@ -224,7 +224,7 @@ impl PlayerInternal {
 
                         true
                     });
-                    println!("Load Done");
+                    info!("Load Done");
                 }
                 Some(PlayerCommand::Seek(position)) => {
                     vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();

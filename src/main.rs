@@ -1,6 +1,9 @@
 extern crate getopts;
 extern crate librespot;
 extern crate rpassword;
+extern crate env_logger;
+#[macro_use]
+extern crate log;
 
 use rpassword::read_password;
 use std::clone::Clone;
@@ -8,6 +11,7 @@ use std::fs::File;
 use std::io::{stdout, Read, Write};
 use std::path::PathBuf;
 use std::thread;
+use std::env;
 
 use librespot::audio_backend::BACKENDS;
 use librespot::authentication::{Credentials, facebook_login, discovery_login};
@@ -30,7 +34,14 @@ static APPKEY: Option<&'static [u8]> = Some(include_bytes!(concat!(env!("CARGO_M
 static APPKEY: Option<&'static [u8]> = None;
 
 fn main() {
-    println!("librespot {} ({}). Built on {}.",
+    let rust_log = "RUST_LOG";
+    if let Err(_) = env::var(rust_log) {
+        env::set_var(rust_log, "debug")
+    }
+
+    env_logger::init().unwrap();
+
+    info!("librespot {} ({}). Built on {}.",
              version::short_sha(),
              version::commit_date(),
              version::short_now());
@@ -141,7 +152,7 @@ fn main() {
     }).or(stored_credentials)
       .or_else(|| {
         if cfg!(feature = "discovery") {
-            println!("No username provided and no stored credentials, starting discovery ...");
+            info!("No username provided and no stored credentials, starting discovery ...");
             Some(discovery_login(&session.config().device_name,
                                  session.device_id()).unwrap())
         } else {

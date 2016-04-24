@@ -207,7 +207,7 @@ impl PacketHandler for MercuryManager {
                 callback: MercuryCallback::Channel,
             }
         } else {
-            println!("Ignore seq {:?} cmd {}", seq, cmd);
+            warn!("Ignore seq {:?} cmd {}", seq, cmd);
             return;
         };
 

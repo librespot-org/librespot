@@ -9,7 +9,7 @@ pub struct PulseAudioSink(*mut pa_simple);
 
 impl Open for PulseAudioSink {
    fn open() -> PulseAudioSink {
-        println!("Using PulseAudioSink");
+        info!("Using PulseAudioSink");
 
         let ss = pa_sample_spec {
             format: PA_SAMPLE_S16LE,
