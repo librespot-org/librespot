@@ -10,7 +10,7 @@ use audio_backend::Sink;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
 use util::{self, SpotifyId, Subfile};
-use spirc::PlayStatus;
+pub use spirc::PlayStatus;
 
 #[cfg(not(feature = "with-tremor"))]
 fn vorbis_time_seek_ms<R>(decoder: &mut vorbis::Decoder<R>, ms: i64) -> Result<(), vorbis::VorbisError> where R: Read + Seek {
@@ -34,6 +34,7 @@ fn vorbis_time_tell_ms<R>(decoder: &mut vorbis::Decoder<R>) -> Result<i64, vorbi
 
 pub type PlayerObserver = Box<Fn(&PlayerState) + Send>;
 
+#[derive(Clone)]
 pub struct Player {
     state: Arc<Mutex<PlayerState>>,
     observers: Arc<Mutex<Vec<PlayerObserver>>>,
@@ -43,13 +44,14 @@ pub struct Player {
 
 #[derive(Clone)]
 pub struct PlayerState {
-    status: PlayStatus,
-    position_ms: u32,
-    position_measured_at: i64,
-    update_time: i64,
-    volume: u16,
+    pub status: PlayStatus,
+    pub position_ms: u32,
+    pub position_measured_at: i64,
+    pub update_time: i64,
+    pub volume: u16,
+    pub track: Option<SpotifyId>,
 
-    end_of_track: bool,
+    pub end_of_track: bool,
 }
 
 struct PlayerInternal {
@@ -68,6 +70,7 @@ enum PlayerCommand {
     Volume(u16),
     Stop,
     Seek(u32),
+    SeekAt(u32, i64),
 }
 
 impl Player {
@@ -81,6 +84,7 @@ impl Player {
             position_measured_at: 0,
             update_time: util::now_ms(),
             volume: 0xFFFF,
+            track: None,
             end_of_track: false,
         }));
 
@@ -124,6 +128,10 @@ impl Player {
 
     pub fn seek(&self, position_ms: u32) {
         self.command(PlayerCommand::Seek(position_ms));
+    }
+
+    pub fn seek_at(&self, position_ms: u32, measured_at: i64) {
+        self.command(PlayerCommand::SeekAt(position_ms, measured_at));
     }
 
     pub fn state(&self) -> PlayerState {
@@ -176,6 +184,7 @@ impl PlayerInternal {
                         state.status = PlayStatus::kPlayStatusPause;
                         state.position_ms = position;
                         state.position_measured_at = util::now_ms();
+                        state.track = Some(track_id);
                         true
                     });
                     drop(decoder);
@@ -235,6 +244,20 @@ impl PlayerInternal {
                         true
                     });
                 }
+                Some(PlayerCommand::SeekAt(position, measured_at)) => {
+                    let position = (util::now_ms() - measured_at + position as i64) as u32;
+
+                    let before = util::now_ms();
+                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();
+                    self.update(|state| {
+                        state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
+                        state.position_measured_at = util::now_ms();
+
+                        println!("SEEK: {} {} {}", before, util::now_ms(), util::now_ms() - before);
+
+                        true
+                    });
+                }
                 Some(PlayerCommand::Play) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPlay;
@@ -249,7 +272,7 @@ impl PlayerInternal {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPause;
                         state.update_time = util::now_ms();
-                        state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
+                        state.position_ms = decoder.as_mut().map(|d| vorbis_time_tell_ms(d).unwrap()).unwrap_or(0) as u32;
                         state.position_measured_at = util::now_ms();
                         true
                     });
@@ -286,6 +309,13 @@ impl PlayerInternal {
                         let buffer = apply_volume(self.state.lock().unwrap().volume,
                                                   &packet.data);
                         sink.write(&buffer).unwrap();
+
+                        self.update(|state| {
+                            state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
+                            state.position_measured_at = util::now_ms();
+
+                            false
+                        });
                     }
                     Some(Err(vorbis::VorbisError::Hole)) => (),
                     Some(Err(e)) => panic!("Vorbis error {:?}", e),
