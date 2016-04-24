@@ -16,34 +16,8 @@ pub use util::spotify_id::{SpotifyId, FileId};
 pub use util::arcvec::ArcVec;
 pub use util::subfile::Subfile;
 
-#[macro_export]
-macro_rules! eprintln(
-    ($($arg:tt)*) => (
-        {
-            use std::io::Write;
-            writeln!(&mut ::std::io::stderr(), $($arg)* ).unwrap()
-        }
-    )
-);
-#[macro_export]
-macro_rules! eprint(
-    ($($arg:tt)*) => (
-        {
-            use std::io::Write;
-            write!(&mut ::std::io::stderr(), $($arg)* ).unwrap()
-        }
-    )
-);
-
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
-}
-
-pub fn hexdump(data: &[u8]) {
-    for b in data.iter() {
-        eprint!("{:02X} ", b);
-    }
-    eprintln!("");
 }
 
 pub trait IgnoreExt {
