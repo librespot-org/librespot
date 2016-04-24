@@ -225,6 +225,8 @@ impl Session {
                     auth_data: welcome_data.get_reusable_auth_credentials().to_owned(),
                 };
 
+                self.0.cache.put_credentials(&reusable_credentials);
+
                 Ok(reusable_credentials)
             }
 

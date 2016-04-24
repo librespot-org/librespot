@@ -16,6 +16,7 @@ pub mod session;
 pub mod spirc;
 pub mod link;
 pub mod stream;
+pub mod main_helper;
 
 #[cfg(feature = "facebook")]
 pub mod spotilocal;
