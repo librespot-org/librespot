@@ -21,8 +21,6 @@ use librespot::session::{Bitrate, Config, Session};
 use librespot::spirc::SpircManager;
 use librespot::version;
 
-static PASSWORD_ENV_NAME: &'static str = "SPOTIFY_PASSWORD";
-
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
     format!("{}", opts.usage(&brief))
@@ -133,7 +131,6 @@ fn main() {
 
     let credentials = username.map(|username| {
         let password = matches.opt_str("p")
-                              .or_else(|| std::env::var(PASSWORD_ENV_NAME).ok())
                               .unwrap_or_else(|| {
                                   print!("Password: ");
                                   stdout().flush().unwrap();
@@ -157,8 +154,6 @@ fn main() {
             None
         }
     }).expect("No username provided and no stored credentials.");
-
-    std::env::remove_var(PASSWORD_ENV_NAME);
 
     let reusable_credentials = session.login(credentials).unwrap();
     session.cache().put_credentials(&reusable_credentials);
