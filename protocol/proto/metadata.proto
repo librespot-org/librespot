@@ -154,6 +154,9 @@ message AudioFile {
         MP3_96 = 0x6;
         OTHER = 0x7;
         OTHER2 = 0x8;
+	OTHER3 = 0x9;
+	OTHER4 = 0xa;
+	OTHER5 = 0xb;
     }
 }
 
