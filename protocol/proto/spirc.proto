@@ -67,6 +67,7 @@ enum CapabilityType {
     kVolumeSteps = 0x8;
     kSupportedTypes = 0x9;
     kCommandAcks = 0xa;
+    kUnknown = 0xb;
 }
 
 message Goodbye {
