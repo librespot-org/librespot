@@ -152,11 +152,11 @@ message AudioFile {
         MP3_320 = 0x4;
         MP3_160 = 0x5;
         MP3_96 = 0x6;
-        OTHER = 0x7;
+        MP3_160_ENC = 0x7;
         OTHER2 = 0x8;
-	OTHER3 = 0x9;
-	OTHER4 = 0xa;
-	OTHER5 = 0xb;
+        OTHER3 = 0x9;
+        AAC_160 = 0xa;
+        AAC_320 = 0xb;
     }
 }
 

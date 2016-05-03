@@ -12,6 +12,7 @@ message Frame {
     optional int64 state_update_id = 0x11;
     repeated string recipient = 0x12;
     optional bytes context_player_state = 0x13;
+    optional string new_name = 0x14;
 }
 
 enum MessageType {
@@ -34,6 +35,7 @@ enum MessageType {
     kMessageTypeReplace = 0x21;
     kMessageTypeLogout = 0x22;
     kMessageTypeAction = 0x23;
+    kMessageTypeRename = 0x24;
 }
 
 message DeviceState {
@@ -46,8 +48,6 @@ message DeviceState {
     optional int64 became_active_at = 0xf;
     optional string error_message = 0x10;
     repeated Capability capabilities = 0x11;
-    repeated string local_uris = 0x12;
-    repeated int32 enc_key = 0x13;
 }
 
 message Capability {
@@ -67,7 +67,7 @@ enum CapabilityType {
     kVolumeSteps = 0x8;
     kSupportedTypes = 0x9;
     kCommandAcks = 0xa;
-    kUnknown = 0xb;
+    kSupportsRename = 0xb;
 }
 
 message Goodbye {
