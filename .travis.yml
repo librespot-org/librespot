@@ -2,8 +2,10 @@ language: rust
 rust:
   - stable
   - beta
-  - nightly-2016-04-21 # Last known to be working nightly
+  - nightly-2016-04-28 # Last known to be working nightly
   - nightly
+
+cache: cargo
 
 matrix:
   allow_failures:
@@ -22,6 +24,7 @@ script:
     - cargo build --no-default-features --features "with-syntex facebook"
     - cargo build --no-default-features --features "with-syntex portaudio-backend"
     - cargo build --no-default-features --features "with-syntex pulseaudio-backend"
+
     # Building without syntex only works on nightly
     - if [[ $TRAVIS_RUST_VERSION == *"nightly"* ]]; then
         cargo build --no-default-features;
