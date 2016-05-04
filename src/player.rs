@@ -9,7 +9,7 @@ use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
-use util::{self, SpotifyId, Subfile};
+use util::{self, ReadSeek, SpotifyId, Subfile};
 pub use spirc::PlayStatus;
 
 #[cfg(not(feature = "with-tremor"))]
@@ -162,6 +162,56 @@ fn apply_volume(volume: u16, data: &[i16]) -> Cow<[i16]> {
     }
 }
 
+fn find_available_alternative<'a>(session: &Session, track: &'a Track) -> Option<Cow<'a, Track>> {
+    if track.available {
+        Some(Cow::Borrowed(track))
+    } else {
+        let alternatives = track.alternatives
+            .iter()
+            .map(|alt_id| {
+                session.metadata::<Track>(*alt_id)
+            })
+        .collect::<Vec<TrackRef>>();
+
+        eventual::sequence(alternatives.into_iter()).iter().find(|alt| alt.available).map(Cow::Owned)
+    }
+}
+
+fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<Subfile<AudioDecrypt<Box<ReadSeek>>>>> {
+    let track = session.metadata::<Track>(track_id).await().unwrap();
+
+    let track = match find_available_alternative(session, &track) {
+        Some(track) => track,
+        None => {
+            warn!("Track \"{}\" is not available", track.name);
+            return None;
+        }
+    };
+
+    let format = match session.config().bitrate {
+        Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
+        Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
+        Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
+    };
+
+
+
+    let file_id = match track.files.iter().find(|&&(_, f)| f == format) {
+        Some(&(file_id, _)) => file_id,
+        None => {
+            warn!("Track \"{}\" is not available in format {:?}", track.name, format);
+            return None;
+        }
+    };
+
+    let key = session.audio_key(track.id, file_id).await().unwrap();
+
+    let audio_file = Subfile::new(AudioDecrypt::new(key, session.audio_file(file_id)), 0xa7);
+    let decoder = vorbis::Decoder::new(audio_file).unwrap();
+
+    Some(decoder)
+}
+
 impl PlayerInternal {
     fn run(self, sink: Box<Sink>) {
         let mut decoder = None;
@@ -189,51 +239,39 @@ impl PlayerInternal {
                     });
                     drop(decoder);
 
-                    let mut track = self.session.metadata::<Track>(track_id).await().unwrap();
+                    decoder = match load_track(&self.session, track_id) {
+                        Some(mut decoder) => {
+                            vorbis_time_seek_ms(&mut decoder, position as i64).unwrap();
 
-                    if !track.available {
-                        let alternatives = track.alternatives
-                                                .iter()
-                                                .map(|alt_id| {
-                                                    self.session.metadata::<Track>(*alt_id)
-                                                })
-                                                .collect::<Vec<TrackRef>>();
+                            self.update(|state| {
+                                state.status = if play {
+                                    sink.start().unwrap();
+                                    PlayStatus::kPlayStatusPlay
+                                } else {
+                                    PlayStatus::kPlayStatusPause
+                                };
+                                state.position_ms = position;
+                                state.position_measured_at = util::now_ms();
 
-                        track = eventual::sequence(alternatives.into_iter())
-                                    .iter()
-                                    .find(|alt| alt.available)
-                                    .unwrap();
+                                true
+                            });
+
+                            info!("Load Done");
+                            Some(decoder)
+                        }
+
+                        None => {
+                            self.update(|state| {
+                                state.status = PlayStatus::kPlayStatusStop;
+                                state.end_of_track = true;
+                                true
+                            });
+
+                            None
+                        }
                     }
 
-                    let format = match self.session.config().bitrate {
-                        Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
-                        Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
-                        Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
-                    };
-                    let (file_id, _) = track.files.into_iter().find(|&(_, f)| f == format).unwrap();
 
-                    let key = self.session.audio_key(track.id, file_id).await().unwrap();
-                    decoder = Some(
-                        vorbis::Decoder::new(
-                        Subfile::new(
-                        AudioDecrypt::new(key,
-                        self.session.audio_file(file_id)), 0xa7)).unwrap());
-
-                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();
-
-                    self.update(|state| {
-                        state.status = if play {
-                            sink.start().unwrap();
-                            PlayStatus::kPlayStatusPlay
-                        } else {
-                            PlayStatus::kPlayStatusPause
-                        };
-                        state.position_ms = position;
-                        state.position_measured_at = util::now_ms();
-
-                        true
-                    });
-                    info!("Load Done");
                 }
                 Some(PlayerCommand::Seek(position)) => {
                     vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();

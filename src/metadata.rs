@@ -31,7 +31,7 @@ pub trait MetadataTrait : Send + 'static {
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Track {
     pub id: SpotifyId,
     pub name: String,
@@ -42,7 +42,7 @@ pub struct Track {
     pub available: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Album {
     pub id: SpotifyId,
     pub name: String,
@@ -51,7 +51,7 @@ pub struct Album {
     pub covers: Vec<FileId>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Artist {
     pub id: SpotifyId,
     pub name: String,
