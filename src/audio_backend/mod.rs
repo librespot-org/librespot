@@ -56,17 +56,21 @@ fn mk_sink<S: Sink + Open + 'static>() -> Box<Sink> {
 
 #[cfg(feature = "portaudio-backend")]
 mod portaudio;
+#[cfg(feature = "portaudio-backend")]
+use self::portaudio::PortAudioSink;
 
 #[cfg(feature = "pulseaudio-backend")]
 mod pulseaudio;
+#[cfg(feature = "pulseaudio-backend")]
+use self::pulseaudio::PulseAudioSink;
 
 
 declare_backends! {
     pub const BACKENDS : &'static [(&'static str, &'static (Fn() -> Box<Sink> + Sync + Send + 'static))] = &[
         #[cfg(feature = "portaudio-backend")]
-        ("portaudio", &mk_sink::<self::portaudio::PortAudioSink>),
+        ("portaudio", &mk_sink::<PortAudioSink>),
         #[cfg(feature = "pulseaudio-backend")]
-        ("pulseaudio", &mk_sink::<self::pulseaudio::PulseAudioSink>),
+        ("pulseaudio", &mk_sink::<PulseAudioSink>),
 
     ];
 }
