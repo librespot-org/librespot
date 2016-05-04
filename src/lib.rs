@@ -16,6 +16,7 @@ extern crate crypto;
 extern crate eventual;
 extern crate getopts;
 extern crate hyper;
+extern crate linear_map;
 extern crate lmdb_rs;
 extern crate num;
 extern crate protobuf;

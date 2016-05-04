@@ -196,8 +196,8 @@ fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<
 
 
 
-    let file_id = match track.files.iter().find(|&&(_, f)| f == format) {
-        Some(&(file_id, _)) => file_id,
+    let file_id = match track.files.get(&format) {
+        Some(&file_id) => file_id,
         None => {
             warn!("Track \"{}\" is not available in format {:?}", track.name, format);
             return None;

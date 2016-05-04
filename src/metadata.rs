@@ -1,4 +1,5 @@
 use eventual::{Async, Future};
+use linear_map::LinearMap;
 use protobuf;
 
 use protocol;
@@ -37,7 +38,7 @@ pub struct Track {
     pub name: String,
     pub album: SpotifyId,
     pub artists: Vec<SpotifyId>,
-    pub files: Vec<(FileId, FileFormat)>,
+    pub files: LinearMap<FileFormat, FileId>,
     pub alternatives: Vec<SpotifyId>,
     pub available: bool,
 }
@@ -85,7 +86,7 @@ impl MetadataTrait for Track {
                        .map(|file| {
                            let mut dst = [0u8; 20];
                            dst.clone_from_slice(&file.get_file_id());
-                           (FileId(dst), file.get_format())
+                           (file.get_format(), FileId(dst))
                        })
                        .collect();
 
