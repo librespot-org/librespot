@@ -29,3 +29,6 @@ script:
     - if [[ $TRAVIS_RUST_VERSION == *"nightly"* ]]; then
         cargo build --no-default-features;
       fi
+
+notifications:
+    email: false
