@@ -133,14 +133,9 @@ pub fn get_credentials(session: &Session, matches: &getopts::Matches) -> Credent
         (None, _, Some(credentials))
             => credentials,
 
-        (None, _, None) if cfg!(feature = "discovery") => {
+        (None, _, None) => {
             info!("No username provided and no stored credentials, starting discovery ...");
             discovery_login(&session.config().device_name, session.device_id()).unwrap()
-        }
-
-        (None, _, None) => {
-            error!("No credentials provided");
-            exit(1)
         }
     }
 }

@@ -42,16 +42,7 @@ target/release/librespot --appkey APPKEY --username USERNAME --cache CACHEDIR --
 
 ## Discovery mode
 *librespot* can be run in discovery mode, in which case no password is required at startup.
-dns-sd or avahi's compatibility layer is required for this. On debian/ubuntu this is the
-`libavahi-compat-libdnssd-dev` package. On Fedora, this is the
-`avahi-compat-libdns_sd-devel` package. It come preinstalled on OS X.
-
-It must be enabled at build time :
-```shell
-cargo build --release --features discovery
-```
-
-When running *librespot* simply omit the `--username` argument.
+For that, simply omit the `--username` argument.
 
 ## Facebook Accounts
 *librespot* can be built with Facebook authentication support. OpenSSL is required for this.

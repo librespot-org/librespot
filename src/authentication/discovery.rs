@@ -1,7 +1,6 @@
 use crypto;
 use crypto::mac::Mac;
 use crypto::digest::Digest;
-use dns_sd::DNSService;
 use hyper;
 use hyper::net::NetworkListener;
 use num::BigUint;
@@ -11,6 +10,7 @@ use rustc_serialize::base64::{self, ToBase64, FromBase64};
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::sync::{mpsc, Mutex};
+use mdns;
 
 use authentication::Credentials;
 use diffie_hellman::{DH_GENERATOR, DH_PRIME};
@@ -176,13 +176,12 @@ pub fn discovery_login(device_name: &str, device_id: &str) -> Result<Credentials
 
     let mut server = hyper::Server::new(listener).handle(handler).unwrap();
 
-    let _svc = DNSService::register(Some(device_name),
-                                    "_spotify-connect._tcp",
-                                    None,
-                                    None,
-                                    port,
-                                    &["VERSION=1.0", "CPath=/"]
-                                    ).unwrap();
+    let responder = mdns::Responder::new().unwrap();
+    let _svc = responder.register(
+        "_spotify-connect._tcp".to_owned(),
+        device_name.to_owned(),
+        port,
+        &["VERSION=1.0", "CPath=/"]);
 
     let cred = rx.recv().unwrap();
     server.close().unwrap();

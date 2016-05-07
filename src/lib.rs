@@ -19,6 +19,7 @@ extern crate getopts;
 extern crate hyper;
 extern crate linear_map;
 extern crate lmdb_rs;
+extern crate mdns;
 extern crate num;
 extern crate protobuf;
 extern crate shannon;
@@ -38,9 +39,6 @@ extern crate log;
 extern crate vorbis;
 #[cfg(feature = "with-tremor")]
 extern crate tremor as vorbis;
-
-#[cfg(feature = "dns-sd")]
-extern crate dns_sd;
 
 #[cfg(feature = "openssl")]
 extern crate openssl;
