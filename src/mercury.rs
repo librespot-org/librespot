@@ -7,8 +7,7 @@ use std::mem::replace;
 use std::sync::mpsc;
 
 use protocol;
-use session::Session;
-use connection::PacketHandler;
+use session::{Session, PacketHandler};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
@@ -186,7 +185,7 @@ impl MercuryManager {
 }
 
 impl PacketHandler for MercuryManager {
-    fn handle(&mut self, cmd: u8, data: Vec<u8>) {
+    fn handle(&mut self, cmd: u8, data: Vec<u8>, _session: &Session) {
         let mut packet = Cursor::new(data);
 
         let seq = {

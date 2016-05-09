@@ -1,37 +1,113 @@
-use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::io::{Cursor, Seek, SeekFrom, Write};
-use eventual::{self, Async};
+use std::io::{Cursor, Seek, SeekFrom};
+use session::{Session, PacketHandler};
 
-use util::{ArcVec, FileId};
-use connection::PacketHandler;
-use session::Session;
-
-#[derive(Debug)]
-pub enum StreamEvent {
-    Header(u8, ArcVec<u8>),
-    Data(ArcVec<u8>),
+pub enum Response<H, S = H> {
+    Continue(H),
+    Spawn(S),
+    Close,
 }
 
-#[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
-pub struct StreamError;
+impl <H: Handler + 'static> Response<H> {
+    pub fn boxed(self) -> Response<Box<Handler>> {
+        match self {
+            Response::Continue(handler) => Response::Continue(Box::new(handler)),
+            Response::Spawn(handler) => Response::Spawn(Box::new(handler)),
+            Response::Close => Response::Close,
+        }
+    }
+}
+
+pub trait Handler: Send {
+    fn on_create(self, channel_id: ChannelId, session: &Session) -> Response<Self> where Self: Sized;
+    fn on_header(self, header_id: u8, header_data: &[u8], session: &Session) -> Response<Self> where Self: Sized;
+    fn on_data(self, data: &[u8], session: &Session) -> Response<Self> where Self: Sized;
+    fn on_error(self, session: &Session) -> Response<Self> where Self: Sized;
+    fn on_close(self, session: &Session) -> Response<Self> where Self: Sized;
+
+    fn box_on_create(self: Box<Self>, channel_id: ChannelId, session: &Session) -> Response<Box<Handler>>;
+    fn box_on_header(self: Box<Self>, header_id: u8, header_data: &[u8], session: &Session) -> Response<Box<Handler>>;
+    fn box_on_data(self: Box<Self>, data: &[u8], session: &Session) -> Response<Box<Handler>>;
+    fn box_on_error(self: Box<Self>, session: &Session) -> Response<Box<Handler>>;
+    fn box_on_close(self: Box<Self>, session: &Session) -> Response<Box<Handler>>;
+}
 
 pub type ChannelId = u16;
 
 enum ChannelMode {
     Header,
-    Data,
+    Data
 }
 
-struct Channel {
-    mode: ChannelMode,
-    callback: Option<eventual::Sender<StreamEvent, StreamError>>,
+struct Channel(ChannelMode, Box<Handler>);
+
+impl Channel {
+    fn handle_packet(self, cmd: u8, data: Vec<u8>, session: &Session) -> Response<Self, Box<Handler>> {
+        let Channel(mode, mut handler) = self;
+
+        let mut packet = Cursor::new(&data as &[u8]);
+        packet.read_u16::<BigEndian>().unwrap(); // Skip channel id
+
+        if cmd == 0xa {
+            println!("error: {} {}", data.len(), packet.read_u16::<BigEndian>().unwrap());
+            return match handler.box_on_error(session) {
+                Response::Continue(_) => Response::Close,
+                Response::Spawn(f) => Response::Spawn(f),
+                Response::Close => Response::Close,
+            };
+        }
+
+        match mode {
+            ChannelMode::Header => {
+                let mut length = 0;
+
+                while packet.position() < data.len() as u64 {
+                    length = packet.read_u16::<BigEndian>().unwrap();
+                    if length > 0 {
+                        let header_id = packet.read_u8().unwrap();
+                        let header_data = &data[packet.position() as usize .. packet.position() as usize + length as usize - 1];
+
+                        handler = match handler.box_on_header(header_id, header_data, session) {
+                            Response::Continue(handler) => handler,
+                            Response::Spawn(f) => return Response::Spawn(f),
+                            Response::Close => return Response::Close,
+                        };
+
+                        packet.seek(SeekFrom::Current(length as i64 - 1)).unwrap();
+                    }
+                }
+
+                if length == 0 {
+                    Response::Continue(Channel(ChannelMode::Data, handler))
+                } else {
+                    Response::Continue(Channel(ChannelMode::Header, handler))
+                }
+            }
+            ChannelMode::Data => {
+                if packet.position() < data.len() as u64 {
+                    let event_data = &data[packet.position() as usize..];
+                    match handler.box_on_data(event_data, session) {
+                        Response::Continue(handler) => Response::Continue(Channel(ChannelMode::Data, handler)),
+                        Response::Spawn(f) => Response::Spawn(f),
+                        Response::Close => Response::Close,
+                    }
+                } else {
+                    match handler.box_on_close(session) {
+                        Response::Continue(_) => Response::Close,
+                        Response::Spawn(f) => Response::Spawn(f),
+                        Response::Close => Response::Close,
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub struct StreamManager {
     next_id: ChannelId,
-    channels: HashMap<ChannelId, Channel>,
+    channels: HashMap<ChannelId, Option<Channel>>,
 }
 
 impl StreamManager {
@@ -42,107 +118,52 @@ impl StreamManager {
         }
     }
 
-    pub fn allocate_stream(&mut self) -> (ChannelId, eventual::Stream<StreamEvent, StreamError>) {
-        let (tx, rx) = eventual::Stream::pair();
-
+    pub fn create(&mut self, handler: Box<Handler>, session: &Session) {
         let channel_id = self.next_id;
         self.next_id += 1;
 
-        self.channels.insert(channel_id,
-                             Channel {
-                                 mode: ChannelMode::Header,
-                                 callback: Some(tx),
-                             });
+        trace!("allocated stream {}", channel_id);
 
-        (channel_id, rx)
-    }
-
-    pub fn request(&mut self,
-                   session: &Session,
-                   file: FileId,
-                   offset: u32,
-                   size: u32)
-                   -> eventual::Stream<StreamEvent, StreamError> {
-
-        let (channel_id, rx) = self.allocate_stream();
-
-        let mut data: Vec<u8> = Vec::new();
-        data.write_u16::<BigEndian>(channel_id).unwrap();
-        data.write_u8(0).unwrap();
-        data.write_u8(1).unwrap();
-        data.write_u16::<BigEndian>(0x0000).unwrap();
-        data.write_u32::<BigEndian>(0x00000000).unwrap();
-        data.write_u32::<BigEndian>(0x00009C40).unwrap();
-        data.write_u32::<BigEndian>(0x00020000).unwrap();
-        data.write(&file.0).unwrap();
-        data.write_u32::<BigEndian>(offset).unwrap();
-        data.write_u32::<BigEndian>(offset + size).unwrap();
-
-        session.send_packet(0x8, &data).unwrap();
-
-        rx
-    }
-}
-
-impl Channel {
-    fn handle_packet(&mut self, cmd: u8, data: Vec<u8>) {
-        let data = ArcVec::new(data);
-        let mut packet = Cursor::new(&data as &[u8]);
-        packet.read_u16::<BigEndian>().unwrap(); // Skip channel id
-
-        if cmd == 0xa {
-            self.callback.take().map(|c| c.fail(StreamError));
-        } else {
-            match self.mode {
-                ChannelMode::Header => {
-                    let mut length = 0;
-
-                    while packet.position() < data.len() as u64 {
-                        length = packet.read_u16::<BigEndian>().unwrap();
-                        if length > 0 {
-                            let header_id = packet.read_u8().unwrap();
-                            let header_data = data.clone()
-                                                  .offset(packet.position() as usize)
-                                                  .limit(length as usize - 1);
-
-                            let header = StreamEvent::Header(header_id, header_data);
-
-                            self.callback = self.callback.take().and_then(|c| c.send(header).await().ok());
-
-                            packet.seek(SeekFrom::Current(length as i64 - 1)).unwrap();
-                        }
-                    }
-
-                    if length == 0 {
-                        self.mode = ChannelMode::Data;
-                    }
-                }
-
-                ChannelMode::Data => {
-                    if packet.position() < data.len() as u64 {
-                        let event_data = data.clone().offset(packet.position() as usize);
-                        let event = StreamEvent::Data(event_data);
-
-                        self.callback = self.callback.take().and_then(|c| c.send(event).await().ok());
-                    } else {
-                        self.callback = None;
-                    }
-                }
+        match handler.box_on_create(channel_id, session) {
+            Response::Continue(handler) => {
+                self.channels.insert(channel_id,  Some(Channel(ChannelMode::Header, handler)));
             }
+            Response::Spawn(handler) => self.create(handler, session),
+            Response::Close => (),
         }
     }
 }
 
 impl PacketHandler for StreamManager {
-    fn handle(&mut self, cmd: u8, data: Vec<u8>) {
+    fn handle(&mut self, cmd: u8, data: Vec<u8>, session: &Session) {
         let id: ChannelId = BigEndian::read_u16(&data[0..2]);
 
-        if let Entry::Occupied(mut entry) = self.channels.entry(id) {
-            entry.get_mut().handle_packet(cmd, data);
-
-            if entry.get().callback.is_none() {
-                entry.remove();
+        let spawn = if let Entry::Occupied(mut entry) = self.channels.entry(id) {
+            if let Some(channel) = entry.get_mut().take() {
+                match channel.handle_packet(cmd, data, session) {
+                    Response::Continue(channel) => {
+                        entry.insert(Some(channel));
+                        None
+                    }
+                    Response::Spawn(f) => {
+                        entry.remove();
+                        Some(f)
+                    }
+                    Response::Close => {
+                        entry.remove();
+                        None
+                    }
+                }
+            } else {
+                None
             }
+        } else {
+            None
+        };
+
+
+        if let Some(s) = spawn {
+            self.create(s, session);
         }
     }
 }

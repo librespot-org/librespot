@@ -4,8 +4,7 @@ use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
 
 use util::{SpotifyId, FileId};
-use session::Session;
-use connection::PacketHandler;
+use session::{Session, PacketHandler};
 
 pub type AudioKey = [u8; 16];
 #[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
@@ -70,7 +69,7 @@ impl AudioKeyManager {
 }
 
 impl PacketHandler for AudioKeyManager {
-    fn handle(&mut self, cmd: u8, data: Vec<u8>) {
+    fn handle(&mut self, cmd: u8, data: Vec<u8>, _session: &Session) {
         let mut data = Cursor::new(data);
         let seq = data.read_u32::<BigEndian>().unwrap();
 

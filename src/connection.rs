@@ -96,7 +96,3 @@ impl CipherConnection {
         Ok((cmd, data))
     }
 }
-
-pub trait PacketHandler {
-    fn handle(&mut self, cmd: u8, data: Vec<u8>);
-}

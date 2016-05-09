@@ -12,20 +12,22 @@ use std::io::{Read, Write, Cursor};
 use std::result::Result;
 use std::sync::{Mutex, RwLock, Arc, mpsc};
 
-use album_cover::get_album_cover;
+use album_cover::AlbumCover;
 use apresolve::apresolve;
 use audio_key::{AudioKeyManager, AudioKey, AudioKeyError};
 use audio_file::AudioFile;
 use authentication::Credentials;
 use cache::Cache;
-use connection::{self, PlainConnection, CipherConnection, PacketHandler};
+use connection::{self, PlainConnection, CipherConnection};
 use diffie_hellman::DHLocalKeys;
 use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use protocol;
-use stream::{ChannelId, StreamManager, StreamEvent, StreamError};
+use stream::StreamManager;
 use util::{self, SpotifyId, FileId, ReadSeek};
 use version;
+
+use stream;
 
 pub enum Bitrate {
     Bitrate96,
@@ -249,12 +251,12 @@ impl Session {
         match cmd {
             0x4 => self.send_packet(0x49, &data).unwrap(),
             0x4a => (),
-            0x9 | 0xa => self.0.stream.lock().unwrap().handle(cmd, data),
-            0xd | 0xe => self.0.audio_key.lock().unwrap().handle(cmd, data),
+            0x9 | 0xa => self.0.stream.lock().unwrap().handle(cmd, data, self),
+            0xd | 0xe => self.0.audio_key.lock().unwrap().handle(cmd, data, self),
             0x1b => {
                 self.0.data.write().unwrap().country = String::from_utf8(data).unwrap();
             }
-            0xb2...0xb6 => self.0.mercury.lock().unwrap().handle(cmd, data),
+            0xb2...0xb6 => self.0.mercury.lock().unwrap().handle(cmd, data, self),
             _ => (),
         }
     }
@@ -293,7 +295,7 @@ impl Session {
                     self_.0.cache.put_file(file_id, &mut complete_file)
                 }).fire();
 
-                Box::new(audio_file)
+                Box::new(audio_file.await().unwrap())
             })
     }
 
@@ -307,7 +309,7 @@ impl Session {
             })
             .unwrap_or_else(|| {
                   let self_ = self.clone();
-                  get_album_cover(self, file_id)
+                  AlbumCover::get(file_id, self)
                       .map(move |data| {
                           self_.0.cache.put_file(file_id, &mut Cursor::new(&data));
                           data
@@ -315,12 +317,8 @@ impl Session {
               })
     }
 
-    pub fn stream(&self, file: FileId, offset: u32, size: u32) -> eventual::Stream<StreamEvent, StreamError> {
-        self.0.stream.lock().unwrap().request(self, file, offset, size)
-    }
-
-    pub fn allocate_stream(&self) -> (ChannelId, eventual::Stream<StreamEvent, StreamError>) {
-        self.0.stream.lock().unwrap().allocate_stream()
+    pub fn stream(&self, handler: Box<stream::Handler>) {
+        self.0.stream.lock().unwrap().create(handler, self)
     }
 
     pub fn metadata<T: MetadataTrait>(&self, id: SpotifyId) -> MetadataRef<T> {
@@ -354,4 +352,8 @@ impl Session {
     pub fn device_id(&self) -> &str {
         &self.0.device_id
     }
+}
+
+pub trait PacketHandler {
+    fn handle(&mut self, cmd: u8, data: Vec<u8>, session: &Session);
 }

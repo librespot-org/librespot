@@ -17,8 +17,7 @@ pub mod spirc;
 pub mod link;
 pub mod stream;
 pub mod main_helper;
+mod audio_file2;
 
 #[cfg(feature = "facebook")]
 pub mod spotilocal;
-
-pub use album_cover::get_album_cover;
