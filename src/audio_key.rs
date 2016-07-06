@@ -1,4 +1,4 @@
-use byteorder::{BigEndian, ByteOrder, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use eventual;
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};

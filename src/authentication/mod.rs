@@ -3,7 +3,6 @@ use crypto;
 use crypto::aes;
 use crypto::digest::Digest;
 use crypto::hmac::Hmac;
-use crypto::mac::Mac;
 use crypto::pbkdf2::pbkdf2;
 use crypto::sha1::Sha1;
 use protobuf::ProtobufEnum;
