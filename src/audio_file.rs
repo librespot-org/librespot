@@ -106,11 +106,8 @@ impl audio_file2::Handler for AudioFileInternal {
             bitmap.insert(index);
             self.shared.cond.notify_all();
 
-            println!("{}/{} {:?}", bitmap.len(), self.chunk_count, *bitmap);
-
             // If all blocks are complete when can stop
             if bitmap.len() >= self.chunk_count {
-                println!("All good");
                 drop(bitmap);
                 self.write_file.seek(SeekFrom::Start(0)).unwrap();
                 self.complete_tx.complete(self.write_file);
@@ -144,10 +141,6 @@ impl audio_file2::Handler for AudioFileInternal {
             let mut bitmap = self.shared.bitmap.lock().unwrap();
             bitmap.insert(index);
             self.shared.cond.notify_all();
-
-            println!("{:?}", *bitmap);
-
-            println!("{} {}", bitmap.len(), self.chunk_count);
 
             // If all blocks are complete when can stop
             if bitmap.len() >= self.chunk_count {

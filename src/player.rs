@@ -285,13 +285,10 @@ impl PlayerInternal {
                 Some(PlayerCommand::SeekAt(position, measured_at)) => {
                     let position = (util::now_ms() - measured_at + position as i64) as u32;
 
-                    let before = util::now_ms();
                     vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();
                     self.update(|state| {
                         state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
                         state.position_measured_at = util::now_ms();
-
-                        println!("SEEK: {} {} {}", before, util::now_ms(), util::now_ms() - before);
 
                         true
                     });

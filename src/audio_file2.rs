@@ -61,7 +61,6 @@ impl <H: Handler> stream::Handler for AudioFile<H> {
     }
 
     fn on_header(mut self, header_id: u8, header_data: &[u8], session: &Session) -> stream::Response<Self> {
-        //println!("on_header");
         match self.handler.on_header(header_id, header_data, session) {
             Response::Continue(handler) => {
                 self.handler = handler;
@@ -77,7 +76,6 @@ impl <H: Handler> stream::Handler for AudioFile<H> {
     }
 
     fn on_data(mut self, data: &[u8], session: &Session) -> stream::Response<Self> {
-        //println!("on_data");
         match self.handler.on_data(self.offset, data, session) {
             Response::Continue(handler) => {
                 self.handler = handler;
@@ -85,7 +83,6 @@ impl <H: Handler> stream::Handler for AudioFile<H> {
                 stream::Response::Continue(self)
             }
             Response::Seek(handler, offset) => {
-                println!("seek request {}", offset);
                 self.handler = handler;
                 self.offset = offset;
                 stream::Response::Spawn(self)
@@ -100,11 +97,9 @@ impl <H: Handler> stream::Handler for AudioFile<H> {
     }
 
     fn on_error(mut self, session: &Session) -> stream::Response<Self> {
-        println!("on_error");
         match self.handler.on_eof(session) {
             Response::Continue(_) => stream::Response::Close,
             Response::Seek(handler, offset) => {
-                println!("seek request {}", offset);
                 self.handler = handler;
                 self.offset = offset;
                 stream::Response::Spawn(self)
