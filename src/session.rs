@@ -36,7 +36,6 @@ pub enum Bitrate {
 }
 
 pub struct Config {
-    pub application_key: Vec<u8>,
     pub user_agent: String,
     pub device_name: String,
     pub bitrate: Bitrate,
@@ -102,33 +101,19 @@ impl Session {
 
         let request = protobuf_init!(protocol::keyexchange::ClientHello::new(), {
             build_info => {
-                product: protocol::keyexchange::Product::PRODUCT_LIBSPOTIFY_EMBEDDED,
+                product: protocol::keyexchange::Product::PRODUCT_PARTNER,
                 platform: protocol::keyexchange::Platform::PLATFORM_LINUX_X86,
                 version: 0x10800000000,
             },
-            /*
-            fingerprints_supported => [
-                protocol::keyexchange::Fingerprint::FINGERPRINT_GRAIN
-            ],
-            */
             cryptosuites_supported => [
                 protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON,
-                //protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_RC4_SHA1_HMAC
             ],
-            /*
-            powschemes_supported => [
-                protocol::keyexchange::Powscheme::POW_HASH_CASH
-            ],
-            */
             login_crypto_hello.diffie_hellman => {
                 gc: local_keys.public_key(),
                 server_keys_known: 1,
             },
             client_nonce: util::rand_vec(&mut thread_rng(), 0x10),
             padding: vec![0x1e],
-            feature_set => {
-                autoupdate2: true,
-            }
         });
 
         let init_client_packet = connection.send_packet_prefix(&[0, 4],
@@ -196,13 +181,6 @@ impl Session {
                 device_id: self.device_id().to_owned(),
             },
             version_string: version::version_string(),
-            appkey => {
-                version: self.config().application_key[0] as u32,
-                devkey: self.config().application_key[0x1..0x81].to_vec(),
-                signature: self.config().application_key[0x81..0x141].to_vec(),
-                useragent: self.config().user_agent.clone(),
-                callback_hash: vec![0; 20],
-            }
         });
 
         let mut connection = self.connect();

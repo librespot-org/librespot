@@ -37,7 +37,7 @@ cargo build --release
 A sample program implementing a headless Spotify Connect receiver is provided.
 Once you've built *librespot*, run it using :
 ```shell
-target/release/librespot --appkey APPKEY --username USERNAME --cache CACHEDIR --name DEVICENAME
+target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME
 ```
 
 ## Discovery mode
@@ -49,7 +49,7 @@ For that, simply omit the `--username` argument.
 
 ```shell
 cargo build --release --features facebook
-target/release/librespot --appkey APPKEY --cache CACHEDIR --name DEVICENAME --facebook
+target/release/librespot --cache CACHEDIR --name DEVICENAME --facebook
 ```
 
 This will print a link to the console, which must be visited on the same computer *librespot* is running on.
@@ -78,8 +78,8 @@ cargo build --no-default-features --features "nightly portaudio-backend"
 This produces better compilation error messages than with the default configuration.
 
 ## Disclaimer
-Using this code to connect to Spotify's API is probably forbidden by them, and
-might result in your application key getting banned. Use at your own risk
+Using this code to connect to Spotify's API is probably forbidden by them.
+Use at your own risk.
 
 ## Contact
 Come and hang out on gitter if you need help or want to offer some.
