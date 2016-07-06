@@ -2,7 +2,7 @@ language: rust
 rust:
   - stable
   - beta
-  - nightly-2016-04-28 # Last known to be working nightly
+  - nightly-2016-07-03 # Last known to be working nightly
   - nightly
 
 cache: cargo
@@ -27,7 +27,7 @@ script:
 
     # Building without syntex only works on nightly
     - if [[ $TRAVIS_RUST_VERSION == *"nightly"* ]]; then
-        cargo build --no-default-features;
+        cargo build --no-default-features --features "nightly";
       fi
 
 notifications:
