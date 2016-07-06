@@ -11,7 +11,7 @@ use player::Player;
 use session::{Bitrate, Config, Session};
 use version;
 
-pub fn find_backend(name: Option<&str>) -> &'static (Fn() -> Box<Sink> + Send + Sync) {
+pub fn find_backend(name: Option<&str>) -> &'static (Fn(Option<&str>) -> Box<Sink> + Send + Sync) {
     match name {
         Some("?") => {
             println!("Available Backends : ");
@@ -51,6 +51,7 @@ pub fn add_authentication_arguments(opts: &mut getopts::Options) {
 
 pub fn add_player_arguments(opts: &mut getopts::Options) {
     opts.optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND");
+    opts.optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE");
 }
 
 pub fn create_session(matches: &getopts::Matches) -> Session {
@@ -119,7 +120,12 @@ pub fn get_credentials(session: &Session, matches: &getopts::Matches) -> Credent
 }
 
 pub fn create_player(session: &Session, matches: &getopts::Matches) -> Player {
-    let make_backend = find_backend(matches.opt_str("backend").as_ref().map(AsRef::as_ref));
+    let backend_name = matches.opt_str("backend");
+    let device_name = matches.opt_str("device");
 
-    Player::new(session.clone(), move || make_backend())
+    let make_backend = find_backend(backend_name.as_ref().map(AsRef::as_ref));
+
+    Player::new(session.clone(), move || {
+        make_backend(device_name.as_ref().map(AsRef::as_ref))
+    })
 }

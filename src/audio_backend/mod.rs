@@ -1,7 +1,7 @@
 use std::io;
 
 pub trait Open {
-    fn open() -> Self;
+    fn open(Option<&str>) -> Self;
 }
 
 pub trait Sink {
@@ -50,8 +50,8 @@ macro_rules! _declare_backends {
 }
 
 #[allow(dead_code)]
-fn mk_sink<S: Sink + Open + 'static>() -> Box<Sink> {
-    Box::new(S::open())
+fn mk_sink<S: Sink + Open + 'static>(device: Option<&str>) -> Box<Sink> {
+    Box::new(S::open(device))
 }
 
 #[cfg(feature = "portaudio-backend")]
@@ -66,11 +66,13 @@ use self::pulseaudio::PulseAudioSink;
 
 
 declare_backends! {
-    pub const BACKENDS : &'static [(&'static str, &'static (Fn() -> Box<Sink> + Sync + Send + 'static))] = &[
+    pub const BACKENDS : &'static [
+        (&'static str,
+         &'static (Fn(Option<&str>) -> Box<Sink> + Sync + Send + 'static))
+    ] = &[
         #[cfg(feature = "portaudio-backend")]
         ("portaudio", &mk_sink::<PortAudioSink>),
         #[cfg(feature = "pulseaudio-backend")]
         ("pulseaudio", &mk_sink::<PulseAudioSink>),
-
     ];
 }

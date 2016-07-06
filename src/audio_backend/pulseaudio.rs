@@ -8,8 +8,12 @@ use std::ffi::CString;
 pub struct PulseAudioSink(*mut pa_simple);
 
 impl Open for PulseAudioSink {
-   fn open() -> PulseAudioSink {
-        info!("Using PulseAudioSink");
+   fn open(device: Option<&str>) -> PulseAudioSink {
+        debug!("Using PulseAudio sink");
+
+        if device.is_some() {
+            panic!("pulseaudio sink does not support specifying a device name");
+        }
 
         let ss = pa_sample_spec {
             format: PA_SAMPLE_S16LE,
