@@ -2,9 +2,9 @@ const APRESOLVE_ENDPOINT : &'static str = "http://apresolve.spotify.com/";
 
 use hyper;
 use std::io::Read;
-use rustc_serialize::json;
+use serde_json;
 
-#[derive(RustcDecodable)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct APResolveData {
     ap_list: Vec<String>
 }
@@ -16,7 +16,7 @@ pub fn apresolve() -> Result<Vec<String>, ()> {
     let mut data = String::new();
     response.read_to_string(&mut data).unwrap();
 
-    let data : APResolveData = json::decode(&data).unwrap();
+    let data : APResolveData = serde_json::from_str(&data).unwrap();
 
     Ok(data.ap_list)
 }

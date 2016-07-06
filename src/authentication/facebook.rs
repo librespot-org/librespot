@@ -5,7 +5,7 @@ use hyper::server::Response;
 use hyper::uri::RequestUri;
 use hyper::header::AccessControlAllowOrigin;
 use rand::{self, Rng};
-use rustc_serialize::json;
+use serde_json;
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::sync::{mpsc, Mutex};
@@ -63,7 +63,7 @@ fn facebook_get_me_id(token: &str) -> Result<String, ()> {
     let mut body = String::new();
     response.read_to_string(&mut body).unwrap();
 
-    let mut result : BTreeMap<String, String> = json::decode(&body).unwrap();
+    let mut result : BTreeMap<String, String> = serde_json::from_str(&body).unwrap();
     Ok(result.remove("id").unwrap())
 }
 

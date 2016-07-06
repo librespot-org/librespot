@@ -26,6 +26,10 @@ dependencies = [
  "rpassword 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.7.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_codegen 0.7.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_macros 0.7.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "shannon 0.1.1 (git+https://github.com/plietar/rust-shannon)",
  "tempfile 2.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -208,6 +212,11 @@ dependencies = [
  "unicode-bidi 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-normalization 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "itoa"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "json_macros"
@@ -531,6 +540,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "quasi_macros"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "quasi_codegen 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "quine-mc_cluskey"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -607,6 +624,52 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "nom 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "serde"
+version = "0.7.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "serde_codegen"
+version = "0.7.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "aster 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quasi 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quasi_codegen 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quasi_macros 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_codegen_internals 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex_syntax 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "serde_codegen_internals"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "syntex_errors 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syntex_syntax 0.37.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "serde_json"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "itoa 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.1.32 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.7.12 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "serde_macros"
+version = "0.7.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "serde_codegen 0.7.12 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

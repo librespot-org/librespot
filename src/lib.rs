@@ -1,8 +1,9 @@
 #![crate_name = "librespot"]
 
-#![cfg_attr(not(feature = "with-syntex"), feature(plugin))]
+#![cfg_attr(not(feature = "with-syntex"), feature(plugin, custom_derive))]
 #![cfg_attr(not(feature = "with-syntex"), plugin(protobuf_macros))]
 #![cfg_attr(not(feature = "with-syntex"), plugin(json_macros))]
+#![cfg_attr(not(feature = "with-syntex"), plugin(serde_macros))]
 
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
@@ -24,6 +25,8 @@ extern crate shannon;
 extern crate rand;
 extern crate rpassword;
 extern crate rustc_serialize;
+extern crate serde;
+extern crate serde_json;
 extern crate time;
 extern crate tempfile;
 extern crate url;

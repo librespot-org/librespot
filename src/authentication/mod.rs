@@ -6,27 +6,27 @@ use crypto::hmac::Hmac;
 use crypto::pbkdf2::pbkdf2;
 use crypto::sha1::Sha1;
 use protobuf::ProtobufEnum;
+use serde;
+use serde_json;
 use std::io::{self, Read, Write};
 use std::fs::File;
 use std::path::Path;
 use rustc_serialize::base64::{self, FromBase64, ToBase64};
-use rustc_serialize::json;
 
 use protocol::authentication::AuthenticationType;
 
 #[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Credentials {
     pub username: String,
-    pub auth_type: AuthenticationType,
-    pub auth_data: Vec<u8>,
-}
 
-#[derive(Debug, Clone)]
-#[derive(RustcDecodable, RustcEncodable)]
-struct StoredCredentials {
-    pub username: String,
-    pub auth_type: i32,
-    pub auth_data: String,
+    #[serde(serialize_with="serialize_protobuf_enum")]
+    #[serde(deserialize_with="deserialize_protobuf_enum")]
+    pub auth_type: AuthenticationType,
+
+    #[serde(serialize_with="serialize_base64")]
+    #[serde(deserialize_with="deserialize_base64")]
+    pub auth_data: Vec<u8>,
 }
 
 impl Credentials {
@@ -124,7 +124,7 @@ impl Credentials {
         let mut contents = String::new();
         reader.read_to_string(&mut contents).unwrap();
 
-        json::decode::<StoredCredentials>(&contents).unwrap().into()
+        serde_json::from_str(&contents).unwrap()
     }
 
     pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Credentials> {
@@ -132,7 +132,7 @@ impl Credentials {
     }
 
     pub fn save_to_writer<W: Write>(&self, writer: &mut W) {
-        let contents = json::encode::<StoredCredentials>(&self.clone().into()).unwrap();
+        let contents = serde_json::to_string(&self.clone()).unwrap();
         writer.write_all(contents.as_bytes()).unwrap();
     }
 
@@ -142,24 +142,30 @@ impl Credentials {
     }
 }
 
-impl From<Credentials> for StoredCredentials {
-    fn from(credentials: Credentials) -> StoredCredentials {
-        StoredCredentials {
-            username: credentials.username,
-            auth_type: credentials.auth_type.value(),
-            auth_data: credentials.auth_data.to_base64(base64::STANDARD),
-        }
-    }
+fn serialize_protobuf_enum<T, S>(v: &T, ser: &mut S) -> Result<(), S::Error>
+    where T: ProtobufEnum, S: serde::Serializer {
+
+    serde::Serialize::serialize(&v.value(), ser)
 }
 
-impl From<StoredCredentials> for Credentials {
-    fn from(credentials: StoredCredentials) -> Credentials {
-        Credentials {
-            username: credentials.username,
-            auth_type: AuthenticationType::from_i32(credentials.auth_type).unwrap(),
-            auth_data: credentials.auth_data.from_base64().unwrap(),
-        }
-    }
+fn deserialize_protobuf_enum<T, D>(de: &mut D) -> Result<T, D::Error>
+    where T: ProtobufEnum, D: serde::Deserializer {
+
+    let v : i32 = try!(serde::Deserialize::deserialize(de));
+    T::from_i32(v).ok_or(serde::Error::invalid_value("Invalid enum value"))
+}
+
+fn serialize_base64<T, S>(v: &T, ser: &mut S) -> Result<(), S::Error>
+    where T: AsRef<[u8]>, S: serde::Serializer {
+
+    serde::Serialize::serialize(&v.as_ref().to_base64(base64::STANDARD), ser)
+}
+
+fn deserialize_base64<D>(de: &mut D) -> Result<Vec<u8>, D::Error>
+    where D: serde::Deserializer {
+
+    let v : String = try!(serde::Deserialize::deserialize(de));
+    v.from_base64().map_err(|e| serde::Error::custom(e.to_string()))
 }
 
 #[cfg(feature = "discovery")]

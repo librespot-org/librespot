@@ -81,7 +81,7 @@ The following backends are currently available :
 ## Development
 When developing *librespot*, it is preferable to use Rust nightly, and build it using the following :
 ```shell
-cargo build --no-default-features --features portaudio-backend
+cargo build --no-default-features --features "nightly portaudio-backend"
 ```
 
 This produces better compilation error messages than with the default configuration.
