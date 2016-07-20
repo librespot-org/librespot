@@ -948,7 +948,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "tremor"
 version = "0.1.0"
-source = "git+https://github.com/plietar/rust-tremor#5ced876f3cffb041fcf31238da7f3273178029fe"
+source = "git+https://github.com/plietar/rust-tremor#5958cc302e78f535dad90e9665da981ddff4000a"
 dependencies = [
  "libc 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "tremor-sys 0.1.0 (git+https://github.com/plietar/rust-tremor)",
@@ -957,11 +957,12 @@ dependencies = [
 [[package]]
 name = "tremor-sys"
 version = "0.1.0"
-source = "git+https://github.com/plietar/rust-tremor#5ced876f3cffb041fcf31238da7f3273178029fe"
+source = "git+https://github.com/plietar/rust-tremor#5958cc302e78f535dad90e9665da981ddff4000a"
 dependencies = [
  "gcc 0.3.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "ogg-sys 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
