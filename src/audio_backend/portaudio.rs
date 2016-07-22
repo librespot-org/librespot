@@ -1,6 +1,7 @@
 use super::{Open, Sink};
 use std::io;
 use std::process::exit;
+use std::time::Duration;
 use portaudio;
 use portaudio::device::{DeviceIndex, DeviceInfo, get_default_output_index};
 
@@ -53,12 +54,16 @@ impl <'a> Open for PortAudioSink<'a> {
             None => get_default_output_index(),
         }.expect("Could not find device");
 
+        let info = portaudio::device::get_info(device_idx);
+        let latency = match info {
+            Some(info) => info.default_high_output_latency,
+            None => Duration::new(0, 0),
+        };
+
         let params = StreamParameters {
             device: device_idx,
             channel_count: 2,
-            // Super hacky workaround the fact that Duration is private
-            // in portaudio
-            suggested_latency: unsafe { ::std::mem::transmute(0i64) },
+            suggested_latency: latency,
             data: 0i16,
         };
 

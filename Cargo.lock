@@ -564,7 +564,7 @@ dependencies = [
 [[package]]
 name = "portaudio"
 version = "0.2.0"
-source = "git+https://github.com/mvdnes/portaudio-rs#0b228f54a16814c52ba1ef449ac439af59f8cab0"
+source = "git+https://github.com/mvdnes/portaudio-rs#2e1630843551a229bfe6cae6291fd157349bad60"
 dependencies = [
  "bitflags 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -574,7 +574,7 @@ dependencies = [
 [[package]]
 name = "portaudio_sys"
 version = "0.1.1"
-source = "git+https://github.com/mvdnes/portaudio-rs#0b228f54a16814c52ba1ef449ac439af59f8cab0"
+source = "git+https://github.com/mvdnes/portaudio-rs#2e1630843551a229bfe6cae6291fd157349bad60"
 dependencies = [
  "libc 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
