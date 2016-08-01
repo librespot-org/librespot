@@ -3,9 +3,10 @@ use std::io;
 use std::process::exit;
 use std::time::Duration;
 use portaudio;
+use portaudio::stream::*;
 use portaudio::device::{DeviceIndex, DeviceInfo, get_default_output_index};
 
-pub struct PortAudioSink<'a>(portaudio::stream::Stream<'a, i16, i16>);
+pub struct PortAudioSink<'a>(Option<portaudio::stream::Stream<'a, i16, i16>>, StreamParameters<i16>);
 
 fn output_devices() -> Box<Iterator<Item=(DeviceIndex, DeviceInfo)>> {
     let count = portaudio::device::get_count().unwrap();
@@ -39,7 +40,6 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 
 impl <'a> Open for PortAudioSink<'a> {
     fn open(device: Option<&str>) -> PortAudioSink<'a> {
-        use portaudio::stream::*;
 
         debug!("Using PortAudio sink");
 
@@ -67,29 +67,32 @@ impl <'a> Open for PortAudioSink<'a> {
             data: 0i16,
         };
 
-        let stream = Stream::open(
-            None, Some(params),
-            44100.0,
-            FRAMES_PER_BUFFER_UNSPECIFIED,
-            StreamFlags::empty(),
-            None
-        ).unwrap();
-
-        PortAudioSink(stream)
+        PortAudioSink(None, params)
     }
 }
 
 impl <'a> Sink for PortAudioSink<'a> {
-    fn start(&self) -> io::Result<()> {
-        self.0.start().unwrap();
+    fn start(&mut self) -> io::Result<()> {
+        if self.0.is_none() {
+            self.0 = Some(Stream::open(
+                None, Some(self.1),
+                44100.0,
+                FRAMES_PER_BUFFER_UNSPECIFIED,
+                StreamFlags::empty(),
+                None
+            ).unwrap());;
+        }
+
+        self.0.as_mut().unwrap().start().unwrap();
         Ok(())
     }
-    fn stop(&self) -> io::Result<()> {
-        self.0.stop().unwrap();
+    fn stop(&mut self) -> io::Result<()> {
+        self.0.as_mut().unwrap().stop().unwrap();
+        self.0 = None;
         Ok(())
     }
-    fn write(&self, data: &[i16]) -> io::Result<()> {
-        match self.0.write(&data) {
+    fn write(&mut self, data: &[i16]) -> io::Result<()> {
+        match self.0.as_mut().unwrap().write(&data) {
             Ok(_) => (),
             Err(portaudio::PaError::OutputUnderflowed) =>
                 error!("PortAudio write underflow"),

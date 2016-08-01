@@ -213,7 +213,7 @@ fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<
 }
 
 impl PlayerInternal {
-    fn run(self, sink: Box<Sink>) {
+    fn run(self, mut sink: Box<Sink>) {
         let mut decoder = None;
 
         loop {
