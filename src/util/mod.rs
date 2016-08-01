@@ -4,7 +4,7 @@ use std::io;
 use std::ops::{Mul, Rem, Shr};
 use std::fs;
 use std::path::Path;
-use time;
+use std::time::{UNIX_EPOCH, SystemTime};
 
 mod int128;
 mod spotify_id;
@@ -34,8 +34,11 @@ impl<T, E> IgnoreExt for Result<T, E> {
 }
 
 pub fn now_ms() -> i64 {
-    let ts = time::now_utc().to_timespec();
-    ts.sec * 1000 + ts.nsec as i64 / 1000000
+    let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(dur) => dur,
+        Err(err) => err.duration(),
+    };
+    (dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000_000) as u64) as i64
 }
 
 pub fn mkdir_existing(path: &Path) -> io::Result<()> {

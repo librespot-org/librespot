@@ -28,7 +28,6 @@ extern crate rpassword;
 extern crate rustc_serialize;
 extern crate serde;
 extern crate serde_json;
-extern crate time;
 extern crate tempfile;
 extern crate url;
 
