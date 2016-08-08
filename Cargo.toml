@@ -29,7 +29,7 @@ hyper           = { version = "0.9.1", default-features = false }
 #json_macros     = "~0.3.0"
 lazy_static     = "~0.2.0"
 linear-map      = "1.0"
-lmdb-rs         = "0.7.0"
+lmdb-rs         = "0.7.2"
 num             = "~0.1.30"
 protobuf        = "~1.0.15"
 rand            = "~0.3.13"
