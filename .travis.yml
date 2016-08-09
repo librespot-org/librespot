@@ -16,7 +16,15 @@ addons:
     packages:
       - libprotoc-dev
       - portaudio19-dev
-      - libpulse-dev 
+      - libpulse-dev
+      - gcc-arm-linux-gnueabihf
+      - libc6-dev-armhf-cross
+
+before_script:
+    - mkdir -p ~/.cargo
+    - echo '[target.armv7-unknown-linux-gnueabihf]' > ~/.cargo/config
+    - echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
+    - sh ~/rust-installer/rustup.sh --prefix=$(rustc --print sysroot) -y --disable-sudo --add-target=armv7-unknown-linux-gnueabihf
 
 script:
     - cargo build --no-default-features --features "with-syntex"
@@ -24,6 +32,7 @@ script:
     - cargo build --no-default-features --features "with-syntex facebook"
     - cargo build --no-default-features --features "with-syntex portaudio-backend"
     - cargo build --no-default-features --features "with-syntex pulseaudio-backend"
+    - cargo build --no-default-features --features "with-syntex" --target armv7-unknown-linux-gnueabihf
 
     # Building without syntex only works on nightly
     - if [[ $TRAVIS_RUST_VERSION == *"nightly"* ]]; then
