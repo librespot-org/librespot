@@ -209,11 +209,14 @@ impl SpircInternal {
                 }
 
                 self.reload_tracks(&frame);
-
-                let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
-                let track = self.tracks[self.index as usize];
-                let position = frame.get_state().get_position_ms();
-                self.player.load(track, play, position);
+                if self.tracks.len() > 0 {
+                    let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
+                    let track = self.tracks[self.index as usize];
+                    let position = frame.get_state().get_position_ms();
+                    self.player.load(track, play, position);
+                } else {
+                    self.notify(false, Some(frame.get_ident()));
+                }
             }
             MessageType::kMessageTypePlay => {
                 self.player.play();
