@@ -43,15 +43,15 @@ impl Open for PulseAudioSink {
 }
 
 impl Sink for PulseAudioSink {
-    fn start(&self) -> io::Result<()> {
+    fn start(&mut self) -> io::Result<()> {
         Ok(())
     }
 
-    fn stop(&self) -> io::Result<()> {
+    fn stop(&mut self) -> io::Result<()> {
         Ok(())
     }
 
-    fn write(&self, data: &[i16]) -> io::Result<()> {
+    fn write(&mut self, data: &[i16]) -> io::Result<()> {
         unsafe {
             let ptr = transmute(data.as_ptr());
             let bytes = data.len() as usize * 2;

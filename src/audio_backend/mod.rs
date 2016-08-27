@@ -5,9 +5,9 @@ pub trait Open {
 }
 
 pub trait Sink {
-    fn start(&self) -> io::Result<()>;
-    fn stop(&self) -> io::Result<()>;
-    fn write(&self, data: &[i16]) -> io::Result<()>;
+    fn start(&mut self) -> io::Result<()>;
+    fn stop(&mut self) -> io::Result<()>;
+    fn write(&mut self, data: &[i16]) -> io::Result<()>;
 }
 
 /*
