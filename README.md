@@ -66,6 +66,7 @@ target/release/librespot [...] --backend portaudio
 ```
 
 The following backends are currently available :
+- ALSA
 - PortAudio 
 - PulseAudio
 
