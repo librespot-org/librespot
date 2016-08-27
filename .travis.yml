@@ -32,6 +32,7 @@ script:
     - cargo build --no-default-features --features "with-syntex facebook"
     - cargo build --no-default-features --features "with-syntex portaudio-backend"
     - cargo build --no-default-features --features "with-syntex pulseaudio-backend"
+    - cargo build --no-default-features --features "with-syntex alsa-backend"
     - cargo build --no-default-features --features "with-syntex" --target armv7-unknown-linux-gnueabihf
 
     # Building without syntex only works on nightly
