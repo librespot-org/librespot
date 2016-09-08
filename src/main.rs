@@ -26,6 +26,7 @@ fn main() {
     main_helper::add_session_arguments(&mut opts);
     main_helper::add_authentication_arguments(&mut opts);
     main_helper::add_player_arguments(&mut opts);
+    main_helper::add_program_arguments(&mut opts);
 
     let args: Vec<String> = std::env::args().collect();
 

@@ -39,6 +39,8 @@ pub struct Config {
     pub user_agent: String,
     pub device_name: String,
     pub bitrate: Bitrate,
+    pub onstart: Option<String>,
+    pub onstop: Option<String>,
 }
 
 pub struct SessionData {

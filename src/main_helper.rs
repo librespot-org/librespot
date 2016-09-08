@@ -54,6 +54,11 @@ pub fn add_player_arguments(opts: &mut getopts::Options) {
     opts.optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE");
 }
 
+pub fn add_program_arguments(opts: &mut getopts::Options) {
+    opts.optopt("", "onstart", "Run PROGRAM when playback is about to begin.", "PROGRAM");
+    opts.optopt("", "onstop", "Run PROGRAM when playback has ended.", "PROGRAM");
+}
+
 pub fn create_session(matches: &getopts::Matches) -> Session {
     info!("librespot {} ({}). Built on {}.",
              version::short_sha(),
@@ -77,10 +82,15 @@ pub fn create_session(matches: &getopts::Matches) -> Session {
         Box::new(DefaultCache::new(PathBuf::from(cache_location)).unwrap()) as Box<Cache + Send + Sync>
     }).unwrap_or_else(|| Box::new(NoCache) as Box<Cache + Send + Sync>);
 
+    let onstart = matches.opt_str("onstart");
+    let onstop = matches.opt_str("onstop");
+
     let config = Config {
         user_agent: version::version_string(),
         device_name: name,
         bitrate: bitrate,
+        onstart: onstart,
+        onstop: onstop,
     };
 
     Session::new(config, cache)

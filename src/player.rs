@@ -212,6 +212,20 @@ fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<
     Some(decoder)
 }
 
+fn run_onstart(session: &Session) {
+    match session.config().onstart {
+        Some(ref program) => util::run_program(program),
+        None => {},
+    };
+}
+
+fn run_onstop(session: &Session) {
+    match session.config().onstop {
+        Some(ref program) => util::run_program(program),
+        None => {},
+    };
+}
+
 impl PlayerInternal {
     fn run(self, mut sink: Box<Sink>) {
         let mut decoder = None;
@@ -229,6 +243,7 @@ impl PlayerInternal {
                     self.update(|state| {
                         if state.status == PlayStatus::kPlayStatusPlay {
                             sink.stop().unwrap();
+                            run_onstop(&self.session);
                         }
                         state.end_of_track = false;
                         state.status = PlayStatus::kPlayStatusPause;
@@ -245,6 +260,7 @@ impl PlayerInternal {
 
                             self.update(|state| {
                                 state.status = if play {
+                                    run_onstart(&self.session);
                                     sink.start().unwrap();
                                     PlayStatus::kPlayStatusPlay
                                 } else {
@@ -301,6 +317,7 @@ impl PlayerInternal {
                         true
                     });
 
+                    run_onstart(&self.session);
                     sink.start().unwrap();
                 }
                 Some(PlayerCommand::Pause) => {
@@ -313,6 +330,7 @@ impl PlayerInternal {
                     });
 
                     sink.stop().unwrap();
+                    run_onstop(&self.session);
                 }
                 Some(PlayerCommand::Volume(vol)) => {
                     self.update(|state| {
@@ -331,6 +349,7 @@ impl PlayerInternal {
                     });
 
                     sink.stop().unwrap();
+                    run_onstop(&self.session);
                     decoder = None;
                 }
                 None => (),
@@ -362,6 +381,7 @@ impl PlayerInternal {
                         });
 
                         sink.stop().unwrap();
+                        run_onstop(&self.session);
                         decoder = None;
                     }
                 }
