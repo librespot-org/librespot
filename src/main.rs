@@ -3,6 +3,7 @@ extern crate librespot;
 extern crate env_logger;
 #[macro_use]
 extern crate log;
+extern crate simple_signal;
 
 use std::process::exit;
 use std::thread;
@@ -10,6 +11,8 @@ use std::env;
 
 use librespot::spirc::SpircManager;
 use librespot::main_helper;
+
+use simple_signal::{Signal, Signals};
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
@@ -44,7 +47,15 @@ fn main() {
     let player = main_helper::create_player(&session, &matches);
 
     let spirc = SpircManager::new(session.clone(), player);
+    let spirc_signal = spirc.clone();
     thread::spawn(move || spirc.run());
+    Signals::set_handler(&[Signal::Int, Signal::Term],
+        move |signals| {
+            println!("Signal received: {:?}. Say goodbye and exit.", signals);
+            spirc_signal.send_goodbye();
+            exit(0);
+        }
+    );
 
     loop {
         session.poll();
