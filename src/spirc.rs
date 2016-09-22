@@ -165,6 +165,12 @@ impl SpircManager {
             .send();
     }
 
+    pub fn send_goodbye(&self) {
+        let mut internal = self.0.lock().unwrap();
+        CommandSender::new(&mut *internal, MessageType::kMessageTypeGoodbye)
+            .send();
+    }
+
     pub fn get_queue(&self) -> Vec<SpotifyId> {
         self.0.lock().unwrap().tracks.clone()
     }
