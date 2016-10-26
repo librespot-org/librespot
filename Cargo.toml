@@ -60,7 +60,7 @@ clippy          = { version = "*", optional = true }
 
 openssl         = { version = "0.7", optional = true }
 
-mdns            = { git = "http://github.com/plietar/rust-mdns" }
+mdns            = { git = "https://github.com/plietar/rust-mdns" }
 
 [build-dependencies]
 vergen          = "~0.1.0"
