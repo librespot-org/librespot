@@ -74,6 +74,7 @@ nightly           = ["serde_macros"]
 
 with-tremor       = ["tremor"]
 facebook          = ["hyper/ssl", "openssl"]
+stdout-backend    = []
 alsa-backend      = ["alsa"]
 portaudio-backend = ["portaudio"]
 pulseaudio-backend= ["libpulse-sys"]

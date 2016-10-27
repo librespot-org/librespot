@@ -54,6 +54,11 @@ fn mk_sink<S: Sink + Open + 'static>(device: Option<&str>) -> Box<Sink> {
     Box::new(S::open(device))
 }
 
+#[cfg(feature = "stdout-backend")]
+mod stdout;
+#[cfg(feature = "stdout-backend")]
+use self::stdout::StdoutSink;
+
 #[cfg(feature = "alsa-backend")]
 mod alsa;
 #[cfg(feature = "alsa-backend")]
@@ -75,6 +80,8 @@ declare_backends! {
         (&'static str,
          &'static (Fn(Option<&str>) -> Box<Sink> + Sync + Send + 'static))
     ] = &[
+        #[cfg(feature = "stdout-backend")]
+        ("stdout", &mk_sink::<StdoutSink>),
         #[cfg(feature = "alsa-backend")]
         ("alsa", &mk_sink::<AlsaSink>),
         #[cfg(feature = "portaudio-backend")]
