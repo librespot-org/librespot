@@ -60,5 +60,5 @@ cmd | length | payload  | mac
  8  |   16   | variable | 32
 
 Each packet has a type identified by the 8 bit `cmd` field.
-The 16 bit big endian length only inculdes the length of the payload.
+The 16 bit big endian length only includes the length of the payload.
 
