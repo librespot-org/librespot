@@ -4,6 +4,7 @@ use std::io;
 use std::ops::{Mul, Rem, Shr};
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 use std::time::{UNIX_EPOCH, SystemTime};
 
 mod int128;
@@ -49,6 +50,16 @@ pub fn mkdir_existing(path: &Path) -> io::Result<()> {
             Err(err)
         }
     })
+}
+
+pub fn run_program(program: &String) {
+    info!("Running {}", program);
+    let mut v: Vec<&str> = program.split_whitespace().collect();
+    let status = Command::new(&v.remove(0))
+            .args(&v)
+            .status()
+            .expect("program failed to start");
+    info!("Exit status: {}", status);
 }
 
 pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
