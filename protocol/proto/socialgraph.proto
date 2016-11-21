@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message CountReply {
     repeated int32 counts = 0x1;
 }

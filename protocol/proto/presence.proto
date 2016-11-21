@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message PlaylistPublishedState {
     optional string uri = 0x1;
     optional int64 timestamp = 0x2;

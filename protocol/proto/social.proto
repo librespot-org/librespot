@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message DecorationData {
     optional string username = 0x1;
     optional string full_name = 0x2;

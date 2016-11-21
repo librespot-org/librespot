@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message AppInfo {
     optional string identifier = 0x1;
     optional int32 version_int = 0x2;

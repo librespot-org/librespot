@@ -1,3 +1,4 @@
+syntax = "proto2";
 
 message ClientHello {
     required BuildInfo build_info = 0xa; 

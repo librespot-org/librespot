@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message Frame {
     optional uint32 version = 0x1;
     optional string ident = 0x2;

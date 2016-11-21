@@ -5,7 +5,4 @@ authors = ["Paul Liétar <paul@lietar.net>"]
 build = "build.rs"
 
 [dependencies]
-protobuf = "~1.0.10"
-
-[build-dependencies.protobuf_build]
-git = "https://github.com/plietar/rust-protobuf-build.git"
+protobuf = "1.0.10"

@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message Rule {
     optional string type = 0x1;
     optional uint32 times = 0x2;

@@ -1,3 +1,4 @@
+syntax = "proto2";
 
 message ClientResponseEncrypted {
     required LoginCredentials login_credentials = 0xa; 

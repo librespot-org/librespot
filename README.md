@@ -11,21 +11,21 @@ are however welcome to experiment with it.
 ## Building
 Rust 1.7.0 or later is required to build librespot.
 
-It also requires a C and C++ toolchain, with libprotoc and portaudio.
+It also requires a C, with portaudio.
 
 On debian / ubuntu, the following command will install these dependencies :
 ```shell
-sudo apt-get install build-essential portaudio19-dev libprotoc-dev
+sudo apt-get install build-essential portaudio19-dev
 ```
 
 On Fedora systems, the following command will install these dependencies :
 ```shell
-sudo dnf install portaudio-devel protobuf-devel make gcc gcc-c++
+sudo dnf install portaudio-devel make gcc
 ```
 
 On OS X, using homebrew :
 ```shell
-brew install portaudio protobuf
+brew install portaudio
 ```
 
 Once you've cloned this repository you can build *librespot* using `cargo`.

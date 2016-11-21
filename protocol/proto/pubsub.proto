@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message Subscription {
     optional string uri = 0x1;
     optional int32 expiry = 0x2;

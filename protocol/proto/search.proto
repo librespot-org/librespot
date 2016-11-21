@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message SearchRequest {
     optional string query = 0x1;
     optional Type type = 0x2;

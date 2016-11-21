@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message ClientIssue {
     optional Level level = 0x1;
     enum Level {

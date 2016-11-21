@@ -322,7 +322,6 @@ name = "librespot-protocol"
 version = "0.1.0"
 dependencies = [
  "protobuf 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf_build 0.1.1 (git+https://github.com/plietar/rust-protobuf-build.git)",
 ]
 
 [[package]]
@@ -614,17 +613,6 @@ dependencies = [
 name = "protobuf"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "protobuf_build"
-version = "0.1.1"
-source = "git+https://github.com/plietar/rust-protobuf-build.git#24d5a01ca035d0c00a3fae7ce5e26b6d2e68ddcb"
-dependencies = [
- "gcc 0.3.35 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
- "pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "protobuf_macros"
@@ -1324,7 +1312,6 @@ dependencies = [
 "checksum portaudio 0.2.0 (git+https://github.com/mvdnes/portaudio-rs)" = "<none>"
 "checksum portaudio_sys 0.1.1 (git+https://github.com/mvdnes/portaudio-rs)" = "<none>"
 "checksum protobuf 1.0.24 (registry+https://github.com/rust-lang/crates.io-index)" = "6ec4c2fe04370298218a09ab53a534febf54c160c5554e4de987b6d73c916d5d"
-"checksum protobuf_build 0.1.1 (git+https://github.com/plietar/rust-protobuf-build.git)" = "<none>"
 "checksum protobuf_macros 0.6.0 (git+https://github.com/plietar/rust-protobuf-macros)" = "<none>"
 "checksum quasi 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "621ed00c72a1279d3272b5ad7137302e8f493ba19f726dcb5a3c7c9774972a64"
 "checksum quasi 0.16.0 (registry+https://github.com/rust-lang/crates.io-index)" = "314e56e9e59af71a5b1f09fab15e8e66ab2ccb786688f8d2e04d98b8d7cbc161"
