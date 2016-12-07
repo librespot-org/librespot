@@ -256,7 +256,10 @@ impl PlayerInternal {
 
                     decoder = match load_track(&self.session, track_id) {
                         Some(mut decoder) => {
-                            vorbis_time_seek_ms(&mut decoder, position as i64).unwrap();
+                            match vorbis_time_seek_ms(&mut decoder, position as i64) {
+                                Ok(_) => (),
+                                Err(err) => error!("Vorbis error: {:?}", err),
+                            }
 
                             self.update(|state| {
                                 state.status = if play {
@@ -290,7 +293,10 @@ impl PlayerInternal {
 
                 }
                 Some(PlayerCommand::Seek(position)) => {
-                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();
+                    match vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64) {
+                        Ok(_) => (),
+                        Err(err) => error!("Vorbis error: {:?}", err),
+                    }
                     self.update(|state| {
                         state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
                         state.position_measured_at = util::now_ms();
@@ -301,7 +307,10 @@ impl PlayerInternal {
                 Some(PlayerCommand::SeekAt(position, measured_at)) => {
                     let position = (util::now_ms() - measured_at + position as i64) as u32;
 
-                    vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64).unwrap();
+                    match vorbis_time_seek_ms(decoder.as_mut().unwrap(), position as i64) {
+                        Ok(_) => (),
+                        Err(err) => error!("Vorbis error: {:?}", err),
+                    }
                     self.update(|state| {
                         state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
                         state.position_measured_at = util::now_ms();
