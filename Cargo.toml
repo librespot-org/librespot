@@ -92,5 +92,6 @@ available in the official library."""
 section = "sound"
 priority = "optional"
 assets = [
-    ["target/release/librespot", "usr/bin/", "755"]
+    ["target/release/librespot", "usr/bin/", "755"],
+    ["assets/librespot.service", "lib/systemd/system/", "644"]
 ]
