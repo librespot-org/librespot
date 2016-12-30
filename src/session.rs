@@ -7,7 +7,6 @@ use eventual::Future;
 use eventual::Async;
 use protobuf::{self, Message};
 use rand::thread_rng;
-use rand::Rng;
 use std::io::{Read, Write, Cursor};
 use std::result::Result;
 use std::sync::{Mutex, RwLock, Arc, mpsc};
@@ -95,11 +94,10 @@ impl Session {
     fn connect(&self) -> CipherConnection {
         let local_keys = DHLocalKeys::random(&mut thread_rng());
 
-        let aps = apresolve().unwrap();
-        let ap = thread_rng().choose(&aps).expect("No APs found");
+        let ap = apresolve();
 
         info!("Connecting to AP {}", ap);
-        let mut connection = PlainConnection::connect(ap).unwrap();
+        let mut connection = PlainConnection::connect(&ap).unwrap();
 
         let request = protobuf_init!(protocol::keyexchange::ClientHello::new(), {
             build_info => {
