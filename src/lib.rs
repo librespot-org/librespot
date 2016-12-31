@@ -8,8 +8,8 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
-#[macro_use]
-extern crate lazy_static;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
 
 extern crate bit_set;
 extern crate byteorder;
@@ -22,17 +22,14 @@ extern crate lmdb_rs;
 extern crate mdns;
 extern crate num;
 extern crate protobuf;
-extern crate shannon;
 extern crate rand;
 extern crate rpassword;
 extern crate rustc_serialize;
 extern crate serde;
 extern crate serde_json;
+extern crate shannon;
 extern crate tempfile;
 extern crate url;
-
-#[macro_use]
-extern crate log;
 
 #[cfg(not(feature = "with-tremor"))]
 extern crate vorbis;
@@ -53,17 +50,25 @@ extern crate libpulse_sys;
 
 extern crate librespot_protocol as protocol;
 
-// include!/include_bytes! don't play nice with syntex, so place these here
-pub mod version {
-    include!(concat!(env!("OUT_DIR"), "/version.rs"));
+pub mod album_cover;
+pub mod audio_backend;
+pub mod audio_decrypt;
+pub mod audio_file2;
+pub mod audio_file;
+pub mod audio_key;
+pub mod cache;
+pub mod connection;
+pub mod diffie_hellman;
+pub mod link;
+pub mod main_helper;
+pub mod metadata;
+pub mod player;
+pub mod stream;
+pub mod util;
+pub mod version;
 
-    pub fn version_string() -> String {
-        format!("librespot-{}", short_sha())
-    }
-}
+#[cfg(feature = "facebook")]
+pub mod spotilocal;
 
-#[cfg(feature = "with-syntex")]
-include!(concat!(env!("OUT_DIR"), "/lib.rs"));
-
-#[cfg(not(feature = "with-syntex"))]
-include!("lib.in.rs");
+#[cfg(feature = "with-syntex")] include!(concat!(env!("OUT_DIR"), "/lib.rs"));
+#[cfg(not(feature = "with-syntex"))] include!("lib.in.rs");
