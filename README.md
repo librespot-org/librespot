@@ -45,10 +45,9 @@ target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME
 For that, simply omit the `--username` argument.
 
 ## Facebook Accounts
-*librespot* can be built with Facebook authentication support. OpenSSL is required for this.
+*librespot* can use Facebook for authentication.
 
 ```shell
-cargo build --release --features facebook
 target/release/librespot --cache CACHEDIR --name DEVICENAME --facebook
 ```
 

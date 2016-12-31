@@ -13,11 +13,10 @@ matrix:
 addons:
   apt:
     packages:
-      - libprotoc-dev
-      - portaudio19-dev
-      - libpulse-dev
       - gcc-arm-linux-gnueabihf
       - libc6-dev-armhf-cross
+      - libpulse-dev
+      - portaudio19-dev
 
 before_script:
     - mkdir -p ~/.cargo
@@ -28,7 +27,6 @@ before_script:
 script:
     - cargo build --no-default-features --features "with-syntex"
     - cargo build --no-default-features --features "with-syntex with-tremor"
-    - cargo build --no-default-features --features "with-syntex facebook"
     - cargo build --no-default-features --features "with-syntex portaudio-backend"
     - cargo build --no-default-features --features "with-syntex pulseaudio-backend"
     - cargo build --no-default-features --features "with-syntex alsa-backend"

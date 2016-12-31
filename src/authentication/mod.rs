@@ -171,11 +171,5 @@ fn deserialize_base64<D>(de: &mut D) -> Result<Vec<u8>, D::Error>
 mod discovery;
 pub use self::discovery::discovery_login;
 
-#[cfg(feature = "facebook")]
 mod facebook;
-#[cfg(feature = "facebook")]
 pub use self::facebook::facebook_login;
-#[cfg(not(feature = "facebook"))]
-pub fn facebook_login() -> Result<Credentials, ()> {
-    Err(())
-}

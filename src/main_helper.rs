@@ -42,11 +42,8 @@ pub fn add_session_arguments(opts: &mut getopts::Options) {
 
 pub fn add_authentication_arguments(opts: &mut getopts::Options) {
     opts.optopt("u", "username", "Username to sign in with", "USERNAME")
-        .optopt("p", "password", "Password", "PASSWORD");
-
-    if cfg!(feature = "facebook") {
-        opts.optflag("", "facebook", "Login with a Facebook account");
-    }
+        .optopt("p", "password", "Password", "PASSWORD")
+        .optflag("", "facebook", "Login with a Facebook account");
 }
 
 pub fn add_player_arguments(opts: &mut getopts::Options) {
@@ -116,7 +113,7 @@ pub fn get_credentials(session: &Session, matches: &getopts::Matches) -> Credent
             Credentials::with_password(username.clone(), password)
         }
 
-        (None, _, _) if cfg!(feature = "facebook") && matches.opt_present("facebook")
+        (None, _, _) if matches.opt_present("facebook")
             => facebook_login().unwrap(),
 
         (None, _, Some(credentials))

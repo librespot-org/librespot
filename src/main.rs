@@ -19,7 +19,7 @@ fn usage(program: &str, opts: &getopts::Options) -> String {
 
 fn main() {
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "info,librespot=trace")
+        env::set_var("RUST_LOG", "mdns=info,librespot=trace")
     }
     env_logger::init().unwrap();
 

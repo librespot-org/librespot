@@ -1,10 +1,13 @@
 use hyper;
+use hyper::header::AccessControlAllowOrigin;
+use hyper::net::HttpsConnector;
 use hyper::net::NetworkListener;
 use hyper::server::Request;
 use hyper::server::Response;
 use hyper::uri::RequestUri;
-use hyper::header::AccessControlAllowOrigin;
+use hyper_rustls;
 use rand::{self, Rng};
+use rustls;
 use serde_json;
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -13,7 +16,7 @@ use url;
 
 use protocol::authentication::AuthenticationType;
 use authentication::Credentials;
-use ::spotilocal::ssl_context;
+use spotilocal::{SPOTILOCAL_CERT, SPOTILOCAL_KEY};
 
 struct ServerHandler {
     token_tx: Mutex<mpsc::Sender<String>>,
@@ -58,7 +61,9 @@ impl hyper::server::Handler for ServerHandler {
 fn facebook_get_me_id(token: &str) -> Result<String, ()> {
     let url = format!("https://graph.facebook.com/me?fields=id&access_token={}", token);
 
-    let client = hyper::Client::new();
+    let connector = HttpsConnector::new(hyper_rustls::TlsClient::new());
+    let client = hyper::Client::with_connector(connector);
+
     let mut response = client.get(&url).send().unwrap();
     let mut body = String::new();
     response.read_to_string(&mut body).unwrap();
@@ -76,9 +81,13 @@ pub fn facebook_login() -> Result<Credentials, ()> {
         csrf: csrf.clone()
     };
 
-    let ssl = ssl_context().unwrap();
+    let mut cert_data = SPOTILOCAL_CERT;
+    let mut key_data = SPOTILOCAL_KEY;
+    let certs = rustls::internal::pemfile::certs(&mut cert_data).unwrap();
+    let key = rustls::internal::pemfile::rsa_private_keys(&mut key_data).unwrap().swap_remove(0);
+    let tls = hyper_rustls::TlsServer::new(certs, key);
 
-    let mut listener = hyper::net::HttpsListener::new("127.0.0.1:0", ssl).unwrap();
+    let mut listener = hyper::net::HttpsListener::new("127.0.0.1:0", tls).unwrap();
     let port = listener.local_addr().unwrap().port();
 
     let mut server = hyper::Server::new(listener).handle(handler).unwrap();
