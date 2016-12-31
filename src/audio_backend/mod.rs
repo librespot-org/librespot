@@ -54,11 +54,6 @@ fn mk_sink<S: Sink + Open + 'static>(device: Option<&str>) -> Box<Sink> {
     Box::new(S::open(device))
 }
 
-#[cfg(feature = "stdout-backend")]
-mod stdout;
-#[cfg(feature = "stdout-backend")]
-use self::stdout::StdoutSink;
-
 #[cfg(feature = "alsa-backend")]
 mod alsa;
 #[cfg(feature = "alsa-backend")]
@@ -74,19 +69,20 @@ mod pulseaudio;
 #[cfg(feature = "pulseaudio-backend")]
 use self::pulseaudio::PulseAudioSink;
 
+mod pipe;
+use self::pipe::StdoutSink;
 
 declare_backends! {
     pub const BACKENDS : &'static [
         (&'static str,
          &'static (Fn(Option<&str>) -> Box<Sink> + Sync + Send + 'static))
     ] = &[
-        #[cfg(feature = "stdout-backend")]
-        ("stdout", &mk_sink::<StdoutSink>),
         #[cfg(feature = "alsa-backend")]
         ("alsa", &mk_sink::<AlsaSink>),
         #[cfg(feature = "portaudio-backend")]
         ("portaudio", &mk_sink::<PortAudioSink>),
         #[cfg(feature = "pulseaudio-backend")]
         ("pulseaudio", &mk_sink::<PulseAudioSink>),
+        ("pipe", &mk_sink::<StdoutSink>),
     ];
 }
