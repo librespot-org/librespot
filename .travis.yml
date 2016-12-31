@@ -2,7 +2,6 @@ language: rust
 rust:
   - stable
   - beta
-  - nightly-2016-07-03 # Last known to be working nightly
   - nightly
 
 cache: cargo
