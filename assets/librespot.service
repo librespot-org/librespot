@@ -1,0 +1,14 @@
+[Unit]
+Description=Librespot
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+#User=librespot
+Restart=always
+RestartSec=10
+ExecStart=/usr/bin/librespot -n "%p on %H"
+
+[Install]
+WantedBy=multi-user.target
+
