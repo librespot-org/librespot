@@ -4,7 +4,8 @@ Requires=network-online.target
 After=network-online.target
 
 [Service]
-#User=librespot
+User=nobody
+Group=audio
 Restart=always
 RestartSec=10
 ExecStart=/usr/bin/librespot -n "%p on %H"
