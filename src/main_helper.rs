@@ -1,6 +1,6 @@
 use getopts;
 use rpassword;
-use std::io::{stdout, Write};
+use std::io::{stderr, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -107,8 +107,8 @@ pub fn get_credentials(session: &Session, matches: &getopts::Matches) -> Credent
             => credentials.clone(),
 
         (Some(username), None, _) => {
-            print!("Password for {}: ", username);
-            stdout().flush().unwrap();
+            write!(stderr(), "Password for {}: ", username).unwrap();
+            stderr().flush().unwrap();
             let password = rpassword::read_password().unwrap();
             Credentials::with_password(username.clone(), password)
         }
