@@ -1,11 +1,9 @@
-const APRESOLVE_ENDPOINT : &'static str = "https://apresolve.spotify.com/";
+const APRESOLVE_ENDPOINT : &'static str = "http://apresolve.spotify.com/";
 const AP_FALLBACK : &'static str = "ap.spotify.com:80";
 
 use hyper;
-use hyper_rustls;
 use std::io::Read;
 use serde_json;
-use hyper::net::HttpsConnector;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct APResolveData {
@@ -13,8 +11,7 @@ pub struct APResolveData {
 }
 
 pub fn apresolve() -> String {
-    let connector = HttpsConnector::new(hyper_rustls::TlsClient::new());
-    let client = hyper::Client::with_connector(connector);
+    let client = hyper::Client::new();
 
     (|| {
         let mut response = client.get(APRESOLVE_ENDPOINT).send().map_err(|_| ())?;

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::exit;
 
 use audio_backend::{BACKENDS, Sink};
-use authentication::{Credentials, facebook_login, discovery_login};
+use authentication::{Credentials, discovery_login};
 use cache::{Cache, DefaultCache, NoCache};
 use player::Player;
 use session::{Bitrate, Config, Session};
@@ -47,8 +47,7 @@ pub fn add_session_arguments(opts: &mut getopts::Options) {
 
 pub fn add_authentication_arguments(opts: &mut getopts::Options) {
     opts.optopt("u", "username", "Username to sign in with", "USERNAME")
-        .optopt("p", "password", "Password", "PASSWORD")
-        .optflag("", "facebook", "Login with a Facebook account");
+        .optopt("p", "password", "Password", "PASSWORD");
 }
 
 pub fn add_player_arguments(opts: &mut getopts::Options) {
@@ -112,9 +111,6 @@ pub fn get_credentials(session: &Session, matches: &getopts::Matches) -> Credent
             let password = rpassword::read_password().unwrap();
             Credentials::with_password(username.clone(), password)
         }
-
-        (None, _, _) if matches.opt_present("facebook")
-            => facebook_login().unwrap(),
 
         (None, _, Some(credentials))
             => credentials,

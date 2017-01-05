@@ -44,15 +44,6 @@ target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME
 *librespot* can be run in discovery mode, in which case no password is required at startup.
 For that, simply omit the `--username` argument.
 
-## Facebook Accounts
-*librespot* can use Facebook for authentication.
-
-```shell
-target/release/librespot --cache CACHEDIR --name DEVICENAME --facebook
-```
-
-This will print a link to the console, which must be visited on the same computer *librespot* is running on.
-
 ## Audio Backends
 *librespot* supports various audio backends. Multiple backends can be enabled at compile time by enabling the
 corresponding cargo feature. By default, only PortAudio is enabled.
