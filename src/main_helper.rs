@@ -1,5 +1,7 @@
+use env_logger::LogBuilder;
 use getopts;
 use rpassword;
+use std::env;
 use std::io::{stderr, Write};
 use std::path::PathBuf;
 use std::process::exit;
@@ -37,7 +39,10 @@ pub fn find_backend(name: Option<&str>) -> &'static (Fn(Option<&str>) -> Box<Sin
 pub fn add_session_arguments(opts: &mut getopts::Options) {
     opts.optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .reqopt("n", "name", "Device name", "NAME")
-        .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE");
+        .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE")
+        .optopt("", "onstart", "Run PROGRAM when playback is about to begin.", "PROGRAM")
+        .optopt("", "onstop", "Run PROGRAM when playback has ended.", "PROGRAM")
+        .optflag("v", "verbose", "Enable verbose output");
 }
 
 pub fn add_authentication_arguments(opts: &mut getopts::Options) {
@@ -47,13 +52,8 @@ pub fn add_authentication_arguments(opts: &mut getopts::Options) {
 }
 
 pub fn add_player_arguments(opts: &mut getopts::Options) {
-    opts.optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND");
-    opts.optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE");
-}
-
-pub fn add_program_arguments(opts: &mut getopts::Options) {
-    opts.optopt("", "onstart", "Run PROGRAM when playback is about to begin.", "PROGRAM");
-    opts.optopt("", "onstop", "Run PROGRAM when playback has ended.", "PROGRAM");
+    opts.optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
+        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE");
 }
 
 pub fn create_session(matches: &getopts::Matches) -> Session {
@@ -135,4 +135,28 @@ pub fn create_player(session: &Session, matches: &getopts::Matches) -> Player {
     Player::new(session.clone(), move || {
         make_backend(device_name.as_ref().map(AsRef::as_ref))
     })
+}
+
+pub fn setup_logging(matches: &getopts::Matches) {
+    let verbose = matches.opt_present("verbose");
+    let mut builder = LogBuilder::new();
+
+    match env::var("RUST_LOG") {
+        Ok(config) => {
+            builder.parse(&config);
+            builder.init().unwrap();
+
+            if verbose {
+                warn!("`--verbose` flag overidden by `RUST_LOG` environment variable");
+            }
+        }
+        Err(_) => {
+            if verbose {
+                builder.parse("mdns=info,librespot=trace");
+            } else {
+                builder.parse("mdns=info,librespot=info");
+            }
+            builder.init().unwrap();
+        }
+    }
 }

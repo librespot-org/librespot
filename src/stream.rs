@@ -51,7 +51,7 @@ impl Channel {
         packet.read_u16::<BigEndian>().unwrap(); // Skip channel id
 
         if cmd == 0xa {
-            error!("error: {} {}", data.len(), packet.read_u16::<BigEndian>().unwrap());
+            trace!("error: {} {}", data.len(), packet.read_u16::<BigEndian>().unwrap());
             return match handler.box_on_error(session) {
                 Response::Continue(_) => Response::Close,
                 Response::Spawn(f) => Response::Spawn(f),

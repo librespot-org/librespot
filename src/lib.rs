@@ -14,6 +14,7 @@
 extern crate bit_set;
 extern crate byteorder;
 extern crate crypto;
+extern crate env_logger;
 extern crate eventual;
 extern crate getopts;
 extern crate hyper;
