@@ -6,12 +6,15 @@ use crypto::hmac::Hmac;
 use crypto::pbkdf2::pbkdf2;
 use crypto::sha1::Sha1;
 use protobuf::ProtobufEnum;
+use rpassword;
 use serde;
 use serde_json;
-use std::io::{self, Read, Write};
+use std::io::{self, stderr, Read, Write};
 use std::fs::File;
 use std::path::Path;
 use rustc_serialize::base64::{self, FromBase64, ToBase64};
+
+use session::Session;
 
 use protocol::authentication::AuthenticationType;
 
@@ -170,3 +173,31 @@ fn deserialize_base64<D>(de: &mut D) -> Result<Vec<u8>, D::Error>
 
 mod discovery;
 pub use self::discovery::discovery_login;
+
+pub fn get_credentials(session: &Session, username: Option<String>, password: Option<String>) -> Credentials {
+    let credentials = session.cache().get_credentials();
+
+    match (username, password, credentials) {
+
+        (Some(username), Some(password), _)
+            => Credentials::with_password(username, password),
+
+        (Some(ref username), _, Some(ref credentials)) if *username == credentials.username
+            => credentials.clone(),
+
+        (Some(username), None, _) => {
+            write!(stderr(), "Password for {}: ", username).unwrap();
+            stderr().flush().unwrap();
+            let password = rpassword::read_password().unwrap();
+            Credentials::with_password(username.clone(), password)
+        }
+
+        (None, _, Some(credentials))
+            => credentials,
+
+        (None, _, None) => {
+            info!("No username provided and no stored credentials, starting discovery ...");
+            discovery_login(&session.config().device_name, session.device_id()).unwrap()
+        }
+    }
+}

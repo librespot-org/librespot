@@ -8,6 +8,7 @@ use std::thread;
 
 use librespot::spirc::SpircManager;
 use librespot::main_helper;
+use librespot::authentication::get_credentials;
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
@@ -33,7 +34,8 @@ fn main() {
     main_helper::setup_logging(&matches);
 
     let session = main_helper::create_session(&matches);
-    let credentials = main_helper::get_credentials(&session, &matches);
+    let credentials = get_credentials(&session, matches.opt_str("username"),
+                                      matches.opt_str("password"));
     session.login(credentials).unwrap();
 
     let player = main_helper::create_player(&session, &matches);
