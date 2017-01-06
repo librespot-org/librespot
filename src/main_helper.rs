@@ -55,14 +55,26 @@ pub fn add_player_arguments(opts: &mut getopts::Options) {
         .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE");
 }
 
-pub fn create_session(matches: &getopts::Matches) -> Session {
+pub fn session_from_matches(matches: &getopts::Matches) -> Session {
+    create_session(matches.opt_str("n").unwrap(),
+                   matches.opt_str("b").as_ref().map(String::as_ref),
+                   matches.opt_str("c").as_ref().map(String::as_ref),
+                   matches.opt_str("onstart"),
+                   matches.opt_str("onstop"))
+}
+
+pub fn create_session(name: String,
+                      bitrate: Option<&str>,
+                      cache: Option<&str>,
+                      onstart: Option<String>,
+                      onstop: Option<String>)
+                      -> Session {
     info!("librespot {} ({}). Built on {}.",
              version::short_sha(),
              version::commit_date(),
              version::short_now());
 
-    let name = matches.opt_str("n").unwrap();
-    let bitrate = match matches.opt_str("b").as_ref().map(String::as_ref) {
+    let bitrate = match bitrate {
         None => Bitrate::Bitrate160, // default value
 
         Some("96") => Bitrate::Bitrate96,
@@ -74,12 +86,9 @@ pub fn create_session(matches: &getopts::Matches) -> Session {
         }
     };
 
-    let cache = matches.opt_str("c").map(|cache_location| {
+    let cache = cache.map(|cache_location| {
         Box::new(DefaultCache::new(PathBuf::from(cache_location)).unwrap()) as Box<Cache + Send + Sync>
     }).unwrap_or_else(|| Box::new(NoCache) as Box<Cache + Send + Sync>);
-
-    let onstart = matches.opt_str("onstart");
-    let onstop = matches.opt_str("onstop");
 
     let config = Config {
         user_agent: version::version_string(),
@@ -92,13 +101,16 @@ pub fn create_session(matches: &getopts::Matches) -> Session {
     Session::new(config, cache)
 }
 
-pub fn get_credentials(session: &Session, matches: &getopts::Matches) -> Credentials {
+pub fn credentials_from_matches(session: &Session,
+                                matches: &getopts::Matches) -> Credentials {
+    get_credentials(session, matches.opt_str("username"), matches.opt_str("password"))
+}
+
+pub fn get_credentials(session: &Session, username: Option<String>,
+                       password: Option<String>) -> Credentials {
     let credentials = session.cache().get_credentials();
 
-    match (matches.opt_str("username"),
-           matches.opt_str("password"),
-           credentials) {
-
+    match (username, password, credentials) {
         (Some(username), Some(password), _)
             => Credentials::with_password(username, password),
 
@@ -122,11 +134,14 @@ pub fn get_credentials(session: &Session, matches: &getopts::Matches) -> Credent
     }
 }
 
-pub fn create_player(session: &Session, matches: &getopts::Matches) -> Player {
-    let backend_name = matches.opt_str("backend");
-    let device_name = matches.opt_str("device");
+pub fn player_from_matches(session: &Session, matches: &getopts::Matches) -> Player {
+    create_player(session, matches.opt_str("backend").as_ref().map(String::as_ref)
+                  , matches.opt_str("device"))
+}
 
-    let make_backend = find_backend(backend_name.as_ref().map(AsRef::as_ref));
+pub fn create_player(session: &Session, backend_name: Option<&str>
+                     , device_name: Option<String>) -> Player {
+    let make_backend = find_backend(backend_name);
 
     Player::new(session.clone(), move || {
         make_backend(device_name.as_ref().map(AsRef::as_ref))

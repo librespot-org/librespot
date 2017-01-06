@@ -32,11 +32,11 @@ fn main() {
 
     main_helper::setup_logging(&matches);
 
-    let session = main_helper::create_session(&matches);
-    let credentials = main_helper::get_credentials(&session, &matches);
+    let session = main_helper::session_from_matches(&matches);
+    let credentials = main_helper::credentials_from_matches(&session, &matches);
     session.login(credentials).unwrap();
 
-    let player = main_helper::create_player(&session, &matches);
+    let player = main_helper::player_from_matches(&session, &matches);
 
     let spirc = SpircManager::new(session.clone(), player);
     let spirc_signal = spirc.clone();
