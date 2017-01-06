@@ -28,6 +28,7 @@ use version;
 
 use stream;
 
+#[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
     Bitrate96,
     Bitrate160,

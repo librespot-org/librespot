@@ -1,13 +1,10 @@
 use env_logger::LogBuilder;
 use getopts;
-use rpassword;
 use std::env;
-use std::io::{stderr, Write};
 use std::path::PathBuf;
 use std::process::exit;
 
 use audio_backend::{BACKENDS, Sink};
-use authentication::{Credentials, discovery_login};
 use cache::{Cache, DefaultCache, NoCache};
 use player::Player;
 use session::{Bitrate, Config, Session};
@@ -90,36 +87,6 @@ pub fn create_session(matches: &getopts::Matches) -> Session {
     };
 
     Session::new(config, cache)
-}
-
-pub fn get_credentials(session: &Session, matches: &getopts::Matches) -> Credentials {
-    let credentials = session.cache().get_credentials();
-
-    match (matches.opt_str("username"),
-           matches.opt_str("password"),
-           credentials) {
-
-        (Some(username), Some(password), _)
-            => Credentials::with_password(username, password),
-
-        (Some(ref username), _, Some(ref credentials)) if *username == credentials.username
-            => credentials.clone(),
-
-        (Some(username), None, _) => {
-            write!(stderr(), "Password for {}: ", username).unwrap();
-            stderr().flush().unwrap();
-            let password = rpassword::read_password().unwrap();
-            Credentials::with_password(username.clone(), password)
-        }
-
-        (None, _, Some(credentials))
-            => credentials,
-
-        (None, _, None) => {
-            info!("No username provided and no stored credentials, starting discovery ...");
-            discovery_login(&session.config().device_name, session.device_id()).unwrap()
-        }
-    }
 }
 
 pub fn create_player(session: &Session, matches: &getopts::Matches) -> Player {
