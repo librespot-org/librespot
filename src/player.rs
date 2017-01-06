@@ -180,12 +180,12 @@ fn find_available_alternative<'a>(session: &Session, track: &'a Track) -> Option
 fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<Subfile<AudioDecrypt<Box<ReadSeek>>>>> {
     let track = session.metadata::<Track>(track_id).await().unwrap();
 
-    info!("Loading track {:?}", track.name);
+    info!("Loading track \"{}\"", track.name);
 
     let track = match find_available_alternative(session, &track) {
         Some(track) => track,
         None => {
-            warn!("Track {:?} is not available", track.name);
+            warn!("Track \"{}\" is not available", track.name);
             return None;
         }
     };

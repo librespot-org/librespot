@@ -6,7 +6,7 @@ pub struct AlsaSink(Option<PCM>, String);
 
 impl Open for AlsaSink {
    fn open(device: Option<&str>) -> AlsaSink {
-        println!("Using alsa sink");
+        info!("Using alsa sink");
 
         let name = device.unwrap_or("default").to_string();
 
