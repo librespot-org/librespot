@@ -14,7 +14,6 @@
 extern crate bit_set;
 extern crate byteorder;
 extern crate crypto;
-extern crate env_logger;
 extern crate eventual;
 extern crate getopts;
 extern crate hyper;
@@ -56,7 +55,6 @@ pub mod cache;
 pub mod connection;
 pub mod diffie_hellman;
 pub mod link;
-pub mod main_helper;
 pub mod metadata;
 pub mod player;
 pub mod stream;

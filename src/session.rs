@@ -10,6 +10,7 @@ use rand::thread_rng;
 use std::io::{Read, Write, Cursor};
 use std::result::Result;
 use std::sync::{Mutex, RwLock, Arc, mpsc};
+use std::str::FromStr;
 
 use album_cover::AlbumCover;
 use apresolve::apresolve;
@@ -33,6 +34,17 @@ pub enum Bitrate {
     Bitrate96,
     Bitrate160,
     Bitrate320,
+}
+impl FromStr for Bitrate {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "96" => Ok(Bitrate::Bitrate96),
+            "160" => Ok(Bitrate::Bitrate160),
+            "320" => Ok(Bitrate::Bitrate320),
+            _ => Err(s.into()),
+        }
+    }
 }
 
 pub struct Config {

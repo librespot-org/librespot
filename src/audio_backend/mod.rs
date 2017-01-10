@@ -86,3 +86,11 @@ declare_backends! {
         ("pipe", &mk_sink::<StdoutSink>),
     ];
 }
+
+pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<&'static (Fn(Option<&str>) -> Box<Sink> + Send + Sync)> {
+    if let Some(name) = name.as_ref().map(AsRef::as_ref) {
+        BACKENDS.iter().find(|backend| name == backend.0).map(|backend| backend.1)
+    } else {
+        Some(BACKENDS.first().expect("No backends were enabled at build time").1)
+    }
+}
