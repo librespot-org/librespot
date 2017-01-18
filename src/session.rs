@@ -12,7 +12,7 @@ use futures::Stream;
 use futures::sync::oneshot;
 
 use album_cover::AlbumCover;
-use apresolve::apresolve;
+use apresolve::apresolve_or_fallback;
 use audio_file::AudioFile;
 use audio_key::{AudioKeyManager, AudioKey, AudioKeyError};
 use authentication::Credentials;
@@ -101,26 +101,29 @@ impl Session {
     }
 
     pub fn login(&self, credentials: Credentials) -> Result<Credentials, ()> {
-        let addr = apresolve();
         let device_id = self.device_id().to_owned();
 
         let (creds_tx, creds_rx) = oneshot::channel();
 
-        info!("Connecting to AP {}", addr);
-
         let (tx, rx) = adaptor::adapt(move |handle| {
-             let connection = connection::connect(&addr as &str, &handle);
-             let authentication = connection.and_then(|connection| {
-                 connection::authenticate(connection, credentials, device_id)
-             });
+            let access_point = apresolve_or_fallback::<io::Error>(&handle);
 
-             authentication.map(|(transport, creds)| {
-                 creds_tx.complete(creds);
-                 transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()))
-             })
+            let connection = access_point.and_then(move |addr| {
+                info!("Connecting to AP \"{}\"", addr);
+                connection::connect::<&str>(&addr, &handle)
+            });
+
+            let authentication = connection.and_then(move |connection| {
+                connection::authenticate(connection, credentials, device_id)
+            });
+
+            authentication.map(|(transport, creds)| {
+                creds_tx.complete(creds);
+                transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()))
+            })
         });
 
-        let reusable_credentials = creds_rx.wait().unwrap();
+        let reusable_credentials: Credentials = creds_rx.wait().unwrap();
 
         self.0.data.write().unwrap().canonical_username = reusable_credentials.username.clone();
         *self.0.rx_connection.lock().unwrap() = Some(rx);

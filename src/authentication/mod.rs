@@ -197,7 +197,8 @@ pub fn get_credentials(session: &Session, username: Option<String>, password: Op
 
         (None, _, None) => {
             info!("No username provided and no stored credentials, starting discovery ...");
-            discovery_login(&session.config().device_name, session.device_id()).unwrap()
+            discovery_login(session.config().device_name.clone(),
+                            session.device_id()).unwrap()
         }
     }
 }

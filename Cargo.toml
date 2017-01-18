@@ -27,13 +27,13 @@ ctrlc           = { version = "2.0", features = ["termination"] }
 env_logger      = "0.3.2"
 eventual        = "0.1.6"
 getopts         = "0.2.14"
-hyper           = { version = "0.9.1", default-features = false }
+hyper           = { git = "https://github.com/hyperium/hyper" }
 lazy_static     = "0.2.0"
 linear-map      = "1.0"
 lmdb-rs         = "0.7.2"
 log             = "0.3.5"
 num             = "0.1.30"
-protobuf        = "1.0.15"
+protobuf        = "1.1"
 rand            = "0.3.13"
 rpassword       = "0.3.0"
 rust-crypto     = "0.2.34"
@@ -43,7 +43,7 @@ serde_json      = "0.8"
 serde_macros    = { version = "0.8", optional = true }
 shannon         = { git = "https://github.com/plietar/rust-shannon" }
 tempfile        = "2.1"
-url             = "0.5.0"
+url             = "1.3"
 
 vorbis          = "0.1.0"
 tremor          = { git = "https://github.com/plietar/rust-tremor", optional = true }
@@ -57,9 +57,10 @@ protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
 
 mdns            = { git = "https://github.com/plietar/rust-mdns" }
 
+error-chain = "0.7.0"
 futures = "0.1.8"
-tokio-proto = "0.1.0"
 tokio-core = "0.1.2"
+tokio-proto = "0.1.0"
 
 [build-dependencies]
 vergen          = "0.1.0"

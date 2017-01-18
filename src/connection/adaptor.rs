@@ -1,5 +1,6 @@
 use futures::future::ok;
 use futures::sync::mpsc;
+use futures::sync::oneshot;
 use futures::{Future, Sink, Stream, BoxFuture, IntoFuture};
 use std::thread;
 use tokio_core::reactor::Core;
@@ -52,7 +53,7 @@ fn adapt_stream<S>(stream: S, tx: mpsc::Sender<Result<S::Item, S::Error>>) -> Bo
 }
 
 pub fn adapt<F, U, S>(f: F) -> (SinkAdaptor<S::SinkItem>, StreamAdaptor<S::Item, S::Error>)
-    where F: FnOnce(&Handle) -> U + Send + 'static,
+    where F: FnOnce(Handle) -> U + Send + 'static,
           U: IntoFuture<Item=S>,
           S: Sink + Stream + Send + 'static,
           S::Item: Send + 'static,
@@ -69,7 +70,7 @@ pub fn adapt<F, U, S>(f: F) -> (SinkAdaptor<S::SinkItem>, StreamAdaptor<S::Item,
         let mut core = Core::new().unwrap();
         let handle = core.handle();
         let task =
-            f(&handle).into_future()
+            f(handle).into_future()
             .map(|connection| connection.split())
             .map_err(|_| ())
             .and_then(|(sink, stream)| {
@@ -82,4 +83,25 @@ pub fn adapt<F, U, S>(f: F) -> (SinkAdaptor<S::SinkItem>, StreamAdaptor<S::Item,
 
     (SinkAdaptor(Some(sender_tx)),
      StreamAdaptor(Some(receiver_rx)))
+}
+
+pub fn adapt_future<F, U>(f: F) -> oneshot::Receiver<Result<U::Item, U::Error>>
+    where F: FnOnce(Handle) -> U + Send + 'static,
+          U: IntoFuture,
+          U::Item: Send + 'static,
+          U::Error: Send + 'static,
+{
+    let (tx, rx) = oneshot::channel();
+
+    thread::spawn(move || {
+        let mut core = Core::new().unwrap();
+        let handle = core.handle();
+
+        let task = f(handle).into_future();
+        let result = core.run(task);
+
+        tx.complete(result);
+    });
+
+    rx
 }

@@ -8,6 +8,8 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
+#[macro_use] extern crate error_chain;
+#[macro_use] extern crate futures;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 
@@ -29,11 +31,9 @@ extern crate serde;
 extern crate serde_json;
 extern crate shannon;
 extern crate tempfile;
-extern crate url;
-
-#[macro_use] extern crate futures;
 extern crate tokio_core;
 extern crate tokio_proto;
+extern crate url;
 
 extern crate librespot_protocol as protocol;
 
@@ -60,6 +60,7 @@ pub mod diffie_hellman;
 pub mod link;
 pub mod metadata;
 pub mod player;
+pub mod session;
 pub mod stream;
 pub mod util;
 pub mod version;

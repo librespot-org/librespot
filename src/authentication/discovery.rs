@@ -1,34 +1,70 @@
-use crypto;
-use crypto::mac::Mac;
 use crypto::digest::Digest;
-use hyper;
-use hyper::net::NetworkListener;
+use crypto::mac::Mac;
+use crypto;
+use diffie_hellman::{DH_GENERATOR, DH_PRIME};
+use futures::{Future, Stream, BoxFuture};
+use futures::sync::mpsc;
+use hyper::{self, Get, Post, StatusCode};
+use hyper::server::{Server, Service, NewService, Request, Response};
+use mdns;
 use num::BigUint;
-use url;
 use rand;
 use rustc_serialize::base64::{self, ToBase64, FromBase64};
+use std::io;
 use std::collections::BTreeMap;
-use std::io::{Read, Write};
-use std::sync::{mpsc, Mutex};
-use mdns;
+use std::sync::Arc;
+use url;
+use tokio_core::reactor::Handle;
+use std::net::SocketAddr;
 
 use authentication::Credentials;
-use diffie_hellman::{DH_GENERATOR, DH_PRIME};
+use connection::adaptor::adapt_future;
 use util;
 
-struct ServerHandler {
-    credentials_tx: Mutex<mpsc::Sender<Credentials>>,
+#[derive(Clone)]
+struct Discovery(Arc<DiscoveryInner>);
+struct DiscoveryInner {
     private_key: BigUint,
     public_key: BigUint,
     device_id: String,
     device_name: String,
+    tx: mpsc::UnboundedSender<Credentials>,
 }
 
-impl ServerHandler {
-    fn handle_get_info(&self, _params: &BTreeMap<String, String>,
-                       mut response: hyper::server::Response<hyper::net::Fresh>) {
+impl Discovery {
+    pub fn new(device_name: String, device_id: String)
+        -> (Discovery, mpsc::UnboundedReceiver<Credentials>)
+    {
+        let (tx, rx) = mpsc::unbounded();
 
-        let public_key = self.public_key.to_bytes_be()
+        let key_data = util::rand_vec(&mut rand::thread_rng(), 95);
+        let private_key = BigUint::from_bytes_be(&key_data);
+        let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
+
+        let discovery = Discovery(Arc::new(DiscoveryInner {
+            device_name: device_name.to_owned(),
+            device_id: device_id.to_owned(),
+            private_key: private_key,
+            public_key: public_key,
+            tx: tx,
+        }));
+
+        (discovery, rx)
+    }
+
+    pub fn serve(&self, addr: &SocketAddr, handle: &Handle)
+        -> hyper::Result<SocketAddr>
+    {
+        let server = Server::http(&addr, handle)?;
+        server.handle(self.clone(), handle)
+    }
+}
+
+impl Discovery {
+    fn handle_get_info(&self, _params: &BTreeMap<String, String>)
+        -> ::futures::Finished<Response, hyper::Error>
+    {
+        let public_key = self.0.public_key.to_bytes_be()
                                         .to_base64(base64::STANDARD);
 
         let result = json!({
@@ -36,8 +72,8 @@ impl ServerHandler {
             "statusString": "ERROR-OK",
             "spotifyError": 0,
             "version": "2.1.0",
-            "deviceID": (self.device_id),
-            "remoteName": (self.device_name),
+            "deviceID": (self.0.device_id),
+            "remoteName": (self.0.device_name),
             "activeUser": "",
             "publicKey": (public_key),
             "deviceType": "UNKNOWN",
@@ -47,13 +83,13 @@ impl ServerHandler {
             "modelDisplayName": "librespot",
         });
 
-        *response.status_mut() = hyper::status::StatusCode::Ok;
-        response.start().unwrap().write_all(result.to_string().as_bytes()).unwrap();
+        let body = result.to_string();
+        ::futures::finished(Response::new().with_body(body))
     }
 
-    fn handle_add_user(&self, params: &BTreeMap<String, String>,
-                       mut response: hyper::server::Response<hyper::net::Fresh>) {
-
+    fn handle_add_user(&self, params: &BTreeMap<String, String>)
+        -> ::futures::Finished<Response, hyper::Error>
+    {
         let username = params.get("userName").unwrap();
         let encrypted_blob = params.get("blob").unwrap();
         let client_key = params.get("clientKey").unwrap();
@@ -63,7 +99,7 @@ impl ServerHandler {
         let client_key = client_key.from_base64().unwrap();
         let client_key = BigUint::from_bytes_be(&client_key);
 
-        let shared_key = util::powm(&client_key, &self.private_key, &DH_PRIME);
+        let shared_key = util::powm(&client_key, &self.0.private_key, &DH_PRIME);
 
         let iv = &encrypted_blob[0..16];
         let encrypted = &encrypted_blob[16..encrypted_blob.len() - 20];
@@ -106,9 +142,9 @@ impl ServerHandler {
             String::from_utf8(data).unwrap()
         };
 
-        let credentials = Credentials::with_blob(username.to_owned(), &decrypted, &self.device_id);
+        let credentials = Credentials::with_blob(username.to_owned(), &decrypted, &self.0.device_id);
 
-        self.credentials_tx.lock().unwrap().send(credentials).unwrap();
+        self.0.tx.send(credentials).unwrap();
 
         let result = json!({
             "status": 101,
@@ -116,74 +152,87 @@ impl ServerHandler {
             "statusString": "ERROR-OK"
         });
 
-        *response.status_mut() = hyper::status::StatusCode::Ok;
-        response.start().unwrap().write_all(result.to_string().as_bytes()).unwrap();
+        let body = result.to_string();
+        ::futures::finished(Response::new().with_body(body))
     }
 
-    fn not_found(&self, mut response: hyper::server::Response<hyper::net::Fresh>) {
-
-        *response.status_mut() = hyper::status::StatusCode::NotFound
+    fn not_found(&self)
+        -> ::futures::Finished<Response, hyper::Error>
+    {
+        ::futures::finished(Response::new().with_status(StatusCode::NotFound))
     }
 }
 
-impl hyper::server::Handler for ServerHandler {
-    fn handle<'a, 'k>(&'a self,
-                      mut request: hyper::server::Request<'a, 'k>,
-                      response: hyper::server::Response<'a, hyper::net::Fresh>) {
+impl Service for Discovery {
+    type Request = Request;
+    type Response = Response;
+    type Error = hyper::Error;
+    type Future = BoxFuture<Response, hyper::Error>;
 
-        if let hyper::uri::RequestUri::AbsolutePath(path) = request.uri.clone() {
-            let (_, query, _) = url::parse_path(&path).unwrap();
-            let mut params = query.map_or(vec![], |q| url::form_urlencoded::parse(q.as_bytes()))
-                                  .into_iter().collect::<BTreeMap<_,_>>();
+    fn call(&self, request: Request) -> Self::Future {
+        let mut params = BTreeMap::new();
 
-            if request.method == hyper::method::Method::Post {
-                let mut body = Vec::new();
-                request.read_to_end(&mut body).unwrap();
-                let form = url::form_urlencoded::parse(&body);
-                params.extend(form);
-            }
-
-            debug!("{:?} {:?} {:?}", request.method, path, params);
-
-            match params.get("action").map(AsRef::as_ref) {
-                Some("getInfo") => self.handle_get_info(&params, response),
-                Some("addUser") => self.handle_add_user(&params, response),
-                _ => self.not_found(response),
-            }
-        } else {
-            self.not_found(response)
+        let (method, uri, _, _, body) = request.deconstruct();
+        if let Some(query) = uri.query() {
+            params.extend(url::form_urlencoded::parse(query.as_bytes()).into_owned());
         }
+
+        debug!("{:?} {:?} {:?}", method, uri.path(), params);
+
+        let this = self.clone();
+        body.fold(Vec::new(), |mut acc, chunk| {
+            acc.extend_from_slice(chunk.as_ref());
+            Ok::<_, hyper::Error>(acc)
+        }).map(move |body| {
+            params.extend(url::form_urlencoded::parse(&body).into_owned());
+            params
+        }).and_then(move |params| {
+            match (method, params.get("action").map(AsRef::as_ref)) {
+                (Get, Some("getInfo")) => this.handle_get_info(&params),
+                (Post, Some("addUser")) => this.handle_add_user(&params),
+                _ => this.not_found(),
+            }
+        }).boxed()
     }
 }
 
-pub fn discovery_login(device_name: &str, device_id: &str) -> Result<Credentials, ()> {
-    let (tx, rx) = mpsc::channel();
+impl NewService for Discovery {
+    type Request = Request;
+    type Response = Response;
+    type Error = hyper::Error;
+    type Instance = Self;
 
-    let key_data = util::rand_vec(&mut rand::thread_rng(), 95);
-    let private_key = BigUint::from_bytes_be(&key_data);
-    let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
+    fn new_service(&self) -> io::Result<Self::Instance> {
+        Ok(self.clone())
+    }
+}
 
-    let handler = ServerHandler {
-        device_name: device_name.to_owned(),
-        device_id: device_id.to_owned(),
-        private_key: private_key,
-        public_key: public_key,
-        credentials_tx: Mutex::new(tx),
-    };
+pub fn discovery_login<A,B>(device_name: A, device_id: B) -> Result<Credentials, ()>
+    where A: Into<String>,
+          B: Into<String>
+{
+    let device_name = device_name.into();
+    let device_id = device_id.into();
 
-    let mut listener = hyper::net::HttpListener::new("0.0.0.0:0").unwrap();
-    let port = listener.local_addr().unwrap().port();
+    let (discovery, rx) = Discovery::new(device_name.clone(), device_id);
 
-    let mut server = hyper::Server::new(listener).handle(handler).unwrap();
+    let addr = "0.0.0.0:0".parse().unwrap();
+    let cred = adapt_future(move |handle| {
+        let addr = discovery.serve(&addr, &handle).unwrap();
 
-    let responder = mdns::Responder::new().unwrap();
-    let _svc = responder.register(
-        "_spotify-connect._tcp".to_owned(),
-        device_name.to_owned(),
-        port,
-        &["VERSION=1.0", "CPath=/"]);
+        let responder = mdns::Responder::spawn(&handle).unwrap();
+        let svc = responder.register(
+            "_spotify-connect._tcp".to_owned(),
+            device_name,
+            addr.port(),
+            &["VERSION=1.0", "CPath=/"]);
 
-    let cred = rx.recv().unwrap();
-    server.close().unwrap();
-    Ok(cred)
+        rx.into_future()
+            .map(move |(creds, _)| (creds, svc))
+            .map_err(|(e, _)| e)
+    });
+
+
+    let (creds, _svc) = cred.wait().unwrap().unwrap();
+    Ok(creds.unwrap())
 }
