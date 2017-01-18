@@ -7,7 +7,7 @@ use std::slice;
 pub struct StdoutSink(Box<Write>);
 
 impl Open for StdoutSink {
-    fn open(path: Option<&str>) -> StdoutSink {
+    fn open(path: Option<String>) -> StdoutSink {
         if let Some(path) = path {
             let file = OpenOptions::new().write(true).open(path).unwrap();
             StdoutSink(Box::new(file))

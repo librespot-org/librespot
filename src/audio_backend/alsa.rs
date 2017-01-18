@@ -5,10 +5,10 @@ use alsa::{PCM, Stream, Mode, Format, Access};
 pub struct AlsaSink(Option<PCM>, String);
 
 impl Open for AlsaSink {
-   fn open(device: Option<&str>) -> AlsaSink {
+   fn open(device: Option<String>) -> AlsaSink {
         info!("Using alsa sink");
 
-        let name = device.unwrap_or("default").to_string();
+        let name = device.unwrap_or("default".to_string());
 
         AlsaSink(None, name)
     }

@@ -9,7 +9,7 @@ use std::sync::{Mutex, RwLock, Arc, mpsc};
 use std::str::FromStr;
 use futures::Future as Future_;
 use futures::Stream;
-use futures::sync::oneshot;
+use tokio_core::reactor::Handle;
 
 use album_cover::AlbumCover;
 use apresolve::apresolve_or_fallback;
@@ -45,7 +45,7 @@ impl FromStr for Bitrate {
 
 pub struct Config {
     pub user_agent: String,
-    pub device_name: String,
+    pub name: String,
     pub device_id: String,
     pub bitrate: Bitrate,
     pub onstart: Option<String>,
@@ -66,74 +66,73 @@ pub struct SessionInternal {
     metadata: Mutex<MetadataManager>,
     stream: Mutex<StreamManager>,
     audio_key: Mutex<AudioKeyManager>,
-    rx_connection: Mutex<Option<adaptor::StreamAdaptor<(u8, Vec<u8>), io::Error>>>,
-    tx_connection: Mutex<Option<adaptor::SinkAdaptor<(u8, Vec<u8>)>>>,
+    rx_connection: Mutex<adaptor::StreamAdaptor<(u8, Vec<u8>), io::Error>>,
+    tx_connection: Mutex<adaptor::SinkAdaptor<(u8, Vec<u8>)>>,
 }
 
 #[derive(Clone)]
 pub struct Session(pub Arc<SessionInternal>);
 
-pub fn device_id(device_name: &str) -> String {
+pub fn device_id(name: &str) -> String {
     let mut h = Sha1::new();
-    h.input_str(&device_name);
+    h.input_str(&name);
     h.result_str()
 }
 
 impl Session {
-    pub fn new(config: Config, cache: Box<Cache + Send + Sync>) -> Session {
-        Session(Arc::new(SessionInternal {
+    pub fn connect(config: Config, credentials: Credentials,
+                   cache: Box<Cache + Send + Sync>, handle: Handle)
+        -> Box<Future_<Item=(Session, Box<Future_<Item=(), Error=io::Error>>), Error=io::Error>>
+    {
+        let access_point = apresolve_or_fallback::<io::Error>(&handle);
+
+        let connection = access_point.and_then(move |addr| {
+            info!("Connecting to AP \"{}\"", addr);
+            connection::connect::<&str>(&addr, &handle)
+        });
+
+        let device_id = config.device_id.clone();
+        let authentication = connection.and_then(move |connection| {
+            connection::authenticate(connection, credentials, device_id)
+        });
+
+        let result = authentication.map(move |(transport, reusable_credentials)| {
+            info!("Authenticated !");
+            cache.put_credentials(&reusable_credentials);
+
+            let (session, task) = Session::create(transport, config, cache, reusable_credentials.username.clone());
+            (session, task)
+        });
+        
+        Box::new(result)
+    }
+
+    fn create(transport: connection::Transport, config: Config,
+              cache: Box<Cache + Send + Sync>, username: String) -> (Session, Box<Future_<Item=(), Error=io::Error>>)
+    {
+        let transport = transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()));
+        let (tx, rx, task) = adaptor::adapt(transport);
+
+        let session = Session(Arc::new(SessionInternal {
             config: config,
             data: RwLock::new(SessionData {
                 country: String::new(),
-                canonical_username: String::new(),
+                canonical_username: username,
             }),
 
-            rx_connection: Mutex::new(None),
-            tx_connection: Mutex::new(None),
+            rx_connection: Mutex::new(rx),
+            tx_connection: Mutex::new(tx),
 
             cache: cache,
             mercury: Mutex::new(MercuryManager::new()),
             metadata: Mutex::new(MetadataManager::new()),
             stream: Mutex::new(StreamManager::new()),
             audio_key: Mutex::new(AudioKeyManager::new()),
-        }))
+        }));
+
+        (session, task)
     }
 
-    pub fn login(&self, credentials: Credentials) -> Result<Credentials, ()> {
-        let device_id = self.device_id().to_owned();
-
-        let (creds_tx, creds_rx) = oneshot::channel();
-
-        let (tx, rx) = adaptor::adapt(move |handle| {
-            let access_point = apresolve_or_fallback::<io::Error>(&handle);
-
-            let connection = access_point.and_then(move |addr| {
-                info!("Connecting to AP \"{}\"", addr);
-                connection::connect::<&str>(&addr, &handle)
-            });
-
-            let authentication = connection.and_then(move |connection| {
-                connection::authenticate(connection, credentials, device_id)
-            });
-
-            authentication.map(|(transport, creds)| {
-                creds_tx.complete(creds);
-                transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()))
-            })
-        });
-
-        let reusable_credentials: Credentials = creds_rx.wait().unwrap();
-
-        self.0.data.write().unwrap().canonical_username = reusable_credentials.username.clone();
-        *self.0.rx_connection.lock().unwrap() = Some(rx);
-        *self.0.tx_connection.lock().unwrap() = Some(tx);
-
-        info!("Authenticated !");
-
-        self.0.cache.put_credentials(&reusable_credentials);
-
-        Ok(reusable_credentials)
-    }
 
     pub fn poll(&self) {
         let (cmd, data) = self.recv();
@@ -152,11 +151,11 @@ impl Session {
     }
 
     pub fn recv(&self) -> (u8, Vec<u8>) {
-        self.0.rx_connection.lock().unwrap().as_mut().unwrap().recv().unwrap()
+        self.0.rx_connection.lock().unwrap().recv().unwrap()
     }
 
     pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
-        self.0.tx_connection.lock().unwrap().as_mut().unwrap().send((cmd, data))
+        self.0.tx_connection.lock().unwrap().send((cmd, data))
     }
 
     pub fn audio_key(&self, track: SpotifyId, file_id: FileId) -> Future<AudioKey, AudioKeyError> {

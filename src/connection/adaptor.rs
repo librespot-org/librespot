@@ -6,8 +6,8 @@ use std::thread;
 use tokio_core::reactor::Core;
 use tokio_core::reactor::Handle;
 
-pub struct SinkAdaptor<T>(Option<mpsc::Sender<T>>);
-pub struct StreamAdaptor<T, E>(Option<mpsc::Receiver<Result<T, E>>>);
+pub struct SinkAdaptor<T>(pub Option<mpsc::Sender<T>>);
+pub struct StreamAdaptor<T, E>(pub Option<mpsc::Receiver<Result<T, E>>>);
 
 impl <T> SinkAdaptor<T> {
     pub fn send(&mut self, item: T) {
@@ -30,59 +30,33 @@ impl <T, E> StreamAdaptor<T, E> {
     }
 }
 
-fn adapt_sink<S>(sink: S, rx: mpsc::Receiver<S::SinkItem>) -> BoxFuture<(), ()>
-    where S: Sink + Send + 'static,
-          S::SinkItem: Send,
-          S::SinkError: Send,
-{
-    rx.map_err(|_| -> S::SinkError { panic!("") })
-      .forward(sink)
-      .map(|_| ()).map_err(|_| ())
-      .boxed()
-}
-
-fn adapt_stream<S>(stream: S, tx: mpsc::Sender<Result<S::Item, S::Error>>) -> BoxFuture<(), ()>
-    where S: Stream + Send + 'static,
-          S::Item: Send,
-          S::Error: Send,
-{
-    stream.then(ok::<_, mpsc::SendError<_>>)
-        .forward(tx)
-        .map(|_| ()).map_err(|_| ())
-        .boxed()
-}
-
-pub fn adapt<F, U, S>(f: F) -> (SinkAdaptor<S::SinkItem>, StreamAdaptor<S::Item, S::Error>)
-    where F: FnOnce(Handle) -> U + Send + 'static,
-          U: IntoFuture<Item=S>,
-          S: Sink + Stream + Send + 'static,
+pub fn adapt<S, E>(transport: S) -> (SinkAdaptor<S::SinkItem>,
+                                     StreamAdaptor<S::Item, E>,
+                                     BoxFuture<(), E>)
+    where S: Sink<SinkError=E> + Stream<Error=E> + Send + 'static,
           S::Item: Send + 'static,
-          S::Error: Send + 'static,
           S::SinkItem: Send + 'static,
-          S::SinkError: Send + 'static,
+          E: Send + 'static,
 {
-
     let (receiver_tx, receiver_rx) = mpsc::channel(0);
     let (sender_tx, sender_rx) = mpsc::channel(0);
 
+    let (sink, stream) = transport.split();
 
-    thread::spawn(move || {
-        let mut core = Core::new().unwrap();
-        let handle = core.handle();
-        let task =
-            f(handle).into_future()
-            .map(|connection| connection.split())
-            .map_err(|_| ())
-            .and_then(|(sink, stream)| {
-                (adapt_sink(sink, sender_rx),
-                 adapt_stream(stream, receiver_tx))
-            });
+    let receiver_task = stream
+        .then(ok::<_, mpsc::SendError<_>>)
+        .forward(receiver_tx).map(|_| ())
+        .map_err(|e| -> E { panic!(e) });
 
-        core.run(task).unwrap();
-    });
+    let sender_task = sender_rx
+        .map_err(|e| -> E { panic!(e) })
+        .forward(sink).map(|_| ());
+
+    let task = (receiver_task, sender_task).into_future()
+        .map(|((), ())| ()).boxed();
 
     (SinkAdaptor(Some(sender_tx)),
-     StreamAdaptor(Some(receiver_rx)))
+     StreamAdaptor(Some(receiver_rx)), task)
 }
 
 pub fn adapt_future<F, U>(f: F) -> oneshot::Receiver<Result<U::Item, U::Error>>

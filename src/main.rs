@@ -3,6 +3,8 @@ extern crate getopts;
 extern crate librespot;
 extern crate ctrlc;
 extern crate env_logger;
+extern crate futures;
+extern crate tokio_core;
 
 use env_logger::LogBuilder;
 use std::io::{stderr, Write};
@@ -11,10 +13,12 @@ use std::thread;
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
+use futures::Future;
+use tokio_core::reactor::Core;
 
 use librespot::spirc::SpircManager;
-use librespot::authentication::get_credentials;
-use librespot::audio_backend::{self, BACKENDS};
+use librespot::authentication::{get_credentials, Credentials};
+use librespot::audio_backend::{self, Sink, BACKENDS};
 use librespot::cache::{Cache, DefaultCache, NoCache};
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
@@ -59,7 +63,15 @@ fn list_backends() {
     }
 }
 
-fn setup(args: &[String]) -> (Session, Player) {
+struct Setup {
+    backend: &'static (Fn(Option<String>) -> Box<Sink> + Send + Sync),
+    cache: Box<Cache + Send + Sync>,
+    config: Config,
+    credentials: Credentials,
+    device: Option<String>,
+}
+
+fn setup(args: &[String]) -> Setup {
     let mut opts = getopts::Options::new();
     opts.optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .reqopt("n", "name", "Device name", "NAME")
@@ -101,8 +113,8 @@ fn setup(args: &[String]) -> (Session, Player) {
         .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
         .unwrap_or(Bitrate::Bitrate160);
 
-    let device_name = matches.opt_str("name").unwrap();
-    let device_id = librespot::session::device_id(&device_name);
+    let name = matches.opt_str("name").unwrap();
+    let device_id = librespot::session::device_id(&name);
 
     let cache = matches.opt_str("c").map(|cache_location| {
         Box::new(DefaultCache::new(PathBuf::from(cache_location)).unwrap()) 
@@ -111,46 +123,59 @@ fn setup(args: &[String]) -> (Session, Player) {
 
     let cached_credentials = cache.get_credentials();
 
-    let credentials = get_credentials(&device_name, &device_id,
+    let credentials = get_credentials(&name, &device_id,
                                       matches.opt_str("username"),
                                       matches.opt_str("password"),
                                       cached_credentials);
 
     let config = Config {
         user_agent: version::version_string(),
-        device_name: device_name,
+        name: name,
         device_id: device_id,
         bitrate: bitrate,
         onstart: matches.opt_str("onstart"),
         onstop: matches.opt_str("onstop"),
     };
 
-    let session = Session::new(config, cache);
+    let device = matches.opt_str("device");
 
-    session.login(credentials).unwrap();
-
-    let device_name = matches.opt_str("device");
-    let player = Player::new(session.clone(), move || {
-        (backend)(device_name.as_ref().map(AsRef::as_ref))
-    });
-
-    (session, player)
+    Setup {
+        backend: backend,
+        cache: cache,
+        config: config,
+        credentials: credentials,
+        device: device,
+    }
 }
 
 fn main() {
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+
     let args: Vec<String> = std::env::args().collect();
-    let (session, player) = setup(&args);
 
-    let spirc = SpircManager::new(session.clone(), player);
-    let spirc_signal = spirc.clone();
-    thread::spawn(move || spirc.run());
+    let Setup { backend, cache, config, credentials, device } = setup(&args);
 
-    ctrlc::set_handler(move || {
-        spirc_signal.send_goodbye();
-        exit(0);
+    let connection = Session::connect(config, credentials, cache, handle);
+
+    let task = connection.and_then(move |(session, task)| {
+        let player = Player::new(session.clone(), move || {
+            (backend)(device)
+        });
+
+        let spirc = SpircManager::new(session.clone(), player);
+        let spirc_signal = spirc.clone();
+
+        ctrlc::set_handler(move || {
+            spirc_signal.send_goodbye();
+            exit(0);
+        });
+
+        thread::spawn(move || spirc.run());
+        thread::spawn(move || loop { session.poll() });
+
+        task
     });
 
-    loop {
-        session.poll();
-    }
+    core.run(task).unwrap()
 }

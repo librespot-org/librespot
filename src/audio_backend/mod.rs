@@ -1,7 +1,7 @@
 use std::io;
 
 pub trait Open {
-    fn open(Option<&str>) -> Self;
+    fn open(Option<String>) -> Self;
 }
 
 pub trait Sink {
@@ -49,8 +49,7 @@ macro_rules! _declare_backends {
     )
 }
 
-#[allow(dead_code)]
-fn mk_sink<S: Sink + Open + 'static>(device: Option<&str>) -> Box<Sink> {
+fn mk_sink<S: Sink + Open + 'static>(device: Option<String>) -> Box<Sink> {
     Box::new(S::open(device))
 }
 
@@ -75,7 +74,7 @@ use self::pipe::StdoutSink;
 declare_backends! {
     pub const BACKENDS : &'static [
         (&'static str,
-         &'static (Fn(Option<&str>) -> Box<Sink> + Sync + Send + 'static))
+         &'static (Fn(Option<String>) -> Box<Sink> + Sync + Send + 'static))
     ] = &[
         #[cfg(feature = "alsa-backend")]
         ("alsa", &mk_sink::<AlsaSink>),
@@ -87,7 +86,7 @@ declare_backends! {
     ];
 }
 
-pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<&'static (Fn(Option<&str>) -> Box<Sink> + Send + Sync)> {
+pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<&'static (Fn(Option<String>) -> Box<Sink> + Send + Sync)> {
     if let Some(name) = name.as_ref().map(AsRef::as_ref) {
         BACKENDS.iter().find(|backend| name == backend.0).map(|backend| backend.1)
     } else {

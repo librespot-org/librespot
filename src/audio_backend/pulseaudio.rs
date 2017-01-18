@@ -8,7 +8,7 @@ use std::ffi::CString;
 pub struct PulseAudioSink(*mut pa_simple);
 
 impl Open for PulseAudioSink {
-   fn open(device: Option<&str>) -> PulseAudioSink {
+   fn open(device: Option<String>) -> PulseAudioSink {
         debug!("Using PulseAudio sink");
 
         if device.is_some() {

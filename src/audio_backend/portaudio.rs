@@ -39,13 +39,13 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 }
 
 impl <'a> Open for PortAudioSink<'a> {
-    fn open(device: Option<&str>) -> PortAudioSink<'a> {
+    fn open(device: Option<String>) -> PortAudioSink<'a> {
 
         debug!("Using PortAudio sink");
 
         portaudio::initialize().unwrap();
 
-        let device_idx = match device {
+        let device_idx = match device.as_ref().map(AsRef::as_ref) {
             Some("?") => {
                 list_outputs();
                 exit(0)
