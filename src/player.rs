@@ -4,6 +4,7 @@ use std::sync::{mpsc, Mutex, Arc, MutexGuard};
 use std::thread;
 use std::io::{Read, Seek};
 use vorbis;
+use futures::Future;
 
 use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
@@ -206,7 +207,7 @@ fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<
         }
     };
 
-    let key = session.audio_key(track.id, file_id).await().unwrap();
+    let key = session.audio_key().request(track.id, file_id).wait().unwrap().unwrap();
 
     let audio_file = Subfile::new(AudioDecrypt::new(key, session.audio_file(file_id)), 0xa7);
     let decoder = vorbis::Decoder::new(audio_file).unwrap();

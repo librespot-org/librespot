@@ -56,7 +56,7 @@ impl Cache for DefaultCache {
         value.and_then(|value| if value.len() == 16 {
             let mut result = [0u8; 16];
             result.clone_from_slice(&value);
-            Some(result)
+            Some(AudioKey(result))
         } else {
             None
         })
@@ -73,7 +73,7 @@ impl Cache for DefaultCache {
             key.extend_from_slice(&track.to_raw());
             key.extend_from_slice(&file.0);
 
-            db.set(&key, &audio_key.as_ref()).unwrap();
+            db.set(&key, &audio_key.0.as_ref()).unwrap();
         }
 
         xact.commit().unwrap();

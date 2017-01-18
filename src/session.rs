@@ -5,23 +5,23 @@ use eventual::Future;
 use eventual::Async;
 use std::io::{self, Read, Cursor};
 use std::result::Result;
-use std::sync::{Mutex, RwLock, Arc, mpsc};
+use std::sync::{Mutex, RwLock, Arc, mpsc, Weak};
 use std::str::FromStr;
 use futures::Future as Future_;
-use futures::Stream;
+use futures::{Stream, BoxFuture};
 use tokio_core::reactor::Handle;
 
 use album_cover::AlbumCover;
 use apresolve::apresolve_or_fallback;
 use audio_file::AudioFile;
-use audio_key::{AudioKeyManager, AudioKey, AudioKeyError};
+use audio_key::AudioKeyManager;
 use authentication::Credentials;
 use cache::Cache;
 use connection::{self, adaptor};
 use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use stream::StreamManager;
-use util::{SpotifyId, FileId, ReadSeek};
+use util::{SpotifyId, FileId, ReadSeek, Lazy};
 
 use stream;
 
@@ -65,13 +65,17 @@ pub struct SessionInternal {
     mercury: Mutex<MercuryManager>,
     metadata: Mutex<MetadataManager>,
     stream: Mutex<StreamManager>,
-    audio_key: Mutex<AudioKeyManager>,
     rx_connection: Mutex<adaptor::StreamAdaptor<(u8, Vec<u8>), io::Error>>,
     tx_connection: Mutex<adaptor::SinkAdaptor<(u8, Vec<u8>)>>,
+
+    audio_key: Lazy<AudioKeyManager>,
 }
 
 #[derive(Clone)]
 pub struct Session(pub Arc<SessionInternal>);
+
+#[derive(Clone)]
+pub struct SessionWeak(pub Weak<SessionInternal>);
 
 pub fn device_id(name: &str) -> String {
     let mut h = Sha1::new();
@@ -82,7 +86,7 @@ pub fn device_id(name: &str) -> String {
 impl Session {
     pub fn connect(config: Config, credentials: Credentials,
                    cache: Box<Cache + Send + Sync>, handle: Handle)
-        -> Box<Future_<Item=(Session, Box<Future_<Item=(), Error=io::Error>>), Error=io::Error>>
+        -> Box<Future_<Item=(Session, BoxFuture<(), io::Error>), Error=io::Error>>
     {
         let access_point = apresolve_or_fallback::<io::Error>(&handle);
 
@@ -108,7 +112,8 @@ impl Session {
     }
 
     fn create(transport: connection::Transport, config: Config,
-              cache: Box<Cache + Send + Sync>, username: String) -> (Session, Box<Future_<Item=(), Error=io::Error>>)
+              cache: Box<Cache + Send + Sync>, username: String)
+        -> (Session, BoxFuture<(), io::Error>)
     {
         let transport = transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()));
         let (tx, rx, task) = adaptor::adapt(transport);
@@ -127,12 +132,16 @@ impl Session {
             mercury: Mutex::new(MercuryManager::new()),
             metadata: Mutex::new(MetadataManager::new()),
             stream: Mutex::new(StreamManager::new()),
-            audio_key: Mutex::new(AudioKeyManager::new()),
+
+            audio_key: Lazy::new(),
         }));
 
         (session, task)
     }
 
+    pub fn audio_key(&self) -> &AudioKeyManager {
+        self.0.audio_key.get(|| AudioKeyManager::new(self.weak()))
+    }
 
     pub fn poll(&self) {
         let (cmd, data) = self.recv();
@@ -141,7 +150,7 @@ impl Session {
             0x4 => self.send_packet(0x49, data),
             0x4a => (),
             0x9 | 0xa => self.0.stream.lock().unwrap().handle(cmd, data, self),
-            0xd | 0xe => self.0.audio_key.lock().unwrap().handle(cmd, data, self),
+            0xd | 0xe => self.audio_key().dispatch(cmd, data),
             0x1b => {
                 self.0.data.write().unwrap().country = String::from_utf8(data).unwrap();
             }
@@ -158,6 +167,7 @@ impl Session {
         self.0.tx_connection.lock().unwrap().send((cmd, data))
     }
 
+    /*
     pub fn audio_key(&self, track: SpotifyId, file_id: FileId) -> Future<AudioKey, AudioKeyError> {
         self.0.cache
             .get_audio_key(track, file_id)
@@ -172,6 +182,7 @@ impl Session {
                     })
             })
     }
+    */
 
     pub fn audio_file(&self, file_id: FileId) -> Box<ReadSeek> {
         self.0.cache
@@ -240,6 +251,16 @@ impl Session {
 
     pub fn device_id(&self) -> &str {
         &self.config().device_id
+    }
+
+    pub fn weak(&self) -> SessionWeak {
+        SessionWeak(Arc::downgrade(&self.0))
+    }
+}
+
+impl SessionWeak {
+    pub fn upgrade(&self) -> Session {
+        Session(self.0.upgrade().expect("Session died"))
     }
 }
 

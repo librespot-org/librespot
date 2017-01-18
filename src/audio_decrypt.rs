@@ -17,7 +17,7 @@ pub struct AudioDecrypt<T: io::Read> {
 
 impl<T: io::Read> AudioDecrypt<T> {
     pub fn new(key: AudioKey, reader: T) -> AudioDecrypt<T> {
-        let cipher = aes::ctr(aes::KeySize::KeySize128, &key, AUDIO_AESIV);
+        let cipher = aes::ctr(aes::KeySize::KeySize128, &key.0, AUDIO_AESIV);
         AudioDecrypt {
             cipher: cipher,
             key: key,
@@ -45,7 +45,7 @@ impl<T: io::Read + io::Seek> io::Seek for AudioDecrypt<T> {
         let iv = BigUint::from_bytes_be(AUDIO_AESIV)
                      .add(BigUint::from_u64(newpos / 16).unwrap())
                      .to_bytes_be();
-        self.cipher = aes::ctr(aes::KeySize::KeySize128, &self.key, &iv);
+        self.cipher = aes::ctr(aes::KeySize::KeySize128, &self.key.0, &iv);
 
         let buf = vec![0u8; skip as usize];
         let mut buf2 = vec![0u8; skip as usize];

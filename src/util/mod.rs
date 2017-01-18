@@ -1,6 +1,7 @@
 use num::{BigUint, Integer, Zero, One};
 use rand::{Rng, Rand};
 use std::io;
+use std::mem;
 use std::ops::{Mul, Rem, Shr};
 use std::fs;
 use std::path::Path;
@@ -107,3 +108,55 @@ impl<'s> Iterator for StrChunks<'s> {
 pub trait ReadSeek : ::std::io::Read + ::std::io::Seek { }
 impl <T: ::std::io::Read + ::std::io::Seek> ReadSeek for T { }
 
+pub trait Seq {
+    fn next(&self) -> Self;
+}
+
+macro_rules! impl_seq {
+    ($($ty:ty)*) => { $(
+        impl Seq for $ty {
+            fn next(&self) -> Self { *self + 1 }
+        }
+    )* }
+}
+
+impl_seq!(u8 u16 u32 u64 usize);
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub struct SeqGenerator<T: Seq>(T);
+
+impl <T: Seq> SeqGenerator<T> {
+    pub fn new(value: T) -> Self {
+        SeqGenerator(value)
+    }
+
+    pub fn get(&mut self) -> T {
+        let value = self.0.next();
+        mem::replace(&mut self.0, value)
+    }
+}
+
+use std::sync::Mutex;
+use std::cell::UnsafeCell;
+
+pub struct Lazy<T>(Mutex<bool>, UnsafeCell<Option<T>>);
+unsafe impl <T: Sync> Sync for Lazy<T> {}
+unsafe impl <T: Send> Send for Lazy<T> {}
+
+impl <T> Lazy<T> {
+    pub fn new() -> Lazy<T> {
+        Lazy(Mutex::new(false), UnsafeCell::new(None))
+    }
+
+    pub fn get<F: FnOnce() -> T>(&self, f: F) -> &T {
+        let mut inner = self.0.lock().unwrap();
+        if !*inner {
+            unsafe {
+                *self.1.get() = Some(f());
+            }
+            *inner = true;
+        }
+
+        unsafe { &*self.1.get() }.as_ref().unwrap()
+    }
+}
