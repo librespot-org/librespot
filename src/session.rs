@@ -5,7 +5,7 @@ use eventual::Future;
 use eventual::Async;
 use std::io::{self, Read, Cursor};
 use std::result::Result;
-use std::sync::{Mutex, RwLock, Arc, mpsc, Weak};
+use std::sync::{Mutex, RwLock, Arc, Weak};
 use std::str::FromStr;
 use futures::Future as Future_;
 use futures::{Stream, BoxFuture};
@@ -14,14 +14,15 @@ use tokio_core::reactor::Handle;
 use album_cover::AlbumCover;
 use apresolve::apresolve_or_fallback;
 use audio_file::AudioFile;
-use audio_key::AudioKeyManager;
 use authentication::Credentials;
 use cache::Cache;
 use connection::{self, adaptor};
-use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use stream::StreamManager;
 use util::{SpotifyId, FileId, ReadSeek, Lazy};
+
+use audio_key::AudioKeyManager;
+use mercury::MercuryManager;
 
 use stream;
 
@@ -62,13 +63,13 @@ pub struct SessionInternal {
     data: RwLock<SessionData>,
 
     cache: Box<Cache + Send + Sync>,
-    mercury: Mutex<MercuryManager>,
     metadata: Mutex<MetadataManager>,
     stream: Mutex<StreamManager>,
     rx_connection: Mutex<adaptor::StreamAdaptor<(u8, Vec<u8>), io::Error>>,
     tx_connection: Mutex<adaptor::SinkAdaptor<(u8, Vec<u8>)>>,
 
     audio_key: Lazy<AudioKeyManager>,
+    mercury: Lazy<MercuryManager>,
 }
 
 #[derive(Clone)]
@@ -129,11 +130,11 @@ impl Session {
             tx_connection: Mutex::new(tx),
 
             cache: cache,
-            mercury: Mutex::new(MercuryManager::new()),
             metadata: Mutex::new(MetadataManager::new()),
             stream: Mutex::new(StreamManager::new()),
 
             audio_key: Lazy::new(),
+            mercury: Lazy::new(),
         }));
 
         (session, task)
@@ -143,6 +144,10 @@ impl Session {
         self.0.audio_key.get(|| AudioKeyManager::new(self.weak()))
     }
 
+    pub fn mercury(&self) -> &MercuryManager {
+        self.0.mercury.get(|| MercuryManager::new(self.weak()))
+    }
+
     pub fn poll(&self) {
         let (cmd, data) = self.recv();
 
@@ -150,11 +155,12 @@ impl Session {
             0x4 => self.send_packet(0x49, data),
             0x4a => (),
             0x9 | 0xa => self.0.stream.lock().unwrap().handle(cmd, data, self),
-            0xd | 0xe => self.audio_key().dispatch(cmd, data),
             0x1b => {
                 self.0.data.write().unwrap().country = String::from_utf8(data).unwrap();
             }
-            0xb2...0xb6 => self.0.mercury.lock().unwrap().handle(cmd, data, self),
+
+            0xd | 0xe => self.audio_key().dispatch(cmd, data),
+            0xb2...0xb6 => self.mercury().dispatch(cmd, data),
             _ => (),
         }
     }
@@ -223,14 +229,6 @@ impl Session {
 
     pub fn metadata<T: MetadataTrait>(&self, id: SpotifyId) -> MetadataRef<T> {
         self.0.metadata.lock().unwrap().get(self, id)
-    }
-
-    pub fn mercury(&self, req: MercuryRequest) -> Future<MercuryResponse, ()> {
-        self.0.mercury.lock().unwrap().request(self, req)
-    }
-
-    pub fn mercury_sub(&self, uri: String) -> mpsc::Receiver<MercuryResponse> {
-        self.0.mercury.lock().unwrap().subscribe(self, uri)
     }
 
     pub fn cache(&self) -> &Cache {

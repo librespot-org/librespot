@@ -1,15 +1,14 @@
-use eventual::Async;
 use protobuf::{self, Message, RepeatedField};
 use std::borrow::Cow;
 use std::sync::{Mutex, Arc};
 use std::collections::HashMap;
 
-use mercury::{MercuryRequest, MercuryMethod};
 use player::{Player, PlayerState};
 use session::Session;
 use util;
 use util::SpotifyId;
 use version;
+use futures::{Future, Stream};
 
 use protocol;
 pub use protocol::spirc::{PlayStatus, MessageType};
@@ -79,7 +78,8 @@ impl SpircManager {
         let rx = {
             let mut internal = self.0.lock().unwrap();
 
-            let rx = internal.session.mercury_sub(internal.uri());
+            let rx = internal.session.mercury().subscribe(internal.uri());
+            let rx = rx.map_err(|_| ()).flatten_stream().wait();
 
             internal.notify(true, None);
 
@@ -97,7 +97,7 @@ impl SpircManager {
         };
 
         for pkt in rx {
-            let data = pkt.payload.first().unwrap();
+            let data = pkt.as_ref().unwrap().payload.first().unwrap();
             let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(data).unwrap();
 
             debug!("{:?} {:?} {} {} {}",
@@ -452,15 +452,10 @@ impl<'a> CommandSender<'a> {
             pkt.set_state(self.spirc_internal.spirc_state(&state));
         }
 
-        self.spirc_internal
-            .session
-            .mercury(MercuryRequest {
-                method: MercuryMethod::SEND,
-                uri: self.spirc_internal.uri(),
-                content_type: None,
-                payload: vec![pkt.write_to_bytes().unwrap()],
-            })
-            .fire();
+        let payload = pkt.write_to_bytes().unwrap();
+        let uri = self.spirc_internal.uri();
+        self.spirc_internal.session.mercury()
+            .send(uri, payload).wait().unwrap();
     }
 }
 

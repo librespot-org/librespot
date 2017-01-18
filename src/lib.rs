@@ -59,6 +59,7 @@ pub mod audio_key;
 pub mod cache;
 pub mod diffie_hellman;
 pub mod link;
+pub mod mercury;
 pub mod metadata;
 pub mod player;
 pub mod session;

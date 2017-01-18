@@ -1,9 +1,9 @@
-use eventual::{Async, Future};
+use eventual::Future;
 use linear_map::LinearMap;
 use protobuf;
+use futures::Future as Future_;
 
 use protocol;
-use mercury::{MercuryRequest, MercuryMethod};
 use util::{SpotifyId, FileId, StrChunksExt};
 use session::Session;
 
@@ -189,17 +189,17 @@ impl MetadataManager {
 
     pub fn get<T: MetadataTrait>(&mut self, session: &Session, id: SpotifyId) -> MetadataRef<T> {
         let session = session.clone();
-        session.mercury(MercuryRequest {
-                   method: MercuryMethod::GET,
-                   uri: format!("{}/{}", T::base_url(), id.to_base16()),
-                   content_type: None,
-                   payload: Vec::new(),
-               })
-               .and_then(move |response| {
-                   let data = response.payload.first().expect("Empty payload");
-                   let msg: T::Message = protobuf::parse_from_bytes(data).unwrap();
 
-                   Ok(T::parse(&msg, &session))
-               })
+        let uri = format!("{}/{}", T::base_url(), id.to_base16());
+        let request = session.mercury().get(uri);
+
+        let result = request.and_then(move |response| {
+            let data = response.payload.first().expect("Empty payload");
+            let msg: T::Message = protobuf::parse_from_bytes(data).unwrap();
+
+            Ok(T::parse(&msg, &session))
+        }).wait();
+
+        Future::of(result.unwrap())
     }
 }

@@ -12,7 +12,7 @@ pub struct AudioKey(pub [u8; 16]);
 #[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
 pub struct AudioKeyError;
 
-type Result = ::std::result::Result<AudioKey, AudioKeyError>;
+pub type Result = ::std::result::Result<AudioKey, AudioKeyError>;
 
 component! {
     AudioKeyManager : AudioKeyManagerInner {
