@@ -14,8 +14,6 @@ use std::fs::File;
 use std::path::Path;
 use rustc_serialize::base64::{self, FromBase64, ToBase64};
 
-use session::Session;
-
 use protocol::authentication::AuthenticationType;
 
 #[derive(Debug, Clone)]
@@ -174,16 +172,18 @@ fn deserialize_base64<D>(de: &mut D) -> Result<Vec<u8>, D::Error>
 mod discovery;
 pub use self::discovery::discovery_login;
 
-pub fn get_credentials(session: &Session, username: Option<String>, password: Option<String>) -> Credentials {
-    let credentials = session.cache().get_credentials();
-
-    match (username, password, credentials) {
+pub fn get_credentials(device_name: &str, device_id: &str,
+                       username: Option<String>, password: Option<String>,
+                       cached_credentials: Option<Credentials>)
+    -> Credentials
+{
+    match (username, password, cached_credentials) {
 
         (Some(username), Some(password), _)
             => Credentials::with_password(username, password),
 
-        (Some(ref username), _, Some(ref credentials)) if *username == credentials.username
-            => credentials.clone(),
+        (Some(ref username), _, Some(ref credentials))
+            if *username == credentials.username => credentials.clone(),
 
         (Some(username), None, _) => {
             write!(stderr(), "Password for {}: ", username).unwrap();
@@ -197,8 +197,7 @@ pub fn get_credentials(session: &Session, username: Option<String>, password: Op
 
         (None, _, None) => {
             info!("No username provided and no stored credentials, starting discovery ...");
-            discovery_login(session.config().device_name.clone(),
-                            session.device_id()).unwrap()
+            discovery_login(device_name.clone(), device_id.clone()).unwrap()
         }
     }
 }

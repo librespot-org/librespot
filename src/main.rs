@@ -101,23 +101,32 @@ fn setup(args: &[String]) -> (Session, Player) {
         .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
         .unwrap_or(Bitrate::Bitrate160);
 
-    let config = Config {
-        user_agent: version::version_string(),
-        device_name: matches.opt_str("name").unwrap(),
-        bitrate: bitrate,
-        onstart: matches.opt_str("onstart"),
-        onstop: matches.opt_str("onstop"),
-    };
+    let device_name = matches.opt_str("name").unwrap();
+    let device_id = librespot::session::device_id(&device_name);
 
     let cache = matches.opt_str("c").map(|cache_location| {
         Box::new(DefaultCache::new(PathBuf::from(cache_location)).unwrap()) 
             as Box<Cache + Send + Sync>
     }).unwrap_or_else(|| Box::new(NoCache));
 
+    let cached_credentials = cache.get_credentials();
+
+    let credentials = get_credentials(&device_name, &device_id,
+                                      matches.opt_str("username"),
+                                      matches.opt_str("password"),
+                                      cached_credentials);
+
+    let config = Config {
+        user_agent: version::version_string(),
+        device_name: device_name,
+        device_id: device_id,
+        bitrate: bitrate,
+        onstart: matches.opt_str("onstart"),
+        onstop: matches.opt_str("onstop"),
+    };
+
     let session = Session::new(config, cache);
 
-    let credentials = get_credentials(&session, matches.opt_str("username"),
-    matches.opt_str("password"));
     session.login(credentials).unwrap();
 
     let device_name = matches.opt_str("device");

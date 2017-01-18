@@ -46,6 +46,7 @@ impl FromStr for Bitrate {
 pub struct Config {
     pub user_agent: String,
     pub device_name: String,
+    pub device_id: String,
     pub bitrate: Bitrate,
     pub onstart: Option<String>,
     pub onstop: Option<String>,
@@ -58,7 +59,6 @@ pub struct SessionData {
 
 pub struct SessionInternal {
     config: Config,
-    device_id: String,
     data: RwLock<SessionData>,
 
     cache: Box<Cache + Send + Sync>,
@@ -73,17 +73,16 @@ pub struct SessionInternal {
 #[derive(Clone)]
 pub struct Session(pub Arc<SessionInternal>);
 
+pub fn device_id(device_name: &str) -> String {
+    let mut h = Sha1::new();
+    h.input_str(&device_name);
+    h.result_str()
+}
+
 impl Session {
     pub fn new(config: Config, cache: Box<Cache + Send + Sync>) -> Session {
-        let device_id = {
-            let mut h = Sha1::new();
-            h.input_str(&config.device_name);
-            h.result_str()
-        };
-
         Session(Arc::new(SessionInternal {
             config: config,
-            device_id: device_id,
             data: RwLock::new(SessionData {
                 country: String::new(),
                 canonical_username: String::new(),
@@ -241,7 +240,7 @@ impl Session {
     }
 
     pub fn device_id(&self) -> &str {
-        &self.0.device_id
+        &self.config().device_id
     }
 }
 
