@@ -38,7 +38,7 @@ impl AudioKeyManager {
         data.write_u32::<BigEndian>(seq).unwrap();
         data.write_u16::<BigEndian>(0x0000).unwrap();
 
-        session.send_packet(0xc, &data).unwrap();
+        session.send_packet(0xc, data);
 
         seq
     }

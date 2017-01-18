@@ -18,7 +18,7 @@ impl stream::Handler for AlbumCover {
         req.write_u16::<BigEndian>(channel_id).unwrap();
         req.write_u16::<BigEndian>(0).unwrap();
         req.write(&self.file_id.0).unwrap();
-        session.send_packet(0x19, &req).unwrap();
+        session.send_packet(0x19, req);
 
         stream::Response::Continue(self)
     }

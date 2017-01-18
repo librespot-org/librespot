@@ -57,6 +57,10 @@ protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }
 
 mdns            = { git = "https://github.com/plietar/rust-mdns" }
 
+futures = "0.1.8"
+tokio-proto = "0.1.0"
+tokio-core = "0.1.2"
+
 [build-dependencies]
 vergen          = "0.1.0"
 protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros" }

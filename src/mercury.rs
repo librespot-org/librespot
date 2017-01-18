@@ -84,7 +84,7 @@ impl MercuryManager {
             _ => 0xb2,
         };
 
-        session.send_packet(cmd, &data).unwrap();
+        session.send_packet(cmd, data);
 
         self.pending.insert(seq.to_vec(),
                             MercuryPending {

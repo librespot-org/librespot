@@ -55,7 +55,7 @@ impl <H: Handler> stream::Handler for AudioFile<H> {
         data.write_u32::<BigEndian>(self.offset as u32 / 4).unwrap();
         data.write_u32::<BigEndian>((self.offset + CHUNK_SIZE) as u32 / 4).unwrap();
 
-        session.send_packet(0x8, &data).unwrap();
+        session.send_packet(0x8, data);
 
         stream::Response::Continue(self)
     }

@@ -31,6 +31,10 @@ extern crate shannon;
 extern crate tempfile;
 extern crate url;
 
+#[macro_use] extern crate futures;
+extern crate tokio_core;
+extern crate tokio_proto;
+
 extern crate librespot_protocol as protocol;
 
 #[cfg(not(feature = "with-tremor"))]
@@ -52,7 +56,6 @@ pub mod audio_file2;
 pub mod audio_file;
 pub mod audio_key;
 pub mod cache;
-pub mod connection;
 pub mod diffie_hellman;
 pub mod link;
 pub mod metadata;
