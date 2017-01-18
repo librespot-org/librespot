@@ -20,7 +20,7 @@
 use protobuf::Message as Message_imported_for_functions;
 use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 
-#[derive(Clone,Default)]
+#[derive(PartialEq,Clone,Default)]
 pub struct Subscription {
     // message fields
     uri: ::protobuf::SingularField<::std::string::String>,
@@ -28,7 +28,7 @@ pub struct Subscription {
     status_code: ::std::option::Option<i32>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -45,15 +45,7 @@ impl Subscription {
             ptr: 0 as *const Subscription,
         };
         unsafe {
-            instance.get(|| {
-                Subscription {
-                    uri: ::protobuf::SingularField::none(),
-                    expiry: ::std::option::Option::None,
-                    status_code: ::std::option::Option::None,
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Subscription::new)
         }
     }
 
@@ -93,6 +85,14 @@ impl Subscription {
         }
     }
 
+    fn get_uri_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.uri
+    }
+
+    fn mut_uri_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.uri
+    }
+
     // optional int32 expiry = 2;
 
     pub fn clear_expiry(&mut self) {
@@ -110,6 +110,14 @@ impl Subscription {
 
     pub fn get_expiry(&self) -> i32 {
         self.expiry.unwrap_or(0)
+    }
+
+    fn get_expiry_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.expiry
+    }
+
+    fn mut_expiry_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.expiry
     }
 
     // optional int32 status_code = 3;
@@ -130,6 +138,14 @@ impl Subscription {
     pub fn get_status_code(&self) -> i32 {
         self.status_code.unwrap_or(0)
     }
+
+    fn get_status_code_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.status_code
+    }
+
+    fn mut_status_code_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.status_code
+    }
 }
 
 impl ::protobuf::Message for Subscription {
@@ -138,28 +154,28 @@ impl ::protobuf::Message for Subscription {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.uri));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.uri)?;
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_int32());
+                    let tmp = is.read_int32()?;
                     self.expiry = ::std::option::Option::Some(tmp);
                 },
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_int32());
+                    let tmp = is.read_int32()?;
                     self.status_code = ::std::option::Option::Some(tmp);
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -170,14 +186,14 @@ impl ::protobuf::Message for Subscription {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.uri {
-            my_size += ::protobuf::rt::string_size(1, &value);
+        if let Some(v) = self.uri.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
         };
-        for value in &self.expiry {
-            my_size += ::protobuf::rt::value_size(2, *value, ::protobuf::wire_format::WireTypeVarint);
+        if let Some(v) = self.expiry {
+            my_size += ::protobuf::rt::value_size(2, v, ::protobuf::wire_format::WireTypeVarint);
         };
-        for value in &self.status_code {
-            my_size += ::protobuf::rt::value_size(3, *value, ::protobuf::wire_format::WireTypeVarint);
+        if let Some(v) = self.status_code {
+            my_size += ::protobuf::rt::value_size(3, v, ::protobuf::wire_format::WireTypeVarint);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -186,15 +202,15 @@ impl ::protobuf::Message for Subscription {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.uri.as_ref() {
-            try!(os.write_string(1, &v));
+            os.write_string(1, &v)?;
         };
         if let Some(v) = self.expiry {
-            try!(os.write_int32(2, v));
+            os.write_int32(2, v)?;
         };
         if let Some(v) = self.status_code {
-            try!(os.write_int32(3, v));
+            os.write_int32(3, v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -208,10 +224,6 @@ impl ::protobuf::Message for Subscription {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Subscription>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -236,20 +248,20 @@ impl ::protobuf::MessageStatic for Subscription {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "uri",
-                    Subscription::has_uri,
-                    Subscription::get_uri,
+                    Subscription::get_uri_for_reflect,
+                    Subscription::mut_uri_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
                     "expiry",
-                    Subscription::has_expiry,
-                    Subscription::get_expiry,
+                    Subscription::get_expiry_for_reflect,
+                    Subscription::mut_expiry_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
                     "status_code",
-                    Subscription::has_status_code,
-                    Subscription::get_status_code,
+                    Subscription::get_status_code_for_reflect,
+                    Subscription::mut_status_code_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Subscription>(
                     "Subscription",
@@ -270,18 +282,15 @@ impl ::protobuf::Clear for Subscription {
     }
 }
 
-impl ::std::cmp::PartialEq for Subscription {
-    fn eq(&self, other: &Subscription) -> bool {
-        self.uri == other.uri &&
-        self.expiry == other.expiry &&
-        self.status_code == other.status_code &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Subscription {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Subscription {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
 }
 

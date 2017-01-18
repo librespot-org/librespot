@@ -20,14 +20,14 @@
 use protobuf::Message as Message_imported_for_functions;
 use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 
-#[derive(Clone,Default)]
+#[derive(PartialEq,Clone,Default)]
 pub struct TopTracks {
     // message fields
     country: ::protobuf::SingularField<::std::string::String>,
     track: ::protobuf::RepeatedField<Track>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -44,14 +44,7 @@ impl TopTracks {
             ptr: 0 as *const TopTracks,
         };
         unsafe {
-            instance.get(|| {
-                TopTracks {
-                    country: ::protobuf::SingularField::none(),
-                    track: ::protobuf::RepeatedField::new(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(TopTracks::new)
         }
     }
 
@@ -91,6 +84,14 @@ impl TopTracks {
         }
     }
 
+    fn get_country_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.country
+    }
+
+    fn mut_country_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.country
+    }
+
     // repeated .Track track = 2;
 
     pub fn clear_track(&mut self) {
@@ -115,6 +116,14 @@ impl TopTracks {
     pub fn get_track(&self) -> &[Track] {
         &self.track
     }
+
+    fn get_track_for_reflect(&self) -> &::protobuf::RepeatedField<Track> {
+        &self.track
+    }
+
+    fn mut_track_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Track> {
+        &mut self.track
+    }
 }
 
 impl ::protobuf::Message for TopTracks {
@@ -123,17 +132,17 @@ impl ::protobuf::Message for TopTracks {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.country));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.country)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.track));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.track)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -144,8 +153,8 @@ impl ::protobuf::Message for TopTracks {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.country {
-            my_size += ::protobuf::rt::string_size(1, &value);
+        if let Some(v) = self.country.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
         };
         for value in &self.track {
             let len = value.compute_size();
@@ -158,14 +167,14 @@ impl ::protobuf::Message for TopTracks {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.country.as_ref() {
-            try!(os.write_string(1, &v));
+            os.write_string(1, &v)?;
         };
         for v in &self.track {
-            try!(os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -179,10 +188,6 @@ impl ::protobuf::Message for TopTracks {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<TopTracks>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -207,14 +212,15 @@ impl ::protobuf::MessageStatic for TopTracks {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "country",
-                    TopTracks::has_country,
-                    TopTracks::get_country,
+                    TopTracks::get_country_for_reflect,
+                    TopTracks::mut_country_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Track>>(
                     "track",
-                    TopTracks::get_track,
+                    TopTracks::get_track_for_reflect,
+                    TopTracks::mut_track_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<TopTracks>(
                     "TopTracks",
@@ -234,21 +240,19 @@ impl ::protobuf::Clear for TopTracks {
     }
 }
 
-impl ::std::cmp::PartialEq for TopTracks {
-    fn eq(&self, other: &TopTracks) -> bool {
-        self.country == other.country &&
-        self.track == other.track &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for TopTracks {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for TopTracks {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct ActivityPeriod {
     // message fields
     start_year: ::std::option::Option<i32>,
@@ -256,7 +260,7 @@ pub struct ActivityPeriod {
     decade: ::std::option::Option<i32>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -273,15 +277,7 @@ impl ActivityPeriod {
             ptr: 0 as *const ActivityPeriod,
         };
         unsafe {
-            instance.get(|| {
-                ActivityPeriod {
-                    start_year: ::std::option::Option::None,
-                    end_year: ::std::option::Option::None,
-                    decade: ::std::option::Option::None,
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(ActivityPeriod::new)
         }
     }
 
@@ -304,6 +300,14 @@ impl ActivityPeriod {
         self.start_year.unwrap_or(0)
     }
 
+    fn get_start_year_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.start_year
+    }
+
+    fn mut_start_year_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.start_year
+    }
+
     // optional sint32 end_year = 2;
 
     pub fn clear_end_year(&mut self) {
@@ -321,6 +325,14 @@ impl ActivityPeriod {
 
     pub fn get_end_year(&self) -> i32 {
         self.end_year.unwrap_or(0)
+    }
+
+    fn get_end_year_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.end_year
+    }
+
+    fn mut_end_year_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.end_year
     }
 
     // optional sint32 decade = 3;
@@ -341,6 +353,14 @@ impl ActivityPeriod {
     pub fn get_decade(&self) -> i32 {
         self.decade.unwrap_or(0)
     }
+
+    fn get_decade_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.decade
+    }
+
+    fn mut_decade_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.decade
+    }
 }
 
 impl ::protobuf::Message for ActivityPeriod {
@@ -349,32 +369,32 @@ impl ::protobuf::Message for ActivityPeriod {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.start_year = ::std::option::Option::Some(tmp);
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.end_year = ::std::option::Option::Some(tmp);
                 },
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.decade = ::std::option::Option::Some(tmp);
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -385,14 +405,14 @@ impl ::protobuf::Message for ActivityPeriod {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.start_year {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(1, *value);
+        if let Some(v) = self.start_year {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(1, v);
         };
-        for value in &self.end_year {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(2, *value);
+        if let Some(v) = self.end_year {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(2, v);
         };
-        for value in &self.decade {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(3, *value);
+        if let Some(v) = self.decade {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(3, v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -401,15 +421,15 @@ impl ::protobuf::Message for ActivityPeriod {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.start_year {
-            try!(os.write_sint32(1, v));
+            os.write_sint32(1, v)?;
         };
         if let Some(v) = self.end_year {
-            try!(os.write_sint32(2, v));
+            os.write_sint32(2, v)?;
         };
         if let Some(v) = self.decade {
-            try!(os.write_sint32(3, v));
+            os.write_sint32(3, v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -423,10 +443,6 @@ impl ::protobuf::Message for ActivityPeriod {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<ActivityPeriod>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -451,20 +467,20 @@ impl ::protobuf::MessageStatic for ActivityPeriod {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "start_year",
-                    ActivityPeriod::has_start_year,
-                    ActivityPeriod::get_start_year,
+                    ActivityPeriod::get_start_year_for_reflect,
+                    ActivityPeriod::mut_start_year_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "end_year",
-                    ActivityPeriod::has_end_year,
-                    ActivityPeriod::get_end_year,
+                    ActivityPeriod::get_end_year_for_reflect,
+                    ActivityPeriod::mut_end_year_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "decade",
-                    ActivityPeriod::has_decade,
-                    ActivityPeriod::get_decade,
+                    ActivityPeriod::get_decade_for_reflect,
+                    ActivityPeriod::mut_decade_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ActivityPeriod>(
                     "ActivityPeriod",
@@ -485,22 +501,19 @@ impl ::protobuf::Clear for ActivityPeriod {
     }
 }
 
-impl ::std::cmp::PartialEq for ActivityPeriod {
-    fn eq(&self, other: &ActivityPeriod) -> bool {
-        self.start_year == other.start_year &&
-        self.end_year == other.end_year &&
-        self.decade == other.decade &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for ActivityPeriod {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for ActivityPeriod {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Artist {
     // message fields
     gid: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -522,7 +535,7 @@ pub struct Artist {
     portrait_group: ::protobuf::SingularPtrField<ImageGroup>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -539,29 +552,7 @@ impl Artist {
             ptr: 0 as *const Artist,
         };
         unsafe {
-            instance.get(|| {
-                Artist {
-                    gid: ::protobuf::SingularField::none(),
-                    name: ::protobuf::SingularField::none(),
-                    popularity: ::std::option::Option::None,
-                    top_track: ::protobuf::RepeatedField::new(),
-                    album_group: ::protobuf::RepeatedField::new(),
-                    single_group: ::protobuf::RepeatedField::new(),
-                    compilation_group: ::protobuf::RepeatedField::new(),
-                    appears_on_group: ::protobuf::RepeatedField::new(),
-                    genre: ::protobuf::RepeatedField::new(),
-                    external_id: ::protobuf::RepeatedField::new(),
-                    portrait: ::protobuf::RepeatedField::new(),
-                    biography: ::protobuf::RepeatedField::new(),
-                    activity_period: ::protobuf::RepeatedField::new(),
-                    restriction: ::protobuf::RepeatedField::new(),
-                    related: ::protobuf::RepeatedField::new(),
-                    is_portrait_album_cover: ::std::option::Option::None,
-                    portrait_group: ::protobuf::SingularPtrField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Artist::new)
         }
     }
 
@@ -601,6 +592,14 @@ impl Artist {
         }
     }
 
+    fn get_gid_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.gid
+    }
+
+    fn mut_gid_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.gid
+    }
+
     // optional string name = 2;
 
     pub fn clear_name(&mut self) {
@@ -637,6 +636,14 @@ impl Artist {
         }
     }
 
+    fn get_name_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.name
+    }
+
+    fn mut_name_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.name
+    }
+
     // optional sint32 popularity = 3;
 
     pub fn clear_popularity(&mut self) {
@@ -654,6 +661,14 @@ impl Artist {
 
     pub fn get_popularity(&self) -> i32 {
         self.popularity.unwrap_or(0)
+    }
+
+    fn get_popularity_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.popularity
+    }
+
+    fn mut_popularity_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.popularity
     }
 
     // repeated .TopTracks top_track = 4;
@@ -681,6 +696,14 @@ impl Artist {
         &self.top_track
     }
 
+    fn get_top_track_for_reflect(&self) -> &::protobuf::RepeatedField<TopTracks> {
+        &self.top_track
+    }
+
+    fn mut_top_track_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<TopTracks> {
+        &mut self.top_track
+    }
+
     // repeated .AlbumGroup album_group = 5;
 
     pub fn clear_album_group(&mut self) {
@@ -704,6 +727,14 @@ impl Artist {
 
     pub fn get_album_group(&self) -> &[AlbumGroup] {
         &self.album_group
+    }
+
+    fn get_album_group_for_reflect(&self) -> &::protobuf::RepeatedField<AlbumGroup> {
+        &self.album_group
+    }
+
+    fn mut_album_group_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<AlbumGroup> {
+        &mut self.album_group
     }
 
     // repeated .AlbumGroup single_group = 6;
@@ -731,6 +762,14 @@ impl Artist {
         &self.single_group
     }
 
+    fn get_single_group_for_reflect(&self) -> &::protobuf::RepeatedField<AlbumGroup> {
+        &self.single_group
+    }
+
+    fn mut_single_group_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<AlbumGroup> {
+        &mut self.single_group
+    }
+
     // repeated .AlbumGroup compilation_group = 7;
 
     pub fn clear_compilation_group(&mut self) {
@@ -754,6 +793,14 @@ impl Artist {
 
     pub fn get_compilation_group(&self) -> &[AlbumGroup] {
         &self.compilation_group
+    }
+
+    fn get_compilation_group_for_reflect(&self) -> &::protobuf::RepeatedField<AlbumGroup> {
+        &self.compilation_group
+    }
+
+    fn mut_compilation_group_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<AlbumGroup> {
+        &mut self.compilation_group
     }
 
     // repeated .AlbumGroup appears_on_group = 8;
@@ -781,6 +828,14 @@ impl Artist {
         &self.appears_on_group
     }
 
+    fn get_appears_on_group_for_reflect(&self) -> &::protobuf::RepeatedField<AlbumGroup> {
+        &self.appears_on_group
+    }
+
+    fn mut_appears_on_group_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<AlbumGroup> {
+        &mut self.appears_on_group
+    }
+
     // repeated string genre = 9;
 
     pub fn clear_genre(&mut self) {
@@ -804,6 +859,14 @@ impl Artist {
 
     pub fn get_genre(&self) -> &[::std::string::String] {
         &self.genre
+    }
+
+    fn get_genre_for_reflect(&self) -> &::protobuf::RepeatedField<::std::string::String> {
+        &self.genre
+    }
+
+    fn mut_genre_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.genre
     }
 
     // repeated .ExternalId external_id = 10;
@@ -831,6 +894,14 @@ impl Artist {
         &self.external_id
     }
 
+    fn get_external_id_for_reflect(&self) -> &::protobuf::RepeatedField<ExternalId> {
+        &self.external_id
+    }
+
+    fn mut_external_id_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<ExternalId> {
+        &mut self.external_id
+    }
+
     // repeated .Image portrait = 11;
 
     pub fn clear_portrait(&mut self) {
@@ -854,6 +925,14 @@ impl Artist {
 
     pub fn get_portrait(&self) -> &[Image] {
         &self.portrait
+    }
+
+    fn get_portrait_for_reflect(&self) -> &::protobuf::RepeatedField<Image> {
+        &self.portrait
+    }
+
+    fn mut_portrait_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Image> {
+        &mut self.portrait
     }
 
     // repeated .Biography biography = 12;
@@ -881,6 +960,14 @@ impl Artist {
         &self.biography
     }
 
+    fn get_biography_for_reflect(&self) -> &::protobuf::RepeatedField<Biography> {
+        &self.biography
+    }
+
+    fn mut_biography_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Biography> {
+        &mut self.biography
+    }
+
     // repeated .ActivityPeriod activity_period = 13;
 
     pub fn clear_activity_period(&mut self) {
@@ -904,6 +991,14 @@ impl Artist {
 
     pub fn get_activity_period(&self) -> &[ActivityPeriod] {
         &self.activity_period
+    }
+
+    fn get_activity_period_for_reflect(&self) -> &::protobuf::RepeatedField<ActivityPeriod> {
+        &self.activity_period
+    }
+
+    fn mut_activity_period_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<ActivityPeriod> {
+        &mut self.activity_period
     }
 
     // repeated .Restriction restriction = 14;
@@ -931,6 +1026,14 @@ impl Artist {
         &self.restriction
     }
 
+    fn get_restriction_for_reflect(&self) -> &::protobuf::RepeatedField<Restriction> {
+        &self.restriction
+    }
+
+    fn mut_restriction_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Restriction> {
+        &mut self.restriction
+    }
+
     // repeated .Artist related = 15;
 
     pub fn clear_related(&mut self) {
@@ -956,6 +1059,14 @@ impl Artist {
         &self.related
     }
 
+    fn get_related_for_reflect(&self) -> &::protobuf::RepeatedField<Artist> {
+        &self.related
+    }
+
+    fn mut_related_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Artist> {
+        &mut self.related
+    }
+
     // optional bool is_portrait_album_cover = 16;
 
     pub fn clear_is_portrait_album_cover(&mut self) {
@@ -973,6 +1084,14 @@ impl Artist {
 
     pub fn get_is_portrait_album_cover(&self) -> bool {
         self.is_portrait_album_cover.unwrap_or(false)
+    }
+
+    fn get_is_portrait_album_cover_for_reflect(&self) -> &::std::option::Option<bool> {
+        &self.is_portrait_album_cover
+    }
+
+    fn mut_is_portrait_album_cover_for_reflect(&mut self) -> &mut ::std::option::Option<bool> {
+        &mut self.is_portrait_album_cover
     }
 
     // optional .ImageGroup portrait_group = 17;
@@ -1007,6 +1126,14 @@ impl Artist {
     pub fn get_portrait_group(&self) -> &ImageGroup {
         self.portrait_group.as_ref().unwrap_or_else(|| ImageGroup::default_instance())
     }
+
+    fn get_portrait_group_for_reflect(&self) -> &::protobuf::SingularPtrField<ImageGroup> {
+        &self.portrait_group
+    }
+
+    fn mut_portrait_group_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<ImageGroup> {
+        &mut self.portrait_group
+    }
 }
 
 impl ::protobuf::Message for Artist {
@@ -1015,70 +1142,70 @@ impl ::protobuf::Message for Artist {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.gid));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.gid)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name)?;
                 },
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.popularity = ::std::option::Option::Some(tmp);
                 },
                 4 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.top_track));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.top_track)?;
                 },
                 5 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.album_group));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.album_group)?;
                 },
                 6 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.single_group));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.single_group)?;
                 },
                 7 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.compilation_group));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.compilation_group)?;
                 },
                 8 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.appears_on_group));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.appears_on_group)?;
                 },
                 9 => {
-                    try!(::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.genre));
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.genre)?;
                 },
                 10 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.external_id));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.external_id)?;
                 },
                 11 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.portrait));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.portrait)?;
                 },
                 12 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.biography));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.biography)?;
                 },
                 13 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.activity_period));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.activity_period)?;
                 },
                 14 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.restriction));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.restriction)?;
                 },
                 15 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.related));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.related)?;
                 },
                 16 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_bool());
+                    let tmp = is.read_bool()?;
                     self.is_portrait_album_cover = ::std::option::Option::Some(tmp);
                 },
                 17 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.portrait_group));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.portrait_group)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -1089,14 +1216,14 @@ impl ::protobuf::Message for Artist {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.gid {
-            my_size += ::protobuf::rt::bytes_size(1, &value);
+        if let Some(v) = self.gid.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(1, &v);
         };
-        for value in &self.name {
-            my_size += ::protobuf::rt::string_size(2, &value);
+        if let Some(v) = self.name.as_ref() {
+            my_size += ::protobuf::rt::string_size(2, &v);
         };
-        for value in &self.popularity {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(3, *value);
+        if let Some(v) = self.popularity {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(3, v);
         };
         for value in &self.top_track {
             let len = value.compute_size();
@@ -1145,11 +1272,11 @@ impl ::protobuf::Message for Artist {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        if self.is_portrait_album_cover.is_some() {
+        if let Some(v) = self.is_portrait_album_cover {
             my_size += 3;
         };
-        for value in &self.portrait_group {
-            let len = value.compute_size();
+        if let Some(v) = self.portrait_group.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -1159,81 +1286,81 @@ impl ::protobuf::Message for Artist {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.gid.as_ref() {
-            try!(os.write_bytes(1, &v));
+            os.write_bytes(1, &v)?;
         };
         if let Some(v) = self.name.as_ref() {
-            try!(os.write_string(2, &v));
+            os.write_string(2, &v)?;
         };
         if let Some(v) = self.popularity {
-            try!(os.write_sint32(3, v));
+            os.write_sint32(3, v)?;
         };
         for v in &self.top_track {
-            try!(os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.album_group {
-            try!(os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.single_group {
-            try!(os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.compilation_group {
-            try!(os.write_tag(7, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(7, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.appears_on_group {
-            try!(os.write_tag(8, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(8, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.genre {
-            try!(os.write_string(9, &v));
+            os.write_string(9, &v)?;
         };
         for v in &self.external_id {
-            try!(os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.portrait {
-            try!(os.write_tag(11, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(11, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.biography {
-            try!(os.write_tag(12, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(12, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.activity_period {
-            try!(os.write_tag(13, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(13, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.restriction {
-            try!(os.write_tag(14, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(14, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.related {
-            try!(os.write_tag(15, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(15, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.is_portrait_album_cover {
-            try!(os.write_bool(16, v));
+            os.write_bool(16, v)?;
         };
         if let Some(v) = self.portrait_group.as_ref() {
-            try!(os.write_tag(17, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(17, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -1247,10 +1374,6 @@ impl ::protobuf::Message for Artist {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Artist>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -1275,78 +1398,90 @@ impl ::protobuf::MessageStatic for Artist {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "gid",
-                    Artist::has_gid,
-                    Artist::get_gid,
+                    Artist::get_gid_for_reflect,
+                    Artist::mut_gid_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "name",
-                    Artist::has_name,
-                    Artist::get_name,
+                    Artist::get_name_for_reflect,
+                    Artist::mut_name_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "popularity",
-                    Artist::has_popularity,
-                    Artist::get_popularity,
+                    Artist::get_popularity_for_reflect,
+                    Artist::mut_popularity_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<TopTracks>>(
                     "top_track",
-                    Artist::get_top_track,
+                    Artist::get_top_track_for_reflect,
+                    Artist::mut_top_track_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AlbumGroup>>(
                     "album_group",
-                    Artist::get_album_group,
+                    Artist::get_album_group_for_reflect,
+                    Artist::mut_album_group_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AlbumGroup>>(
                     "single_group",
-                    Artist::get_single_group,
+                    Artist::get_single_group_for_reflect,
+                    Artist::mut_single_group_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AlbumGroup>>(
                     "compilation_group",
-                    Artist::get_compilation_group,
+                    Artist::get_compilation_group_for_reflect,
+                    Artist::mut_compilation_group_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AlbumGroup>>(
                     "appears_on_group",
-                    Artist::get_appears_on_group,
+                    Artist::get_appears_on_group_for_reflect,
+                    Artist::mut_appears_on_group_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "genre",
-                    Artist::get_genre,
+                    Artist::get_genre_for_reflect,
+                    Artist::mut_genre_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ExternalId>>(
                     "external_id",
-                    Artist::get_external_id,
+                    Artist::get_external_id_for_reflect,
+                    Artist::mut_external_id_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Image>>(
                     "portrait",
-                    Artist::get_portrait,
+                    Artist::get_portrait_for_reflect,
+                    Artist::mut_portrait_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Biography>>(
                     "biography",
-                    Artist::get_biography,
+                    Artist::get_biography_for_reflect,
+                    Artist::mut_biography_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ActivityPeriod>>(
                     "activity_period",
-                    Artist::get_activity_period,
+                    Artist::get_activity_period_for_reflect,
+                    Artist::mut_activity_period_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Restriction>>(
                     "restriction",
-                    Artist::get_restriction,
+                    Artist::get_restriction_for_reflect,
+                    Artist::mut_restriction_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Artist>>(
                     "related",
-                    Artist::get_related,
+                    Artist::get_related_for_reflect,
+                    Artist::mut_related_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bool_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
                     "is_portrait_album_cover",
-                    Artist::has_is_portrait_album_cover,
-                    Artist::get_is_portrait_album_cover,
+                    Artist::get_is_portrait_album_cover_for_reflect,
+                    Artist::mut_is_portrait_album_cover_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ImageGroup>>(
                     "portrait_group",
-                    Artist::has_portrait_group,
-                    Artist::get_portrait_group,
+                    Artist::get_portrait_group_for_reflect,
+                    Artist::mut_portrait_group_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Artist>(
                     "Artist",
@@ -1381,42 +1516,25 @@ impl ::protobuf::Clear for Artist {
     }
 }
 
-impl ::std::cmp::PartialEq for Artist {
-    fn eq(&self, other: &Artist) -> bool {
-        self.gid == other.gid &&
-        self.name == other.name &&
-        self.popularity == other.popularity &&
-        self.top_track == other.top_track &&
-        self.album_group == other.album_group &&
-        self.single_group == other.single_group &&
-        self.compilation_group == other.compilation_group &&
-        self.appears_on_group == other.appears_on_group &&
-        self.genre == other.genre &&
-        self.external_id == other.external_id &&
-        self.portrait == other.portrait &&
-        self.biography == other.biography &&
-        self.activity_period == other.activity_period &&
-        self.restriction == other.restriction &&
-        self.related == other.related &&
-        self.is_portrait_album_cover == other.is_portrait_album_cover &&
-        self.portrait_group == other.portrait_group &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Artist {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Artist {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct AlbumGroup {
     // message fields
     album: ::protobuf::RepeatedField<Album>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -1433,13 +1551,7 @@ impl AlbumGroup {
             ptr: 0 as *const AlbumGroup,
         };
         unsafe {
-            instance.get(|| {
-                AlbumGroup {
-                    album: ::protobuf::RepeatedField::new(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(AlbumGroup::new)
         }
     }
 
@@ -1467,6 +1579,14 @@ impl AlbumGroup {
     pub fn get_album(&self) -> &[Album] {
         &self.album
     }
+
+    fn get_album_for_reflect(&self) -> &::protobuf::RepeatedField<Album> {
+        &self.album
+    }
+
+    fn mut_album_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Album> {
+        &mut self.album
+    }
 }
 
 impl ::protobuf::Message for AlbumGroup {
@@ -1475,14 +1595,14 @@ impl ::protobuf::Message for AlbumGroup {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.album));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.album)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -1504,11 +1624,11 @@ impl ::protobuf::Message for AlbumGroup {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         for v in &self.album {
-            try!(os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -1522,10 +1642,6 @@ impl ::protobuf::Message for AlbumGroup {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<AlbumGroup>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -1550,9 +1666,10 @@ impl ::protobuf::MessageStatic for AlbumGroup {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Album>>(
                     "album",
-                    AlbumGroup::get_album,
+                    AlbumGroup::get_album_for_reflect,
+                    AlbumGroup::mut_album_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<AlbumGroup>(
                     "AlbumGroup",
@@ -1571,20 +1688,19 @@ impl ::protobuf::Clear for AlbumGroup {
     }
 }
 
-impl ::std::cmp::PartialEq for AlbumGroup {
-    fn eq(&self, other: &AlbumGroup) -> bool {
-        self.album == other.album &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for AlbumGroup {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for AlbumGroup {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Date {
     // message fields
     year: ::std::option::Option<i32>,
@@ -1592,7 +1708,7 @@ pub struct Date {
     day: ::std::option::Option<i32>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -1609,15 +1725,7 @@ impl Date {
             ptr: 0 as *const Date,
         };
         unsafe {
-            instance.get(|| {
-                Date {
-                    year: ::std::option::Option::None,
-                    month: ::std::option::Option::None,
-                    day: ::std::option::Option::None,
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Date::new)
         }
     }
 
@@ -1640,6 +1748,14 @@ impl Date {
         self.year.unwrap_or(0)
     }
 
+    fn get_year_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.year
+    }
+
+    fn mut_year_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.year
+    }
+
     // optional sint32 month = 2;
 
     pub fn clear_month(&mut self) {
@@ -1657,6 +1773,14 @@ impl Date {
 
     pub fn get_month(&self) -> i32 {
         self.month.unwrap_or(0)
+    }
+
+    fn get_month_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.month
+    }
+
+    fn mut_month_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.month
     }
 
     // optional sint32 day = 3;
@@ -1677,6 +1801,14 @@ impl Date {
     pub fn get_day(&self) -> i32 {
         self.day.unwrap_or(0)
     }
+
+    fn get_day_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.day
+    }
+
+    fn mut_day_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.day
+    }
 }
 
 impl ::protobuf::Message for Date {
@@ -1685,32 +1817,32 @@ impl ::protobuf::Message for Date {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.year = ::std::option::Option::Some(tmp);
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.month = ::std::option::Option::Some(tmp);
                 },
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.day = ::std::option::Option::Some(tmp);
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -1721,14 +1853,14 @@ impl ::protobuf::Message for Date {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.year {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(1, *value);
+        if let Some(v) = self.year {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(1, v);
         };
-        for value in &self.month {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(2, *value);
+        if let Some(v) = self.month {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(2, v);
         };
-        for value in &self.day {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(3, *value);
+        if let Some(v) = self.day {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(3, v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -1737,15 +1869,15 @@ impl ::protobuf::Message for Date {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.year {
-            try!(os.write_sint32(1, v));
+            os.write_sint32(1, v)?;
         };
         if let Some(v) = self.month {
-            try!(os.write_sint32(2, v));
+            os.write_sint32(2, v)?;
         };
         if let Some(v) = self.day {
-            try!(os.write_sint32(3, v));
+            os.write_sint32(3, v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -1759,10 +1891,6 @@ impl ::protobuf::Message for Date {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Date>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -1787,20 +1915,20 @@ impl ::protobuf::MessageStatic for Date {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "year",
-                    Date::has_year,
-                    Date::get_year,
+                    Date::get_year_for_reflect,
+                    Date::mut_year_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "month",
-                    Date::has_month,
-                    Date::get_month,
+                    Date::get_month_for_reflect,
+                    Date::mut_month_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "day",
-                    Date::has_day,
-                    Date::get_day,
+                    Date::get_day_for_reflect,
+                    Date::mut_day_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Date>(
                     "Date",
@@ -1821,22 +1949,19 @@ impl ::protobuf::Clear for Date {
     }
 }
 
-impl ::std::cmp::PartialEq for Date {
-    fn eq(&self, other: &Date) -> bool {
-        self.year == other.year &&
-        self.month == other.month &&
-        self.day == other.day &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Date {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Date {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Album {
     // message fields
     gid: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -1858,7 +1983,7 @@ pub struct Album {
     cover_group: ::protobuf::SingularPtrField<ImageGroup>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -1875,29 +2000,7 @@ impl Album {
             ptr: 0 as *const Album,
         };
         unsafe {
-            instance.get(|| {
-                Album {
-                    gid: ::protobuf::SingularField::none(),
-                    name: ::protobuf::SingularField::none(),
-                    artist: ::protobuf::RepeatedField::new(),
-                    typ: ::std::option::Option::None,
-                    label: ::protobuf::SingularField::none(),
-                    date: ::protobuf::SingularPtrField::none(),
-                    popularity: ::std::option::Option::None,
-                    genre: ::protobuf::RepeatedField::new(),
-                    cover: ::protobuf::RepeatedField::new(),
-                    external_id: ::protobuf::RepeatedField::new(),
-                    disc: ::protobuf::RepeatedField::new(),
-                    review: ::protobuf::RepeatedField::new(),
-                    copyright: ::protobuf::RepeatedField::new(),
-                    restriction: ::protobuf::RepeatedField::new(),
-                    related: ::protobuf::RepeatedField::new(),
-                    sale_period: ::protobuf::RepeatedField::new(),
-                    cover_group: ::protobuf::SingularPtrField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Album::new)
         }
     }
 
@@ -1937,6 +2040,14 @@ impl Album {
         }
     }
 
+    fn get_gid_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.gid
+    }
+
+    fn mut_gid_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.gid
+    }
+
     // optional string name = 2;
 
     pub fn clear_name(&mut self) {
@@ -1973,6 +2084,14 @@ impl Album {
         }
     }
 
+    fn get_name_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.name
+    }
+
+    fn mut_name_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.name
+    }
+
     // repeated .Artist artist = 3;
 
     pub fn clear_artist(&mut self) {
@@ -1998,6 +2117,14 @@ impl Album {
         &self.artist
     }
 
+    fn get_artist_for_reflect(&self) -> &::protobuf::RepeatedField<Artist> {
+        &self.artist
+    }
+
+    fn mut_artist_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Artist> {
+        &mut self.artist
+    }
+
     // optional .Album.Type typ = 4;
 
     pub fn clear_typ(&mut self) {
@@ -2015,6 +2142,14 @@ impl Album {
 
     pub fn get_typ(&self) -> Album_Type {
         self.typ.unwrap_or(Album_Type::ALBUM)
+    }
+
+    fn get_typ_for_reflect(&self) -> &::std::option::Option<Album_Type> {
+        &self.typ
+    }
+
+    fn mut_typ_for_reflect(&mut self) -> &mut ::std::option::Option<Album_Type> {
+        &mut self.typ
     }
 
     // optional string label = 5;
@@ -2053,6 +2188,14 @@ impl Album {
         }
     }
 
+    fn get_label_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.label
+    }
+
+    fn mut_label_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.label
+    }
+
     // optional .Date date = 6;
 
     pub fn clear_date(&mut self) {
@@ -2086,6 +2229,14 @@ impl Album {
         self.date.as_ref().unwrap_or_else(|| Date::default_instance())
     }
 
+    fn get_date_for_reflect(&self) -> &::protobuf::SingularPtrField<Date> {
+        &self.date
+    }
+
+    fn mut_date_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<Date> {
+        &mut self.date
+    }
+
     // optional sint32 popularity = 7;
 
     pub fn clear_popularity(&mut self) {
@@ -2103,6 +2254,14 @@ impl Album {
 
     pub fn get_popularity(&self) -> i32 {
         self.popularity.unwrap_or(0)
+    }
+
+    fn get_popularity_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.popularity
+    }
+
+    fn mut_popularity_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.popularity
     }
 
     // repeated string genre = 8;
@@ -2130,6 +2289,14 @@ impl Album {
         &self.genre
     }
 
+    fn get_genre_for_reflect(&self) -> &::protobuf::RepeatedField<::std::string::String> {
+        &self.genre
+    }
+
+    fn mut_genre_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.genre
+    }
+
     // repeated .Image cover = 9;
 
     pub fn clear_cover(&mut self) {
@@ -2153,6 +2320,14 @@ impl Album {
 
     pub fn get_cover(&self) -> &[Image] {
         &self.cover
+    }
+
+    fn get_cover_for_reflect(&self) -> &::protobuf::RepeatedField<Image> {
+        &self.cover
+    }
+
+    fn mut_cover_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Image> {
+        &mut self.cover
     }
 
     // repeated .ExternalId external_id = 10;
@@ -2180,6 +2355,14 @@ impl Album {
         &self.external_id
     }
 
+    fn get_external_id_for_reflect(&self) -> &::protobuf::RepeatedField<ExternalId> {
+        &self.external_id
+    }
+
+    fn mut_external_id_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<ExternalId> {
+        &mut self.external_id
+    }
+
     // repeated .Disc disc = 11;
 
     pub fn clear_disc(&mut self) {
@@ -2203,6 +2386,14 @@ impl Album {
 
     pub fn get_disc(&self) -> &[Disc] {
         &self.disc
+    }
+
+    fn get_disc_for_reflect(&self) -> &::protobuf::RepeatedField<Disc> {
+        &self.disc
+    }
+
+    fn mut_disc_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Disc> {
+        &mut self.disc
     }
 
     // repeated string review = 12;
@@ -2230,6 +2421,14 @@ impl Album {
         &self.review
     }
 
+    fn get_review_for_reflect(&self) -> &::protobuf::RepeatedField<::std::string::String> {
+        &self.review
+    }
+
+    fn mut_review_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.review
+    }
+
     // repeated .Copyright copyright = 13;
 
     pub fn clear_copyright(&mut self) {
@@ -2253,6 +2452,14 @@ impl Album {
 
     pub fn get_copyright(&self) -> &[Copyright] {
         &self.copyright
+    }
+
+    fn get_copyright_for_reflect(&self) -> &::protobuf::RepeatedField<Copyright> {
+        &self.copyright
+    }
+
+    fn mut_copyright_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Copyright> {
+        &mut self.copyright
     }
 
     // repeated .Restriction restriction = 14;
@@ -2280,6 +2487,14 @@ impl Album {
         &self.restriction
     }
 
+    fn get_restriction_for_reflect(&self) -> &::protobuf::RepeatedField<Restriction> {
+        &self.restriction
+    }
+
+    fn mut_restriction_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Restriction> {
+        &mut self.restriction
+    }
+
     // repeated .Album related = 15;
 
     pub fn clear_related(&mut self) {
@@ -2305,6 +2520,14 @@ impl Album {
         &self.related
     }
 
+    fn get_related_for_reflect(&self) -> &::protobuf::RepeatedField<Album> {
+        &self.related
+    }
+
+    fn mut_related_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Album> {
+        &mut self.related
+    }
+
     // repeated .SalePeriod sale_period = 16;
 
     pub fn clear_sale_period(&mut self) {
@@ -2328,6 +2551,14 @@ impl Album {
 
     pub fn get_sale_period(&self) -> &[SalePeriod] {
         &self.sale_period
+    }
+
+    fn get_sale_period_for_reflect(&self) -> &::protobuf::RepeatedField<SalePeriod> {
+        &self.sale_period
+    }
+
+    fn mut_sale_period_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<SalePeriod> {
+        &mut self.sale_period
     }
 
     // optional .ImageGroup cover_group = 17;
@@ -2362,6 +2593,14 @@ impl Album {
     pub fn get_cover_group(&self) -> &ImageGroup {
         self.cover_group.as_ref().unwrap_or_else(|| ImageGroup::default_instance())
     }
+
+    fn get_cover_group_for_reflect(&self) -> &::protobuf::SingularPtrField<ImageGroup> {
+        &self.cover_group
+    }
+
+    fn mut_cover_group_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<ImageGroup> {
+        &mut self.cover_group
+    }
 }
 
 impl ::protobuf::Message for Album {
@@ -2370,70 +2609,70 @@ impl ::protobuf::Message for Album {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.gid));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.gid)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name)?;
                 },
                 3 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.artist));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.artist)?;
                 },
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.typ = ::std::option::Option::Some(tmp);
                 },
                 5 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.label));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.label)?;
                 },
                 6 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.date));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.date)?;
                 },
                 7 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.popularity = ::std::option::Option::Some(tmp);
                 },
                 8 => {
-                    try!(::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.genre));
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.genre)?;
                 },
                 9 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.cover));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.cover)?;
                 },
                 10 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.external_id));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.external_id)?;
                 },
                 11 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.disc));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.disc)?;
                 },
                 12 => {
-                    try!(::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.review));
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.review)?;
                 },
                 13 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.copyright));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.copyright)?;
                 },
                 14 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.restriction));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.restriction)?;
                 },
                 15 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.related));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.related)?;
                 },
                 16 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.sale_period));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.sale_period)?;
                 },
                 17 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.cover_group));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.cover_group)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -2444,28 +2683,28 @@ impl ::protobuf::Message for Album {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.gid {
-            my_size += ::protobuf::rt::bytes_size(1, &value);
+        if let Some(v) = self.gid.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(1, &v);
         };
-        for value in &self.name {
-            my_size += ::protobuf::rt::string_size(2, &value);
+        if let Some(v) = self.name.as_ref() {
+            my_size += ::protobuf::rt::string_size(2, &v);
         };
         for value in &self.artist {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.typ {
-            my_size += ::protobuf::rt::enum_size(4, *value);
+        if let Some(v) = self.typ {
+            my_size += ::protobuf::rt::enum_size(4, v);
         };
-        for value in &self.label {
-            my_size += ::protobuf::rt::string_size(5, &value);
+        if let Some(v) = self.label.as_ref() {
+            my_size += ::protobuf::rt::string_size(5, &v);
         };
-        for value in &self.date {
-            let len = value.compute_size();
+        if let Some(v) = self.date.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.popularity {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(7, *value);
+        if let Some(v) = self.popularity {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(7, v);
         };
         for value in &self.genre {
             my_size += ::protobuf::rt::string_size(8, &value);
@@ -2501,8 +2740,8 @@ impl ::protobuf::Message for Album {
             let len = value.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.cover_group {
-            let len = value.compute_size();
+        if let Some(v) = self.cover_group.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -2512,77 +2751,77 @@ impl ::protobuf::Message for Album {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.gid.as_ref() {
-            try!(os.write_bytes(1, &v));
+            os.write_bytes(1, &v)?;
         };
         if let Some(v) = self.name.as_ref() {
-            try!(os.write_string(2, &v));
+            os.write_string(2, &v)?;
         };
         for v in &self.artist {
-            try!(os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.typ {
-            try!(os.write_enum(4, v.value()));
+            os.write_enum(4, v.value())?;
         };
         if let Some(v) = self.label.as_ref() {
-            try!(os.write_string(5, &v));
+            os.write_string(5, &v)?;
         };
         if let Some(v) = self.date.as_ref() {
-            try!(os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.popularity {
-            try!(os.write_sint32(7, v));
+            os.write_sint32(7, v)?;
         };
         for v in &self.genre {
-            try!(os.write_string(8, &v));
+            os.write_string(8, &v)?;
         };
         for v in &self.cover {
-            try!(os.write_tag(9, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(9, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.external_id {
-            try!(os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.disc {
-            try!(os.write_tag(11, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(11, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.review {
-            try!(os.write_string(12, &v));
+            os.write_string(12, &v)?;
         };
         for v in &self.copyright {
-            try!(os.write_tag(13, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(13, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.restriction {
-            try!(os.write_tag(14, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(14, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.related {
-            try!(os.write_tag(15, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(15, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.sale_period {
-            try!(os.write_tag(16, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(16, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.cover_group.as_ref() {
-            try!(os.write_tag(17, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(17, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -2596,10 +2835,6 @@ impl ::protobuf::Message for Album {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Album>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -2624,80 +2859,90 @@ impl ::protobuf::MessageStatic for Album {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "gid",
-                    Album::has_gid,
-                    Album::get_gid,
+                    Album::get_gid_for_reflect,
+                    Album::mut_gid_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "name",
-                    Album::has_name,
-                    Album::get_name,
+                    Album::get_name_for_reflect,
+                    Album::mut_name_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Artist>>(
                     "artist",
-                    Album::get_artist,
+                    Album::get_artist_for_reflect,
+                    Album::mut_artist_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Album_Type>>(
                     "typ",
-                    Album::has_typ,
-                    Album::get_typ,
+                    Album::get_typ_for_reflect,
+                    Album::mut_typ_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "label",
-                    Album::has_label,
-                    Album::get_label,
+                    Album::get_label_for_reflect,
+                    Album::mut_label_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Date>>(
                     "date",
-                    Album::has_date,
-                    Album::get_date,
+                    Album::get_date_for_reflect,
+                    Album::mut_date_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "popularity",
-                    Album::has_popularity,
-                    Album::get_popularity,
+                    Album::get_popularity_for_reflect,
+                    Album::mut_popularity_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "genre",
-                    Album::get_genre,
+                    Album::get_genre_for_reflect,
+                    Album::mut_genre_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Image>>(
                     "cover",
-                    Album::get_cover,
+                    Album::get_cover_for_reflect,
+                    Album::mut_cover_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ExternalId>>(
                     "external_id",
-                    Album::get_external_id,
+                    Album::get_external_id_for_reflect,
+                    Album::mut_external_id_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Disc>>(
                     "disc",
-                    Album::get_disc,
+                    Album::get_disc_for_reflect,
+                    Album::mut_disc_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "review",
-                    Album::get_review,
+                    Album::get_review_for_reflect,
+                    Album::mut_review_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Copyright>>(
                     "copyright",
-                    Album::get_copyright,
+                    Album::get_copyright_for_reflect,
+                    Album::mut_copyright_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Restriction>>(
                     "restriction",
-                    Album::get_restriction,
+                    Album::get_restriction_for_reflect,
+                    Album::mut_restriction_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Album>>(
                     "related",
-                    Album::get_related,
+                    Album::get_related_for_reflect,
+                    Album::mut_related_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<SalePeriod>>(
                     "sale_period",
-                    Album::get_sale_period,
+                    Album::get_sale_period_for_reflect,
+                    Album::mut_sale_period_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ImageGroup>>(
                     "cover_group",
-                    Album::has_cover_group,
-                    Album::get_cover_group,
+                    Album::get_cover_group_for_reflect,
+                    Album::mut_cover_group_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Album>(
                     "Album",
@@ -2732,32 +2977,15 @@ impl ::protobuf::Clear for Album {
     }
 }
 
-impl ::std::cmp::PartialEq for Album {
-    fn eq(&self, other: &Album) -> bool {
-        self.gid == other.gid &&
-        self.name == other.name &&
-        self.artist == other.artist &&
-        self.typ == other.typ &&
-        self.label == other.label &&
-        self.date == other.date &&
-        self.popularity == other.popularity &&
-        self.genre == other.genre &&
-        self.cover == other.cover &&
-        self.external_id == other.external_id &&
-        self.disc == other.disc &&
-        self.review == other.review &&
-        self.copyright == other.copyright &&
-        self.restriction == other.restriction &&
-        self.related == other.related &&
-        self.sale_period == other.sale_period &&
-        self.cover_group == other.cover_group &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Album {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Album {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
 }
 
@@ -2807,7 +3035,13 @@ impl ::protobuf::ProtobufEnum for Album_Type {
 impl ::std::marker::Copy for Album_Type {
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Album_Type {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Track {
     // message fields
     gid: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -2827,7 +3061,7 @@ pub struct Track {
     preview: ::protobuf::RepeatedField<AudioFile>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -2844,27 +3078,7 @@ impl Track {
             ptr: 0 as *const Track,
         };
         unsafe {
-            instance.get(|| {
-                Track {
-                    gid: ::protobuf::SingularField::none(),
-                    name: ::protobuf::SingularField::none(),
-                    album: ::protobuf::SingularPtrField::none(),
-                    artist: ::protobuf::RepeatedField::new(),
-                    number: ::std::option::Option::None,
-                    disc_number: ::std::option::Option::None,
-                    duration: ::std::option::Option::None,
-                    popularity: ::std::option::Option::None,
-                    explicit: ::std::option::Option::None,
-                    external_id: ::protobuf::RepeatedField::new(),
-                    restriction: ::protobuf::RepeatedField::new(),
-                    file: ::protobuf::RepeatedField::new(),
-                    alternative: ::protobuf::RepeatedField::new(),
-                    sale_period: ::protobuf::RepeatedField::new(),
-                    preview: ::protobuf::RepeatedField::new(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Track::new)
         }
     }
 
@@ -2904,6 +3118,14 @@ impl Track {
         }
     }
 
+    fn get_gid_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.gid
+    }
+
+    fn mut_gid_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.gid
+    }
+
     // optional string name = 2;
 
     pub fn clear_name(&mut self) {
@@ -2940,6 +3162,14 @@ impl Track {
         }
     }
 
+    fn get_name_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.name
+    }
+
+    fn mut_name_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.name
+    }
+
     // optional .Album album = 3;
 
     pub fn clear_album(&mut self) {
@@ -2973,6 +3203,14 @@ impl Track {
         self.album.as_ref().unwrap_or_else(|| Album::default_instance())
     }
 
+    fn get_album_for_reflect(&self) -> &::protobuf::SingularPtrField<Album> {
+        &self.album
+    }
+
+    fn mut_album_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<Album> {
+        &mut self.album
+    }
+
     // repeated .Artist artist = 4;
 
     pub fn clear_artist(&mut self) {
@@ -2998,6 +3236,14 @@ impl Track {
         &self.artist
     }
 
+    fn get_artist_for_reflect(&self) -> &::protobuf::RepeatedField<Artist> {
+        &self.artist
+    }
+
+    fn mut_artist_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Artist> {
+        &mut self.artist
+    }
+
     // optional sint32 number = 5;
 
     pub fn clear_number(&mut self) {
@@ -3015,6 +3261,14 @@ impl Track {
 
     pub fn get_number(&self) -> i32 {
         self.number.unwrap_or(0)
+    }
+
+    fn get_number_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.number
+    }
+
+    fn mut_number_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.number
     }
 
     // optional sint32 disc_number = 6;
@@ -3036,6 +3290,14 @@ impl Track {
         self.disc_number.unwrap_or(0)
     }
 
+    fn get_disc_number_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.disc_number
+    }
+
+    fn mut_disc_number_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.disc_number
+    }
+
     // optional sint32 duration = 7;
 
     pub fn clear_duration(&mut self) {
@@ -3053,6 +3315,14 @@ impl Track {
 
     pub fn get_duration(&self) -> i32 {
         self.duration.unwrap_or(0)
+    }
+
+    fn get_duration_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.duration
+    }
+
+    fn mut_duration_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.duration
     }
 
     // optional sint32 popularity = 8;
@@ -3074,6 +3344,14 @@ impl Track {
         self.popularity.unwrap_or(0)
     }
 
+    fn get_popularity_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.popularity
+    }
+
+    fn mut_popularity_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.popularity
+    }
+
     // optional bool explicit = 9;
 
     pub fn clear_explicit(&mut self) {
@@ -3091,6 +3369,14 @@ impl Track {
 
     pub fn get_explicit(&self) -> bool {
         self.explicit.unwrap_or(false)
+    }
+
+    fn get_explicit_for_reflect(&self) -> &::std::option::Option<bool> {
+        &self.explicit
+    }
+
+    fn mut_explicit_for_reflect(&mut self) -> &mut ::std::option::Option<bool> {
+        &mut self.explicit
     }
 
     // repeated .ExternalId external_id = 10;
@@ -3118,6 +3404,14 @@ impl Track {
         &self.external_id
     }
 
+    fn get_external_id_for_reflect(&self) -> &::protobuf::RepeatedField<ExternalId> {
+        &self.external_id
+    }
+
+    fn mut_external_id_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<ExternalId> {
+        &mut self.external_id
+    }
+
     // repeated .Restriction restriction = 11;
 
     pub fn clear_restriction(&mut self) {
@@ -3141,6 +3435,14 @@ impl Track {
 
     pub fn get_restriction(&self) -> &[Restriction] {
         &self.restriction
+    }
+
+    fn get_restriction_for_reflect(&self) -> &::protobuf::RepeatedField<Restriction> {
+        &self.restriction
+    }
+
+    fn mut_restriction_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Restriction> {
+        &mut self.restriction
     }
 
     // repeated .AudioFile file = 12;
@@ -3168,6 +3470,14 @@ impl Track {
         &self.file
     }
 
+    fn get_file_for_reflect(&self) -> &::protobuf::RepeatedField<AudioFile> {
+        &self.file
+    }
+
+    fn mut_file_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<AudioFile> {
+        &mut self.file
+    }
+
     // repeated .Track alternative = 13;
 
     pub fn clear_alternative(&mut self) {
@@ -3191,6 +3501,14 @@ impl Track {
 
     pub fn get_alternative(&self) -> &[Track] {
         &self.alternative
+    }
+
+    fn get_alternative_for_reflect(&self) -> &::protobuf::RepeatedField<Track> {
+        &self.alternative
+    }
+
+    fn mut_alternative_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Track> {
+        &mut self.alternative
     }
 
     // repeated .SalePeriod sale_period = 14;
@@ -3218,6 +3536,14 @@ impl Track {
         &self.sale_period
     }
 
+    fn get_sale_period_for_reflect(&self) -> &::protobuf::RepeatedField<SalePeriod> {
+        &self.sale_period
+    }
+
+    fn mut_sale_period_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<SalePeriod> {
+        &mut self.sale_period
+    }
+
     // repeated .AudioFile preview = 15;
 
     pub fn clear_preview(&mut self) {
@@ -3242,6 +3568,14 @@ impl Track {
     pub fn get_preview(&self) -> &[AudioFile] {
         &self.preview
     }
+
+    fn get_preview_for_reflect(&self) -> &::protobuf::RepeatedField<AudioFile> {
+        &self.preview
+    }
+
+    fn mut_preview_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<AudioFile> {
+        &mut self.preview
+    }
 }
 
 impl ::protobuf::Message for Track {
@@ -3250,76 +3584,76 @@ impl ::protobuf::Message for Track {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.gid));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.gid)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name)?;
                 },
                 3 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.album));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.album)?;
                 },
                 4 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.artist));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.artist)?;
                 },
                 5 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.number = ::std::option::Option::Some(tmp);
                 },
                 6 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.disc_number = ::std::option::Option::Some(tmp);
                 },
                 7 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.duration = ::std::option::Option::Some(tmp);
                 },
                 8 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.popularity = ::std::option::Option::Some(tmp);
                 },
                 9 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_bool());
+                    let tmp = is.read_bool()?;
                     self.explicit = ::std::option::Option::Some(tmp);
                 },
                 10 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.external_id));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.external_id)?;
                 },
                 11 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.restriction));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.restriction)?;
                 },
                 12 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.file));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.file)?;
                 },
                 13 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.alternative));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.alternative)?;
                 },
                 14 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.sale_period));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.sale_period)?;
                 },
                 15 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.preview));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.preview)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -3330,33 +3664,33 @@ impl ::protobuf::Message for Track {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.gid {
-            my_size += ::protobuf::rt::bytes_size(1, &value);
+        if let Some(v) = self.gid.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(1, &v);
         };
-        for value in &self.name {
-            my_size += ::protobuf::rt::string_size(2, &value);
+        if let Some(v) = self.name.as_ref() {
+            my_size += ::protobuf::rt::string_size(2, &v);
         };
-        for value in &self.album {
-            let len = value.compute_size();
+        if let Some(v) = self.album.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         for value in &self.artist {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.number {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(5, *value);
+        if let Some(v) = self.number {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(5, v);
         };
-        for value in &self.disc_number {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(6, *value);
+        if let Some(v) = self.disc_number {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(6, v);
         };
-        for value in &self.duration {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(7, *value);
+        if let Some(v) = self.duration {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(7, v);
         };
-        for value in &self.popularity {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(8, *value);
+        if let Some(v) = self.popularity {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(8, v);
         };
-        if self.explicit.is_some() {
+        if let Some(v) = self.explicit {
             my_size += 2;
         };
         for value in &self.external_id {
@@ -3390,67 +3724,67 @@ impl ::protobuf::Message for Track {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.gid.as_ref() {
-            try!(os.write_bytes(1, &v));
+            os.write_bytes(1, &v)?;
         };
         if let Some(v) = self.name.as_ref() {
-            try!(os.write_string(2, &v));
+            os.write_string(2, &v)?;
         };
         if let Some(v) = self.album.as_ref() {
-            try!(os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.artist {
-            try!(os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.number {
-            try!(os.write_sint32(5, v));
+            os.write_sint32(5, v)?;
         };
         if let Some(v) = self.disc_number {
-            try!(os.write_sint32(6, v));
+            os.write_sint32(6, v)?;
         };
         if let Some(v) = self.duration {
-            try!(os.write_sint32(7, v));
+            os.write_sint32(7, v)?;
         };
         if let Some(v) = self.popularity {
-            try!(os.write_sint32(8, v));
+            os.write_sint32(8, v)?;
         };
         if let Some(v) = self.explicit {
-            try!(os.write_bool(9, v));
+            os.write_bool(9, v)?;
         };
         for v in &self.external_id {
-            try!(os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.restriction {
-            try!(os.write_tag(11, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(11, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.file {
-            try!(os.write_tag(12, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(12, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.alternative {
-            try!(os.write_tag(13, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(13, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.sale_period {
-            try!(os.write_tag(14, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(14, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.preview {
-            try!(os.write_tag(15, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(15, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -3464,10 +3798,6 @@ impl ::protobuf::Message for Track {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Track>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -3492,73 +3822,80 @@ impl ::protobuf::MessageStatic for Track {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "gid",
-                    Track::has_gid,
-                    Track::get_gid,
+                    Track::get_gid_for_reflect,
+                    Track::mut_gid_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "name",
-                    Track::has_name,
-                    Track::get_name,
+                    Track::get_name_for_reflect,
+                    Track::mut_name_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Album>>(
                     "album",
-                    Track::has_album,
-                    Track::get_album,
+                    Track::get_album_for_reflect,
+                    Track::mut_album_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Artist>>(
                     "artist",
-                    Track::get_artist,
+                    Track::get_artist_for_reflect,
+                    Track::mut_artist_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "number",
-                    Track::has_number,
-                    Track::get_number,
+                    Track::get_number_for_reflect,
+                    Track::mut_number_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "disc_number",
-                    Track::has_disc_number,
-                    Track::get_disc_number,
+                    Track::get_disc_number_for_reflect,
+                    Track::mut_disc_number_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "duration",
-                    Track::has_duration,
-                    Track::get_duration,
+                    Track::get_duration_for_reflect,
+                    Track::mut_duration_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "popularity",
-                    Track::has_popularity,
-                    Track::get_popularity,
+                    Track::get_popularity_for_reflect,
+                    Track::mut_popularity_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bool_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
                     "explicit",
-                    Track::has_explicit,
-                    Track::get_explicit,
+                    Track::get_explicit_for_reflect,
+                    Track::mut_explicit_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ExternalId>>(
                     "external_id",
-                    Track::get_external_id,
+                    Track::get_external_id_for_reflect,
+                    Track::mut_external_id_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Restriction>>(
                     "restriction",
-                    Track::get_restriction,
+                    Track::get_restriction_for_reflect,
+                    Track::mut_restriction_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AudioFile>>(
                     "file",
-                    Track::get_file,
+                    Track::get_file_for_reflect,
+                    Track::mut_file_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Track>>(
                     "alternative",
-                    Track::get_alternative,
+                    Track::get_alternative_for_reflect,
+                    Track::mut_alternative_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<SalePeriod>>(
                     "sale_period",
-                    Track::get_sale_period,
+                    Track::get_sale_period_for_reflect,
+                    Track::mut_sale_period_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AudioFile>>(
                     "preview",
-                    Track::get_preview,
+                    Track::get_preview_for_reflect,
+                    Track::mut_preview_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Track>(
                     "Track",
@@ -3591,34 +3928,19 @@ impl ::protobuf::Clear for Track {
     }
 }
 
-impl ::std::cmp::PartialEq for Track {
-    fn eq(&self, other: &Track) -> bool {
-        self.gid == other.gid &&
-        self.name == other.name &&
-        self.album == other.album &&
-        self.artist == other.artist &&
-        self.number == other.number &&
-        self.disc_number == other.disc_number &&
-        self.duration == other.duration &&
-        self.popularity == other.popularity &&
-        self.explicit == other.explicit &&
-        self.external_id == other.external_id &&
-        self.restriction == other.restriction &&
-        self.file == other.file &&
-        self.alternative == other.alternative &&
-        self.sale_period == other.sale_period &&
-        self.preview == other.preview &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Track {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Track {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Image {
     // message fields
     file_id: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -3627,7 +3949,7 @@ pub struct Image {
     height: ::std::option::Option<i32>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -3644,16 +3966,7 @@ impl Image {
             ptr: 0 as *const Image,
         };
         unsafe {
-            instance.get(|| {
-                Image {
-                    file_id: ::protobuf::SingularField::none(),
-                    size: ::std::option::Option::None,
-                    width: ::std::option::Option::None,
-                    height: ::std::option::Option::None,
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Image::new)
         }
     }
 
@@ -3693,6 +4006,14 @@ impl Image {
         }
     }
 
+    fn get_file_id_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.file_id
+    }
+
+    fn mut_file_id_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.file_id
+    }
+
     // optional .Image.Size size = 2;
 
     pub fn clear_size(&mut self) {
@@ -3710,6 +4031,14 @@ impl Image {
 
     pub fn get_size(&self) -> Image_Size {
         self.size.unwrap_or(Image_Size::DEFAULT)
+    }
+
+    fn get_size_for_reflect(&self) -> &::std::option::Option<Image_Size> {
+        &self.size
+    }
+
+    fn mut_size_for_reflect(&mut self) -> &mut ::std::option::Option<Image_Size> {
+        &mut self.size
     }
 
     // optional sint32 width = 3;
@@ -3731,6 +4060,14 @@ impl Image {
         self.width.unwrap_or(0)
     }
 
+    fn get_width_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.width
+    }
+
+    fn mut_width_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.width
+    }
+
     // optional sint32 height = 4;
 
     pub fn clear_height(&mut self) {
@@ -3749,6 +4086,14 @@ impl Image {
     pub fn get_height(&self) -> i32 {
         self.height.unwrap_or(0)
     }
+
+    fn get_height_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.height
+    }
+
+    fn mut_height_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.height
+    }
 }
 
 impl ::protobuf::Message for Image {
@@ -3757,35 +4102,35 @@ impl ::protobuf::Message for Image {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.file_id));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.file_id)?;
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.size = ::std::option::Option::Some(tmp);
                 },
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.width = ::std::option::Option::Some(tmp);
                 },
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.height = ::std::option::Option::Some(tmp);
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -3796,17 +4141,17 @@ impl ::protobuf::Message for Image {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.file_id {
-            my_size += ::protobuf::rt::bytes_size(1, &value);
+        if let Some(v) = self.file_id.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(1, &v);
         };
-        for value in &self.size {
-            my_size += ::protobuf::rt::enum_size(2, *value);
+        if let Some(v) = self.size {
+            my_size += ::protobuf::rt::enum_size(2, v);
         };
-        for value in &self.width {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(3, *value);
+        if let Some(v) = self.width {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(3, v);
         };
-        for value in &self.height {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(4, *value);
+        if let Some(v) = self.height {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(4, v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -3815,18 +4160,18 @@ impl ::protobuf::Message for Image {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.file_id.as_ref() {
-            try!(os.write_bytes(1, &v));
+            os.write_bytes(1, &v)?;
         };
         if let Some(v) = self.size {
-            try!(os.write_enum(2, v.value()));
+            os.write_enum(2, v.value())?;
         };
         if let Some(v) = self.width {
-            try!(os.write_sint32(3, v));
+            os.write_sint32(3, v)?;
         };
         if let Some(v) = self.height {
-            try!(os.write_sint32(4, v));
+            os.write_sint32(4, v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -3840,10 +4185,6 @@ impl ::protobuf::Message for Image {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Image>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -3868,25 +4209,25 @@ impl ::protobuf::MessageStatic for Image {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "file_id",
-                    Image::has_file_id,
-                    Image::get_file_id,
+                    Image::get_file_id_for_reflect,
+                    Image::mut_file_id_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Image_Size>>(
                     "size",
-                    Image::has_size,
-                    Image::get_size,
+                    Image::get_size_for_reflect,
+                    Image::mut_size_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "width",
-                    Image::has_width,
-                    Image::get_width,
+                    Image::get_width_for_reflect,
+                    Image::mut_width_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "height",
-                    Image::has_height,
-                    Image::get_height,
+                    Image::get_height_for_reflect,
+                    Image::mut_height_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Image>(
                     "Image",
@@ -3908,19 +4249,15 @@ impl ::protobuf::Clear for Image {
     }
 }
 
-impl ::std::cmp::PartialEq for Image {
-    fn eq(&self, other: &Image) -> bool {
-        self.file_id == other.file_id &&
-        self.size == other.size &&
-        self.width == other.width &&
-        self.height == other.height &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Image {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Image {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
 }
 
@@ -3973,13 +4310,19 @@ impl ::protobuf::ProtobufEnum for Image_Size {
 impl ::std::marker::Copy for Image_Size {
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Image_Size {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct ImageGroup {
     // message fields
     image: ::protobuf::RepeatedField<Image>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -3996,13 +4339,7 @@ impl ImageGroup {
             ptr: 0 as *const ImageGroup,
         };
         unsafe {
-            instance.get(|| {
-                ImageGroup {
-                    image: ::protobuf::RepeatedField::new(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(ImageGroup::new)
         }
     }
 
@@ -4030,6 +4367,14 @@ impl ImageGroup {
     pub fn get_image(&self) -> &[Image] {
         &self.image
     }
+
+    fn get_image_for_reflect(&self) -> &::protobuf::RepeatedField<Image> {
+        &self.image
+    }
+
+    fn mut_image_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Image> {
+        &mut self.image
+    }
 }
 
 impl ::protobuf::Message for ImageGroup {
@@ -4038,14 +4383,14 @@ impl ::protobuf::Message for ImageGroup {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.image));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.image)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -4067,11 +4412,11 @@ impl ::protobuf::Message for ImageGroup {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         for v in &self.image {
-            try!(os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -4085,10 +4430,6 @@ impl ::protobuf::Message for ImageGroup {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<ImageGroup>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -4113,9 +4454,10 @@ impl ::protobuf::MessageStatic for ImageGroup {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Image>>(
                     "image",
-                    ImageGroup::get_image,
+                    ImageGroup::get_image_for_reflect,
+                    ImageGroup::mut_image_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ImageGroup>(
                     "ImageGroup",
@@ -4134,20 +4476,19 @@ impl ::protobuf::Clear for ImageGroup {
     }
 }
 
-impl ::std::cmp::PartialEq for ImageGroup {
-    fn eq(&self, other: &ImageGroup) -> bool {
-        self.image == other.image &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for ImageGroup {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for ImageGroup {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Biography {
     // message fields
     text: ::protobuf::SingularField<::std::string::String>,
@@ -4155,7 +4496,7 @@ pub struct Biography {
     portrait_group: ::protobuf::RepeatedField<ImageGroup>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -4172,15 +4513,7 @@ impl Biography {
             ptr: 0 as *const Biography,
         };
         unsafe {
-            instance.get(|| {
-                Biography {
-                    text: ::protobuf::SingularField::none(),
-                    portrait: ::protobuf::RepeatedField::new(),
-                    portrait_group: ::protobuf::RepeatedField::new(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Biography::new)
         }
     }
 
@@ -4220,6 +4553,14 @@ impl Biography {
         }
     }
 
+    fn get_text_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.text
+    }
+
+    fn mut_text_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.text
+    }
+
     // repeated .Image portrait = 2;
 
     pub fn clear_portrait(&mut self) {
@@ -4243,6 +4584,14 @@ impl Biography {
 
     pub fn get_portrait(&self) -> &[Image] {
         &self.portrait
+    }
+
+    fn get_portrait_for_reflect(&self) -> &::protobuf::RepeatedField<Image> {
+        &self.portrait
+    }
+
+    fn mut_portrait_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Image> {
+        &mut self.portrait
     }
 
     // repeated .ImageGroup portrait_group = 3;
@@ -4269,6 +4618,14 @@ impl Biography {
     pub fn get_portrait_group(&self) -> &[ImageGroup] {
         &self.portrait_group
     }
+
+    fn get_portrait_group_for_reflect(&self) -> &::protobuf::RepeatedField<ImageGroup> {
+        &self.portrait_group
+    }
+
+    fn mut_portrait_group_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<ImageGroup> {
+        &mut self.portrait_group
+    }
 }
 
 impl ::protobuf::Message for Biography {
@@ -4277,20 +4634,20 @@ impl ::protobuf::Message for Biography {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.text));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.text)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.portrait));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.portrait)?;
                 },
                 3 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.portrait_group));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.portrait_group)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -4301,8 +4658,8 @@ impl ::protobuf::Message for Biography {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.text {
-            my_size += ::protobuf::rt::string_size(1, &value);
+        if let Some(v) = self.text.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
         };
         for value in &self.portrait {
             let len = value.compute_size();
@@ -4319,19 +4676,19 @@ impl ::protobuf::Message for Biography {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.text.as_ref() {
-            try!(os.write_string(1, &v));
+            os.write_string(1, &v)?;
         };
         for v in &self.portrait {
-            try!(os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         for v in &self.portrait_group {
-            try!(os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -4345,10 +4702,6 @@ impl ::protobuf::Message for Biography {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Biography>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -4373,18 +4726,20 @@ impl ::protobuf::MessageStatic for Biography {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "text",
-                    Biography::has_text,
-                    Biography::get_text,
+                    Biography::get_text_for_reflect,
+                    Biography::mut_text_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Image>>(
                     "portrait",
-                    Biography::get_portrait,
+                    Biography::get_portrait_for_reflect,
+                    Biography::mut_portrait_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ImageGroup>>(
                     "portrait_group",
-                    Biography::get_portrait_group,
+                    Biography::get_portrait_group_for_reflect,
+                    Biography::mut_portrait_group_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Biography>(
                     "Biography",
@@ -4405,22 +4760,19 @@ impl ::protobuf::Clear for Biography {
     }
 }
 
-impl ::std::cmp::PartialEq for Biography {
-    fn eq(&self, other: &Biography) -> bool {
-        self.text == other.text &&
-        self.portrait == other.portrait &&
-        self.portrait_group == other.portrait_group &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Biography {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Biography {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Disc {
     // message fields
     number: ::std::option::Option<i32>,
@@ -4428,7 +4780,7 @@ pub struct Disc {
     track: ::protobuf::RepeatedField<Track>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -4445,15 +4797,7 @@ impl Disc {
             ptr: 0 as *const Disc,
         };
         unsafe {
-            instance.get(|| {
-                Disc {
-                    number: ::std::option::Option::None,
-                    name: ::protobuf::SingularField::none(),
-                    track: ::protobuf::RepeatedField::new(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Disc::new)
         }
     }
 
@@ -4474,6 +4818,14 @@ impl Disc {
 
     pub fn get_number(&self) -> i32 {
         self.number.unwrap_or(0)
+    }
+
+    fn get_number_for_reflect(&self) -> &::std::option::Option<i32> {
+        &self.number
+    }
+
+    fn mut_number_for_reflect(&mut self) -> &mut ::std::option::Option<i32> {
+        &mut self.number
     }
 
     // optional string name = 2;
@@ -4512,6 +4864,14 @@ impl Disc {
         }
     }
 
+    fn get_name_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.name
+    }
+
+    fn mut_name_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.name
+    }
+
     // repeated .Track track = 3;
 
     pub fn clear_track(&mut self) {
@@ -4536,6 +4896,14 @@ impl Disc {
     pub fn get_track(&self) -> &[Track] {
         &self.track
     }
+
+    fn get_track_for_reflect(&self) -> &::protobuf::RepeatedField<Track> {
+        &self.track
+    }
+
+    fn mut_track_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Track> {
+        &mut self.track
+    }
 }
 
 impl ::protobuf::Message for Disc {
@@ -4544,24 +4912,24 @@ impl ::protobuf::Message for Disc {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_sint32());
+                    let tmp = is.read_sint32()?;
                     self.number = ::std::option::Option::Some(tmp);
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name)?;
                 },
                 3 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.track));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.track)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -4572,11 +4940,11 @@ impl ::protobuf::Message for Disc {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.number {
-            my_size += ::protobuf::rt::value_varint_zigzag_size(1, *value);
+        if let Some(v) = self.number {
+            my_size += ::protobuf::rt::value_varint_zigzag_size(1, v);
         };
-        for value in &self.name {
-            my_size += ::protobuf::rt::string_size(2, &value);
+        if let Some(v) = self.name.as_ref() {
+            my_size += ::protobuf::rt::string_size(2, &v);
         };
         for value in &self.track {
             let len = value.compute_size();
@@ -4589,17 +4957,17 @@ impl ::protobuf::Message for Disc {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.number {
-            try!(os.write_sint32(1, v));
+            os.write_sint32(1, v)?;
         };
         if let Some(v) = self.name.as_ref() {
-            try!(os.write_string(2, &v));
+            os.write_string(2, &v)?;
         };
         for v in &self.track {
-            try!(os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -4613,10 +4981,6 @@ impl ::protobuf::Message for Disc {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Disc>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -4641,19 +5005,20 @@ impl ::protobuf::MessageStatic for Disc {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_i32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
                     "number",
-                    Disc::has_number,
-                    Disc::get_number,
+                    Disc::get_number_for_reflect,
+                    Disc::mut_number_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "name",
-                    Disc::has_name,
-                    Disc::get_name,
+                    Disc::get_name_for_reflect,
+                    Disc::mut_name_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Track>>(
                     "track",
-                    Disc::get_track,
+                    Disc::get_track_for_reflect,
+                    Disc::mut_track_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Disc>(
                     "Disc",
@@ -4674,29 +5039,26 @@ impl ::protobuf::Clear for Disc {
     }
 }
 
-impl ::std::cmp::PartialEq for Disc {
-    fn eq(&self, other: &Disc) -> bool {
-        self.number == other.number &&
-        self.name == other.name &&
-        self.track == other.track &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Disc {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Disc {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Copyright {
     // message fields
     typ: ::std::option::Option<Copyright_Type>,
     text: ::protobuf::SingularField<::std::string::String>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -4713,14 +5075,7 @@ impl Copyright {
             ptr: 0 as *const Copyright,
         };
         unsafe {
-            instance.get(|| {
-                Copyright {
-                    typ: ::std::option::Option::None,
-                    text: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Copyright::new)
         }
     }
 
@@ -4741,6 +5096,14 @@ impl Copyright {
 
     pub fn get_typ(&self) -> Copyright_Type {
         self.typ.unwrap_or(Copyright_Type::P)
+    }
+
+    fn get_typ_for_reflect(&self) -> &::std::option::Option<Copyright_Type> {
+        &self.typ
+    }
+
+    fn mut_typ_for_reflect(&mut self) -> &mut ::std::option::Option<Copyright_Type> {
+        &mut self.typ
     }
 
     // optional string text = 2;
@@ -4778,6 +5141,14 @@ impl Copyright {
             None => "",
         }
     }
+
+    fn get_text_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.text
+    }
+
+    fn mut_text_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.text
+    }
 }
 
 impl ::protobuf::Message for Copyright {
@@ -4786,21 +5157,21 @@ impl ::protobuf::Message for Copyright {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.typ = ::std::option::Option::Some(tmp);
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.text));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.text)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -4811,11 +5182,11 @@ impl ::protobuf::Message for Copyright {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.typ {
-            my_size += ::protobuf::rt::enum_size(1, *value);
+        if let Some(v) = self.typ {
+            my_size += ::protobuf::rt::enum_size(1, v);
         };
-        for value in &self.text {
-            my_size += ::protobuf::rt::string_size(2, &value);
+        if let Some(v) = self.text.as_ref() {
+            my_size += ::protobuf::rt::string_size(2, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -4824,12 +5195,12 @@ impl ::protobuf::Message for Copyright {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.typ {
-            try!(os.write_enum(1, v.value()));
+            os.write_enum(1, v.value())?;
         };
         if let Some(v) = self.text.as_ref() {
-            try!(os.write_string(2, &v));
+            os.write_string(2, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -4843,10 +5214,6 @@ impl ::protobuf::Message for Copyright {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Copyright>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -4871,15 +5238,15 @@ impl ::protobuf::MessageStatic for Copyright {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Copyright_Type>>(
                     "typ",
-                    Copyright::has_typ,
-                    Copyright::get_typ,
+                    Copyright::get_typ_for_reflect,
+                    Copyright::mut_typ_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "text",
-                    Copyright::has_text,
-                    Copyright::get_text,
+                    Copyright::get_text_for_reflect,
+                    Copyright::mut_text_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Copyright>(
                     "Copyright",
@@ -4899,17 +5266,15 @@ impl ::protobuf::Clear for Copyright {
     }
 }
 
-impl ::std::cmp::PartialEq for Copyright {
-    fn eq(&self, other: &Copyright) -> bool {
-        self.typ == other.typ &&
-        self.text == other.text &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Copyright {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Copyright {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
 }
 
@@ -4956,7 +5321,13 @@ impl ::protobuf::ProtobufEnum for Copyright_Type {
 impl ::std::marker::Copy for Copyright_Type {
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Copyright_Type {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct Restriction {
     // message fields
     countries_allowed: ::protobuf::SingularField<::std::string::String>,
@@ -4965,7 +5336,7 @@ pub struct Restriction {
     catalogue_str: ::protobuf::RepeatedField<::std::string::String>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -4982,16 +5353,7 @@ impl Restriction {
             ptr: 0 as *const Restriction,
         };
         unsafe {
-            instance.get(|| {
-                Restriction {
-                    countries_allowed: ::protobuf::SingularField::none(),
-                    countries_forbidden: ::protobuf::SingularField::none(),
-                    typ: ::std::option::Option::None,
-                    catalogue_str: ::protobuf::RepeatedField::new(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(Restriction::new)
         }
     }
 
@@ -5031,6 +5393,14 @@ impl Restriction {
         }
     }
 
+    fn get_countries_allowed_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.countries_allowed
+    }
+
+    fn mut_countries_allowed_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.countries_allowed
+    }
+
     // optional string countries_forbidden = 3;
 
     pub fn clear_countries_forbidden(&mut self) {
@@ -5067,6 +5437,14 @@ impl Restriction {
         }
     }
 
+    fn get_countries_forbidden_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.countries_forbidden
+    }
+
+    fn mut_countries_forbidden_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.countries_forbidden
+    }
+
     // optional .Restriction.Type typ = 4;
 
     pub fn clear_typ(&mut self) {
@@ -5084,6 +5462,14 @@ impl Restriction {
 
     pub fn get_typ(&self) -> Restriction_Type {
         self.typ.unwrap_or(Restriction_Type::STREAMING)
+    }
+
+    fn get_typ_for_reflect(&self) -> &::std::option::Option<Restriction_Type> {
+        &self.typ
+    }
+
+    fn mut_typ_for_reflect(&mut self) -> &mut ::std::option::Option<Restriction_Type> {
+        &mut self.typ
     }
 
     // repeated string catalogue_str = 5;
@@ -5110,6 +5496,14 @@ impl Restriction {
     pub fn get_catalogue_str(&self) -> &[::std::string::String] {
         &self.catalogue_str
     }
+
+    fn get_catalogue_str_for_reflect(&self) -> &::protobuf::RepeatedField<::std::string::String> {
+        &self.catalogue_str
+    }
+
+    fn mut_catalogue_str_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.catalogue_str
+    }
 }
 
 impl ::protobuf::Message for Restriction {
@@ -5118,27 +5512,27 @@ impl ::protobuf::Message for Restriction {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 2 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.countries_allowed));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.countries_allowed)?;
                 },
                 3 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.countries_forbidden));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.countries_forbidden)?;
                 },
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.typ = ::std::option::Option::Some(tmp);
                 },
                 5 => {
-                    try!(::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.catalogue_str));
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.catalogue_str)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -5149,14 +5543,14 @@ impl ::protobuf::Message for Restriction {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.countries_allowed {
-            my_size += ::protobuf::rt::string_size(2, &value);
+        if let Some(v) = self.countries_allowed.as_ref() {
+            my_size += ::protobuf::rt::string_size(2, &v);
         };
-        for value in &self.countries_forbidden {
-            my_size += ::protobuf::rt::string_size(3, &value);
+        if let Some(v) = self.countries_forbidden.as_ref() {
+            my_size += ::protobuf::rt::string_size(3, &v);
         };
-        for value in &self.typ {
-            my_size += ::protobuf::rt::enum_size(4, *value);
+        if let Some(v) = self.typ {
+            my_size += ::protobuf::rt::enum_size(4, v);
         };
         for value in &self.catalogue_str {
             my_size += ::protobuf::rt::string_size(5, &value);
@@ -5168,18 +5562,18 @@ impl ::protobuf::Message for Restriction {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.countries_allowed.as_ref() {
-            try!(os.write_string(2, &v));
+            os.write_string(2, &v)?;
         };
         if let Some(v) = self.countries_forbidden.as_ref() {
-            try!(os.write_string(3, &v));
+            os.write_string(3, &v)?;
         };
         if let Some(v) = self.typ {
-            try!(os.write_enum(4, v.value()));
+            os.write_enum(4, v.value())?;
         };
         for v in &self.catalogue_str {
-            try!(os.write_string(5, &v));
+            os.write_string(5, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -5193,10 +5587,6 @@ impl ::protobuf::Message for Restriction {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<Restriction>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -5221,24 +5611,25 @@ impl ::protobuf::MessageStatic for Restriction {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "countries_allowed",
-                    Restriction::has_countries_allowed,
-                    Restriction::get_countries_allowed,
+                    Restriction::get_countries_allowed_for_reflect,
+                    Restriction::mut_countries_allowed_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "countries_forbidden",
-                    Restriction::has_countries_forbidden,
-                    Restriction::get_countries_forbidden,
+                    Restriction::get_countries_forbidden_for_reflect,
+                    Restriction::mut_countries_forbidden_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Restriction_Type>>(
                     "typ",
-                    Restriction::has_typ,
-                    Restriction::get_typ,
+                    Restriction::get_typ_for_reflect,
+                    Restriction::mut_typ_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "catalogue_str",
-                    Restriction::get_catalogue_str,
+                    Restriction::get_catalogue_str_for_reflect,
+                    Restriction::mut_catalogue_str_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Restriction>(
                     "Restriction",
@@ -5260,19 +5651,15 @@ impl ::protobuf::Clear for Restriction {
     }
 }
 
-impl ::std::cmp::PartialEq for Restriction {
-    fn eq(&self, other: &Restriction) -> bool {
-        self.countries_allowed == other.countries_allowed &&
-        self.countries_forbidden == other.countries_forbidden &&
-        self.typ == other.typ &&
-        self.catalogue_str == other.catalogue_str &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for Restriction {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for Restriction {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
 }
 
@@ -5316,7 +5703,13 @@ impl ::protobuf::ProtobufEnum for Restriction_Type {
 impl ::std::marker::Copy for Restriction_Type {
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for Restriction_Type {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct SalePeriod {
     // message fields
     restriction: ::protobuf::RepeatedField<Restriction>,
@@ -5324,7 +5717,7 @@ pub struct SalePeriod {
     end: ::protobuf::SingularPtrField<Date>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -5341,15 +5734,7 @@ impl SalePeriod {
             ptr: 0 as *const SalePeriod,
         };
         unsafe {
-            instance.get(|| {
-                SalePeriod {
-                    restriction: ::protobuf::RepeatedField::new(),
-                    start: ::protobuf::SingularPtrField::none(),
-                    end: ::protobuf::SingularPtrField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(SalePeriod::new)
         }
     }
 
@@ -5376,6 +5761,14 @@ impl SalePeriod {
 
     pub fn get_restriction(&self) -> &[Restriction] {
         &self.restriction
+    }
+
+    fn get_restriction_for_reflect(&self) -> &::protobuf::RepeatedField<Restriction> {
+        &self.restriction
+    }
+
+    fn mut_restriction_for_reflect(&mut self) -> &mut ::protobuf::RepeatedField<Restriction> {
+        &mut self.restriction
     }
 
     // optional .Date start = 2;
@@ -5411,6 +5804,14 @@ impl SalePeriod {
         self.start.as_ref().unwrap_or_else(|| Date::default_instance())
     }
 
+    fn get_start_for_reflect(&self) -> &::protobuf::SingularPtrField<Date> {
+        &self.start
+    }
+
+    fn mut_start_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<Date> {
+        &mut self.start
+    }
+
     // optional .Date end = 3;
 
     pub fn clear_end(&mut self) {
@@ -5443,6 +5844,14 @@ impl SalePeriod {
     pub fn get_end(&self) -> &Date {
         self.end.as_ref().unwrap_or_else(|| Date::default_instance())
     }
+
+    fn get_end_for_reflect(&self) -> &::protobuf::SingularPtrField<Date> {
+        &self.end
+    }
+
+    fn mut_end_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<Date> {
+        &mut self.end
+    }
 }
 
 impl ::protobuf::Message for SalePeriod {
@@ -5451,20 +5860,20 @@ impl ::protobuf::Message for SalePeriod {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.restriction));
+                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.restriction)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.start));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.start)?;
                 },
                 3 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.end));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.end)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -5479,12 +5888,12 @@ impl ::protobuf::Message for SalePeriod {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.start {
-            let len = value.compute_size();
+        if let Some(v) = self.start.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.end {
-            let len = value.compute_size();
+        if let Some(v) = self.end.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -5494,21 +5903,21 @@ impl ::protobuf::Message for SalePeriod {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         for v in &self.restriction {
-            try!(os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.start.as_ref() {
-            try!(os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.end.as_ref() {
-            try!(os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -5522,10 +5931,6 @@ impl ::protobuf::Message for SalePeriod {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<SalePeriod>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -5550,19 +5955,20 @@ impl ::protobuf::MessageStatic for SalePeriod {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_repeated_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Restriction>>(
                     "restriction",
-                    SalePeriod::get_restriction,
+                    SalePeriod::get_restriction_for_reflect,
+                    SalePeriod::mut_restriction_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Date>>(
                     "start",
-                    SalePeriod::has_start,
-                    SalePeriod::get_start,
+                    SalePeriod::get_start_for_reflect,
+                    SalePeriod::mut_start_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Date>>(
                     "end",
-                    SalePeriod::has_end,
-                    SalePeriod::get_end,
+                    SalePeriod::get_end_for_reflect,
+                    SalePeriod::mut_end_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<SalePeriod>(
                     "SalePeriod",
@@ -5583,29 +5989,26 @@ impl ::protobuf::Clear for SalePeriod {
     }
 }
 
-impl ::std::cmp::PartialEq for SalePeriod {
-    fn eq(&self, other: &SalePeriod) -> bool {
-        self.restriction == other.restriction &&
-        self.start == other.start &&
-        self.end == other.end &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for SalePeriod {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for SalePeriod {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct ExternalId {
     // message fields
     typ: ::protobuf::SingularField<::std::string::String>,
     id: ::protobuf::SingularField<::std::string::String>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -5622,14 +6025,7 @@ impl ExternalId {
             ptr: 0 as *const ExternalId,
         };
         unsafe {
-            instance.get(|| {
-                ExternalId {
-                    typ: ::protobuf::SingularField::none(),
-                    id: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(ExternalId::new)
         }
     }
 
@@ -5669,6 +6065,14 @@ impl ExternalId {
         }
     }
 
+    fn get_typ_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.typ
+    }
+
+    fn mut_typ_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.typ
+    }
+
     // optional string id = 2;
 
     pub fn clear_id(&mut self) {
@@ -5704,6 +6108,14 @@ impl ExternalId {
             None => "",
         }
     }
+
+    fn get_id_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.id
+    }
+
+    fn mut_id_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.id
+    }
 }
 
 impl ::protobuf::Message for ExternalId {
@@ -5712,17 +6124,17 @@ impl ::protobuf::Message for ExternalId {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.typ));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.typ)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.id));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.id)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -5733,11 +6145,11 @@ impl ::protobuf::Message for ExternalId {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.typ {
-            my_size += ::protobuf::rt::string_size(1, &value);
+        if let Some(v) = self.typ.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
         };
-        for value in &self.id {
-            my_size += ::protobuf::rt::string_size(2, &value);
+        if let Some(v) = self.id.as_ref() {
+            my_size += ::protobuf::rt::string_size(2, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -5746,12 +6158,12 @@ impl ::protobuf::Message for ExternalId {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.typ.as_ref() {
-            try!(os.write_string(1, &v));
+            os.write_string(1, &v)?;
         };
         if let Some(v) = self.id.as_ref() {
-            try!(os.write_string(2, &v));
+            os.write_string(2, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -5765,10 +6177,6 @@ impl ::protobuf::Message for ExternalId {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<ExternalId>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -5793,15 +6201,15 @@ impl ::protobuf::MessageStatic for ExternalId {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "typ",
-                    ExternalId::has_typ,
-                    ExternalId::get_typ,
+                    ExternalId::get_typ_for_reflect,
+                    ExternalId::mut_typ_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "id",
-                    ExternalId::has_id,
-                    ExternalId::get_id,
+                    ExternalId::get_id_for_reflect,
+                    ExternalId::mut_id_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ExternalId>(
                     "ExternalId",
@@ -5821,28 +6229,26 @@ impl ::protobuf::Clear for ExternalId {
     }
 }
 
-impl ::std::cmp::PartialEq for ExternalId {
-    fn eq(&self, other: &ExternalId) -> bool {
-        self.typ == other.typ &&
-        self.id == other.id &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for ExternalId {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for ExternalId {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct AudioFile {
     // message fields
     file_id: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     format: ::std::option::Option<AudioFile_Format>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -5859,14 +6265,7 @@ impl AudioFile {
             ptr: 0 as *const AudioFile,
         };
         unsafe {
-            instance.get(|| {
-                AudioFile {
-                    file_id: ::protobuf::SingularField::none(),
-                    format: ::std::option::Option::None,
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(AudioFile::new)
         }
     }
 
@@ -5906,6 +6305,14 @@ impl AudioFile {
         }
     }
 
+    fn get_file_id_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.file_id
+    }
+
+    fn mut_file_id_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.file_id
+    }
+
     // optional .AudioFile.Format format = 2;
 
     pub fn clear_format(&mut self) {
@@ -5924,6 +6331,14 @@ impl AudioFile {
     pub fn get_format(&self) -> AudioFile_Format {
         self.format.unwrap_or(AudioFile_Format::OGG_VORBIS_96)
     }
+
+    fn get_format_for_reflect(&self) -> &::std::option::Option<AudioFile_Format> {
+        &self.format
+    }
+
+    fn mut_format_for_reflect(&mut self) -> &mut ::std::option::Option<AudioFile_Format> {
+        &mut self.format
+    }
 }
 
 impl ::protobuf::Message for AudioFile {
@@ -5932,21 +6347,21 @@ impl ::protobuf::Message for AudioFile {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.file_id));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.file_id)?;
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.format = ::std::option::Option::Some(tmp);
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -5957,11 +6372,11 @@ impl ::protobuf::Message for AudioFile {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.file_id {
-            my_size += ::protobuf::rt::bytes_size(1, &value);
+        if let Some(v) = self.file_id.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(1, &v);
         };
-        for value in &self.format {
-            my_size += ::protobuf::rt::enum_size(2, *value);
+        if let Some(v) = self.format {
+            my_size += ::protobuf::rt::enum_size(2, v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -5970,12 +6385,12 @@ impl ::protobuf::Message for AudioFile {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.file_id.as_ref() {
-            try!(os.write_bytes(1, &v));
+            os.write_bytes(1, &v)?;
         };
         if let Some(v) = self.format {
-            try!(os.write_enum(2, v.value()));
+            os.write_enum(2, v.value())?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -5989,10 +6404,6 @@ impl ::protobuf::Message for AudioFile {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<AudioFile>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -6017,15 +6428,15 @@ impl ::protobuf::MessageStatic for AudioFile {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "file_id",
-                    AudioFile::has_file_id,
-                    AudioFile::get_file_id,
+                    AudioFile::get_file_id_for_reflect,
+                    AudioFile::mut_file_id_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AudioFile_Format>>(
                     "format",
-                    AudioFile::has_format,
-                    AudioFile::get_format,
+                    AudioFile::get_format_for_reflect,
+                    AudioFile::mut_format_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<AudioFile>(
                     "AudioFile",
@@ -6045,17 +6456,15 @@ impl ::protobuf::Clear for AudioFile {
     }
 }
 
-impl ::std::cmp::PartialEq for AudioFile {
-    fn eq(&self, other: &AudioFile) -> bool {
-        self.file_id == other.file_id &&
-        self.format == other.format &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for AudioFile {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for AudioFile {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
 }
 
@@ -6130,6 +6539,12 @@ impl ::protobuf::ProtobufEnum for AudioFile_Format {
 }
 
 impl ::std::marker::Copy for AudioFile_Format {
+}
+
+impl ::protobuf::reflect::ProtobufValue for AudioFile_Format {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
 }
 
 static file_descriptor_proto_data: &'static [u8] = &[

@@ -20,7 +20,7 @@
 use protobuf::Message as Message_imported_for_functions;
 use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 
-#[derive(Clone,Default)]
+#[derive(PartialEq,Clone,Default)]
 pub struct ClientResponseEncrypted {
     // message fields
     login_credentials: ::protobuf::SingularPtrField<LoginCredentials>,
@@ -34,7 +34,7 @@ pub struct ClientResponseEncrypted {
     client_info: ::protobuf::SingularPtrField<ClientInfo>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -51,21 +51,7 @@ impl ClientResponseEncrypted {
             ptr: 0 as *const ClientResponseEncrypted,
         };
         unsafe {
-            instance.get(|| {
-                ClientResponseEncrypted {
-                    login_credentials: ::protobuf::SingularPtrField::none(),
-                    account_creation: ::std::option::Option::None,
-                    fingerprint_response: ::protobuf::SingularPtrField::none(),
-                    peer_ticket: ::protobuf::SingularPtrField::none(),
-                    system_info: ::protobuf::SingularPtrField::none(),
-                    platform_model: ::protobuf::SingularField::none(),
-                    version_string: ::protobuf::SingularField::none(),
-                    appkey: ::protobuf::SingularPtrField::none(),
-                    client_info: ::protobuf::SingularPtrField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(ClientResponseEncrypted::new)
         }
     }
 
@@ -102,6 +88,14 @@ impl ClientResponseEncrypted {
         self.login_credentials.as_ref().unwrap_or_else(|| LoginCredentials::default_instance())
     }
 
+    fn get_login_credentials_for_reflect(&self) -> &::protobuf::SingularPtrField<LoginCredentials> {
+        &self.login_credentials
+    }
+
+    fn mut_login_credentials_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<LoginCredentials> {
+        &mut self.login_credentials
+    }
+
     // optional .AccountCreation account_creation = 20;
 
     pub fn clear_account_creation(&mut self) {
@@ -119,6 +113,14 @@ impl ClientResponseEncrypted {
 
     pub fn get_account_creation(&self) -> AccountCreation {
         self.account_creation.unwrap_or(AccountCreation::ACCOUNT_CREATION_ALWAYS_PROMPT)
+    }
+
+    fn get_account_creation_for_reflect(&self) -> &::std::option::Option<AccountCreation> {
+        &self.account_creation
+    }
+
+    fn mut_account_creation_for_reflect(&mut self) -> &mut ::std::option::Option<AccountCreation> {
+        &mut self.account_creation
     }
 
     // optional .FingerprintResponseUnion fingerprint_response = 30;
@@ -154,6 +156,14 @@ impl ClientResponseEncrypted {
         self.fingerprint_response.as_ref().unwrap_or_else(|| FingerprintResponseUnion::default_instance())
     }
 
+    fn get_fingerprint_response_for_reflect(&self) -> &::protobuf::SingularPtrField<FingerprintResponseUnion> {
+        &self.fingerprint_response
+    }
+
+    fn mut_fingerprint_response_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<FingerprintResponseUnion> {
+        &mut self.fingerprint_response
+    }
+
     // optional .PeerTicketUnion peer_ticket = 40;
 
     pub fn clear_peer_ticket(&mut self) {
@@ -187,6 +197,14 @@ impl ClientResponseEncrypted {
         self.peer_ticket.as_ref().unwrap_or_else(|| PeerTicketUnion::default_instance())
     }
 
+    fn get_peer_ticket_for_reflect(&self) -> &::protobuf::SingularPtrField<PeerTicketUnion> {
+        &self.peer_ticket
+    }
+
+    fn mut_peer_ticket_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<PeerTicketUnion> {
+        &mut self.peer_ticket
+    }
+
     // required .SystemInfo system_info = 50;
 
     pub fn clear_system_info(&mut self) {
@@ -218,6 +236,14 @@ impl ClientResponseEncrypted {
 
     pub fn get_system_info(&self) -> &SystemInfo {
         self.system_info.as_ref().unwrap_or_else(|| SystemInfo::default_instance())
+    }
+
+    fn get_system_info_for_reflect(&self) -> &::protobuf::SingularPtrField<SystemInfo> {
+        &self.system_info
+    }
+
+    fn mut_system_info_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<SystemInfo> {
+        &mut self.system_info
     }
 
     // optional string platform_model = 60;
@@ -256,6 +282,14 @@ impl ClientResponseEncrypted {
         }
     }
 
+    fn get_platform_model_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.platform_model
+    }
+
+    fn mut_platform_model_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.platform_model
+    }
+
     // optional string version_string = 70;
 
     pub fn clear_version_string(&mut self) {
@@ -292,6 +326,14 @@ impl ClientResponseEncrypted {
         }
     }
 
+    fn get_version_string_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.version_string
+    }
+
+    fn mut_version_string_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.version_string
+    }
+
     // optional .LibspotifyAppKey appkey = 80;
 
     pub fn clear_appkey(&mut self) {
@@ -323,6 +365,14 @@ impl ClientResponseEncrypted {
 
     pub fn get_appkey(&self) -> &LibspotifyAppKey {
         self.appkey.as_ref().unwrap_or_else(|| LibspotifyAppKey::default_instance())
+    }
+
+    fn get_appkey_for_reflect(&self) -> &::protobuf::SingularPtrField<LibspotifyAppKey> {
+        &self.appkey
+    }
+
+    fn mut_appkey_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<LibspotifyAppKey> {
+        &mut self.appkey
     }
 
     // optional .ClientInfo client_info = 90;
@@ -357,6 +407,14 @@ impl ClientResponseEncrypted {
     pub fn get_client_info(&self) -> &ClientInfo {
         self.client_info.as_ref().unwrap_or_else(|| ClientInfo::default_instance())
     }
+
+    fn get_client_info_for_reflect(&self) -> &::protobuf::SingularPtrField<ClientInfo> {
+        &self.client_info
+    }
+
+    fn mut_client_info_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<ClientInfo> {
+        &mut self.client_info
+    }
 }
 
 impl ::protobuf::Message for ClientResponseEncrypted {
@@ -371,42 +429,42 @@ impl ::protobuf::Message for ClientResponseEncrypted {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.login_credentials));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.login_credentials)?;
                 },
                 20 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.account_creation = ::std::option::Option::Some(tmp);
                 },
                 30 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fingerprint_response));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fingerprint_response)?;
                 },
                 40 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.peer_ticket));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.peer_ticket)?;
                 },
                 50 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.system_info));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.system_info)?;
                 },
                 60 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.platform_model));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.platform_model)?;
                 },
                 70 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.version_string));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.version_string)?;
                 },
                 80 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.appkey));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.appkey)?;
                 },
                 90 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.client_info));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.client_info)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -417,37 +475,37 @@ impl ::protobuf::Message for ClientResponseEncrypted {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.login_credentials {
-            let len = value.compute_size();
+        if let Some(v) = self.login_credentials.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.account_creation {
-            my_size += ::protobuf::rt::enum_size(20, *value);
+        if let Some(v) = self.account_creation {
+            my_size += ::protobuf::rt::enum_size(20, v);
         };
-        for value in &self.fingerprint_response {
-            let len = value.compute_size();
+        if let Some(v) = self.fingerprint_response.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.peer_ticket {
-            let len = value.compute_size();
+        if let Some(v) = self.peer_ticket.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.system_info {
-            let len = value.compute_size();
+        if let Some(v) = self.system_info.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.platform_model {
-            my_size += ::protobuf::rt::string_size(60, &value);
+        if let Some(v) = self.platform_model.as_ref() {
+            my_size += ::protobuf::rt::string_size(60, &v);
         };
-        for value in &self.version_string {
-            my_size += ::protobuf::rt::string_size(70, &value);
+        if let Some(v) = self.version_string.as_ref() {
+            my_size += ::protobuf::rt::string_size(70, &v);
         };
-        for value in &self.appkey {
-            let len = value.compute_size();
+        if let Some(v) = self.appkey.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.client_info {
-            let len = value.compute_size();
+        if let Some(v) = self.client_info.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -457,45 +515,45 @@ impl ::protobuf::Message for ClientResponseEncrypted {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.login_credentials.as_ref() {
-            try!(os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.account_creation {
-            try!(os.write_enum(20, v.value()));
+            os.write_enum(20, v.value())?;
         };
         if let Some(v) = self.fingerprint_response.as_ref() {
-            try!(os.write_tag(30, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(30, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.peer_ticket.as_ref() {
-            try!(os.write_tag(40, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(40, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.system_info.as_ref() {
-            try!(os.write_tag(50, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(50, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.platform_model.as_ref() {
-            try!(os.write_string(60, &v));
+            os.write_string(60, &v)?;
         };
         if let Some(v) = self.version_string.as_ref() {
-            try!(os.write_string(70, &v));
+            os.write_string(70, &v)?;
         };
         if let Some(v) = self.appkey.as_ref() {
-            try!(os.write_tag(80, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(80, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.client_info.as_ref() {
-            try!(os.write_tag(90, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(90, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -509,10 +567,6 @@ impl ::protobuf::Message for ClientResponseEncrypted {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<ClientResponseEncrypted>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -537,50 +591,50 @@ impl ::protobuf::MessageStatic for ClientResponseEncrypted {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<LoginCredentials>>(
                     "login_credentials",
-                    ClientResponseEncrypted::has_login_credentials,
-                    ClientResponseEncrypted::get_login_credentials,
+                    ClientResponseEncrypted::get_login_credentials_for_reflect,
+                    ClientResponseEncrypted::mut_login_credentials_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AccountCreation>>(
                     "account_creation",
-                    ClientResponseEncrypted::has_account_creation,
-                    ClientResponseEncrypted::get_account_creation,
+                    ClientResponseEncrypted::get_account_creation_for_reflect,
+                    ClientResponseEncrypted::mut_account_creation_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FingerprintResponseUnion>>(
                     "fingerprint_response",
-                    ClientResponseEncrypted::has_fingerprint_response,
-                    ClientResponseEncrypted::get_fingerprint_response,
+                    ClientResponseEncrypted::get_fingerprint_response_for_reflect,
+                    ClientResponseEncrypted::mut_fingerprint_response_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<PeerTicketUnion>>(
                     "peer_ticket",
-                    ClientResponseEncrypted::has_peer_ticket,
-                    ClientResponseEncrypted::get_peer_ticket,
+                    ClientResponseEncrypted::get_peer_ticket_for_reflect,
+                    ClientResponseEncrypted::mut_peer_ticket_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<SystemInfo>>(
                     "system_info",
-                    ClientResponseEncrypted::has_system_info,
-                    ClientResponseEncrypted::get_system_info,
+                    ClientResponseEncrypted::get_system_info_for_reflect,
+                    ClientResponseEncrypted::mut_system_info_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "platform_model",
-                    ClientResponseEncrypted::has_platform_model,
-                    ClientResponseEncrypted::get_platform_model,
+                    ClientResponseEncrypted::get_platform_model_for_reflect,
+                    ClientResponseEncrypted::mut_platform_model_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "version_string",
-                    ClientResponseEncrypted::has_version_string,
-                    ClientResponseEncrypted::get_version_string,
+                    ClientResponseEncrypted::get_version_string_for_reflect,
+                    ClientResponseEncrypted::mut_version_string_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<LibspotifyAppKey>>(
                     "appkey",
-                    ClientResponseEncrypted::has_appkey,
-                    ClientResponseEncrypted::get_appkey,
+                    ClientResponseEncrypted::get_appkey_for_reflect,
+                    ClientResponseEncrypted::mut_appkey_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ClientInfo>>(
                     "client_info",
-                    ClientResponseEncrypted::has_client_info,
-                    ClientResponseEncrypted::get_client_info,
+                    ClientResponseEncrypted::get_client_info_for_reflect,
+                    ClientResponseEncrypted::mut_client_info_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ClientResponseEncrypted>(
                     "ClientResponseEncrypted",
@@ -607,28 +661,19 @@ impl ::protobuf::Clear for ClientResponseEncrypted {
     }
 }
 
-impl ::std::cmp::PartialEq for ClientResponseEncrypted {
-    fn eq(&self, other: &ClientResponseEncrypted) -> bool {
-        self.login_credentials == other.login_credentials &&
-        self.account_creation == other.account_creation &&
-        self.fingerprint_response == other.fingerprint_response &&
-        self.peer_ticket == other.peer_ticket &&
-        self.system_info == other.system_info &&
-        self.platform_model == other.platform_model &&
-        self.version_string == other.version_string &&
-        self.appkey == other.appkey &&
-        self.client_info == other.client_info &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for ClientResponseEncrypted {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for ClientResponseEncrypted {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct LoginCredentials {
     // message fields
     username: ::protobuf::SingularField<::std::string::String>,
@@ -636,7 +681,7 @@ pub struct LoginCredentials {
     auth_data: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -653,15 +698,7 @@ impl LoginCredentials {
             ptr: 0 as *const LoginCredentials,
         };
         unsafe {
-            instance.get(|| {
-                LoginCredentials {
-                    username: ::protobuf::SingularField::none(),
-                    typ: ::std::option::Option::None,
-                    auth_data: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(LoginCredentials::new)
         }
     }
 
@@ -701,6 +738,14 @@ impl LoginCredentials {
         }
     }
 
+    fn get_username_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.username
+    }
+
+    fn mut_username_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.username
+    }
+
     // required .AuthenticationType typ = 20;
 
     pub fn clear_typ(&mut self) {
@@ -718,6 +763,14 @@ impl LoginCredentials {
 
     pub fn get_typ(&self) -> AuthenticationType {
         self.typ.unwrap_or(AuthenticationType::AUTHENTICATION_USER_PASS)
+    }
+
+    fn get_typ_for_reflect(&self) -> &::std::option::Option<AuthenticationType> {
+        &self.typ
+    }
+
+    fn mut_typ_for_reflect(&mut self) -> &mut ::std::option::Option<AuthenticationType> {
+        &mut self.typ
     }
 
     // optional bytes auth_data = 30;
@@ -755,6 +808,14 @@ impl LoginCredentials {
             None => &[],
         }
     }
+
+    fn get_auth_data_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.auth_data
+    }
+
+    fn mut_auth_data_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.auth_data
+    }
 }
 
 impl ::protobuf::Message for LoginCredentials {
@@ -766,24 +827,24 @@ impl ::protobuf::Message for LoginCredentials {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.username));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.username)?;
                 },
                 20 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.typ = ::std::option::Option::Some(tmp);
                 },
                 30 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.auth_data));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.auth_data)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -794,14 +855,14 @@ impl ::protobuf::Message for LoginCredentials {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.username {
-            my_size += ::protobuf::rt::string_size(10, &value);
+        if let Some(v) = self.username.as_ref() {
+            my_size += ::protobuf::rt::string_size(10, &v);
         };
-        for value in &self.typ {
-            my_size += ::protobuf::rt::enum_size(20, *value);
+        if let Some(v) = self.typ {
+            my_size += ::protobuf::rt::enum_size(20, v);
         };
-        for value in &self.auth_data {
-            my_size += ::protobuf::rt::bytes_size(30, &value);
+        if let Some(v) = self.auth_data.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(30, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -810,15 +871,15 @@ impl ::protobuf::Message for LoginCredentials {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.username.as_ref() {
-            try!(os.write_string(10, &v));
+            os.write_string(10, &v)?;
         };
         if let Some(v) = self.typ {
-            try!(os.write_enum(20, v.value()));
+            os.write_enum(20, v.value())?;
         };
         if let Some(v) = self.auth_data.as_ref() {
-            try!(os.write_bytes(30, &v));
+            os.write_bytes(30, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -832,10 +893,6 @@ impl ::protobuf::Message for LoginCredentials {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<LoginCredentials>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -860,20 +917,20 @@ impl ::protobuf::MessageStatic for LoginCredentials {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "username",
-                    LoginCredentials::has_username,
-                    LoginCredentials::get_username,
+                    LoginCredentials::get_username_for_reflect,
+                    LoginCredentials::mut_username_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AuthenticationType>>(
                     "typ",
-                    LoginCredentials::has_typ,
-                    LoginCredentials::get_typ,
+                    LoginCredentials::get_typ_for_reflect,
+                    LoginCredentials::mut_typ_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "auth_data",
-                    LoginCredentials::has_auth_data,
-                    LoginCredentials::get_auth_data,
+                    LoginCredentials::get_auth_data_for_reflect,
+                    LoginCredentials::mut_auth_data_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<LoginCredentials>(
                     "LoginCredentials",
@@ -894,29 +951,26 @@ impl ::protobuf::Clear for LoginCredentials {
     }
 }
 
-impl ::std::cmp::PartialEq for LoginCredentials {
-    fn eq(&self, other: &LoginCredentials) -> bool {
-        self.username == other.username &&
-        self.typ == other.typ &&
-        self.auth_data == other.auth_data &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for LoginCredentials {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for LoginCredentials {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct FingerprintResponseUnion {
     // message fields
     grain: ::protobuf::SingularPtrField<FingerprintGrainResponse>,
     hmac_ripemd: ::protobuf::SingularPtrField<FingerprintHmacRipemdResponse>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -933,14 +987,7 @@ impl FingerprintResponseUnion {
             ptr: 0 as *const FingerprintResponseUnion,
         };
         unsafe {
-            instance.get(|| {
-                FingerprintResponseUnion {
-                    grain: ::protobuf::SingularPtrField::none(),
-                    hmac_ripemd: ::protobuf::SingularPtrField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(FingerprintResponseUnion::new)
         }
     }
 
@@ -977,6 +1024,14 @@ impl FingerprintResponseUnion {
         self.grain.as_ref().unwrap_or_else(|| FingerprintGrainResponse::default_instance())
     }
 
+    fn get_grain_for_reflect(&self) -> &::protobuf::SingularPtrField<FingerprintGrainResponse> {
+        &self.grain
+    }
+
+    fn mut_grain_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<FingerprintGrainResponse> {
+        &mut self.grain
+    }
+
     // optional .FingerprintHmacRipemdResponse hmac_ripemd = 20;
 
     pub fn clear_hmac_ripemd(&mut self) {
@@ -1009,6 +1064,14 @@ impl FingerprintResponseUnion {
     pub fn get_hmac_ripemd(&self) -> &FingerprintHmacRipemdResponse {
         self.hmac_ripemd.as_ref().unwrap_or_else(|| FingerprintHmacRipemdResponse::default_instance())
     }
+
+    fn get_hmac_ripemd_for_reflect(&self) -> &::protobuf::SingularPtrField<FingerprintHmacRipemdResponse> {
+        &self.hmac_ripemd
+    }
+
+    fn mut_hmac_ripemd_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<FingerprintHmacRipemdResponse> {
+        &mut self.hmac_ripemd
+    }
 }
 
 impl ::protobuf::Message for FingerprintResponseUnion {
@@ -1017,17 +1080,17 @@ impl ::protobuf::Message for FingerprintResponseUnion {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.grain));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.grain)?;
                 },
                 20 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.hmac_ripemd));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.hmac_ripemd)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -1038,12 +1101,12 @@ impl ::protobuf::Message for FingerprintResponseUnion {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.grain {
-            let len = value.compute_size();
+        if let Some(v) = self.grain.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.hmac_ripemd {
-            let len = value.compute_size();
+        if let Some(v) = self.hmac_ripemd.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -1053,16 +1116,16 @@ impl ::protobuf::Message for FingerprintResponseUnion {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.grain.as_ref() {
-            try!(os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.hmac_ripemd.as_ref() {
-            try!(os.write_tag(20, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(20, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -1076,10 +1139,6 @@ impl ::protobuf::Message for FingerprintResponseUnion {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<FingerprintResponseUnion>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -1104,15 +1163,15 @@ impl ::protobuf::MessageStatic for FingerprintResponseUnion {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FingerprintGrainResponse>>(
                     "grain",
-                    FingerprintResponseUnion::has_grain,
-                    FingerprintResponseUnion::get_grain,
+                    FingerprintResponseUnion::get_grain_for_reflect,
+                    FingerprintResponseUnion::mut_grain_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FingerprintHmacRipemdResponse>>(
                     "hmac_ripemd",
-                    FingerprintResponseUnion::has_hmac_ripemd,
-                    FingerprintResponseUnion::get_hmac_ripemd,
+                    FingerprintResponseUnion::get_hmac_ripemd_for_reflect,
+                    FingerprintResponseUnion::mut_hmac_ripemd_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<FingerprintResponseUnion>(
                     "FingerprintResponseUnion",
@@ -1132,27 +1191,25 @@ impl ::protobuf::Clear for FingerprintResponseUnion {
     }
 }
 
-impl ::std::cmp::PartialEq for FingerprintResponseUnion {
-    fn eq(&self, other: &FingerprintResponseUnion) -> bool {
-        self.grain == other.grain &&
-        self.hmac_ripemd == other.hmac_ripemd &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for FingerprintResponseUnion {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for FingerprintResponseUnion {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct FingerprintGrainResponse {
     // message fields
     encrypted_key: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -1169,13 +1226,7 @@ impl FingerprintGrainResponse {
             ptr: 0 as *const FingerprintGrainResponse,
         };
         unsafe {
-            instance.get(|| {
-                FingerprintGrainResponse {
-                    encrypted_key: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(FingerprintGrainResponse::new)
         }
     }
 
@@ -1214,6 +1265,14 @@ impl FingerprintGrainResponse {
             None => &[],
         }
     }
+
+    fn get_encrypted_key_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.encrypted_key
+    }
+
+    fn mut_encrypted_key_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.encrypted_key
+    }
 }
 
 impl ::protobuf::Message for FingerprintGrainResponse {
@@ -1225,14 +1284,14 @@ impl ::protobuf::Message for FingerprintGrainResponse {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.encrypted_key));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.encrypted_key)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -1243,8 +1302,8 @@ impl ::protobuf::Message for FingerprintGrainResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.encrypted_key {
-            my_size += ::protobuf::rt::bytes_size(10, &value);
+        if let Some(v) = self.encrypted_key.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(10, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -1253,9 +1312,9 @@ impl ::protobuf::Message for FingerprintGrainResponse {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.encrypted_key.as_ref() {
-            try!(os.write_bytes(10, &v));
+            os.write_bytes(10, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -1269,10 +1328,6 @@ impl ::protobuf::Message for FingerprintGrainResponse {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<FingerprintGrainResponse>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -1297,10 +1352,10 @@ impl ::protobuf::MessageStatic for FingerprintGrainResponse {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "encrypted_key",
-                    FingerprintGrainResponse::has_encrypted_key,
-                    FingerprintGrainResponse::get_encrypted_key,
+                    FingerprintGrainResponse::get_encrypted_key_for_reflect,
+                    FingerprintGrainResponse::mut_encrypted_key_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<FingerprintGrainResponse>(
                     "FingerprintGrainResponse",
@@ -1319,26 +1374,25 @@ impl ::protobuf::Clear for FingerprintGrainResponse {
     }
 }
 
-impl ::std::cmp::PartialEq for FingerprintGrainResponse {
-    fn eq(&self, other: &FingerprintGrainResponse) -> bool {
-        self.encrypted_key == other.encrypted_key &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for FingerprintGrainResponse {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for FingerprintGrainResponse {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct FingerprintHmacRipemdResponse {
     // message fields
     hmac: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -1355,13 +1409,7 @@ impl FingerprintHmacRipemdResponse {
             ptr: 0 as *const FingerprintHmacRipemdResponse,
         };
         unsafe {
-            instance.get(|| {
-                FingerprintHmacRipemdResponse {
-                    hmac: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(FingerprintHmacRipemdResponse::new)
         }
     }
 
@@ -1400,6 +1448,14 @@ impl FingerprintHmacRipemdResponse {
             None => &[],
         }
     }
+
+    fn get_hmac_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.hmac
+    }
+
+    fn mut_hmac_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.hmac
+    }
 }
 
 impl ::protobuf::Message for FingerprintHmacRipemdResponse {
@@ -1411,14 +1467,14 @@ impl ::protobuf::Message for FingerprintHmacRipemdResponse {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.hmac));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.hmac)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -1429,8 +1485,8 @@ impl ::protobuf::Message for FingerprintHmacRipemdResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.hmac {
-            my_size += ::protobuf::rt::bytes_size(10, &value);
+        if let Some(v) = self.hmac.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(10, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -1439,9 +1495,9 @@ impl ::protobuf::Message for FingerprintHmacRipemdResponse {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.hmac.as_ref() {
-            try!(os.write_bytes(10, &v));
+            os.write_bytes(10, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -1455,10 +1511,6 @@ impl ::protobuf::Message for FingerprintHmacRipemdResponse {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<FingerprintHmacRipemdResponse>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -1483,10 +1535,10 @@ impl ::protobuf::MessageStatic for FingerprintHmacRipemdResponse {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "hmac",
-                    FingerprintHmacRipemdResponse::has_hmac,
-                    FingerprintHmacRipemdResponse::get_hmac,
+                    FingerprintHmacRipemdResponse::get_hmac_for_reflect,
+                    FingerprintHmacRipemdResponse::mut_hmac_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<FingerprintHmacRipemdResponse>(
                     "FingerprintHmacRipemdResponse",
@@ -1505,27 +1557,26 @@ impl ::protobuf::Clear for FingerprintHmacRipemdResponse {
     }
 }
 
-impl ::std::cmp::PartialEq for FingerprintHmacRipemdResponse {
-    fn eq(&self, other: &FingerprintHmacRipemdResponse) -> bool {
-        self.hmac == other.hmac &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for FingerprintHmacRipemdResponse {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for FingerprintHmacRipemdResponse {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct PeerTicketUnion {
     // message fields
     public_key: ::protobuf::SingularPtrField<PeerTicketPublicKey>,
     old_ticket: ::protobuf::SingularPtrField<PeerTicketOld>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -1542,14 +1593,7 @@ impl PeerTicketUnion {
             ptr: 0 as *const PeerTicketUnion,
         };
         unsafe {
-            instance.get(|| {
-                PeerTicketUnion {
-                    public_key: ::protobuf::SingularPtrField::none(),
-                    old_ticket: ::protobuf::SingularPtrField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(PeerTicketUnion::new)
         }
     }
 
@@ -1586,6 +1630,14 @@ impl PeerTicketUnion {
         self.public_key.as_ref().unwrap_or_else(|| PeerTicketPublicKey::default_instance())
     }
 
+    fn get_public_key_for_reflect(&self) -> &::protobuf::SingularPtrField<PeerTicketPublicKey> {
+        &self.public_key
+    }
+
+    fn mut_public_key_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<PeerTicketPublicKey> {
+        &mut self.public_key
+    }
+
     // optional .PeerTicketOld old_ticket = 20;
 
     pub fn clear_old_ticket(&mut self) {
@@ -1618,6 +1670,14 @@ impl PeerTicketUnion {
     pub fn get_old_ticket(&self) -> &PeerTicketOld {
         self.old_ticket.as_ref().unwrap_or_else(|| PeerTicketOld::default_instance())
     }
+
+    fn get_old_ticket_for_reflect(&self) -> &::protobuf::SingularPtrField<PeerTicketOld> {
+        &self.old_ticket
+    }
+
+    fn mut_old_ticket_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<PeerTicketOld> {
+        &mut self.old_ticket
+    }
 }
 
 impl ::protobuf::Message for PeerTicketUnion {
@@ -1626,17 +1686,17 @@ impl ::protobuf::Message for PeerTicketUnion {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.public_key));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.public_key)?;
                 },
                 20 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.old_ticket));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.old_ticket)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -1647,12 +1707,12 @@ impl ::protobuf::Message for PeerTicketUnion {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.public_key {
-            let len = value.compute_size();
+        if let Some(v) = self.public_key.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.old_ticket {
-            let len = value.compute_size();
+        if let Some(v) = self.old_ticket.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -1662,16 +1722,16 @@ impl ::protobuf::Message for PeerTicketUnion {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.public_key.as_ref() {
-            try!(os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.old_ticket.as_ref() {
-            try!(os.write_tag(20, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(20, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -1685,10 +1745,6 @@ impl ::protobuf::Message for PeerTicketUnion {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<PeerTicketUnion>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -1713,15 +1769,15 @@ impl ::protobuf::MessageStatic for PeerTicketUnion {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<PeerTicketPublicKey>>(
                     "public_key",
-                    PeerTicketUnion::has_public_key,
-                    PeerTicketUnion::get_public_key,
+                    PeerTicketUnion::get_public_key_for_reflect,
+                    PeerTicketUnion::mut_public_key_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<PeerTicketOld>>(
                     "old_ticket",
-                    PeerTicketUnion::has_old_ticket,
-                    PeerTicketUnion::get_old_ticket,
+                    PeerTicketUnion::get_old_ticket_for_reflect,
+                    PeerTicketUnion::mut_old_ticket_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<PeerTicketUnion>(
                     "PeerTicketUnion",
@@ -1741,27 +1797,25 @@ impl ::protobuf::Clear for PeerTicketUnion {
     }
 }
 
-impl ::std::cmp::PartialEq for PeerTicketUnion {
-    fn eq(&self, other: &PeerTicketUnion) -> bool {
-        self.public_key == other.public_key &&
-        self.old_ticket == other.old_ticket &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for PeerTicketUnion {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for PeerTicketUnion {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct PeerTicketPublicKey {
     // message fields
     public_key: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -1778,13 +1832,7 @@ impl PeerTicketPublicKey {
             ptr: 0 as *const PeerTicketPublicKey,
         };
         unsafe {
-            instance.get(|| {
-                PeerTicketPublicKey {
-                    public_key: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(PeerTicketPublicKey::new)
         }
     }
 
@@ -1823,6 +1871,14 @@ impl PeerTicketPublicKey {
             None => &[],
         }
     }
+
+    fn get_public_key_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.public_key
+    }
+
+    fn mut_public_key_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.public_key
+    }
 }
 
 impl ::protobuf::Message for PeerTicketPublicKey {
@@ -1834,14 +1890,14 @@ impl ::protobuf::Message for PeerTicketPublicKey {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.public_key));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.public_key)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -1852,8 +1908,8 @@ impl ::protobuf::Message for PeerTicketPublicKey {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.public_key {
-            my_size += ::protobuf::rt::bytes_size(10, &value);
+        if let Some(v) = self.public_key.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(10, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -1862,9 +1918,9 @@ impl ::protobuf::Message for PeerTicketPublicKey {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.public_key.as_ref() {
-            try!(os.write_bytes(10, &v));
+            os.write_bytes(10, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -1878,10 +1934,6 @@ impl ::protobuf::Message for PeerTicketPublicKey {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<PeerTicketPublicKey>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -1906,10 +1958,10 @@ impl ::protobuf::MessageStatic for PeerTicketPublicKey {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "public_key",
-                    PeerTicketPublicKey::has_public_key,
-                    PeerTicketPublicKey::get_public_key,
+                    PeerTicketPublicKey::get_public_key_for_reflect,
+                    PeerTicketPublicKey::mut_public_key_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<PeerTicketPublicKey>(
                     "PeerTicketPublicKey",
@@ -1928,27 +1980,26 @@ impl ::protobuf::Clear for PeerTicketPublicKey {
     }
 }
 
-impl ::std::cmp::PartialEq for PeerTicketPublicKey {
-    fn eq(&self, other: &PeerTicketPublicKey) -> bool {
-        self.public_key == other.public_key &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for PeerTicketPublicKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for PeerTicketPublicKey {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct PeerTicketOld {
     // message fields
     peer_ticket: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     peer_ticket_signature: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -1965,14 +2016,7 @@ impl PeerTicketOld {
             ptr: 0 as *const PeerTicketOld,
         };
         unsafe {
-            instance.get(|| {
-                PeerTicketOld {
-                    peer_ticket: ::protobuf::SingularField::none(),
-                    peer_ticket_signature: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(PeerTicketOld::new)
         }
     }
 
@@ -2012,6 +2056,14 @@ impl PeerTicketOld {
         }
     }
 
+    fn get_peer_ticket_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.peer_ticket
+    }
+
+    fn mut_peer_ticket_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.peer_ticket
+    }
+
     // required bytes peer_ticket_signature = 20;
 
     pub fn clear_peer_ticket_signature(&mut self) {
@@ -2047,6 +2099,14 @@ impl PeerTicketOld {
             None => &[],
         }
     }
+
+    fn get_peer_ticket_signature_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.peer_ticket_signature
+    }
+
+    fn mut_peer_ticket_signature_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.peer_ticket_signature
+    }
 }
 
 impl ::protobuf::Message for PeerTicketOld {
@@ -2061,17 +2121,17 @@ impl ::protobuf::Message for PeerTicketOld {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.peer_ticket));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.peer_ticket)?;
                 },
                 20 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.peer_ticket_signature));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.peer_ticket_signature)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -2082,11 +2142,11 @@ impl ::protobuf::Message for PeerTicketOld {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.peer_ticket {
-            my_size += ::protobuf::rt::bytes_size(10, &value);
+        if let Some(v) = self.peer_ticket.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(10, &v);
         };
-        for value in &self.peer_ticket_signature {
-            my_size += ::protobuf::rt::bytes_size(20, &value);
+        if let Some(v) = self.peer_ticket_signature.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(20, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -2095,12 +2155,12 @@ impl ::protobuf::Message for PeerTicketOld {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.peer_ticket.as_ref() {
-            try!(os.write_bytes(10, &v));
+            os.write_bytes(10, &v)?;
         };
         if let Some(v) = self.peer_ticket_signature.as_ref() {
-            try!(os.write_bytes(20, &v));
+            os.write_bytes(20, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -2114,10 +2174,6 @@ impl ::protobuf::Message for PeerTicketOld {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<PeerTicketOld>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -2142,15 +2198,15 @@ impl ::protobuf::MessageStatic for PeerTicketOld {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "peer_ticket",
-                    PeerTicketOld::has_peer_ticket,
-                    PeerTicketOld::get_peer_ticket,
+                    PeerTicketOld::get_peer_ticket_for_reflect,
+                    PeerTicketOld::mut_peer_ticket_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "peer_ticket_signature",
-                    PeerTicketOld::has_peer_ticket_signature,
-                    PeerTicketOld::get_peer_ticket_signature,
+                    PeerTicketOld::get_peer_ticket_signature_for_reflect,
+                    PeerTicketOld::mut_peer_ticket_signature_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<PeerTicketOld>(
                     "PeerTicketOld",
@@ -2170,21 +2226,19 @@ impl ::protobuf::Clear for PeerTicketOld {
     }
 }
 
-impl ::std::cmp::PartialEq for PeerTicketOld {
-    fn eq(&self, other: &PeerTicketOld) -> bool {
-        self.peer_ticket == other.peer_ticket &&
-        self.peer_ticket_signature == other.peer_ticket_signature &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for PeerTicketOld {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for PeerTicketOld {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct SystemInfo {
     // message fields
     cpu_family: ::std::option::Option<CpuFamily>,
@@ -2199,7 +2253,7 @@ pub struct SystemInfo {
     device_id: ::protobuf::SingularField<::std::string::String>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -2216,22 +2270,7 @@ impl SystemInfo {
             ptr: 0 as *const SystemInfo,
         };
         unsafe {
-            instance.get(|| {
-                SystemInfo {
-                    cpu_family: ::std::option::Option::None,
-                    cpu_subtype: ::std::option::Option::None,
-                    cpu_ext: ::std::option::Option::None,
-                    brand: ::std::option::Option::None,
-                    brand_flags: ::std::option::Option::None,
-                    os: ::std::option::Option::None,
-                    os_version: ::std::option::Option::None,
-                    os_ext: ::std::option::Option::None,
-                    system_information_string: ::protobuf::SingularField::none(),
-                    device_id: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(SystemInfo::new)
         }
     }
 
@@ -2254,6 +2293,14 @@ impl SystemInfo {
         self.cpu_family.unwrap_or(CpuFamily::CPU_UNKNOWN)
     }
 
+    fn get_cpu_family_for_reflect(&self) -> &::std::option::Option<CpuFamily> {
+        &self.cpu_family
+    }
+
+    fn mut_cpu_family_for_reflect(&mut self) -> &mut ::std::option::Option<CpuFamily> {
+        &mut self.cpu_family
+    }
+
     // optional uint32 cpu_subtype = 20;
 
     pub fn clear_cpu_subtype(&mut self) {
@@ -2271,6 +2318,14 @@ impl SystemInfo {
 
     pub fn get_cpu_subtype(&self) -> u32 {
         self.cpu_subtype.unwrap_or(0)
+    }
+
+    fn get_cpu_subtype_for_reflect(&self) -> &::std::option::Option<u32> {
+        &self.cpu_subtype
+    }
+
+    fn mut_cpu_subtype_for_reflect(&mut self) -> &mut ::std::option::Option<u32> {
+        &mut self.cpu_subtype
     }
 
     // optional uint32 cpu_ext = 30;
@@ -2292,6 +2347,14 @@ impl SystemInfo {
         self.cpu_ext.unwrap_or(0)
     }
 
+    fn get_cpu_ext_for_reflect(&self) -> &::std::option::Option<u32> {
+        &self.cpu_ext
+    }
+
+    fn mut_cpu_ext_for_reflect(&mut self) -> &mut ::std::option::Option<u32> {
+        &mut self.cpu_ext
+    }
+
     // optional .Brand brand = 40;
 
     pub fn clear_brand(&mut self) {
@@ -2309,6 +2372,14 @@ impl SystemInfo {
 
     pub fn get_brand(&self) -> Brand {
         self.brand.unwrap_or(Brand::BRAND_UNBRANDED)
+    }
+
+    fn get_brand_for_reflect(&self) -> &::std::option::Option<Brand> {
+        &self.brand
+    }
+
+    fn mut_brand_for_reflect(&mut self) -> &mut ::std::option::Option<Brand> {
+        &mut self.brand
     }
 
     // optional uint32 brand_flags = 50;
@@ -2330,6 +2401,14 @@ impl SystemInfo {
         self.brand_flags.unwrap_or(0)
     }
 
+    fn get_brand_flags_for_reflect(&self) -> &::std::option::Option<u32> {
+        &self.brand_flags
+    }
+
+    fn mut_brand_flags_for_reflect(&mut self) -> &mut ::std::option::Option<u32> {
+        &mut self.brand_flags
+    }
+
     // required .Os os = 60;
 
     pub fn clear_os(&mut self) {
@@ -2347,6 +2426,14 @@ impl SystemInfo {
 
     pub fn get_os(&self) -> Os {
         self.os.unwrap_or(Os::OS_UNKNOWN)
+    }
+
+    fn get_os_for_reflect(&self) -> &::std::option::Option<Os> {
+        &self.os
+    }
+
+    fn mut_os_for_reflect(&mut self) -> &mut ::std::option::Option<Os> {
+        &mut self.os
     }
 
     // optional uint32 os_version = 70;
@@ -2368,6 +2455,14 @@ impl SystemInfo {
         self.os_version.unwrap_or(0)
     }
 
+    fn get_os_version_for_reflect(&self) -> &::std::option::Option<u32> {
+        &self.os_version
+    }
+
+    fn mut_os_version_for_reflect(&mut self) -> &mut ::std::option::Option<u32> {
+        &mut self.os_version
+    }
+
     // optional uint32 os_ext = 80;
 
     pub fn clear_os_ext(&mut self) {
@@ -2385,6 +2480,14 @@ impl SystemInfo {
 
     pub fn get_os_ext(&self) -> u32 {
         self.os_ext.unwrap_or(0)
+    }
+
+    fn get_os_ext_for_reflect(&self) -> &::std::option::Option<u32> {
+        &self.os_ext
+    }
+
+    fn mut_os_ext_for_reflect(&mut self) -> &mut ::std::option::Option<u32> {
+        &mut self.os_ext
     }
 
     // optional string system_information_string = 90;
@@ -2423,6 +2526,14 @@ impl SystemInfo {
         }
     }
 
+    fn get_system_information_string_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.system_information_string
+    }
+
+    fn mut_system_information_string_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.system_information_string
+    }
+
     // optional string device_id = 100;
 
     pub fn clear_device_id(&mut self) {
@@ -2458,6 +2569,14 @@ impl SystemInfo {
             None => "",
         }
     }
+
+    fn get_device_id_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.device_id
+    }
+
+    fn mut_device_id_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.device_id
+    }
 }
 
 impl ::protobuf::Message for SystemInfo {
@@ -2472,73 +2591,73 @@ impl ::protobuf::Message for SystemInfo {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.cpu_family = ::std::option::Option::Some(tmp);
                 },
                 20 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_uint32());
+                    let tmp = is.read_uint32()?;
                     self.cpu_subtype = ::std::option::Option::Some(tmp);
                 },
                 30 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_uint32());
+                    let tmp = is.read_uint32()?;
                     self.cpu_ext = ::std::option::Option::Some(tmp);
                 },
                 40 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.brand = ::std::option::Option::Some(tmp);
                 },
                 50 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_uint32());
+                    let tmp = is.read_uint32()?;
                     self.brand_flags = ::std::option::Option::Some(tmp);
                 },
                 60 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.os = ::std::option::Option::Some(tmp);
                 },
                 70 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_uint32());
+                    let tmp = is.read_uint32()?;
                     self.os_version = ::std::option::Option::Some(tmp);
                 },
                 80 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_uint32());
+                    let tmp = is.read_uint32()?;
                     self.os_ext = ::std::option::Option::Some(tmp);
                 },
                 90 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.system_information_string));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.system_information_string)?;
                 },
                 100 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.device_id));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.device_id)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -2549,35 +2668,35 @@ impl ::protobuf::Message for SystemInfo {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.cpu_family {
-            my_size += ::protobuf::rt::enum_size(10, *value);
+        if let Some(v) = self.cpu_family {
+            my_size += ::protobuf::rt::enum_size(10, v);
         };
-        for value in &self.cpu_subtype {
-            my_size += ::protobuf::rt::value_size(20, *value, ::protobuf::wire_format::WireTypeVarint);
+        if let Some(v) = self.cpu_subtype {
+            my_size += ::protobuf::rt::value_size(20, v, ::protobuf::wire_format::WireTypeVarint);
         };
-        for value in &self.cpu_ext {
-            my_size += ::protobuf::rt::value_size(30, *value, ::protobuf::wire_format::WireTypeVarint);
+        if let Some(v) = self.cpu_ext {
+            my_size += ::protobuf::rt::value_size(30, v, ::protobuf::wire_format::WireTypeVarint);
         };
-        for value in &self.brand {
-            my_size += ::protobuf::rt::enum_size(40, *value);
+        if let Some(v) = self.brand {
+            my_size += ::protobuf::rt::enum_size(40, v);
         };
-        for value in &self.brand_flags {
-            my_size += ::protobuf::rt::value_size(50, *value, ::protobuf::wire_format::WireTypeVarint);
+        if let Some(v) = self.brand_flags {
+            my_size += ::protobuf::rt::value_size(50, v, ::protobuf::wire_format::WireTypeVarint);
         };
-        for value in &self.os {
-            my_size += ::protobuf::rt::enum_size(60, *value);
+        if let Some(v) = self.os {
+            my_size += ::protobuf::rt::enum_size(60, v);
         };
-        for value in &self.os_version {
-            my_size += ::protobuf::rt::value_size(70, *value, ::protobuf::wire_format::WireTypeVarint);
+        if let Some(v) = self.os_version {
+            my_size += ::protobuf::rt::value_size(70, v, ::protobuf::wire_format::WireTypeVarint);
         };
-        for value in &self.os_ext {
-            my_size += ::protobuf::rt::value_size(80, *value, ::protobuf::wire_format::WireTypeVarint);
+        if let Some(v) = self.os_ext {
+            my_size += ::protobuf::rt::value_size(80, v, ::protobuf::wire_format::WireTypeVarint);
         };
-        for value in &self.system_information_string {
-            my_size += ::protobuf::rt::string_size(90, &value);
+        if let Some(v) = self.system_information_string.as_ref() {
+            my_size += ::protobuf::rt::string_size(90, &v);
         };
-        for value in &self.device_id {
-            my_size += ::protobuf::rt::string_size(100, &value);
+        if let Some(v) = self.device_id.as_ref() {
+            my_size += ::protobuf::rt::string_size(100, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -2586,36 +2705,36 @@ impl ::protobuf::Message for SystemInfo {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.cpu_family {
-            try!(os.write_enum(10, v.value()));
+            os.write_enum(10, v.value())?;
         };
         if let Some(v) = self.cpu_subtype {
-            try!(os.write_uint32(20, v));
+            os.write_uint32(20, v)?;
         };
         if let Some(v) = self.cpu_ext {
-            try!(os.write_uint32(30, v));
+            os.write_uint32(30, v)?;
         };
         if let Some(v) = self.brand {
-            try!(os.write_enum(40, v.value()));
+            os.write_enum(40, v.value())?;
         };
         if let Some(v) = self.brand_flags {
-            try!(os.write_uint32(50, v));
+            os.write_uint32(50, v)?;
         };
         if let Some(v) = self.os {
-            try!(os.write_enum(60, v.value()));
+            os.write_enum(60, v.value())?;
         };
         if let Some(v) = self.os_version {
-            try!(os.write_uint32(70, v));
+            os.write_uint32(70, v)?;
         };
         if let Some(v) = self.os_ext {
-            try!(os.write_uint32(80, v));
+            os.write_uint32(80, v)?;
         };
         if let Some(v) = self.system_information_string.as_ref() {
-            try!(os.write_string(90, &v));
+            os.write_string(90, &v)?;
         };
         if let Some(v) = self.device_id.as_ref() {
-            try!(os.write_string(100, &v));
+            os.write_string(100, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -2629,10 +2748,6 @@ impl ::protobuf::Message for SystemInfo {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<SystemInfo>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -2657,55 +2772,55 @@ impl ::protobuf::MessageStatic for SystemInfo {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<CpuFamily>>(
                     "cpu_family",
-                    SystemInfo::has_cpu_family,
-                    SystemInfo::get_cpu_family,
+                    SystemInfo::get_cpu_family_for_reflect,
+                    SystemInfo::mut_cpu_family_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_u32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "cpu_subtype",
-                    SystemInfo::has_cpu_subtype,
-                    SystemInfo::get_cpu_subtype,
+                    SystemInfo::get_cpu_subtype_for_reflect,
+                    SystemInfo::mut_cpu_subtype_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_u32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "cpu_ext",
-                    SystemInfo::has_cpu_ext,
-                    SystemInfo::get_cpu_ext,
+                    SystemInfo::get_cpu_ext_for_reflect,
+                    SystemInfo::mut_cpu_ext_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Brand>>(
                     "brand",
-                    SystemInfo::has_brand,
-                    SystemInfo::get_brand,
+                    SystemInfo::get_brand_for_reflect,
+                    SystemInfo::mut_brand_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_u32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "brand_flags",
-                    SystemInfo::has_brand_flags,
-                    SystemInfo::get_brand_flags,
+                    SystemInfo::get_brand_flags_for_reflect,
+                    SystemInfo::mut_brand_flags_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Os>>(
                     "os",
-                    SystemInfo::has_os,
-                    SystemInfo::get_os,
+                    SystemInfo::get_os_for_reflect,
+                    SystemInfo::mut_os_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_u32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "os_version",
-                    SystemInfo::has_os_version,
-                    SystemInfo::get_os_version,
+                    SystemInfo::get_os_version_for_reflect,
+                    SystemInfo::mut_os_version_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_u32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "os_ext",
-                    SystemInfo::has_os_ext,
-                    SystemInfo::get_os_ext,
+                    SystemInfo::get_os_ext_for_reflect,
+                    SystemInfo::mut_os_ext_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "system_information_string",
-                    SystemInfo::has_system_information_string,
-                    SystemInfo::get_system_information_string,
+                    SystemInfo::get_system_information_string_for_reflect,
+                    SystemInfo::mut_system_information_string_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "device_id",
-                    SystemInfo::has_device_id,
-                    SystemInfo::get_device_id,
+                    SystemInfo::get_device_id_for_reflect,
+                    SystemInfo::mut_device_id_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<SystemInfo>(
                     "SystemInfo",
@@ -2733,29 +2848,19 @@ impl ::protobuf::Clear for SystemInfo {
     }
 }
 
-impl ::std::cmp::PartialEq for SystemInfo {
-    fn eq(&self, other: &SystemInfo) -> bool {
-        self.cpu_family == other.cpu_family &&
-        self.cpu_subtype == other.cpu_subtype &&
-        self.cpu_ext == other.cpu_ext &&
-        self.brand == other.brand &&
-        self.brand_flags == other.brand_flags &&
-        self.os == other.os &&
-        self.os_version == other.os_version &&
-        self.os_ext == other.os_ext &&
-        self.system_information_string == other.system_information_string &&
-        self.device_id == other.device_id &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for SystemInfo {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for SystemInfo {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct LibspotifyAppKey {
     // message fields
     version: ::std::option::Option<u32>,
@@ -2765,7 +2870,7 @@ pub struct LibspotifyAppKey {
     callback_hash: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -2782,17 +2887,7 @@ impl LibspotifyAppKey {
             ptr: 0 as *const LibspotifyAppKey,
         };
         unsafe {
-            instance.get(|| {
-                LibspotifyAppKey {
-                    version: ::std::option::Option::None,
-                    devkey: ::protobuf::SingularField::none(),
-                    signature: ::protobuf::SingularField::none(),
-                    useragent: ::protobuf::SingularField::none(),
-                    callback_hash: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(LibspotifyAppKey::new)
         }
     }
 
@@ -2813,6 +2908,14 @@ impl LibspotifyAppKey {
 
     pub fn get_version(&self) -> u32 {
         self.version.unwrap_or(0)
+    }
+
+    fn get_version_for_reflect(&self) -> &::std::option::Option<u32> {
+        &self.version
+    }
+
+    fn mut_version_for_reflect(&mut self) -> &mut ::std::option::Option<u32> {
+        &mut self.version
     }
 
     // required bytes devkey = 2;
@@ -2851,6 +2954,14 @@ impl LibspotifyAppKey {
         }
     }
 
+    fn get_devkey_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.devkey
+    }
+
+    fn mut_devkey_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.devkey
+    }
+
     // required bytes signature = 3;
 
     pub fn clear_signature(&mut self) {
@@ -2885,6 +2996,14 @@ impl LibspotifyAppKey {
             Some(v) => &v,
             None => &[],
         }
+    }
+
+    fn get_signature_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.signature
+    }
+
+    fn mut_signature_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.signature
     }
 
     // required string useragent = 4;
@@ -2923,6 +3042,14 @@ impl LibspotifyAppKey {
         }
     }
 
+    fn get_useragent_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.useragent
+    }
+
+    fn mut_useragent_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.useragent
+    }
+
     // required bytes callback_hash = 5;
 
     pub fn clear_callback_hash(&mut self) {
@@ -2958,6 +3085,14 @@ impl LibspotifyAppKey {
             None => &[],
         }
     }
+
+    fn get_callback_hash_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.callback_hash
+    }
+
+    fn mut_callback_hash_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.callback_hash
+    }
 }
 
 impl ::protobuf::Message for LibspotifyAppKey {
@@ -2981,30 +3116,30 @@ impl ::protobuf::Message for LibspotifyAppKey {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_uint32());
+                    let tmp = is.read_uint32()?;
                     self.version = ::std::option::Option::Some(tmp);
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.devkey));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.devkey)?;
                 },
                 3 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.signature));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.signature)?;
                 },
                 4 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.useragent));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.useragent)?;
                 },
                 5 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.callback_hash));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.callback_hash)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -3015,20 +3150,20 @@ impl ::protobuf::Message for LibspotifyAppKey {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.version {
-            my_size += ::protobuf::rt::value_size(1, *value, ::protobuf::wire_format::WireTypeVarint);
+        if let Some(v) = self.version {
+            my_size += ::protobuf::rt::value_size(1, v, ::protobuf::wire_format::WireTypeVarint);
         };
-        for value in &self.devkey {
-            my_size += ::protobuf::rt::bytes_size(2, &value);
+        if let Some(v) = self.devkey.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(2, &v);
         };
-        for value in &self.signature {
-            my_size += ::protobuf::rt::bytes_size(3, &value);
+        if let Some(v) = self.signature.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(3, &v);
         };
-        for value in &self.useragent {
-            my_size += ::protobuf::rt::string_size(4, &value);
+        if let Some(v) = self.useragent.as_ref() {
+            my_size += ::protobuf::rt::string_size(4, &v);
         };
-        for value in &self.callback_hash {
-            my_size += ::protobuf::rt::bytes_size(5, &value);
+        if let Some(v) = self.callback_hash.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(5, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -3037,21 +3172,21 @@ impl ::protobuf::Message for LibspotifyAppKey {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.version {
-            try!(os.write_uint32(1, v));
+            os.write_uint32(1, v)?;
         };
         if let Some(v) = self.devkey.as_ref() {
-            try!(os.write_bytes(2, &v));
+            os.write_bytes(2, &v)?;
         };
         if let Some(v) = self.signature.as_ref() {
-            try!(os.write_bytes(3, &v));
+            os.write_bytes(3, &v)?;
         };
         if let Some(v) = self.useragent.as_ref() {
-            try!(os.write_string(4, &v));
+            os.write_string(4, &v)?;
         };
         if let Some(v) = self.callback_hash.as_ref() {
-            try!(os.write_bytes(5, &v));
+            os.write_bytes(5, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -3065,10 +3200,6 @@ impl ::protobuf::Message for LibspotifyAppKey {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<LibspotifyAppKey>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -3093,30 +3224,30 @@ impl ::protobuf::MessageStatic for LibspotifyAppKey {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_u32_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
                     "version",
-                    LibspotifyAppKey::has_version,
-                    LibspotifyAppKey::get_version,
+                    LibspotifyAppKey::get_version_for_reflect,
+                    LibspotifyAppKey::mut_version_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "devkey",
-                    LibspotifyAppKey::has_devkey,
-                    LibspotifyAppKey::get_devkey,
+                    LibspotifyAppKey::get_devkey_for_reflect,
+                    LibspotifyAppKey::mut_devkey_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "signature",
-                    LibspotifyAppKey::has_signature,
-                    LibspotifyAppKey::get_signature,
+                    LibspotifyAppKey::get_signature_for_reflect,
+                    LibspotifyAppKey::mut_signature_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "useragent",
-                    LibspotifyAppKey::has_useragent,
-                    LibspotifyAppKey::get_useragent,
+                    LibspotifyAppKey::get_useragent_for_reflect,
+                    LibspotifyAppKey::mut_useragent_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "callback_hash",
-                    LibspotifyAppKey::has_callback_hash,
-                    LibspotifyAppKey::get_callback_hash,
+                    LibspotifyAppKey::get_callback_hash_for_reflect,
+                    LibspotifyAppKey::mut_callback_hash_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<LibspotifyAppKey>(
                     "LibspotifyAppKey",
@@ -3139,24 +3270,19 @@ impl ::protobuf::Clear for LibspotifyAppKey {
     }
 }
 
-impl ::std::cmp::PartialEq for LibspotifyAppKey {
-    fn eq(&self, other: &LibspotifyAppKey) -> bool {
-        self.version == other.version &&
-        self.devkey == other.devkey &&
-        self.signature == other.signature &&
-        self.useragent == other.useragent &&
-        self.callback_hash == other.callback_hash &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for LibspotifyAppKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for LibspotifyAppKey {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct ClientInfo {
     // message fields
     limited: ::std::option::Option<bool>,
@@ -3164,7 +3290,7 @@ pub struct ClientInfo {
     language: ::protobuf::SingularField<::std::string::String>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -3181,15 +3307,7 @@ impl ClientInfo {
             ptr: 0 as *const ClientInfo,
         };
         unsafe {
-            instance.get(|| {
-                ClientInfo {
-                    limited: ::std::option::Option::None,
-                    fb: ::protobuf::SingularPtrField::none(),
-                    language: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(ClientInfo::new)
         }
     }
 
@@ -3210,6 +3328,14 @@ impl ClientInfo {
 
     pub fn get_limited(&self) -> bool {
         self.limited.unwrap_or(false)
+    }
+
+    fn get_limited_for_reflect(&self) -> &::std::option::Option<bool> {
+        &self.limited
+    }
+
+    fn mut_limited_for_reflect(&mut self) -> &mut ::std::option::Option<bool> {
+        &mut self.limited
     }
 
     // optional .ClientInfoFacebook fb = 2;
@@ -3243,6 +3369,14 @@ impl ClientInfo {
 
     pub fn get_fb(&self) -> &ClientInfoFacebook {
         self.fb.as_ref().unwrap_or_else(|| ClientInfoFacebook::default_instance())
+    }
+
+    fn get_fb_for_reflect(&self) -> &::protobuf::SingularPtrField<ClientInfoFacebook> {
+        &self.fb
+    }
+
+    fn mut_fb_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<ClientInfoFacebook> {
+        &mut self.fb
     }
 
     // optional string language = 3;
@@ -3280,6 +3414,14 @@ impl ClientInfo {
             None => "",
         }
     }
+
+    fn get_language_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.language
+    }
+
+    fn mut_language_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.language
+    }
 }
 
 impl ::protobuf::Message for ClientInfo {
@@ -3288,24 +3430,24 @@ impl ::protobuf::Message for ClientInfo {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_bool());
+                    let tmp = is.read_bool()?;
                     self.limited = ::std::option::Option::Some(tmp);
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fb));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fb)?;
                 },
                 3 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.language));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.language)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -3316,15 +3458,15 @@ impl ::protobuf::Message for ClientInfo {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.limited.is_some() {
+        if let Some(v) = self.limited {
             my_size += 2;
         };
-        for value in &self.fb {
-            let len = value.compute_size();
+        if let Some(v) = self.fb.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.language {
-            my_size += ::protobuf::rt::string_size(3, &value);
+        if let Some(v) = self.language.as_ref() {
+            my_size += ::protobuf::rt::string_size(3, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -3333,17 +3475,17 @@ impl ::protobuf::Message for ClientInfo {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.limited {
-            try!(os.write_bool(1, v));
+            os.write_bool(1, v)?;
         };
         if let Some(v) = self.fb.as_ref() {
-            try!(os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.language.as_ref() {
-            try!(os.write_string(3, &v));
+            os.write_string(3, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -3357,10 +3499,6 @@ impl ::protobuf::Message for ClientInfo {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<ClientInfo>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -3385,20 +3523,20 @@ impl ::protobuf::MessageStatic for ClientInfo {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_bool_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
                     "limited",
-                    ClientInfo::has_limited,
-                    ClientInfo::get_limited,
+                    ClientInfo::get_limited_for_reflect,
+                    ClientInfo::mut_limited_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ClientInfoFacebook>>(
                     "fb",
-                    ClientInfo::has_fb,
-                    ClientInfo::get_fb,
+                    ClientInfo::get_fb_for_reflect,
+                    ClientInfo::mut_fb_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "language",
-                    ClientInfo::has_language,
-                    ClientInfo::get_language,
+                    ClientInfo::get_language_for_reflect,
+                    ClientInfo::mut_language_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ClientInfo>(
                     "ClientInfo",
@@ -3419,28 +3557,25 @@ impl ::protobuf::Clear for ClientInfo {
     }
 }
 
-impl ::std::cmp::PartialEq for ClientInfo {
-    fn eq(&self, other: &ClientInfo) -> bool {
-        self.limited == other.limited &&
-        self.fb == other.fb &&
-        self.language == other.language &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for ClientInfo {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for ClientInfo {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct ClientInfoFacebook {
     // message fields
     machine_id: ::protobuf::SingularField<::std::string::String>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -3457,13 +3592,7 @@ impl ClientInfoFacebook {
             ptr: 0 as *const ClientInfoFacebook,
         };
         unsafe {
-            instance.get(|| {
-                ClientInfoFacebook {
-                    machine_id: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(ClientInfoFacebook::new)
         }
     }
 
@@ -3502,6 +3631,14 @@ impl ClientInfoFacebook {
             None => "",
         }
     }
+
+    fn get_machine_id_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.machine_id
+    }
+
+    fn mut_machine_id_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.machine_id
+    }
 }
 
 impl ::protobuf::Message for ClientInfoFacebook {
@@ -3510,14 +3647,14 @@ impl ::protobuf::Message for ClientInfoFacebook {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.machine_id));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.machine_id)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -3528,8 +3665,8 @@ impl ::protobuf::Message for ClientInfoFacebook {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.machine_id {
-            my_size += ::protobuf::rt::string_size(1, &value);
+        if let Some(v) = self.machine_id.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -3538,9 +3675,9 @@ impl ::protobuf::Message for ClientInfoFacebook {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.machine_id.as_ref() {
-            try!(os.write_string(1, &v));
+            os.write_string(1, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -3554,10 +3691,6 @@ impl ::protobuf::Message for ClientInfoFacebook {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<ClientInfoFacebook>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -3582,10 +3715,10 @@ impl ::protobuf::MessageStatic for ClientInfoFacebook {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "machine_id",
-                    ClientInfoFacebook::has_machine_id,
-                    ClientInfoFacebook::get_machine_id,
+                    ClientInfoFacebook::get_machine_id_for_reflect,
+                    ClientInfoFacebook::mut_machine_id_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ClientInfoFacebook>(
                     "ClientInfoFacebook",
@@ -3604,20 +3737,19 @@ impl ::protobuf::Clear for ClientInfoFacebook {
     }
 }
 
-impl ::std::cmp::PartialEq for ClientInfoFacebook {
-    fn eq(&self, other: &ClientInfoFacebook) -> bool {
-        self.machine_id == other.machine_id &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for ClientInfoFacebook {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for ClientInfoFacebook {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct APWelcome {
     // message fields
     canonical_username: ::protobuf::SingularField<::std::string::String>,
@@ -3630,7 +3762,7 @@ pub struct APWelcome {
     fb: ::protobuf::SingularPtrField<AccountInfoFacebook>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -3647,20 +3779,7 @@ impl APWelcome {
             ptr: 0 as *const APWelcome,
         };
         unsafe {
-            instance.get(|| {
-                APWelcome {
-                    canonical_username: ::protobuf::SingularField::none(),
-                    account_type_logged_in: ::std::option::Option::None,
-                    credentials_type_logged_in: ::std::option::Option::None,
-                    reusable_auth_credentials_type: ::std::option::Option::None,
-                    reusable_auth_credentials: ::protobuf::SingularField::none(),
-                    lfs_secret: ::protobuf::SingularField::none(),
-                    account_info: ::protobuf::SingularPtrField::none(),
-                    fb: ::protobuf::SingularPtrField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(APWelcome::new)
         }
     }
 
@@ -3700,6 +3819,14 @@ impl APWelcome {
         }
     }
 
+    fn get_canonical_username_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.canonical_username
+    }
+
+    fn mut_canonical_username_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.canonical_username
+    }
+
     // required .AccountType account_type_logged_in = 20;
 
     pub fn clear_account_type_logged_in(&mut self) {
@@ -3717,6 +3844,14 @@ impl APWelcome {
 
     pub fn get_account_type_logged_in(&self) -> AccountType {
         self.account_type_logged_in.unwrap_or(AccountType::Spotify)
+    }
+
+    fn get_account_type_logged_in_for_reflect(&self) -> &::std::option::Option<AccountType> {
+        &self.account_type_logged_in
+    }
+
+    fn mut_account_type_logged_in_for_reflect(&mut self) -> &mut ::std::option::Option<AccountType> {
+        &mut self.account_type_logged_in
     }
 
     // required .AccountType credentials_type_logged_in = 25;
@@ -3738,6 +3873,14 @@ impl APWelcome {
         self.credentials_type_logged_in.unwrap_or(AccountType::Spotify)
     }
 
+    fn get_credentials_type_logged_in_for_reflect(&self) -> &::std::option::Option<AccountType> {
+        &self.credentials_type_logged_in
+    }
+
+    fn mut_credentials_type_logged_in_for_reflect(&mut self) -> &mut ::std::option::Option<AccountType> {
+        &mut self.credentials_type_logged_in
+    }
+
     // required .AuthenticationType reusable_auth_credentials_type = 30;
 
     pub fn clear_reusable_auth_credentials_type(&mut self) {
@@ -3755,6 +3898,14 @@ impl APWelcome {
 
     pub fn get_reusable_auth_credentials_type(&self) -> AuthenticationType {
         self.reusable_auth_credentials_type.unwrap_or(AuthenticationType::AUTHENTICATION_USER_PASS)
+    }
+
+    fn get_reusable_auth_credentials_type_for_reflect(&self) -> &::std::option::Option<AuthenticationType> {
+        &self.reusable_auth_credentials_type
+    }
+
+    fn mut_reusable_auth_credentials_type_for_reflect(&mut self) -> &mut ::std::option::Option<AuthenticationType> {
+        &mut self.reusable_auth_credentials_type
     }
 
     // required bytes reusable_auth_credentials = 40;
@@ -3793,6 +3944,14 @@ impl APWelcome {
         }
     }
 
+    fn get_reusable_auth_credentials_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.reusable_auth_credentials
+    }
+
+    fn mut_reusable_auth_credentials_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.reusable_auth_credentials
+    }
+
     // optional bytes lfs_secret = 50;
 
     pub fn clear_lfs_secret(&mut self) {
@@ -3829,6 +3988,14 @@ impl APWelcome {
         }
     }
 
+    fn get_lfs_secret_for_reflect(&self) -> &::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &self.lfs_secret
+    }
+
+    fn mut_lfs_secret_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::vec::Vec<u8>> {
+        &mut self.lfs_secret
+    }
+
     // optional .AccountInfo account_info = 60;
 
     pub fn clear_account_info(&mut self) {
@@ -3860,6 +4027,14 @@ impl APWelcome {
 
     pub fn get_account_info(&self) -> &AccountInfo {
         self.account_info.as_ref().unwrap_or_else(|| AccountInfo::default_instance())
+    }
+
+    fn get_account_info_for_reflect(&self) -> &::protobuf::SingularPtrField<AccountInfo> {
+        &self.account_info
+    }
+
+    fn mut_account_info_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<AccountInfo> {
+        &mut self.account_info
     }
 
     // optional .AccountInfoFacebook fb = 70;
@@ -3894,6 +4069,14 @@ impl APWelcome {
     pub fn get_fb(&self) -> &AccountInfoFacebook {
         self.fb.as_ref().unwrap_or_else(|| AccountInfoFacebook::default_instance())
     }
+
+    fn get_fb_for_reflect(&self) -> &::protobuf::SingularPtrField<AccountInfoFacebook> {
+        &self.fb
+    }
+
+    fn mut_fb_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<AccountInfoFacebook> {
+        &mut self.fb
+    }
 }
 
 impl ::protobuf::Message for APWelcome {
@@ -3917,47 +4100,47 @@ impl ::protobuf::Message for APWelcome {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.canonical_username));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.canonical_username)?;
                 },
                 20 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.account_type_logged_in = ::std::option::Option::Some(tmp);
                 },
                 25 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.credentials_type_logged_in = ::std::option::Option::Some(tmp);
                 },
                 30 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     };
-                    let tmp = try!(is.read_enum());
+                    let tmp = is.read_enum()?;
                     self.reusable_auth_credentials_type = ::std::option::Option::Some(tmp);
                 },
                 40 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.reusable_auth_credentials));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.reusable_auth_credentials)?;
                 },
                 50 => {
-                    try!(::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.lfs_secret));
+                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.lfs_secret)?;
                 },
                 60 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.account_info));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.account_info)?;
                 },
                 70 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fb));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fb)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -3968,30 +4151,30 @@ impl ::protobuf::Message for APWelcome {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.canonical_username {
-            my_size += ::protobuf::rt::string_size(10, &value);
+        if let Some(v) = self.canonical_username.as_ref() {
+            my_size += ::protobuf::rt::string_size(10, &v);
         };
-        for value in &self.account_type_logged_in {
-            my_size += ::protobuf::rt::enum_size(20, *value);
+        if let Some(v) = self.account_type_logged_in {
+            my_size += ::protobuf::rt::enum_size(20, v);
         };
-        for value in &self.credentials_type_logged_in {
-            my_size += ::protobuf::rt::enum_size(25, *value);
+        if let Some(v) = self.credentials_type_logged_in {
+            my_size += ::protobuf::rt::enum_size(25, v);
         };
-        for value in &self.reusable_auth_credentials_type {
-            my_size += ::protobuf::rt::enum_size(30, *value);
+        if let Some(v) = self.reusable_auth_credentials_type {
+            my_size += ::protobuf::rt::enum_size(30, v);
         };
-        for value in &self.reusable_auth_credentials {
-            my_size += ::protobuf::rt::bytes_size(40, &value);
+        if let Some(v) = self.reusable_auth_credentials.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(40, &v);
         };
-        for value in &self.lfs_secret {
-            my_size += ::protobuf::rt::bytes_size(50, &value);
+        if let Some(v) = self.lfs_secret.as_ref() {
+            my_size += ::protobuf::rt::bytes_size(50, &v);
         };
-        for value in &self.account_info {
-            let len = value.compute_size();
+        if let Some(v) = self.account_info.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.fb {
-            let len = value.compute_size();
+        if let Some(v) = self.fb.as_ref() {
+            let len = v.compute_size();
             my_size += 2 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -4001,34 +4184,34 @@ impl ::protobuf::Message for APWelcome {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.canonical_username.as_ref() {
-            try!(os.write_string(10, &v));
+            os.write_string(10, &v)?;
         };
         if let Some(v) = self.account_type_logged_in {
-            try!(os.write_enum(20, v.value()));
+            os.write_enum(20, v.value())?;
         };
         if let Some(v) = self.credentials_type_logged_in {
-            try!(os.write_enum(25, v.value()));
+            os.write_enum(25, v.value())?;
         };
         if let Some(v) = self.reusable_auth_credentials_type {
-            try!(os.write_enum(30, v.value()));
+            os.write_enum(30, v.value())?;
         };
         if let Some(v) = self.reusable_auth_credentials.as_ref() {
-            try!(os.write_bytes(40, &v));
+            os.write_bytes(40, &v)?;
         };
         if let Some(v) = self.lfs_secret.as_ref() {
-            try!(os.write_bytes(50, &v));
+            os.write_bytes(50, &v)?;
         };
         if let Some(v) = self.account_info.as_ref() {
-            try!(os.write_tag(60, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(60, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.fb.as_ref() {
-            try!(os.write_tag(70, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(70, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -4042,10 +4225,6 @@ impl ::protobuf::Message for APWelcome {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<APWelcome>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -4070,45 +4249,45 @@ impl ::protobuf::MessageStatic for APWelcome {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "canonical_username",
-                    APWelcome::has_canonical_username,
-                    APWelcome::get_canonical_username,
+                    APWelcome::get_canonical_username_for_reflect,
+                    APWelcome::mut_canonical_username_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AccountType>>(
                     "account_type_logged_in",
-                    APWelcome::has_account_type_logged_in,
-                    APWelcome::get_account_type_logged_in,
+                    APWelcome::get_account_type_logged_in_for_reflect,
+                    APWelcome::mut_account_type_logged_in_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AccountType>>(
                     "credentials_type_logged_in",
-                    APWelcome::has_credentials_type_logged_in,
-                    APWelcome::get_credentials_type_logged_in,
+                    APWelcome::get_credentials_type_logged_in_for_reflect,
+                    APWelcome::mut_credentials_type_logged_in_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_enum_accessor(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AuthenticationType>>(
                     "reusable_auth_credentials_type",
-                    APWelcome::has_reusable_auth_credentials_type,
-                    APWelcome::get_reusable_auth_credentials_type,
+                    APWelcome::get_reusable_auth_credentials_type_for_reflect,
+                    APWelcome::mut_reusable_auth_credentials_type_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "reusable_auth_credentials",
-                    APWelcome::has_reusable_auth_credentials,
-                    APWelcome::get_reusable_auth_credentials,
+                    APWelcome::get_reusable_auth_credentials_for_reflect,
+                    APWelcome::mut_reusable_auth_credentials_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_bytes_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
                     "lfs_secret",
-                    APWelcome::has_lfs_secret,
-                    APWelcome::get_lfs_secret,
+                    APWelcome::get_lfs_secret_for_reflect,
+                    APWelcome::mut_lfs_secret_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AccountInfo>>(
                     "account_info",
-                    APWelcome::has_account_info,
-                    APWelcome::get_account_info,
+                    APWelcome::get_account_info_for_reflect,
+                    APWelcome::mut_account_info_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AccountInfoFacebook>>(
                     "fb",
-                    APWelcome::has_fb,
-                    APWelcome::get_fb,
+                    APWelcome::get_fb_for_reflect,
+                    APWelcome::mut_fb_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<APWelcome>(
                     "APWelcome",
@@ -4134,34 +4313,26 @@ impl ::protobuf::Clear for APWelcome {
     }
 }
 
-impl ::std::cmp::PartialEq for APWelcome {
-    fn eq(&self, other: &APWelcome) -> bool {
-        self.canonical_username == other.canonical_username &&
-        self.account_type_logged_in == other.account_type_logged_in &&
-        self.credentials_type_logged_in == other.credentials_type_logged_in &&
-        self.reusable_auth_credentials_type == other.reusable_auth_credentials_type &&
-        self.reusable_auth_credentials == other.reusable_auth_credentials &&
-        self.lfs_secret == other.lfs_secret &&
-        self.account_info == other.account_info &&
-        self.fb == other.fb &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for APWelcome {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for APWelcome {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct AccountInfo {
     // message fields
     spotify: ::protobuf::SingularPtrField<AccountInfoSpotify>,
     facebook: ::protobuf::SingularPtrField<AccountInfoFacebook>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -4178,14 +4349,7 @@ impl AccountInfo {
             ptr: 0 as *const AccountInfo,
         };
         unsafe {
-            instance.get(|| {
-                AccountInfo {
-                    spotify: ::protobuf::SingularPtrField::none(),
-                    facebook: ::protobuf::SingularPtrField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(AccountInfo::new)
         }
     }
 
@@ -4222,6 +4386,14 @@ impl AccountInfo {
         self.spotify.as_ref().unwrap_or_else(|| AccountInfoSpotify::default_instance())
     }
 
+    fn get_spotify_for_reflect(&self) -> &::protobuf::SingularPtrField<AccountInfoSpotify> {
+        &self.spotify
+    }
+
+    fn mut_spotify_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<AccountInfoSpotify> {
+        &mut self.spotify
+    }
+
     // optional .AccountInfoFacebook facebook = 2;
 
     pub fn clear_facebook(&mut self) {
@@ -4254,6 +4426,14 @@ impl AccountInfo {
     pub fn get_facebook(&self) -> &AccountInfoFacebook {
         self.facebook.as_ref().unwrap_or_else(|| AccountInfoFacebook::default_instance())
     }
+
+    fn get_facebook_for_reflect(&self) -> &::protobuf::SingularPtrField<AccountInfoFacebook> {
+        &self.facebook
+    }
+
+    fn mut_facebook_for_reflect(&mut self) -> &mut ::protobuf::SingularPtrField<AccountInfoFacebook> {
+        &mut self.facebook
+    }
 }
 
 impl ::protobuf::Message for AccountInfo {
@@ -4262,17 +4442,17 @@ impl ::protobuf::Message for AccountInfo {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.spotify));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.spotify)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.facebook));
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.facebook)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -4283,12 +4463,12 @@ impl ::protobuf::Message for AccountInfo {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.spotify {
-            let len = value.compute_size();
+        if let Some(v) = self.spotify.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        for value in &self.facebook {
-            let len = value.compute_size();
+        if let Some(v) = self.facebook.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -4298,16 +4478,16 @@ impl ::protobuf::Message for AccountInfo {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.spotify.as_ref() {
-            try!(os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
         if let Some(v) = self.facebook.as_ref() {
-            try!(os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited));
-            try!(os.write_raw_varint32(v.get_cached_size()));
-            try!(v.write_to_with_cached_sizes(os));
+            os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+            os.write_raw_varint32(v.get_cached_size())?;
+            v.write_to_with_cached_sizes(os)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -4321,10 +4501,6 @@ impl ::protobuf::Message for AccountInfo {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<AccountInfo>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -4349,15 +4525,15 @@ impl ::protobuf::MessageStatic for AccountInfo {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AccountInfoSpotify>>(
                     "spotify",
-                    AccountInfo::has_spotify,
-                    AccountInfo::get_spotify,
+                    AccountInfo::get_spotify_for_reflect,
+                    AccountInfo::mut_spotify_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AccountInfoFacebook>>(
                     "facebook",
-                    AccountInfo::has_facebook,
-                    AccountInfo::get_facebook,
+                    AccountInfo::get_facebook_for_reflect,
+                    AccountInfo::mut_facebook_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<AccountInfo>(
                     "AccountInfo",
@@ -4377,25 +4553,23 @@ impl ::protobuf::Clear for AccountInfo {
     }
 }
 
-impl ::std::cmp::PartialEq for AccountInfo {
-    fn eq(&self, other: &AccountInfo) -> bool {
-        self.spotify == other.spotify &&
-        self.facebook == other.facebook &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for AccountInfo {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for AccountInfo {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct AccountInfoSpotify {
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -4412,12 +4586,7 @@ impl AccountInfoSpotify {
             ptr: 0 as *const AccountInfoSpotify,
         };
         unsafe {
-            instance.get(|| {
-                AccountInfoSpotify {
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(AccountInfoSpotify::new)
         }
     }
 }
@@ -4428,11 +4597,11 @@ impl ::protobuf::Message for AccountInfoSpotify {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -4449,7 +4618,7 @@ impl ::protobuf::Message for AccountInfoSpotify {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -4463,10 +4632,6 @@ impl ::protobuf::Message for AccountInfoSpotify {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<AccountInfoSpotify>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -4507,26 +4672,26 @@ impl ::protobuf::Clear for AccountInfoSpotify {
     }
 }
 
-impl ::std::cmp::PartialEq for AccountInfoSpotify {
-    fn eq(&self, other: &AccountInfoSpotify) -> bool {
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for AccountInfoSpotify {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
     }
 }
 
-#[derive(Clone,Default)]
+impl ::protobuf::reflect::ProtobufValue for AccountInfoSpotify {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct AccountInfoFacebook {
     // message fields
     access_token: ::protobuf::SingularField<::std::string::String>,
     machine_id: ::protobuf::SingularField<::std::string::String>,
     // special fields
     unknown_fields: ::protobuf::UnknownFields,
-    cached_size: ::std::cell::Cell<u32>,
+    cached_size: ::protobuf::CachedSize,
 }
 
 // see codegen.rs for the explanation why impl Sync explicitly
@@ -4543,14 +4708,7 @@ impl AccountInfoFacebook {
             ptr: 0 as *const AccountInfoFacebook,
         };
         unsafe {
-            instance.get(|| {
-                AccountInfoFacebook {
-                    access_token: ::protobuf::SingularField::none(),
-                    machine_id: ::protobuf::SingularField::none(),
-                    unknown_fields: ::protobuf::UnknownFields::new(),
-                    cached_size: ::std::cell::Cell::new(0),
-                }
-            })
+            instance.get(AccountInfoFacebook::new)
         }
     }
 
@@ -4590,6 +4748,14 @@ impl AccountInfoFacebook {
         }
     }
 
+    fn get_access_token_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.access_token
+    }
+
+    fn mut_access_token_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.access_token
+    }
+
     // optional string machine_id = 2;
 
     pub fn clear_machine_id(&mut self) {
@@ -4625,6 +4791,14 @@ impl AccountInfoFacebook {
             None => "",
         }
     }
+
+    fn get_machine_id_for_reflect(&self) -> &::protobuf::SingularField<::std::string::String> {
+        &self.machine_id
+    }
+
+    fn mut_machine_id_for_reflect(&mut self) -> &mut ::protobuf::SingularField<::std::string::String> {
+        &mut self.machine_id
+    }
 }
 
 impl ::protobuf::Message for AccountInfoFacebook {
@@ -4633,17 +4807,17 @@ impl ::protobuf::Message for AccountInfoFacebook {
     }
 
     fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
-        while !try!(is.eof()) {
-            let (field_number, wire_type) = try!(is.read_tag_unpack());
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.access_token));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.access_token)?;
                 },
                 2 => {
-                    try!(::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.machine_id));
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.machine_id)?;
                 },
                 _ => {
-                    try!(::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields()));
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
             };
         }
@@ -4654,11 +4828,11 @@ impl ::protobuf::Message for AccountInfoFacebook {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.access_token {
-            my_size += ::protobuf::rt::string_size(1, &value);
+        if let Some(v) = self.access_token.as_ref() {
+            my_size += ::protobuf::rt::string_size(1, &v);
         };
-        for value in &self.machine_id {
-            my_size += ::protobuf::rt::string_size(2, &value);
+        if let Some(v) = self.machine_id.as_ref() {
+            my_size += ::protobuf::rt::string_size(2, &v);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -4667,12 +4841,12 @@ impl ::protobuf::Message for AccountInfoFacebook {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.access_token.as_ref() {
-            try!(os.write_string(1, &v));
+            os.write_string(1, &v)?;
         };
         if let Some(v) = self.machine_id.as_ref() {
-            try!(os.write_string(2, &v));
+            os.write_string(2, &v)?;
         };
-        try!(os.write_unknown_fields(self.get_unknown_fields()));
+        os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
 
@@ -4686,10 +4860,6 @@ impl ::protobuf::Message for AccountInfoFacebook {
 
     fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
         &mut self.unknown_fields
-    }
-
-    fn type_id(&self) -> ::std::any::TypeId {
-        ::std::any::TypeId::of::<AccountInfoFacebook>()
     }
 
     fn as_any(&self) -> &::std::any::Any {
@@ -4714,15 +4884,15 @@ impl ::protobuf::MessageStatic for AccountInfoFacebook {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "access_token",
-                    AccountInfoFacebook::has_access_token,
-                    AccountInfoFacebook::get_access_token,
+                    AccountInfoFacebook::get_access_token_for_reflect,
+                    AccountInfoFacebook::mut_access_token_for_reflect,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_string_accessor(
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "machine_id",
-                    AccountInfoFacebook::has_machine_id,
-                    AccountInfoFacebook::get_machine_id,
+                    AccountInfoFacebook::get_machine_id_for_reflect,
+                    AccountInfoFacebook::mut_machine_id_for_reflect,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<AccountInfoFacebook>(
                     "AccountInfoFacebook",
@@ -4742,17 +4912,15 @@ impl ::protobuf::Clear for AccountInfoFacebook {
     }
 }
 
-impl ::std::cmp::PartialEq for AccountInfoFacebook {
-    fn eq(&self, other: &AccountInfoFacebook) -> bool {
-        self.access_token == other.access_token &&
-        self.machine_id == other.machine_id &&
-        self.unknown_fields == other.unknown_fields
-    }
-}
-
 impl ::std::fmt::Debug for AccountInfoFacebook {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for AccountInfoFacebook {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
     }
 }
 
@@ -4808,6 +4976,12 @@ impl ::protobuf::ProtobufEnum for AuthenticationType {
 impl ::std::marker::Copy for AuthenticationType {
 }
 
+impl ::protobuf::reflect::ProtobufValue for AuthenticationType {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
+}
+
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub enum AccountCreation {
     ACCOUNT_CREATION_ALWAYS_PROMPT = 1,
@@ -4849,6 +5023,12 @@ impl ::protobuf::ProtobufEnum for AccountCreation {
 }
 
 impl ::std::marker::Copy for AccountCreation {
+}
+
+impl ::protobuf::reflect::ProtobufValue for AccountCreation {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
 }
 
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
@@ -4918,6 +5098,12 @@ impl ::protobuf::ProtobufEnum for CpuFamily {
 impl ::std::marker::Copy for CpuFamily {
 }
 
+impl ::protobuf::reflect::ProtobufValue for CpuFamily {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
+}
+
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub enum Brand {
     BRAND_UNBRANDED = 0,
@@ -4965,6 +5151,12 @@ impl ::protobuf::ProtobufEnum for Brand {
 }
 
 impl ::std::marker::Copy for Brand {
+}
+
+impl ::protobuf::reflect::ProtobufValue for Brand {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
 }
 
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
@@ -5073,6 +5265,12 @@ impl ::protobuf::ProtobufEnum for Os {
 impl ::std::marker::Copy for Os {
 }
 
+impl ::protobuf::reflect::ProtobufValue for Os {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
+}
+
 #[derive(Clone,PartialEq,Eq,Debug,Hash)]
 pub enum AccountType {
     Spotify = 0,
@@ -5114,6 +5312,12 @@ impl ::protobuf::ProtobufEnum for AccountType {
 }
 
 impl ::std::marker::Copy for AccountType {
+}
+
+impl ::protobuf::reflect::ProtobufValue for AccountType {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
+    }
 }
 
 static file_descriptor_proto_data: &'static [u8] = &[
