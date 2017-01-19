@@ -1,14 +1,13 @@
-use eventual::{self, Async};
 use std::borrow::Cow;
 use std::sync::{mpsc, Mutex, Arc, MutexGuard};
 use std::thread;
 use std::io::{Read, Seek};
 use vorbis;
-use futures::Future;
+use futures::{future, Future};
 
 use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
-use metadata::{FileFormat, Track, TrackRef};
+use metadata::{FileFormat, Track};
 use session::{Bitrate, Session};
 use util::{self, ReadSeek, SpotifyId, Subfile};
 pub use spirc::PlayStatus;
@@ -170,16 +169,16 @@ fn find_available_alternative<'a>(session: &Session, track: &'a Track) -> Option
         let alternatives = track.alternatives
             .iter()
             .map(|alt_id| {
-                session.metadata::<Track>(*alt_id)
-            })
-        .collect::<Vec<TrackRef>>();
+                session.metadata().get::<Track>(*alt_id)
+            });
+        let alternatives = future::join_all(alternatives).wait().unwrap();
 
-        eventual::sequence(alternatives.into_iter()).iter().find(|alt| alt.available).map(Cow::Owned)
+        alternatives.into_iter().find(|alt| alt.available).map(Cow::Owned)
     }
 }
 
 fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<Subfile<AudioDecrypt<Box<ReadSeek>>>>> {
-    let track = session.metadata::<Track>(track_id).await().unwrap();
+    let track = session.metadata().get::<Track>(track_id).wait().unwrap();
 
     info!("Loading track \"{}\"", track.name);
 
@@ -207,7 +206,7 @@ fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<
         }
     };
 
-    let key = session.audio_key().request(track.id, file_id).wait().unwrap().unwrap();
+    let key = session.audio_key().request(track.id, file_id).wait().unwrap();
 
     let audio_file = Subfile::new(AudioDecrypt::new(key, session.audio_file(file_id)), 0xa7);
     let decoder = vorbis::Decoder::new(audio_file).unwrap();

@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use futures::sync::oneshot;
+use futures::{Async, Future, Poll};
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -12,12 +13,10 @@ pub struct AudioKey(pub [u8; 16]);
 #[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
 pub struct AudioKeyError;
 
-pub type Result = ::std::result::Result<AudioKey, AudioKeyError>;
-
 component! {
     AudioKeyManager : AudioKeyManagerInner {
         sequence: SeqGenerator<u32> = SeqGenerator::new(0),
-        pending: HashMap<u32, oneshot::Sender<Result>> = HashMap::new(),
+        pending: HashMap<u32, oneshot::Sender<Result<AudioKey, AudioKeyError>>> = HashMap::new(),
     }
 }
 
@@ -43,7 +42,7 @@ impl AudioKeyManager {
         }
     }
 
-    pub fn request<'a>(&self, track: SpotifyId, file: FileId) -> oneshot::Receiver<Result> {
+    pub fn request<'a>(&self, track: SpotifyId, file: FileId) -> AudioKeyFuture<AudioKey> {
         let (tx, rx) = oneshot::channel();
 
         let seq = self.lock(move |inner| {
@@ -53,7 +52,7 @@ impl AudioKeyManager {
         });
 
         self.send_key_request(seq, track, file);
-        rx
+        AudioKeyFuture(rx)
     }
 
     fn send_key_request<'a>(&self, seq: u32, track: SpotifyId, file: FileId) {
@@ -66,3 +65,19 @@ impl AudioKeyManager {
         self.session().send_packet(0xc, data)
     }
 }
+
+pub struct AudioKeyFuture<T>(oneshot::Receiver<Result<T, AudioKeyError>>);
+impl <T> Future for AudioKeyFuture<T> {
+    type Item = T;
+    type Error = AudioKeyError;
+
+    fn poll(&mut self) -> Poll<T, AudioKeyError> {
+        match self.0.poll() {
+            Ok(Async::Ready(Ok(value))) => Ok(Async::Ready(value)),
+            Ok(Async::Ready(Err(err))) => Err(err),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(oneshot::Canceled) => Err(AudioKeyError),
+        }
+    }
+}
+

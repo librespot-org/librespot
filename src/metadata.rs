@@ -1,11 +1,11 @@
-use eventual::Future;
+use futures::{Future, BoxFuture};
 use linear_map::LinearMap;
 use protobuf;
-use futures::Future as Future_;
 
+use mercury::MercuryError;
 use protocol;
-use util::{SpotifyId, FileId, StrChunksExt};
 use session::Session;
+use util::{SpotifyId, FileId, StrChunksExt};
 
 pub use protocol::metadata::AudioFile_Format as FileFormat;
 
@@ -58,11 +58,6 @@ pub struct Artist {
     pub name: String,
     pub top_tracks: Vec<SpotifyId>,
 }
-
-pub type MetadataRef<T> = Future<T, ()>;
-pub type TrackRef = MetadataRef<Track>;
-pub type AlbumRef = MetadataRef<Album>;
-pub type ArtistRef = MetadataRef<Artist>;
 
 impl MetadataTrait for Track {
     type Message = protocol::metadata::Track;
@@ -180,26 +175,22 @@ impl MetadataTrait for Artist {
     }
 }
 
-pub struct MetadataManager;
+component! {
+    MetadataManager : MetadataManagerInner { }
+}
 
 impl MetadataManager {
-    pub fn new() -> MetadataManager {
-        MetadataManager
-    }
-
-    pub fn get<T: MetadataTrait>(&mut self, session: &Session, id: SpotifyId) -> MetadataRef<T> {
-        let session = session.clone();
+    pub fn get<T: MetadataTrait>(&self, id: SpotifyId) -> BoxFuture<T, MercuryError> {
+        let session = self.session();
 
         let uri = format!("{}/{}", T::base_url(), id.to_base16());
         let request = session.mercury().get(uri);
 
-        let result = request.and_then(move |response| {
+        request.and_then(move |response| {
             let data = response.payload.first().expect("Empty payload");
             let msg: T::Message = protobuf::parse_from_bytes(data).unwrap();
 
             Ok(T::parse(&msg, &session))
-        }).wait();
-
-        Future::of(result.unwrap())
+        }).boxed()
     }
 }

@@ -1,12 +1,11 @@
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use futures::sync::{oneshot, mpsc};
-use futures::{BoxFuture, Future};
+use futures::{Async, Poll, BoxFuture, Future};
+use protobuf;
+use protocol;
 use std::collections::HashMap;
 use std::io::Read;
 use std::mem;
-use protocol;
-use protobuf;
-use futures::{Async, Poll};
 
 use util::SeqGenerator;
 

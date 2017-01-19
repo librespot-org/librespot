@@ -17,12 +17,12 @@ use audio_file::AudioFile;
 use authentication::Credentials;
 use cache::Cache;
 use connection::{self, adaptor};
-use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use stream::StreamManager;
-use util::{SpotifyId, FileId, ReadSeek, Lazy};
+use util::{FileId, ReadSeek, Lazy};
 
 use audio_key::AudioKeyManager;
 use mercury::MercuryManager;
+use metadata::MetadataManager;
 
 use stream;
 
@@ -63,13 +63,13 @@ pub struct SessionInternal {
     data: RwLock<SessionData>,
 
     cache: Box<Cache + Send + Sync>,
-    metadata: Mutex<MetadataManager>,
     stream: Mutex<StreamManager>,
     rx_connection: Mutex<adaptor::StreamAdaptor<(u8, Vec<u8>), io::Error>>,
     tx_connection: Mutex<adaptor::SinkAdaptor<(u8, Vec<u8>)>>,
 
     audio_key: Lazy<AudioKeyManager>,
     mercury: Lazy<MercuryManager>,
+    metadata: Lazy<MetadataManager>,
 }
 
 #[derive(Clone)]
@@ -130,11 +130,11 @@ impl Session {
             tx_connection: Mutex::new(tx),
 
             cache: cache,
-            metadata: Mutex::new(MetadataManager::new()),
             stream: Mutex::new(StreamManager::new()),
 
             audio_key: Lazy::new(),
             mercury: Lazy::new(),
+            metadata: Lazy::new(),
         }));
 
         (session, task)
@@ -146,6 +146,10 @@ impl Session {
 
     pub fn mercury(&self) -> &MercuryManager {
         self.0.mercury.get(|| MercuryManager::new(self.weak()))
+    }
+
+    pub fn metadata(&self) -> &MetadataManager {
+        self.0.metadata.get(|| MetadataManager::new(self.weak()))
     }
 
     pub fn poll(&self) {
@@ -225,10 +229,6 @@ impl Session {
 
     pub fn stream(&self, handler: Box<stream::Handler>) {
         self.0.stream.lock().unwrap().create(handler, self)
-    }
-
-    pub fn metadata<T: MetadataTrait>(&self, id: SpotifyId) -> MetadataRef<T> {
-        self.0.metadata.lock().unwrap().get(self, id)
     }
 
     pub fn cache(&self) -> &Cache {
