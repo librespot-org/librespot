@@ -1,167 +1,270 @@
 use bit_set::BitSet;
-use byteorder::{ByteOrder, BigEndian};
-use eventual;
+use byteorder::{ByteOrder, BigEndian, WriteBytesExt};
+use futures::Stream;
+use futures::sync::{oneshot, mpsc};
+use futures::{Poll, Async, Future};
 use std::cmp::min;
-use std::sync::{Arc, Condvar, Mutex};
-use std::sync::mpsc::{self, TryRecvError};
 use std::fs;
 use std::io::{self, Read, Write, Seek, SeekFrom};
+use std::sync::{Arc, Condvar, Mutex};
 use tempfile::NamedTempFile;
 
-use util::{FileId, IgnoreExt};
+use channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
 use session::Session;
-use audio_file2;
+use util::FileId;
 
 const CHUNK_SIZE: usize = 0x20000;
+
+component! {
+    AudioFileManager : AudioFileManagerInner { }
+}
 
 pub struct AudioFile {
     read_file: fs::File,
 
     position: u64,
-    seek: mpsc::Sender<u64>,
+    seek: mpsc::UnboundedSender<u64>,
 
     shared: Arc<AudioFileShared>,
 }
 
-struct AudioFileInternal {
-    partial_tx: Option<eventual::Complete<fs::File, ()>>,
-    complete_tx: eventual::Complete<NamedTempFile, ()>,
-    write_file: NamedTempFile,
-    seek_rx: mpsc::Receiver<u64>,
-    shared: Arc<AudioFileShared>,
-    chunk_count: usize,
+pub struct AudioFileOpen {
+    session: Session,
+    data_rx: Option<ChannelData>,
+    headers: ChannelHeaders,
+    file_id: FileId,
+    complete_tx: Option<oneshot::Sender<NamedTempFile>>,
 }
 
 struct AudioFileShared {
+    file_id: FileId,
+    chunk_count: usize,
     cond: Condvar,
     bitmap: Mutex<BitSet>,
 }
 
-impl AudioFile {
-    pub fn new(session: &Session, file_id: FileId)
-        -> (eventual::Future<AudioFile, ()>, eventual::Future<NamedTempFile, ()>) {
+impl AudioFileOpen {
+    fn finish(&mut self, size: usize) -> AudioFile {
+        let chunk_count = (size + CHUNK_SIZE - 1) / CHUNK_SIZE;
 
         let shared = Arc::new(AudioFileShared {
+            file_id: self.file_id,
+            chunk_count: chunk_count,
             cond: Condvar::new(),
-            bitmap: Mutex::new(BitSet::new()),
+            bitmap: Mutex::new(BitSet::with_capacity(chunk_count)),
         });
 
-        let (seek_tx, seek_rx) = mpsc::channel();
-        let (partial_tx, partial_rx) = eventual::Future::pair();
-        let (complete_tx, complete_rx) = eventual::Future::pair();
+        let mut write_file = NamedTempFile::new().unwrap();
+        write_file.set_len(size as u64).unwrap();
+        write_file.seek(SeekFrom::Start(0)).unwrap();
 
-        let internal = AudioFileInternal {
-            shared: shared.clone(),
-            write_file: NamedTempFile::new().unwrap(),
-            seek_rx: seek_rx,
-            partial_tx: Some(partial_tx),
-            complete_tx: complete_tx,
-            chunk_count: 0,
-        };
+        let read_file = write_file.reopen().unwrap();
 
-        audio_file2::AudioFile::new(file_id, 0, internal, session);
+        let data_rx = self.data_rx.take().unwrap();
+        let complete_tx = self.complete_tx.take().unwrap();
+        let (seek_tx, seek_rx) = mpsc::unbounded();
 
-        let file_rx = partial_rx.map(|read_file| {
-            AudioFile {
-                read_file: read_file,
+        let fetcher = AudioFileFetch::new(
+            self.session.clone(), shared.clone(), data_rx, write_file, seek_rx, complete_tx
+        );
+        self.session.spawn(move |_| fetcher);
 
-                position: 0,
-                seek: seek_tx,
+        AudioFile {
+            read_file: read_file,
 
-                shared: shared,
-            }
-        });
-        
-        (file_rx, complete_rx)
+            position: 0,
+            seek: seek_tx,
+
+            shared: shared,
+        }
     }
 }
 
-impl audio_file2::Handler for AudioFileInternal {
-    fn on_header(mut self, header_id: u8, header_data: &[u8], _session: &Session) -> audio_file2::Response<Self> {
-        if header_id == 0x3 {
-            if let Some(tx) = self.partial_tx.take() {
-                let size = BigEndian::read_u32(header_data) as usize * 4;
-                self.write_file.set_len(size as u64).unwrap();
-                let read_file = self.write_file.reopen().unwrap();
+impl Future for AudioFileOpen {
+    type Item = AudioFile;
+    type Error = ChannelError;
 
-                self.chunk_count = (size + CHUNK_SIZE - 1) / CHUNK_SIZE;
-                self.shared.bitmap.lock().unwrap().reserve_len(self.chunk_count);
+    fn poll(&mut self) -> Poll<AudioFile, ChannelError> {
+        loop {
+            let (id, data) = try_ready!(self.headers.poll()).unwrap();
 
-                tx.complete(read_file)
+            if id == 0x3 {
+                let size = BigEndian::read_u32(&data) as usize * 4;
+                let file = self.finish(size);
+                
+                return Ok(Async::Ready(file));
+            }
+        }
+    }
+}
+
+impl AudioFileManager {
+    pub fn open(&self, file_id: FileId) -> (AudioFileOpen, oneshot::Receiver<NamedTempFile>) {
+        let (complete_tx, complete_rx) = oneshot::channel();
+        let (headers, data) = request_chunk(&self.session(), file_id, 0).split();
+
+        let open = AudioFileOpen {
+            session: self.session(),
+            file_id: file_id,
+
+            headers: headers,
+            data_rx: Some(data),
+
+            complete_tx: Some(complete_tx),
+        };
+
+        (open, complete_rx)
+    }
+}
+
+fn request_chunk(session: &Session, file: FileId, index: usize) -> Channel {
+    debug!("requesting chunk {}", index);
+
+    let start = (index * CHUNK_SIZE / 4) as u32;
+    let end = ((index + 1) * CHUNK_SIZE / 4) as u32;
+
+    let (id, channel) = session.channel().allocate();
+
+    let mut data: Vec<u8> = Vec::new();
+    data.write_u16::<BigEndian>(id).unwrap();
+    data.write_u8(0).unwrap();
+    data.write_u8(1).unwrap();
+    data.write_u16::<BigEndian>(0x0000).unwrap();
+    data.write_u32::<BigEndian>(0x00000000).unwrap();
+    data.write_u32::<BigEndian>(0x00009C40).unwrap();
+    data.write_u32::<BigEndian>(0x00020000).unwrap();
+    data.write(&file.0).unwrap();
+    data.write_u32::<BigEndian>(start).unwrap();
+    data.write_u32::<BigEndian>(end).unwrap();
+
+    session.send_packet(0x8, data);
+
+    channel
+}
+
+struct AudioFileFetch {
+    session: Session,
+    shared: Arc<AudioFileShared>,
+    output: Option<NamedTempFile>,
+
+    index: usize,
+    data_rx: ChannelData,
+
+    seek_rx: mpsc::UnboundedReceiver<u64>,
+    complete_tx: Option<oneshot::Sender<NamedTempFile>>,
+}
+
+impl AudioFileFetch {
+    fn new(session: Session, shared: Arc<AudioFileShared>,
+           data_rx: ChannelData, output: NamedTempFile,
+           seek_rx: mpsc::UnboundedReceiver<u64>,
+           complete_tx: oneshot::Sender<NamedTempFile>) -> AudioFileFetch
+    {
+        AudioFileFetch {
+            session: session,
+            shared: shared,
+            output: Some(output),
+
+            index: 0,
+            data_rx: data_rx,
+
+            seek_rx: seek_rx,
+            complete_tx: Some(complete_tx),
+        }
+    }
+
+    fn download(&mut self, mut new_index: usize) {
+        assert!(new_index < self.shared.chunk_count);
+
+        {
+            let bitmap = self.shared.bitmap.lock().unwrap();
+            while bitmap.contains(new_index) {
+                new_index = (new_index + 1) % self.shared.chunk_count;
             }
         }
 
-        audio_file2::Response::Continue(self)
-    }
+        if self.index != new_index {
+            self.index = new_index;
 
-    fn on_data(mut self, offset: usize, data: &[u8], _session: &Session) -> audio_file2::Response<Self> {
-        self.write_file.seek(SeekFrom::Start(offset as u64)).unwrap();
-        self.write_file.write_all(&data).unwrap();
+            let offset = self.index * CHUNK_SIZE;
 
-        // We've crossed a chunk boundary
-        // Mark the previous one as complete in the bitmap and notify the reader
-        let seek = if (offset + data.len()) % CHUNK_SIZE < data.len() {
-            let mut index = offset / CHUNK_SIZE;
-            let mut bitmap = self.shared.bitmap.lock().unwrap();
-            bitmap.insert(index);
-            self.shared.cond.notify_all();
+            self.output.as_mut().unwrap()
+                .seek(SeekFrom::Start(offset as u64)).unwrap();
 
-            // If all blocks are complete when can stop
-            if bitmap.len() >= self.chunk_count {
-                drop(bitmap);
-                self.write_file.seek(SeekFrom::Start(0)).unwrap();
-                self.complete_tx.complete(self.write_file);
-                return audio_file2::Response::Close;
-            }
-
-            // Find the next undownloaded block
-            index = (index + 1) % self.chunk_count;
-            while bitmap.contains(index) {
-                index = (index + 1) % self.chunk_count;
-            }
-
-            Some(index)
-        } else {
-            None
-        };
-
-        match self.seek_rx.try_recv() {
-            Ok(seek_offset) => audio_file2::Response::Seek(self, seek_offset as usize / CHUNK_SIZE * CHUNK_SIZE),
-            Err(TryRecvError::Disconnected) => audio_file2::Response::Close,
-            Err(TryRecvError::Empty) => match seek {
-                Some(index) => audio_file2::Response::Seek(self, index * CHUNK_SIZE),
-                None => audio_file2::Response::Continue(self),
-            },
+            let (_headers, data) = request_chunk(&self.session, self.shared.file_id, self.index).split();
+            self.data_rx = data;
         }
     }
 
-    fn on_eof(mut self, _session: &Session) -> audio_file2::Response<Self> {
-        let index = {
-            let mut index = self.chunk_count - 1;
-            let mut bitmap = self.shared.bitmap.lock().unwrap();
-            bitmap.insert(index);
-            self.shared.cond.notify_all();
+    fn finish(&mut self) {
+        let mut output = self.output.take().unwrap();
+        let complete_tx = self.complete_tx.take().unwrap();
 
-            // If all blocks are complete when can stop
-            if bitmap.len() >= self.chunk_count {
-                drop(bitmap);
-                self.write_file.seek(SeekFrom::Start(0)).unwrap();
-                self.complete_tx.complete(self.write_file);
-                return audio_file2::Response::Close;
-            }
-
-            // Find the next undownloaded block
-            index = (index + 1) % self.chunk_count;
-            while bitmap.contains(index) {
-                index = (index + 1) % self.chunk_count;
-            }
-            index
-        };
-
-        audio_file2::Response::Seek(self, index * CHUNK_SIZE)
+        output.seek(SeekFrom::Start(0)).unwrap();
+        complete_tx.complete(output);
     }
+}
 
-    fn on_error(self, _session: &Session) {
+impl Future for AudioFileFetch {
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<(), ()> {
+        loop {
+            let mut progress = false;
+
+            match self.seek_rx.poll() {
+                Ok(Async::Ready(None)) => {
+                    return Ok(Async::Ready(()));
+                }
+                Ok(Async::Ready(Some(offset))) => {
+                    progress = true;
+                    let index = offset as usize / CHUNK_SIZE;
+                    self.download(index);
+                }
+                Ok(Async::NotReady) => (),
+                Err(()) => unreachable!(),
+            }
+
+            match self.data_rx.poll() {
+                Ok(Async::Ready(Some(data))) => {
+                    progress = true;
+
+                    self.output.as_mut().unwrap()
+                        .write_all(&data).unwrap();
+                }
+                 Ok(Async::Ready(None)) => {
+                    progress = true;
+
+                    debug!("chunk {} / {} complete", self.index, self.shared.chunk_count);
+
+                    let full = {
+                        let mut bitmap = self.shared.bitmap.lock().unwrap();
+                        bitmap.insert(self.index as usize);
+                        self.shared.cond.notify_all();
+
+                        bitmap.len() >= self.shared.chunk_count
+                    };
+
+                    if full {
+                        self.finish();
+                        return Ok(Async::Ready(()));
+                    }
+
+                    let new_index = (self.index + 1) % self.shared.chunk_count;
+                    self.download(new_index);
+                }
+                Ok(Async::NotReady) => (),
+                Err(ChannelError) => {
+                    warn!("error from channel");
+                    return Ok(Async::Ready(()));
+                },
+            }
+
+            if !progress {
+                return Ok(Async::NotReady);
+            }
+        }
     }
 }
 
@@ -192,7 +295,7 @@ impl Seek for AudioFile {
         // Notify the fetch thread to get the correct block
         // This can fail if fetch thread has completed, in which case the
         // block is ready. Just ignore the error.
-        self.seek.send(self.position).ignore();
-        Ok(self.position as u64)
+        let _ = self.seek.send(self.position);
+        Ok(self.position)
     }
 }

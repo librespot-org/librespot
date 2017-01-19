@@ -22,19 +22,6 @@ pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
 }
 
-pub trait IgnoreExt {
-    fn ignore(self);
-}
-
-impl<T, E> IgnoreExt for Result<T, E> {
-    fn ignore(self) {
-        match self {
-            Ok(_) => (),
-            Err(_) => (),
-        }
-    }
-}
-
 pub fn now_ms() -> i64 {
     let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(dur) => dur,
@@ -133,30 +120,5 @@ impl <T: Seq> SeqGenerator<T> {
     pub fn get(&mut self) -> T {
         let value = self.0.next();
         mem::replace(&mut self.0, value)
-    }
-}
-
-use std::sync::Mutex;
-use std::cell::UnsafeCell;
-
-pub struct Lazy<T>(Mutex<bool>, UnsafeCell<Option<T>>);
-unsafe impl <T: Sync> Sync for Lazy<T> {}
-unsafe impl <T: Send> Send for Lazy<T> {}
-
-impl <T> Lazy<T> {
-    pub fn new() -> Lazy<T> {
-        Lazy(Mutex::new(false), UnsafeCell::new(None))
-    }
-
-    pub fn get<F: FnOnce() -> T>(&self, f: F) -> &T {
-        let mut inner = self.0.lock().unwrap();
-        if !*inner {
-            unsafe {
-                *self.1.get() = Some(f());
-            }
-            *inner = true;
-        }
-
-        unsafe { &*self.1.get() }.as_ref().unwrap()
     }
 }

@@ -7,6 +7,7 @@ use serde_json;
 use tokio_core::reactor::Handle;
 
 error_chain! { }
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct APResolveData {
     ap_list: Vec<String>

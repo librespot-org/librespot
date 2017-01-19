@@ -25,7 +25,6 @@ bit-set         = "0.4.0"
 byteorder       = "1.0"
 ctrlc           = { version = "2.0", features = ["termination"] }
 env_logger      = "0.3.2"
-eventual        = "0.1.6"
 getopts         = "0.2.14"
 hyper           = { git = "https://github.com/hyperium/hyper" }
 lazy_static     = "0.2.0"

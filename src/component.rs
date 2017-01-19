@@ -27,3 +27,28 @@ macro_rules! component {
         }
     }
 }
+
+use std::sync::Mutex;
+use std::cell::UnsafeCell;
+
+pub struct Lazy<T>(Mutex<bool>, UnsafeCell<Option<T>>);
+unsafe impl <T: Sync> Sync for Lazy<T> {}
+unsafe impl <T: Send> Send for Lazy<T> {}
+
+impl <T> Lazy<T> {
+    pub fn new() -> Lazy<T> {
+        Lazy(Mutex::new(false), UnsafeCell::new(None))
+    }
+
+    pub fn get<F: FnOnce() -> T>(&self, f: F) -> &T {
+        let mut inner = self.0.lock().unwrap();
+        if !*inner {
+            unsafe {
+                *self.1.get() = Some(f());
+            }
+            *inner = true;
+        }
+
+        unsafe { &*self.1.get() }.as_ref().unwrap()
+    }
+}

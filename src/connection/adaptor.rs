@@ -6,14 +6,12 @@ use std::thread;
 use tokio_core::reactor::Core;
 use tokio_core::reactor::Handle;
 
-pub struct SinkAdaptor<T>(pub Option<mpsc::Sender<T>>);
-pub struct StreamAdaptor<T, E>(pub Option<mpsc::Receiver<Result<T, E>>>);
+pub struct SinkAdaptor<T>(mpsc::UnboundedSender<T>);
+pub struct StreamAdaptor<T, E>(Option<mpsc::Receiver<Result<T, E>>>);
 
 impl <T> SinkAdaptor<T> {
     pub fn send(&mut self, item: T) {
-        let sender = self.0.take().unwrap();
-        let sending = sender.send(item);
-        self.0 = Some(sending.wait().unwrap());
+        mpsc::UnboundedSender::send(&mut self.0, item).unwrap();
     }
 }
 
@@ -39,7 +37,7 @@ pub fn adapt<S, E>(transport: S) -> (SinkAdaptor<S::SinkItem>,
           E: Send + 'static,
 {
     let (receiver_tx, receiver_rx) = mpsc::channel(0);
-    let (sender_tx, sender_rx) = mpsc::channel(0);
+    let (sender_tx, sender_rx) = mpsc::unbounded();
 
     let (sink, stream) = transport.split();
 
@@ -55,7 +53,7 @@ pub fn adapt<S, E>(transport: S) -> (SinkAdaptor<S::SinkItem>,
     let task = (receiver_task, sender_task).into_future()
         .map(|((), ())| ()).boxed();
 
-    (SinkAdaptor(Some(sender_tx)),
+    (SinkAdaptor(sender_tx),
      StreamAdaptor(Some(receiver_rx)), task)
 }
 

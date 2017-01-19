@@ -16,7 +16,6 @@
 extern crate bit_set;
 extern crate byteorder;
 extern crate crypto;
-extern crate eventual;
 extern crate getopts;
 extern crate hyper;
 extern crate linear_map;
@@ -50,19 +49,18 @@ extern crate portaudio;
 extern crate libpulse_sys;
 
 #[macro_use] mod component;
-pub mod album_cover;
+
 pub mod audio_backend;
 pub mod audio_decrypt;
-pub mod audio_file2;
 pub mod audio_file;
 pub mod audio_key;
 pub mod cache;
+pub mod channel;
 pub mod diffie_hellman;
 pub mod mercury;
 pub mod metadata;
 pub mod player;
 pub mod session;
-pub mod stream;
 pub mod util;
 pub mod version;
 

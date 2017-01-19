@@ -1,30 +1,24 @@
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
-use eventual;
-use eventual::Future;
-use eventual::Async;
-use std::io::{self, Read, Cursor};
+use std::io;
 use std::result::Result;
 use std::sync::{Mutex, RwLock, Arc, Weak};
 use std::str::FromStr;
 use futures::Future as Future_;
-use futures::{Stream, BoxFuture};
-use tokio_core::reactor::Handle;
+use futures::{Stream, BoxFuture, IntoFuture};
+use tokio_core::reactor::{Handle, Remote};
 
-use album_cover::AlbumCover;
 use apresolve::apresolve_or_fallback;
-use audio_file::AudioFile;
 use authentication::Credentials;
 use cache::Cache;
+use component::Lazy;
 use connection::{self, adaptor};
-use stream::StreamManager;
-use util::{FileId, ReadSeek, Lazy};
 
 use audio_key::AudioKeyManager;
+use channel::ChannelManager;
 use mercury::MercuryManager;
 use metadata::MetadataManager;
-
-use stream;
+use audio_file::AudioFileManager;
 
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
@@ -63,13 +57,17 @@ pub struct SessionInternal {
     data: RwLock<SessionData>,
 
     cache: Box<Cache + Send + Sync>,
-    stream: Mutex<StreamManager>,
+
     rx_connection: Mutex<adaptor::StreamAdaptor<(u8, Vec<u8>), io::Error>>,
     tx_connection: Mutex<adaptor::SinkAdaptor<(u8, Vec<u8>)>>,
 
     audio_key: Lazy<AudioKeyManager>,
+    audio_file: Lazy<AudioFileManager>,
+    channel: Lazy<ChannelManager>,
     mercury: Lazy<MercuryManager>,
     metadata: Lazy<MetadataManager>,
+
+    handle: Remote,
 }
 
 #[derive(Clone)]
@@ -91,9 +89,10 @@ impl Session {
     {
         let access_point = apresolve_or_fallback::<io::Error>(&handle);
 
+        let handle_ = handle.clone();
         let connection = access_point.and_then(move |addr| {
             info!("Connecting to AP \"{}\"", addr);
-            connection::connect::<&str>(&addr, &handle)
+            connection::connect::<&str>(&addr, &handle_)
         });
 
         let device_id = config.device_id.clone();
@@ -105,15 +104,19 @@ impl Session {
             info!("Authenticated !");
             cache.put_credentials(&reusable_credentials);
 
-            let (session, task) = Session::create(transport, config, cache, reusable_credentials.username.clone());
+            let (session, task) = Session::create(
+                &handle, transport, config, cache, reusable_credentials.username.clone()
+            );
+
             (session, task)
         });
         
         Box::new(result)
     }
 
-    fn create(transport: connection::Transport, config: Config,
-              cache: Box<Cache + Send + Sync>, username: String)
+    fn create(handle: &Handle, transport: connection::Transport,
+              config: Config, cache: Box<Cache + Send + Sync>,
+              username: String)
         -> (Session, BoxFuture<(), io::Error>)
     {
         let transport = transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()));
@@ -130,11 +133,14 @@ impl Session {
             tx_connection: Mutex::new(tx),
 
             cache: cache,
-            stream: Mutex::new(StreamManager::new()),
 
             audio_key: Lazy::new(),
+            audio_file: Lazy::new(),
+            channel: Lazy::new(),
             mercury: Lazy::new(),
             metadata: Lazy::new(),
+
+            handle: handle.remote().clone(),
         }));
 
         (session, task)
@@ -142,6 +148,14 @@ impl Session {
 
     pub fn audio_key(&self) -> &AudioKeyManager {
         self.0.audio_key.get(|| AudioKeyManager::new(self.weak()))
+    }
+
+    pub fn audio_file(&self) -> &AudioFileManager {
+        self.0.audio_file.get(|| AudioFileManager::new(self.weak()))
+    }
+
+    pub fn channel(&self) -> &ChannelManager {
+        self.0.channel.get(|| ChannelManager::new(self.weak()))
     }
 
     pub fn mercury(&self) -> &MercuryManager {
@@ -152,17 +166,25 @@ impl Session {
         self.0.metadata.get(|| MetadataManager::new(self.weak()))
     }
 
+    pub fn spawn<F, R>(&self, f: F)
+        where F: FnOnce(&Handle) -> R + Send + 'static,
+              R: IntoFuture<Item=(), Error=()>,
+              R::Future: 'static
+    {
+        self.0.handle.spawn(f)
+    }
+
     pub fn poll(&self) {
         let (cmd, data) = self.recv();
 
         match cmd {
             0x4 => self.send_packet(0x49, data),
             0x4a => (),
-            0x9 | 0xa => self.0.stream.lock().unwrap().handle(cmd, data, self),
             0x1b => {
                 self.0.data.write().unwrap().country = String::from_utf8(data).unwrap();
             }
 
+            0x9 | 0xa => self.channel().dispatch(cmd, data),
             0xd | 0xe => self.audio_key().dispatch(cmd, data),
             0xb2...0xb6 => self.mercury().dispatch(cmd, data),
             _ => (),
@@ -175,60 +197,6 @@ impl Session {
 
     pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
         self.0.tx_connection.lock().unwrap().send((cmd, data))
-    }
-
-    /*
-    pub fn audio_key(&self, track: SpotifyId, file_id: FileId) -> Future<AudioKey, AudioKeyError> {
-        self.0.cache
-            .get_audio_key(track, file_id)
-            .map(Future::of)
-            .unwrap_or_else(|| {
-                let self_ = self.clone();
-                self.0.audio_key.lock().unwrap()
-                    .request(self, track, file_id)
-                    .map(move |key| {
-                        self_.0.cache.put_audio_key(track, file_id, key);
-                        key
-                    })
-            })
-    }
-    */
-
-    pub fn audio_file(&self, file_id: FileId) -> Box<ReadSeek> {
-        self.0.cache
-            .get_file(file_id)
-            .unwrap_or_else(|| {
-                let (audio_file, complete_rx) = AudioFile::new(self, file_id);
-
-                let self_ = self.clone();
-                complete_rx.map(move |mut complete_file| {
-                    self_.0.cache.put_file(file_id, &mut complete_file)
-                }).fire();
-
-                Box::new(audio_file.await().unwrap())
-            })
-    }
-
-    pub fn album_cover(&self, file_id: FileId) -> eventual::Future<Vec<u8>, ()> {
-        self.0.cache
-            .get_file(file_id)
-            .map(|mut f| {
-                let mut data = Vec::new();
-                f.read_to_end(&mut data).unwrap();
-                Future::of(data)
-            })
-            .unwrap_or_else(|| {
-                  let self_ = self.clone();
-                  AlbumCover::get(file_id, self)
-                      .map(move |data| {
-                          self_.0.cache.put_file(file_id, &mut Cursor::new(&data));
-                          data
-                      })
-              })
-    }
-
-    pub fn stream(&self, handler: Box<stream::Handler>) {
-        self.0.stream.lock().unwrap().create(handler, self)
     }
 
     pub fn cache(&self) -> &Cache {

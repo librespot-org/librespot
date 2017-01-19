@@ -5,11 +5,12 @@ use std::io::{Read, Seek};
 use vorbis;
 use futures::{future, Future};
 
+use audio_file::AudioFile;
 use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
 use metadata::{FileFormat, Track};
 use session::{Bitrate, Session};
-use util::{self, ReadSeek, SpotifyId, Subfile};
+use util::{self, SpotifyId, Subfile};
 pub use spirc::PlayStatus;
 
 #[cfg(not(feature = "with-tremor"))]
@@ -177,7 +178,9 @@ fn find_available_alternative<'a>(session: &Session, track: &'a Track) -> Option
     }
 }
 
-fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<Subfile<AudioDecrypt<Box<ReadSeek>>>>> {
+fn load_track(session: &Session, track_id: SpotifyId)
+    -> Option<vorbis::Decoder<Subfile<AudioDecrypt<AudioFile>>>>
+{
     let track = session.metadata().get::<Track>(track_id).wait().unwrap();
 
     info!("Loading track \"{}\"", track.name);
@@ -208,7 +211,10 @@ fn load_track(session: &Session, track_id: SpotifyId) -> Option<vorbis::Decoder<
 
     let key = session.audio_key().request(track.id, file_id).wait().unwrap();
 
-    let audio_file = Subfile::new(AudioDecrypt::new(key, session.audio_file(file_id)), 0xa7);
+    let (open, _) = session.audio_file().open(file_id);
+    let encrypted_file = open.wait().unwrap();
+
+    let audio_file = Subfile::new(AudioDecrypt::new(key, encrypted_file), 0xa7);
     let decoder = vorbis::Decoder::new(audio_file).unwrap();
 
     Some(decoder)
