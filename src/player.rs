@@ -355,7 +355,7 @@ impl PlayerInternal {
                 Some(PlayerCommand::Volume(vol)) => {
                     self.update(|state| {
                         state.volume = vol;
-                        true
+                        false
                     });
                 }
                 Some(PlayerCommand::Stop) => {
@@ -415,8 +415,9 @@ impl PlayerInternal {
         let mut guard = self.state.lock().unwrap();
         let update = f(&mut guard);
 
-        let observers = self.observers.lock().unwrap();
         if update {
+            let observers = self.observers.lock().unwrap();
+
             guard.update_time = util::now_ms();
             let state = guard.clone();
             drop(guard);

@@ -12,23 +12,19 @@ use util::{now_ms, SpotifyId, SeqGenerator};
 use version;
 
 use protocol;
-pub use protocol::spirc::{PlayStatus, MessageType, Frame};
+pub use protocol::spirc::PlayStatus;
+use protocol::spirc::{MessageType, Frame, DeviceState};
 
 pub struct SpircTask {
     player: Player,
 
     sequence: SeqGenerator<u32>,
 
-    name: String,
     ident: String,
-    device_type: u8,
-    can_play: bool,
+    device: DeviceState,
 
     repeat: bool,
     shuffle: bool,
-
-    is_active: bool,
-    became_active_at: i64,
 
     last_command_ident: String,
     last_command_msgid: u32,
@@ -53,6 +49,66 @@ pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
 }
 
+fn initial_device_state(name: String, volume: u16) -> DeviceState {
+    protobuf_init!(DeviceState::new(), {
+        sw_version: version::version_string(),
+        is_active: false,
+        can_play: true,
+        volume: volume as u32,
+        name: name,
+        error_code: 0,
+        became_active_at: 0,
+        capabilities => [
+            @{
+                typ: protocol::spirc::CapabilityType::kCanBePlayer,
+                intValue => [0]
+            },
+            @{
+                typ: protocol::spirc::CapabilityType::kDeviceType,
+                intValue => [5]
+            },
+            @{
+                typ: protocol::spirc::CapabilityType::kGaiaEqConnectId,
+                intValue => [1]
+            },
+            @{
+                typ: protocol::spirc::CapabilityType::kSupportsLogout,
+                intValue => [0]
+            },
+            @{
+                typ: protocol::spirc::CapabilityType::kIsObservable,
+                intValue => [1]
+            },
+            @{
+                typ: protocol::spirc::CapabilityType::kVolumeSteps,
+                intValue => [10]
+            },
+            @{
+                typ: protocol::spirc::CapabilityType::kSupportedContexts,
+                stringValue => [
+                    "album",
+                    "playlist",
+                    "search",
+                    "inbox",
+                    "toplist",
+                    "starred",
+                    "publishedstarred",
+                    "track",
+                ]
+            },
+            @{
+                typ: protocol::spirc::CapabilityType::kSupportedTypes,
+                stringValue => [
+                    "audio/local",
+                    "audio/track",
+                    "local",
+                    "track",
+                ]
+            }
+        ],
+    })
+}
+
 impl Spirc {
     pub fn new(session: Session, player: Player) -> (Spirc, SpircTask) {
         let ident = session.device_id().to_owned();
@@ -75,21 +131,20 @@ impl Spirc {
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
+        let volume = 0xFFFF;
+        let device = initial_device_state(name, volume);
+        player.volume(volume);
+
         let mut task = SpircTask {
             player: player,
 
             sequence: SeqGenerator::new(1),
 
-            name: name,
             ident: ident,
-            device_type: 5,
-            can_play: true,
+            device: device,
 
             repeat: false,
             shuffle: false,
-
-            is_active: false,
-            became_active_at: 0,
 
             last_command_ident: String::new(),
             last_command_msgid: 0,
@@ -217,9 +272,9 @@ impl SpircTask {
                 self.notify(false, Some(frame.get_ident()));
             }
             MessageType::kMessageTypeLoad => {
-                if !self.is_active {
-                    self.is_active = true;
-                    self.became_active_at = now_ms();
+                if !self.device.get_is_active() {
+                    self.device.set_is_active(true);
+                    self.device.set_became_active_at(now_ms());
                 }
 
                 self.reload_tracks(&frame);
@@ -255,13 +310,16 @@ impl SpircTask {
                 self.reload_tracks(&frame);
             }
             MessageType::kMessageTypeNotify => {
-                if self.is_active && frame.get_device_state().get_is_active() {
-                    self.is_active = false;
+                if self.device.get_is_active() && frame.get_device_state().get_is_active() {
+                    self.device.set_is_active(false);
                     self.player.stop();
                 }
             }
             MessageType::kMessageTypeVolume => {
-                self.player.volume(frame.get_volume() as u16);
+                let volume = frame.get_volume();
+                self.player.volume(volume as u16);
+                self.device.set_volume(volume);
+                self.notify(false, None);
             }
             MessageType::kMessageTypeGoodbye => (),
             _ => (),
@@ -332,66 +390,6 @@ impl SpircTask {
             last_command_msgid: self.last_command_msgid
         })
     }
-
-    fn device_state(&self, player_state: &PlayerState) -> protocol::spirc::DeviceState {
-        protobuf_init!(protocol::spirc::DeviceState::new(), {
-            sw_version: version::version_string(),
-            is_active: self.is_active,
-            can_play: self.can_play,
-            volume: player_state.volume() as u32,
-            name: self.name.clone(),
-            error_code: 0,
-            became_active_at: if self.is_active { self.became_active_at as i64 } else { 0 },
-            capabilities => [
-                @{
-                    typ: protocol::spirc::CapabilityType::kCanBePlayer,
-                    intValue => [0]
-                },
-                @{
-                    typ: protocol::spirc::CapabilityType::kDeviceType,
-                    intValue => [ self.device_type as i64 ]
-                },
-                @{
-                    typ: protocol::spirc::CapabilityType::kGaiaEqConnectId,
-                    intValue => [1]
-                },
-                @{
-                    typ: protocol::spirc::CapabilityType::kSupportsLogout,
-                    intValue => [0]
-                },
-                @{
-                    typ: protocol::spirc::CapabilityType::kIsObservable,
-                    intValue => [1]
-                },
-                @{
-                    typ: protocol::spirc::CapabilityType::kVolumeSteps,
-                    intValue => [10]
-                },
-                @{
-                    typ: protocol::spirc::CapabilityType::kSupportedContexts,
-                    stringValue => [
-                        "album",
-                        "playlist",
-                        "search",
-                        "inbox",
-                        "toplist",
-                        "starred",
-                        "publishedstarred",
-                        "track",
-                    ]
-                },
-                @{
-                    typ: protocol::spirc::CapabilityType::kSupportedTypes,
-                    stringValue => [
-                        "audio/local",
-                        "audio/track",
-                        "local",
-                        "track",
-                    ]
-                }
-            ],
-        })
-    }
 }
 
 struct CommandSender<'a> {
@@ -445,11 +443,11 @@ impl<'a> CommandSender<'a> {
             recipient: RepeatedField::from_vec(
                 self.recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
                 ),
-            device_state: self.spirc.device_state(&state),
+            device_state: self.spirc.device.clone(),
             state_update_id: state.update_time()
         });
 
-        if self.spirc.is_active {
+        if self.spirc.device.get_is_active() {
             frame.set_state(self.spirc.spirc_state(&state));
         }
 
