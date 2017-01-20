@@ -1,6 +1,5 @@
 mod codec;
 mod handshake;
-pub mod adaptor;
 
 pub use self::codec::APCodec;
 pub use self::handshake::handshake;

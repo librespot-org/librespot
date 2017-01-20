@@ -94,11 +94,9 @@ impl MercuryManager {
         })
     }
 
-    /*
     pub fn sender<T: Into<String>>(&self, uri: T) -> MercurySender {
         MercurySender::new(self.clone(), uri.into())
     }
-    */
 
     pub fn subscribe<T: Into<String>>(&self, uri: T)
         -> BoxFuture<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError>

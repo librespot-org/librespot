@@ -172,7 +172,6 @@ fn main() {
         });
 
         thread::spawn(move || spirc.run());
-        thread::spawn(move || loop { session.poll() });
 
         task
     });

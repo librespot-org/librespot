@@ -18,7 +18,6 @@ use tokio_core::reactor::Handle;
 use std::net::SocketAddr;
 
 use authentication::Credentials;
-use connection::adaptor::adapt_future;
 use util;
 
 #[derive(Clone)]
@@ -207,6 +206,8 @@ impl NewService for Discovery {
     }
 }
 
+use tokio_core::reactor::Core;
+
 pub fn discovery_login<A,B>(device_name: A, device_id: B) -> Result<Credentials, ()>
     where A: Into<String>,
           B: Into<String>
@@ -214,25 +215,25 @@ pub fn discovery_login<A,B>(device_name: A, device_id: B) -> Result<Credentials,
     let device_name = device_name.into();
     let device_id = device_id.into();
 
-    let (discovery, rx) = Discovery::new(device_name.clone(), device_id);
+    let (discovery, creds_rx) = Discovery::new(device_name.clone(), device_id);
+
+    let creds_rx = creds_rx.into_future()
+        .map(move |(creds, _)| creds.unwrap()).map_err(|(e, _)| e);
 
     let addr = "0.0.0.0:0".parse().unwrap();
-    let cred = adapt_future(move |handle| {
-        let addr = discovery.serve(&addr, &handle).unwrap();
 
-        let responder = mdns::Responder::spawn(&handle).unwrap();
-        let svc = responder.register(
-            "_spotify-connect._tcp".to_owned(),
-            device_name,
-            addr.port(),
-            &["VERSION=1.0", "CPath=/"]);
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+    let listening_addr = discovery.serve(&addr, &handle).unwrap();
 
-        rx.into_future()
-            .map(move |(creds, _)| (creds, svc))
-            .map_err(|(e, _)| e)
-    });
+    let responder = mdns::Responder::spawn(&handle).unwrap();
+    let _svc = responder.register(
+        "_spotify-connect._tcp".to_owned(),
+        device_name,
+        listening_addr.port(),
+        &["VERSION=1.0", "CPath=/"]);
 
+    let creds = core.run(creds_rx).unwrap();
 
-    let (creds, _svc) = cred.wait().unwrap().unwrap();
-    Ok(creds.unwrap())
+    Ok(creds)
 }

@@ -1,18 +1,19 @@
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
+use futures::Future;
+use futures::sync::mpsc;
+use futures::{Stream, BoxFuture, IntoFuture};
 use std::io;
 use std::result::Result;
-use std::sync::{Mutex, RwLock, Arc, Weak};
 use std::str::FromStr;
-use futures::Future as Future_;
-use futures::{Stream, BoxFuture, IntoFuture};
+use std::sync::{RwLock, Arc, Weak};
 use tokio_core::reactor::{Handle, Remote};
 
 use apresolve::apresolve_or_fallback;
 use authentication::Credentials;
 use cache::Cache;
 use component::Lazy;
-use connection::{self, adaptor};
+use connection;
 
 use audio_key::AudioKeyManager;
 use channel::ChannelManager;
@@ -58,8 +59,7 @@ pub struct SessionInternal {
 
     cache: Box<Cache + Send + Sync>,
 
-    rx_connection: Mutex<adaptor::StreamAdaptor<(u8, Vec<u8>), io::Error>>,
-    tx_connection: Mutex<adaptor::SinkAdaptor<(u8, Vec<u8>)>>,
+    tx_connection: mpsc::UnboundedSender<(u8, Vec<u8>)>,
 
     audio_key: Lazy<AudioKeyManager>,
     audio_file: Lazy<AudioFileManager>,
@@ -85,7 +85,7 @@ pub fn device_id(name: &str) -> String {
 impl Session {
     pub fn connect(config: Config, credentials: Credentials,
                    cache: Box<Cache + Send + Sync>, handle: Handle)
-        -> Box<Future_<Item=(Session, BoxFuture<(), io::Error>), Error=io::Error>>
+        -> Box<Future<Item=(Session, BoxFuture<(), io::Error>), Error=io::Error>>
     {
         let access_point = apresolve_or_fallback::<io::Error>(&handle);
 
@@ -120,7 +120,13 @@ impl Session {
         -> (Session, BoxFuture<(), io::Error>)
     {
         let transport = transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()));
-        let (tx, rx, task) = adaptor::adapt(transport);
+        let (sink, stream) = transport.split();
+
+        let (sender_tx, sender_rx) = mpsc::unbounded();
+
+        let sender_task = sender_rx
+            .map_err(|e| -> io::Error { panic!(e) })
+            .forward(sink).map(|_| ());
 
         let session = Session(Arc::new(SessionInternal {
             config: config,
@@ -129,8 +135,7 @@ impl Session {
                 canonical_username: username,
             }),
 
-            rx_connection: Mutex::new(rx),
-            tx_connection: Mutex::new(tx),
+            tx_connection: sender_tx,
 
             cache: cache,
 
@@ -142,6 +147,17 @@ impl Session {
 
             handle: handle.remote().clone(),
         }));
+
+        let receiver_task = {
+            let session = session.clone();
+            stream.for_each(move |(cmd, data)| {
+                session.dispatch(cmd, data);
+                Ok(())
+            })
+        };
+
+        let task = (receiver_task, sender_task).into_future()
+            .map(|((), ())| ()).boxed();
 
         (session, task)
     }
@@ -174,9 +190,7 @@ impl Session {
         self.0.handle.spawn(f)
     }
 
-    pub fn poll(&self) {
-        let (cmd, data) = self.recv();
-
+    fn dispatch(&self, cmd: u8, data: Vec<u8>) {
         match cmd {
             0x4 => self.send_packet(0x49, data),
             0x4a => (),
@@ -191,12 +205,8 @@ impl Session {
         }
     }
 
-    pub fn recv(&self) -> (u8, Vec<u8>) {
-        self.0.rx_connection.lock().unwrap().recv().unwrap()
-    }
-
     pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
-        self.0.tx_connection.lock().unwrap().send((cmd, data))
+        self.0.tx_connection.send((cmd, data)).unwrap();
     }
 
     pub fn cache(&self) -> &Cache {
@@ -228,8 +238,4 @@ impl SessionWeak {
     pub fn upgrade(&self) -> Session {
         Session(self.0.upgrade().expect("Session died"))
     }
-}
-
-pub trait PacketHandler {
-    fn handle(&mut self, cmd: u8, data: Vec<u8>, session: &Session);
 }
