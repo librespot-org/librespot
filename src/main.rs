@@ -9,14 +9,13 @@ extern crate tokio_core;
 use env_logger::LogBuilder;
 use std::io::{stderr, Write};
 use std::process::exit;
-use std::thread;
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
 use futures::Future;
 use tokio_core::reactor::Core;
 
-use librespot::spirc::SpircManager;
+use librespot::spirc::Spirc;
 use librespot::authentication::{get_credentials, Credentials};
 use librespot::audio_backend::{self, Sink, BACKENDS};
 use librespot::cache::{Cache, DefaultCache, NoCache};
@@ -158,22 +157,19 @@ fn main() {
 
     let connection = Session::connect(config, credentials, cache, handle);
 
-    let task = connection.and_then(move |(session, task)| {
+    let task = connection.and_then(move |session| {
         let player = Player::new(session.clone(), move || {
             (backend)(device)
         });
 
-        let spirc = SpircManager::new(session.clone(), player);
-        let spirc_signal = spirc.clone();
+        let (spirc, task) = Spirc::new(session.clone(), player);
+        let spirc = ::std::cell::RefCell::new(spirc);
 
         ctrlc::set_handler(move || {
-            spirc_signal.send_goodbye();
-            exit(0);
+            spirc.borrow_mut().shutdown();
         });
 
-        thread::spawn(move || spirc.run());
-
-        task
+        task.map_err(|()| panic!("spirc error"))
     });
 
     core.run(task).unwrap()

@@ -1,26 +1,23 @@
 use protobuf::{self, Message, RepeatedField};
 use std::borrow::Cow;
-use std::sync::{Mutex, Arc};
-use std::collections::HashMap;
+use futures::{Future, Stream, Sink, Async, Poll};
+use futures::stream::BoxStream;
+use futures::sink::BoxSink;
+use futures::sync::mpsc;
 
+use mercury::MercuryError;
 use player::{Player, PlayerState};
 use session::Session;
-use util;
-use util::SpotifyId;
+use util::{now_ms, SpotifyId, SeqGenerator};
 use version;
-use futures::{Future, Stream};
 
 use protocol;
-pub use protocol::spirc::{PlayStatus, MessageType};
+pub use protocol::spirc::{PlayStatus, MessageType, Frame};
 
-#[derive(Clone)]
-pub struct SpircManager(Arc<Mutex<SpircInternal>>);
-
-struct SpircInternal {
+pub struct SpircTask {
     player: Player,
-    session: Session,
 
-    seq_nr: u32,
+    sequence: SeqGenerator<u32>,
 
     name: String,
     ident: String,
@@ -39,19 +36,49 @@ struct SpircInternal {
     tracks: Vec<SpotifyId>,
     index: u32,
 
-    devices: HashMap<String, String>,
+    subscription: BoxStream<Frame, MercuryError>,
+    sender: BoxSink<Frame, MercuryError>,
+
+    updates: mpsc::UnboundedReceiver<PlayerState>,
+    commands: mpsc::UnboundedReceiver<SpircCommand>,
+
+    shutdown: bool,
 }
 
-impl SpircManager {
-    pub fn new(session: Session, player: Player) -> SpircManager {
+pub enum SpircCommand {
+    Shutdown
+}
+
+pub struct Spirc {
+    commands: mpsc::UnboundedSender<SpircCommand>,
+}
+
+impl Spirc {
+    pub fn new(session: Session, player: Player) -> (Spirc, SpircTask) {
         let ident = session.device_id().to_owned();
         let name = session.config().name.clone();
 
-        SpircManager(Arc::new(Mutex::new(SpircInternal {
-            player: player,
-            session: session,
+        let uri = format!("hm://remote/user/{}", session.username());
 
-            seq_nr: 0,
+        let subscription = session.mercury().subscribe(&uri as &str);
+        let subscription = subscription.map(|stream| stream.map_err(|_| MercuryError)).flatten_stream();
+        let subscription = subscription.map(|response| -> Frame {
+            let data = response.payload.first().unwrap();
+            protobuf::parse_from_bytes(data).unwrap()
+        }).boxed();
+
+        let sender = Box::new(session.mercury().sender(uri).with(|frame: Frame| {
+            Ok(frame.write_to_bytes().unwrap())
+        }));
+
+        let updates = player.observe();
+
+        let (cmd_tx, cmd_rx) = mpsc::unbounded();
+
+        let mut task = SpircTask {
+            player: player,
+
+            sequence: SeqGenerator::new(1),
 
             name: name,
             ident: ident,
@@ -70,125 +97,111 @@ impl SpircManager {
             tracks: Vec::new(),
             index: 0,
 
-            devices: HashMap::new(),
-        })))
-    }
+            subscription: subscription,
+            sender: sender,
+            updates: updates,
+            commands: cmd_rx,
 
-    pub fn run(&self) {
-        let rx = {
-            let mut internal = self.0.lock().unwrap();
-
-            let rx = internal.session.mercury().subscribe(internal.uri());
-            let rx = rx.map_err(|_| ()).flatten_stream().wait();
-
-            internal.notify(true, None);
-
-            // Use a weak pointer to avoid creating an Rc cycle between the player and the
-            // SpircManager
-            let _self = Arc::downgrade(&self.0);
-            internal.player.add_observer(Box::new(move |state| {
-                if let Some(_self) = _self.upgrade() {
-                    let mut internal = _self.lock().unwrap();
-                    internal.on_update(state);
-                }
-            }));
-
-            rx
+            shutdown: false,
         };
 
-        for pkt in rx {
-            let data = pkt.as_ref().unwrap().payload.first().unwrap();
-            let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(data).unwrap();
+        let spirc = Spirc {
+            commands: cmd_tx,
+        };
 
-            debug!("{:?} {:?} {} {} {}",
-                     frame.get_typ(),
-                     frame.get_device_state().get_name(),
-                     frame.get_ident(),
-                     frame.get_seq_nr(),
-                     frame.get_state_update_id());
+        task.notify(true, None);
 
-            self.0.lock().unwrap().handle(frame);
-        }
+        (spirc, task)
     }
 
-    pub fn devices(&self) -> HashMap<String, String> {
-        self.0.lock().unwrap().devices.clone()
-    }
-
-    pub fn send_play(&self, recipient: &str) {
-        let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal, MessageType::kMessageTypePlay)
-            .recipient(recipient)
-            .send();
-    }
-
-    pub fn send_pause(&self, recipient: &str) {
-        let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal, MessageType::kMessageTypePause)
-            .recipient(recipient)
-            .send();
-    }
-
-    pub fn send_prev(&self, recipient: &str) {
-        let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal, MessageType::kMessageTypePrev)
-            .recipient(recipient)
-            .send();
-    }
-
-    pub fn send_next(&self, recipient: &str) {
-        let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal, MessageType::kMessageTypeNext)
-            .recipient(recipient)
-            .send();
-    }
-
-    pub fn send_replace_tracks<I: Iterator<Item = SpotifyId>>(&mut self,
-                                                              recipient: &str,
-                                                              track_ids: I) {
-        let state = track_ids_to_state(track_ids);
-        let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal, MessageType::kMessageTypeReplace)
-            .recipient(recipient)
-            .state(state)
-            .send();
-    }
-
-    pub fn send_load_tracks<I: Iterator<Item = SpotifyId>>(&mut self,
-                                                           recipient: &str,
-                                                           track_ids: I) {
-        let state = track_ids_to_state(track_ids);
-        let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal, MessageType::kMessageTypeLoad)
-            .recipient(recipient)
-            .state(state)
-            .send();
-    }
-
-    pub fn send_goodbye(&self) {
-        let mut internal = self.0.lock().unwrap();
-        CommandSender::new(&mut *internal, MessageType::kMessageTypeGoodbye)
-            .send();
-    }
-
-    pub fn get_queue(&self) -> Vec<SpotifyId> {
-        self.0.lock().unwrap().tracks.clone()
+    pub fn shutdown(&mut self) {
+        mpsc::UnboundedSender::send(&mut self.commands, SpircCommand::Shutdown).unwrap();
     }
 }
 
-impl SpircInternal {
-    fn on_update(&mut self, player_state: &PlayerState) {
+impl Future for SpircTask {
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<(), ()> {
+        loop {
+            let mut progress = false;
+
+            if !self.shutdown {
+                match self.subscription.poll().unwrap() {
+                    Async::Ready(Some(frame)) => {
+                        progress = true;
+                        self.handle_frame(frame);
+                    }
+                    Async::Ready(None) => panic!("subscription terminated"),
+                    Async::NotReady => (),
+                }
+
+                match self.updates.poll().unwrap() {
+                    Async::Ready(Some(state)) => {
+                        progress = true;
+                        self.handle_update(state);
+                    }
+                    Async::Ready(None) => panic!("player terminated"),
+                    Async::NotReady => (),
+                }
+
+                match self.commands.poll().unwrap() {
+                    Async::Ready(Some(command)) => {
+                        progress = true;
+                        self.handle_command(command);
+                    }
+                    Async::Ready(None) => (),
+                    Async::NotReady => (),
+                }
+            }
+
+            let poll_sender = self.sender.poll_complete().unwrap();
+
+            // Only shutdown once we've flushed out all our messages
+            if self.shutdown && poll_sender.is_ready() {
+                return Ok(Async::Ready(()));
+            }
+
+            if !progress {
+
+                return Ok(Async::NotReady);
+            }
+        }
+    }
+}
+
+impl SpircTask {
+    fn handle_update(&mut self, player_state: PlayerState) {
         let end_of_track = player_state.end_of_track();
         if end_of_track {
             self.index = (self.index + 1) % self.tracks.len() as u32;
             let track = self.tracks[self.index as usize];
             self.player.load(track, true, 0);
         } else {
-            self.notify_with_player_state(false, None, player_state);
+            self.notify_with_player_state(false, None, &player_state);
         }
     }
 
-    fn handle(&mut self, frame: protocol::spirc::Frame) {
+    fn handle_command(&mut self, cmd: SpircCommand) {
+        match cmd {
+            SpircCommand::Shutdown => {
+                CommandSender::new(self, MessageType::kMessageTypeGoodbye).send();
+                self.shutdown = true;
+                self.commands.close();
+                self.updates.close();
+            }
+        }
+    }
+
+    fn handle_frame(&mut self, frame: Frame) {
+        debug!("{:?} {:?} {} {} {}",
+               frame.get_typ(),
+               frame.get_device_state().get_name(),
+               frame.get_ident(),
+               frame.get_seq_nr(),
+               frame.get_state_update_id());
+
         if frame.get_ident() == self.ident ||
            (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident)) {
             return;
@@ -199,11 +212,6 @@ impl SpircInternal {
             self.last_command_msgid = frame.get_seq_nr();
         }
 
-        if frame.has_ident() && !frame.has_goodbye() && frame.has_device_state() {
-            self.devices.insert(frame.get_ident().into(),
-                                frame.get_device_state().get_name().into());
-        }
-
         match frame.get_typ() {
             MessageType::kMessageTypeHello => {
                 self.notify(false, Some(frame.get_ident()));
@@ -211,7 +219,7 @@ impl SpircInternal {
             MessageType::kMessageTypeLoad => {
                 if !self.is_active {
                     self.is_active = true;
-                    self.became_active_at = util::now_ms();
+                    self.became_active_at = now_ms();
                 }
 
                 self.reload_tracks(&frame);
@@ -255,11 +263,7 @@ impl SpircInternal {
             MessageType::kMessageTypeVolume => {
                 self.player.volume(frame.get_volume() as u16);
             }
-            MessageType::kMessageTypeGoodbye => {
-                if frame.has_ident() {
-                    self.devices.remove(frame.get_ident());
-                }
-            }
+            MessageType::kMessageTypeGoodbye => (),
             _ => (),
         }
     }
@@ -388,14 +392,10 @@ impl SpircInternal {
             ],
         })
     }
-
-    fn uri(&self) -> String {
-        format!("hm://remote/user/{}", self.session.username())
-    }
 }
 
 struct CommandSender<'a> {
-    spirc_internal: &'a mut SpircInternal,
+    spirc: &'a mut SpircTask,
     cmd: MessageType,
     recipient: Option<&'a str>,
     player_state: Option<&'a PlayerState>,
@@ -403,9 +403,9 @@ struct CommandSender<'a> {
 }
 
 impl<'a> CommandSender<'a> {
-    fn new(spirc_internal: &'a mut SpircInternal, cmd: MessageType) -> CommandSender {
+    fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender {
         CommandSender {
-            spirc_internal: spirc_internal,
+            spirc: spirc,
             cmd: cmd,
             recipient: None,
             player_state: None,
@@ -423,6 +423,7 @@ impl<'a> CommandSender<'a> {
         self
     }
 
+    #[allow(dead_code)]
     fn state(mut self, s: protocol::spirc::State) -> CommandSender<'a> {
         self.state = Some(s);
         self
@@ -430,35 +431,34 @@ impl<'a> CommandSender<'a> {
 
     fn send(self) {
         let state = self.player_state.map_or_else(|| {
-            Cow::Owned(self.spirc_internal.player.state())
+            Cow::Owned(self.spirc.player.state())
         }, |s| {
             Cow::Borrowed(s)
         });
 
-        let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
+        let mut frame = protobuf_init!(Frame::new(), {
             version: 1,
-            ident: self.spirc_internal.ident.clone(),
+            ident: self.spirc.ident.clone(),
             protocol_version: "2.0.0",
-            seq_nr: { self.spirc_internal.seq_nr += 1; self.spirc_internal.seq_nr  },
+            seq_nr: self.spirc.sequence.get(),
             typ: self.cmd,
             recipient: RepeatedField::from_vec(
                 self.recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
                 ),
-            device_state: self.spirc_internal.device_state(&state),
+            device_state: self.spirc.device_state(&state),
             state_update_id: state.update_time()
         });
 
-        if self.spirc_internal.is_active {
-            pkt.set_state(self.spirc_internal.spirc_state(&state));
+        if self.spirc.is_active {
+            frame.set_state(self.spirc.spirc_state(&state));
         }
 
-        let payload = pkt.write_to_bytes().unwrap();
-        let uri = self.spirc_internal.uri();
-        self.spirc_internal.session.mercury()
-            .send(uri, payload).wait().unwrap();
+        let ready = self.spirc.sender.start_send(frame).unwrap().is_ready();
+        assert!(ready);
     }
 }
 
+#[allow(dead_code)]
 fn track_ids_to_state<I: Iterator<Item = SpotifyId>>(track_ids: I) -> protocol::spirc::State {
     let tracks: Vec<protocol::spirc::TrackRef> =
         track_ids.map(|i| {

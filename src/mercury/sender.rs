@@ -20,6 +20,16 @@ impl MercurySender {
     }
 }
 
+impl Clone for MercurySender {
+    fn clone(&self) -> MercurySender {
+        MercurySender {
+            mercury: self.mercury.clone(),
+            uri: self.uri.clone(),
+            pending: VecDeque::new(),
+        }
+    }
+}
+
 impl Sink for MercurySender {
     type SinkItem = Vec<u8>;
     type SinkError = MercuryError;

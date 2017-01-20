@@ -1,9 +1,11 @@
-use std::borrow::Cow;
-use std::sync::{mpsc, Mutex, Arc, MutexGuard};
-use std::thread;
-use std::io::{Read, Seek};
-use vorbis;
 use futures::{future, Future};
+use futures::sync::mpsc;
+use std;
+use std::borrow::Cow;
+use std::io::{Read, Seek};
+use std::sync::{Mutex, Arc, MutexGuard};
+use std::thread;
+use vorbis;
 
 use audio_file::AudioFile;
 use audio_decrypt::AudioDecrypt;
@@ -33,14 +35,12 @@ fn vorbis_time_tell_ms<R>(decoder: &mut vorbis::Decoder<R>) -> Result<i64, vorbi
     decoder.time_tell()
 }
 
-pub type PlayerObserver = Box<Fn(&PlayerState) + Send>;
-
 #[derive(Clone)]
 pub struct Player {
     state: Arc<Mutex<PlayerState>>,
-    observers: Arc<Mutex<Vec<PlayerObserver>>>,
+    observers: Arc<Mutex<Vec<mpsc::UnboundedSender<PlayerState>>>>,
 
-    commands: mpsc::Sender<PlayerCommand>,
+    commands: std::sync::mpsc::Sender<PlayerCommand>,
 }
 
 #[derive(Clone)]
@@ -57,10 +57,10 @@ pub struct PlayerState {
 
 struct PlayerInternal {
     state: Arc<Mutex<PlayerState>>,
-    observers: Arc<Mutex<Vec<PlayerObserver>>>,
+    observers: Arc<Mutex<Vec<mpsc::UnboundedSender<PlayerState>>>>,
 
     session: Session,
-    commands: mpsc::Receiver<PlayerCommand>,
+    commands: std::sync::mpsc::Receiver<PlayerCommand>,
 }
 
 #[derive(Debug)]
@@ -77,7 +77,7 @@ enum PlayerCommand {
 impl Player {
     pub fn new<F>(session: Session, sink_builder: F) -> Player
         where F: FnOnce() -> Box<Sink> + Send + 'static {
-        let (cmd_tx, cmd_rx) = mpsc::channel();
+        let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
 
         let state = Arc::new(Mutex::new(PlayerState {
             status: PlayStatus::kPlayStatusStop,
@@ -143,8 +143,11 @@ impl Player {
         self.command(PlayerCommand::Volume(vol));
     }
 
-    pub fn add_observer(&self, observer: PlayerObserver) {
-        self.observers.lock().unwrap().push(observer);
+    pub fn observe(&self) -> mpsc::UnboundedReceiver<PlayerState> {
+        let (tx, rx) = mpsc::unbounded();
+        self.observers.lock().unwrap().push(tx);
+
+        rx
     }
 }
 
@@ -419,7 +422,7 @@ impl PlayerInternal {
             drop(guard);
 
             for observer in observers.iter() {
-                observer(&state);
+                observer.send(state.clone()).unwrap();
             }
         }
     }

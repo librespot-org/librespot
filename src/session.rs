@@ -85,7 +85,7 @@ pub fn device_id(name: &str) -> String {
 impl Session {
     pub fn connect(config: Config, credentials: Credentials,
                    cache: Box<Cache + Send + Sync>, handle: Handle)
-        -> Box<Future<Item=(Session, BoxFuture<(), io::Error>), Error=io::Error>>
+        -> Box<Future<Item=Session, Error=io::Error>>
     {
         let access_point = apresolve_or_fallback::<io::Error>(&handle);
 
@@ -108,7 +108,9 @@ impl Session {
                 &handle, transport, config, cache, reusable_credentials.username.clone()
             );
 
-            (session, task)
+            handle.spawn(task.map_err(|e| panic!(e)));
+
+            session
         });
         
         Box::new(result)
