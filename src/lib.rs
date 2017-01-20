@@ -50,6 +50,7 @@ extern crate libpulse_sys;
 
 #[macro_use] mod component;
 
+pub mod album_cover;
 pub mod audio_backend;
 pub mod audio_decrypt;
 pub mod audio_file;
