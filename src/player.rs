@@ -7,6 +7,7 @@ use vorbis;
 
 use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
+use mixer::Mixer;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
 use util::{self, ReadSeek, SpotifyId, Subfile};
@@ -74,8 +75,9 @@ enum PlayerCommand {
 }
 
 impl Player {
-    pub fn new<F>(session: Session, sink_builder: F) -> Player
-        where F: FnOnce() -> Box<Sink> + Send + 'static {
+    pub fn new<F, M>(session: Session, mixer: Box<M>, sink_builder: F) -> Player
+        where F: FnOnce() -> Box<Sink> + Send + 'static,
+              M: Mixer + Send + 'static {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
         let state = Arc::new(Mutex::new(PlayerState {
@@ -83,7 +85,7 @@ impl Player {
             position_ms: 0,
             position_measured_at: 0,
             update_time: util::now_ms(),
-            volume: 0xFFFF,
+            volume: mixer.volume(),
             track: None,
             end_of_track: false,
         }));
@@ -97,7 +99,7 @@ impl Player {
             observers: observers.clone(),
         };
 
-        thread::spawn(move || internal.run(sink_builder()));
+        thread::spawn(move || internal.run(sink_builder(), mixer));
 
         Player {
             commands: cmd_tx,
@@ -144,21 +146,6 @@ impl Player {
 
     pub fn add_observer(&self, observer: PlayerObserver) {
         self.observers.lock().unwrap().push(observer);
-    }
-}
-
-fn apply_volume(volume: u16, data: &[i16]) -> Cow<[i16]> {
-    // Fast path when volume is 100%
-    if volume == 0xFFFF {
-        Cow::Borrowed(data)
-    } else {
-        Cow::Owned(data.iter()
-                       .map(|&x| {
-                           (x as i32
-                            * volume as i32
-                            / 0xFFFF) as i16
-                       })
-                       .collect())
     }
 }
 
@@ -229,7 +216,7 @@ fn run_onstop(session: &Session) {
 }
 
 impl PlayerInternal {
-    fn run(self, mut sink: Box<Sink>) {
+    fn run(self, mut sink: Box<Sink>, mut mixer: Box<Mixer>) {
         let mut decoder = None;
 
         loop {
@@ -344,8 +331,9 @@ impl PlayerInternal {
                     run_onstop(&self.session);
                 }
                 Some(PlayerCommand::Volume(vol)) => {
+                    mixer.set(vol);
                     self.update(|state| {
-                        state.volume = vol;
+                        state.volume = mixer.volume();
                         true
                     });
                 }
@@ -371,8 +359,7 @@ impl PlayerInternal {
 
                 match packet {
                     Some(Ok(packet)) => {
-                        let buffer = apply_volume(self.state.lock().unwrap().volume,
-                                                  &packet.data);
+                        let buffer = mixer.apply_volume(&packet.data);
                         sink.write(&buffer).unwrap();
 
                         self.update(|state| {

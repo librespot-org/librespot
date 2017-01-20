@@ -18,6 +18,7 @@ use librespot::audio_backend::{self, BACKENDS};
 use librespot::cache::{Cache, DefaultCache, NoCache};
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
+use librespot::mixer::softmixer::SoftMixer;
 use librespot::version;
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
@@ -120,8 +121,10 @@ fn setup(args: &[String]) -> (Session, Player) {
     matches.opt_str("password"));
     session.login(credentials).unwrap();
 
+    let mixer = SoftMixer::new();
+
     let device_name = matches.opt_str("device");
-    let player = Player::new(session.clone(), move || {
+    let player = Player::new(session.clone(), Box::new(mixer), move || {
         (backend)(device_name.as_ref().map(AsRef::as_ref))
     });
 
