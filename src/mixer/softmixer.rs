@@ -1,43 +1,53 @@
 use super::Mixer;
+use super::StreamEditor;
 use std::borrow::Cow;
+use std::sync::{Arc, RwLock};
 
 pub struct SoftMixer {
-    volume: u16,
+  volume: Arc<RwLock<u16>>
 }
 
 impl SoftMixer {
     pub fn new() -> SoftMixer {
         SoftMixer {
-            volume: 0xFFFF
+            volume: Arc::new(RwLock::new(0xFFFF))
         }
     }
 }
 
 impl Mixer for SoftMixer {
-    fn init(&mut self) {
+    fn init(&self) {
     }
-    
-    fn inuse(&mut self) {
+    fn start(&self) {
     }
-
-    fn release(&mut self) {
+    fn stop(&self) {
     }
-
-    fn set_volume(&mut self, volume: u16) {
-        self.volume = volume;
-    }
-
     fn volume(&self) -> u16 {
-        self.volume
+        *self.volume.read().unwrap()
     }
-    fn apply_volume<'a>(&mut self, data: &'a [i16]) -> Cow<'a, [i16]> {
-        if self.volume == 0xFFFF {
+    fn set_volume(&self, volume: u16) {
+        *self.volume.write().unwrap() = volume;
+    }
+    fn get_stream_editor(&self) -> Option<Box<StreamEditor>> {
+        let vol = self.volume.clone();
+        Some(Box::new(SoftVolumeApplier { get_volume: Box::new(move || *vol.read().unwrap() ) }))
+    }
+}
+
+struct SoftVolumeApplier {
+  get_volume: Box<Fn() -> u16>
+}
+
+impl StreamEditor for SoftVolumeApplier {
+    fn modify_stream<'a>(&self, data: &'a [i16]) -> Cow<'a, [i16]> {
+        let volume = (self.get_volume)();
+        if volume == 0xFFFF {
             Cow::Borrowed(data)
         } else {
             Cow::Owned(data.iter()
                         .map(|&x| {
                             (x as i32
-                                * self.volume as i32
+                                * volume as i32
                                 / 0xFFFF) as i16
                         })
                         .collect())
