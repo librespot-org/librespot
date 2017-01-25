@@ -8,7 +8,7 @@ pub trait Mixer {
     fn stop(&self);
     fn set_volume(&self, volume: u16);
     fn volume(&self) -> u16;
-    fn get_stream_editor(&self) -> Option<Box<StreamEditor>>
+    fn get_stream_editor(&self) -> Option<Box<StreamEditor + Send>>
     {
         None
     }

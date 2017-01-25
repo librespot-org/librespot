@@ -129,7 +129,7 @@ fn setup(args: &[String]) -> (Session, Player, Box<Mixer + Send>) {
     let mixer = mixer::find(&mixer_name).unwrap();
 
     let device_name = matches.opt_str("device");
-    let player = Player::new(session.clone(), move || {
+    let player = Player::new(session.clone(), mixer.get_stream_editor(), move || {
         (backend)(device_name.as_ref().map(AsRef::as_ref))
     });
 

@@ -9,6 +9,7 @@ use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
+use mixer::StreamEditor;
 use util::{self, ReadSeek, SpotifyId, Subfile};
 pub use spirc::PlayStatus;
 
@@ -71,7 +72,7 @@ enum PlayerCommand {
 }
 
 impl Player {
-    pub fn new<F>(session: Session, sink_builder: F) -> Player
+    pub fn new<F>(session: Session, stream_editor: Option<Box<StreamEditor + Send>>, sink_builder: F) -> Player
         where F: FnOnce() -> Box<Sink> + Send + 'static {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
@@ -92,7 +93,7 @@ impl Player {
             observers: observers.clone(),
         };
 
-        thread::spawn(move || internal.run(sink_builder()));
+        thread::spawn(move || internal.run(sink_builder(), stream_editor));
 
         Player {
             commands: cmd_tx,
@@ -136,6 +137,10 @@ impl Player {
     pub fn add_observer(&self, observer: PlayerObserver) {
         self.observers.lock().unwrap().push(observer);
     }
+}
+
+fn borrow_data<'a>(data: &'a [i16]) -> Cow<'a, [i16]> {
+    Cow::Borrowed(&data)
 }
 
 fn find_available_alternative<'a>(session: &Session, track: &'a Track) -> Option<Cow<'a, Track>> {
@@ -205,7 +210,7 @@ fn run_onstop(session: &Session) {
 }
 
 impl PlayerInternal {
-    fn run(self, mut sink: Box<Sink>) {
+    fn run(self, mut sink: Box<Sink>, stream_editor: Option<Box<StreamEditor + Send>>) {
         let mut decoder = None;
 
         loop {
@@ -340,8 +345,11 @@ impl PlayerInternal {
 
                 match packet {
                     Some(Ok(packet)) => {
-                        //let buffer = mixer.apply_volume(&packet.data);
-                        let buffer = Cow::Borrowed(&packet.data);
+                        let buffer = if let Some(ref editor) = stream_editor {
+                            editor.modify_stream(&packet.data)
+                        } else {
+                            borrow_data(&packet.data)
+                        };
                         sink.write(&buffer).unwrap();
 
                         self.update(|state| {

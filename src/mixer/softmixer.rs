@@ -28,14 +28,14 @@ impl Mixer for SoftMixer {
     fn set_volume(&self, volume: u16) {
         *self.volume.write().unwrap() = volume;
     }
-    fn get_stream_editor(&self) -> Option<Box<StreamEditor>> {
+    fn get_stream_editor(&self) -> Option<Box<StreamEditor + Send>> {
         let vol = self.volume.clone();
         Some(Box::new(SoftVolumeApplier { get_volume: Box::new(move || *vol.read().unwrap() ) }))
     }
 }
 
 struct SoftVolumeApplier {
-  get_volume: Box<Fn() -> u16>
+  get_volume: Box<Fn() -> u16 + Send>
 }
 
 impl StreamEditor for SoftVolumeApplier {
