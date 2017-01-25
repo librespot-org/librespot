@@ -18,8 +18,7 @@ use librespot::audio_backend::{self, BACKENDS};
 use librespot::cache::{Cache, DefaultCache, NoCache};
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
-use librespot::mixer::softmixer::SoftMixer;
-use librespot::mixer::Mixer;
+use librespot::mixer::{self, Mixer};
 
 use librespot::version;
 
@@ -73,7 +72,8 @@ fn setup(args: &[String]) -> (Session, Player, Box<Mixer + Send>) {
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
-        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE");
+        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
+        .optopt("", "mixer", "Mixer to use", "MIXER");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -123,14 +123,17 @@ fn setup(args: &[String]) -> (Session, Player, Box<Mixer + Send>) {
     matches.opt_str("password"));
     session.login(credentials).unwrap();
 
-    let mixer = SoftMixer::new();
+     
+    let mixer_name = matches.opt_str("mixer").unwrap_or("SoftMixer".to_owned());
+
+    let mixer = mixer::find(&mixer_name).unwrap();
 
     let device_name = matches.opt_str("device");
     let player = Player::new(session.clone(), move || {
         (backend)(device_name.as_ref().map(AsRef::as_ref))
     });
 
-    (session, player, Box::new(mixer))
+    (session, player, mixer)
 }
 
 fn main() {

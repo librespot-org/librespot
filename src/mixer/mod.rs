@@ -17,3 +17,10 @@ pub trait Mixer {
 pub trait StreamEditor {
   fn modify_stream<'a>(&self, data: &'a [i16]) -> Cow<'a, [i16]>;
 }
+
+pub fn find(s: &str) -> Option<Box<Mixer + Send>> {
+  match s {
+    "SoftMixer" => Some(Box::new(softmixer::SoftMixer::new())),
+    _ => None,
+  }
+}
