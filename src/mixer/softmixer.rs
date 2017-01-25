@@ -23,7 +23,7 @@ impl Mixer for SoftMixer {
     fn release(&mut self) {
     }
 
-    fn set(&mut self, volume: u16) {
+    fn set_volume(&mut self, volume: u16) {
         self.volume = volume;
     }
 

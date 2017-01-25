@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use mercury::{MercuryRequest, MercuryMethod};
 use player::{Player, PlayerState};
+use mixer::Mixer;
 use session::Session;
 use util;
 use util::SpotifyId;
@@ -20,6 +21,7 @@ pub struct SpircManager(Arc<Mutex<SpircInternal>>);
 struct SpircInternal {
     player: Player,
     session: Session,
+    mixer: Box<Mixer + Send>,
 
     seq_nr: u32,
 
@@ -43,14 +45,26 @@ struct SpircInternal {
     devices: HashMap<String, String>,
 }
 
+#[derive(Clone)]
+pub struct State {
+    pub status: PlayStatus,
+    pub position_ms: u32,
+    pub position_measured_at: i64,
+    pub update_time: i64,
+    pub volume: u16,
+    pub track: Option<SpotifyId>,
+    pub end_of_track: bool,
+}
+
 impl SpircManager {
-    pub fn new(session: Session, player: Player) -> SpircManager {
+    pub fn new(session: Session, player: Player, mixer: Box<Mixer + Send>) -> SpircManager {
         let ident = session.device_id().to_owned();
         let name = session.config().device_name.clone();
 
         SpircManager(Arc::new(Mutex::new(SpircInternal {
             player: player,
             session: session,
+            mixer: mixer,
 
             seq_nr: 0,
 
@@ -184,7 +198,7 @@ impl SpircInternal {
             let track = self.tracks[self.index as usize];
             self.player.load(track, true, 0);
         } else {
-            self.notify_with_player_state(false, None, player_state);
+            self.notify(false, None);
         }
     }
 
@@ -253,7 +267,7 @@ impl SpircInternal {
                 }
             }
             MessageType::kMessageTypeVolume => {
-                self.player.volume(frame.get_volume() as u16);
+                self.mixer.set_volume(frame.get_volume() as u16);
             }
             MessageType::kMessageTypeGoodbye => {
                 if frame.has_ident() {
@@ -287,30 +301,11 @@ impl SpircInternal {
         cs.send();
     }
 
-    fn notify_with_player_state(&mut self,
-                                hello: bool,
-                                recipient: Option<&str>,
-                                player_state: &PlayerState) {
-        let mut cs = CommandSender::new(self,
-                                        if hello {
-                                            MessageType::kMessageTypeHello
-                                        } else {
-                                            MessageType::kMessageTypeNotify
-                                        })
-                         .player_state(player_state);
-        if let Some(s) = recipient {
-            cs = cs.recipient(&s);
-        }
-        cs.send();
-    }
-
-    fn spirc_state(&self, player_state: &PlayerState) -> protocol::spirc::State {
-        let (position_ms, position_measured_at) = player_state.position();
-
+    fn spirc_state(&self, state: &State) -> protocol::spirc::State {
         protobuf_init!(protocol::spirc::State::new(), {
-            status: player_state.status(),
-            position_ms: position_ms,
-            position_measured_at: position_measured_at as u64,
+            status: state.status,
+            position_ms: state.position_ms,
+            position_measured_at: state.position_measured_at as u64,
 
             playing_track_index: self.index,
             track: self.tracks.iter().map(|track| {
@@ -329,12 +324,12 @@ impl SpircInternal {
         })
     }
 
-    fn device_state(&self, player_state: &PlayerState) -> protocol::spirc::DeviceState {
+    fn device_state(&self, state: &State) -> protocol::spirc::DeviceState {
         protobuf_init!(protocol::spirc::DeviceState::new(), {
             sw_version: version::version_string(),
             is_active: self.is_active,
             can_play: self.can_play,
-            volume: player_state.volume() as u32,
+            volume: state.volume as u32,
             name: self.name.clone(),
             error_code: 0,
             became_active_at: if self.is_active { self.became_active_at as i64 } else { 0 },
@@ -398,7 +393,6 @@ struct CommandSender<'a> {
     spirc_internal: &'a mut SpircInternal,
     cmd: MessageType,
     recipient: Option<&'a str>,
-    player_state: Option<&'a PlayerState>,
     state: Option<protocol::spirc::State>,
 }
 
@@ -408,7 +402,6 @@ impl<'a> CommandSender<'a> {
             spirc_internal: spirc_internal,
             cmd: cmd,
             recipient: None,
-            player_state: None,
             state: None,
         }
     }
@@ -418,21 +411,21 @@ impl<'a> CommandSender<'a> {
         self
     }
 
-    fn player_state(mut self, s: &'a PlayerState) -> CommandSender {
-        self.player_state = Some(s);
-        self
-    }
-
     fn state(mut self, s: protocol::spirc::State) -> CommandSender<'a> {
         self.state = Some(s);
         self
     }
 
     fn send(self) {
-        let state = self.player_state.map_or_else(|| {
-            Cow::Owned(self.spirc_internal.player.state())
-        }, |s| {
-            Cow::Borrowed(s)
+        //TODO: get data
+        let state = Cow::Owned(State {
+            status: PlayStatus::kPlayStatusStop,
+            position_ms: 0,
+            position_measured_at: 0,
+            update_time: util::now_ms(),
+            volume: 0,
+            track: None,
+            end_of_track: false,
         });
 
         let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
@@ -445,7 +438,7 @@ impl<'a> CommandSender<'a> {
                 self.recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
                 ),
             device_state: self.spirc_internal.device_state(&state),
-            state_update_id: state.update_time()
+            state_update_id: state.update_time
         });
 
         if self.spirc_internal.is_active {

@@ -7,7 +7,6 @@ use vorbis;
 
 use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
-use mixer::Mixer;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
 use util::{self, ReadSeek, SpotifyId, Subfile};
@@ -48,8 +47,6 @@ pub struct PlayerState {
     pub status: PlayStatus,
     pub position_ms: u32,
     pub position_measured_at: i64,
-    pub update_time: i64,
-    pub volume: u16,
     pub track: Option<SpotifyId>,
 
     pub end_of_track: bool,
@@ -68,24 +65,20 @@ enum PlayerCommand {
     Load(SpotifyId, bool, u32),
     Play,
     Pause,
-    Volume(u16),
     Stop,
     Seek(u32),
     SeekAt(u32, i64),
 }
 
 impl Player {
-    pub fn new<F, M>(session: Session, mixer: Box<M>, sink_builder: F) -> Player
-        where F: FnOnce() -> Box<Sink> + Send + 'static,
-              M: Mixer + Send + 'static {
+    pub fn new<F>(session: Session, sink_builder: F) -> Player
+        where F: FnOnce() -> Box<Sink> + Send + 'static {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
         let state = Arc::new(Mutex::new(PlayerState {
             status: PlayStatus::kPlayStatusStop,
             position_ms: 0,
             position_measured_at: 0,
-            update_time: util::now_ms(),
-            volume: mixer.volume(),
             track: None,
             end_of_track: false,
         }));
@@ -99,7 +92,7 @@ impl Player {
             observers: observers.clone(),
         };
 
-        thread::spawn(move || internal.run(sink_builder(), mixer));
+        thread::spawn(move || internal.run(sink_builder()));
 
         Player {
             commands: cmd_tx,
@@ -138,10 +131,6 @@ impl Player {
 
     pub fn state(&self) -> PlayerState {
         self.state.lock().unwrap().clone()
-    }
-
-    pub fn volume(&self, vol: u16) {
-        self.command(PlayerCommand::Volume(vol));
     }
 
     pub fn add_observer(&self, observer: PlayerObserver) {
@@ -216,7 +205,7 @@ fn run_onstop(session: &Session) {
 }
 
 impl PlayerInternal {
-    fn run(self, mut sink: Box<Sink>, mut mixer: Box<Mixer>) {
+    fn run(self, mut sink: Box<Sink>) {
         let mut decoder = None;
 
         loop {
@@ -321,7 +310,6 @@ impl PlayerInternal {
                 Some(PlayerCommand::Pause) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPause;
-                        state.update_time = util::now_ms();
                         state.position_ms = decoder.as_mut().map(|d| vorbis_time_tell_ms(d).unwrap()).unwrap_or(0) as u32;
                         state.position_measured_at = util::now_ms();
                         true
@@ -329,13 +317,6 @@ impl PlayerInternal {
 
                     sink.stop().unwrap();
                     run_onstop(&self.session);
-                }
-                Some(PlayerCommand::Volume(vol)) => {
-                    mixer.set(vol);
-                    self.update(|state| {
-                        state.volume = mixer.volume();
-                        true
-                    });
                 }
                 Some(PlayerCommand::Stop) => {
                     self.update(|state| {
@@ -359,7 +340,8 @@ impl PlayerInternal {
 
                 match packet {
                     Some(Ok(packet)) => {
-                        let buffer = mixer.apply_volume(&packet.data);
+                        //let buffer = mixer.apply_volume(&packet.data);
+                        let buffer = Cow::Borrowed(&packet.data);
                         sink.write(&buffer).unwrap();
 
                         self.update(|state| {
@@ -395,7 +377,6 @@ impl PlayerInternal {
 
         let observers = self.observers.lock().unwrap();
         if update {
-            guard.update_time = util::now_ms();
             let state = guard.clone();
             drop(guard);
 
@@ -413,14 +394,6 @@ impl PlayerState {
 
     pub fn position(&self) -> (u32, i64) {
         (self.position_ms, self.position_measured_at)
-    }
-
-    pub fn volume(&self) -> u16 {
-        self.volume
-    }
-
-    pub fn update_time(&self) -> i64 {
-        self.update_time
     }
 
     pub fn end_of_track(&self) -> bool {

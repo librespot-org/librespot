@@ -19,6 +19,8 @@ use librespot::cache::{Cache, DefaultCache, NoCache};
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
 use librespot::mixer::softmixer::SoftMixer;
+use librespot::mixer::Mixer;
+
 use librespot::version;
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
@@ -60,7 +62,7 @@ fn list_backends() {
     }
 }
 
-fn setup(args: &[String]) -> (Session, Player) {
+fn setup(args: &[String]) -> (Session, Player, Box<Mixer + Send>) {
     let mut opts = getopts::Options::new();
     opts.optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .reqopt("n", "name", "Device name", "NAME")
@@ -124,18 +126,18 @@ fn setup(args: &[String]) -> (Session, Player) {
     let mixer = SoftMixer::new();
 
     let device_name = matches.opt_str("device");
-    let player = Player::new(session.clone(), Box::new(mixer), move || {
+    let player = Player::new(session.clone(), move || {
         (backend)(device_name.as_ref().map(AsRef::as_ref))
     });
 
-    (session, player)
+    (session, player, Box::new(mixer))
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let (session, player) = setup(&args);
+    let (session, player, mixer) = setup(&args);
 
-    let spirc = SpircManager::new(session.clone(), player);
+    let spirc = SpircManager::new(session.clone(), player, mixer);
     let spirc_signal = spirc.clone();
     thread::spawn(move || spirc.run());
 
