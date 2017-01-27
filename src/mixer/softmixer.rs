@@ -1,5 +1,5 @@
 use super::Mixer;
-use super::StreamEditor;
+use super::AudioFilter;
 use std::borrow::Cow;
 use std::sync::{Arc, RwLock};
 
@@ -28,9 +28,10 @@ impl Mixer for SoftMixer {
     fn set_volume(&self, volume: u16) {
         *self.volume.write().unwrap() = volume;
     }
-    fn get_stream_editor(&self) -> Option<Box<StreamEditor + Send>> {
+    fn get_audio_filter(&self) -> Option<Box<AudioFilter + Send>> {
         let vol = self.volume.clone();
-        Some(Box::new(SoftVolumeApplier { get_volume: Box::new(move || *vol.read().unwrap() ) }))
+        let get_volume = Box::new(move || *vol.read().unwrap());
+        Some(Box::new(SoftVolumeApplier { get_volume: get_volume }))
     }
 }
 
@@ -38,7 +39,7 @@ struct SoftVolumeApplier {
   get_volume: Box<Fn() -> u16 + Send>
 }
 
-impl StreamEditor for SoftVolumeApplier {
+impl AudioFilter for SoftVolumeApplier {
     fn modify_stream<'a>(&self, data: &'a [i16]) -> Cow<'a, [i16]> {
         let volume = (self.get_volume)();
         if volume == 0xFFFF {

@@ -9,7 +9,7 @@ use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
-use mixer::StreamEditor;
+use mixer::AudioFilter;
 use util::{self, ReadSeek, SpotifyId, Subfile};
 pub use spirc::PlayStatus;
 
@@ -72,7 +72,7 @@ enum PlayerCommand {
 }
 
 impl Player {
-    pub fn new<F>(session: Session, stream_editor: Option<Box<StreamEditor + Send>>, sink_builder: F) -> Player
+    pub fn new<F>(session: Session, stream_editor: Option<Box<AudioFilter + Send>>, sink_builder: F) -> Player
         where F: FnOnce() -> Box<Sink> + Send + 'static {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
@@ -210,7 +210,7 @@ fn run_onstop(session: &Session) {
 }
 
 impl PlayerInternal {
-    fn run(self, mut sink: Box<Sink>, stream_editor: Option<Box<StreamEditor + Send>>) {
+    fn run(self, mut sink: Box<Sink>, stream_editor: Option<Box<AudioFilter + Send>>) {
         let mut decoder = None;
 
         loop {

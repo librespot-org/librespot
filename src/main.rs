@@ -122,14 +122,13 @@ fn setup(args: &[String]) -> (Session, Player, Box<Mixer + Send>) {
     let credentials = get_credentials(&session, matches.opt_str("username"),
     matches.opt_str("password"));
     session.login(credentials).unwrap();
-
-     
-    let mixer_name = matches.opt_str("mixer").unwrap_or("SoftMixer".to_owned());
-
-    let mixer = mixer::find(&mixer_name).unwrap();
+ 
+    let mixer_name = matches.opt_str("mixer");
+    let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
+    let audio_filter = mixer.get_audio_filter();
 
     let device_name = matches.opt_str("device");
-    let player = Player::new(session.clone(), mixer.get_stream_editor(), move || {
+    let player = Player::new(session.clone(), audio_filter, move || {
         (backend)(device_name.as_ref().map(AsRef::as_ref))
     });
 
