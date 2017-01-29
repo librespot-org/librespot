@@ -1,4 +1,6 @@
-use num::{BigUint, Integer, Zero, One};
+use num_bigint::BigUint;
+use num_traits::{Zero, One};
+use num_integer::Integer;
 use rand::{Rng, Rand};
 use std::io;
 use std::mem;

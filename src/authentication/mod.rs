@@ -143,30 +143,30 @@ impl Credentials {
     }
 }
 
-fn serialize_protobuf_enum<T, S>(v: &T, ser: &mut S) -> Result<(), S::Error>
+fn serialize_protobuf_enum<T, S>(v: &T, ser: S) -> Result<S::Ok, S::Error>
     where T: ProtobufEnum, S: serde::Serializer {
 
     serde::Serialize::serialize(&v.value(), ser)
 }
 
-fn deserialize_protobuf_enum<T, D>(de: &mut D) -> Result<T, D::Error>
+fn deserialize_protobuf_enum<T, D>(de: D) -> Result<T, D::Error>
     where T: ProtobufEnum, D: serde::Deserializer {
 
     let v : i32 = try!(serde::Deserialize::deserialize(de));
-    T::from_i32(v).ok_or(serde::Error::invalid_value("Invalid enum value"))
+    T::from_i32(v).ok_or(serde::de::Error::custom("Invalid enum value"))
 }
 
-fn serialize_base64<T, S>(v: &T, ser: &mut S) -> Result<(), S::Error>
+fn serialize_base64<T, S>(v: &T, ser: S) -> Result<S::Ok, S::Error>
     where T: AsRef<[u8]>, S: serde::Serializer {
 
     serde::Serialize::serialize(&v.as_ref().to_base64(base64::STANDARD), ser)
 }
 
-fn deserialize_base64<D>(de: &mut D) -> Result<Vec<u8>, D::Error>
+fn deserialize_base64<D>(de: D) -> Result<Vec<u8>, D::Error>
     where D: serde::Deserializer {
 
     let v : String = try!(serde::Deserialize::deserialize(de));
-    v.from_base64().map_err(|e| serde::Error::custom(e.to_string()))
+    v.from_base64().map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
 mod discovery;

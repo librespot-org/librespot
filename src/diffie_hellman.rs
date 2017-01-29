@@ -1,4 +1,5 @@
-use num::{BigUint, FromPrimitive};
+use num_bigint::BigUint;
+use num_traits::FromPrimitive;
 use rand::Rng;
 
 use util;

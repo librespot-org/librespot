@@ -2,20 +2,21 @@ use crypto::digest::Digest;
 use crypto::mac::Mac;
 use crypto;
 use diffie_hellman::{DH_GENERATOR, DH_PRIME};
-use futures::{Future, Stream, BoxFuture};
 use futures::sync::mpsc;
+use futures::{Future, Stream, BoxFuture};
+use hyper::server::{Service, NewService, Request, Response, Http};
 use hyper::{self, Get, Post, StatusCode};
-use hyper::server::{Server, Service, NewService, Request, Response};
 use mdns;
-use num::BigUint;
+use num_bigint::BigUint;
 use rand;
 use rustc_serialize::base64::{self, ToBase64, FromBase64};
-use std::io;
 use std::collections::BTreeMap;
-use std::sync::Arc;
-use url;
-use tokio_core::reactor::Handle;
+use std::io;
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio_core::net::TcpListener;
+use tokio_core::reactor::Handle;
+use url;
 
 use authentication::Credentials;
 use util;
@@ -54,8 +55,21 @@ impl Discovery {
     pub fn serve(&self, addr: &SocketAddr, handle: &Handle)
         -> hyper::Result<SocketAddr>
     {
-        let server = Server::http(&addr, handle)?;
-        server.handle(self.clone(), handle)
+        let listener = TcpListener::bind(addr, handle)?;
+        let addr = listener.local_addr()?;
+
+        let http = Http::new();
+        let svc = self.clone();
+        let handle_ = handle.clone();
+
+        let task = listener.incoming().for_each(move |(socket, addr)| {
+            http.bind_connection(&handle_, socket, addr, svc.clone());
+            Ok(())
+        });
+
+        handle.spawn(task.map_err(|e| panic!(e)));
+
+        Ok(addr)
     }
 }
 

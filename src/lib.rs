@@ -2,16 +2,15 @@
 
 #![cfg_attr(not(feature = "with-syntex"), feature(plugin, custom_derive))]
 #![cfg_attr(not(feature = "with-syntex"), plugin(protobuf_macros))]
-#![cfg_attr(not(feature = "with-syntex"), plugin(json_macros))]
-#![cfg_attr(not(feature = "with-syntex"), plugin(serde_macros))]
-
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
 
 #[macro_use] extern crate error_chain;
 #[macro_use] extern crate futures;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
+#[macro_use] extern crate serde_json;
+
+#[cfg(not(feature = "with-syntex"))]
+#[macro_use] extern crate serde_derive;
 
 extern crate bit_set;
 extern crate byteorder;
@@ -21,13 +20,14 @@ extern crate hyper;
 extern crate linear_map;
 extern crate lmdb_rs;
 extern crate mdns;
-extern crate num;
+extern crate num_bigint;
+extern crate num_integer;
+extern crate num_traits;
 extern crate protobuf;
 extern crate rand;
 extern crate rpassword;
 extern crate rustc_serialize;
 extern crate serde;
-extern crate serde_json;
 extern crate shannon;
 extern crate tempfile;
 extern crate tokio_core;

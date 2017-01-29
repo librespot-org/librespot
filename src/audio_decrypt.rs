@@ -1,6 +1,7 @@
 use crypto::aes;
 use crypto::symmetriccipher::SynchronousStreamCipher;
-use num::{BigUint, FromPrimitive};
+use num_bigint::BigUint;
+use num_traits::FromPrimitive;
 use std::io;
 use std::ops::Add;
 
