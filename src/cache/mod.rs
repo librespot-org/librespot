@@ -1,27 +1,57 @@
-use util::{SpotifyId, FileId, ReadSeek};
-use audio_key::AudioKey;
-use authentication::Credentials;
+use std::path::PathBuf;
 use std::io::Read;
+use std::fs::File;
 
-pub trait Cache {
-    fn get_audio_key(&self, _track: SpotifyId, _file: FileId) -> Option<AudioKey> {
-        None
-    }
-    fn put_audio_key(&self, _track: SpotifyId, _file: FileId, _audio_key: AudioKey) { }
+use util::{FileId, mkdir_existing};
+use authentication::Credentials;
 
-    fn get_credentials(&self) -> Option<Credentials> {
-        None
-    }
-    fn put_credentials(&self, _cred: &Credentials) { }
-
-    fn get_file(&self, _file: FileId) -> Option<Box<ReadSeek>> {
-        None
-    }
-    fn put_file(&self, _file: FileId, _contents: &mut Read) { }
+pub struct Cache {
+    root: PathBuf,
 }
 
-pub struct NoCache;
-impl Cache for NoCache { }
+impl Cache {
+    pub fn new(location: PathBuf) -> Cache {
+        mkdir_existing(&location).unwrap();
+        mkdir_existing(&location.join("files")).unwrap();
 
-mod default_cache;
-pub use self::default_cache::DefaultCache;
+        Cache {
+            root: location
+        }
+    }
+}
+
+impl Cache {
+    fn credentials_path(&self) -> PathBuf {
+        self.root.join("credentials.json")
+    }
+
+    pub fn credentials(&self) -> Option<Credentials> {
+        let path = self.credentials_path();
+        Credentials::from_file(path)
+    }
+
+    pub fn save_credentials(&self, cred: &Credentials) {
+        let path = self.credentials_path();
+        cred.save_to_file(&path);
+    }
+}
+
+impl Cache {
+    fn file_path(&self, file: FileId) -> PathBuf {
+        let name = file.to_base16();
+        self.root.join("files").join(&name[0..2]).join(&name[2..])
+    }
+
+    pub fn file(&self, file: FileId) -> Option<File> {
+        File::open(self.file_path(file)).ok()
+    }
+
+    pub fn save_file(&self, file: FileId, contents: &mut Read) {
+        let path = self.file_path(file);
+
+        mkdir_existing(path.parent().unwrap()).unwrap();
+
+        let mut cache_file = File::create(path).unwrap();
+        ::std::io::copy(contents, &mut cache_file).unwrap();
+    }
+}

@@ -15,7 +15,6 @@ dependencies = [
  "libpulse-sys 0.0.0 (git+https://github.com/astro/libpulse-sys)",
  "librespot-protocol 0.1.0",
  "linear-map 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "lmdb-rs 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mdns 0.2.0 (git+https://github.com/plietar/rust-mdns)",
  "num-bigint 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -295,15 +294,6 @@ version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "liblmdb-sys"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "gcc 0.3.41 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "libpulse-sys"
 version = "0.0.0"
 source = "git+https://github.com/astro/libpulse-sys#3e167c0d75dae1ce3946eec7526f6afd92adda0f"
@@ -322,17 +312,6 @@ dependencies = [
 name = "linear-map"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "lmdb-rs"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
- "liblmdb-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "log"
@@ -1059,10 +1038,8 @@ dependencies = [
 "checksum lazy_static 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6abe0ee2e758cd6bc8a2cd56726359007748fbf4128da998b65d0b70f881e19b"
 "checksum lazycell 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ce12306c4739d86ee97c23139f3a34ddf0387bbf181bc7929d287025a8c3ef6b"
 "checksum libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)" = "684f330624d8c3784fb9558ca46c4ce488073a8d22450415c5eb4f4cfb0d11b5"
-"checksum liblmdb-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b56d07dcf983f9b6679f768df73c72671d0087bd66329baabb63325f4f592677"
 "checksum libpulse-sys 0.0.0 (git+https://github.com/astro/libpulse-sys)" = "<none>"
 "checksum linear-map 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8f947d2a0ca958037e42a430bc7ea4369f97b60a2002bd927b84404509cc64cf"
-"checksum lmdb-rs 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "da5a6654b1d6ed38bed1ed96f601c719b9caacad2f5ff63afc1eb7d6c0011c2b"
 "checksum log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "ab83497bf8bf4ed2a74259c1c802351fcd67a65baa86394b6ba73c36f4838054"
 "checksum matches 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "efd7622e3022e1a6eaa602c4cea8912254e5582c9c692e9167714182244801b1"
 "checksum mdns 0.2.0 (git+https://github.com/plietar/rust-mdns)" = "<none>"

@@ -1,5 +1,3 @@
-use lmdb_rs as lmdb;
-use lmdb_rs::core::MdbResult;
 use std::path::PathBuf;
 use std::io::Read;
 use std::fs::File;

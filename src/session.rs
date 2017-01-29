@@ -57,8 +57,6 @@ pub struct SessionInternal {
     config: Config,
     data: RwLock<SessionData>,
 
-    cache: Box<Cache + Send + Sync>,
-
     tx_connection: mpsc::UnboundedSender<(u8, Vec<u8>)>,
 
     audio_key: Lazy<AudioKeyManager>,
@@ -66,6 +64,7 @@ pub struct SessionInternal {
     channel: Lazy<ChannelManager>,
     mercury: Lazy<MercuryManager>,
     metadata: Lazy<MetadataManager>,
+    cache: Option<Arc<Cache>>,
 
     handle: Remote,
 }
@@ -84,7 +83,7 @@ pub fn device_id(name: &str) -> String {
 
 impl Session {
     pub fn connect(config: Config, credentials: Credentials,
-                   cache: Box<Cache + Send + Sync>, handle: Handle)
+                   cache: Option<Cache>, handle: Handle)
         -> Box<Future<Item=Session, Error=io::Error>>
     {
         let access_point = apresolve_or_fallback::<io::Error>(&handle);
@@ -102,7 +101,9 @@ impl Session {
 
         let result = authentication.map(move |(transport, reusable_credentials)| {
             info!("Authenticated !");
-            cache.put_credentials(&reusable_credentials);
+            if let Some(ref cache) = cache {
+                cache.save_credentials(&reusable_credentials);
+            }
 
             let (session, task) = Session::create(
                 &handle, transport, config, cache, reusable_credentials.username.clone()
@@ -117,8 +118,7 @@ impl Session {
     }
 
     fn create(handle: &Handle, transport: connection::Transport,
-              config: Config, cache: Box<Cache + Send + Sync>,
-              username: String)
+              config: Config, cache: Option<Cache>, username: String)
         -> (Session, BoxFuture<(), io::Error>)
     {
         let transport = transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()));
@@ -139,7 +139,7 @@ impl Session {
 
             tx_connection: sender_tx,
 
-            cache: cache,
+            cache: cache.map(Arc::new),
 
             audio_key: Lazy::new(),
             audio_file: Lazy::new(),
@@ -211,7 +211,7 @@ impl Session {
         self.0.tx_connection.send((cmd, data)).unwrap();
     }
 
-    pub fn cache(&self) -> &Cache {
+    pub fn cache(&self) -> Option<&Arc<Cache>> {
         self.0.cache.as_ref()
     }
 

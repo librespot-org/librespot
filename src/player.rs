@@ -371,7 +371,7 @@ impl PlayerInternal {
 
         let key = self.session.audio_key().request(track.id, file_id).wait().unwrap();
 
-        let (open, _) = self.session.audio_file().open(file_id);
+        let open = self.session.audio_file().open(file_id);
         let encrypted_file = open.wait().unwrap();
 
         let audio_file = Subfile::new(AudioDecrypt::new(key, encrypted_file), 0xa7);

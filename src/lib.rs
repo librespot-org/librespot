@@ -18,7 +18,6 @@ extern crate crypto;
 extern crate getopts;
 extern crate hyper;
 extern crate linear_map;
-extern crate lmdb_rs;
 extern crate mdns;
 extern crate num_bigint;
 extern crate num_integer;

@@ -18,7 +18,7 @@ use tokio_core::reactor::Core;
 use librespot::spirc::Spirc;
 use librespot::authentication::{get_credentials, Credentials};
 use librespot::audio_backend::{self, Sink, BACKENDS};
-use librespot::cache::{Cache, DefaultCache, NoCache};
+use librespot::cache::Cache;
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
 use librespot::version;
@@ -64,7 +64,7 @@ fn list_backends() {
 
 struct Setup {
     backend: &'static (Fn(Option<String>) -> Box<Sink> + Send + Sync),
-    cache: Box<Cache + Send + Sync>,
+    cache: Option<Cache>,
     config: Config,
     credentials: Credentials,
     device: Option<String>,
@@ -116,11 +116,10 @@ fn setup(args: &[String]) -> Setup {
     let device_id = librespot::session::device_id(&name);
 
     let cache = matches.opt_str("c").map(|cache_location| {
-        Box::new(DefaultCache::new(PathBuf::from(cache_location)).unwrap()) 
-            as Box<Cache + Send + Sync>
-    }).unwrap_or_else(|| Box::new(NoCache));
+        Cache::new(PathBuf::from(cache_location))
+    });
 
-    let cached_credentials = cache.get_credentials();
+    let cached_credentials = cache.as_ref().and_then(Cache::credentials);
 
     let credentials = get_credentials(&name, &device_id,
                                       matches.opt_str("username"),
