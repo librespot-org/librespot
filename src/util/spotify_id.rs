@@ -1,13 +1,11 @@
 use std;
+use std::fmt;
 use util::u128;
 use byteorder::{BigEndian, ByteOrder};
 use std::ascii::AsciiExt;
 
 #[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
 pub struct SpotifyId(u128);
-
-#[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
-pub struct FileId(pub [u8; 20]);
 
 const BASE62_DIGITS: &'static [u8] =
     b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -79,6 +77,9 @@ impl SpotifyId {
     }
 }
 
+#[derive(Copy,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
+pub struct FileId(pub [u8; 20]);
+
 impl FileId {
     pub fn to_base16(&self) -> String {
         self.0
@@ -86,5 +87,17 @@ impl FileId {
             .map(|b| format!("{:02x}", b))
             .collect::<Vec<String>>()
             .concat()
+    }
+}
+
+impl fmt::Debug for FileId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("FileId").field(&self.to_base16()).finish()
+    }
+}
+
+impl fmt::Display for FileId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.to_base16())
     }
 }

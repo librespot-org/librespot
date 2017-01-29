@@ -132,8 +132,11 @@ impl AudioFileManager {
         let cache = self.session().cache().cloned();
 
         if let Some(file) = cache.as_ref().and_then(|cache| cache.file(file_id)) {
+            debug!("File {} already in cache", file_id);
             return AudioFileOpen::Cached(future::ok(file));
         }
+
+        debug!("Downloading file {}", file_id);
 
         let (complete_tx, complete_rx) = oneshot::channel();
         let (headers, data) = request_chunk(&self.session(), file_id, 0).split();
@@ -153,6 +156,9 @@ impl AudioFileManager {
             complete_rx.map(move |mut file| {
                 if let Some(cache) = session.cache() {
                     cache.save_file(file_id, &mut file);
+                    debug!("File {} complete, saving to cache", file_id);
+                } else {
+                    debug!("File {} complete", file_id);
                 }
             }).or_else(|oneshot::Canceled| Ok(()))
         });
@@ -275,7 +281,7 @@ impl Future for AudioFileFetch {
                     progress = true;
 
                     self.output.as_mut().unwrap()
-                        .write_all(&data).unwrap();
+                        .write_all(data.as_ref()).unwrap();
                 }
                  Ok(Async::Ready(None)) => {
                     progress = true;

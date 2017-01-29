@@ -7,6 +7,7 @@ use std::io;
 use std::result::Result;
 use std::str::FromStr;
 use std::sync::{RwLock, Arc, Weak};
+use tokio_core::io::EasyBuf;
 use tokio_core::reactor::{Handle, Remote};
 
 use apresolve::apresolve_or_fallback;
@@ -121,7 +122,6 @@ impl Session {
               config: Config, cache: Option<Cache>, username: String)
         -> (Session, BoxFuture<(), io::Error>)
     {
-        let transport = transport.map(|(cmd, data)| (cmd, data.as_ref().to_owned()));
         let (sink, stream) = transport.split();
 
         let (sender_tx, sender_rx) = mpsc::unbounded();
@@ -193,12 +193,13 @@ impl Session {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
-    fn dispatch(&self, cmd: u8, data: Vec<u8>) {
+    fn dispatch(&self, cmd: u8, data: EasyBuf) {
         match cmd {
-            0x4 => self.send_packet(0x49, data),
+            0x4 => self.send_packet(0x49, data.as_ref().to_owned()),
             0x4a => (),
             0x1b => {
-                self.0.data.write().unwrap().country = String::from_utf8(data).unwrap();
+                let country = String::from_utf8(data.as_ref().to_owned()).unwrap();
+                self.0.data.write().unwrap().country = country;
             }
 
             0x9 | 0xa => self.channel().dispatch(cmd, data),

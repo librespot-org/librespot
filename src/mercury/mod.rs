@@ -1,11 +1,11 @@
-use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
+use byteorder::{BigEndian, ByteOrder};
 use futures::sync::{oneshot, mpsc};
 use futures::{Async, Poll, BoxFuture, Future};
 use protobuf;
 use protocol;
 use std::collections::HashMap;
-use std::io::Read;
 use std::mem;
+use tokio_core::io::EasyBuf;
 
 use util::SeqGenerator;
 
@@ -125,16 +125,12 @@ impl MercuryManager {
         }).boxed()
     }
 
-    pub fn dispatch(&self, cmd: u8, data: Vec<u8>) {
-        let mut packet = ::std::io::Cursor::new(data);
-        let seq = {
-            let len = packet.read_u16::<BigEndian>().unwrap() as usize;
-            let mut seq = vec![0; len];
-            packet.read_exact(&mut seq).unwrap();
-            seq
-        };
-        let flags = packet.read_u8().unwrap();
-        let count = packet.read_u16::<BigEndian>().unwrap() as usize;
+    pub fn dispatch(&self, cmd: u8, mut data: EasyBuf) {
+        let seq_len = BigEndian::read_u16(data.drain_to(2).as_ref()) as usize;
+        let seq = data.drain_to(seq_len).as_ref().to_owned();
+
+        let flags = data.drain_to(1).as_ref()[0];
+        let count = BigEndian::read_u16(data.drain_to(2).as_ref()) as usize;
 
         let pending = self.lock(|inner| inner.pending.remove(&seq));
 
@@ -154,10 +150,10 @@ impl MercuryManager {
         };
 
         for i in 0..count {
-            let mut part = Self::parse_part(&mut packet);
-            if let Some(mut data) = mem::replace(&mut pending.partial, None) {
-                data.append(&mut part);
-                part = data;
+            let mut part = Self::parse_part(&mut data);
+            if let Some(mut partial) = mem::replace(&mut pending.partial, None) {
+                partial.extend_from_slice(&part);
+                part = partial;
             }
 
             if i == count - 1 && (flags == 2) {
@@ -174,12 +170,9 @@ impl MercuryManager {
         }
     }
 
-    fn parse_part<T: Read>(s: &mut T) -> Vec<u8> {
-        let size = s.read_u16::<BigEndian>().unwrap() as usize;
-        let mut buffer = vec![0; size];
-        s.read_exact(&mut buffer).unwrap();
-
-        buffer
+    fn parse_part(data: &mut EasyBuf) -> Vec<u8> {
+        let size = BigEndian::read_u16(data.drain_to(2).as_ref()) as usize;
+        data.drain_to(size).as_ref().to_owned()
     }
 
     fn complete_request(&self, cmd: u8, mut pending: MercuryPending) {

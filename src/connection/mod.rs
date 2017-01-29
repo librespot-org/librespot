@@ -27,7 +27,9 @@ pub fn connect<A: ToSocketAddrs>(addr: A, handle: &Handle) -> BoxFuture<Transpor
     connection.boxed()
 }
 
-pub fn authenticate(transport: Transport, credentials: Credentials, device_id: String) -> BoxFuture<(Transport, Credentials), io::Error> {
+pub fn authenticate(transport: Transport, credentials: Credentials, device_id: String)
+    -> BoxFuture<(Transport, Credentials), io::Error>
+{
     use protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
 
     let packet = protobuf_init!(ClientResponseEncrypted::new(), {
