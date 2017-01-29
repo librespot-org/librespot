@@ -3,6 +3,8 @@
 #![cfg_attr(not(feature = "with-syntex"), feature(plugin, custom_derive))]
 #![cfg_attr(not(feature = "with-syntex"), plugin(protobuf_macros))]
 
+#![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
+
 #[macro_use] extern crate error_chain;
 #[macro_use] extern crate futures;
 #[macro_use] extern crate lazy_static;

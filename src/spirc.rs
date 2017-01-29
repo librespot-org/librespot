@@ -159,8 +159,8 @@ impl Spirc {
         (spirc, task)
     }
 
-    pub fn shutdown(&mut self) {
-        mpsc::UnboundedSender::send(&mut self.commands, SpircCommand::Shutdown).unwrap();
+    pub fn shutdown(&self) {
+        mpsc::UnboundedSender::send(&self.commands, SpircCommand::Shutdown).unwrap();
     }
 }
 
@@ -312,7 +312,12 @@ impl SpircTask {
                 // Over 3s it seeks to zero
                 if self.position() < 3000 {
                     let current_index = self.state.get_playing_track_index();
-                    let new_index = (current_index - 1) % (self.state.get_track().len() as u32);
+
+                    let new_index = if current_index == 0 {
+                        self.state.get_track().len() as u32 - 1
+                    } else {
+                        current_index - 1
+                    };
 
                     self.state.set_playing_track_index(new_index);
                     self.state.set_position_ms(0);
@@ -379,12 +384,12 @@ impl SpircTask {
         self.state.get_position_ms() + diff as u32
     }
 
-    fn update_tracks(&mut self, ref frame: &protocol::spirc::Frame) {
+    fn update_tracks(&mut self, frame: &protocol::spirc::Frame) {
         let index = frame.get_state().get_playing_track_index();
         let tracks = frame.get_state().get_track();
 
         self.state.set_playing_track_index(index);
-        self.state.set_track(tracks.into_iter().map(Clone::clone).collect());
+        self.state.set_track(tracks.into_iter().cloned().collect());
     }
 
     fn load_track(&mut self, play: bool) {
@@ -398,7 +403,12 @@ impl SpircTask {
 
         let end_of_track = self.player.load(track, play, position);
 
-        self.state.set_status(PlayStatus::kPlayStatusPlay);
+        if play {
+            self.state.set_status(PlayStatus::kPlayStatusPlay);
+        } else {
+            self.state.set_status(PlayStatus::kPlayStatusPause);
+        }
+
         self.end_of_track = end_of_track.boxed();
     }
 

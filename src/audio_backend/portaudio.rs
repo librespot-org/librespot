@@ -92,7 +92,7 @@ impl <'a> Sink for PortAudioSink<'a> {
         Ok(())
     }
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        match self.0.as_mut().unwrap().write(&data) {
+        match self.0.as_mut().unwrap().write(data) {
             Ok(_) => (),
             Err(portaudio::PaError::OutputUnderflowed) =>
                 error!("PortAudio write underflow"),

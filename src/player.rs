@@ -197,7 +197,7 @@ impl PlayerInternal {
         match packet {
             Some(Ok(mut packet)) => {
                 if self.volume < 0xFFFF {
-                    for x in packet.data.iter_mut() {
+                    for x in &mut packet.data {
                         *x = (*x as i32 * self.volume as i32 / 0xFFFF) as i16;
                     }
                 }
@@ -314,17 +314,15 @@ impl PlayerInternal {
     }
 
     fn run_onstart(&self) {
-        match self.session.config().onstart {
-            Some(ref program) => util::run_program(program),
-            None => {},
-        };
+        if let Some(ref program) = self.session.config().onstart {
+            util::run_program(program)
+        }
     }
 
     fn run_onstop(&self) {
-        match self.session.config().onstop {
-            Some(ref program) => util::run_program(program),
-            None => {},
-        };
+        if let Some(ref program) = self.session.config().onstop {
+            util::run_program(program)
+        }
     }
 
     fn find_available_alternative<'a>(&self, track: &'a Track) -> Option<Cow<'a, Track>> {

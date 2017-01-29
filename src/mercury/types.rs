@@ -72,7 +72,7 @@ impl MercuryRequest {
 
         for p in &self.payload {
             packet.write_u16::<BigEndian>(p.len() as u16).unwrap();
-            packet.write(&p).unwrap();
+            packet.write(p).unwrap();
         }
 
         packet

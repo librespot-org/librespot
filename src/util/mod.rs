@@ -42,7 +42,7 @@ pub fn mkdir_existing(path: &Path) -> io::Result<()> {
     })
 }
 
-pub fn run_program(program: &String) {
+pub fn run_program(program: &str) {
     info!("Running {}", program);
     let mut v: Vec<&str> = program.split_whitespace().collect();
     let status = Command::new(&v.remove(0))

@@ -80,7 +80,7 @@ impl MetadataTrait for Track {
                        .filter(|file| file.has_file_id())
                        .map(|file| {
                            let mut dst = [0u8; 20];
-                           dst.clone_from_slice(&file.get_file_id());
+                           dst.clone_from_slice(file.get_file_id());
                            (file.get_format(), FileId(dst))
                        })
                        .collect();
@@ -129,7 +129,7 @@ impl MetadataTrait for Album {
                         .filter(|image| image.has_file_id())
                         .map(|image| {
                             let mut dst = [0u8; 20];
-                            dst.clone_from_slice(&image.get_file_id());
+                            dst.clone_from_slice(image.get_file_id());
                             FileId(dst)
                         })
                         .collect::<Vec<_>>();
@@ -157,9 +157,7 @@ impl MetadataTrait for Artist {
 
         let top_tracks = msg.get_top_track()
                             .iter()
-                            .filter(|tt| !tt.has_country() ||
-                                         countrylist_contains(tt.get_country(), &country))
-                            .next()
+                            .find(|tt| !tt.has_country() || countrylist_contains(tt.get_country(), &country))
                             .unwrap()
                             .get_track()
                             .iter()

@@ -77,7 +77,7 @@ pub struct SessionWeak(pub Weak<SessionInternal>);
 
 pub fn device_id(name: &str) -> String {
     let mut h = Sha1::new();
-    h.input_str(&name);
+    h.input_str(name);
     h.result_str()
 }
 
@@ -192,6 +192,7 @@ impl Session {
         self.0.handle.spawn(f)
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
     fn dispatch(&self, cmd: u8, data: Vec<u8>) {
         match cmd {
             0x4 => self.send_packet(0x49, data),

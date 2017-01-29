@@ -86,10 +86,10 @@ impl std::ops::Mul<u128> for u128 {
                     2 => (product, 0),
                     3 => (product << 32, 0),
                     _ => {
-                        if product != 0 {
-                            panic!("Overflow on mul {:?} {:?} ({} {})", self, rhs, i, j)
-                        } else {
+                        if product == 0 {
                             (0, 0)
+                        } else {
+                            panic!("Overflow on mul {:?} {:?} ({} {})", self, rhs, i, j)
                         }
                     }
                 };

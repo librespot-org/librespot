@@ -25,7 +25,7 @@ use librespot::version;
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
-    format!("{}", opts.usage(&brief))
+    opts.usage(&brief)
 }
 
 fn setup_logging(verbose: bool) {
