@@ -1,19 +1,18 @@
-use protobuf::{self, Message, RepeatedField};
-use std::borrow::Cow;
-use futures::{Future, Stream, Sink, Async, Poll};
-use futures::stream::BoxStream;
+use futures::future;
 use futures::sink::BoxSink;
-use futures::sync::mpsc;
+use futures::stream::BoxStream;
+use futures::sync::{oneshot, mpsc};
+use futures::{Future, Stream, Sink, Async, Poll, BoxFuture};
+use protobuf::{self, Message};
 
 use mercury::MercuryError;
-use player::{Player, PlayerState};
+use player::Player;
 use session::Session;
 use util::{now_ms, SpotifyId, SeqGenerator};
 use version;
 
 use protocol;
-pub use protocol::spirc::PlayStatus;
-use protocol::spirc::{MessageType, Frame, DeviceState};
+use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
 
 pub struct SpircTask {
     player: Player,
@@ -22,21 +21,12 @@ pub struct SpircTask {
 
     ident: String,
     device: DeviceState,
-
-    repeat: bool,
-    shuffle: bool,
-
-    last_command_ident: String,
-    last_command_msgid: u32,
-
-    tracks: Vec<SpotifyId>,
-    index: u32,
+    state: State,
 
     subscription: BoxStream<Frame, MercuryError>,
     sender: BoxSink<Frame, MercuryError>,
-
-    updates: mpsc::UnboundedReceiver<PlayerState>,
     commands: mpsc::UnboundedReceiver<SpircCommand>,
+    end_of_track: BoxFuture<(), oneshot::Canceled>,
 
     shutdown: bool,
 }
@@ -49,6 +39,17 @@ pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
 }
 
+fn initial_state() -> State {
+    protobuf_init!(protocol::spirc::State::new(), {
+        repeat: false,
+        shuffle: false,
+
+        status: PlayStatus::kPlayStatusStop,
+        position_ms: 0,
+        position_measured_at: 0,
+    })
+}
+
 fn initial_device_state(name: String, volume: u16) -> DeviceState {
     protobuf_init!(DeviceState::new(), {
         sw_version: version::version_string(),
@@ -56,12 +57,10 @@ fn initial_device_state(name: String, volume: u16) -> DeviceState {
         can_play: true,
         volume: volume as u32,
         name: name,
-        error_code: 0,
-        became_active_at: 0,
         capabilities => [
             @{
                 typ: protocol::spirc::CapabilityType::kCanBePlayer,
-                intValue => [0]
+                intValue => [1]
             },
             @{
                 typ: protocol::spirc::CapabilityType::kDeviceType,
@@ -127,8 +126,6 @@ impl Spirc {
             Ok(frame.write_to_bytes().unwrap())
         }));
 
-        let updates = player.observe();
-
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
         let volume = 0xFFFF;
@@ -141,21 +138,14 @@ impl Spirc {
             sequence: SeqGenerator::new(1),
 
             ident: ident,
+
             device: device,
-
-            repeat: false,
-            shuffle: false,
-
-            last_command_ident: String::new(),
-            last_command_msgid: 0,
-
-            tracks: Vec::new(),
-            index: 0,
+            state: initial_state(),
 
             subscription: subscription,
             sender: sender,
-            updates: updates,
             commands: cmd_rx,
+            end_of_track: future::empty().boxed(),
 
             shutdown: false,
         };
@@ -164,7 +154,7 @@ impl Spirc {
             commands: cmd_tx,
         };
 
-        task.notify(true, None);
+        task.hello();
 
         (spirc, task)
     }
@@ -192,15 +182,6 @@ impl Future for SpircTask {
                     Async::NotReady => (),
                 }
 
-                match self.updates.poll().unwrap() {
-                    Async::Ready(Some(state)) => {
-                        progress = true;
-                        self.handle_update(state);
-                    }
-                    Async::Ready(None) => panic!("player terminated"),
-                    Async::NotReady => (),
-                }
-
                 match self.commands.poll().unwrap() {
                     Async::Ready(Some(command)) => {
                         progress = true;
@@ -208,6 +189,17 @@ impl Future for SpircTask {
                     }
                     Async::Ready(None) => (),
                     Async::NotReady => (),
+                }
+
+                match self.end_of_track.poll() {
+                    Ok(Async::Ready(())) => {
+                        progress = true;
+                        self.handle_end_of_track();
+                    }
+                    Ok(Async::NotReady) => (),
+                    Err(oneshot::Canceled) => {
+                        self.end_of_track = future::empty().boxed()
+                    }
                 }
             }
 
@@ -219,7 +211,6 @@ impl Future for SpircTask {
             }
 
             if !progress {
-
                 return Ok(Async::NotReady);
             }
         }
@@ -227,24 +218,12 @@ impl Future for SpircTask {
 }
 
 impl SpircTask {
-    fn handle_update(&mut self, player_state: PlayerState) {
-        let end_of_track = player_state.end_of_track();
-        if end_of_track {
-            self.index = (self.index + 1) % self.tracks.len() as u32;
-            let track = self.tracks[self.index as usize];
-            self.player.load(track, true, 0);
-        } else {
-            self.notify_with_player_state(false, None, &player_state);
-        }
-    }
-
     fn handle_command(&mut self, cmd: SpircCommand) {
         match cmd {
             SpircCommand::Shutdown => {
                 CommandSender::new(self, MessageType::kMessageTypeGoodbye).send();
                 self.shutdown = true;
                 self.commands.close();
-                self.updates.close();
             }
         }
     }
@@ -262,142 +241,188 @@ impl SpircTask {
             return;
         }
 
-        if frame.get_recipient().len() > 0 {
-            self.last_command_ident = frame.get_ident().to_owned();
-            self.last_command_msgid = frame.get_seq_nr();
-        }
-
         match frame.get_typ() {
             MessageType::kMessageTypeHello => {
-                self.notify(false, Some(frame.get_ident()));
+                self.notify(Some(frame.get_ident()));
             }
+
             MessageType::kMessageTypeLoad => {
                 if !self.device.get_is_active() {
                     self.device.set_is_active(true);
                     self.device.set_became_active_at(now_ms());
                 }
 
-                self.reload_tracks(&frame);
-                if self.tracks.len() > 0 {
+                self.update_tracks(&frame);
+
+                if self.state.get_track().len() > 0 {
+                    self.state.set_position_ms(frame.get_state().get_position_ms());
+                    self.state.set_position_measured_at(now_ms() as u64);
+
                     let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
-                    let track = self.tracks[self.index as usize];
-                    let position = frame.get_state().get_position_ms();
-                    self.player.load(track, play, position);
+                    self.load_track(play);
                 } else {
-                    self.notify(false, Some(frame.get_ident()));
+                    self.state.set_status(PlayStatus::kPlayStatusStop);
                 }
+
+                self.notify(None);
             }
+
             MessageType::kMessageTypePlay => {
-                self.player.play();
+                if self.state.get_status() == PlayStatus::kPlayStatusPause {
+                    self.player.play();
+                    self.state.set_status(PlayStatus::kPlayStatusPlay);
+                    self.state.set_position_measured_at(now_ms() as u64);
+                }
+
+                self.notify(None);
             }
+
             MessageType::kMessageTypePause => {
-                self.player.pause();
+                if self.state.get_status() == PlayStatus::kPlayStatusPlay {
+                    self.player.pause();
+                    self.state.set_status(PlayStatus::kPlayStatusPause);
+
+                    let now = now_ms() as u64;
+                    let position = self.state.get_position_ms();
+
+                    let diff = now - self.state.get_position_measured_at();
+
+                    self.state.set_position_ms(position + diff as u32);
+                    self.state.set_position_measured_at(now);
+                }
+
+                self.notify(None);
             }
+
             MessageType::kMessageTypeNext => {
-                self.index = (self.index + 1) % self.tracks.len() as u32;
-                let track = self.tracks[self.index as usize];
-                self.player.load(track, true, 0);
+                let current_index = self.state.get_playing_track_index();
+                let new_index = (current_index + 1) % (self.state.get_track().len() as u32);
+
+                self.state.set_playing_track_index(new_index);
+                self.state.set_position_ms(0);
+                self.state.set_position_measured_at(now_ms() as u64);
+
+                self.load_track(true);
+                self.notify(None);
             }
+
             MessageType::kMessageTypePrev => {
-                self.index = (self.index - 1) % self.tracks.len() as u32;
-                let track = self.tracks[self.index as usize];
-                self.player.load(track, true, 0);
+                // Previous behaves differently based on the position
+                // Under 3s it goes to the previous song
+                // Over 3s it seeks to zero
+                if self.position() < 3000 {
+                    let current_index = self.state.get_playing_track_index();
+                    let new_index = (current_index - 1) % (self.state.get_track().len() as u32);
+
+                    self.state.set_playing_track_index(new_index);
+                    self.state.set_position_ms(0);
+                    self.state.set_position_measured_at(now_ms() as u64);
+
+                    self.load_track(true);
+                } else {
+                    self.state.set_position_ms(0);
+                    self.state.set_position_measured_at(now_ms() as u64);
+                    self.player.seek(0);
+                }
+                self.notify(None);
             }
+
             MessageType::kMessageTypeSeek => {
-                self.player.seek(frame.get_position());
+                let position = frame.get_position();
+
+                self.state.set_position_ms(position);
+                self.state.set_position_measured_at(now_ms() as u64);
+                self.player.seek(position);
+                self.notify(None);
             }
+
             MessageType::kMessageTypeReplace => {
-                self.reload_tracks(&frame);
+                self.update_tracks(&frame);
+                self.notify(None);
             }
+
+            MessageType::kMessageTypeVolume => {
+                let volume = frame.get_volume();
+                self.device.set_volume(volume);
+                self.player.volume(volume as u16);
+                self.notify(None);
+            }
+
             MessageType::kMessageTypeNotify => {
-                if self.device.get_is_active() && frame.get_device_state().get_is_active() {
+                if self.device.get_is_active() &&
+                    frame.get_device_state().get_is_active()
+                {
                     self.device.set_is_active(false);
+                    self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
                 }
             }
-            MessageType::kMessageTypeVolume => {
-                let volume = frame.get_volume();
-                self.player.volume(volume as u16);
-                self.device.set_volume(volume);
-                self.notify(false, None);
-            }
-            MessageType::kMessageTypeGoodbye => (),
+
             _ => (),
         }
     }
 
-    fn reload_tracks(&mut self, ref frame: &protocol::spirc::Frame) {
-        self.index = frame.get_state().get_playing_track_index();
-        self.tracks = frame.get_state()
-                           .get_track()
-                           .iter()
-                           .filter(|track| track.has_gid())
-                           .map(|track| SpotifyId::from_raw(track.get_gid()))
-                           .collect();
+    fn handle_end_of_track(&mut self) {
+        let current_index = self.state.get_playing_track_index();
+        let new_index = (current_index + 1) % (self.state.get_track().len() as u32);
+
+        self.state.set_playing_track_index(new_index);
+        self.state.set_position_ms(0);
+        self.state.set_position_measured_at(now_ms() as u64);
+
+        self.load_track(true);
+        self.notify(None);
     }
 
-    fn notify(&mut self, hello: bool, recipient: Option<&str>) {
-        let mut cs = CommandSender::new(self,
-                                        if hello {
-                                            MessageType::kMessageTypeHello
-                                        } else {
-                                            MessageType::kMessageTypeNotify
-                                        });
+    fn position(&mut self) -> u32 {
+        let diff = now_ms() as u64 - self.state.get_position_measured_at();
+        self.state.get_position_ms() + diff as u32
+    }
+
+    fn update_tracks(&mut self, ref frame: &protocol::spirc::Frame) {
+        let index = frame.get_state().get_playing_track_index();
+        let tracks = frame.get_state().get_track();
+
+        self.state.set_playing_track_index(index);
+        self.state.set_track(tracks.into_iter().map(Clone::clone).collect());
+    }
+
+    fn load_track(&mut self, play: bool) {
+        let index = self.state.get_playing_track_index();
+        let track = {
+            let gid = self.state.get_track()[index as usize].get_gid();
+            SpotifyId::from_raw(gid)
+        };
+
+        let position = self.state.get_position_ms();
+
+        let end_of_track = self.player.load(track, play, position);
+
+        self.state.set_status(PlayStatus::kPlayStatusPlay);
+        self.end_of_track = end_of_track.boxed();
+    }
+
+    fn hello(&mut self) {
+        CommandSender::new(self, MessageType::kMessageTypeHello).send();
+    }
+
+    fn notify(&mut self, recipient: Option<&str>) {
+        let mut cs = CommandSender::new(self, MessageType::kMessageTypeNotify);
         if let Some(s) = recipient {
             cs = cs.recipient(&s);
         }
         cs.send();
     }
 
-    fn notify_with_player_state(&mut self,
-                                hello: bool,
-                                recipient: Option<&str>,
-                                player_state: &PlayerState) {
-        let mut cs = CommandSender::new(self,
-                                        if hello {
-                                            MessageType::kMessageTypeHello
-                                        } else {
-                                            MessageType::kMessageTypeNotify
-                                        })
-                         .player_state(player_state);
-        if let Some(s) = recipient {
-            cs = cs.recipient(&s);
-        }
-        cs.send();
-    }
-
-    fn spirc_state(&self, player_state: &PlayerState) -> protocol::spirc::State {
-        let (position_ms, position_measured_at) = player_state.position();
-
-        protobuf_init!(protocol::spirc::State::new(), {
-            status: player_state.status(),
-            position_ms: position_ms,
-            position_measured_at: position_measured_at as u64,
-
-            playing_track_index: self.index,
-            track: self.tracks.iter().map(|track| {
-                protobuf_init!(protocol::spirc::TrackRef::new(), {
-                    gid: track.to_raw().to_vec()
-                })
-            }).collect(),
-
-            shuffle: self.shuffle,
-            repeat: self.repeat,
-
-            playing_from_fallback: true,
-
-            last_command_ident: self.last_command_ident.clone(),
-            last_command_msgid: self.last_command_msgid
-        })
+    fn spirc_state(&self) -> protocol::spirc::State {
+        self.state.clone()
     }
 }
 
 struct CommandSender<'a> {
     spirc: &'a mut SpircTask,
     cmd: MessageType,
-    recipient: Option<&'a str>,
-    player_state: Option<&'a PlayerState>,
-    state: Option<protocol::spirc::State>,
+    recipient: Option<String>,
 }
 
 impl<'a> CommandSender<'a> {
@@ -406,64 +431,34 @@ impl<'a> CommandSender<'a> {
             spirc: spirc,
             cmd: cmd,
             recipient: None,
-            player_state: None,
-            state: None,
         }
     }
 
-    fn recipient(mut self, r: &'a str) -> CommandSender {
-        self.recipient = Some(r);
-        self
-    }
-
-    fn player_state(mut self, s: &'a PlayerState) -> CommandSender {
-        self.player_state = Some(s);
-        self
-    }
-
-    #[allow(dead_code)]
-    fn state(mut self, s: protocol::spirc::State) -> CommandSender<'a> {
-        self.state = Some(s);
+    fn recipient(mut self, r: &str) -> CommandSender<'a> {
+        self.recipient = Some(r.to_owned());
         self
     }
 
     fn send(self) {
-        let state = self.player_state.map_or_else(|| {
-            Cow::Owned(self.spirc.player.state())
-        }, |s| {
-            Cow::Borrowed(s)
-        });
-
         let mut frame = protobuf_init!(Frame::new(), {
             version: 1,
             ident: self.spirc.ident.clone(),
             protocol_version: "2.0.0",
             seq_nr: self.spirc.sequence.get(),
             typ: self.cmd,
-            recipient: RepeatedField::from_vec(
-                self.recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
-                ),
             device_state: self.spirc.device.clone(),
-            state_update_id: state.update_time()
+            state_update_id: now_ms(),
         });
 
+        if let Some(recipient) = self.recipient {
+            frame.mut_recipient().push(recipient.to_owned());
+        }
+
         if self.spirc.device.get_is_active() {
-            frame.set_state(self.spirc.spirc_state(&state));
+            frame.set_state(self.spirc.spirc_state());
         }
 
         let ready = self.spirc.sender.start_send(frame).unwrap().is_ready();
         assert!(ready);
     }
-}
-
-#[allow(dead_code)]
-fn track_ids_to_state<I: Iterator<Item = SpotifyId>>(track_ids: I) -> protocol::spirc::State {
-    let tracks: Vec<protocol::spirc::TrackRef> =
-        track_ids.map(|i| {
-                     protobuf_init!(protocol::spirc::TrackRef::new(), { gid: i.to_raw().to_vec()})
-                 })
-                 .collect();
-    protobuf_init!(protocol::spirc::State::new(), {
-                    track: RepeatedField::from_vec(tracks)
-                })
 }
