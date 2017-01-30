@@ -361,7 +361,7 @@ impl SpircInternal {
                 },
                 @{
                     typ: protocol::spirc::CapabilityType::kVolumeSteps,
-                    intValue => [10]
+                    intValue => [64]
                 },
                 @{
                     typ: protocol::spirc::CapabilityType::kSupportedContexts,
