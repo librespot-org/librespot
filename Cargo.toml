@@ -16,6 +16,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "librespot"
 path = "src/main.rs"
+doc = false
 
 [dependencies.librespot-protocol]
 path = "protocol"
