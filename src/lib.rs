@@ -8,6 +8,9 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
+#[macro_use] 
+pub mod util;
+
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 
@@ -58,7 +61,6 @@ pub mod link;
 pub mod metadata;
 pub mod player;
 pub mod stream;
-pub mod util;
 pub mod version;
 pub mod mixer;
 
