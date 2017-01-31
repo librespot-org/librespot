@@ -5,6 +5,7 @@ use std::fs::File;
 use util::{FileId, mkdir_existing};
 use authentication::Credentials;
 
+#[derive(Clone)]
 pub struct Cache {
     root: PathBuf,
 }

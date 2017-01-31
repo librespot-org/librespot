@@ -160,7 +160,7 @@ impl Spirc {
     }
 
     pub fn shutdown(&self) {
-        mpsc::UnboundedSender::send(&self.commands, SpircCommand::Shutdown).unwrap();
+        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Shutdown);
     }
 }
 

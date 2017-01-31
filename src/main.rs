@@ -62,6 +62,7 @@ fn list_backends() {
     }
 }
 
+#[derive(Clone)]
 struct Setup {
     backend: &'static (Fn(Option<String>) -> Box<Sink> + Send + Sync),
     cache: Option<Cache>,

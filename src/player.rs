@@ -3,6 +3,7 @@ use futures::{future, Future};
 use std::borrow::Cow;
 use std::io::{Read, Seek};
 use std::mem;
+use std::sync::mpsc::{RecvError, TryRecvError};
 use std::thread;
 use std;
 use vorbis::{self, VorbisError};
@@ -174,9 +175,16 @@ impl PlayerInternal {
     fn run(mut self) {
         loop {
             let cmd = if self.state.is_playing() {
-                self.commands.try_recv().ok()
+                match self.commands.try_recv() {
+                    Ok(cmd) => Some(cmd),
+                    Err(TryRecvError::Empty) => None,
+                    Err(TryRecvError::Disconnected) => return,
+                }
             } else {
-                Some(self.commands.recv().unwrap())
+                match self.commands.recv() {
+                    Ok(cmd) => Some(cmd),
+                    Err(RecvError) => return,
+                }
             };
 
             if let Some(cmd) = cmd {

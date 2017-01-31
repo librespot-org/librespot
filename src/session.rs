@@ -40,6 +40,7 @@ impl FromStr for Bitrate {
     }
 }
 
+#[derive(Clone)]
 pub struct Config {
     pub user_agent: String,
     pub name: String,
