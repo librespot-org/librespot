@@ -1,10 +1,10 @@
 use eventual::Async;
 use protobuf::{self, Message, RepeatedField};
 use std::borrow::Cow;
-use std::sync::{Mutex, Arc};
+use std::sync::{mpsc, Mutex, Arc};
 use std::collections::HashMap;
 
-use mercury::{MercuryRequest, MercuryMethod};
+use mercury::{MercuryRequest, MercuryMethod, MercuryResponse};
 use player::{Player, PlayerState};
 use mixer::Mixer;
 use session::Session;
@@ -56,6 +56,18 @@ pub struct State {
     pub end_of_track: bool,
 }
 
+pub struct UpdateMessage;
+
+pub enum SpircMessage {
+    MercuryMsg(MercuryResponse),
+    UpdateMsg(UpdateMessage)
+}
+
+implement_sender!(name => MercuryResponseSender, 
+                  wrap => MercuryResponse, 
+                  with => SpircMessage, 
+                  variant => MercuryMsg);
+
 impl SpircManager {
     pub fn new(session: Session, player: Player, mixer: Box<Mixer + Send>) -> SpircManager {
         let ident = session.device_id().to_owned();
@@ -92,8 +104,11 @@ impl SpircManager {
     pub fn run(&self) {
         let rx = {
             let mut internal = self.0.lock().unwrap();
+            let (tx, rx) = mpsc::channel::<SpircMessage>();
 
-            let rx = internal.session.mercury_sub(internal.uri());
+            let mercury_response_sender = MercuryResponseSender::create(tx.clone());
+
+            internal.session.mercury_sub(internal.uri(), mercury_response_sender);
 
             internal.notify(true, None);
 
@@ -110,18 +125,23 @@ impl SpircManager {
             rx
         };
 
-        for pkt in rx {
-            let data = pkt.payload.first().unwrap();
-            let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(data).unwrap();
+        for msg in rx {
+            match msg {
+            SpircMessage::MercuryMsg(pkt) => {
+                let data = pkt.payload.first().unwrap();
+                let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(data).unwrap();
 
-            debug!("{:?} {:?} {} {} {}",
-                     frame.get_typ(),
-                     frame.get_device_state().get_name(),
-                     frame.get_ident(),
-                     frame.get_seq_nr(),
-                     frame.get_state_update_id());
+                debug!("{:?} {:?} {} {} {}",
+                        frame.get_typ(),
+                        frame.get_device_state().get_name(),
+                        frame.get_ident(),
+                        frame.get_seq_nr(),
+                        frame.get_state_update_id());
 
-            self.0.lock().unwrap().handle(frame);
+                self.0.lock().unwrap().handle(frame);
+            }
+            _ => {}
+            }
         }
     }
 

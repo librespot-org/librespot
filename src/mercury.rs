@@ -4,10 +4,10 @@ use protobuf::{self, Message};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
 use std::mem::replace;
-use std::sync::mpsc;
 
 use protocol;
 use session::{Session, PacketHandler};
+use spirc::MercuryResponseSender;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
@@ -32,7 +32,7 @@ pub struct MercuryResponse {
 
 enum MercuryCallback {
     Future(eventual::Complete<MercuryResponse, ()>),
-    Subscription(mpsc::Sender<MercuryResponse>),
+    Subscription(MercuryResponseSender),
     Channel,
 }
 
@@ -45,7 +45,7 @@ pub struct MercuryPending {
 pub struct MercuryManager {
     next_seq: u32,
     pending: HashMap<Vec<u8>, MercuryPending>,
-    subscriptions: HashMap<String, mpsc::Sender<MercuryResponse>>,
+    subscriptions: HashMap<String, MercuryResponseSender>,
 }
 
 impl ToString for MercuryMethod {
@@ -103,9 +103,7 @@ impl MercuryManager {
         rx
     }
 
-    pub fn subscribe(&mut self, session: &Session, uri: String) -> mpsc::Receiver<MercuryResponse> {
-        let (tx, rx) = mpsc::channel();
-
+    pub fn subscribe(&mut self, session: &Session, uri: String, tx: MercuryResponseSender) {
         self.request_with_callback(session,
                                    MercuryRequest {
                                        method: MercuryMethod::SUB,
@@ -114,8 +112,6 @@ impl MercuryManager {
                                        payload: Vec::new(),
                                    },
                                    MercuryCallback::Subscription(tx));
-
-        rx
     }
 
     fn parse_part(mut s: &mut Read) -> Vec<u8> {
@@ -128,7 +124,7 @@ impl MercuryManager {
 
     fn complete_subscription(&mut self,
                              response: MercuryResponse,
-                             tx: mpsc::Sender<MercuryResponse>) {
+                             tx: MercuryResponseSender) {
         for sub_data in response.payload {
             if let Ok(mut sub) =
                    protobuf::parse_from_bytes::<protocol::pubsub::Subscription>(&sub_data) {
