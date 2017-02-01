@@ -1,22 +1,29 @@
-use super::Mixer;
-use super::AudioFilter;
 use std::borrow::Cow;
 use std::sync::{Arc, RwLock};
 
+use spirc::UpdateMessageSender;
+use spirc::UpdateMessage;
+
+use super::Mixer;
+use super::AudioFilter;
+
 pub struct SoftMixer {
-  volume: Arc<RwLock<u16>>
+  volume: Arc<RwLock<u16>>,
+  tx: Option<UpdateMessageSender>
 }
 
 impl SoftMixer {
     pub fn new() -> SoftMixer {
         SoftMixer {
-            volume: Arc::new(RwLock::new(0xFFFF))
+            volume: Arc::new(RwLock::new(0xFFFF)),
+            tx: None
         }
     }
 }
 
 impl Mixer for SoftMixer {
-    fn init(&self) {
+    fn init(&mut self, tx: UpdateMessageSender) {
+        self.tx = Some(tx);
     }
     fn start(&self) {
     }
@@ -27,6 +34,8 @@ impl Mixer for SoftMixer {
     }
     fn set_volume(&self, volume: u16) {
         *self.volume.write().unwrap() = volume;
+        let tx = self.tx.as_ref().expect("SoftMixer not initialized");
+        tx.send(UpdateMessage).unwrap();
     }
     fn get_audio_filter(&self) -> Option<Box<AudioFilter + Send>> {
         let vol = self.volume.clone();

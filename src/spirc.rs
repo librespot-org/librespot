@@ -68,6 +68,11 @@ implement_sender!(name => MercuryResponseSender,
                   with => SpircMessage, 
                   variant => MercuryMsg);
 
+implement_sender!(name => UpdateMessageSender, 
+                  wrap => UpdateMessage, 
+                  with => SpircMessage, 
+                  variant => UpdateMsg);
+
 impl SpircManager {
     pub fn new(session: Session, player: Player, mixer: Box<Mixer + Send>) -> SpircManager {
         let ident = session.device_id().to_owned();
@@ -110,6 +115,10 @@ impl SpircManager {
 
             internal.session.mercury_sub(internal.uri(), mercury_response_sender);
 
+            let update_message_sender = UpdateMessageSender::create(tx.clone());
+
+            internal.mixer.init(update_message_sender);
+
             internal.notify(true, None);
 
             // Use a weak pointer to avoid creating an Rc cycle between the player and the
@@ -127,20 +136,22 @@ impl SpircManager {
 
         for msg in rx {
             match msg {
-            SpircMessage::MercuryMsg(pkt) => {
-                let data = pkt.payload.first().unwrap();
-                let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(data).unwrap();
+                SpircMessage::MercuryMsg(pkt) => {
+                    let data = pkt.payload.first().unwrap();
+                    let frame = protobuf::parse_from_bytes::<protocol::spirc::Frame>(data).unwrap();
 
-                debug!("{:?} {:?} {} {} {}",
-                        frame.get_typ(),
-                        frame.get_device_state().get_name(),
-                        frame.get_ident(),
-                        frame.get_seq_nr(),
-                        frame.get_state_update_id());
+                    debug!("{:?} {:?} {} {} {}",
+                            frame.get_typ(),
+                            frame.get_device_state().get_name(),
+                            frame.get_ident(),
+                            frame.get_seq_nr(),
+                            frame.get_state_update_id());
 
-                self.0.lock().unwrap().handle(frame);
-            }
-            _ => {}
+                    self.0.lock().unwrap().handle(frame);
+                }
+                SpircMessage::UpdateMsg(_) => {
+                    self.0.lock().unwrap().notify(false, None);
+                }
             }
         }
     }

@@ -1,10 +1,13 @@
 use std::borrow::Cow;
+
+use spirc::UpdateMessageSender;
+
 use self::softmixer::SoftMixer;
 
 pub mod softmixer;
 
 pub trait Mixer {
-    fn init(&self);
+    fn init(&mut self, UpdateMessageSender);
     fn start(&self);
     fn stop(&self);
     fn set_volume(&self, volume: u16);
