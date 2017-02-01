@@ -139,10 +139,6 @@ impl Player {
     }
 }
 
-fn borrow_data<'a>(data: &'a [i16]) -> Cow<'a, [i16]> {
-    Cow::Borrowed(&data)
-}
-
 fn find_available_alternative<'a>(session: &Session, track: &'a Track) -> Option<Cow<'a, Track>> {
     if track.available {
         Some(Cow::Borrowed(track))
@@ -345,10 +341,10 @@ impl PlayerInternal {
 
                 match packet {
                     Some(Ok(packet)) => {
-                        let buffer = if let Some(ref editor) = stream_editor {
-                            editor.modify_stream(&packet.data)
-                        } else {
-                            borrow_data(&packet.data)
+                        let mut buffer = packet.data.to_vec();
+                        
+                        if let Some(ref editor) = stream_editor {
+                            editor.modify_stream(&mut buffer)
                         };
                         sink.write(&buffer).unwrap();
 

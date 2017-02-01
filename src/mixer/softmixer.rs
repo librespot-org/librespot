@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -48,18 +47,13 @@ struct SoftVolumeApplier {
 }
 
 impl AudioFilter for SoftVolumeApplier {
-    fn modify_stream<'a>(&self, data: &'a [i16]) -> Cow<'a, [i16]> {
+    fn modify_stream(&self, data: &mut [i16]) {
         let volume = self.volume.load(Ordering::Relaxed) as u16;
-        if volume == 0xFFFF {
-            Cow::Borrowed(data)
-        } else {
-            Cow::Owned(data.iter()
-                        .map(|&x| {
-                            (x as i32
-                                * volume as i32
-                                / 0xFFFF) as i16
-                        })
-                        .collect())
+        if volume != 0xFFFF {
+            let factor = volume as i32 / 0xFFFF;
+            for x in data.iter_mut() {
+                *x = (*x as i32 * factor) as i16;
+            }
         }
     }
 }

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use spirc::UpdateMessageSender;
 
 use self::softmixer::SoftMixer;
@@ -18,7 +16,7 @@ pub trait Mixer {
 }
 
 pub trait AudioFilter {
-  fn modify_stream<'a>(&self, data: &'a [i16]) -> Cow<'a, [i16]>;
+  fn modify_stream(&self, data: &mut [i16]);
 }
 
 pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<Box<Mixer + Send>> {
