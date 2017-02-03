@@ -4,7 +4,8 @@ use std::borrow::Cow;
 use std::sync::{mpsc, Mutex, Arc};
 use std::collections::HashMap;
 
-use mercury::{MercuryRequest, MercuryMethod, MercuryResponse};
+use mercury::{MercuryRequest, MercuryMethod};
+use messaging::{SpircMessage, MercuryResponseSender, UpdateMessageSender};
 use player::{Player, PlayerState};
 use mixer::Mixer;
 use session::Session;
@@ -55,23 +56,6 @@ pub struct State {
     pub track: Option<SpotifyId>,
     pub end_of_track: bool,
 }
-
-pub struct UpdateMessage;
-
-pub enum SpircMessage {
-    MercuryMsg(MercuryResponse),
-    UpdateMsg(UpdateMessage)
-}
-
-implement_sender!(name => MercuryResponseSender, 
-                  wrap => MercuryResponse, 
-                  with => SpircMessage, 
-                  variant => MercuryMsg);
-
-implement_sender!(name => UpdateMessageSender, 
-                  wrap => UpdateMessage, 
-                  with => SpircMessage, 
-                  variant => UpdateMsg);
 
 impl SpircManager {
     pub fn new(session: Session, player: Player, mixer: Box<Mixer + Send>) -> SpircManager {

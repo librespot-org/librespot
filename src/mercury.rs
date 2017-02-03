@@ -7,7 +7,7 @@ use std::mem::replace;
 
 use protocol;
 use session::{Session, PacketHandler};
-use spirc::MercuryResponseSender;
+use messaging::{MercuryResponse, MercuryResponseSender};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
@@ -21,12 +21,6 @@ pub struct MercuryRequest {
     pub method: MercuryMethod,
     pub uri: String,
     pub content_type: Option<String>,
-    pub payload: Vec<Vec<u8>>,
-}
-
-#[derive(Debug)]
-pub struct MercuryResponse {
-    pub uri: String,
     pub payload: Vec<Vec<u8>>,
 }
 

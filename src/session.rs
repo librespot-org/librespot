@@ -20,11 +20,11 @@ use authentication::Credentials;
 use cache::Cache;
 use connection::{self, PlainConnection, CipherConnection};
 use diffie_hellman::DHLocalKeys;
-use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
+use mercury::{MercuryManager, MercuryRequest};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use protocol;
 use stream::StreamManager;
-use spirc::MercuryResponseSender;
+use messaging::{MercuryResponse, MercuryResponseSender};
 use util::{self, SpotifyId, FileId, ReadSeek};
 use version;
 

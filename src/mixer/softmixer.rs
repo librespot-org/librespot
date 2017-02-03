@@ -1,8 +1,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use spirc::UpdateMessageSender;
-use spirc::UpdateMessage;
+use messaging::{UpdateMessage, UpdateMessageSender};
 
 use super::Mixer;
 use super::AudioFilter;

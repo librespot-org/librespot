@@ -1,4 +1,4 @@
-use spirc::UpdateMessageSender;
+use messaging::UpdateMessageSender;
 
 use self::softmixer::SoftMixer;
 
