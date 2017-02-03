@@ -290,9 +290,11 @@ impl SpircInternal {
             }
             MessageType::kMessageTypePlay => {
                 self.player.play();
+                self.mixer.start();
             }
             MessageType::kMessageTypePause => {
                 self.player.pause();
+                self.mixer.stop();
             }
             MessageType::kMessageTypeNext => {
                 self.index = (self.index + 1) % self.tracks.len() as u32;
@@ -314,6 +316,7 @@ impl SpircInternal {
                 if self.is_active && frame.get_device_state().get_is_active() {
                     self.is_active = false;
                     self.player.stop();
+                    self.mixer.stop();
                 }
             }
             MessageType::kMessageTypeVolume => {
