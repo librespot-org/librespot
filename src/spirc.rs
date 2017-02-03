@@ -1,6 +1,5 @@
 use eventual::Async;
 use protobuf::{self, Message, RepeatedField};
-use std::borrow::Cow;
 use std::sync::{mpsc, Mutex, Arc};
 use std::collections::HashMap;
 
@@ -55,6 +54,42 @@ pub struct State {
     pub volume: u16,
     pub track: Option<SpotifyId>,
     pub end_of_track: bool,
+}
+
+impl State {
+    pub fn new() -> State {
+        let state = State {
+            status: PlayStatus::kPlayStatusStop,
+            position_ms: 0,
+            position_measured_at: 0,
+            update_time: 0,
+            volume: 0,
+            track: None,
+            end_of_track: false,
+        };
+        state.update_time()
+    }
+
+    pub fn update_from_player(mut self, player: &Player) -> State {
+        let player_state = player.state();
+        let (position_ms, position_measured_at) = player_state.position();
+        self.status = player_state.status();
+        self.position_ms = position_ms;
+        self.position_measured_at = position_measured_at;
+        self.track = player_state.track;
+        self.end_of_track = player_state.end_of_track();
+        self.update_time()
+    }
+
+    pub fn update_from_mixer(mut self, mixer: &Box<Mixer + Send>) -> State {
+        self.volume = mixer.volume();
+        self.update_time()
+    }
+
+    fn update_time(mut self) -> State {
+        self.update_time = util::now_ms();
+        self
+    }
 }
 
 impl SpircManager {
@@ -432,16 +467,9 @@ impl<'a> CommandSender<'a> {
     }
 
     fn send(self) {
-        //TODO: get data
-        let state = Cow::Owned(State {
-            status: PlayStatus::kPlayStatusStop,
-            position_ms: 0,
-            position_measured_at: 0,
-            update_time: util::now_ms(),
-            volume: 0,
-            track: None,
-            end_of_track: false,
-        });
+        let state = State::new()
+                         .update_from_player(&self.spirc_internal.player)
+                         .update_from_mixer(&self.spirc_internal.mixer);
 
         let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
