@@ -1,29 +1,22 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use messaging::{UpdateMessage, UpdateMessageSender};
-
 use super::Mixer;
 use super::AudioFilter;
 
 pub struct SoftMixer {
-  volume: Arc<AtomicUsize>,
-  tx: Option<UpdateMessageSender>
+  volume: Arc<AtomicUsize>
 }
 
 impl SoftMixer {
     pub fn new() -> SoftMixer {
         SoftMixer {
-            volume: Arc::new(AtomicUsize::new(0xFFFF)),
-            tx: None
+            volume: Arc::new(AtomicUsize::new(0xFFFF))
         }
     }
 }
 
 impl Mixer for SoftMixer {
-    fn init(&mut self, tx: UpdateMessageSender) {
-        self.tx = Some(tx);
-    }
     fn start(&self) {
     }
     fn stop(&self) {
@@ -33,8 +26,6 @@ impl Mixer for SoftMixer {
     }
     fn set_volume(&self, volume: u16) {
         self.volume.store(volume as usize, Ordering::Relaxed);
-        let tx = self.tx.as_ref().expect("SoftMixer not initialized");
-        tx.send(UpdateMessage).unwrap();
     }
     fn get_audio_filter(&self) -> Option<Box<AudioFilter + Send>> {
         Some(Box::new(SoftVolumeApplier { volume: self.volume.clone() }))

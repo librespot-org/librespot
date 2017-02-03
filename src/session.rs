@@ -9,7 +9,7 @@ use protobuf::{self, Message};
 use rand::thread_rng;
 use std::io::{Read, Write, Cursor};
 use std::result::Result;
-use std::sync::{Mutex, RwLock, Arc};
+use std::sync::{Mutex, RwLock, Arc, mpsc};
 use std::str::FromStr;
 
 use album_cover::AlbumCover;
@@ -20,11 +20,10 @@ use authentication::Credentials;
 use cache::Cache;
 use connection::{self, PlainConnection, CipherConnection};
 use diffie_hellman::DHLocalKeys;
-use mercury::{MercuryManager, MercuryRequest};
+use mercury::{MercuryManager, MercuryRequest, MercuryResponse};
 use metadata::{MetadataManager, MetadataRef, MetadataTrait};
 use protocol;
 use stream::StreamManager;
-use messaging::{MercuryResponse, MercuryResponseSender};
 use util::{self, SpotifyId, FileId, ReadSeek};
 use version;
 
@@ -321,8 +320,8 @@ impl Session {
         self.0.mercury.lock().unwrap().request(self, req)
     }
 
-    pub fn mercury_sub(&self, uri: String, tx: MercuryResponseSender) {
-        self.0.mercury.lock().unwrap().subscribe(self, uri, tx)
+    pub fn mercury_sub(&self, uri: String) -> mpsc::Receiver<MercuryResponse> {
+        self.0.mercury.lock().unwrap().subscribe(self, uri)
     }
 
     pub fn cache(&self) -> &Cache {

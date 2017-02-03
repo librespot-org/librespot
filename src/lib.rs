@@ -8,9 +8,6 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
 
-#[macro_use] 
-pub mod util;
-
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 
@@ -61,9 +58,9 @@ pub mod link;
 pub mod metadata;
 pub mod player;
 pub mod stream;
+pub mod util;
 pub mod version;
 pub mod mixer;
-pub mod messaging;
 
 #[cfg(feature = "with-syntex")] include!(concat!(env!("OUT_DIR"), "/lib.rs"));
 #[cfg(not(feature = "with-syntex"))] include!("lib.in.rs");

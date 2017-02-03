@@ -4,10 +4,10 @@ use protobuf::{self, Message};
 use std::collections::HashMap;
 use std::io::{Cursor, Read, Write};
 use std::mem::replace;
+use std::sync::mpsc;
 
 use protocol;
 use session::{Session, PacketHandler};
-use messaging::{MercuryResponse, MercuryResponseSender};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
@@ -24,9 +24,15 @@ pub struct MercuryRequest {
     pub payload: Vec<Vec<u8>>,
 }
 
+#[derive(Debug)]
+pub struct MercuryResponse {
+    pub uri: String,
+    pub payload: Vec<Vec<u8>>,
+}
+
 enum MercuryCallback {
     Future(eventual::Complete<MercuryResponse, ()>),
-    Subscription(MercuryResponseSender),
+    Subscription(mpsc::Sender<MercuryResponse>),
     Channel,
 }
 
@@ -39,7 +45,7 @@ pub struct MercuryPending {
 pub struct MercuryManager {
     next_seq: u32,
     pending: HashMap<Vec<u8>, MercuryPending>,
-    subscriptions: HashMap<String, MercuryResponseSender>,
+    subscriptions: HashMap<String, mpsc::Sender<MercuryResponse>>,
 }
 
 impl ToString for MercuryMethod {
@@ -97,7 +103,9 @@ impl MercuryManager {
         rx
     }
 
-    pub fn subscribe(&mut self, session: &Session, uri: String, tx: MercuryResponseSender) {
+    pub fn subscribe(&mut self, session: &Session, uri: String) -> mpsc::Receiver<MercuryResponse> {
+        let (tx, rx) = mpsc::channel();
+
         self.request_with_callback(session,
                                    MercuryRequest {
                                        method: MercuryMethod::SUB,
@@ -106,6 +114,8 @@ impl MercuryManager {
                                        payload: Vec::new(),
                                    },
                                    MercuryCallback::Subscription(tx));
+
+        rx
     }
 
     fn parse_part(mut s: &mut Read) -> Vec<u8> {
@@ -118,7 +128,7 @@ impl MercuryManager {
 
     fn complete_subscription(&mut self,
                              response: MercuryResponse,
-                             tx: MercuryResponseSender) {
+                             tx: mpsc::Sender<MercuryResponse>) {
         for sub_data in response.payload {
             if let Ok(mut sub) =
                    protobuf::parse_from_bytes::<protocol::pubsub::Subscription>(&sub_data) {

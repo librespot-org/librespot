@@ -11,8 +11,6 @@ mod int128;
 mod spotify_id;
 mod arcvec;
 mod subfile;
-#[macro_use]
-mod channel;
 
 pub use util::int128::u128;
 pub use util::spotify_id::{SpotifyId, FileId};
