@@ -340,13 +340,11 @@ impl PlayerInternal {
                 let packet = decoder.as_mut().unwrap().packets().next();
 
                 match packet {
-                    Some(Ok(packet)) => {
-                        let mut buffer = packet.data.to_vec();
-                        
+                    Some(Ok(mut packet)) => {
                         if let Some(ref editor) = stream_editor {
-                            editor.modify_stream(&mut buffer)
+                            editor.modify_stream(&mut packet.data)
                         };
-                        sink.write(&buffer).unwrap();
+                        sink.write(&packet.data).unwrap();
 
                         self.update(|state| {
                             state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
