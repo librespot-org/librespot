@@ -49,9 +49,8 @@ impl AudioFilter for SoftVolumeApplier {
     fn modify_stream(&self, data: &mut [i16]) {
         let volume = self.volume.load(Ordering::Relaxed) as u16;
         if volume != 0xFFFF {
-            let factor = volume as i32 / 0xFFFF;
             for x in data.iter_mut() {
-                *x = (*x as i32 * factor) as i16;
+                *x = (*x as i32 * volume as i32 / 0xFFFF) as i16;
             }
         }
     }
