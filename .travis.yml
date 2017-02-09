@@ -1,14 +1,11 @@
 language: rust
 rust:
+  - 1.15.0
   - stable
   - beta
   - nightly
 
 cache: cargo
-
-matrix:
-  allow_failures:
-    - rust: nightly
 
 addons:
   apt:
@@ -25,17 +22,12 @@ before_script:
     - sh ~/rust-installer/rustup.sh --prefix=$(rustc --print sysroot) -y --disable-sudo --add-target=armv7-unknown-linux-gnueabihf
 
 script:
-    - cargo build --no-default-features --features "with-syntex"
-    - cargo build --no-default-features --features "with-syntex with-tremor"
-    - cargo build --no-default-features --features "with-syntex portaudio-backend"
-    - cargo build --no-default-features --features "with-syntex pulseaudio-backend"
-    - cargo build --no-default-features --features "with-syntex alsa-backend"
-    - cargo build --no-default-features --features "with-syntex" --target armv7-unknown-linux-gnueabihf
-
-    # Building without syntex only works on nightly
-    - if [[ $TRAVIS_RUST_VERSION == *"nightly"* ]]; then
-        cargo build --no-default-features --features "nightly";
-      fi
+    - cargo build --no-default-features
+    - cargo build --no-default-features --features "with-tremor"
+    - cargo build --no-default-features --features "portaudio-backend"
+    - cargo build --no-default-features --features "pulseaudio-backend"
+    - cargo build --no-default-features --features "alsa-backend"
+    - cargo build --no-default-features --target armv7-unknown-linux-gnueabihf
 
 notifications:
     email: false

@@ -60,14 +60,6 @@ The following backends are currently available :
 - PortAudio 
 - PulseAudio
 
-## Development
-When developing *librespot*, it is preferable to use Rust nightly, and build it using the following :
-```shell
-cargo build --no-default-features --features "nightly portaudio-backend"
-```
-
-This produces better compilation error messages than with the default configuration.
-
 ## Disclaimer
 Using this code to connect to Spotify's API is probably forbidden by them.
 Use at your own risk.

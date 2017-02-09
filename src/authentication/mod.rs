@@ -1,3 +1,4 @@
+use base64;
 use byteorder::{BigEndian, ByteOrder};
 use crypto;
 use crypto::aes;
@@ -12,7 +13,6 @@ use serde_json;
 use std::io::{self, stderr, Read, Write};
 use std::fs::File;
 use std::path::Path;
-use rustc_serialize::base64::{self, FromBase64, ToBase64};
 
 use protocol::authentication::AuthenticationType;
 
@@ -64,7 +64,7 @@ impl Credentials {
             Ok(data)
         }
 
-        let encrypted_blob = encrypted_blob.from_base64().unwrap();
+        let encrypted_blob = base64::decode(encrypted_blob).unwrap();
 
         let secret = {
             let mut data = [0u8; 20];
@@ -159,14 +159,14 @@ fn deserialize_protobuf_enum<T, D>(de: D) -> Result<T, D::Error>
 fn serialize_base64<T, S>(v: &T, ser: S) -> Result<S::Ok, S::Error>
     where T: AsRef<[u8]>, S: serde::Serializer {
 
-    serde::Serialize::serialize(&v.as_ref().to_base64(base64::STANDARD), ser)
+    serde::Serialize::serialize(&base64::encode(v.as_ref()), ser)
 }
 
 fn deserialize_base64<D>(de: D) -> Result<Vec<u8>, D::Error>
     where D: serde::Deserializer {
 
     let v : String = try!(serde::Deserialize::deserialize(de));
-    v.from_base64().map_err(|e| serde::de::Error::custom(e.to_string()))
+    base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
 mod discovery;

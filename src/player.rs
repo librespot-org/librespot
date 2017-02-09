@@ -29,7 +29,6 @@ struct PlayerInternal {
     sink: Box<Sink>,
 }
 
-//#[derive(Debug)]
 enum PlayerCommand {
     Load(SpotifyId, bool, u32, oneshot::Sender<()>),
     Play,
@@ -226,7 +225,7 @@ impl PlayerInternal {
     }
 
     fn handle_command(&mut self, cmd: PlayerCommand) {
-        //debug!("command={:?}", cmd);
+        debug!("command={:?}", cmd);
         match cmd {
             PlayerCommand::Load(track_id, play, position, end_of_track) => {
                 if self.state.is_playing() {
@@ -402,4 +401,37 @@ fn vorbis_time_seek_ms<R>(decoder: &mut vorbis::Decoder<R>, ms: i64) -> Result<(
 #[cfg(feature = "with-tremor")]
 fn vorbis_time_seek_ms<R>(decoder: &mut vorbis::Decoder<R>, ms: i64) -> Result<(), vorbis::VorbisError> where R: Read + Seek {
     decoder.time_seek(ms)
+}
+
+impl ::std::fmt::Debug for PlayerCommand {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+            PlayerCommand::Load(track, play, position, _) => {
+                f.debug_tuple("Load")
+                 .field(&track)
+                 .field(&play)
+                 .field(&position)
+                 .finish()
+            }
+            PlayerCommand::Play => {
+                f.debug_tuple("Play").finish()
+            }
+            PlayerCommand::Pause => {
+                f.debug_tuple("Pause").finish()
+            }
+            PlayerCommand::Volume(volume) => {
+                f.debug_tuple("Volume")
+                 .field(&volume)
+                 .finish()
+            }
+            PlayerCommand::Stop => {
+                f.debug_tuple("Stop").finish()
+            }
+            PlayerCommand::Seek(position) => {
+                f.debug_tuple("Seek")
+                 .field(&position)
+                 .finish()
+            }
+        }
+    }
 }

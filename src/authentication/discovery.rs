@@ -1,3 +1,4 @@
+use base64;
 use crypto::digest::Digest;
 use crypto::mac::Mac;
 use crypto;
@@ -9,7 +10,6 @@ use hyper::{self, Get, Post, StatusCode};
 use mdns;
 use num_bigint::BigUint;
 use rand;
-use rustc_serialize::base64::{self, ToBase64, FromBase64};
 use std::collections::BTreeMap;
 use std::io;
 use std::net::SocketAddr;
@@ -77,8 +77,8 @@ impl Discovery {
     fn handle_get_info(&self, _params: &BTreeMap<String, String>)
         -> ::futures::Finished<Response, hyper::Error>
     {
-        let public_key = self.0.public_key.to_bytes_be()
-                                        .to_base64(base64::STANDARD);
+        let public_key = self.0.public_key.to_bytes_be();
+        let public_key = base64::encode(&public_key);
 
         let result = json!({
             "status": 101,
@@ -107,9 +107,9 @@ impl Discovery {
         let encrypted_blob = params.get("blob").unwrap();
         let client_key = params.get("clientKey").unwrap();
 
-        let encrypted_blob = encrypted_blob.from_base64().unwrap();
+        let encrypted_blob = base64::decode(encrypted_blob).unwrap();
 
-        let client_key = client_key.from_base64().unwrap();
+        let client_key = base64::decode(client_key).unwrap();
         let client_key = BigUint::from_bytes_be(&client_key);
 
         let shared_key = util::powm(&client_key, &self.0.private_key, &DH_PRIME);
