@@ -153,7 +153,7 @@ fn deserialize_protobuf_enum<T, D>(de: D) -> Result<T, D::Error>
     where T: ProtobufEnum, D: serde::Deserializer {
 
     let v : i32 = try!(serde::Deserialize::deserialize(de));
-    T::from_i32(v).ok_or(serde::de::Error::custom("Invalid enum value"))
+    T::from_i32(v).ok_or_else(|| serde::de::Error::custom("Invalid enum value"))
 }
 
 fn serialize_base64<T, S>(v: &T, ser: S) -> Result<S::Ok, S::Error>
@@ -197,7 +197,7 @@ pub fn get_credentials(device_name: &str, device_id: &str,
 
         (None, _, None) => {
             info!("No username provided and no stored credentials, starting discovery ...");
-            discovery_login(device_name.clone(), device_id.clone()).unwrap()
+            discovery_login(device_name, device_id).unwrap()
         }
     }
 }

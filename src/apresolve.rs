@@ -16,7 +16,7 @@ pub struct APResolveData {
 pub fn apresolve(handle: &Handle) -> Box<Future<Item=String, Error=Error>> {
     let url = Url::parse(APRESOLVE_ENDPOINT).expect("invalid AP resolve URL");
 
-    let client = Client::new(&handle);
+    let client = Client::new(handle);
     let response = client.get(url);
 
     let body = response.and_then(|response| {

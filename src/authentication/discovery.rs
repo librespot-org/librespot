@@ -128,13 +128,13 @@ impl Discovery {
 
         let checksum_key = {
             let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &base_key);
-            h.input("checksum".as_bytes());
+            h.input(b"checksum");
             h.result().code().to_owned()
         };
 
         let encryption_key = {
             let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &base_key);
-            h.input("encryption".as_bytes());
+            h.input(b"encryption");
             h.result().code().to_owned()
         };
 
@@ -149,9 +149,8 @@ impl Discovery {
         let decrypted = {
             let mut data = vec![0u8; encrypted.len()];
             let mut cipher = crypto::aes::ctr(crypto::aes::KeySize::KeySize128,
-                                              &encryption_key[0..16],
-                                              &iv);
-            cipher.process(&encrypted, &mut data);
+                                              &encryption_key[0..16], iv);
+            cipher.process(encrypted, &mut data);
             String::from_utf8(data).unwrap()
         };
 
