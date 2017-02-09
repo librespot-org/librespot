@@ -80,7 +80,7 @@ fn initial_device_state(name: String, volume: u16) -> DeviceState {
             },
             @{
                 typ: protocol::spirc::CapabilityType::kVolumeSteps,
-                intValue => [10]
+                intValue => [64]
             },
             @{
                 typ: protocol::spirc::CapabilityType::kSupportedContexts,
