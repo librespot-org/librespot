@@ -88,5 +88,5 @@ section = "sound"
 priority = "optional"
 assets = [
     ["target/release/librespot", "usr/bin/", "755"],
-    ["assets/librespot.service", "lib/systemd/system/", "644"]
+    ["contrib/librespot.service", "lib/systemd/system/", "644"]
 ]
