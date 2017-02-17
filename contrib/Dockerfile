@@ -27,11 +27,13 @@ ENV PATH="/root/.cargo/bin/:${PATH}"
 RUN rustup target add arm-unknown-linux-gnueabi
 RUN rustup target add arm-unknown-linux-gnueabihf
 
-RUN echo '[target.arm-unknown-linux-gnueabihf]\nlinker = "arm-linux-gnueabihf-gcc"' > ~/.cargo/config
-RUN echo '[target.arm-unknown-linux-gnueabi]\nlinker = "arm-linux-gnueabi-gcc"' > ~/.cargo/config
+RUN mkdir /.cargo && \
+    echo '[target.arm-unknown-linux-gnueabihf]\nlinker = "arm-linux-gnueabihf-gcc"' > /.cargo/config && \
+    echo '[target.arm-unknown-linux-gnueabi]\nlinker = "arm-linux-gnueabi-gcc"' >> /.cargo/config
 
 RUN mkdir /build
 ENV CARGO_TARGET_DIR /build
+ENV CARGO_HOME /build/cache
 
 ADD . /src
 WORKDIR /src
