@@ -1,18 +1,19 @@
 #[macro_use] extern crate log;
-extern crate getopts;
-extern crate librespot;
 extern crate ctrlc;
 extern crate env_logger;
 extern crate futures;
+extern crate getopts;
+extern crate librespot;
 extern crate tokio_core;
 
 use env_logger::LogBuilder;
-use std::io::{stderr, Write};
-use std::process::exit;
-use std::env;
-use std::path::PathBuf;
-use std::str::FromStr;
 use futures::Future;
+use std::cell::{RefCell, Cell};
+use std::env;
+use std::io::{stderr, Write};
+use std::path::PathBuf;
+use std::process::exit;
+use std::str::FromStr;
 use tokio_core::reactor::Core;
 
 use librespot::spirc::Spirc;
@@ -173,10 +174,18 @@ fn main() {
         });
 
         let (spirc, task) = Spirc::new(session.clone(), player, mixer);
-        let spirc = ::std::cell::RefCell::new(spirc);
+        let spirc = RefCell::new(spirc);
 
+        let shutting_down = Cell::new(false);
         ctrlc::set_handler(move || {
-            spirc.borrow_mut().shutdown();
+            if shutting_down.get() {
+                warn!("Forced shutdown");
+                exit(1);
+            } else {
+                info!("Shutting down");
+                spirc.borrow_mut().shutdown();
+                shutting_down.set(true);
+            }
         });
 
         task.map_err(|()| panic!("spirc error"))
