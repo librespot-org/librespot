@@ -73,20 +73,19 @@ use self::pipe::StdoutSink;
 
 declare_backends! {
     pub const BACKENDS : &'static [
-        (&'static str,
-         &'static (Fn(Option<String>) -> Box<Sink> + Sync + Send + 'static))
+        (&'static str, fn(Option<String>) -> Box<Sink>)
     ] = &[
         #[cfg(feature = "alsa-backend")]
-        ("alsa", &mk_sink::<AlsaSink>),
+        ("alsa", mk_sink::<AlsaSink>),
         #[cfg(feature = "portaudio-backend")]
-        ("portaudio", &mk_sink::<PortAudioSink>),
+        ("portaudio", mk_sink::<PortAudioSink>),
         #[cfg(feature = "pulseaudio-backend")]
-        ("pulseaudio", &mk_sink::<PulseAudioSink>),
-        ("pipe", &mk_sink::<StdoutSink>),
+        ("pulseaudio", mk_sink::<PulseAudioSink>),
+        ("pipe", mk_sink::<StdoutSink>),
     ];
 }
 
-pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<&'static (Fn(Option<String>) -> Box<Sink> + Send + Sync)> {
+pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<fn(Option<String>) -> Box<Sink>> {
     if let Some(name) = name.as_ref().map(AsRef::as_ref) {
         BACKENDS.iter().find(|backend| name == backend.0).map(|backend| backend.1)
     } else {

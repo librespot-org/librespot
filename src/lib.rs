@@ -64,6 +64,7 @@ pub mod player;
 pub mod session;
 pub mod util;
 pub mod version;
+pub mod mixer;
 
 
 include!(concat!(env!("OUT_DIR"), "/lib.rs"));

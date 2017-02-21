@@ -4,10 +4,6 @@ applications to use Spotify's service, without using the official but
 closed-source libspotify. Additionally, it will provide extra features
 which are not available in the official library.
 
-## Status
-*librespot* is currently under development and is not fully functional yet. You
-are however welcome to experiment with it.
-
 ## Building
 Rust 1.7.0 or later is required to build librespot.
 
@@ -59,6 +55,36 @@ The following backends are currently available :
 - ALSA
 - PortAudio 
 - PulseAudio
+
+## Cross-compiling
+A cross compilation environment is provided as a docker image.
+Build the image from the root of the project with the following command :
+
+```
+$ docker build -t librespot-cross -f contrib/Dockerfile .
+```
+
+The resulting image can be used to build librespot for linux x86_64, armhf and armel.
+The compiled binaries will be located in /tmp/librespot-build
+
+```
+docker run -v /tmp/librespot-build:/build librespot-cross
+```
+
+If only one architecture is desired, cargo can be invoked directly with the appropriate options :
+```shell
+docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --no-default-features --features "with-syntex alsa-backend"
+docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features "with-syntex alsa-backend"
+docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabi --no-default-features --features "with-syntex alsa-backend"
+```
+
+## Development
+When developing *librespot*, it is preferable to use Rust nightly, and build it using the following :
+```shell
+cargo build --no-default-features --features "nightly portaudio-backend"
+```
+
+This produces better compilation error messages than with the default configuration.
 
 ## Disclaimer
 Using this code to connect to Spotify's API is probably forbidden by them.

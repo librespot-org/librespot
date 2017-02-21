@@ -21,6 +21,8 @@ use librespot::audio_backend::{self, Sink, BACKENDS};
 use librespot::cache::Cache;
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
+use librespot::mixer::{self, Mixer};
+
 use librespot::version;
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
@@ -62,9 +64,9 @@ fn list_backends() {
     }
 }
 
-#[derive(Clone)]
 struct Setup {
-    backend: &'static (Fn(Option<String>) -> Box<Sink> + Send + Sync),
+    backend: fn(Option<String>) -> Box<Sink>,
+    mixer: Box<Mixer + Send>,
     cache: Option<Cache>,
     config: Config,
     credentials: Credentials,
@@ -82,7 +84,8 @@ fn setup(args: &[String]) -> Setup {
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
-        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE");
+        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
+        .optopt("", "mixer", "Mixer to use", "MIXER");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -108,6 +111,10 @@ fn setup(args: &[String]) -> Setup {
 
     let backend = audio_backend::find(backend_name.as_ref())
         .expect("Invalid backend");
+
+    let mixer_name = matches.opt_str("mixer");
+    let mixer = mixer::find(mixer_name.as_ref())
+        .expect("Invalid mixer");
 
     let bitrate = matches.opt_str("b").as_ref()
         .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
@@ -140,6 +147,7 @@ fn setup(args: &[String]) -> Setup {
 
     Setup {
         backend: backend,
+        mixer: mixer,
         cache: cache,
         config: config,
         credentials: credentials,
@@ -153,16 +161,18 @@ fn main() {
 
     let args: Vec<String> = std::env::args().collect();
 
-    let Setup { backend, cache, config, credentials, device } = setup(&args);
+    let Setup { backend, mixer, cache, config, credentials, device }
+        = setup(&args);
 
     let connection = Session::connect(config, credentials, cache, handle);
 
     let task = connection.and_then(move |session| {
-        let player = Player::new(session.clone(), move || {
+        let audio_filter = mixer.get_audio_filter();
+        let player = Player::new(session.clone(), audio_filter, move || {
             (backend)(device)
         });
 
-        let (spirc, task) = Spirc::new(session.clone(), player);
+        let (spirc, task) = Spirc::new(session.clone(), player, mixer);
         let spirc = ::std::cell::RefCell::new(spirc);
 
         ctrlc::set_handler(move || {

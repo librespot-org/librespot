@@ -7,6 +7,7 @@ use protobuf::{self, Message};
 
 use mercury::MercuryError;
 use player::Player;
+use mixer::Mixer;
 use session::Session;
 use util::{now_ms, SpotifyId, SeqGenerator};
 use version;
@@ -16,6 +17,7 @@ use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
 
 pub struct SpircTask {
     player: Player,
+    mixer: Box<Mixer + Send>,
 
     sequence: SeqGenerator<u32>,
 
@@ -43,7 +45,6 @@ fn initial_state() -> State {
     protobuf_init!(protocol::spirc::State::new(), {
         repeat: false,
         shuffle: false,
-
         status: PlayStatus::kPlayStatusStop,
         position_ms: 0,
         position_measured_at: 0,
@@ -109,7 +110,9 @@ fn initial_device_state(name: String, volume: u16) -> DeviceState {
 }
 
 impl Spirc {
-    pub fn new(session: Session, player: Player) -> (Spirc, SpircTask) {
+    pub fn new(session: Session, player: Player, mixer: Box<Mixer + Send>)
+        -> (Spirc, SpircTask)
+    {
         let ident = session.device_id().to_owned();
         let name = session.config().name.clone();
 
@@ -130,10 +133,11 @@ impl Spirc {
 
         let volume = 0xFFFF;
         let device = initial_device_state(name, volume);
-        player.volume(volume);
+        mixer.set_volume(volume);
 
         let mut task = SpircTask {
             player: player,
+            mixer: mixer,
 
             sequence: SeqGenerator::new(1),
 
@@ -269,6 +273,7 @@ impl SpircTask {
 
             MessageType::kMessageTypePlay => {
                 if self.state.get_status() == PlayStatus::kPlayStatusPause {
+                    self.mixer.start();
                     self.player.play();
                     self.state.set_status(PlayStatus::kPlayStatusPlay);
                     self.state.set_position_measured_at(now_ms() as u64);
@@ -280,6 +285,7 @@ impl SpircTask {
             MessageType::kMessageTypePause => {
                 if self.state.get_status() == PlayStatus::kPlayStatusPlay {
                     self.player.pause();
+                    self.mixer.stop();
                     self.state.set_status(PlayStatus::kPlayStatusPause);
 
                     let now = now_ms() as u64;
@@ -349,7 +355,7 @@ impl SpircTask {
             MessageType::kMessageTypeVolume => {
                 let volume = frame.get_volume();
                 self.device.set_volume(volume);
-                self.player.volume(volume as u16);
+                self.mixer.set_volume(frame.get_volume() as u16);
                 self.notify(None);
             }
 
@@ -360,6 +366,7 @@ impl SpircTask {
                     self.device.set_is_active(false);
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
+                    self.mixer.stop();
                 }
             }
 
@@ -398,7 +405,6 @@ impl SpircTask {
             let gid = self.state.get_track()[index as usize].get_gid();
             SpotifyId::from_raw(gid)
         };
-
         let position = self.state.get_position_ms();
 
         let end_of_track = self.player.load(track, play, position);
@@ -423,52 +429,49 @@ impl SpircTask {
         }
         cs.send();
     }
-
-    fn spirc_state(&self) -> protocol::spirc::State {
-        self.state.clone()
-    }
 }
 
 struct CommandSender<'a> {
     spirc: &'a mut SpircTask,
-    cmd: MessageType,
-    recipient: Option<String>,
+    frame: protocol::spirc::Frame,
 }
 
 impl<'a> CommandSender<'a> {
     fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender {
-        CommandSender {
-            spirc: spirc,
-            cmd: cmd,
-            recipient: None,
-        }
-    }
-
-    fn recipient(mut self, r: &str) -> CommandSender<'a> {
-        self.recipient = Some(r.to_owned());
-        self
-    }
-
-    fn send(self) {
-        let mut frame = protobuf_init!(Frame::new(), {
+        let frame = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
-            ident: self.spirc.ident.clone(),
             protocol_version: "2.0.0",
-            seq_nr: self.spirc.sequence.get(),
-            typ: self.cmd,
-            device_state: self.spirc.device.clone(),
+            ident: spirc.ident.clone(),
+            seq_nr: spirc.sequence.get(),
+            typ: cmd,
+
+            device_state: spirc.device.clone(),
             state_update_id: now_ms(),
         });
 
-        if let Some(recipient) = self.recipient {
-            frame.mut_recipient().push(recipient.to_owned());
+        CommandSender {
+            spirc: spirc,
+            frame: frame,
+        }
+    }
+
+    fn recipient(mut self, recipient: &'a str) -> CommandSender {
+        self.frame.mut_recipient().push(recipient.to_owned());
+        self
+    }
+
+    #[allow(dead_code)]
+    fn state(mut self, state: protocol::spirc::State) -> CommandSender<'a> {
+        self.frame.set_state(state);
+        self
+    }
+
+    fn send(mut self) {
+        if !self.frame.has_state() && self.spirc.device.get_is_active() {
+            self.frame.set_state(self.spirc.state.clone());
         }
 
-        if self.spirc.device.get_is_active() {
-            frame.set_state(self.spirc.spirc_state());
-        }
-
-        let ready = self.spirc.sender.start_send(frame).unwrap().is_ready();
-        assert!(ready);
+        let send = self.spirc.sender.start_send(self.frame).unwrap();
+        assert!(send.is_ready());
     }
 }

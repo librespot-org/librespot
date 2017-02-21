@@ -13,6 +13,7 @@ use audio_decrypt::AudioDecrypt;
 use audio_file::AudioFile;
 use metadata::{FileFormat, Track};
 use session::{Bitrate, Session};
+use mixer::AudioFilter;
 use util::{self, SpotifyId, Subfile};
 
 #[derive(Clone)]
@@ -25,21 +26,20 @@ struct PlayerInternal {
     commands: std::sync::mpsc::Receiver<PlayerCommand>,
 
     state: PlayerState,
-    volume: u16,
     sink: Box<Sink>,
+    audio_filter: Option<Box<AudioFilter + Send>>,
 }
 
 enum PlayerCommand {
     Load(SpotifyId, bool, u32, oneshot::Sender<()>),
     Play,
     Pause,
-    Volume(u16),
     Stop,
     Seek(u32),
 }
 
 impl Player {
-    pub fn new<F>(session: Session, sink_builder: F) -> Player
+    pub fn new<F>(session: Session, audio_filter: Option<Box<AudioFilter + Send>>, sink_builder: F) -> Player
         where F: FnOnce() -> Box<Sink> + Send + 'static {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
 
@@ -49,8 +49,8 @@ impl Player {
                 commands: cmd_rx,
 
                 state: PlayerState::Stopped,
-                volume: 0xFFFF,
                 sink: sink_builder(),
+                audio_filter: audio_filter,
             };
 
             internal.run();
@@ -88,10 +88,6 @@ impl Player {
 
     pub fn seek(&self, position_ms: u32) {
         self.command(PlayerCommand::Seek(position_ms));
-    }
-
-    pub fn volume(&self, vol: u16) {
-        self.command(PlayerCommand::Volume(vol));
     }
 }
 
@@ -203,11 +199,9 @@ impl PlayerInternal {
     fn handle_packet(&mut self, packet: Option<Result<vorbis::Packet, VorbisError>>) {
         match packet {
             Some(Ok(mut packet)) => {
-                if self.volume < 0xFFFF {
-                    for x in &mut packet.data {
-                        *x = (*x as i32 * self.volume as i32 / 0xFFFF) as i16;
-                    }
-                }
+                if let Some(ref editor) = self.audio_filter {
+                    editor.modify_stream(&mut packet.data)
+                };
 
                 self.sink.write(&packet.data).unwrap();
             }
@@ -313,10 +307,6 @@ impl PlayerInternal {
                     PlayerState::Invalid => panic!("invalid state"),
                 }
             }
-
-            PlayerCommand::Volume(vol) => {
-                self.volume = vol;
-            }
         }
     }
 
@@ -418,11 +408,6 @@ impl ::std::fmt::Debug for PlayerCommand {
             }
             PlayerCommand::Pause => {
                 f.debug_tuple("Pause").finish()
-            }
-            PlayerCommand::Volume(volume) => {
-                f.debug_tuple("Volume")
-                 .field(&volume)
-                 .finish()
             }
             PlayerCommand::Stop => {
                 f.debug_tuple("Stop").finish()

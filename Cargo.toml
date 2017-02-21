@@ -16,6 +16,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "librespot"
 path = "src/main.rs"
+doc = false
 
 [dependencies.librespot-protocol]
 path = "protocol"
@@ -86,5 +87,5 @@ section = "sound"
 priority = "optional"
 assets = [
     ["target/release/librespot", "usr/bin/", "755"],
-    ["assets/librespot.service", "lib/systemd/system/", "644"]
+    ["contrib/librespot.service", "lib/systemd/system/", "644"]
 ]
