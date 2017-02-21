@@ -60,6 +60,7 @@ pub mod player;
 pub mod stream;
 pub mod util;
 pub mod version;
+pub mod mixer;
 
 #[cfg(feature = "with-syntex")] include!(concat!(env!("OUT_DIR"), "/lib.rs"));
 #[cfg(not(feature = "with-syntex"))] include!("lib.in.rs");

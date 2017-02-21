@@ -18,6 +18,8 @@ use librespot::audio_backend::{self, BACKENDS};
 use librespot::cache::{Cache, DefaultCache, NoCache};
 use librespot::player::Player;
 use librespot::session::{Bitrate, Config, Session};
+use librespot::mixer::{self, Mixer};
+
 use librespot::version;
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
@@ -59,7 +61,7 @@ fn list_backends() {
     }
 }
 
-fn setup(args: &[String]) -> (Session, Player) {
+fn setup(args: &[String]) -> (Session, Player, Box<Mixer + Send>) {
     let mut opts = getopts::Options::new();
     opts.optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .reqopt("n", "name", "Device name", "NAME")
@@ -70,7 +72,8 @@ fn setup(args: &[String]) -> (Session, Player) {
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
-        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE");
+        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
+        .optopt("", "mixer", "Mixer to use", "MIXER");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -119,20 +122,24 @@ fn setup(args: &[String]) -> (Session, Player) {
     let credentials = get_credentials(&session, matches.opt_str("username"),
     matches.opt_str("password"));
     session.login(credentials).unwrap();
+ 
+    let mixer_name = matches.opt_str("mixer");
+    let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
+    let audio_filter = mixer.get_audio_filter();
 
     let device_name = matches.opt_str("device");
-    let player = Player::new(session.clone(), move || {
+    let player = Player::new(session.clone(), audio_filter, move || {
         (backend)(device_name.as_ref().map(AsRef::as_ref))
     });
 
-    (session, player)
+    (session, player, mixer)
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let (session, player) = setup(&args);
+    let (session, player, mixer) = setup(&args);
 
-    let spirc = SpircManager::new(session.clone(), player);
+    let spirc = SpircManager::new(session.clone(), player, mixer);
     let spirc_signal = spirc.clone();
     thread::spawn(move || spirc.run());
 

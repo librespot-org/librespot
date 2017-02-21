@@ -9,6 +9,7 @@ use audio_decrypt::AudioDecrypt;
 use audio_backend::Sink;
 use metadata::{FileFormat, Track, TrackRef};
 use session::{Bitrate, Session};
+use mixer::AudioFilter;
 use util::{self, ReadSeek, SpotifyId, Subfile};
 pub use spirc::PlayStatus;
 
@@ -47,8 +48,6 @@ pub struct PlayerState {
     pub status: PlayStatus,
     pub position_ms: u32,
     pub position_measured_at: i64,
-    pub update_time: i64,
-    pub volume: u16,
     pub track: Option<SpotifyId>,
 
     pub end_of_track: bool,
@@ -67,14 +66,13 @@ enum PlayerCommand {
     Load(SpotifyId, bool, u32),
     Play,
     Pause,
-    Volume(u16),
     Stop,
     Seek(u32),
     SeekAt(u32, i64),
 }
 
 impl Player {
-    pub fn new<F>(session: Session, sink_builder: F) -> Player
+    pub fn new<F>(session: Session, stream_editor: Option<Box<AudioFilter + Send>>, sink_builder: F) -> Player
         where F: FnOnce() -> Box<Sink> + Send + 'static {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
@@ -82,8 +80,6 @@ impl Player {
             status: PlayStatus::kPlayStatusStop,
             position_ms: 0,
             position_measured_at: 0,
-            update_time: util::now_ms(),
-            volume: 0xFFFF,
             track: None,
             end_of_track: false,
         }));
@@ -97,7 +93,7 @@ impl Player {
             observers: observers.clone(),
         };
 
-        thread::spawn(move || internal.run(sink_builder()));
+        thread::spawn(move || internal.run(sink_builder(), stream_editor));
 
         Player {
             commands: cmd_tx,
@@ -138,27 +134,8 @@ impl Player {
         self.state.lock().unwrap().clone()
     }
 
-    pub fn volume(&self, vol: u16) {
-        self.command(PlayerCommand::Volume(vol));
-    }
-
     pub fn add_observer(&self, observer: PlayerObserver) {
         self.observers.lock().unwrap().push(observer);
-    }
-}
-
-fn apply_volume(volume: u16, data: &[i16]) -> Cow<[i16]> {
-    // Fast path when volume is 100%
-    if volume == 0xFFFF {
-        Cow::Borrowed(data)
-    } else {
-        Cow::Owned(data.iter()
-                       .map(|&x| {
-                           (x as i32
-                            * volume as i32
-                            / 0xFFFF) as i16
-                       })
-                       .collect())
     }
 }
 
@@ -229,7 +206,7 @@ fn run_onstop(session: &Session) {
 }
 
 impl PlayerInternal {
-    fn run(self, mut sink: Box<Sink>) {
+    fn run(self, mut sink: Box<Sink>, stream_editor: Option<Box<AudioFilter + Send>>) {
         let mut decoder = None;
 
         loop {
@@ -334,7 +311,6 @@ impl PlayerInternal {
                 Some(PlayerCommand::Pause) => {
                     self.update(|state| {
                         state.status = PlayStatus::kPlayStatusPause;
-                        state.update_time = util::now_ms();
                         state.position_ms = decoder.as_mut().map(|d| vorbis_time_tell_ms(d).unwrap()).unwrap_or(0) as u32;
                         state.position_measured_at = util::now_ms();
                         true
@@ -342,12 +318,6 @@ impl PlayerInternal {
 
                     sink.stop().unwrap();
                     run_onstop(&self.session);
-                }
-                Some(PlayerCommand::Volume(vol)) => {
-                    self.update(|state| {
-                        state.volume = vol;
-                        true
-                    });
                 }
                 Some(PlayerCommand::Stop) => {
                     self.update(|state| {
@@ -370,10 +340,11 @@ impl PlayerInternal {
                 let packet = decoder.as_mut().unwrap().packets().next();
 
                 match packet {
-                    Some(Ok(packet)) => {
-                        let buffer = apply_volume(self.state.lock().unwrap().volume,
-                                                  &packet.data);
-                        sink.write(&buffer).unwrap();
+                    Some(Ok(mut packet)) => {
+                        if let Some(ref editor) = stream_editor {
+                            editor.modify_stream(&mut packet.data)
+                        };
+                        sink.write(&packet.data).unwrap();
 
                         self.update(|state| {
                             state.position_ms = vorbis_time_tell_ms(decoder.as_mut().unwrap()).unwrap() as u32;
@@ -408,7 +379,6 @@ impl PlayerInternal {
 
         let observers = self.observers.lock().unwrap();
         if update {
-            guard.update_time = util::now_ms();
             let state = guard.clone();
             drop(guard);
 
@@ -426,14 +396,6 @@ impl PlayerState {
 
     pub fn position(&self) -> (u32, i64) {
         (self.position_ms, self.position_measured_at)
-    }
-
-    pub fn volume(&self) -> u16 {
-        self.volume
-    }
-
-    pub fn update_time(&self) -> i64 {
-        self.update_time
     }
 
     pub fn end_of_track(&self) -> bool {
