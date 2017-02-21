@@ -44,53 +44,6 @@ struct SpircInternal {
     devices: HashMap<String, String>,
 }
 
-#[derive(Clone)]
-pub struct State {
-    pub status: PlayStatus,
-    pub position_ms: u32,
-    pub position_measured_at: i64,
-    pub update_time: i64,
-    pub volume: u16,
-    pub track: Option<SpotifyId>,
-    pub end_of_track: bool,
-}
-
-impl State {
-    pub fn new() -> State {
-        let state = State {
-            status: PlayStatus::kPlayStatusStop,
-            position_ms: 0,
-            position_measured_at: 0,
-            update_time: 0,
-            volume: 0,
-            track: None,
-            end_of_track: false,
-        };
-        state.update_time()
-    }
-
-    pub fn update_from_player(mut self, player: &Player) -> State {
-        let player_state = player.state();
-        let (position_ms, position_measured_at) = player_state.position();
-        self.status = player_state.status();
-        self.position_ms = position_ms;
-        self.position_measured_at = position_measured_at;
-        self.track = player_state.track;
-        self.end_of_track = player_state.end_of_track();
-        self.update_time()
-    }
-
-    pub fn update_from_mixer(mut self, mixer: &Box<Mixer + Send>) -> State {
-        self.volume = mixer.volume();
-        self.update_time()
-    }
-
-    fn update_time(mut self) -> State {
-        self.update_time = util::now_ms();
-        self
-    }
-}
-
 impl SpircManager {
     pub fn new(session: Session, player: Player, mixer: Box<Mixer + Send>) -> SpircManager {
         let ident = session.device_id().to_owned();
@@ -340,11 +293,14 @@ impl SpircInternal {
         cs.send();
     }
 
-    fn spirc_state(&self, state: &State) -> protocol::spirc::State {
+    fn spirc_state(&self) -> protocol::spirc::State {
+        let player_state = self.player.state();
+        let (position_ms, position_measured_at) = player_state.position();
+
         protobuf_init!(protocol::spirc::State::new(), {
-            status: state.status,
-            position_ms: state.position_ms,
-            position_measured_at: state.position_measured_at as u64,
+            status: player_state.status(),
+            position_ms: position_ms,
+            position_measured_at: position_measured_at as u64,
 
             playing_track_index: self.index,
             track: self.tracks.iter().map(|track| {
@@ -363,12 +319,12 @@ impl SpircInternal {
         })
     }
 
-    fn device_state(&self, state: &State) -> protocol::spirc::DeviceState {
+    fn device_state(&self) -> protocol::spirc::DeviceState {
         protobuf_init!(protocol::spirc::DeviceState::new(), {
             sw_version: version::version_string(),
             is_active: self.is_active,
             can_play: self.can_play,
-            volume: state.volume as u32,
+            volume: self.mixer.volume() as u32,
             name: self.name.clone(),
             error_code: 0,
             became_active_at: if self.is_active { self.became_active_at as i64 } else { 0 },
@@ -429,63 +385,54 @@ impl SpircInternal {
 }
 
 struct CommandSender<'a> {
-    spirc_internal: &'a mut SpircInternal,
-    cmd: MessageType,
-    recipient: Option<&'a str>,
-    state: Option<protocol::spirc::State>,
+    spirc: &'a mut SpircInternal,
+    frame: protocol::spirc::Frame,
 }
 
 impl<'a> CommandSender<'a> {
-    fn new(spirc_internal: &'a mut SpircInternal, cmd: MessageType) -> CommandSender {
-        CommandSender {
-            spirc_internal: spirc_internal,
-            cmd: cmd,
-            recipient: None,
-            state: None,
-        }
-    }
-
-    fn recipient(mut self, r: &'a str) -> CommandSender {
-        self.recipient = Some(r);
-        self
-    }
-
-    fn state(mut self, s: protocol::spirc::State) -> CommandSender<'a> {
-        self.state = Some(s);
-        self
-    }
-
-    fn send(self) {
-        let state = State::new()
-                         .update_from_player(&self.spirc_internal.player)
-                         .update_from_mixer(&self.spirc_internal.mixer);
-
-        let mut pkt = protobuf_init!(protocol::spirc::Frame::new(), {
+    fn new(spirc: &'a mut SpircInternal, cmd: MessageType) -> CommandSender {
+        let frame = protobuf_init!(protocol::spirc::Frame::new(), {
             version: 1,
-            ident: self.spirc_internal.ident.clone(),
             protocol_version: "2.0.0",
-            seq_nr: { self.spirc_internal.seq_nr += 1; self.spirc_internal.seq_nr  },
-            typ: self.cmd,
-            recipient: RepeatedField::from_vec(
-                self.recipient.map(|r| vec![r.to_owned()] ).unwrap_or(vec![])
-                ),
-            device_state: self.spirc_internal.device_state(&state),
-            state_update_id: state.update_time
+            ident: spirc.ident.clone(),
+            seq_nr: { spirc.seq_nr += 1; spirc.seq_nr  },
+            typ: cmd,
+
+            device_state: spirc.device_state(),
+            state_update_id: util::now_ms(),
         });
 
-        if self.spirc_internal.is_active {
-            pkt.set_state(self.spirc_internal.spirc_state(&state));
+        CommandSender {
+            spirc: spirc,
+            frame: frame,
+        }
+    }
+
+    fn recipient(mut self, recipient: &'a str) -> CommandSender {
+        self.frame.mut_recipient().push(recipient.to_owned());
+        self
+    }
+
+    fn state(mut self, state: protocol::spirc::State) -> CommandSender<'a> {
+        self.frame.set_state(state);
+        self
+    }
+
+    fn send(mut self) {
+        if !self.frame.has_state() && self.spirc.is_active {
+            self.frame.set_state(self.spirc.spirc_state());
         }
 
-        self.spirc_internal
+        let payload = vec![self.frame.write_to_bytes().unwrap()];
+
+        self.spirc
             .session
             .mercury(MercuryRequest {
                 method: MercuryMethod::SEND,
-                uri: self.spirc_internal.uri(),
+                uri: self.spirc.uri(),
                 content_type: None,
-                payload: vec![pkt.write_to_bytes().unwrap()],
-            })
-            .fire();
+                payload: payload,
+            }).fire();
     }
 }
 

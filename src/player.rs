@@ -72,8 +72,9 @@ enum PlayerCommand {
 }
 
 impl Player {
-    pub fn new<F>(session: Session, stream_editor: Option<Box<AudioFilter + Send>>, sink_builder: F) -> Player
-        where F: FnOnce() -> Box<Sink> + Send + 'static {
+    pub fn new<F>(session: Session, audio_filter: Option<Box<AudioFilter + Send>>, sink_builder: F) -> Player
+        where F: FnOnce() -> Box<Sink> + Send + 'static
+    {
         let (cmd_tx, cmd_rx) = mpsc::channel();
 
         let state = Arc::new(Mutex::new(PlayerState {
@@ -93,7 +94,7 @@ impl Player {
             observers: observers.clone(),
         };
 
-        thread::spawn(move || internal.run(sink_builder(), stream_editor));
+        thread::spawn(move || internal.run(sink_builder(), audio_filter));
 
         Player {
             commands: cmd_tx,
@@ -206,7 +207,7 @@ fn run_onstop(session: &Session) {
 }
 
 impl PlayerInternal {
-    fn run(self, mut sink: Box<Sink>, stream_editor: Option<Box<AudioFilter + Send>>) {
+    fn run(self, mut sink: Box<Sink>, audio_filter: Option<Box<AudioFilter + Send>>) {
         let mut decoder = None;
 
         loop {
@@ -341,7 +342,7 @@ impl PlayerInternal {
 
                 match packet {
                     Some(Ok(mut packet)) => {
-                        if let Some(ref editor) = stream_editor {
+                        if let Some(ref editor) = audio_filter {
                             editor.modify_stream(&mut packet.data)
                         };
                         sink.write(&packet.data).unwrap();
