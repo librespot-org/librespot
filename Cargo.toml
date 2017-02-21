@@ -54,7 +54,7 @@ libpulse-sys    = { git = "https://github.com/astro/libpulse-sys", optional = tr
 
 mdns            = { git = "https://github.com/plietar/rust-mdns" }
 
-error-chain = "0.9.0"
+error-chain = { version = "0.9.0", default_features = false }
 futures = "0.1.8"
 tokio-core = "0.1.2"
 tokio-proto = "0.1.0"
