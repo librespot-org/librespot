@@ -41,7 +41,7 @@ rust-crypto     = "0.2.34"
 serde           = "0.9.6"
 serde_json      = "0.9.5"
 serde_derive    = "0.9.6"
-shannon         = { git = "https://github.com/plietar/rust-shannon" }
+shannon         = "0.2.0"
 tempfile        = "2.1"
 url             = "1.3"
 
