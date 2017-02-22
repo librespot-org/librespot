@@ -5,7 +5,7 @@ closed-source libspotify. Additionally, it will provide extra features
 which are not available in the official library.
 
 ## Building
-Rust 1.7.0 or later is required to build librespot.
+Rust 1.15.0 or later is required to build librespot.
 
 It also requires a C, with portaudio.
 
