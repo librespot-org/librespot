@@ -19,7 +19,7 @@ RUN dpkg --add-architecture armhf
 RUN dpkg --add-architecture armel
 RUN apt-get update
 
-RUN apt-get install -y curl build-essential crossbuild-essential-armhf crossbuild-essential-armel
+RUN apt-get install -y curl git build-essential crossbuild-essential-armhf crossbuild-essential-armel
 RUN apt-get install -y libasound2-dev libasound2-dev:armhf libasound2-dev:armel
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
