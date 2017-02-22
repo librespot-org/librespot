@@ -22,7 +22,7 @@ doc = false
 path = "protocol"
 
 [dependencies]
-base64          = "0.3.0"
+base64          = "0.4.0"
 bit-set         = "0.4.0"
 byteorder       = "1.0"
 env_logger      = "0.4.0"
