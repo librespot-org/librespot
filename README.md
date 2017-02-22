@@ -73,9 +73,9 @@ docker run -v /tmp/librespot-build:/build librespot-cross
 
 If only one architecture is desired, cargo can be invoked directly with the appropriate options :
 ```shell
-docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --no-default-features --features "with-syntex alsa-backend"
-docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features "with-syntex alsa-backend"
-docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabi --no-default-features --features "with-syntex alsa-backend"
+docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --no-default-features --features alsa-backend
+docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features alsa-backend
+docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabi --no-default-features --features alsa-backend
 ```
 
 ## Development
