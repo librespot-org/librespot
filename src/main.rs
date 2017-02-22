@@ -185,18 +185,19 @@ struct Main {
 impl Main {
     fn new(handle: Handle,
            config: Config,
+           cache: Option<Cache>,
            backend: fn(Option<String>) -> Box<Sink>,
            device: Option<String>,
            mixer: fn() -> Box<Mixer>) -> Main
     {
         Main {
             handle: handle.clone(),
+            cache: cache,
             config: config,
             backend: backend,
             device: device,
             mixer: mixer,
 
-            cache: None,
             connect: Box::new(futures::future::empty()),
             discovery: None,
             spirc: None,
@@ -215,6 +216,7 @@ impl Main {
     fn credentials(&mut self, credentials: Credentials) {
         let config = self.config.clone();
         let handle = self.handle.clone();
+
         let connection = Session::connect(config, credentials, self.cache.clone(), handle);
 
         self.connect = connection;
@@ -223,10 +225,6 @@ impl Main {
         if let Some(task) = task {
             self.handle.spawn(task);
         }
-    }
-
-    fn cache(&mut self, cache: Cache) {
-        self.cache = Some(cache);
     }
 }
 
@@ -302,16 +300,14 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let Setup { backend, config, device, cache, enable_discovery, credentials, mixer } = setup(&args);
 
-    let mut task = Main::new(handle, config.clone(), backend, device, mixer);
+    let mut task = Main::new(handle, config.clone(), cache, backend, device, mixer);
     if enable_discovery {
         task.discovery();
     }
     if let Some(credentials) = credentials {
         task.credentials(credentials);
     }
-    if let Some(cache) = cache {
-        task.cache(cache);
-    }
 
     core.run(task).unwrap()
 }
+
