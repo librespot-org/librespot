@@ -1,14 +1,14 @@
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
-use futures::Future;
 use futures::sync::mpsc;
-use futures::{Stream, BoxFuture, IntoFuture};
+use futures::{Future, Stream, BoxFuture, IntoFuture, Poll, Async};
 use std::io;
 use std::result::Result;
 use std::str::FromStr;
 use std::sync::{RwLock, Arc, Weak};
 use tokio_core::io::EasyBuf;
 use tokio_core::reactor::{Handle, Remote};
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
 use apresolve::apresolve_or_fallback;
 use authentication::Credentials;
@@ -69,13 +69,14 @@ pub struct SessionInternal {
     cache: Option<Arc<Cache>>,
 
     handle: Remote,
+
+    session_id: usize,
 }
+
+static SESSION_COUNTER : AtomicUsize = ATOMIC_USIZE_INIT;
 
 #[derive(Clone)]
 pub struct Session(pub Arc<SessionInternal>);
-
-#[derive(Clone)]
-pub struct SessionWeak(pub Weak<SessionInternal>);
 
 pub fn device_id(name: &str) -> String {
     let mut h = Sha1::new();
@@ -102,7 +103,7 @@ impl Session {
         });
 
         let result = authentication.map(move |(transport, reusable_credentials)| {
-            info!("Authenticated !");
+            info!("Authenticated as \"{}\" !", reusable_credentials.username);
             if let Some(ref cache) = cache {
                 cache.save_credentials(&reusable_credentials);
             }
@@ -126,10 +127,9 @@ impl Session {
         let (sink, stream) = transport.split();
 
         let (sender_tx, sender_rx) = mpsc::unbounded();
+        let session_id = SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
 
-        let sender_task = sender_rx
-            .map_err(|e| -> io::Error { panic!(e) })
-            .forward(sink).map(|_| ());
+        debug!("new Session[{}]", session_id);
 
         let session = Session(Arc::new(SessionInternal {
             config: config,
@@ -149,15 +149,14 @@ impl Session {
             metadata: Lazy::new(),
 
             handle: handle.remote().clone(),
+
+            session_id: session_id,
         }));
 
-        let receiver_task = {
-            let session = session.clone();
-            stream.for_each(move |(cmd, data)| {
-                session.dispatch(cmd, data);
-                Ok(())
-            })
-        };
+        let sender_task = sender_rx
+            .map_err(|e| -> io::Error { panic!(e) })
+            .forward(sink).map(|_| ());
+        let receiver_task = DispatchTask(stream, session.weak());
 
         let task = (receiver_task, sender_task).into_future()
             .map(|((), ())| ()).boxed();
@@ -193,10 +192,18 @@ impl Session {
         self.0.handle.spawn(f)
     }
 
+    fn debug_info(&self) {
+        debug!("Session[{}] strong={} weak={}",
+               self.0.session_id, Arc::strong_count(&self.0), Arc::weak_count(&self.0));
+    }
+
     #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
     fn dispatch(&self, cmd: u8, data: EasyBuf) {
         match cmd {
-            0x4 => self.send_packet(0x49, data.as_ref().to_owned()),
+            0x4 => {
+                self.debug_info();
+                self.send_packet(0x49, data.as_ref().to_owned());
+            },
             0x4a => (),
             0x1b => {
                 let country = String::from_utf8(data.as_ref().to_owned()).unwrap();
@@ -237,10 +244,59 @@ impl Session {
     pub fn weak(&self) -> SessionWeak {
         SessionWeak(Arc::downgrade(&self.0))
     }
+
+    pub fn session_id(&self) -> usize {
+        self.0.session_id
+    }
 }
 
+#[derive(Clone)]
+pub struct SessionWeak(pub Weak<SessionInternal>);
+
 impl SessionWeak {
+    pub fn try_upgrade(&self) -> Option<Session> {
+        self.0.upgrade().map(Session)
+    }
+
     pub fn upgrade(&self) -> Session {
-        Session(self.0.upgrade().expect("Session died"))
+        self.try_upgrade().expect("Session died")
+    }
+}
+
+impl Drop for SessionInternal {
+    fn drop(&mut self) {
+        debug!("drop Session[{}]", self.session_id);
+    }
+}
+
+struct DispatchTask<S>(S, SessionWeak)
+    where S: Stream<Item = (u8, EasyBuf)>;
+
+impl <S> Future for DispatchTask<S>
+    where S: Stream<Item = (u8, EasyBuf)>
+{
+    type Item = ();
+    type Error = S::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        let session = match self.1.try_upgrade() {
+            Some(session) => session,
+            None => {
+                return Ok(Async::Ready(()))
+            },
+        };
+
+        loop {
+            let (cmd, data) = try_ready!(self.0.poll()).expect("connection closed");
+            session.dispatch(cmd, data);
+        }
+    }
+}
+
+impl <S> Drop for DispatchTask<S>
+    where S: Stream<Item = (u8, EasyBuf)>
+{
+    fn drop(&mut self) {
+        debug!("drop Dispatch");
     }
 }

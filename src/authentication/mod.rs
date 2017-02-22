@@ -16,6 +16,8 @@ use std::path::Path;
 
 use protocol::authentication::AuthenticationType;
 
+pub mod discovery;
+
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct Credentials {
@@ -169,35 +171,28 @@ fn deserialize_base64<D>(de: D) -> Result<Vec<u8>, D::Error>
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
-mod discovery;
-pub use self::discovery::discovery_login;
-
-pub fn get_credentials(device_name: &str, device_id: &str,
-                       username: Option<String>, password: Option<String>,
+pub fn get_credentials(username: Option<String>, password: Option<String>,
                        cached_credentials: Option<Credentials>)
-    -> Credentials
+    -> Option<Credentials>
 {
     match (username, password, cached_credentials) {
 
         (Some(username), Some(password), _)
-            => Credentials::with_password(username, password),
+            => Some(Credentials::with_password(username, password)),
 
         (Some(ref username), _, Some(ref credentials))
-            if *username == credentials.username => credentials.clone(),
+            if *username == credentials.username => Some(credentials.clone()),
 
         (Some(username), None, _) => {
             write!(stderr(), "Password for {}: ", username).unwrap();
             stderr().flush().unwrap();
             let password = rpassword::read_password().unwrap();
-            Credentials::with_password(username.clone(), password)
+            Some(Credentials::with_password(username.clone(), password))
         }
 
         (None, _, Some(credentials))
-            => credentials,
+            => Some(credentials),
 
-        (None, _, None) => {
-            info!("No username provided and no stored credentials, starting discovery ...");
-            discovery_login(device_name, device_id).unwrap()
-        }
+        (None, _, None) => None,
     }
 }

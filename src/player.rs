@@ -44,6 +44,8 @@ impl Player {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
 
         thread::spawn(move || {
+            debug!("new Player[{}]", session.session_id());
+
             let internal = PlayerInternal {
                 session: session,
                 commands: cmd_rx,
@@ -380,6 +382,12 @@ impl PlayerInternal {
         info!("Track \"{}\" loaded", track.name);
 
         Some(decoder)
+    }
+}
+
+impl Drop for PlayerInternal {
+    fn drop(&mut self) {
+        debug!("drop Player[{}]", self.session.session_id());
     }
 }
 

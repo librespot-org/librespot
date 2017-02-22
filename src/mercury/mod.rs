@@ -186,8 +186,12 @@ impl MercuryManager {
 
         if cmd == 0xb5 {
             self.lock(|inner| {
-                if let Some(cb) = inner.subscriptions.get(&response.uri) {
-                    cb.send(response).unwrap();
+                use std::collections::hash_map::Entry;
+                if let Entry::Occupied(entry) = inner.subscriptions.entry(response.uri.clone()) {
+                    // TODO: send unsub message
+                    if entry.get().send(response).is_err() {
+                        entry.remove();
+                    }
                 }
             })
         } else if let Some(cb) = pending.callback {

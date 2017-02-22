@@ -4,7 +4,7 @@ use crypto::mac::Mac;
 use crypto;
 use diffie_hellman::{DH_GENERATOR, DH_PRIME};
 use futures::sync::mpsc;
-use futures::{Future, Stream, BoxFuture};
+use futures::{Future, Stream, BoxFuture, Poll, Async};
 use hyper::server::{Service, NewService, Request, Response, Http};
 use hyper::{self, Get, Post, StatusCode};
 use mdns;
@@ -12,7 +12,6 @@ use num_bigint::BigUint;
 use rand;
 use std::collections::BTreeMap;
 use std::io;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio_core::net::TcpListener;
 use tokio_core::reactor::Handle;
@@ -50,26 +49,6 @@ impl Discovery {
         }));
 
         (discovery, rx)
-    }
-
-    pub fn serve(&self, addr: &SocketAddr, handle: &Handle)
-        -> hyper::Result<SocketAddr>
-    {
-        let listener = TcpListener::bind(addr, handle)?;
-        let addr = listener.local_addr()?;
-
-        let http = Http::new();
-        let svc = self.clone();
-        let handle_ = handle.clone();
-
-        let task = listener.incoming().for_each(move |(socket, addr)| {
-            http.bind_connection(&handle_, socket, addr, svc.clone());
-            Ok(())
-        });
-
-        handle.spawn(task.map_err(|e| panic!(e)));
-
-        Ok(addr)
     }
 }
 
@@ -189,7 +168,9 @@ impl Service for Discovery {
             params.extend(url::form_urlencoded::parse(query.as_bytes()).into_owned());
         }
 
-        debug!("{:?} {:?} {:?}", method, uri.path(), params);
+        if method != Get {
+            debug!("{:?} {:?} {:?}", method, uri.path(), params);
+        }
 
         let this = self.clone();
         body.fold(Vec::new(), |mut acc, chunk| {
@@ -219,34 +200,51 @@ impl NewService for Discovery {
     }
 }
 
-use tokio_core::reactor::Core;
+pub struct DiscoveryStream {
+    credentials: mpsc::UnboundedReceiver<Credentials>,
+    _svc: mdns::Service,
+    task: Box<Future<Item=(), Error=io::Error>>,
+}
 
-pub fn discovery_login<A,B>(device_name: A, device_id: B) -> Result<Credentials, ()>
-    where A: Into<String>,
-          B: Into<String>
+pub fn discovery(handle: &Handle, device_name: String, device_id: String)
+    -> io::Result<DiscoveryStream>
 {
-    let device_name = device_name.into();
-    let device_id = device_id.into();
-
     let (discovery, creds_rx) = Discovery::new(device_name.clone(), device_id);
 
-    let creds_rx = creds_rx.into_future()
-        .map(move |(creds, _)| creds.unwrap()).map_err(|(e, _)| e);
+    let listener = TcpListener::bind(&"0.0.0.0:0".parse().unwrap(), handle)?;
+    let addr = listener.local_addr()?;
 
-    let addr = "0.0.0.0:0".parse().unwrap();
+    let http = Http::new();
+    let handle_ = handle.clone();
+    let task = Box::new(listener.incoming().for_each(move |(socket, addr)| {
+        http.bind_connection(&handle_, socket, addr, discovery.clone());
+        Ok(())
+    }));
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-    let listening_addr = discovery.serve(&addr, &handle).unwrap();
-
-    let responder = mdns::Responder::spawn(&handle).unwrap();
-    let _svc = responder.register(
+    let responder = mdns::Responder::spawn(&handle)?;
+    let svc = responder.register(
         "_spotify-connect._tcp".to_owned(),
         device_name,
-        listening_addr.port(),
+        addr.port(),
         &["VERSION=1.0", "CPath=/"]);
 
-    let creds = core.run(creds_rx).unwrap();
+    Ok(DiscoveryStream {
+        credentials: creds_rx,
+        _svc: svc,
+        task: task,
+    })
+}
 
-    Ok(creds)
+impl Stream for DiscoveryStream {
+    type Item = Credentials;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+        match self.task.poll()? {
+            Async::Ready(()) => unreachable!(),
+            Async::NotReady => (),
+        }
+
+        Ok(self.credentials.poll().unwrap())
+    }
 }

@@ -1,4 +1,5 @@
-pub trait Mixer {
+pub trait Mixer : Send {
+    fn open() -> Self where Self: Sized;
     fn start(&self);
     fn stop(&self);
     fn set_volume(&self, volume: u16);
@@ -15,9 +16,13 @@ pub trait AudioFilter {
 pub mod softmixer;
 use self::softmixer::SoftMixer;
 
-pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<Box<Mixer + Send>> {
+fn mk_sink<M: Mixer + 'static>() -> Box<Mixer> {
+    Box::new(M::open())
+}
+
+pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<fn() -> Box<Mixer>> {
     match name.as_ref().map(AsRef::as_ref) {
-        None | Some("softvol") => Some(Box::new(SoftMixer::new())),
+        None | Some("softvol") => Some(mk_sink::<SoftMixer>),
         _ => None,
     }
 }

@@ -17,7 +17,7 @@ use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
 
 pub struct SpircTask {
     player: Player,
-    mixer: Box<Mixer + Send>,
+    mixer: Box<Mixer>,
 
     sequence: SeqGenerator<u32>,
 
@@ -31,6 +31,7 @@ pub struct SpircTask {
     end_of_track: BoxFuture<(), oneshot::Canceled>,
 
     shutdown: bool,
+    session: Session,
 }
 
 pub enum SpircCommand {
@@ -110,9 +111,11 @@ fn initial_device_state(name: String, volume: u16) -> DeviceState {
 }
 
 impl Spirc {
-    pub fn new(session: Session, player: Player, mixer: Box<Mixer + Send>)
+    pub fn new(session: Session, player: Player, mixer: Box<Mixer>)
         -> (Spirc, SpircTask)
     {
+        debug!("new Spirc[{}]", session.session_id());
+
         let ident = session.device_id().to_owned();
         let name = session.config().name.clone();
 
@@ -152,6 +155,7 @@ impl Spirc {
             end_of_track: future::empty().boxed(),
 
             shutdown: false,
+            session: session.clone(),
         };
 
         let spirc = Spirc {
@@ -428,6 +432,12 @@ impl SpircTask {
             cs = cs.recipient(&s);
         }
         cs.send();
+    }
+}
+
+impl Drop for SpircTask {
+    fn drop(&mut self) {
+        debug!("drop Spirc[{}]", self.session.session_id());
     }
 }
 

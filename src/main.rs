@@ -1,23 +1,25 @@
 #[macro_use] extern crate log;
-extern crate ctrlc;
 extern crate env_logger;
 extern crate futures;
 extern crate getopts;
 extern crate librespot;
 extern crate tokio_core;
+extern crate tokio_signal;
 
 use env_logger::LogBuilder;
-use futures::Future;
-use std::cell::{RefCell, Cell};
+use futures::{Future, Async, Poll, Stream};
 use std::env;
-use std::io::{stderr, Write};
+use std::io::{self, stderr, Write};
 use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Handle, Core};
+use tokio_core::io::IoStream;
+use std::mem;
 
-use librespot::spirc::Spirc;
+use librespot::spirc::{Spirc, SpircTask};
 use librespot::authentication::{get_credentials, Credentials};
+use librespot::authentication::discovery::{discovery, DiscoveryStream};
 use librespot::audio_backend::{self, Sink, BACKENDS};
 use librespot::cache::Cache;
 use librespot::player::Player;
@@ -33,7 +35,6 @@ fn usage(program: &str, opts: &getopts::Options) -> String {
 
 fn setup_logging(verbose: bool) {
     let mut builder = LogBuilder::new();
-
     match env::var("RUST_LOG") {
         Ok(config) => {
             builder.parse(&config);
@@ -65,13 +66,17 @@ fn list_backends() {
     }
 }
 
+#[derive(Clone)]
 struct Setup {
     backend: fn(Option<String>) -> Box<Sink>,
-    mixer: Box<Mixer + Send>,
+    device: Option<String>,
+
+    mixer: fn() -> Box<Mixer>,
+
     cache: Option<Cache>,
     config: Config,
-    credentials: Credentials,
-    device: Option<String>,
+    credentials: Option<Credentials>,
+    enable_discovery: bool,
 }
 
 fn setup(args: &[String]) -> Setup {
@@ -84,6 +89,7 @@ fn setup(args: &[String]) -> Setup {
         .optflag("v", "verbose", "Enable verbose output")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
+        .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
         .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
         .optopt("", "mixer", "Mixer to use", "MIXER");
@@ -130,10 +136,11 @@ fn setup(args: &[String]) -> Setup {
 
     let cached_credentials = cache.as_ref().and_then(Cache::credentials);
 
-    let credentials = get_credentials(&name, &device_id,
-                                      matches.opt_str("username"),
+    let credentials = get_credentials(matches.opt_str("username"),
                                       matches.opt_str("password"),
                                       cached_credentials);
+
+    let enable_discovery = !matches.opt_present("disable-discovery");
 
     let config = Config {
         user_agent: version::version_string(),
@@ -148,11 +155,143 @@ fn setup(args: &[String]) -> Setup {
 
     Setup {
         backend: backend,
-        mixer: mixer,
         cache: cache,
         config: config,
         credentials: credentials,
         device: device,
+        enable_discovery: enable_discovery,
+        mixer: mixer,
+    }
+}
+
+struct Main {
+    cache: Option<Cache>,
+    config: Config,
+    backend: fn(Option<String>) -> Box<Sink>,
+    device: Option<String>,
+    mixer: fn() -> Box<Mixer>,
+    handle: Handle,
+
+    discovery: Option<DiscoveryStream>,
+    signal: IoStream<()>,
+
+    spirc: Option<Spirc>,
+    spirc_task: Option<SpircTask>,
+    connect: Box<Future<Item=Session, Error=io::Error>>,
+
+    shutdown: bool,
+}
+
+impl Main {
+    fn new(handle: Handle,
+           config: Config,
+           backend: fn(Option<String>) -> Box<Sink>,
+           device: Option<String>,
+           mixer: fn() -> Box<Mixer>) -> Main
+    {
+        Main {
+            handle: handle.clone(),
+            config: config,
+            backend: backend,
+            device: device,
+            mixer: mixer,
+
+            cache: None,
+            connect: Box::new(futures::future::empty()),
+            discovery: None,
+            spirc: None,
+            spirc_task: None,
+            shutdown: false,
+            signal: tokio_signal::ctrl_c(&handle).flatten_stream().boxed(),
+        }
+    }
+
+    fn discovery(&mut self) {
+        let name = self.config.name.clone();
+        let device_id = self.config.device_id.clone();
+        self.discovery = Some(discovery(&self.handle, name, device_id).unwrap());
+    }
+
+    fn credentials(&mut self, credentials: Credentials) {
+        let config = self.config.clone();
+        let handle = self.handle.clone();
+        let connection = Session::connect(config, credentials, self.cache.clone(), handle);
+
+        self.connect = connection;
+        self.spirc = None;
+        let task = mem::replace(&mut self.spirc_task, None);
+        if let Some(task) = task {
+            self.handle.spawn(task);
+        }
+    }
+
+    fn cache(&mut self, cache: Cache) {
+        self.cache = Some(cache);
+    }
+}
+
+impl Future for Main {
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self) -> Poll<(), ()> {
+        loop {
+            let mut progress = false;
+
+            if let Some(Async::Ready(Some(creds))) = self.discovery.as_mut().map(|d| d.poll().unwrap()) {
+                if let Some(ref spirc) = self.spirc {
+                    spirc.shutdown();
+                }
+                self.credentials(creds);
+
+                progress = true;
+            }
+
+            if let Async::Ready(session) = self.connect.poll().unwrap() {
+                self.connect = Box::new(futures::future::empty());
+                let device = self.device.clone();
+                let mixer = (self.mixer)();
+
+                let audio_filter = mixer.get_audio_filter();
+                let backend = self.backend;
+                let player = Player::new(session.clone(), audio_filter, move || {
+                    (backend)(device)
+                });
+
+                let (spirc, spirc_task) = Spirc::new(session, player, mixer);
+                self.spirc = Some(spirc);
+                self.spirc_task = Some(spirc_task);
+
+                progress = true;
+            }
+
+            if let Async::Ready(Some(())) = self.signal.poll().unwrap() {
+                if !self.shutdown {
+                    if let Some(ref spirc) = self.spirc {
+                        spirc.shutdown();
+                    }
+                    self.shutdown = true;
+                } else {
+                    return Ok(Async::Ready(()));
+                }
+
+                progress = true;
+            }
+
+            if let Some(ref mut spirc_task) = self.spirc_task {
+                if let Async::Ready(()) = spirc_task.poll().unwrap() {
+                    if self.shutdown {
+                        return Ok(Async::Ready(()));
+                    } else {
+                        panic!("Spirc shut down unexpectedly");
+                    }
+                }
+            }
+
+            if !progress {
+                return Ok(Async::NotReady);
+            }
+        }
     }
 }
 
@@ -161,35 +300,18 @@ fn main() {
     let handle = core.handle();
 
     let args: Vec<String> = std::env::args().collect();
+    let Setup { backend, config, device, cache, enable_discovery, credentials, mixer } = setup(&args);
 
-    let Setup { backend, mixer, cache, config, credentials, device }
-        = setup(&args);
-
-    let connection = Session::connect(config, credentials, cache, handle);
-
-    let task = connection.and_then(move |session| {
-        let audio_filter = mixer.get_audio_filter();
-        let player = Player::new(session.clone(), audio_filter, move || {
-            (backend)(device)
-        });
-
-        let (spirc, task) = Spirc::new(session.clone(), player, mixer);
-        let spirc = RefCell::new(spirc);
-
-        let shutting_down = Cell::new(false);
-        ctrlc::set_handler(move || {
-            if shutting_down.get() {
-                warn!("Forced shutdown");
-                exit(1);
-            } else {
-                info!("Shutting down");
-                spirc.borrow_mut().shutdown();
-                shutting_down.set(true);
-            }
-        });
-
-        task.map_err(|()| panic!("spirc error"))
-    });
+    let mut task = Main::new(handle, config.clone(), backend, device, mixer);
+    if enable_discovery {
+        task.discovery();
+    }
+    if let Some(credentials) = credentials {
+        task.credentials(credentials);
+    }
+    if let Some(cache) = cache {
+        task.cache(cache);
+    }
 
     core.run(task).unwrap()
 }
