@@ -51,7 +51,7 @@ impl Codec for APCodec {
 
         self.encode_cipher.encrypt(&mut buf[offset..]);
 
-        let mac = [0u8; MAC_SIZE];
+        let mut mac = [0u8; MAC_SIZE];
         self.encode_cipher.finish(&mut mac);
         buf.extend_from_slice(&mac);
 
