@@ -78,6 +78,8 @@ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release 
 docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabi --no-default-features --features alsa-backend
 ```
 
+Don't forget to set the `with-tremor` feature flag if your target device does not have floating-point capabilities.
+
 ## Development
 When developing *librespot*, it is preferable to use Rust nightly, and build it using the following :
 ```shell
