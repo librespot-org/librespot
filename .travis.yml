@@ -19,7 +19,7 @@ before_script:
     - mkdir -p ~/.cargo
     - echo '[target.armv7-unknown-linux-gnueabihf]' > ~/.cargo/config
     - echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
-    - sh ~/rust-installer/rustup.sh --prefix=$(rustc --print sysroot) -y --disable-sudo --add-target=armv7-unknown-linux-gnueabihf
+    - rustup target add armv7-unknown-linux-gnueabihf
 
 script:
     - cargo build --no-default-features
