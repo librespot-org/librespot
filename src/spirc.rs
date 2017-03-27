@@ -35,6 +35,13 @@ pub struct SpircTask {
 }
 
 pub enum SpircCommand {
+    Play,
+    PlayPause,
+    Pause,
+    Prev,
+    Next,
+    VolumeUp,
+    VolumeDown,
     Shutdown
 }
 
@@ -167,6 +174,27 @@ impl Spirc {
         (spirc, task)
     }
 
+    pub fn play(&self) {
+        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Play);
+    }
+    pub fn play_pause(&self) {
+        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::PlayPause);
+    }
+    pub fn pause(&self) {
+        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Pause);
+    }
+    pub fn prev(&self) {
+        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Prev);
+    }
+    pub fn next(&self) {
+        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Next);
+    }
+    pub fn volume_up(&self) {
+        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::VolumeUp);
+    }
+    pub fn volume_down(&self) {
+        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::VolumeDown);
+    }
     pub fn shutdown(&self) {
         let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Shutdown);
     }
@@ -227,7 +255,64 @@ impl Future for SpircTask {
 
 impl SpircTask {
     fn handle_command(&mut self, cmd: SpircCommand) {
+        let active = self.device.get_is_active();
         match cmd {
+            SpircCommand::Play => {
+                if active {
+                    self.handle_play();
+                    self.notify(None);
+                } else {
+                    CommandSender::new(self, MessageType::kMessageTypePlay).send();
+                }
+            }
+            SpircCommand::PlayPause => {
+                if active {
+                    self.handle_play_pause();
+                    self.notify(None);
+                } else {
+                    CommandSender::new(self, MessageType::kMessageTypePlayPause).send();
+                }
+            }
+            SpircCommand::Pause => {
+                if active {
+                    self.handle_pause();
+                    self.notify(None);
+                } else {
+                    CommandSender::new(self, MessageType::kMessageTypePause).send();
+                }
+            }
+            SpircCommand::Prev => {
+                if active {
+                    self.handle_prev();
+                    self.notify(None);
+                } else {
+                    CommandSender::new(self, MessageType::kMessageTypePrev).send();
+                }
+            }
+            SpircCommand::Next => {
+                if active {
+                    self.handle_next();
+                    self.notify(None);
+                } else {
+                    CommandSender::new(self, MessageType::kMessageTypeNext).send();
+                }
+            }
+            SpircCommand::VolumeUp => {
+                if active {
+                    self.handle_volume_up();
+                    self.notify(None);
+                } else {
+                    CommandSender::new(self, MessageType::kMessageTypeVolumeUp).send();
+                }
+            }
+            SpircCommand::VolumeDown => {
+                if active {
+                    self.handle_volume_down();
+                    self.notify(None);
+                } else {
+                    CommandSender::new(self, MessageType::kMessageTypeVolumeDown).send();
+                }
+            }
             SpircCommand::Shutdown => {
                 CommandSender::new(self, MessageType::kMessageTypeGoodbye).send();
                 self.shutdown = true;
@@ -276,69 +361,37 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypePlay => {
-                if self.state.get_status() == PlayStatus::kPlayStatusPause {
-                    self.mixer.start();
-                    self.player.play();
-                    self.state.set_status(PlayStatus::kPlayStatusPlay);
-                    self.state.set_position_measured_at(now_ms() as u64);
-                }
+                self.handle_play();
+                self.notify(None);
+            }
 
+            MessageType::kMessageTypePlayPause => {
+                self.handle_play_pause();
                 self.notify(None);
             }
 
             MessageType::kMessageTypePause => {
-                if self.state.get_status() == PlayStatus::kPlayStatusPlay {
-                    self.player.pause();
-                    self.mixer.stop();
-                    self.state.set_status(PlayStatus::kPlayStatusPause);
-
-                    let now = now_ms() as u64;
-                    let position = self.state.get_position_ms();
-
-                    let diff = now - self.state.get_position_measured_at();
-
-                    self.state.set_position_ms(position + diff as u32);
-                    self.state.set_position_measured_at(now);
-                }
-
+                self.handle_pause();
                 self.notify(None);
             }
 
             MessageType::kMessageTypeNext => {
-                let current_index = self.state.get_playing_track_index();
-                let new_index = (current_index + 1) % (self.state.get_track().len() as u32);
-
-                self.state.set_playing_track_index(new_index);
-                self.state.set_position_ms(0);
-                self.state.set_position_measured_at(now_ms() as u64);
-
-                self.load_track(true);
+                self.handle_next();
                 self.notify(None);
             }
 
             MessageType::kMessageTypePrev => {
-                // Previous behaves differently based on the position
-                // Under 3s it goes to the previous song
-                // Over 3s it seeks to zero
-                if self.position() < 3000 {
-                    let current_index = self.state.get_playing_track_index();
+                self.handle_prev();
+                self.notify(None);
+            }
 
-                    let new_index = if current_index == 0 {
-                        self.state.get_track().len() as u32 - 1
-                    } else {
-                        current_index - 1
-                    };
+            MessageType::kMessageTypeVolumeUp => {
+                self.handle_volume_up();
+                self.notify(None);
+            }
 
-                    self.state.set_playing_track_index(new_index);
-                    self.state.set_position_ms(0);
-                    self.state.set_position_measured_at(now_ms() as u64);
-
-                    self.load_track(true);
-                } else {
-                    self.state.set_position_ms(0);
-                    self.state.set_position_measured_at(now_ms() as u64);
-                    self.player.seek(0);
-                }
+            MessageType::kMessageTypeVolumeDown => {
+                self.handle_volume_down();
                 self.notify(None);
             }
 
@@ -376,6 +429,93 @@ impl SpircTask {
 
             _ => (),
         }
+    }
+
+    fn handle_play(&mut self) {
+        if self.state.get_status() == PlayStatus::kPlayStatusPause {
+            self.mixer.start();
+            self.player.play();
+            self.state.set_status(PlayStatus::kPlayStatusPlay);
+            self.state.set_position_measured_at(now_ms() as u64);
+        }
+    }
+
+    fn handle_play_pause(&mut self) {
+        match self.state.get_status() {
+            PlayStatus::kPlayStatusPlay => self.handle_pause(),
+            PlayStatus::kPlayStatusPause => self.handle_play(),
+            _ => (),
+        }
+    }
+
+    fn handle_pause(&mut self) {
+        if self.state.get_status() == PlayStatus::kPlayStatusPlay {
+            self.player.pause();
+            self.mixer.stop();
+            self.state.set_status(PlayStatus::kPlayStatusPause);
+
+            let now = now_ms() as u64;
+            let position = self.state.get_position_ms();
+
+            let diff = now - self.state.get_position_measured_at();
+
+            self.state.set_position_ms(position + diff as u32);
+            self.state.set_position_measured_at(now);
+        }
+    }
+
+    fn handle_next(&mut self) {
+        let current_index = self.state.get_playing_track_index();
+        let new_index = (current_index + 1) % (self.state.get_track().len() as u32);
+
+        self.state.set_playing_track_index(new_index);
+        self.state.set_position_ms(0);
+        self.state.set_position_measured_at(now_ms() as u64);
+
+        self.load_track(true);
+    }
+
+    fn handle_prev(&mut self) {
+        // Previous behaves differently based on the position
+        // Under 3s it goes to the previous song
+        // Over 3s it seeks to zero
+        if self.position() < 3000 {
+            let current_index = self.state.get_playing_track_index();
+
+            let new_index = if current_index == 0 {
+                self.state.get_track().len() as u32 - 1
+            } else {
+                current_index - 1
+            };
+
+            self.state.set_playing_track_index(new_index);
+            self.state.set_position_ms(0);
+            self.state.set_position_measured_at(now_ms() as u64);
+
+            self.load_track(true);
+        } else {
+            self.state.set_position_ms(0);
+            self.state.set_position_measured_at(now_ms() as u64);
+            self.player.seek(0);
+        }
+    }
+
+    fn handle_volume_up(&mut self) {
+        let mut volume: u32 = self.mixer.volume() as u32 + 4096;
+        if volume > 0xFFFF {
+            volume = 0xFFFF;
+        }
+        self.device.set_volume(volume);
+        self.mixer.set_volume(volume as u16);
+    }
+
+    fn handle_volume_down(&mut self) {
+        let mut volume: i32 = self.mixer.volume() as i32 - 4096;
+        if volume < 0 {
+            volume = 0;
+        }
+        self.device.set_volume(volume as u32);
+        self.mixer.set_volume(volume as u16);
     }
 
     fn handle_end_of_track(&mut self) {
