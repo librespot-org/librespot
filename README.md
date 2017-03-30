@@ -4,6 +4,11 @@ applications to use Spotify's service, without using the official but
 closed-source libspotify. Additionally, it will provide extra features
 which are not available in the official library.
 
+**I will be very busy with other stuff until July, and won't be able to
+dedicate much time to librespot. Please keep using it and open issues,
+but it's likely I won't be able to answer them until then. Non-trivial
+pull requests will probably not be reviwed either.**
+
 ## Building
 Rust 1.15.0 or later is required to build librespot.
 
