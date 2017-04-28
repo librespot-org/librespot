@@ -9,12 +9,14 @@ use std::sync::{RwLock, Arc, Weak};
 use tokio_core::io::EasyBuf;
 use tokio_core::reactor::{Handle, Remote};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
+use uuid::Uuid;
 
 use apresolve::apresolve_or_fallback;
 use authentication::Credentials;
 use cache::Cache;
 use component::Lazy;
 use connection;
+use version;
 
 use audio_key::AudioKeyManager;
 use channel::ChannelManager;
@@ -43,11 +45,23 @@ impl FromStr for Bitrate {
 #[derive(Clone)]
 pub struct Config {
     pub user_agent: String,
-    pub name: String,
     pub device_id: String,
     pub bitrate: Bitrate,
     pub onstart: Option<String>,
     pub onstop: Option<String>,
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        let device_id = Uuid::new_v4().hyphenated().to_string();
+        Config {
+            user_agent: version::version_string(),
+            device_id: device_id,
+            bitrate: Bitrate::Bitrate160,
+            onstart: None,
+            onstop: None,
+        }
+    }
 }
 
 pub struct SessionData {

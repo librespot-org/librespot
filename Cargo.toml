@@ -59,6 +59,7 @@ futures = "0.1.8"
 tokio-core = "0.1.2"
 tokio-proto = "0.1.0"
 tokio-signal = "0.1"
+uuid = { version = "0.4", features = ["v4"] }
 
 [build-dependencies]
 vergen          = "0.1.0"

@@ -118,13 +118,12 @@ fn initial_device_state(name: String, volume: u16) -> DeviceState {
 }
 
 impl Spirc {
-    pub fn new(session: Session, player: Player, mixer: Box<Mixer>)
+    pub fn new(name: String, session: Session, player: Player, mixer: Box<Mixer>)
         -> (Spirc, SpircTask)
     {
         debug!("new Spirc[{}]", session.session_id());
 
         let ident = session.device_id().to_owned();
-        let name = session.config().name.clone();
 
         let uri = format!("hm://remote/user/{}", session.username());
 

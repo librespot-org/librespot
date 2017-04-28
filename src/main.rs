@@ -73,6 +73,7 @@ struct Setup {
 
     mixer: fn() -> Box<Mixer>,
 
+    name: String,
     cache: Option<Cache>,
     config: Config,
     credentials: Option<Credentials>,
@@ -116,7 +117,7 @@ fn setup(args: &[String]) -> Setup {
         exit(0);
     }
 
-    let backend = audio_backend::find(backend_name.as_ref())
+    let backend = audio_backend::find(backend_name)
         .expect("Invalid backend");
 
     let mixer_name = matches.opt_str("mixer");
@@ -144,7 +145,6 @@ fn setup(args: &[String]) -> Setup {
 
     let config = Config {
         user_agent: version::version_string(),
-        name: name,
         device_id: device_id,
         bitrate: bitrate,
         onstart: matches.opt_str("onstart"),
@@ -154,6 +154,7 @@ fn setup(args: &[String]) -> Setup {
     let device = matches.opt_str("device");
 
     Setup {
+        name: name,
         backend: backend,
         cache: cache,
         config: config,
@@ -165,6 +166,7 @@ fn setup(args: &[String]) -> Setup {
 }
 
 struct Main {
+    name: String,
     cache: Option<Cache>,
     config: Config,
     backend: fn(Option<String>) -> Box<Sink>,
@@ -184,6 +186,7 @@ struct Main {
 
 impl Main {
     fn new(handle: Handle,
+           name: String,
            config: Config,
            cache: Option<Cache>,
            backend: fn(Option<String>) -> Box<Sink>,
@@ -192,6 +195,7 @@ impl Main {
     {
         Main {
             handle: handle.clone(),
+            name: name,
             cache: cache,
             config: config,
             backend: backend,
@@ -208,8 +212,9 @@ impl Main {
     }
 
     fn discovery(&mut self) {
-        let name = self.config.name.clone();
         let device_id = self.config.device_id.clone();
+        let name = self.name.clone();
+
         self.discovery = Some(discovery(&self.handle, name, device_id).unwrap());
     }
 
@@ -256,7 +261,7 @@ impl Future for Main {
                     (backend)(device)
                 });
 
-                let (spirc, spirc_task) = Spirc::new(session, player, mixer);
+                let (spirc, spirc_task) = Spirc::new(self.name.clone(), session, player, mixer);
                 self.spirc = Some(spirc);
                 self.spirc_task = Some(spirc_task);
 
@@ -298,9 +303,9 @@ fn main() {
     let handle = core.handle();
 
     let args: Vec<String> = std::env::args().collect();
-    let Setup { backend, config, device, cache, enable_discovery, credentials, mixer } = setup(&args);
+    let Setup { name, backend, config, device, cache, enable_discovery, credentials, mixer } = setup(&args);
 
-    let mut task = Main::new(handle, config.clone(), cache, backend, device, mixer);
+    let mut task = Main::new(handle, name, config, cache, backend, device, mixer);
     if enable_discovery {
         task.discovery();
     }

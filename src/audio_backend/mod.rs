@@ -85,8 +85,8 @@ declare_backends! {
     ];
 }
 
-pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<fn(Option<String>) -> Box<Sink>> {
-    if let Some(name) = name.as_ref().map(AsRef::as_ref) {
+pub fn find(name: Option<String>) -> Option<fn(Option<String>) -> Box<Sink>> {
+    if let Some(name) = name {
         BACKENDS.iter().find(|backend| name == backend.0).map(|backend| backend.1)
     } else {
         Some(BACKENDS.first().expect("No backends were enabled at build time").1)

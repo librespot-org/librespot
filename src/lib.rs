@@ -29,6 +29,7 @@ extern crate tempfile;
 extern crate tokio_core;
 extern crate tokio_proto;
 extern crate url;
+extern crate uuid;
 
 pub extern crate librespot_protocol as protocol;
 
