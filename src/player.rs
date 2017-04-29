@@ -253,6 +253,7 @@ impl PlayerInternal {
                     }
 
                     None => {
+                        end_of_track.complete(());
                         if self.state.is_playing() {
                             self.run_onstop();
                         }

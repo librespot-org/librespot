@@ -221,6 +221,7 @@ impl Session {
             0x4a => (),
             0x1b => {
                 let country = String::from_utf8(data.as_ref().to_owned()).unwrap();
+                info!("Country: {:?}", country);
                 self.0.data.write().unwrap().country = country;
             }
 
