@@ -2,6 +2,9 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
 
+// TODO: many items from tokio-core::io have been deprecated in favour of tokio-io
+#![allow(deprecated)]
+
 #[macro_use] extern crate error_chain;
 #[macro_use] extern crate futures;
 #[macro_use] extern crate lazy_static;
