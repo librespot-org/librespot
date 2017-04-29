@@ -41,8 +41,8 @@ extern crate tremor as vorbis;
 #[cfg(feature = "alsa-backend")]
 extern crate alsa;
 
-#[cfg(feature = "portaudio")]
-extern crate portaudio;
+#[cfg(feature = "portaudio-rs")]
+extern crate portaudio_rs;
 
 #[cfg(feature = "libpulse-sys")]
 extern crate libpulse_sys;

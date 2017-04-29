@@ -1,8 +1,9 @@
 const AP_FALLBACK : &'static str = "ap.spotify.com:80";
 const APRESOLVE_ENDPOINT : &'static str = "http://apresolve.spotify.com/";
 
+use std::str::FromStr;
 use futures::{Future, Stream};
-use hyper::{self, Url, Client};
+use hyper::{self, Uri, Client};
 use serde_json;
 use tokio_core::reactor::Handle;
 
@@ -14,7 +15,7 @@ pub struct APResolveData {
 }
 
 pub fn apresolve(handle: &Handle) -> Box<Future<Item=String, Error=Error>> {
-    let url = Url::parse(APRESOLVE_ENDPOINT).expect("invalid AP resolve URL");
+    let url = Uri::from_str(APRESOLVE_ENDPOINT).expect("invalid AP resolve URL");
 
     let client = Client::new(handle);
     let response = client.get(url);
