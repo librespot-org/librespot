@@ -10,45 +10,6 @@ pub trait Sink {
     fn write(&mut self, data: &[i16]) -> io::Result<()>;
 }
 
-/*
- * Allow #[cfg] rules around elements of a list.
- * Workaround until stmt_expr_attributes is stable.
- *
- * This generates 2^n declarations of the list, with every combination possible
- */
-macro_rules! declare_backends {
-    (pub const $name:ident : $ty:ty = & [ $($tt:tt)* ];) => (
-        _declare_backends!($name ; $ty ; []; []; []; $($tt)*);
-    );
-}
-
-macro_rules! _declare_backends {
-    ($name:ident ; $ty:ty ; [ $($yes:meta,)* ] ; [ $($no:meta,)* ] ; [ $($exprs:expr,)* ] ; #[cfg($m:meta)] $e:expr, $($rest:tt)* ) => (
-        _declare_backends!($name ; $ty ; [ $m, $($yes,)* ] ; [ $($no,)* ] ; [ $($exprs,)* $e, ] ; $($rest)*);
-        _declare_backends!($name ; $ty ; [ $($yes,)* ] ; [ $m, $($no,)* ] ; [ $($exprs,)* ] ; $($rest)*);
-    );
-
-    ($name:ident ; $ty:ty ; [ $($yes:meta,)* ] ; [ $($no:meta,)* ] ; [ $($exprs:expr,)* ] ; $e:expr, $($rest:tt)*) => (
-        _declare_backends!($name ; $ty ; [ $($yes,)* ] ; [ $($no,)* ] ; [ $($exprs,)* $e, ] ; $($rest)*);
-    );
-
-    ($name:ident ; $ty:ty ; [ $($yes:meta,)* ] ; [ $($no:meta,)* ] ; [ $($exprs:expr,)* ] ; #[cfg($m:meta)] $e:expr) => (
-        _declare_backends!($name ; $ty ; [ $m, $($yes,)* ] ; [ $($no,)* ] ; [ $($exprs,)* $e, ] ; );
-        _declare_backends!($name ; $ty ; [ $($yes,)* ] ; [ $m, $($no,)* ] ; [ $($exprs,)* ] ; );
-    );
-
-    ($name:ident ; $ty:ty ; [ $($yes:meta,)* ] ; [ $($no:meta,)* ] ; [ $($exprs:expr,)* ] ; $e:expr ) => (
-        _declare_backends!($name ; $ty ; [ $($yes,)* ] ; [ $($no,)* ] ; [ $($exprs,)* $e, ] ; );
-    );
-
-    ($name:ident ; $ty:ty ; [ $($yes:meta,)* ] ; [ $($no:meta,)* ] ; [ $($exprs:expr,)* ] ; ) => (
-        #[cfg(all($($yes,)* not(any($($no),*))))]
-        pub const $name : $ty = &[
-            $($exprs,)*
-        ];
-    )
-}
-
 fn mk_sink<S: Sink + Open + 'static>(device: Option<String>) -> Box<Sink> {
     Box::new(S::open(device))
 }
@@ -71,19 +32,17 @@ use self::pulseaudio::PulseAudioSink;
 mod pipe;
 use self::pipe::StdoutSink;
 
-declare_backends! {
-    pub const BACKENDS : &'static [
-        (&'static str, fn(Option<String>) -> Box<Sink>)
-    ] = &[
-        #[cfg(feature = "alsa-backend")]
-        ("alsa", mk_sink::<AlsaSink>),
-        #[cfg(feature = "portaudio-backend")]
-        ("portaudio", mk_sink::<PortAudioSink>),
-        #[cfg(feature = "pulseaudio-backend")]
-        ("pulseaudio", mk_sink::<PulseAudioSink>),
-        ("pipe", mk_sink::<StdoutSink>),
-    ];
-}
+pub const BACKENDS : &'static [
+    (&'static str, fn(Option<String>) -> Box<Sink>)
+] = &[
+    #[cfg(feature = "alsa-backend")]
+    ("alsa", mk_sink::<AlsaSink>),
+    #[cfg(feature = "portaudio-backend")]
+    ("portaudio", mk_sink::<PortAudioSink>),
+    #[cfg(feature = "pulseaudio-backend")]
+    ("pulseaudio", mk_sink::<PulseAudioSink>),
+    ("pipe", mk_sink::<StdoutSink>),
+];
 
 pub fn find(name: Option<String>) -> Option<fn(Option<String>) -> Box<Sink>> {
     if let Some(name) = name {
