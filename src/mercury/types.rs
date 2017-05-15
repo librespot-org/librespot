@@ -20,7 +20,7 @@ pub struct MercuryRequest {
     pub payload: Vec<Vec<u8>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MercuryResponse {
     pub uri: String,
     pub status_code: i32,
