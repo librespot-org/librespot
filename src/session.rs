@@ -18,8 +18,6 @@ use config::SessionConfig;
 use audio_key::AudioKeyManager;
 use channel::ChannelManager;
 use mercury::MercuryManager;
-use metadata::MetadataManager;
-use audio_file::AudioFileManager;
 
 pub struct SessionData {
     country: String,
@@ -33,10 +31,8 @@ pub struct SessionInternal {
     tx_connection: mpsc::UnboundedSender<(u8, Vec<u8>)>,
 
     audio_key: Lazy<AudioKeyManager>,
-    audio_file: Lazy<AudioFileManager>,
     channel: Lazy<ChannelManager>,
     mercury: Lazy<MercuryManager>,
-    metadata: Lazy<MetadataManager>,
     cache: Option<Arc<Cache>>,
 
     handle: Remote,
@@ -61,6 +57,7 @@ impl Session {
         -> Box<Future<Item=Session, Error=io::Error>>
     {
         let access_point = apresolve_or_fallback::<io::Error>(&handle);
+
 
         let handle_ = handle.clone();
         let connection = access_point.and_then(move |addr| {
@@ -114,10 +111,8 @@ impl Session {
             cache: cache.map(Arc::new),
 
             audio_key: Lazy::new(),
-            audio_file: Lazy::new(),
             channel: Lazy::new(),
             mercury: Lazy::new(),
-            metadata: Lazy::new(),
 
             handle: handle.remote().clone(),
 
@@ -139,20 +134,12 @@ impl Session {
         self.0.audio_key.get(|| AudioKeyManager::new(self.weak()))
     }
 
-    pub fn audio_file(&self) -> &AudioFileManager {
-        self.0.audio_file.get(|| AudioFileManager::new(self.weak()))
-    }
-
     pub fn channel(&self) -> &ChannelManager {
         self.0.channel.get(|| ChannelManager::new(self.weak()))
     }
 
     pub fn mercury(&self) -> &MercuryManager {
         self.0.mercury.get(|| MercuryManager::new(self.weak()))
-    }
-
-    pub fn metadata(&self) -> &MetadataManager {
-        self.0.metadata.get(|| MetadataManager::new(self.weak()))
     }
 
     pub fn spawn<F, R>(&self, f: F)

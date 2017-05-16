@@ -11,7 +11,7 @@ use vorbis::{self, VorbisError};
 use audio_backend::Sink;
 use audio_decrypt::AudioDecrypt;
 use audio_file::AudioFile;
-use metadata::{FileFormat, Track};
+use metadata::{FileFormat, Track, Metadata};
 use session::Session;
 use mixer::AudioFilter;
 use util::{self, SpotifyId, Subfile};
@@ -338,7 +338,7 @@ impl PlayerInternal {
             let alternatives = track.alternatives
                 .iter()
                 .map(|alt_id| {
-                    self.session.metadata().get::<Track>(*alt_id)
+                    Track::get(&self.session, *alt_id)
                 });
             let alternatives = future::join_all(alternatives).wait().unwrap();
 
@@ -347,7 +347,7 @@ impl PlayerInternal {
     }
 
     fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<Decoder> {
-        let track = self.session.metadata().get::<Track>(track_id).wait().unwrap();
+        let track = Track::get(&self.session, track_id).wait().unwrap();
 
         info!("Loading track \"{}\"", track.name);
 
@@ -375,10 +375,9 @@ impl PlayerInternal {
 
         let key = self.session.audio_key().request(track.id, file_id).wait().unwrap();
 
-        let open = self.session.audio_file().open(file_id);
-        let encrypted_file = open.wait().unwrap();
-
+        let encrypted_file = AudioFile::open(&self.session, file_id).wait().unwrap();
         let audio_file = Subfile::new(AudioDecrypt::new(key, encrypted_file), 0xa7);
+
         let mut decoder = vorbis::Decoder::new(audio_file).unwrap();
 
         match vorbis_time_seek_ms(&mut decoder, position) {

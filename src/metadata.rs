@@ -43,11 +43,24 @@ fn parse_restrictions<'s, I>(restrictions: I, country: &str, catalogue: &str) ->
     (!has_allowed || countrylist_contains(allowed.as_str(), country))
 }
 
-pub trait MetadataTrait : Send + 'static {
+pub trait Metadata : Send + Sized + 'static {
     type Message: protobuf::MessageStatic;
 
     fn base_url() -> &'static str;
     fn parse(msg: &Self::Message, session: &Session) -> Self;
+
+    fn get(session: &Session, id: SpotifyId) -> BoxFuture<Self, MercuryError> {
+        let uri = format!("{}/{}", Self::base_url(), id.to_base16());
+        let request = session.mercury().get(uri);
+
+        let session = session.clone();
+        request.and_then(move |response| {
+            let data = response.payload.first().expect("Empty payload");
+            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
+
+            Ok(Self::parse(&msg, &session))
+        }).boxed()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -77,7 +90,7 @@ pub struct Artist {
     pub top_tracks: Vec<SpotifyId>,
 }
 
-impl MetadataTrait for Track {
+impl Metadata for Track {
     type Message = protocol::metadata::Track;
 
     fn base_url() -> &'static str {
@@ -120,7 +133,7 @@ impl MetadataTrait for Track {
     }
 }
 
-impl MetadataTrait for Album {
+impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
     fn base_url() -> &'static str {
@@ -163,7 +176,7 @@ impl MetadataTrait for Album {
 }
 
 
-impl MetadataTrait for Artist {
+impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
     fn base_url() -> &'static str {
@@ -191,22 +204,3 @@ impl MetadataTrait for Artist {
     }
 }
 
-component! {
-    MetadataManager : MetadataManagerInner { }
-}
-
-impl MetadataManager {
-    pub fn get<T: MetadataTrait>(&self, id: SpotifyId) -> BoxFuture<T, MercuryError> {
-        let session = self.session();
-
-        let uri = format!("{}/{}", T::base_url(), id.to_base16());
-        let request = session.mercury().get(uri);
-
-        request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty payload");
-            let msg: T::Message = protobuf::parse_from_bytes(data).unwrap();
-
-            Ok(T::parse(&msg, &session))
-        }).boxed()
-    }
-}

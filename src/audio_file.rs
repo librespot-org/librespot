@@ -16,10 +16,6 @@ use util::FileId;
 
 const CHUNK_SIZE: usize = 0x20000;
 
-component! {
-    AudioFileManager : AudioFileManagerInner { }
-}
-
 pub enum AudioFile {
     Cached(fs::File),
     Streaming(AudioFileStreaming),
@@ -127,9 +123,9 @@ impl Future for AudioFileOpenStreaming {
     }
 }
 
-impl AudioFileManager {
-    pub fn open(&self, file_id: FileId) -> AudioFileOpen {
-        let cache = self.session().cache().cloned();
+impl AudioFile {
+    pub fn open(session: &Session, file_id: FileId) -> AudioFileOpen {
+        let cache = session.cache().cloned();
 
         if let Some(file) = cache.as_ref().and_then(|cache| cache.file(file_id)) {
             debug!("File {} already in cache", file_id);
@@ -139,10 +135,10 @@ impl AudioFileManager {
         debug!("Downloading file {}", file_id);
 
         let (complete_tx, complete_rx) = oneshot::channel();
-        let (headers, data) = request_chunk(&self.session(), file_id, 0).split();
+        let (headers, data) = request_chunk(session, file_id, 0).split();
 
         let open = AudioFileOpenStreaming {
-            session: self.session(),
+            session: session.clone(),
             file_id: file_id,
 
             headers: headers,
@@ -151,10 +147,10 @@ impl AudioFileManager {
             complete_tx: Some(complete_tx),
         };
 
-        let session = self.session();
-        self.session().spawn(move |_| {
+        let session_ = session.clone();
+        session.spawn(move |_| {
             complete_rx.map(move |mut file| {
-                if let Some(cache) = session.cache() {
+                if let Some(cache) = session_.cache() {
                     cache.save_file(file_id, &mut file);
                     debug!("File {} complete, saving to cache", file_id);
                 } else {
