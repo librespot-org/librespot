@@ -38,6 +38,7 @@ fn parse_restrictions<'s, I>(restrictions: I, country: &str, catalogue: &str) ->
         }
     }
 
+    (has_forbidden || has_allowed) &&
     (!has_forbidden || !countrylist_contains(forbidden.as_str(), country)) &&
     (!has_allowed || countrylist_contains(allowed.as_str(), country))
 }
