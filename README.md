@@ -12,6 +12,8 @@ pull requests will probably not be reviewed either.**
 ## Building
 Rust 1.15.0 or later is required to build librespot.
 
+**If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.** 
+
 It also requires a C, with portaudio.
 
 On debian / ubuntu, the following command will install these dependencies :
@@ -24,7 +26,7 @@ On Fedora systems, the following command will install these dependencies :
 sudo dnf install portaudio-devel make gcc
 ```
 
-On OS X, using homebrew :
+On macOS, using homebrew :
 ```shell
 brew install portaudio
 ```
