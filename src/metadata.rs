@@ -16,13 +16,31 @@ fn countrylist_contains(list: &str, country: &str) -> bool {
 fn parse_restrictions<'s, I>(restrictions: I, country: &str, catalogue: &str) -> bool
     where I: IntoIterator<Item = &'s protocol::metadata::Restriction>
 {
-    restrictions.into_iter()
-                .filter(|r| r.get_catalogue_str().contains(&catalogue.to_owned()))
-                .all(|r| {
-                    !countrylist_contains(r.get_countries_forbidden(), country) &&
-                    (!r.has_countries_allowed() ||
-                     countrylist_contains(r.get_countries_allowed(), country))
-                })
+    let mut forbidden = "".to_string();
+    let mut has_forbidden = false;
+
+    let mut allowed = "".to_string();
+    let mut has_allowed = false;
+
+    let rs = restrictions.into_iter().filter(|r|
+        r.get_catalogue_str().contains(&catalogue.to_owned())
+    );
+
+    for r in rs {
+        if r.has_countries_forbidden() {
+            forbidden.push_str(r.get_countries_forbidden());
+            has_forbidden = true;
+        }
+
+        if r.has_countries_allowed() {
+            allowed.push_str(r.get_countries_allowed());
+            has_allowed = true;
+        }
+    }
+
+    (has_forbidden || has_allowed) &&
+    (!has_forbidden || !countrylist_contains(forbidden.as_str(), country)) &&
+    (!has_allowed || countrylist_contains(allowed.as_str(), country))
 }
 
 pub trait MetadataTrait : Send + 'static {
