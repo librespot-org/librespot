@@ -71,7 +71,7 @@ Build the image from the root of the project with the following command :
 $ docker build -t librespot-cross -f contrib/Dockerfile .
 ```
 
-The resulting image can be used to build librespot for linux x86_64, armhf and armel.
+The resulting image can be used to build librespot for linux x86_64, armhf (compatible e. g. with Raspberry Pi 2 or 3, but not with Raspberry Pi 1 or Zero) and armel.
 The compiled binaries will be located in /tmp/librespot-build
 
 ```
