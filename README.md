@@ -89,6 +89,35 @@ The above command will create a receiver named ```Librespot```, with bitrate set
 A full list of runtime options are available [here](https://github.com/librespot-org/librespot/wiki/Options)
 
 _Please Note: When using the cache feature, an authentication blob is stored for your account in the cache directory. For security purposes, we recommend that you set directory permissions on the cache directory to `700`._
+
+### Running as a system-wide service
+
+`contrib/systemd.service` should be installed into `/usr/lib/systemd/system/`.
+This'll allow running librespot as a system-wide service permanently by
+enabling it:
+
+    systemctl enable --now librespot
+
+This is the recommended approach for embedded devices. Note that only `root`
+can manage this service.
+
+It is recommended that downstream packagers include this file in distribution
+packages.
+
+### Running as a user service
+
+`contrib/systemd.user.service` should be installed into `/usr/lib/systemd/user/`.
+This'll allow running librespot as a user service which can be controlled
+without privileges, and is bound to the currently logged in user.
+
+    systemctl --user enable --now librespot
+
+This is the recommended approach for desktops and especially for shared devices
+where not all users will have root privileges.
+
+It is recommended that downstream packagers include this file in distribution
+packages.
+
 ## Contact
 Come and hang out on gitter if you need help or want to offer some.
 https://gitter.im/librespot-org/spotify-connect-resources
