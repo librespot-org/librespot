@@ -37,7 +37,7 @@ num-traits      = "0.1.36"
 protobuf        = "1.1"
 rand            = "0.3.13"
 rpassword       = "0.3.0"
-rust-crypto     = "0.2.34"
+rust-crypto     = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
 serde           = "0.9.6"
 serde_json      = "0.9.5"
 serde_derive    = "0.9.6"
