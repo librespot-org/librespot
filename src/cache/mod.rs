@@ -8,15 +8,17 @@ use authentication::Credentials;
 #[derive(Clone)]
 pub struct Cache {
     root: PathBuf,
+    use_audio_cache: bool,
 }
 
 impl Cache {
-    pub fn new(location: PathBuf) -> Cache {
+    pub fn new(location: PathBuf, use_audio_cache: bool) -> Cache {
         mkdir_existing(&location).unwrap();
         mkdir_existing(&location.join("files")).unwrap();
 
         Cache {
-            root: location
+            root: location,
+            use_audio_cache: use_audio_cache
         }
     }
 }
@@ -48,11 +50,13 @@ impl Cache {
     }
 
     pub fn save_file(&self, file: FileId, contents: &mut Read) {
-        let path = self.file_path(file);
+        if self.use_audio_cache {
+            let path = self.file_path(file);
 
-        mkdir_existing(path.parent().unwrap()).unwrap();
+            mkdir_existing(path.parent().unwrap()).unwrap();
 
-        let mut cache_file = File::create(path).unwrap();
-        ::std::io::copy(contents, &mut cache_file).unwrap();
+            let mut cache_file = File::create(path).unwrap();
+            ::std::io::copy(contents, &mut cache_file).unwrap();
+        }
     }
 }
