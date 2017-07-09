@@ -159,6 +159,8 @@ message AudioFile {
         OTHER3 = 0x9;
         AAC_160 = 0xa;
         AAC_320 = 0xb;
+        OTHER4 = 0xc;
+        OTHER5 = 0xd;
     }
 }
 
