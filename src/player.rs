@@ -13,8 +13,8 @@ use core::session::Session;
 use core::util::{self, SpotifyId, Subfile};
 
 use audio_backend::Sink;
-use audio_decrypt::AudioDecrypt;
-use audio_file::AudioFile;
+use audio::AudioDecrypt;
+use audio::AudioFile;
 use metadata::{FileFormat, Track, Metadata};
 use mixer::AudioFilter;
 

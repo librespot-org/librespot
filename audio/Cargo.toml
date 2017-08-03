@@ -1,0 +1,17 @@
+[package]
+name = "librespot-audio"
+version = "0.1.0"
+authors = ["Paul Lietar <paul@lietar.net>"]
+
+[dependencies]
+bit-set = "0.4.0"
+byteorder = "1.0"
+rust-crypto = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
+futures = "0.1.8"
+log = "0.3.5"
+num-bigint = "0.1.35"
+num-traits = "0.1.36"
+tempfile = "2.1"
+
+[dependencies.librespot-core]
+path = "../core"

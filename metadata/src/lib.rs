@@ -1,10 +1,10 @@
-pub extern crate librespot_core as core;
-pub extern crate librespot_protocol as protocol;
-
 extern crate byteorder;
 extern crate futures;
 extern crate linear_map;
 extern crate protobuf;
+
+extern crate librespot_core as core;
+extern crate librespot_protocol as protocol;
 
 pub mod cover;
 

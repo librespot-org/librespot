@@ -253,6 +253,7 @@ dependencies = [
  "hyper 0.11.0-a.0 (git+https://github.com/hyperium/hyper)",
  "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "libpulse-sys 0.0.0 (git+https://github.com/astro/libpulse-sys)",
+ "librespot-audio 0.1.0",
  "librespot-core 0.1.0",
  "librespot-metadata 0.1.0",
  "librespot-protocol 0.1.0",
@@ -281,6 +282,21 @@ dependencies = [
  "uuid 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vergen 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "vorbis 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "librespot-audio"
+version = "0.1.0"
+dependencies = [
+ "bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "librespot-core 0.1.0",
+ "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-bigint 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-traits 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rust-crypto 0.2.36 (git+https://github.com/awmath/rust-crypto.git?branch=avx2)",
+ "tempfile 2.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

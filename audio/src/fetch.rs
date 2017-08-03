@@ -3,7 +3,6 @@ use byteorder::{ByteOrder, BigEndian, WriteBytesExt};
 use futures::Stream;
 use futures::sync::{oneshot, mpsc};
 use futures::{Poll, Async, Future};
-use futures::future::{self, FutureResult};
 use std::cmp::min;
 use std::fs;
 use std::io::{self, Read, Write, Seek, SeekFrom};
@@ -22,7 +21,7 @@ pub enum AudioFile {
 }
 
 pub enum AudioFileOpen {
-    Cached(FutureResult<fs::File, ChannelError>),
+    Cached(Option<fs::File>),
     Streaming(AudioFileOpenStreaming),
 }
 
@@ -97,8 +96,8 @@ impl Future for AudioFileOpen {
                 let file = try_ready!(open.poll());
                 Ok(Async::Ready(AudioFile::Streaming(file)))
             }
-            AudioFileOpen::Cached(ref mut open) => {
-                let file = try_ready!(open.poll());
+            AudioFileOpen::Cached(ref mut file) => {
+                let file = file.take().unwrap();
                 Ok(Async::Ready(AudioFile::Cached(file)))
             }
         }
@@ -129,7 +128,7 @@ impl AudioFile {
 
         if let Some(file) = cache.as_ref().and_then(|cache| cache.file(file_id)) {
             debug!("File {} already in cache", file_id);
-            return AudioFileOpen::Cached(future::ok(file));
+            return AudioFileOpen::Cached(Some(file));
         }
 
         debug!("Downloading file {}", file_id);
@@ -247,7 +246,7 @@ impl AudioFileFetch {
         let complete_tx = self.complete_tx.take().unwrap();
 
         output.seek(SeekFrom::Start(0)).unwrap();
-        complete_tx.complete(output);
+        let _ = complete_tx.send(output);
     }
 }
 
