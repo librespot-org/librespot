@@ -26,7 +26,8 @@ use librespot::authentication::discovery::{discovery, DiscoveryStream};
 use librespot::audio_backend::{self, Sink, BACKENDS};
 use librespot::cache::Cache;
 use librespot::player::Player;
-use librespot::session::{Bitrate, Config, Session};
+use librespot::session::Session;
+use librespot::config::{Bitrate, DeviceType, PlayerConfig, SessionConfig, ConnectConfig};
 use librespot::mixer::{self, Mixer};
 
 use librespot::version;
@@ -76,9 +77,10 @@ struct Setup {
 
     mixer: fn() -> Box<Mixer>,
 
-    name: String,
     cache: Option<Cache>,
-    config: Config,
+    player_config: PlayerConfig,
+    session_config: SessionConfig,
+    connect_config: ConnectConfig,
     credentials: Option<Credentials>,
     enable_discovery: bool,
 }
@@ -88,6 +90,7 @@ fn setup(args: &[String]) -> Setup {
     opts.optopt("c", "cache", "Path to a directory where files will be cached.", "CACHE")
         .optflag("", "disable-audio-cache", "Disable caching of the audio data.")
         .reqopt("n", "name", "Device name", "NAME")
+        .optopt("", "device-type", "Displayed device type", "DEVICE_TYPE")
         .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE")
         .optopt("", "onstart", "Run PROGRAM when playback is about to begin.", "PROGRAM")
         .optopt("", "onstop", "Run PROGRAM when playback has ended.", "PROGRAM")
@@ -125,45 +128,69 @@ fn setup(args: &[String]) -> Setup {
     let backend = audio_backend::find(backend_name)
         .expect("Invalid backend");
 
+    let device = matches.opt_str("device");
+
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref())
         .expect("Invalid mixer");
 
-    let bitrate = matches.opt_str("b").as_ref()
-        .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
-        .unwrap_or(Bitrate::Bitrate160);
-
     let name = matches.opt_str("name").unwrap();
-    let device_id = librespot::session::device_id(&name);
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
 
     let cache = matches.opt_str("c").map(|cache_location| {
         Cache::new(PathBuf::from(cache_location), use_audio_cache)
     });
 
-    let cached_credentials = cache.as_ref().and_then(Cache::credentials);
+    let credentials = {
+        let cached_credentials = cache.as_ref().and_then(Cache::credentials);
 
-    let credentials = get_credentials(matches.opt_str("username"),
-                                      matches.opt_str("password"),
-                                      cached_credentials);
+        get_credentials(
+            matches.opt_str("username"),
+            matches.opt_str("password"),
+            cached_credentials
+        )
+    };
+
+    let session_config = {
+        let device_id = librespot::session::device_id(&name);
+
+        SessionConfig {
+            user_agent: version::version_string(),
+            device_id: device_id,
+        }
+    };
+
+    let player_config = {
+        let bitrate = matches.opt_str("b").as_ref()
+            .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
+            .unwrap_or(Bitrate::default());
+
+        PlayerConfig {
+            bitrate: bitrate,
+            onstart: matches.opt_str("onstart"),
+            onstop: matches.opt_str("onstop"),
+        }
+    };
+
+    let connect_config = {
+        let device_type = matches.opt_str("device-type").as_ref()
+            .map(|device_type| DeviceType::from_str(device_type).expect("Invalid device type"))
+            .unwrap_or(DeviceType::default());
+
+        ConnectConfig {
+            name: name,
+            device_type: device_type,
+        }
+    };
 
     let enable_discovery = !matches.opt_present("disable-discovery");
 
-    let config = Config {
-        user_agent: version::version_string(),
-        device_id: device_id,
-        bitrate: bitrate,
-        onstart: matches.opt_str("onstart"),
-        onstop: matches.opt_str("onstop"),
-    };
-
-    let device = matches.opt_str("device");
-
     Setup {
-        name: name,
         backend: backend,
         cache: cache,
-        config: config,
+        session_config: session_config,
+        player_config: player_config,
+        connect_config: connect_config,
         credentials: credentials,
         device: device,
         enable_discovery: enable_discovery,
@@ -172,9 +199,10 @@ fn setup(args: &[String]) -> Setup {
 }
 
 struct Main {
-    name: String,
     cache: Option<Cache>,
-    config: Config,
+    player_config: PlayerConfig,
+    session_config: SessionConfig,
+    connect_config: ConnectConfig,
     backend: fn(Option<String>) -> Box<Sink>,
     device: Option<String>,
     mixer: fn() -> Box<Mixer>,
@@ -191,22 +219,16 @@ struct Main {
 }
 
 impl Main {
-    fn new(handle: Handle,
-           name: String,
-           config: Config,
-           cache: Option<Cache>,
-           backend: fn(Option<String>) -> Box<Sink>,
-           device: Option<String>,
-           mixer: fn() -> Box<Mixer>) -> Main
-    {
-        Main {
+    fn new(handle: Handle, setup: Setup) -> Main {
+        let mut task = Main {
             handle: handle.clone(),
-            name: name,
-            cache: cache,
-            config: config,
-            backend: backend,
-            device: device,
-            mixer: mixer,
+            cache: setup.cache,
+            session_config: setup.session_config,
+            player_config: setup.player_config,
+            connect_config: setup.connect_config,
+            backend: setup.backend,
+            device: setup.device,
+            mixer: setup.mixer,
 
             connect: Box::new(futures::future::empty()),
             discovery: None,
@@ -214,18 +236,24 @@ impl Main {
             spirc_task: None,
             shutdown: false,
             signal: tokio_signal::ctrl_c(&handle).flatten_stream().boxed(),
+        };
+
+        if setup.enable_discovery {
+            let config = task.connect_config.clone();
+            let device_id = task.session_config.device_id.clone();
+
+            task.discovery = Some(discovery(&handle, config, device_id).unwrap());
         }
-    }
 
-    fn discovery(&mut self) {
-        let device_id = self.config.device_id.clone();
-        let name = self.name.clone();
+        if let Some(credentials) = setup.credentials {
+            task.credentials(credentials);
+        }
 
-        self.discovery = Some(discovery(&self.handle, name, device_id).unwrap());
+        task
     }
 
     fn credentials(&mut self, credentials: Credentials) {
-        let config = self.config.clone();
+        let config = self.session_config.clone();
         let handle = self.handle.clone();
 
         let connection = Session::connect(config, credentials, self.cache.clone(), handle);
@@ -260,14 +288,16 @@ impl Future for Main {
                 self.connect = Box::new(futures::future::empty());
                 let device = self.device.clone();
                 let mixer = (self.mixer)();
+                let player_config = self.player_config.clone();
+                let connect_config = self.connect_config.clone();
 
                 let audio_filter = mixer.get_audio_filter();
                 let backend = self.backend;
-                let player = Player::new(session.clone(), audio_filter, move || {
+                let player = Player::new(player_config, session.clone(), audio_filter, move || {
                     (backend)(device)
                 });
 
-                let (spirc, spirc_task) = Spirc::new(self.name.clone(), session, player, mixer);
+                let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
                 self.spirc = Some(spirc);
                 self.spirc_task = Some(spirc_task);
 
@@ -309,16 +339,7 @@ fn main() {
     let handle = core.handle();
 
     let args: Vec<String> = std::env::args().collect();
-    let Setup { name, backend, config, device, cache, enable_discovery, credentials, mixer } = setup(&args);
 
-    let mut task = Main::new(handle, name, config, cache, backend, device, mixer);
-    if enable_discovery {
-        task.discovery();
-    }
-    if let Some(credentials) = credentials {
-        task.credentials(credentials);
-    }
-
-    core.run(task).unwrap()
+    core.run(Main::new(handle, setup(&args))).unwrap()
 }
 

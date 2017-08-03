@@ -61,14 +61,15 @@ pub mod audio_key;
 pub mod authentication;
 pub mod cache;
 pub mod channel;
+pub mod config;
 pub mod diffie_hellman;
+pub mod keymaster;
 pub mod mercury;
 pub mod metadata;
+pub mod mixer;
 pub mod player;
 pub mod session;
 pub mod util;
 pub mod version;
-pub mod mixer;
-pub mod keymaster;
 
 include!(concat!(env!("OUT_DIR"), "/lib.rs"));

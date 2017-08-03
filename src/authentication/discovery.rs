@@ -19,19 +19,20 @@ use url;
 
 use authentication::Credentials;
 use util;
+use config::ConnectConfig;
 
 #[derive(Clone)]
 struct Discovery(Arc<DiscoveryInner>);
 struct DiscoveryInner {
+    config: ConnectConfig,
+    device_id: String,
     private_key: BigUint,
     public_key: BigUint,
-    device_id: String,
-    device_name: String,
     tx: mpsc::UnboundedSender<Credentials>,
 }
 
 impl Discovery {
-    pub fn new(device_name: String, device_id: String)
+    pub fn new(config: ConnectConfig, device_id: String)
         -> (Discovery, mpsc::UnboundedReceiver<Credentials>)
     {
         let (tx, rx) = mpsc::unbounded();
@@ -41,8 +42,8 @@ impl Discovery {
         let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
 
         let discovery = Discovery(Arc::new(DiscoveryInner {
-            device_name: device_name.to_owned(),
-            device_id: device_id.to_owned(),
+            config: config,
+            device_id: device_id,
             private_key: private_key,
             public_key: public_key,
             tx: tx,
@@ -65,10 +66,10 @@ impl Discovery {
             "spotifyError": 0,
             "version": "2.1.0",
             "deviceID": (self.0.device_id),
-            "remoteName": (self.0.device_name),
+            "remoteName": (self.0.config.name),
             "activeUser": "",
             "publicKey": (public_key),
-            "deviceType": "UNKNOWN",
+            "deviceType": (self.0.config.device_type.to_string().to_uppercase()),
             "libraryVersion": "0.1.0",
             "accountReq": "PREMIUM",
             "brandDisplayName": "librespot",
@@ -206,10 +207,10 @@ pub struct DiscoveryStream {
     task: Box<Future<Item=(), Error=io::Error>>,
 }
 
-pub fn discovery(handle: &Handle, device_name: String, device_id: String)
+pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
     -> io::Result<DiscoveryStream>
 {
-    let (discovery, creds_rx) = Discovery::new(device_name.clone(), device_id);
+    let (discovery, creds_rx) = Discovery::new(config.clone(), device_id);
 
     let listener = TcpListener::bind(&"0.0.0.0:0".parse().unwrap(), handle)?;
     let addr = listener.local_addr()?;
@@ -224,7 +225,7 @@ pub fn discovery(handle: &Handle, device_name: String, device_id: String)
     let responder = mdns::Responder::spawn(&handle)?;
     let svc = responder.register(
         "_spotify-connect._tcp".to_owned(),
-        device_name,
+        config.name,
         addr.port(),
         &["VERSION=1.0", "CPath=/"]);
 

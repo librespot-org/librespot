@@ -5,9 +5,10 @@ use futures::sync::{oneshot, mpsc};
 use futures::{Future, Stream, Sink, Async, Poll, BoxFuture};
 use protobuf::{self, Message};
 
+use config::ConnectConfig;
 use mercury::MercuryError;
-use player::Player;
 use mixer::Mixer;
+use player::Player;
 use session::Session;
 use util::{now_ms, SpotifyId, SeqGenerator};
 use version;
@@ -59,13 +60,13 @@ fn initial_state() -> State {
     })
 }
 
-fn initial_device_state(name: String, volume: u16) -> DeviceState {
+fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
     protobuf_init!(DeviceState::new(), {
         sw_version: version::version_string(),
         is_active: false,
         can_play: true,
         volume: volume as u32,
-        name: name,
+        name: config.name,
         capabilities => [
             @{
                 typ: protocol::spirc::CapabilityType::kCanBePlayer,
@@ -73,7 +74,7 @@ fn initial_device_state(name: String, volume: u16) -> DeviceState {
             },
             @{
                 typ: protocol::spirc::CapabilityType::kDeviceType,
-                intValue => [5]
+                intValue => [config.device_type as i64]
             },
             @{
                 typ: protocol::spirc::CapabilityType::kGaiaEqConnectId,
@@ -118,7 +119,7 @@ fn initial_device_state(name: String, volume: u16) -> DeviceState {
 }
 
 impl Spirc {
-    pub fn new(name: String, session: Session, player: Player, mixer: Box<Mixer>)
+    pub fn new(config: ConnectConfig, session: Session, player: Player, mixer: Box<Mixer>)
         -> (Spirc, SpircTask)
     {
         debug!("new Spirc[{}]", session.session_id());
@@ -141,7 +142,7 @@ impl Spirc {
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
         let volume = 0xFFFF;
-        let device = initial_device_state(name, volume);
+        let device = initial_device_state(config, volume);
         mixer.set_volume(volume);
 
         let mut task = SpircTask {

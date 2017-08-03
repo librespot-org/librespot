@@ -12,9 +12,10 @@ use audio_backend::Sink;
 use audio_decrypt::AudioDecrypt;
 use audio_file::AudioFile;
 use metadata::{FileFormat, Track};
-use session::{Bitrate, Session};
+use session::Session;
 use mixer::AudioFilter;
 use util::{self, SpotifyId, Subfile};
+use config::{Bitrate, PlayerConfig};
 
 #[derive(Clone)]
 pub struct Player {
@@ -23,6 +24,7 @@ pub struct Player {
 
 struct PlayerInternal {
     session: Session,
+    config: PlayerConfig,
     commands: std::sync::mpsc::Receiver<PlayerCommand>,
 
     state: PlayerState,
@@ -39,8 +41,11 @@ enum PlayerCommand {
 }
 
 impl Player {
-    pub fn new<F>(session: Session, audio_filter: Option<Box<AudioFilter + Send>>, sink_builder: F) -> Player
-        where F: FnOnce() -> Box<Sink> + Send + 'static {
+    pub fn new<F>(config: PlayerConfig, session: Session,
+                  audio_filter: Option<Box<AudioFilter + Send>>,
+                  sink_builder: F) -> Player
+        where F: FnOnce() -> Box<Sink> + Send + 'static
+    {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
 
         thread::spawn(move || {
@@ -48,6 +53,7 @@ impl Player {
 
             let internal = PlayerInternal {
                 session: session,
+                config: config,
                 commands: cmd_rx,
 
                 state: PlayerState::Stopped,
@@ -314,13 +320,13 @@ impl PlayerInternal {
     }
 
     fn run_onstart(&self) {
-        if let Some(ref program) = self.session.config().onstart {
+        if let Some(ref program) = self.config.onstart {
             util::run_program(program)
         }
     }
 
     fn run_onstop(&self) {
-        if let Some(ref program) = self.session.config().onstop {
+        if let Some(ref program) = self.config.onstop {
             util::run_program(program)
         }
     }
@@ -353,7 +359,7 @@ impl PlayerInternal {
             }
         };
 
-        let format = match self.session.config().bitrate {
+        let format = match self.config.bitrate {
             Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
             Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
             Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
