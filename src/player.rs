@@ -8,14 +8,15 @@ use std::thread;
 use std;
 use vorbis::{self, VorbisError};
 
+use core::config::{Bitrate, PlayerConfig};
+use core::session::Session;
+use core::util::{self, SpotifyId, Subfile};
+
 use audio_backend::Sink;
 use audio_decrypt::AudioDecrypt;
 use audio_file::AudioFile;
 use metadata::{FileFormat, Track, Metadata};
-use session::Session;
 use mixer::AudioFilter;
-use util::{self, SpotifyId, Subfile};
-use config::{Bitrate, PlayerConfig};
 
 #[derive(Clone)]
 pub struct Player {

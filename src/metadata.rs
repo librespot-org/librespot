@@ -2,10 +2,10 @@ use futures::{Future, BoxFuture};
 use linear_map::LinearMap;
 use protobuf;
 
-use mercury::MercuryError;
+use core::mercury::MercuryError;
 use protocol;
-use session::Session;
-use util::{SpotifyId, FileId, StrChunksExt};
+use core::session::Session;
+use core::util::{SpotifyId, FileId, StrChunksExt};
 
 pub use protocol::metadata::AudioFile_Format as FileFormat;
 

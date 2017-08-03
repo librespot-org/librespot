@@ -4,6 +4,23 @@ use std::fmt;
 
 use version;
 
+#[derive(Clone,Debug)]
+pub struct SessionConfig {
+    pub user_agent: String,
+    pub device_id: String,
+}
+
+impl Default for SessionConfig {
+    fn default() -> SessionConfig {
+        let device_id = Uuid::new_v4().hyphenated().to_string();
+        SessionConfig {
+            user_agent: version::version_string(),
+            device_id: device_id,
+        }
+    }
+}
+
+
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
     Bitrate96,
@@ -80,22 +97,6 @@ impl fmt::Display for DeviceType {
 impl Default for DeviceType {
     fn default() -> DeviceType {
         DeviceType::Speaker
-    }
-}
-
-#[derive(Clone,Debug)]
-pub struct SessionConfig {
-    pub user_agent: String,
-    pub device_id: String,
-}
-
-impl Default for SessionConfig {
-    fn default() -> SessionConfig {
-        let device_id = Uuid::new_v4().hyphenated().to_string();
-        SessionConfig {
-            user_agent: version::version_string(),
-            device_id: device_id,
-        }
     }
 }
 

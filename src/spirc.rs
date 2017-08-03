@@ -5,16 +5,17 @@ use futures::sync::{oneshot, mpsc};
 use futures::{Future, Stream, Sink, Async, Poll, BoxFuture};
 use protobuf::{self, Message};
 
-use config::ConnectConfig;
-use mercury::MercuryError;
-use mixer::Mixer;
-use player::Player;
-use session::Session;
-use util::{now_ms, SpotifyId, SeqGenerator};
-use version;
+use core::config::ConnectConfig;
+use core::mercury::MercuryError;
+use core::session::Session;
+use core::util::{now_ms, SpotifyId, SeqGenerator};
+use core::version;
 
 use protocol;
 use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
+
+use mixer::Mixer;
+use player::Player;
 
 pub struct SpircTask {
     player: Player,

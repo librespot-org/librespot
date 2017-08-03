@@ -20,17 +20,17 @@ use tokio_core::reactor::{Handle, Core};
 use tokio_core::io::IoStream;
 use std::mem;
 
-use librespot::spirc::{Spirc, SpircTask};
-use librespot::authentication::{get_credentials, Credentials};
-use librespot::authentication::discovery::{discovery, DiscoveryStream};
-use librespot::audio_backend::{self, Sink, BACKENDS};
-use librespot::cache::Cache;
-use librespot::player::Player;
-use librespot::session::Session;
-use librespot::config::{Bitrate, DeviceType, PlayerConfig, SessionConfig, ConnectConfig};
-use librespot::mixer::{self, Mixer};
+use librespot::core::authentication::{get_credentials, Credentials};
+use librespot::core::cache::Cache;
+use librespot::core::config::{Bitrate, DeviceType, PlayerConfig, SessionConfig, ConnectConfig};
+use librespot::core::session::Session;
+use librespot::core::version;
 
-use librespot::version;
+use librespot::audio_backend::{self, Sink, BACKENDS};
+use librespot::discovery::{discovery, DiscoveryStream};
+use librespot::mixer::{self, Mixer};
+use librespot::player::Player;
+use librespot::spirc::{Spirc, SpircTask};
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
@@ -152,7 +152,7 @@ fn setup(args: &[String]) -> Setup {
     };
 
     let session_config = {
-        let device_id = librespot::session::device_id(&name);
+        let device_id = librespot::core::session::device_id(&name);
 
         SessionConfig {
             user_agent: version::version_string(),

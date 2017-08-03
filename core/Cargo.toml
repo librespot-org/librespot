@@ -1,30 +1,11 @@
 [package]
-name = "librespot"
+name = "librespot-core"
 version = "0.1.0"
-authors = ["Paul Liétar <paul@lietar.net>"]
+authors = ["Paul Lietar <paul@lietar.net>"]
 build = "build.rs"
-license = "MIT"
-description = "Open Source Spotify client library"
-keywords = ["spotify"]
-repository = "https://github.com/plietar/librespot"
-readme = "README.md"
-
-[workspace]
-
-[lib]
-name = "librespot"
-path = "src/lib.rs"
-
-[[bin]]
-name = "librespot"
-path = "src/main.rs"
-doc = false
 
 [dependencies.librespot-protocol]
-path = "protocol"
-
-[dependencies.librespot-core]
-path = "core"
+path = "../protocol"
 
 [dependencies]
 base64          = "0.5.0"
@@ -70,29 +51,3 @@ uuid = { version = "0.4", features = ["v4"] }
 rand            = "0.3.13"
 vergen          = "0.1.0"
 protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros", features = ["with-syntex"] }
-
-[features]
-alsa-backend = ["alsa"]
-portaudio-backend = ["portaudio-rs"]
-pulseaudio-backend = ["libpulse-sys"]
-
-with-tremor = ["tremor"]
-
-default = ["portaudio-backend"]
-
-[package.metadata.deb]
-maintainer = "nobody"
-copyright = "2016 Paul Liétar"
-license_file = ["LICENSE", "4"]
-depends = "$auto"
-extended_description = """\
-librespot is an open source client library for Spotify. It enables applications \
-to use Spotify's service, without using the official but closed-source \
-libspotify. Additionally, it will provide extra features which are not \
-available in the official library."""
-section = "sound"
-priority = "optional"
-assets = [
-    ["target/release/librespot", "usr/bin/", "755"],
-    ["contrib/librespot.service", "lib/systemd/system/", "644"]
-]

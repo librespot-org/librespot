@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, WriteBytesExt};
 use std::io::Write;
 
-use channel::ChannelData;
-use session::Session;
-use util::FileId;
+use core::channel::ChannelData;
+use core::session::Session;
+use core::util::FileId;
 
 pub fn get(session: &Session, file: FileId) -> ChannelData {
     let (channel_id, channel) = session.channel().allocate();

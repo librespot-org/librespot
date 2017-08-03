@@ -16,8 +16,6 @@ use std::path::Path;
 
 use protocol::authentication::AuthenticationType;
 
-pub mod discovery;
-
 #[derive(Debug, Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct Credentials {

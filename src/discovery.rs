@@ -2,7 +2,6 @@ use base64;
 use crypto::digest::Digest;
 use crypto::mac::Mac;
 use crypto;
-use diffie_hellman::{DH_GENERATOR, DH_PRIME};
 use futures::sync::mpsc;
 use futures::{Future, Stream, BoxFuture, Poll, Async};
 use hyper::server::{Service, NewService, Request, Response, Http};
@@ -17,9 +16,10 @@ use tokio_core::net::TcpListener;
 use tokio_core::reactor::Handle;
 use url;
 
-use authentication::Credentials;
-use util;
-use config::ConnectConfig;
+use core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
+use core::authentication::Credentials;
+use core::util;
+use core::config::ConnectConfig;
 
 #[derive(Clone)]
 struct Discovery(Arc<DiscoveryInner>);

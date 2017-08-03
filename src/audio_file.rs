@@ -10,9 +10,9 @@ use std::io::{self, Read, Write, Seek, SeekFrom};
 use std::sync::{Arc, Condvar, Mutex};
 use tempfile::NamedTempFile;
 
-use channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
-use session::Session;
-use util::FileId;
+use core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
+use core::session::Session;
+use core::util::FileId;
 
 const CHUNK_SIZE: usize = 0x20000;
 
