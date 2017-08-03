@@ -254,6 +254,7 @@ dependencies = [
  "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "libpulse-sys 0.0.0 (git+https://github.com/astro/libpulse-sys)",
  "librespot-core 0.1.0",
+ "librespot-metadata 0.1.0",
  "librespot-protocol 0.1.0",
  "linear-map 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -323,6 +324,18 @@ dependencies = [
  "uuid 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vergen 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "vorbis 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "librespot-metadata"
+version = "0.1.0"
+dependencies = [
+ "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "librespot-core 0.1.0",
+ "librespot-protocol 0.1.0",
+ "linear-map 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protobuf 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

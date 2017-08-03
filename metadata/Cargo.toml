@@ -1,0 +1,15 @@
+[package]
+name = "librespot-metadata"
+version = "0.1.0"
+authors = ["Paul Lietar <paul@lietar.net>"]
+
+[dependencies]
+byteorder = "1.0"
+futures = "0.1.8"
+linear-map = "1.0"
+protobuf = "1.1"
+
+[dependencies.librespot-core]
+path = "../core"
+[dependencies.librespot-protocol]
+path = "../protocol"

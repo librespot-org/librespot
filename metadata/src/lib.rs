@@ -1,9 +1,17 @@
+pub extern crate librespot_core as core;
+pub extern crate librespot_protocol as protocol;
+
+extern crate byteorder;
+extern crate futures;
+extern crate linear_map;
+extern crate protobuf;
+
+pub mod cover;
+
 use futures::{Future, BoxFuture};
 use linear_map::LinearMap;
-use protobuf;
 
 use core::mercury::MercuryError;
-use protocol;
 use core::session::Session;
 use core::util::{SpotifyId, FileId, StrChunksExt};
 
