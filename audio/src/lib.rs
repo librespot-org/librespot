@@ -13,5 +13,15 @@ extern crate librespot_core as core;
 mod fetch;
 mod decrypt;
 
+#[cfg(not(feature = "with-lewton"))]
+mod libvorbis_decoder;
+#[cfg(feature = "with-lewton")]
+mod lewton_decoder;
+
 pub use fetch::{AudioFile, AudioFileOpen};
 pub use decrypt::AudioDecrypt;
+
+#[cfg(not(feature = "with-lewton"))]
+pub use libvorbis_decoder::{VorbisDecoder, VorbisPacket, VorbisError};
+#[cfg(feature = "with-lewton")]
+pub use lewton_decoder::{VorbisDecoder, VorbisPacket, VorbisError};

@@ -226,6 +226,15 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "lewton"
+version = "0.6.2"
+source = "git+https://github.com/RustAudio/lewton#64a1f3fca7e1dfbfcc18ddcac07e845396c9b7bd"
+dependencies = [
+ "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ogg 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -244,25 +253,18 @@ version = "0.1.0"
 dependencies = [
  "alsa 0.0.1 (git+https://github.com/plietar/rust-alsa)",
  "base64 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "error-chain 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.0-a.0 (git+https://github.com/hyperium/hyper)",
- "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "libpulse-sys 0.0.0 (git+https://github.com/astro/libpulse-sys)",
  "librespot-audio 0.1.0",
  "librespot-core 0.1.0",
  "librespot-metadata 0.1.0",
  "librespot-protocol 0.1.0",
- "linear-map 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "mdns 0.2.0 (git+https://github.com/plietar/rust-mdns)",
  "num-bigint 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-integer 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-traits 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "portaudio-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf_macros 0.6.0 (git+https://github.com/plietar/rust-protobuf-macros)",
@@ -272,16 +274,10 @@ dependencies = [
  "serde 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "shannon 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tempfile 2.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-proto 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-signal 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tremor 0.1.0 (git+https://github.com/plietar/rust-tremor)",
  "url 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "uuid 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vergen 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "vorbis 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -291,37 +287,32 @@ dependencies = [
  "bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lewton 0.6.2 (git+https://github.com/RustAudio/lewton)",
  "librespot-core 0.1.0",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.36 (git+https://github.com/awmath/rust-crypto.git?branch=avx2)",
  "tempfile 2.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tremor 0.1.0 (git+https://github.com/plietar/rust-tremor)",
+ "vorbis 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "librespot-core"
 version = "0.1.0"
 dependencies = [
- "alsa 0.0.1 (git+https://github.com/plietar/rust-alsa)",
  "base64 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "env_logger 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "getopts 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.0-a.0 (git+https://github.com/hyperium/hyper)",
  "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "libpulse-sys 0.0.0 (git+https://github.com/astro/libpulse-sys)",
  "librespot-protocol 0.1.0",
- "linear-map 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "mdns 0.2.0 (git+https://github.com/plietar/rust-mdns)",
  "num-bigint 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-integer 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
- "portaudio-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf_macros 0.6.0 (git+https://github.com/plietar/rust-protobuf-macros)",
  "rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -331,15 +322,9 @@ dependencies = [
  "serde_derive 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "shannon 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tempfile 2.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-proto 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-signal 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tremor 0.1.0 (git+https://github.com/plietar/rust-tremor)",
- "url 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vergen 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "vorbis 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -496,6 +481,14 @@ version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ogg"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1061,6 +1054,7 @@ dependencies = [
 "checksum language-tags 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a91d884b6667cd606bb5a69aa0c99ba811a115fc68915e7056ec08a46e93199a"
 "checksum lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3b37545ab726dd833ec6420aaba8231c5b320814b9029ad585555d2a03e94fbf"
 "checksum lazycell 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ce12306c4739d86ee97c23139f3a34ddf0387bbf181bc7929d287025a8c3ef6b"
+"checksum lewton 0.6.2 (git+https://github.com/RustAudio/lewton)" = "<none>"
 "checksum libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)" = "babb8281da88cba992fa1f4ddec7d63ed96280a1a53ec9b919fd37b53d71e502"
 "checksum libpulse-sys 0.0.0 (git+https://github.com/astro/libpulse-sys)" = "<none>"
 "checksum linear-map 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8f947d2a0ca958037e42a430bc7ea4369f97b60a2002bd927b84404509cc64cf"
@@ -1079,6 +1073,7 @@ dependencies = [
 "checksum num-integer 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)" = "ef1a4bf6f9174aa5783a9b4cc892cacd11aebad6c69ad027a0b65c6ca5f8aa37"
 "checksum num-traits 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)" = "e1cbfa3781f3fe73dc05321bed52a06d2d491eaa764c52335cf4399f046ece99"
 "checksum num_cpus 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ca313f1862c7ec3e0dfe8ace9fa91b1d9cb5c84ace3d00f5ec4216238e93c167"
+"checksum ogg 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7137bf02687385302f4c0aecd77cfce052b69f5b4ee937be778e125c62f67e30"
 "checksum ogg-sys 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)" = "a95b8c172e17df1a41bf8d666301d3b2c4efeb90d9d0415e2a4dc0668b35fdb2"
 "checksum pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "3a8b4c6b8165cd1a1cd4b9b120978131389f64bdaf456435caa41e630edba903"
 "checksum portaudio-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "029e0ab393b44b2d825efbc755cae51c36be7a99d91356b2052be0ed05836636"

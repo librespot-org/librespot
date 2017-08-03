@@ -30,44 +30,28 @@ path = "metadata"
 path = "protocol"
 
 [dependencies]
-base64          = "0.5.0"
-bit-set         = "0.4.0"
-byteorder       = "1.0"
-env_logger      = "0.4.0"
-getopts         = "0.2.14"
-hyper           = { git = "https://github.com/hyperium/hyper" }
-lazy_static     = "0.2.0"
-linear-map      = "1.0"
-log             = "0.3.5"
-num-bigint      = "0.1.35"
-num-integer     = "0.1.32"
-num-traits      = "0.1.36"
-protobuf        = "1.1"
-rand            = "0.3.13"
-rpassword       = "0.3.0"
-rust-crypto     = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
-serde           = "0.9.6"
-serde_json      = "0.9.5"
-serde_derive    = "0.9.6"
-shannon         = "0.2.0"
-tempfile        = "2.1"
-url             = "1.3"
-
-vorbis          = "0.1.0"
-tremor          = { git = "https://github.com/plietar/rust-tremor", optional = true }
+base64 = "0.5.0"
+env_logger = "0.4.0"
+futures = "0.1.8"
+getopts = "0.2.14"
+hyper = { git = "https://github.com/hyperium/hyper" }
+log = "0.3.5"
+mdns = { git = "https://github.com/plietar/rust-mdns" }
+num-bigint = "0.1.35"
+protobuf = "1.1"
+rand = "0.3.13"
+rpassword = "0.3.0"
+rust-crypto = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
+serde = "0.9.6"
+serde_derive = "0.9.6"
+serde_json = "0.9.5"
+tokio-core = "0.1.2"
+tokio-signal = "0.1.2"
+url = "1.3"
 
 alsa            = { git = "https://github.com/plietar/rust-alsa", optional = true }
 portaudio-rs    = { version = "0.3.0", optional = true }
 libpulse-sys    = { git = "https://github.com/astro/libpulse-sys", optional = true }
-
-mdns            = { git = "https://github.com/plietar/rust-mdns" }
-
-error-chain = { version = "0.9.0", default_features = false }
-futures = "0.1.8"
-tokio-core = "0.1.2"
-tokio-proto = "0.1.0"
-tokio-signal = "0.1"
-uuid = { version = "0.4", features = ["v4"] }
 
 [build-dependencies]
 rand            = "0.3.13"
@@ -79,7 +63,8 @@ alsa-backend = ["alsa"]
 portaudio-backend = ["portaudio-rs"]
 pulseaudio-backend = ["libpulse-sys"]
 
-with-tremor = ["tremor"]
+with-tremor = ["librespot-audio/with-tremor"]
+with-lewton = ["librespot-audio/with-lewton"]
 
 default = ["portaudio-backend"]
 
