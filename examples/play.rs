@@ -4,17 +4,20 @@ extern crate tokio_core;
 use std::env;
 use tokio_core::reactor::Core;
 
+use librespot::core::authentication::Credentials;
+use librespot::core::config::{PlayerConfig, SessionConfig};
+use librespot::core::session::Session;
+use librespot::core::util::SpotifyId;
+
 use librespot::audio_backend;
-use librespot::authentication::Credentials;
 use librespot::player::Player;
-use librespot::session::{Config, Session};
-use librespot::util::SpotifyId;
 
 fn main() {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    let config = Config::default();
+    let session_config = SessionConfig::default();
+    let player_config = PlayerConfig::default();
 
     let args : Vec<_> = env::args().collect();
     if args.len() != 4 {
@@ -29,9 +32,9 @@ fn main() {
     let backend = audio_backend::find(None).unwrap();
 
     println!("Connecting ..");
-    let session = core.run(Session::connect(config, credentials, None, handle)).unwrap();
+    let session = core.run(Session::connect(session_config, credentials, None, handle)).unwrap();
 
-    let player = Player::new(session.clone(), None, move || (backend)(None));
+    let player = Player::new(player_config, session.clone(), None, move || (backend)(None));
 
     println!("Playing...");
     core.run(player.load(track, true, 0)).unwrap();
