@@ -24,6 +24,7 @@ before_script:
 script:
     - cargo build --no-default-features
     - cargo build --no-default-features --features "with-tremor"
+    - cargo build --no-default-features --features "with-lewton"
     - cargo build --no-default-features --features "portaudio-backend"
     - cargo build --no-default-features --features "pulseaudio-backend"
     - cargo build --no-default-features --features "alsa-backend"

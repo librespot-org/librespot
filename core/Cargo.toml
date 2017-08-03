@@ -12,7 +12,7 @@ base64 = "0.5.0"
 byteorder = "1.0"
 error-chain = { version = "0.9.0", default_features = false }
 futures = "0.1.8"
-hyper = { git = "https://github.com/hyperium/hyper" }
+hyper = "0.11.2"
 lazy_static = "0.2.0"
 log = "0.3.5"
 num-bigint = "0.1.35"
