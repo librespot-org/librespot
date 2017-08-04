@@ -5,7 +5,7 @@ closed-source libspotify. Additionally, it will provide extra features
 which are not available in the official library.
 
 ## Building
-Rust 1.15.0 or later is required to build librespot.
+Rust 1.17.0 or later is required to build librespot.
 
 **If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.** 
 
