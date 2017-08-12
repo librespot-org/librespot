@@ -24,6 +24,8 @@ enum AuthenticationType {
     AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS = 0x2;
     AUTHENTICATION_SPOTIFY_TOKEN = 0x3;
     AUTHENTICATION_FACEBOOK_TOKEN = 0x4;
+    // this type is returned when requesting AUTHENTICATION_SPOTIFY_TOKEN
+    AUTHENTICATION_UNKNOWN = 0x7;
 }
 
 enum AccountCreation {
