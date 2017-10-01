@@ -194,15 +194,19 @@ impl Metadata for Artist {
     fn parse(msg: &Self::Message, session: &Session) -> Self {
         let country = session.country();
 
-        let top_tracks = msg.get_top_track()
+        let top_tracks: Vec<SpotifyId> = match msg.get_top_track()
                             .iter()
-                            .find(|tt| !tt.has_country() || countrylist_contains(tt.get_country(), &country))
-                            .unwrap()
-                            .get_track()
-                            .iter()
-                            .filter(|track| track.has_gid())
-                            .map(|track| SpotifyId::from_raw(track.get_gid()))
-                            .collect::<Vec<_>>();
+                            .find(|tt| !tt.has_country() || countrylist_contains(tt.get_country(), &country)) {
+                                Some(tracks) => {
+                                    tracks.get_track()
+                                    .iter()
+                                    .filter(|track| track.has_gid())
+                                    .map(|track| SpotifyId::from_raw(track.get_gid()))
+                                    .collect::<Vec<_>>()
+                                },
+                                None => Vec::new()
+                            };
+
 
         Artist {
             id: SpotifyId::from_raw(msg.get_gid()),
