@@ -7,7 +7,7 @@ which are not available in the official library.
 # Unmaintained
 Unfortunately I am unable to maintain librespot anymore. It should still work,
 but issues and Pull requests will be ignored. Feel free to fork it and continue
-development there. If a fork gains traction I will happilly point to it from the
+development there. If a fork gains traction I will happily point to it from the
 README.
 
 ## Building
