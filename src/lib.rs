@@ -34,6 +34,9 @@ extern crate portaudio_rs;
 #[cfg(feature = "libpulse-sys")]
 extern crate libpulse_sys;
 
+#[cfg(feature = "jackaudio-backend")]
+extern crate jack;
+
 pub mod audio_backend;
 pub mod discovery;
 pub mod keymaster;
