@@ -4,6 +4,8 @@ applications to use Spotify's service, without using the official but
 closed-source libspotify. Additionally, it will provide extra features
 which are not available in the official library.
 
+Note: librespot only works with Spotify Premium.
+
 # Unmaintained
 Unfortunately I am unable to maintain librespot anymore. It should still work,
 but issues and Pull requests will be ignored. Feel free to fork it and continue
