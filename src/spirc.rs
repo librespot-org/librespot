@@ -396,6 +396,11 @@ impl SpircTask {
                 self.notify(None);
             }
 
+            MessageType::kMessageTypeRepeat => {
+                self.state.set_repeat(frame.get_state().get_repeat());
+                self.notify(None);
+            }
+
             MessageType::kMessageTypeSeek => {
                 let position = frame.get_position();
 
@@ -467,13 +472,19 @@ impl SpircTask {
 
     fn handle_next(&mut self) {
         let current_index = self.state.get_playing_track_index();
-        let new_index = (current_index + 1) % (self.state.get_track().len() as u32);
+        let num_tracks = self.state.get_track().len() as u32;
+        let new_index = (current_index + 1) % num_tracks;
+
+        let mut was_last_track = (current_index + 1) >= num_tracks;
+        if self.state.get_repeat() {
+            was_last_track = false;
+        }
 
         self.state.set_playing_track_index(new_index);
         self.state.set_position_ms(0);
         self.state.set_position_measured_at(now_ms() as u64);
 
-        self.load_track(true);
+        self.load_track(!was_last_track);
     }
 
     fn handle_prev(&mut self) {
@@ -520,14 +531,7 @@ impl SpircTask {
     }
 
     fn handle_end_of_track(&mut self) {
-        let current_index = self.state.get_playing_track_index();
-        let new_index = (current_index + 1) % (self.state.get_track().len() as u32);
-
-        self.state.set_playing_track_index(new_index);
-        self.state.set_position_ms(0);
-        self.state.set_position_measured_at(now_ms() as u64);
-
-        self.load_track(true);
+        self.handle_next();   
         self.notify(None);
     }
 
