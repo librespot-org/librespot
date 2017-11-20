@@ -4,13 +4,16 @@ applications to use Spotify's service, without using the official but
 closed-source libspotify. Additionally, it will provide extra features
 which are not available in the official library.
 
-Note: librespot only works with Spotify Premium.
+Note: librespot needs to be logged in and only works with Spotify Premium
 
-# Unmaintained
-Unfortunately I am unable to maintain librespot anymore. It should still work,
-but issues and Pull requests will be ignored. Feel free to fork it and continue
-development there. If a fork gains traction I will happily point to it from the
-README.
+# THIS FORK
+As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged. 
+
+# THANKS
+I've done noting more than make this pretty so big thanks to:  
+[plietar](https://github.com/plietar/) for making the thing in the first place.  
+[kingosticks](https://github.com/kingosticks/) For the Suffling and Repeat.  
+[ipha](https://github.com/ipha/) For the start stop audio sink.  
 
 ## Building
 Rust 1.17.0 or later is required to build librespot.
@@ -46,9 +49,27 @@ Once you've built *librespot*, run it using :
 target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME
 ```
 
-## Discovery mode
-*librespot* can be run in discovery mode, in which case no password is required at startup.
-For that, simply omit the `--username` argument.
+### All options
+
+| Type     | Short | Long                | Description                                     | Hint        |
+|----------|-------|---------------------|-------------------------------------------------|-------------|
+| Option   | c     | cache               | Path to a directory where files will be cached. | CACHE       |
+| Flag     |       | disable-audio-cache | Disable caching of the audio data.              |             |
+| Required | n     | name                | Device name                                     | NAME        |
+| Option   |       | device-type         | Displayed device type                           | DEVICE_TYPE |
+| Option   | b     | bitrate             | Bitrate (96, 160 or 320). Defaults to 160       | BITRATE     |
+| Option   |       | onstart             | Run PROGRAM when playback is about to begin.    |             |
+| Option   |       | onstop              | Run PROGRAM when playback has ended.            | PROGRAM     |
+| Flag     | v     | verbose             | Enable verbose output                           | PROGRAM     |
+| Option   | u     | username            | Username to sign in with                        | USERNAME    |
+| Option   | p     | password            | Password                                        | PASSWORD    |
+| Flag     |       | disable-discovery   | Disable discovery mode                          |             |
+| Option   |       | backend             | Audio backend to use. Use '?' to list options   | BACKEND     |
+| Option   |       | device              | Audio device to use. Use '?' to list options    | DEVICE      |
+| Option   |       | mixer               | Mixer to use                                    | MIXER       |
+
+Taken from here:
+https://github.com/ComlOnline/librespot/blob/master/src/main.rs#L88
 
 ## Audio Backends
 *librespot* supports various audio backends. Multiple backends can be enabled at compile time by enabling the
