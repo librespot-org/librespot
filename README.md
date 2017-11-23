@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/ComlOnline/librespot.svg?branch=master)](https://travis-ci.org/ComlOnline/librespot)
+
 # librespot
 *librespot* is an open source client library for Spotify. It enables
 applications to use Spotify's service, without using the official but
@@ -8,6 +10,7 @@ Note: librespot needs to be logged in and only works with Spotify Premium
 
 # THIS FORK
 As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged. 
+
 
 # THANKS
 I've done noting more than make this pretty so big thanks to:  
