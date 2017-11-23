@@ -129,4 +129,3 @@ https://gitter.im/sashahilton00/spotify-connect-resources
 
 ## License
 Everything in this repository is licensed under the MIT license.
-
