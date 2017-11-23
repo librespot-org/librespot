@@ -7,7 +7,8 @@ which are not available in the official library.
 Note: librespot needs to be logged in and only works with Spotify Premium
 
 # THIS FORK
-As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged. 
+As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged.
+[![Build Status](https://travis-ci.org/ComlOnline/librespot.svg?branch=master)](https://travis-ci.org/ComlOnline/librespot)
 
 # THANKS
 I've done noting more than make this pretty so big thanks to:  
