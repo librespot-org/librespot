@@ -16,9 +16,9 @@ use audio::{VorbisDecoder, VorbisPacket};
 use metadata::{FileFormat, Track, Metadata};
 use mixer::AudioFilter;
 
-#[derive(Clone)]
 pub struct Player {
-    commands: std::sync::mpsc::Sender<PlayerCommand>,
+    commands: Option<std::sync::mpsc::Sender<PlayerCommand>>,
+    thread_handle: Option<thread::JoinHandle<()>>,
 }
 
 struct PlayerInternal {
@@ -47,7 +47,7 @@ impl Player {
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
 
-        thread::spawn(move || {
+        let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
 
             let internal = PlayerInternal {
@@ -64,12 +64,13 @@ impl Player {
         });
 
         Player {
-            commands: cmd_tx,
+            commands: Some(cmd_tx),
+            thread_handle: Some(handle),
         }
     }
 
     fn command(&self, cmd: PlayerCommand) {
-        self.commands.send(cmd).unwrap();
+        self.commands.as_ref().unwrap().send(cmd).unwrap();
     }
 
     pub fn load(&self, track: SpotifyId, start_playing: bool, position_ms: u32)
@@ -95,6 +96,19 @@ impl Player {
 
     pub fn seek(&self, position_ms: u32) {
         self.command(PlayerCommand::Seek(position_ms));
+    }
+}
+
+impl Drop for Player {
+    fn drop(&mut self) {
+        debug!("Shutting down player thread ...");
+        self.commands = None;
+        if let Some(handle) = self.thread_handle.take() {
+            match handle.join() {
+                Ok(_) => (),
+                Err(_) => error!("Player thread panicked!")
+            }
+        }
     }
 }
 
