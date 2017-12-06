@@ -142,9 +142,9 @@ impl Spirc {
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
-        let volume = 0x8000;
+        let volume = config.volume as u16;
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume);
+        mixer.set_volume(volume as u16);
 
         let mut task = SpircTask {
             player: player,
