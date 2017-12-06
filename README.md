@@ -15,7 +15,7 @@ README.
 ## Building
 Rust 1.17.0 or later is required to build librespot.
 
-**If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.** 
+**If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.**
 
 It also requires a C, with portaudio.
 
@@ -43,7 +43,7 @@ cargo build --release
 A sample program implementing a headless Spotify Connect receiver is provided.
 Once you've built *librespot*, run it using :
 ```shell
-target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME
+target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME [--initial-volume 20]
 ```
 
 ## Discovery mode
@@ -63,7 +63,7 @@ target/release/librespot [...] --backend portaudio
 
 The following backends are currently available :
 - ALSA
-- PortAudio 
+- PortAudio
 - PulseAudio
 
 ## Cross-compiling
@@ -108,4 +108,3 @@ https://gitter.im/sashahilton00/spotify-connect-resources
 
 ## License
 Everything in this repository is licensed under the MIT license.
-

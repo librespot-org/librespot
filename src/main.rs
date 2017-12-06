@@ -101,7 +101,7 @@ fn setup(args: &[String]) -> Setup {
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
         .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
         .optopt("", "mixer", "Mixer to use", "MIXER")
-        .optopt("", "initial-volume", "Initial volume in %, once connected", "VOLUME");
+        .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -136,7 +136,12 @@ fn setup(args: &[String]) -> Setup {
         .expect("Invalid mixer");
     let initial_volume;
     if matches.opt_present("initial-volume"){
-        initial_volume = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap()* 0xFFFF as i32 / 100 ;
+        if matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok(){
+            initial_volume = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap()* 0xFFFF as i32 / 100 ;
+            }
+        else {
+            initial_volume = 0x8000 as i32;
+            }
         }
     else{
         initial_volume = 0x8000 as i32;
