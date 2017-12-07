@@ -5,6 +5,9 @@ use std::mem;
 use std::sync::mpsc::{RecvError, TryRecvError};
 use std::thread;
 use std;
+use std::io::Seek;
+use std::io::SeekFrom;
+use std::io::Read;
 
 use core::config::{Bitrate, PlayerConfig};
 use core::session::Session;
@@ -103,10 +106,12 @@ enum PlayerState {
     Stopped,
     Paused {
         decoder: Decoder,
+        track_gain_db: f32,
         end_of_track: oneshot::Sender<()>,
     },
     Playing {
         decoder: Decoder,
+        track_gain_db: f32,
         end_of_track: oneshot::Sender<()>,
     },
 
@@ -149,9 +154,10 @@ impl PlayerState {
     fn paused_to_playing(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Paused { decoder, end_of_track } => {
+            Paused { decoder, track_gain_db, end_of_track } => {
                 *self = Playing {
                     decoder: decoder,
+                    track_gain_db: track_gain_db,
                     end_of_track: end_of_track,
                 };
             }
@@ -162,9 +168,10 @@ impl PlayerState {
     fn playing_to_paused(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Playing { decoder, end_of_track } => {
+            Playing { decoder, track_gain_db, end_of_track } => {
                 *self = Paused {
                     decoder: decoder,
+                    track_gain_db: track_gain_db,
                     end_of_track: end_of_track,
                 };
             }
@@ -193,22 +200,34 @@ impl PlayerInternal {
                 self.handle_command(cmd);
             }
 
-            let packet = if let PlayerState::Playing { ref mut decoder, .. } = self.state {
+            let mut current_track_gain_db: f32 = 0.0;
+            let packet = if let PlayerState::Playing { ref mut decoder, track_gain_db, .. } = self.state {
+                current_track_gain_db = track_gain_db;
                 Some(decoder.next_packet().expect("Vorbis error"))
             } else { None };
 
             if let Some(packet) = packet {
-                self.handle_packet(packet);
+                self.handle_packet(packet, current_track_gain_db);
             }
         }
     }
 
-    fn handle_packet(&mut self, packet: Option<VorbisPacket>) {
+    fn handle_packet(&mut self, packet: Option<VorbisPacket>, track_gain_db: f32) {
         match packet {
             Some(mut packet) => {
                 if let Some(ref editor) = self.audio_filter {
                     editor.modify_stream(&mut packet.data_mut())
                 };
+
+                let normalization_factor = f32::powf(10.0, track_gain_db / 20.0);
+
+                // info!("Use gain: {}, factor: {}", track_gain_db, normalization_factor);
+
+                if normalization_factor != 1.0 {
+                    for x in packet.data_mut().iter_mut() {
+                        *x = (*x as f32 * normalization_factor) as i16;
+                    }
+                }
 
                 self.sink.write(&packet.data()).unwrap();
             }
@@ -232,7 +251,7 @@ impl PlayerInternal {
                 }
 
                 match self.load_track(track_id, position as i64) {
-                    Some(decoder) => {
+                    Some((decoder, track_gain_db)) => {
                         if play {
                             if !self.state.is_playing() {
                                 self.run_onstart();
@@ -241,6 +260,7 @@ impl PlayerInternal {
 
                             self.state = PlayerState::Playing {
                                 decoder: decoder,
+                                track_gain_db: track_gain_db,
                                 end_of_track: end_of_track,
                             };
                         } else {
@@ -250,6 +270,7 @@ impl PlayerInternal {
 
                             self.state = PlayerState::Paused {
                                 decoder: decoder,
+                                track_gain_db: track_gain_db,
                                 end_of_track: end_of_track,
                             };
                         }
@@ -343,7 +364,7 @@ impl PlayerInternal {
         }
     }
 
-    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<Decoder> {
+    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<(Decoder, f32)> {
         let track = Track::get(&self.session, track_id).wait().unwrap();
 
         info!("Loading track \"{}\"", track.name);
@@ -373,7 +394,17 @@ impl PlayerInternal {
         let key = self.session.audio_key().request(track.id, file_id).wait().unwrap();
 
         let encrypted_file = AudioFile::open(&self.session, file_id).wait().unwrap();
-        let audio_file = Subfile::new(AudioDecrypt::new(key, encrypted_file), 0xa7);
+        let mut track_gain_float_bytes = [0; 4];
+
+        let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+        decrypted_file.seek(SeekFrom::Start(144)).unwrap(); // 4 bytes as LE float
+        decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+        let track_gain_db: f32;
+        unsafe {
+           track_gain_db = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
+           info!("Track gain: {}db", track_gain_db);
+        }
+        let audio_file = Subfile::new(decrypted_file, 0xa7);
 
         let mut decoder = VorbisDecoder::new(audio_file).unwrap();
 
@@ -384,7 +415,7 @@ impl PlayerInternal {
 
         info!("Track \"{}\" loaded", track.name);
 
-        Some(decoder)
+        Some((decoder, track_gain_db))
     }
 }
 
