@@ -70,6 +70,7 @@ target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME 
 | Option   |       | backend             | Audio backend to use. Use '?' to list options   | BACKEND     |
 | Option   |       | device              | Audio device to use. Use '?' to list options    | DEVICE      |
 | Option   |       | mixer               | Mixer to use                                    | MIXER       |
+| Option   |       | initial-volume      | Initial volume in %, once connected [0-100]     | VOLUME      |
 
 Taken from here:
 https://github.com/ComlOnline/librespot/blob/master/src/main.rs#L88
