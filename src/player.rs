@@ -219,14 +219,18 @@ impl PlayerInternal {
                     editor.modify_stream(&mut packet.data_mut())
                 };
 
-                let normalization_factor = f32::powf(10.0, track_gain_db / 20.0);
+                if self.config.normalization {
 
-                // info!("Use gain: {}, factor: {}", track_gain_db, normalization_factor);
+                    let normalization_factor = f32::powf(10.0, track_gain_db / 20.0);
 
-                if normalization_factor != 1.0 {
-                    for x in packet.data_mut().iter_mut() {
-                        *x = (*x as f32 * normalization_factor) as i16;
+                    // info!("Use gain: {}, factor: {}", track_gain_db, normalization_factor);
+
+                    if normalization_factor != 1.0 {
+                        for x in packet.data_mut().iter_mut() {
+                            *x = (*x as f32 * normalization_factor) as i16;
+                        }
                     }
+
                 }
 
                 self.sink.write(&packet.data()).unwrap();
@@ -394,16 +398,21 @@ impl PlayerInternal {
         let key = self.session.audio_key().request(track.id, file_id).wait().unwrap();
 
         let encrypted_file = AudioFile::open(&self.session, file_id).wait().unwrap();
-        let mut track_gain_float_bytes = [0; 4];
 
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
-        decrypted_file.seek(SeekFrom::Start(144)).unwrap(); // 4 bytes as LE float
-        decrypted_file.read(&mut track_gain_float_bytes).unwrap();
-        let track_gain_db: f32;
-        unsafe {
-           track_gain_db = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
-           info!("Track gain: {}db", track_gain_db);
+
+        let mut track_gain_db: f32 = 0.0;
+
+        if self.config.normalization {
+            let mut track_gain_float_bytes = [0; 4];
+            decrypted_file.seek(SeekFrom::Start(144)).unwrap(); // 4 bytes as LE float
+            decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            unsafe {
+                track_gain_db = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
+                info!("Track gain: {}db", track_gain_db);
+           }
         }
+
         let audio_file = Subfile::new(decrypted_file, 0xa7);
 
         let mut decoder = VorbisDecoder::new(audio_file).unwrap();

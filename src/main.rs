@@ -100,7 +100,8 @@ fn setup(args: &[String]) -> Setup {
         .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
         .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
-        .optopt("", "mixer", "Mixer to use", "MIXER");
+        .optopt("", "mixer", "Mixer to use", "MIXER")
+        .optflag("", "enable-volume-normalization", "Play all tracks at the same volume");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -169,6 +170,7 @@ fn setup(args: &[String]) -> Setup {
             bitrate: bitrate,
             onstart: matches.opt_str("onstart"),
             onstop: matches.opt_str("onstop"),
+            normalization: matches.opt_present("enable-volume-normalization")
         }
     };
 
