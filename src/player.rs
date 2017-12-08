@@ -410,7 +410,24 @@ impl PlayerInternal {
             unsafe {
                 track_gain_db = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
                 info!("Track gain: {}db", track_gain_db);
-           }
+            }
+            decrypted_file.seek(SeekFrom::Start(148)).unwrap(); // 4 bytes as LE float
+            decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            unsafe {
+                // track peak, 1.0 represents dbfs
+                info!("Track peak: {}", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
+            }
+            decrypted_file.seek(SeekFrom::Start(152)).unwrap(); // 4 bytes as LE float
+            decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            unsafe {
+                info!("Album gain: {}db", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
+            }
+            decrypted_file.seek(SeekFrom::Start(156)).unwrap(); // 4 bytes as LE float
+            decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            unsafe {
+                // album peak, 1.0 represents dbfs
+                info!("Album peak: {}", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
+            }
         }
 
         let audio_file = Subfile::new(decrypted_file, 0xa7);
