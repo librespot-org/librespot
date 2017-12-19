@@ -100,7 +100,8 @@ fn setup(args: &[String]) -> Setup {
         .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
         .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
-        .optopt("", "mixer", "Mixer to use", "MIXER");
+        .optopt("", "mixer", "Mixer to use", "MIXER")
+        .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -133,6 +134,33 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref())
         .expect("Invalid mixer");
+    let initial_volume;
+    // check if initial-volume argument is present
+    if matches.opt_present("initial-volume"){
+        // check if value is a number
+        if matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok(){
+            // check if value is in [0-100] range, otherwise put the bound values
+            if matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap() < 0 {
+                initial_volume = 0 as i32;
+            }
+            else if matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap() > 100{
+                initial_volume = 0xFFFF as i32;
+            }
+            // checks ok
+            else{
+                initial_volume = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap()* 0xFFFF as i32 / 100 ;
+            }
+        }
+        // if value is not a number use default value (50%)
+        else {
+            initial_volume = 0x8000 as i32;
+        }
+    }
+    // if argument not present use default values (50%)
+    else{
+        initial_volume = 0x8000 as i32;
+        }
+    debug!("Volume \"{}\" !", initial_volume);
 
     let name = matches.opt_str("name").unwrap();
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
@@ -180,6 +208,7 @@ fn setup(args: &[String]) -> Setup {
         ConnectConfig {
             name: name,
             device_type: device_type,
+            volume: initial_volume,
         }
     };
 
@@ -342,4 +371,3 @@ fn main() {
 
     core.run(Main::new(handle, setup(&args))).unwrap()
 }
-

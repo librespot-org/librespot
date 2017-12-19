@@ -9,7 +9,7 @@ which are not available in the official library.
 Note: librespot needs to be logged in and only works with Spotify Premium
 
 # THIS FORK
-As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged. 
+As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged.
 
 
 # THANKS
@@ -21,7 +21,7 @@ I've done noting more than make this pretty so big thanks to:
 ## Building
 Rust 1.17.0 or later is required to build librespot.
 
-**If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.** 
+**If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.**
 
 It also requires a C, with portaudio.
 
@@ -49,7 +49,7 @@ cargo build --release
 A sample program implementing a headless Spotify Connect receiver is provided.
 Once you've built *librespot*, run it using :
 ```shell
-target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME
+target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME [--initial-volume 20]
 ```
 
 ### All options
@@ -70,6 +70,7 @@ target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME
 | Option   |       | backend             | Audio backend to use. Use '?' to list options   | BACKEND     |
 | Option   |       | device              | Audio device to use. Use '?' to list options    | DEVICE      |
 | Option   |       | mixer               | Mixer to use                                    | MIXER       |
+| Option   |       | initial-volume      | Initial volume in %, once connected [0-100]     | VOLUME      |
 
 Taken from here:
 https://github.com/ComlOnline/librespot/blob/master/src/main.rs#L88
@@ -87,7 +88,7 @@ target/release/librespot [...] --backend portaudio
 
 The following backends are currently available :
 - ALSA
-- PortAudio 
+- PortAudio
 - PulseAudio
 
 ## Cross-compiling

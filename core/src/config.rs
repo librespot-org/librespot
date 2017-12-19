@@ -121,4 +121,5 @@ impl Default for PlayerConfig {
 pub struct ConnectConfig {
     pub name: String,
     pub device_type: DeviceType,
+    pub volume: i32,
 }
