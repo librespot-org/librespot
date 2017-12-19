@@ -17,6 +17,8 @@ I've done noting more than make this pretty so big thanks to:
 [plietar](https://github.com/plietar/) for making the thing in the first place.  
 [kingosticks](https://github.com/kingosticks/) For the Suffling and Repeat.  
 [ipha](https://github.com/ipha/) For the start stop audio sink.  
+[fossedihelm](https://github.com/fossedihelm/) for [addind a default inital volume and options for it](https://github.com/ComlOnline/librespot/pull/5)  
+[brain0](https://github.com/brain0/) for [making pluseaudio more robust against audio failures](https://github.com/ComlOnline/librespot/pull/6)  
 
 ## Building
 Rust 1.17.0 or later is required to build librespot.
