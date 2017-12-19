@@ -15,8 +15,8 @@ As the origin is no longer maintained I wanted to have a place for a version of 
 # THANKS
 I've done noting more than make this pretty so big thanks to:  
 [plietar](https://github.com/plietar/) for making the thing in the first place.  
-[kingosticks](https://github.com/kingosticks/) For the Suffling and Repeat.  
-[ipha](https://github.com/ipha/) For the start stop audio sink.  
+[kingosticks](https://github.com/kingosticks/) for the Suffling and Repeat.  
+[ipha](https://github.com/ipha/) for the start stop audio sink.  
 [fossedihelm](https://github.com/fossedihelm/) for [addind a default inital volume and options for it](https://github.com/ComlOnline/librespot/pull/5)  
 [brain0](https://github.com/brain0/) for [making pluseaudio more robust against audio failures](https://github.com/ComlOnline/librespot/pull/6)  
 
