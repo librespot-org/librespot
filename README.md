@@ -6,7 +6,7 @@ applications to use Spotify's service, without using the official but
 closed-source libspotify. Additionally, it will provide extra features
 which are not available in the official library.
 
-Note: librespot needs to be logged in and only works with Spotify Premium
+Note: librespot only works with Spotify Premium
 
 # THIS FORK
 As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged.
