@@ -177,7 +177,7 @@ impl Session {
     }
 
     pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
-        self.0.tx_connection.send((cmd, data)).unwrap();
+        self.0.tx_connection.unbounded_send((cmd, data)).unwrap();
     }
 
     pub fn cache(&self) -> Option<&Arc<Cache>> {

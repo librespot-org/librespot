@@ -136,7 +136,7 @@ impl Discovery {
 
         let credentials = Credentials::with_blob(username.to_owned(), &decrypted, &self.0.device_id);
 
-        self.0.tx.send(credentials).unwrap();
+        self.0.tx.unbounded_send(credentials).unwrap();
 
         let result = json!({
             "status": 101,

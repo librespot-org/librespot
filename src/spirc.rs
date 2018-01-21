@@ -177,28 +177,28 @@ impl Spirc {
     }
 
     pub fn play(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Play);
+        let _ = self.commands.unbounded_send(SpircCommand::Play);
     }
     pub fn play_pause(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::PlayPause);
+        let _ = self.commands.unbounded_send(SpircCommand::PlayPause);
     }
     pub fn pause(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Pause);
+        let _ = self.commands.unbounded_send(SpircCommand::Pause);
     }
     pub fn prev(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Prev);
+        let _ = self.commands.unbounded_send(SpircCommand::Prev);
     }
     pub fn next(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Next);
+        let _ = self.commands.unbounded_send(SpircCommand::Next);
     }
     pub fn volume_up(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::VolumeUp);
+        let _ = self.commands.unbounded_send(SpircCommand::VolumeUp);
     }
     pub fn volume_down(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::VolumeDown);
+        let _ = self.commands.unbounded_send(SpircCommand::VolumeDown);
     }
     pub fn shutdown(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Shutdown);
+        let _ = self.commands.unbounded_send(SpircCommand::Shutdown);
     }
 }
 

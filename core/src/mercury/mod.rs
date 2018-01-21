@@ -211,7 +211,7 @@ impl MercuryManager {
 
                             // if send fails, remove from list of subs
                             // TODO: send unsub message
-                            sub.send(response.clone()).is_ok()
+                            sub.unbounded_send(response.clone()).is_ok()
                         } else {
                             // URI doesn't match
                             true

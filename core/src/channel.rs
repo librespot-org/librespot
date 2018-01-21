@@ -61,7 +61,7 @@ impl ChannelManager {
 
         self.lock(|inner| {
             if let Entry::Occupied(entry) = inner.channels.entry(id) {
-                let _ = entry.get().send((cmd, data));
+                let _ = entry.get().unbounded_send((cmd, data));
             }
         });
     }
