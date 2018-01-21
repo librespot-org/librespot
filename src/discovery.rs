@@ -3,8 +3,8 @@ use crypto::digest::Digest;
 use crypto::mac::Mac;
 use crypto;
 use futures::sync::mpsc;
-use futures::{Future, Stream, Poll, Async};
-use hyper::server::{Service, NewService, Request, Response, Http};
+use futures::{Future, Stream, Poll};
+use hyper::server::{Service, Request, Response, Http};
 use hyper::{self, Get, Post, StatusCode};
 use mdns;
 use num_bigint::BigUint;
@@ -12,7 +12,6 @@ use rand;
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::Arc;
-use tokio_core::net::TcpListener;
 use tokio_core::reactor::Handle;
 use url;
 
@@ -32,7 +31,7 @@ struct DiscoveryInner {
 }
 
 impl Discovery {
-    pub fn new(config: ConnectConfig, device_id: String)
+    fn new(config: ConnectConfig, device_id: String)
         -> (Discovery, mpsc::UnboundedReceiver<Credentials>)
     {
         let (tx, rx) = mpsc::unbounded();
@@ -190,21 +189,9 @@ impl Service for Discovery {
     }
 }
 
-impl NewService for Discovery {
-    type Request = Request;
-    type Response = Response;
-    type Error = hyper::Error;
-    type Instance = Self;
-
-    fn new_service(&self) -> io::Result<Self::Instance> {
-        Ok(self.clone())
-    }
-}
-
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
     _svc: mdns::Service,
-    task: Box<Future<Item=(), Error=io::Error>>,
 }
 
 pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
@@ -212,15 +199,20 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
 {
     let (discovery, creds_rx) = Discovery::new(config.clone(), device_id);
 
-    let listener = TcpListener::bind(&"0.0.0.0:0".parse().unwrap(), handle)?;
-    let addr = listener.local_addr()?;
-
-    let http = Http::new();
-    let handle_ = handle.clone();
-    let task = Box::new(listener.incoming().for_each(move |(socket, addr)| {
-        http.bind_connection(&handle_, socket, addr, discovery.clone());
-        Ok(())
-    }));
+    let serve = {
+        let http = Http::new();
+        http.serve_addr_handle(&"0.0.0.0:0".parse().unwrap(), &handle, move || Ok(discovery.clone())).unwrap()
+    };
+    let addr = serve.incoming_ref().local_addr();
+    let server_future = {
+        let handle = handle.clone();
+        serve.for_each(move |connection| {
+                handle.spawn(connection.then(|_| Ok(())));
+                Ok(())
+            })
+            .then(|_| Ok(()))
+    };
+    handle.spawn(server_future);
 
     let responder = mdns::Responder::spawn(&handle)?;
     let svc = responder.register(
@@ -232,20 +224,14 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
     Ok(DiscoveryStream {
         credentials: creds_rx,
         _svc: svc,
-        task: task,
     })
 }
 
 impl Stream for DiscoveryStream {
     type Item = Credentials;
-    type Error = io::Error;
+    type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match self.task.poll()? {
-            Async::Ready(()) => unreachable!(),
-            Async::NotReady => (),
-        }
-
-        Ok(self.credentials.poll().unwrap())
+        self.credentials.poll()
     }
 }
