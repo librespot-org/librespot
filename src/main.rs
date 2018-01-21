@@ -1,12 +1,10 @@
-// TODO: many items from tokio-core::io have been deprecated in favour of tokio-io
-#![allow(deprecated)]
-
 #[macro_use] extern crate log;
 extern crate env_logger;
 extern crate futures;
 extern crate getopts;
 extern crate librespot;
 extern crate tokio_core;
+extern crate tokio_io;
 extern crate tokio_signal;
 
 use env_logger::LogBuilder;
@@ -17,7 +15,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
 use tokio_core::reactor::{Handle, Core};
-use tokio_core::io::IoStream;
+use tokio_io::IoStream;
 use std::mem;
 
 use librespot::core::authentication::{get_credentials, Credentials};

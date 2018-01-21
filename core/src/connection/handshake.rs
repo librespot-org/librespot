@@ -3,9 +3,11 @@ use crypto::hmac::Hmac;
 use crypto::mac::Mac;use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use protobuf::{self, Message, MessageStatic};
 use rand::thread_rng;
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::marker::PhantomData;
-use tokio_core::io::{Io, Framed, write_all, WriteAll, read_exact, ReadExact, Window};
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::codec::Framed;
+use tokio_io::io::{write_all, WriteAll, read_exact, ReadExact, Window};
 use futures::{Poll, Async, Future};
 
 use diffie_hellman::DHLocalKeys;
@@ -25,7 +27,7 @@ enum HandshakeState<T> {
     ClientResponse(Option<APCodec>, WriteAll<T, Vec<u8>>),
 }
 
-pub fn handshake<T: Io>(connection: T) -> Handshake<T> {
+pub fn handshake<T: AsyncRead + AsyncWrite>(connection: T) -> Handshake<T> {
     let local_keys = DHLocalKeys::random(&mut thread_rng());
     let client_hello = client_hello(connection, local_keys.public_key());
 
@@ -35,7 +37,7 @@ pub fn handshake<T: Io>(connection: T) -> Handshake<T> {
     }
 }
 
-impl <T: Io> Future for Handshake<T> {
+impl <T: AsyncRead + AsyncWrite> Future for Handshake<T> {
     type Item = Framed<T, APCodec>;
     type Error = io::Error;
 
@@ -78,7 +80,7 @@ impl <T: Io> Future for Handshake<T> {
     }
 }
 
-fn client_hello<T: Write>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8>> {
+fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8>> {
     let packet = protobuf_init!(ClientHello::new(), {
         build_info => {
             product: protocol::keyexchange::Product::PRODUCT_PARTNER,
@@ -104,7 +106,7 @@ fn client_hello<T: Write>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8>> {
     write_all(connection, buffer)
 }
 
-fn client_response<T: Write>(connection: T, challenge: Vec<u8>) -> WriteAll<T, Vec<u8>> {
+fn client_response<T: AsyncWrite>(connection: T, challenge: Vec<u8>) -> WriteAll<T, Vec<u8>> {
     let packet = protobuf_init!(ClientResponsePlaintext::new(), {
         login_crypto_response.diffie_hellman => {
             hmac: challenge
@@ -126,14 +128,14 @@ enum RecvPacket<T, M: MessageStatic> {
     Body(ReadExact<T, Window<Vec<u8>>>, PhantomData<M>),
 }
 
-fn recv_packet<T, M>(connection: T, acc: Vec<u8>) -> RecvPacket<T, M>
+fn recv_packet<T: AsyncRead, M>(connection: T, acc: Vec<u8>) -> RecvPacket<T, M>
     where T: Read,
           M: MessageStatic
 {
     RecvPacket::Header(read_into_accumulator(connection, 4, acc), PhantomData)
 }
 
-impl <T, M> Future for RecvPacket<T, M>
+impl <T: AsyncRead, M> Future for RecvPacket<T, M>
     where T: Read,
           M: MessageStatic
 {
@@ -165,7 +167,7 @@ impl <T, M> Future for RecvPacket<T, M>
     }
 }
 
-fn read_into_accumulator<T: Read>(connection: T, size: usize, mut acc: Vec<u8>) -> ReadExact<T, Window<Vec<u8>>> {
+fn read_into_accumulator<T: AsyncRead>(connection: T, size: usize, mut acc: Vec<u8>) -> ReadExact<T, Window<Vec<u8>>> {
     let offset = acc.len();
     acc.resize(offset + size, 0);
 

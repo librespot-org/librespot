@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use bytes::Bytes;
 use futures::sync::oneshot;
 use futures::{Async, Future, Poll};
 use std::collections::HashMap;
 use std::io::Write;
-use tokio_core::io::EasyBuf;
 
 use util::SeqGenerator;
 use util::{SpotifyId, FileId};
@@ -22,8 +22,8 @@ component! {
 }
 
 impl AudioKeyManager {
-    pub fn dispatch(&self, cmd: u8, mut data: EasyBuf) {
-        let seq = BigEndian::read_u32(data.drain_to(4).as_ref());
+    pub fn dispatch(&self, cmd: u8, mut data: Bytes) {
+        let seq = BigEndian::read_u32(data.split_to(4).as_ref());
 
         let sender = self.lock(|inner| inner.pending.remove(&seq));
 

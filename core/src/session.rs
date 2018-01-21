@@ -1,10 +1,10 @@
+use bytes::Bytes;
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use futures::sync::mpsc;
 use futures::{Future, Stream, IntoFuture, Poll, Async};
 use std::io;
 use std::sync::{RwLock, Arc, Weak};
-use tokio_core::io::EasyBuf;
 use tokio_core::reactor::{Handle, Remote};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
@@ -156,7 +156,7 @@ impl Session {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
-    fn dispatch(&self, cmd: u8, data: EasyBuf) {
+    fn dispatch(&self, cmd: u8, data: Bytes) {
         match cmd {
             0x4 => {
                 self.debug_info();
@@ -229,10 +229,10 @@ impl Drop for SessionInternal {
 }
 
 struct DispatchTask<S>(S, SessionWeak)
-    where S: Stream<Item = (u8, EasyBuf)>;
+    where S: Stream<Item = (u8, Bytes)>;
 
 impl <S> Future for DispatchTask<S>
-    where S: Stream<Item = (u8, EasyBuf)>
+    where S: Stream<Item = (u8, Bytes)>
 {
     type Item = ();
     type Error = S::Error;
@@ -253,7 +253,7 @@ impl <S> Future for DispatchTask<S>
 }
 
 impl <S> Drop for DispatchTask<S>
-    where S: Stream<Item = (u8, EasyBuf)>
+    where S: Stream<Item = (u8, Bytes)>
 {
     fn drop(&mut self) {
         debug!("drop Dispatch");

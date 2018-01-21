@@ -9,7 +9,7 @@ use std::io;
 use std::net::ToSocketAddrs;
 use tokio_core::net::TcpStream;
 use tokio_core::reactor::Handle;
-use tokio_core::io::Framed;
+use tokio_io::codec::Framed;
 use protobuf::{self, Message};
 
 use authentication::Credentials;
