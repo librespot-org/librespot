@@ -4,7 +4,7 @@ mod handshake;
 pub use self::codec::APCodec;
 pub use self::handshake::handshake;
 
-use futures::{Future, Sink, Stream, BoxFuture};
+use futures::{Future, Sink, Stream};
 use std::io;
 use std::net::ToSocketAddrs;
 use tokio_core::net::TcpStream;
@@ -17,18 +17,18 @@ use version;
 
 pub type Transport = Framed<TcpStream, APCodec>;
 
-pub fn connect<A: ToSocketAddrs>(addr: A, handle: &Handle) -> BoxFuture<Transport, io::Error> {
+pub fn connect<A: ToSocketAddrs>(addr: A, handle: &Handle) -> Box<Future<Item = Transport, Error = io::Error>> {
     let addr = addr.to_socket_addrs().unwrap().next().unwrap();
     let socket = TcpStream::connect(&addr, handle);
     let connection = socket.and_then(|socket| {
         handshake(socket)
     });
 
-    connection.boxed()
+    Box::new(connection)
 }
 
 pub fn authenticate(transport: Transport, credentials: Credentials, device_id: String)
-    -> BoxFuture<(Transport, Credentials), io::Error>
+    -> Box<Future<Item = (Transport, Credentials), Error = io::Error>>
 {
     use protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
 
@@ -50,7 +50,7 @@ pub fn authenticate(transport: Transport, credentials: Credentials, device_id: S
     let cmd = 0xab;
     let data = packet.write_to_bytes().unwrap();
 
-    transport.send((cmd, data)).and_then(|transport| {
+    Box::new(transport.send((cmd, data)).and_then(|transport| {
         transport.into_future().map_err(|(err, _stream)| err)
     }).and_then(|(packet, transport)| {
         match packet {
@@ -71,5 +71,5 @@ pub fn authenticate(transport: Transport, credentials: Credentials, device_id: S
             Some((cmd, _)) => panic!("Unexpected packet {:?}", cmd),
             None => panic!("EOF"),
         }
-    }).boxed()
+    }))
 }

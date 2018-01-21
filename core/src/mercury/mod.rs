@@ -1,6 +1,6 @@
 use byteorder::{BigEndian, ByteOrder};
 use futures::sync::{oneshot, mpsc};
-use futures::{Async, Poll, BoxFuture, Future};
+use futures::{Async, Poll, Future};
 use protobuf;
 use protocol;
 use std::collections::HashMap;
@@ -99,7 +99,7 @@ impl MercuryManager {
     }
 
     pub fn subscribe<T: Into<String>>(&self, uri: T)
-        -> BoxFuture<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError>
+        -> Box<Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>>
     {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
@@ -110,7 +110,7 @@ impl MercuryManager {
         });
 
         let manager = self.clone();
-        request.map(move |response| {
+        Box::new(request.map(move |response| {
             let (tx, rx) = mpsc::unbounded();
 
             manager.lock(move |inner| {
@@ -133,7 +133,7 @@ impl MercuryManager {
             });
 
             rx
-        }).boxed()
+        }))
     }
 
     pub fn dispatch(&self, cmd: u8, mut data: EasyBuf) {

@@ -264,7 +264,7 @@ impl Main {
             spirc: None,
             spirc_task: None,
             shutdown: false,
-            signal: tokio_signal::ctrl_c(&handle).flatten_stream().boxed(),
+            signal: Box::new(tokio_signal::ctrl_c(&handle).flatten_stream()),
         };
 
         if setup.enable_discovery {

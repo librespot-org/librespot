@@ -3,7 +3,7 @@ use crypto::digest::Digest;
 use crypto::mac::Mac;
 use crypto;
 use futures::sync::mpsc;
-use futures::{Future, Stream, BoxFuture, Poll, Async};
+use futures::{Future, Stream, Poll, Async};
 use hyper::server::{Service, NewService, Request, Response, Http};
 use hyper::{self, Get, Post, StatusCode};
 use mdns;
@@ -159,7 +159,7 @@ impl Service for Discovery {
     type Request = Request;
     type Response = Response;
     type Error = hyper::Error;
-    type Future = BoxFuture<Response, hyper::Error>;
+    type Future = Box<Future<Item = Response, Error = hyper::Error>>;
 
     fn call(&self, request: Request) -> Self::Future {
         let mut params = BTreeMap::new();
@@ -174,7 +174,7 @@ impl Service for Discovery {
         }
 
         let this = self.clone();
-        body.fold(Vec::new(), |mut acc, chunk| {
+        Box::new(body.fold(Vec::new(), |mut acc, chunk| {
             acc.extend_from_slice(chunk.as_ref());
             Ok::<_, hyper::Error>(acc)
         }).map(move |body| {
@@ -186,7 +186,7 @@ impl Service for Discovery {
                 (Post, Some("addUser")) => this.handle_add_user(&params),
                 _ => this.not_found(),
             }
-        }).boxed()
+        }))
     }
 }
 

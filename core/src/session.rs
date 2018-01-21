@@ -1,7 +1,7 @@
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use futures::sync::mpsc;
-use futures::{Future, Stream, BoxFuture, IntoFuture, Poll, Async};
+use futures::{Future, Stream, IntoFuture, Poll, Async};
 use std::io;
 use std::sync::{RwLock, Arc, Weak};
 use tokio_core::io::EasyBuf;
@@ -90,7 +90,7 @@ impl Session {
 
     fn create(handle: &Handle, transport: connection::Transport,
               config: SessionConfig, cache: Option<Cache>, username: String)
-        -> (Session, BoxFuture<(), io::Error>)
+        -> (Session, Box<Future<Item = (), Error = io::Error>>)
     {
         let (sink, stream) = transport.split();
 
@@ -124,8 +124,8 @@ impl Session {
             .forward(sink).map(|_| ());
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task = (receiver_task, sender_task).into_future()
-            .map(|((), ())| ()).boxed();
+        let task = Box::new((receiver_task, sender_task).into_future()
+            .map(|((), ())| ()));
 
         (session, task)
     }
