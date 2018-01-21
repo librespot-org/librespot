@@ -199,7 +199,7 @@ impl MercuryManager {
         if response.status_code >= 400 {
             warn!("error {} for uri {}", response.status_code, &response.uri);
             if let Some(cb) = pending.callback {
-                cb.complete(Err(MercuryError));
+                let _ = cb.send(Err(MercuryError));
             }
         } else {
             if cmd == 0xb5 {
@@ -223,7 +223,7 @@ impl MercuryManager {
                     }
                 })
             } else if let Some(cb) = pending.callback {
-                cb.complete(Ok(response));
+                let _ = cb.send(Ok(response));
             }
         }
     }
