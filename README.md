@@ -8,7 +8,7 @@ which are not available in the official library.
 
 Note: librespot only works with Spotify Premium
 
-# This fork
+## This fork
 As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged.
 
 # Wiki
