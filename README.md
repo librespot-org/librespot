@@ -8,12 +8,12 @@ which are not available in the official library.
 
 Note: librespot only works with Spotify Premium
 
-# THIS FORK
+# This fork
 As the origin is no longer maintained I wanted to have a place for a version of librespot with other peoples forks and features merged.
 
 
-# THANKS
-I've done noting more than make this pretty so big thanks to:  
+# Credits
+I've done nothing more than make this pretty so big thanks to:  
 [plietar](https://github.com/plietar/) for making the thing in the first place.  
 [kingosticks](https://github.com/kingosticks/) for the Suffling and Repeat.  
 [ipha](https://github.com/ipha/) for the start stop audio sink.  
