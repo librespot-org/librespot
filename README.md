@@ -14,7 +14,7 @@ As the origin is no longer maintained I wanted to have a place for a version of 
 # Wiki
 More information can befound in the [wiki](https://github.com/ComlOnline/librespot/wiki)
 
-## Building
+# Building
 Rust 1.17.0 or later is required to build librespot.
 
 **If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.**
@@ -48,7 +48,7 @@ Once you've built *librespot*, run it using :
 target/release/librespot --name DEVICENAME 
 ```
 
-# Credits
+## Credits
 I've done nothing more than make this pretty so big thanks to:  
 [plietar](https://github.com/plietar/) for making the thing in the first place.  
 [kingosticks](https://github.com/kingosticks/) for the Suffling and Repeat.  
