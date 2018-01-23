@@ -14,14 +14,6 @@ As the origin is no longer maintained I wanted to have a place for a version of 
 # Wiki
 More information can befound in the [wiki](https://github.com/ComlOnline/librespot/wiki)
 
-# Credits
-I've done nothing more than make this pretty so big thanks to:  
-[plietar](https://github.com/plietar/) for making the thing in the first place.  
-[kingosticks](https://github.com/kingosticks/) for the Suffling and Repeat.  
-[ipha](https://github.com/ipha/) for the start stop audio sink.  
-[fossedihelm](https://github.com/fossedihelm/) for [addind a default inital volume and options for it](https://github.com/ComlOnline/librespot/pull/5)  
-[brain0](https://github.com/brain0/) for [making pluseaudio more robust against audio failures](https://github.com/ComlOnline/librespot/pull/6)  
-
 ## Building
 Rust 1.17.0 or later is required to build librespot.
 
@@ -55,6 +47,15 @@ Once you've built *librespot*, run it using :
 ```shell
 target/release/librespot --name DEVICENAME 
 ```
+
+# Credits
+I've done nothing more than make this pretty so big thanks to:  
+[plietar](https://github.com/plietar/) for making the thing in the first place.  
+[kingosticks](https://github.com/kingosticks/) for the Suffling and Repeat.  
+[ipha](https://github.com/ipha/) for the start stop audio sink.  
+[fossedihelm](https://github.com/fossedihelm/) for [addind a default inital volume and options for it](https://github.com/ComlOnline/librespot/pull/5)  
+[brain0](https://github.com/brain0/) for [making pluseaudio more robust against audio failures](https://github.com/ComlOnline/librespot/pull/6)  
+
 ## Disclaimer
 Using this code to connect to Spotify's API is probably forbidden by them.
 Use at your own risk.
