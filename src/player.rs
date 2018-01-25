@@ -221,7 +221,8 @@ impl PlayerInternal {
 
                 if self.config.normalization {
 
-                    let normalization_factor = f32::powf(10.0, track_gain_db / 20.0);
+                    // see http://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification#Loudness_normalization
+                    let normalization_factor = f32::powf(10.0, (track_gain_db + self.config.normalization_pre_gain) / 20.0);
 
                     // info!("Use gain: {}, factor: {}", track_gain_db, normalization_factor);
 
@@ -413,9 +414,15 @@ impl PlayerInternal {
             }
             decrypted_file.seek(SeekFrom::Start(148)).unwrap(); // 4 bytes as LE float
             decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            let normalization_factor = f32::powf(10.0, (track_gain_db + self.config.normalization_pre_gain) / 20.0);
+            let mut track_peak: f32 = 1.0;
             unsafe {
                 // track peak, 1.0 represents dbfs
-                info!("Track peak: {}", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
+                track_peak = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
+                info!("Track peak: {}", track_peak);
+                if normalization_factor * track_peak > 1.0 {
+                    warn!("Track will clip, please add negative pre-gain");
+                }
             }
             decrypted_file.seek(SeekFrom::Start(152)).unwrap(); // 4 bytes as LE float
             decrypted_file.read(&mut track_gain_float_bytes).unwrap();
