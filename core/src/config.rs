@@ -122,4 +122,5 @@ pub struct ConnectConfig {
     pub name: String,
     pub device_type: DeviceType,
     pub volume: i32,
+    pub progressive_volume: bool,
 }
