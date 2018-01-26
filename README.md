@@ -73,6 +73,7 @@ target/release/librespot --username USERNAME --cache CACHEDIR --name DEVICENAME 
 | Option   |       | device              | Audio device to use. Use '?' to list options    | DEVICE      |
 | Option   |       | mixer               | Mixer to use                                    | MIXER       |
 | Option   |       | initial-volume      | Initial volume in %, once connected [0-100]     | VOLUME      |
+| Flag     |       | progressive-volume  | Increase volume slowly at low level             |             |
 
 Taken from here:
 https://github.com/ComlOnline/librespot/blob/master/src/main.rs#L88
