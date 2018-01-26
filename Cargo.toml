@@ -36,7 +36,7 @@ futures = "0.1.8"
 getopts = "0.2.14"
 hyper = "0.11.2"
 log = "0.3.5"
-mdns = { git = "https://github.com/plietar/rust-mdns" }
+dns-sd = "0.1.3"
 num-bigint = "0.1.35"
 protobuf = "1.1"
 rand = "0.3.13"

@@ -6,7 +6,7 @@ use futures::sync::mpsc;
 use futures::{Future, Stream, Poll};
 use hyper::server::{Service, Request, Response, Http};
 use hyper::{self, Get, Post, StatusCode};
-use mdns;
+use dns_sd::DNSService;
 use num_bigint::BigUint;
 use rand;
 use std::collections::BTreeMap;
@@ -191,7 +191,7 @@ impl Service for Discovery {
 
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
-    _svc: mdns::Service,
+    _svc: DNSService,
 }
 
 pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
@@ -203,7 +203,7 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
         let http = Http::new();
         http.serve_addr_handle(&"0.0.0.0:0".parse().unwrap(), &handle, move || Ok(discovery.clone())).unwrap()
     };
-    let addr = serve.incoming_ref().local_addr();
+    let port = serve.incoming_ref().local_addr().port();
     let server_future = {
         let handle = handle.clone();
         serve.for_each(move |connection| {
@@ -214,12 +214,13 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
     };
     handle.spawn(server_future);
 
-    let responder = mdns::Responder::spawn(&handle)?;
-    let svc = responder.register(
-        "_spotify-connect._tcp".to_owned(),
-        config.name,
-        addr.port(),
-        &["VERSION=1.0", "CPath=/"]);
+    let svc = DNSService::register(Some(&*config.name),
+                                   "_spotify-connect._tcp",
+                                   None,
+                                   None,
+                                   port,
+                                   &["VERSION=1.0", "CPath=/"])
+                      .unwrap();
 
     Ok(DiscoveryStream {
         credentials: creds_rx,

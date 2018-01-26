@@ -107,6 +107,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dns-sd"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "dtoa"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -283,7 +292,7 @@ dependencies = [
  "librespot-metadata 0.1.0",
  "librespot-protocol 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "mdns 0.2.0 (git+https://github.com/plietar/rust-mdns)",
+ "dns-sd 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)",
  "portaudio-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -394,23 +403,6 @@ dependencies = [
 name = "matches"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "mdns"
-version = "0.2.0"
-source = "git+https://github.com/plietar/rust-mdns#c0fc73502d7d752a4ffeb5268a017561405e218c"
-dependencies = [
- "byteorder 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "dns-parser 0.3.2 (git+https://github.com/plietar/dns-parser)",
- "futures 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "multimap 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "net2 0.2.31 (registry+https://github.com/rust-lang/crates.io-index)",
- "nix 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-core 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "memchr"
@@ -1134,7 +1126,6 @@ dependencies = [
 "checksum log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
 "checksum log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "89f010e843f2b1a31dbd316b3b8d443758bc634bed37aabade59c686d644e0a2"
 "checksum matches 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "100aabe6b8ff4e4a7e32c1c13523379802df0772b82466207ac25b013f193376"
-"checksum mdns 0.2.0 (git+https://github.com/plietar/rust-mdns)" = "<none>"
 "checksum memchr 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "796fba70e76612589ed2ce7f45282f5af869e0fdd7cc6199fa1aa1f1d591ba9d"
 "checksum mime 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "e2e00e17be181010a91dbfefb01660b17311059dc8c7f48b9017677721e732bd"
 "checksum mio 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)" = "75f72a93f046f1517e3cfddc0a096eb756a2ba727d36edc8227dee769a50a9b0"
