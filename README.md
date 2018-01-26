@@ -12,7 +12,7 @@ Note: librespot only works with Spotify Premium
 As the origin by [plietar](https://github.com/plietar/) is no longer actively maintained I wanted to have a place for a version of librespot with other peoples forks and features merged.
 
 # Wiki
-More information can befound in the [wiki](https://github.com/librespot-org/librespot/wiki)
+More information can be found in the [wiki](https://github.com/librespot-org/librespot/wiki)
 
 # Building
 Rust 1.18.0 or later is required to build librespot.
