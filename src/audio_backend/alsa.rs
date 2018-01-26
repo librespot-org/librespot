@@ -18,10 +18,17 @@ impl Sink for AlsaSink {
     fn start(&mut self) -> io::Result<()> {
         if self.0.is_some() {
         } else {
-            self.0 = Some(PCM::open(&*self.1,
+            match PCM::open(&*self.1,
                                     Stream::Playback, Mode::Blocking,
                                     Format::Signed16, Access::Interleaved,
-                                    2, 44100).ok().unwrap());
+                                    2, 44100) {
+                Ok(f) => self.0 = Some(f),
+                Err(e) => {
+                    self.0 = None; 
+                    error!("Alsa error PCM open {}", e); 
+                    return Err(io::Error::new(io::ErrorKind::Other, "Alsa error: PCM open failed"));
+                }
+            }
         }
         Ok(())
     }
