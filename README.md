@@ -21,7 +21,7 @@ I've done noting more than make this pretty so big thanks to:
 [brain0](https://github.com/brain0/) for [making pluseaudio more robust against audio failures](https://github.com/ComlOnline/librespot/pull/6)  
 
 ## Building
-Rust 1.17.0 or later is required to build librespot.
+Rust 1.18.0 or later is required to build librespot.
 
 **If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.**
 

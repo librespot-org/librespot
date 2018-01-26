@@ -2,6 +2,8 @@ use std;
 use std::fmt;
 use util::u128;
 use byteorder::{BigEndian, ByteOrder};
+// Unneeded since 1.21
+#[allow(unused_imports)]
 use std::ascii::AsciiExt;
 
 #[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]

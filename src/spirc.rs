@@ -1,8 +1,6 @@
 use futures::future;
-use futures::sink::BoxSink;
-use futures::stream::BoxStream;
 use futures::sync::{oneshot, mpsc};
-use futures::{Future, Stream, Sink, Async, Poll, BoxFuture};
+use futures::{Future, Stream, Sink, Async, Poll};
 use protobuf::{self, Message};
 
 use core::config::ConnectConfig;
@@ -30,10 +28,10 @@ pub struct SpircTask {
     device: DeviceState,
     state: State,
 
-    subscription: BoxStream<Frame, MercuryError>,
-    sender: BoxSink<Frame, MercuryError>,
+    subscription: Box<Stream<Item = Frame, Error = MercuryError>>,
+    sender: Box<Sink<SinkItem = Frame, SinkError = MercuryError>>,
     commands: mpsc::UnboundedReceiver<SpircCommand>,
-    end_of_track: BoxFuture<(), oneshot::Canceled>,
+    end_of_track: Box<Future<Item = (), Error = oneshot::Canceled>>,
 
     shutdown: bool,
     session: Session,
@@ -134,10 +132,10 @@ impl Spirc {
 
         let subscription = session.mercury().subscribe(&uri as &str);
         let subscription = subscription.map(|stream| stream.map_err(|_| MercuryError)).flatten_stream();
-        let subscription = subscription.map(|response| -> Frame {
+        let subscription = Box::new(subscription.map(|response| -> Frame {
             let data = response.payload.first().unwrap();
             protobuf::parse_from_bytes(data).unwrap()
-        }).boxed();
+        }));
 
         let sender = Box::new(session.mercury().sender(uri).with(|frame: Frame| {
             Ok(frame.write_to_bytes().unwrap())
@@ -163,7 +161,7 @@ impl Spirc {
             subscription: subscription,
             sender: sender,
             commands: cmd_rx,
-            end_of_track: future::empty().boxed(),
+            end_of_track: Box::new(future::empty()),
 
             shutdown: false,
             session: session.clone(),
@@ -179,28 +177,28 @@ impl Spirc {
     }
 
     pub fn play(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Play);
+        let _ = self.commands.unbounded_send(SpircCommand::Play);
     }
     pub fn play_pause(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::PlayPause);
+        let _ = self.commands.unbounded_send(SpircCommand::PlayPause);
     }
     pub fn pause(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Pause);
+        let _ = self.commands.unbounded_send(SpircCommand::Pause);
     }
     pub fn prev(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Prev);
+        let _ = self.commands.unbounded_send(SpircCommand::Prev);
     }
     pub fn next(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Next);
+        let _ = self.commands.unbounded_send(SpircCommand::Next);
     }
     pub fn volume_up(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::VolumeUp);
+        let _ = self.commands.unbounded_send(SpircCommand::VolumeUp);
     }
     pub fn volume_down(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::VolumeDown);
+        let _ = self.commands.unbounded_send(SpircCommand::VolumeDown);
     }
     pub fn shutdown(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Shutdown);
+        let _ = self.commands.unbounded_send(SpircCommand::Shutdown);
     }
 }
 
@@ -238,7 +236,7 @@ impl Future for SpircTask {
                     }
                     Ok(Async::NotReady) => (),
                     Err(oneshot::Canceled) => {
-                        self.end_of_track = future::empty().boxed()
+                        self.end_of_track = Box::new(future::empty())
                     }
                 }
             }
@@ -587,7 +585,7 @@ impl SpircTask {
             self.state.set_status(PlayStatus::kPlayStatusPause);
         }
 
-        self.end_of_track = end_of_track.boxed();
+        self.end_of_track = Box::new(end_of_track);
     }
 
     fn hello(&mut self) {
