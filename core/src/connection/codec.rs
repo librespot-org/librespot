@@ -1,7 +1,8 @@
-use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder};
+use bytes::{Bytes, BytesMut, BufMut};
 use shannon::Shannon;
 use std::io;
-use tokio_core::io::{Codec, EasyBuf};
+use tokio_io::codec::{Decoder, Encoder};
 
 const HEADER_SIZE: usize = 3;
 const MAC_SIZE: usize = 4;
@@ -34,16 +35,17 @@ impl APCodec {
     }
 }
 
-impl Codec for APCodec {
-    type Out = (u8, Vec<u8>);
-    type In = (u8, EasyBuf);
+impl Encoder for APCodec {
+    type Item = (u8, Vec<u8>);
+    type Error = io::Error;
 
-    fn encode(&mut self, item: (u8, Vec<u8>), buf: &mut Vec<u8>) -> io::Result<()> {
+    fn encode(&mut self, item: (u8, Vec<u8>), buf: &mut BytesMut) -> io::Result<()> {
         let (cmd, payload) = item;
         let offset = buf.len();
 
-        buf.write_u8(cmd).unwrap();
-        buf.write_u16::<BigEndian>(payload.len() as u16).unwrap();
+        buf.reserve(3 + payload.len());
+        buf.put_u8(cmd);
+        buf.put_u16::<BigEndian>(payload.len() as u16);
         buf.extend_from_slice(&payload);
 
         self.encode_cipher.nonce_u32(self.encode_nonce);
@@ -57,12 +59,17 @@ impl Codec for APCodec {
 
         Ok(())
     }
+}
 
-    fn decode(&mut self, buf: &mut EasyBuf) -> io::Result<Option<(u8, EasyBuf)>> {
+impl Decoder for APCodec {
+    type Item = (u8, Bytes);
+    type Error = io::Error;
+
+    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<(u8, Bytes)>> {
         if let DecodeState::Header = self.decode_state {
             if buf.len() >= HEADER_SIZE {
                 let mut header = [0u8; HEADER_SIZE];
-                header.copy_from_slice(buf.drain_to(HEADER_SIZE).as_slice());
+                header.copy_from_slice(buf.split_to(HEADER_SIZE).as_ref());
 
                 self.decode_cipher.nonce_u32(self.decode_nonce);
                 self.decode_nonce += 1;
@@ -79,13 +86,13 @@ impl Codec for APCodec {
             if buf.len() >= size + MAC_SIZE {
                 self.decode_state = DecodeState::Header;
 
-                let mut payload = buf.drain_to(size + MAC_SIZE);
+                let mut payload = buf.split_to(size + MAC_SIZE);
 
-                self.decode_cipher.decrypt(&mut payload.get_mut()[..size]);
+                self.decode_cipher.decrypt(&mut payload.get_mut(..size).unwrap());
                 let mac = payload.split_off(size);
-                self.decode_cipher.check_mac(mac.as_slice())?;
+                self.decode_cipher.check_mac(mac.as_ref())?;
 
-                return Ok(Some((cmd, payload)));
+                return Ok(Some((cmd, payload.freeze())));
             }
         }
 

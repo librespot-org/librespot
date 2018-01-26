@@ -155,7 +155,7 @@ impl PlayerState {
         match self {
             Paused { end_of_track, .. } |
             Playing { end_of_track, .. } => {
-                end_of_track.complete(())
+                let _ = end_of_track.send(());
             }
 
             Stopped => warn!("signal_end_of_track from stopped state"),
@@ -313,7 +313,7 @@ impl PlayerInternal {
                     }
 
                     None => {
-                        end_of_track.complete(());
+                        let _ = end_of_track.send(());
                         if self.state.is_playing() {
                             self.run_onstop();
                         }

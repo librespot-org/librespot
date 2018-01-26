@@ -46,6 +46,7 @@ serde = "0.9.6"
 serde_derive = "0.9.6"
 serde_json = "0.9.5"
 tokio-core = "0.1.2"
+tokio-io = "0.1"
 tokio-signal = "0.1.2"
 url = "1.3"
 
