@@ -15,7 +15,7 @@ As the origin by [plietar](https://github.com/plietar/) is no longer actively ma
 More information can befound in the [wiki](https://github.com/librespot-org/librespot/wiki)
 
 # Building
-Rust 1.17.0 or later is required to build librespot.
+Rust 1.18.0 or later is required to build librespot.
 
 **If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build.**
 
