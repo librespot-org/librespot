@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/librespot-org/librespot.svg?branch=master)](https://travis-ci.org/librespot-org/librespot)
+[![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/sashahilton00/spotify-connect-resources)
 
 # librespot
 *librespot* is an open source client library for Spotify. It enables
