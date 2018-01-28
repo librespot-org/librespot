@@ -55,11 +55,13 @@ https://gitter.im/sashahilton00/spotify-connect-resources
 ## To-Do/Feature Requests
 If there is a feature request that is being considered, or has been widely requested, it should be listed below. Please do not use this for bug reports or special use case feature requests.
 
-[ ] Document the Spotify Protocol and provide reference example.
-[ ] Implement API to allow wrappers to be written for librespot.
-[ ] Logarithmic volume scaling (#10)
-[ ] Provide automatic release binaries for download
-[ ] Provide an adequate method for exporting metadata (#7)
+- [ ] Document the Spotify Protocol and provide reference example.
+- [ ] Implement API to allow wrappers to be written for librespot.
+- [ ] Logarithmic volume scaling (#10)
+- [ ] Provide automatic release binaries for download
+- [ ] Provide an adequate method for exporting metadata (#7)
+  - [ ] Provide API Documentation
+  - [ ] Provide Schema/Versioning
 
 ## Disclaimer
 Using this code to connect to Spotify's API is probably forbidden by them.
