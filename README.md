@@ -58,9 +58,9 @@ If there is a feature request that is being considered, or has been widely reque
 
 - [ ] Document the Spotify Protocol and provide reference example.
 - [ ] Implement API to allow wrappers to be written for librespot.
-- [ ] Logarithmic volume scaling (#10)
+- [ ] Logarithmic volume scaling ([#10](https://github.com/librespot-org/librespot/issues/10))
 - [ ] Provide automatic release binaries for download
-- [ ] Provide an adequate method for exporting metadata (#7)
+- [ ] Provide an adequate method for exporting metadata ([#7](https://github.com/librespot-org/librespot/issues/7))
   - [ ] Provide API Documentation
   - [ ] Provide Schema/Versioning
 
