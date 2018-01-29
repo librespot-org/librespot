@@ -101,8 +101,7 @@ fn setup(args: &[String]) -> Setup {
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
         .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
         .optopt("", "mixer", "Mixer to use", "MIXER")
-        .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME")
-        .optflag("", "progressive-volume", "Increase volume slowly at low level, faster at high level");
+        .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -160,11 +159,8 @@ fn setup(args: &[String]) -> Setup {
     // if argument not present use default values (50%)
     else{
         initial_volume = 0x8000 as i32;
-    }
-
-    let progressive_volume = matches.opt_present("progressive-volume");
-    info!("Volume:{}, progressive_volume: {}.", initial_volume, progressive_volume);
-
+        }
+    debug!("Volume \"{}\" !", initial_volume);
 
     let name = matches.opt_str("name").unwrap();
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
@@ -213,7 +209,6 @@ fn setup(args: &[String]) -> Setup {
             name: name,
             device_type: device_type,
             volume: initial_volume,
-            progressive_volume,
         }
     };
 

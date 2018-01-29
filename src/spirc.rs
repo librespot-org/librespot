@@ -24,7 +24,6 @@ use rand::Rng;
 pub struct SpircTask {
     player: Player,
     mixer: Box<Mixer>,
-    progressive_volume:bool,
 
     sequence: SeqGenerator<u32>,
 
@@ -124,30 +123,26 @@ fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
     })
 }
 
-fn volume_to_mixer(volume: u16, progressive: bool) -> u16 {
-    if progressive {
-        // Some by trail determined volume calculation algorithm. Start increasing slowly,
-        // then after 50% increase in bigger steps.
-        let d = volume / (std::u16::MAX / 100);
-        let mut v:u32 = 0;
-        let mut incr:u32 = 0;
-        for i in 0..d {
-            v += incr;
-            incr +=3;
-            if i > 50 {
-                // Increase faster to reach max volume
-                incr += 42;
-            }
-        }
-        
-        // Clip the vulume to the max
-        if v > std::u16::MAX as u32 {v = std::u16::MAX as u32;}
-        debug!("volume_to_mixer {} {}", volume, v);	
-        return v as u16;
-    } else {
-        debug!("volume_to_mixer {}", volume);	
-        return volume;
+fn volume_to_mixer(volume: u16) -> u16 {
+    // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
+    // Convert the given volume [0..0xffff] to a dB gain
+    // We assume a dB range of 60dB.
+    // Use the equatation: a * exp(b * x)
+    // in which a = IDEAL_FACTOR, b = 1/1000
+    const IDEAL_FACTOR: f64 = 6.908;
+    let normalized_volume = volume as f64 / std::u16::MAX as f64; // To get a value between 0 and 1
+
+    let mut val = std::u16::MAX;
+    // Prevent val > std::u16::MAX due to rounding errors
+    if normalized_volume < 0.999 { 
+        let new_volume = (normalized_volume * IDEAL_FACTOR).exp() / 1000.0;
+        val = (new_volume * std::u16::MAX as f64) as u16;
     }
+
+    debug!("input volume:{} to mixer: {}", volume, val);	
+
+    // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
+    val
 }
 
 
@@ -173,15 +168,15 @@ impl Spirc {
         }));
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
-        let progressive_volume = config.progressive_volume;
+
         let volume = config.volume as u16;
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume_to_mixer(volume as u16, progressive_volume));
+        mixer.set_volume(volume_to_mixer(volume as u16));
 
         let mut task = SpircTask {
             player: player,
             mixer: mixer,
-            progressive_volume,
+
             sequence: SeqGenerator::new(1),
 
             ident: ident,
@@ -469,8 +464,7 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer.set_volume(
-                    volume_to_mixer(frame.get_volume() as u16, self.progressive_volume));
+                self.mixer.set_volume(volume_to_mixer(frame.get_volume() as u16));
                 self.notify(None);
             }
 
@@ -570,7 +564,7 @@ impl SpircTask {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer.set_volume(volume_to_mixer(volume as u16, self.progressive_volume));
+        self.mixer.set_volume(volume_to_mixer(volume as u16));
     }
 
     fn handle_volume_down(&mut self) {
@@ -579,7 +573,7 @@ impl SpircTask {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume_to_mixer(volume as u16, self.progressive_volume));
+        self.mixer.set_volume(volume_to_mixer(volume as u16));
     }
 
     fn handle_end_of_track(&mut self) {
