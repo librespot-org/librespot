@@ -132,19 +132,20 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref())
         .expect("Invalid mixer");
-        
-    let initial_volume;
-        if matches.opt_present("initial-volume") && matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok() {
-            let iv = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap();
-            if 0 <= iv && iv <= 100 {
-                initial_volume = iv * 0xFFFF as i32 / 100 ;
-            } else {
-                debug!("Volume needs to be a value from 0-100; set as 50%");
-                initial_volume = 0x8000 as i32;
+
+    let initial_volume: i32;
+    if matches.opt_present("initial-volume") && matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok() {
+        let iv = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap();
+        match iv {
+            iv if iv >= 0 && iv <= 100 => { initial_volume = iv * 0xFFFF / 100 }
+            _ => {
+                debug!("Volume needs to be a value from 0-100; set volume level to 50%");
+                initial_volume = 0x8000;
             }
-        } else {
-            initial_volume = 0x8000 as i32;
         }
+    } else {
+        initial_volume = 0x8000;
+    }
 
     let name = matches.opt_str("name").unwrap();
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
