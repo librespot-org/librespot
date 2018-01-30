@@ -134,33 +134,20 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref())
         .expect("Invalid mixer");
-    let initial_volume;
-    // check if initial-volume argument is present
-    if matches.opt_present("initial-volume"){
-        // check if value is a number
-        if matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok(){
-            // check if value is in [0-100] range, otherwise put the bound values
-            if matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap() < 0 {
-                initial_volume = 0 as i32;
-            }
-            else if matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap() > 100{
-                initial_volume = 0xFFFF as i32;
-            }
-            // checks ok
-            else{
-                initial_volume = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap()* 0xFFFF as i32 / 100 ;
+
+    let initial_volume: i32;
+    if matches.opt_present("initial-volume") && matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok() {
+        let iv = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap();
+        match iv {
+            iv if iv >= 0 && iv <= 100 => { initial_volume = iv * 0xFFFF / 100 }
+            _ => {
+                debug!("Volume needs to be a value from 0-100; set volume level to 50%");
+                initial_volume = 0x8000;
             }
         }
-        // if value is not a number use default value (50%)
-        else {
-            initial_volume = 0x8000 as i32;
-        }
+    } else {
+        initial_volume = 0x8000;
     }
-    // if argument not present use default values (50%)
-    else{
-        initial_volume = 0x8000 as i32;
-        }
-    debug!("Volume \"{}\" !", initial_volume);
 
     let zeroconf_port: u16;
     if matches.opt_present("zeroconf-port") && matches.opt_str("zeroconf-port").unwrap().parse::<u16>().is_ok() {
