@@ -340,7 +340,7 @@ impl Seek for AudioFileStreaming {
         // Notify the fetch thread to get the correct block
         // This can fail if fetch thread has completed, in which case the
         // block is ready. Just ignore the error.
-        let _ = self.seek.send(self.position);
+        let _ = self.seek.unbounded_send(self.position);
         Ok(self.position)
     }
 }

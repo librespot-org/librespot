@@ -8,7 +8,7 @@ extern crate librespot_protocol as protocol;
 
 pub mod cover;
 
-use futures::{Future, BoxFuture};
+use futures::Future;
 use linear_map::LinearMap;
 
 use core::mercury::MercuryError;
@@ -57,17 +57,17 @@ pub trait Metadata : Send + Sized + 'static {
     fn base_url() -> &'static str;
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 
-    fn get(session: &Session, id: SpotifyId) -> BoxFuture<Self, MercuryError> {
+    fn get(session: &Session, id: SpotifyId) -> Box<Future<Item = Self, Error = MercuryError>> {
         let uri = format!("{}/{}", Self::base_url(), id.to_base16());
         let request = session.mercury().get(uri);
 
         let session = session.clone();
-        request.and_then(move |response| {
+        Box::new(request.and_then(move |response| {
             let data = response.payload.first().expect("Empty payload");
             let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
 
             Ok(Self::parse(&msg, &session))
-        }).boxed()
+        }))
     }
 }
 

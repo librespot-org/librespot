@@ -1,4 +1,4 @@
-use futures::{Future, BoxFuture};
+use futures::Future;
 use serde_json;
 
 use core::mercury::MercuryError;
@@ -13,14 +13,14 @@ pub struct Token {
     pub scope: Vec<String>,
 }
 
-pub fn get_token(session: &Session, client_id: &str, scopes: &str) -> BoxFuture<Token, MercuryError> {
+pub fn get_token(session: &Session, client_id: &str, scopes: &str) -> Box<Future<Item = Token, Error = MercuryError>> {
     let url = format!("hm://keymaster/token/authenticated?client_id={}&scope={}",
                       client_id, scopes);
-    session.mercury().get(url).map(move |response| {
+    Box::new(session.mercury().get(url).map(move |response| {
         let data = response.payload.first().expect("Empty payload");
         let data = String::from_utf8(data.clone()).unwrap();
         let token : Token = serde_json::from_str(&data).unwrap();
 
         token
-    }).boxed()
+    }))
 }

@@ -1,8 +1,6 @@
 use futures::future;
-use futures::sink::BoxSink;
-use futures::stream::BoxStream;
 use futures::sync::{oneshot, mpsc};
-use futures::{Future, Stream, Sink, Async, Poll, BoxFuture};
+use futures::{Future, Stream, Sink, Async, Poll};
 use protobuf::{self, Message};
 
 use core::config::ConnectConfig;
@@ -17,6 +15,7 @@ use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
 use mixer::Mixer;
 use player::Player;
 
+use std;
 use rand;
 use rand::Rng;
 
@@ -30,10 +29,10 @@ pub struct SpircTask {
     device: DeviceState,
     state: State,
 
-    subscription: BoxStream<Frame, MercuryError>,
-    sender: BoxSink<Frame, MercuryError>,
+    subscription: Box<Stream<Item = Frame, Error = MercuryError>>,
+    sender: Box<Sink<SinkItem = Frame, SinkError = MercuryError>>,
     commands: mpsc::UnboundedReceiver<SpircCommand>,
-    end_of_track: BoxFuture<(), oneshot::Canceled>,
+    end_of_track: Box<Future<Item = (), Error = oneshot::Canceled>>,
 
     shutdown: bool,
     session: Session,
@@ -122,6 +121,29 @@ fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
     })
 }
 
+fn volume_to_mixer(volume: u16) -> u16 {
+    // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
+    // Convert the given volume [0..0xffff] to a dB gain
+    // We assume a dB range of 60dB.
+    // Use the equatation: a * exp(b * x)
+    // in which a = IDEAL_FACTOR, b = 1/1000
+    const IDEAL_FACTOR: f64 = 6.908;
+    let normalized_volume = volume as f64 / std::u16::MAX as f64; // To get a value between 0 and 1
+
+    let mut val = std::u16::MAX;
+    // Prevent val > std::u16::MAX due to rounding errors
+    if normalized_volume < 0.999 { 
+        let new_volume = (normalized_volume * IDEAL_FACTOR).exp() / 1000.0;
+        val = (new_volume * std::u16::MAX as f64) as u16;
+    }
+
+    debug!("input volume:{} to mixer: {}", volume, val);	
+
+    // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
+    val
+}
+
+
 impl Spirc {
     pub fn new(config: ConnectConfig, session: Session, player: Player, mixer: Box<Mixer>)
         -> (Spirc, SpircTask)
@@ -134,10 +156,10 @@ impl Spirc {
 
         let subscription = session.mercury().subscribe(&uri as &str);
         let subscription = subscription.map(|stream| stream.map_err(|_| MercuryError)).flatten_stream();
-        let subscription = subscription.map(|response| -> Frame {
+        let subscription = Box::new(subscription.map(|response| -> Frame {
             let data = response.payload.first().unwrap();
             protobuf::parse_from_bytes(data).unwrap()
-        }).boxed();
+        }));
 
         let sender = Box::new(session.mercury().sender(uri).with(|frame: Frame| {
             Ok(frame.write_to_bytes().unwrap())
@@ -147,7 +169,7 @@ impl Spirc {
 
         let volume = config.volume as u16;
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume as u16);
+        mixer.set_volume(volume_to_mixer(volume as u16));
 
         let mut task = SpircTask {
             player: player,
@@ -163,7 +185,7 @@ impl Spirc {
             subscription: subscription,
             sender: sender,
             commands: cmd_rx,
-            end_of_track: future::empty().boxed(),
+            end_of_track: Box::new(future::empty()),
 
             shutdown: false,
             session: session.clone(),
@@ -179,28 +201,28 @@ impl Spirc {
     }
 
     pub fn play(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Play);
+        let _ = self.commands.unbounded_send(SpircCommand::Play);
     }
     pub fn play_pause(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::PlayPause);
+        let _ = self.commands.unbounded_send(SpircCommand::PlayPause);
     }
     pub fn pause(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Pause);
+        let _ = self.commands.unbounded_send(SpircCommand::Pause);
     }
     pub fn prev(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Prev);
+        let _ = self.commands.unbounded_send(SpircCommand::Prev);
     }
     pub fn next(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Next);
+        let _ = self.commands.unbounded_send(SpircCommand::Next);
     }
     pub fn volume_up(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::VolumeUp);
+        let _ = self.commands.unbounded_send(SpircCommand::VolumeUp);
     }
     pub fn volume_down(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::VolumeDown);
+        let _ = self.commands.unbounded_send(SpircCommand::VolumeDown);
     }
     pub fn shutdown(&self) {
-        let _ = mpsc::UnboundedSender::send(&self.commands, SpircCommand::Shutdown);
+        let _ = self.commands.unbounded_send(SpircCommand::Shutdown);
     }
 }
 
@@ -238,7 +260,7 @@ impl Future for SpircTask {
                     }
                     Ok(Async::NotReady) => (),
                     Err(oneshot::Canceled) => {
-                        self.end_of_track = future::empty().boxed()
+                        self.end_of_track = Box::new(future::empty())
                     }
                 }
             }
@@ -439,9 +461,8 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeVolume => {
-                let volume = frame.get_volume();
-                self.device.set_volume(volume);
-                self.mixer.set_volume(frame.get_volume() as u16);
+                self.device.set_volume(frame.get_volume());
+                self.mixer.set_volume(volume_to_mixer(frame.get_volume() as u16));
                 self.notify(None);
             }
 
@@ -536,21 +557,21 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let mut volume: u32 = self.mixer.volume() as u32 + 4096;
+        let mut volume: u32 = self.device.get_volume() as u32 + 4096;
         if volume > 0xFFFF {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer.set_volume(volume as u16);
+        self.mixer.set_volume(volume_to_mixer(volume as u16));
     }
 
     fn handle_volume_down(&mut self) {
-        let mut volume: i32 = self.mixer.volume() as i32 - 4096;
+        let mut volume: i32 = self.device.get_volume() as i32 - 4096;
         if volume < 0 {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume as u16);
+        self.mixer.set_volume(volume_to_mixer(volume as u16));
     }
 
     fn handle_end_of_track(&mut self) {
@@ -587,7 +608,7 @@ impl SpircTask {
             self.state.set_status(PlayStatus::kPlayStatusPause);
         }
 
-        self.end_of_track = end_of_track.boxed();
+        self.end_of_track = Box::new(end_of_track);
     }
 
     fn hello(&mut self) {
