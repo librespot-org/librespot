@@ -15,6 +15,7 @@ use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
 use mixer::Mixer;
 use player::Player;
 
+use std;
 use rand;
 use rand::Rng;
 
@@ -120,6 +121,29 @@ fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
     })
 }
 
+fn volume_to_mixer(volume: u16) -> u16 {
+    // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
+    // Convert the given volume [0..0xffff] to a dB gain
+    // We assume a dB range of 60dB.
+    // Use the equatation: a * exp(b * x)
+    // in which a = IDEAL_FACTOR, b = 1/1000
+    const IDEAL_FACTOR: f64 = 6.908;
+    let normalized_volume = volume as f64 / std::u16::MAX as f64; // To get a value between 0 and 1
+
+    let mut val = std::u16::MAX;
+    // Prevent val > std::u16::MAX due to rounding errors
+    if normalized_volume < 0.999 { 
+        let new_volume = (normalized_volume * IDEAL_FACTOR).exp() / 1000.0;
+        val = (new_volume * std::u16::MAX as f64) as u16;
+    }
+
+    debug!("input volume:{} to mixer: {}", volume, val);	
+
+    // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
+    val
+}
+
+
 impl Spirc {
     pub fn new(config: ConnectConfig, session: Session, player: Player, mixer: Box<Mixer>)
         -> (Spirc, SpircTask)
@@ -145,7 +169,7 @@ impl Spirc {
 
         let volume = config.volume as u16;
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume as u16);
+        mixer.set_volume(volume_to_mixer(volume as u16));
 
         let mut task = SpircTask {
             player: player,
@@ -437,9 +461,8 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeVolume => {
-                let volume = frame.get_volume();
-                self.device.set_volume(volume);
-                self.mixer.set_volume(frame.get_volume() as u16);
+                self.device.set_volume(frame.get_volume());
+                self.mixer.set_volume(volume_to_mixer(frame.get_volume() as u16));
                 self.notify(None);
             }
 
@@ -534,21 +557,21 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let mut volume: u32 = self.mixer.volume() as u32 + 4096;
+        let mut volume: u32 = self.device.get_volume() as u32 + 4096;
         if volume > 0xFFFF {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer.set_volume(volume as u16);
+        self.mixer.set_volume(volume_to_mixer(volume as u16));
     }
 
     fn handle_volume_down(&mut self) {
-        let mut volume: i32 = self.mixer.volume() as i32 - 4096;
+        let mut volume: i32 = self.device.get_volume() as i32 - 4096;
         if volume < 0 {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume as u16);
+        self.mixer.set_volume(volume_to_mixer(volume as u16));
     }
 
     fn handle_end_of_track(&mut self) {
