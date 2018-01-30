@@ -10,7 +10,7 @@ extern crate base64;
 extern crate crypto;
 extern crate futures;
 extern crate hyper;
-extern crate mdns;
+extern crate dns_sd;
 extern crate num_bigint;
 extern crate protobuf;
 extern crate rand;
