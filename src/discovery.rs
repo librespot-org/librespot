@@ -194,14 +194,15 @@ pub struct DiscoveryStream {
     _svc: mdns::Service,
 }
 
-pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
+pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String, port: u16)
     -> io::Result<DiscoveryStream>
 {
     let (discovery, creds_rx) = Discovery::new(config.clone(), device_id);
 
     let serve = {
         let http = Http::new();
-        http.serve_addr_handle(&"0.0.0.0:0".parse().unwrap(), &handle, move || Ok(discovery.clone())).unwrap()
+        debug!("Zeroconf server listening on 0.0.0.0:{}", port);
+        http.serve_addr_handle(&format!("0.0.0.0:{}", port).parse().unwrap(), &handle, move || Ok(discovery.clone())).unwrap()
     };
     let addr = serve.incoming_ref().local_addr();
     let server_future = {
