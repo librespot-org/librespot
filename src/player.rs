@@ -106,12 +106,12 @@ enum PlayerState {
     Stopped,
     Paused {
         decoder: Decoder,
-        track_gain_db: f32,
+        normalization_factor: f32,
         end_of_track: oneshot::Sender<()>,
     },
     Playing {
         decoder: Decoder,
-        track_gain_db: f32,
+        normalization_factor: f32,
         end_of_track: oneshot::Sender<()>,
     },
 
@@ -154,10 +154,10 @@ impl PlayerState {
     fn paused_to_playing(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Paused { decoder, track_gain_db, end_of_track } => {
+            Paused { decoder, normalization_factor, end_of_track } => {
                 *self = Playing {
                     decoder: decoder,
-                    track_gain_db: track_gain_db,
+                    normalization_factor: normalization_factor,
                     end_of_track: end_of_track,
                 };
             }
@@ -168,10 +168,10 @@ impl PlayerState {
     fn playing_to_paused(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Playing { decoder, track_gain_db, end_of_track } => {
+            Playing { decoder, normalization_factor, end_of_track } => {
                 *self = Paused {
                     decoder: decoder,
-                    track_gain_db: track_gain_db,
+                    normalization_factor: normalization_factor,
                     end_of_track: end_of_track,
                 };
             }
@@ -200,19 +200,19 @@ impl PlayerInternal {
                 self.handle_command(cmd);
             }
 
-            let mut current_track_gain_db: f32 = 0.0;
-            let packet = if let PlayerState::Playing { ref mut decoder, track_gain_db, .. } = self.state {
-                current_track_gain_db = track_gain_db;
+            let mut current_normalization_factor: f32 = 1.0;
+            let packet = if let PlayerState::Playing { ref mut decoder, normalization_factor, .. } = self.state {
+                current_normalization_factor = normalization_factor;
                 Some(decoder.next_packet().expect("Vorbis error"))
             } else { None };
 
             if let Some(packet) = packet {
-                self.handle_packet(packet, current_track_gain_db);
+                self.handle_packet(packet, current_normalization_factor);
             }
         }
     }
 
-    fn handle_packet(&mut self, packet: Option<VorbisPacket>, track_gain_db: f32) {
+    fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalization_factor: f32) {
         match packet {
             Some(mut packet) => {
                 if let Some(ref editor) = self.audio_filter {
@@ -220,11 +220,6 @@ impl PlayerInternal {
                 };
 
                 if self.config.normalization {
-
-                    // see http://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification#Loudness_normalization
-                    let normalization_factor = f32::powf(10.0, (track_gain_db + self.config.normalization_pre_gain) / 20.0);
-
-                    // info!("Use gain: {}, factor: {}", track_gain_db, normalization_factor);
 
                     if normalization_factor != 1.0 {
                         for x in packet.data_mut().iter_mut() {
@@ -256,7 +251,7 @@ impl PlayerInternal {
                 }
 
                 match self.load_track(track_id, position as i64) {
-                    Some((decoder, track_gain_db)) => {
+                    Some((decoder, normalization_factor)) => {
                         if play {
                             if !self.state.is_playing() {
                                 self.run_onstart();
@@ -265,7 +260,7 @@ impl PlayerInternal {
 
                             self.state = PlayerState::Playing {
                                 decoder: decoder,
-                                track_gain_db: track_gain_db,
+                                normalization_factor: normalization_factor,
                                 end_of_track: end_of_track,
                             };
                         } else {
@@ -275,7 +270,7 @@ impl PlayerInternal {
 
                             self.state = PlayerState::Paused {
                                 decoder: decoder,
-                                track_gain_db: track_gain_db,
+                                normalization_factor: normalization_factor,
                                 end_of_track: end_of_track,
                             };
                         }
@@ -402,38 +397,52 @@ impl PlayerInternal {
 
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
-        let mut track_gain_db: f32 = 0.0;
+        let mut normalization_factor: f32 = 1.0;
 
         if self.config.normalization {
+            //buffer for float bytes
             let mut track_gain_float_bytes = [0; 4];
+
             decrypted_file.seek(SeekFrom::Start(144)).unwrap(); // 4 bytes as LE float
             decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            let track_gain_db: f32;
             unsafe {
                 track_gain_db = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
-                info!("Track gain: {}db", track_gain_db);
+                debug!("Track gain: {}db", track_gain_db);
             }
+
             decrypted_file.seek(SeekFrom::Start(148)).unwrap(); // 4 bytes as LE float
             decrypted_file.read(&mut track_gain_float_bytes).unwrap();
-            let normalization_factor = f32::powf(10.0, (track_gain_db + self.config.normalization_pre_gain) / 20.0);
-            let mut track_peak: f32 = 1.0;
+            let track_peak: f32;
             unsafe {
                 // track peak, 1.0 represents dbfs
                 track_peak = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
-                info!("Track peak: {}", track_peak);
-                if normalization_factor * track_peak > 1.0 {
-                    warn!("Track will clip, please add negative pre-gain");
-                }
+                debug!("Track peak: {}", track_peak);
             }
+
+            // see http://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification#Loudness_normalization
+            normalization_factor = f32::powf(10.0, (track_gain_db + self.config.normalization_pre_gain) / 20.0);
+
+            if normalization_factor * track_peak > 1.0 {
+                warn!("Track would clip, reducing normalisation factor. \
+                    Please add negative pre-gain to avoid.");
+                normalization_factor = 1.0/track_peak;
+            }
+
+            info!("Applying normalization factor: {}", normalization_factor);
+
+            // TODO there are also values for album gain/peak, which should be used if an album is playing
+            // but I don't know how to determine if album is playing
             decrypted_file.seek(SeekFrom::Start(152)).unwrap(); // 4 bytes as LE float
             decrypted_file.read(&mut track_gain_float_bytes).unwrap();
             unsafe {
-                info!("Album gain: {}db", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
+                debug!("Album gain: {}db", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
             }
             decrypted_file.seek(SeekFrom::Start(156)).unwrap(); // 4 bytes as LE float
             decrypted_file.read(&mut track_gain_float_bytes).unwrap();
             unsafe {
                 // album peak, 1.0 represents dbfs
-                info!("Album peak: {}", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
+                debug!("Album peak: {}", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
             }
         }
 
@@ -448,7 +457,7 @@ impl PlayerInternal {
 
         info!("Track \"{}\" loaded", track.name);
 
-        Some((decoder, track_gain_db))
+        Some((decoder, normalization_factor))
     }
 }
 
