@@ -135,7 +135,7 @@ fn setup(args: &[String]) -> Setup {
         
     let initial_volume;
         if matches.opt_present("initial-volume") && matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok() {
-            let matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap();
+            let iv = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap();
             if 0 <= iv && iv <= 100 {
                 initial_volume = iv * 0xFFFF as i32 / 100 ;
             } else {
