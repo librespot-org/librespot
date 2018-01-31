@@ -220,6 +220,9 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
     #[cfg(feature = "with-dns-sd")]
     let port = serve.incoming_ref().local_addr().port();
 
+    #[cfg(not(feature = "with-dns-sd"))]
+    let addr = serve.incoming_ref().local_addr();
+
     let server_future = {
         let handle = handle.clone();
         serve.for_each(move |connection| {
@@ -239,9 +242,8 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
        &["VERSION=1.0", "CPath=/"]).unwrap();
 
     #[cfg(not(feature = "with-dns-sd"))]
-    let addr = serve.incoming_ref().local_addr();
-    #[cfg(not(feature = "with-dns-sd"))]
     let responder = mdns::Responder::spawn(&handle)?;
+    
     #[cfg(not(feature = "with-dns-sd"))]
     let svc = responder.register(
         "_spotify-connect._tcp".to_owned(),
