@@ -148,7 +148,7 @@ fn setup(args: &[String]) -> Setup {
 
     let zeroconf_port =
     matches.opt_str("zeroconf-port")
-           .map(|volume| volume.parse::<u16>().unwrap())
+           .map(|port| port.parse::<u16>().unwrap())
            .unwrap_or(0);
 
     let name = matches.opt_str("name").unwrap();
