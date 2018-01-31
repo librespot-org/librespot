@@ -135,30 +135,21 @@ fn setup(args: &[String]) -> Setup {
     let mixer = mixer::find(mixer_name.as_ref())
         .expect("Invalid mixer");
 
-    let initial_volume: i32;
-    if matches.opt_present("initial-volume") && matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok() {
-        let iv = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap();
-        match iv {
-            iv if iv >= 0 && iv <= 100 => { initial_volume = iv * 0xFFFF / 100 }
-            _ => {
-                debug!("Volume needs to be a value from 0-100; set volume level to 50%");
-                initial_volume = 0x8000;
+    let initial_volume = matches
+        .opt_str("initial-volume")
+        .map(|volume| {
+            let volume = volume.parse::<i32>().unwrap();
+            if volume < 0 || volume > 100 {
+                panic!("Initial volume must be in the range 0-100");
             }
-        }
-    } else {
-        initial_volume = 0x8000;
-    }
+            volume * 0xFFFF / 100
+        })
+        .unwrap_or(0x8000);
 
-    let zeroconf_port: u16;
-    if matches.opt_present("zeroconf-port") && matches.opt_str("zeroconf-port").unwrap().parse::<u16>().is_ok() {
-        let z = matches.opt_str("zeroconf-port").unwrap().parse::<u16>().unwrap();
-        match z {
-            z if z >= 1024 => { zeroconf_port = z }
-            _ => { zeroconf_port = 0 }
-        }
-    } else {
-        zeroconf_port = 0
-    }
+    let zeroconf_port =
+    matches.opt_str("zeroconf-port")
+           .map(|port| port.parse::<u16>().unwrap())
+           .unwrap_or(0);
 
     let name = matches.opt_str("name").unwrap();
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
