@@ -1,8 +1,5 @@
 #![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
 
-// TODO: many items from tokio-core::io have been deprecated in favour of tokio-io
-#![allow(deprecated)]
-
 #[macro_use] extern crate error_chain;
 #[macro_use] extern crate futures;
 #[macro_use] extern crate lazy_static;
@@ -11,6 +8,7 @@
 
 extern crate base64;
 extern crate byteorder;
+extern crate bytes;
 extern crate crypto;
 extern crate hyper;
 extern crate num_bigint;
@@ -23,6 +21,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate shannon;
 extern crate tokio_core;
+extern crate tokio_io;
 extern crate uuid;
 
 extern crate librespot_protocol as protocol;

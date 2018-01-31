@@ -3,16 +3,21 @@ use crypto::digest::Digest;
 use crypto::mac::Mac;
 use crypto;
 use futures::sync::mpsc;
-use futures::{Future, Stream, BoxFuture, Poll, Async};
-use hyper::server::{Service, NewService, Request, Response, Http};
+use futures::{Future, Stream, Poll};
+use hyper::server::{Service, Request, Response, Http};
 use hyper::{self, Get, Post, StatusCode};
+
+#[cfg(feature = "with-dns-sd")]
+use dns_sd::DNSService;
+
+#[cfg(not(feature = "with-dns-sd"))]
 use mdns;
+
 use num_bigint::BigUint;
 use rand;
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::Arc;
-use tokio_core::net::TcpListener;
 use tokio_core::reactor::Handle;
 use url;
 
@@ -32,7 +37,7 @@ struct DiscoveryInner {
 }
 
 impl Discovery {
-    pub fn new(config: ConnectConfig, device_id: String)
+    fn new(config: ConnectConfig, device_id: String)
         -> (Discovery, mpsc::UnboundedReceiver<Credentials>)
     {
         let (tx, rx) = mpsc::unbounded();
@@ -136,7 +141,7 @@ impl Discovery {
 
         let credentials = Credentials::with_blob(username.to_owned(), &decrypted, &self.0.device_id);
 
-        self.0.tx.send(credentials).unwrap();
+        self.0.tx.unbounded_send(credentials).unwrap();
 
         let result = json!({
             "status": 101,
@@ -159,7 +164,7 @@ impl Service for Discovery {
     type Request = Request;
     type Response = Response;
     type Error = hyper::Error;
-    type Future = BoxFuture<Response, hyper::Error>;
+    type Future = Box<Future<Item = Response, Error = hyper::Error>>;
 
     fn call(&self, request: Request) -> Self::Future {
         let mut params = BTreeMap::new();
@@ -174,7 +179,7 @@ impl Service for Discovery {
         }
 
         let this = self.clone();
-        body.fold(Vec::new(), |mut acc, chunk| {
+        Box::new(body.fold(Vec::new(), |mut acc, chunk| {
             acc.extend_from_slice(chunk.as_ref());
             Ok::<_, hyper::Error>(acc)
         }).map(move |body| {
@@ -186,43 +191,61 @@ impl Service for Discovery {
                 (Post, Some("addUser")) => this.handle_add_user(&params),
                 _ => this.not_found(),
             }
-        }).boxed()
+        }))
     }
 }
 
-impl NewService for Discovery {
-    type Request = Request;
-    type Response = Response;
-    type Error = hyper::Error;
-    type Instance = Self;
-
-    fn new_service(&self) -> io::Result<Self::Instance> {
-        Ok(self.clone())
-    }
+#[cfg(feature = "with-dns-sd")]
+pub struct DiscoveryStream {
+    credentials: mpsc::UnboundedReceiver<Credentials>,
+    _svc: DNSService,
 }
 
+#[cfg(not(feature = "with-dns-sd"))]
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
     _svc: mdns::Service,
-    task: Box<Future<Item=(), Error=io::Error>>,
 }
 
-pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
+pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String, port: u16)
     -> io::Result<DiscoveryStream>
 {
     let (discovery, creds_rx) = Discovery::new(config.clone(), device_id);
 
-    let listener = TcpListener::bind(&"0.0.0.0:0".parse().unwrap(), handle)?;
-    let addr = listener.local_addr()?;
+    let serve = {
+        let http = Http::new();
+        debug!("Zeroconf server listening on 0.0.0.0:{}", port);
+        http.serve_addr_handle(&format!("0.0.0.0:{}", port).parse().unwrap(), &handle, move || Ok(discovery.clone())).unwrap()
+    };
 
-    let http = Http::new();
-    let handle_ = handle.clone();
-    let task = Box::new(listener.incoming().for_each(move |(socket, addr)| {
-        http.bind_connection(&handle_, socket, addr, discovery.clone());
-        Ok(())
-    }));
+    #[cfg(feature = "with-dns-sd")]
+    let port = serve.incoming_ref().local_addr().port();
 
+    #[cfg(not(feature = "with-dns-sd"))]
+    let addr = serve.incoming_ref().local_addr();
+
+    let server_future = {
+        let handle = handle.clone();
+        serve.for_each(move |connection| {
+                handle.spawn(connection.then(|_| Ok(())));
+                Ok(())
+            })
+            .then(|_| Ok(()))
+    };
+    handle.spawn(server_future);
+
+    #[cfg(feature = "with-dns-sd")]
+    let svc = DNSService::register(Some(&*config.name),
+       "_spotify-connect._tcp",
+       None,
+       None,
+       port,
+       &["VERSION=1.0", "CPath=/"]).unwrap();
+
+    #[cfg(not(feature = "with-dns-sd"))]
     let responder = mdns::Responder::spawn(&handle)?;
+    
+    #[cfg(not(feature = "with-dns-sd"))]
     let svc = responder.register(
         "_spotify-connect._tcp".to_owned(),
         config.name,
@@ -232,20 +255,14 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
     Ok(DiscoveryStream {
         credentials: creds_rx,
         _svc: svc,
-        task: task,
     })
 }
 
 impl Stream for DiscoveryStream {
     type Item = Credentials;
-    type Error = io::Error;
+    type Error = ();
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        match self.task.poll()? {
-            Async::Ready(()) => unreachable!(),
-            Async::NotReady => (),
-        }
-
-        Ok(self.credentials.poll().unwrap())
+        self.credentials.poll()
     }
 }

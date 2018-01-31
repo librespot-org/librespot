@@ -1,10 +1,10 @@
+use bytes::Bytes;
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use futures::sync::mpsc;
-use futures::{Future, Stream, BoxFuture, IntoFuture, Poll, Async};
+use futures::{Future, Stream, IntoFuture, Poll, Async};
 use std::io;
 use std::sync::{RwLock, Arc, Weak};
-use tokio_core::io::EasyBuf;
 use tokio_core::reactor::{Handle, Remote};
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 
@@ -90,7 +90,7 @@ impl Session {
 
     fn create(handle: &Handle, transport: connection::Transport,
               config: SessionConfig, cache: Option<Cache>, username: String)
-        -> (Session, BoxFuture<(), io::Error>)
+        -> (Session, Box<Future<Item = (), Error = io::Error>>)
     {
         let (sink, stream) = transport.split();
 
@@ -124,8 +124,8 @@ impl Session {
             .forward(sink).map(|_| ());
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task = (receiver_task, sender_task).into_future()
-            .map(|((), ())| ()).boxed();
+        let task = Box::new((receiver_task, sender_task).into_future()
+            .map(|((), ())| ()));
 
         (session, task)
     }
@@ -156,7 +156,7 @@ impl Session {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
-    fn dispatch(&self, cmd: u8, data: EasyBuf) {
+    fn dispatch(&self, cmd: u8, data: Bytes) {
         match cmd {
             0x4 => {
                 self.debug_info();
@@ -177,7 +177,7 @@ impl Session {
     }
 
     pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
-        self.0.tx_connection.send((cmd, data)).unwrap();
+        self.0.tx_connection.unbounded_send((cmd, data)).unwrap();
     }
 
     pub fn cache(&self) -> Option<&Arc<Cache>> {
@@ -229,10 +229,10 @@ impl Drop for SessionInternal {
 }
 
 struct DispatchTask<S>(S, SessionWeak)
-    where S: Stream<Item = (u8, EasyBuf)>;
+    where S: Stream<Item = (u8, Bytes)>;
 
 impl <S> Future for DispatchTask<S>
-    where S: Stream<Item = (u8, EasyBuf)>
+    where S: Stream<Item = (u8, Bytes)>
 {
     type Item = ();
     type Error = S::Error;
@@ -253,7 +253,7 @@ impl <S> Future for DispatchTask<S>
 }
 
 impl <S> Drop for DispatchTask<S>
-    where S: Stream<Item = (u8, EasyBuf)>
+    where S: Stream<Item = (u8, Bytes)>
 {
     fn drop(&mut self) {
         debug!("drop Dispatch");

@@ -2,8 +2,9 @@ use futures::sync::oneshot;
 use futures::{future, Future};
 use std::borrow::Cow;
 use std::mem;
-use std::sync::mpsc::{RecvError, TryRecvError};
+use std::sync::mpsc::{RecvError, TryRecvError, RecvTimeoutError};
 use std::thread;
+use std::time::Duration;
 use std;
 use std::io::Seek;
 use std::io::SeekFrom;
@@ -19,9 +20,9 @@ use audio::{VorbisDecoder, VorbisPacket};
 use metadata::{FileFormat, Track, Metadata};
 use mixer::AudioFilter;
 
-#[derive(Clone)]
 pub struct Player {
-    commands: std::sync::mpsc::Sender<PlayerCommand>,
+    commands: Option<std::sync::mpsc::Sender<PlayerCommand>>,
+    thread_handle: Option<thread::JoinHandle<()>>,
 }
 
 struct PlayerInternal {
@@ -31,6 +32,7 @@ struct PlayerInternal {
 
     state: PlayerState,
     sink: Box<Sink>,
+    sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
 }
 
@@ -50,7 +52,7 @@ impl Player {
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
 
-        thread::spawn(move || {
+        let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
 
             let internal = PlayerInternal {
@@ -60,6 +62,7 @@ impl Player {
 
                 state: PlayerState::Stopped,
                 sink: sink_builder(),
+                sink_running: false,
                 audio_filter: audio_filter,
             };
 
@@ -67,12 +70,13 @@ impl Player {
         });
 
         Player {
-            commands: cmd_tx,
+            commands: Some(cmd_tx),
+            thread_handle: Some(handle),
         }
     }
 
     fn command(&self, cmd: PlayerCommand) {
-        self.commands.send(cmd).unwrap();
+        self.commands.as_ref().unwrap().send(cmd).unwrap();
     }
 
     pub fn load(&self, track: SpotifyId, start_playing: bool, position_ms: u32)
@@ -98,6 +102,19 @@ impl Player {
 
     pub fn seek(&self, position_ms: u32) {
         self.command(PlayerCommand::Seek(position_ms));
+    }
+}
+
+impl Drop for Player {
+    fn drop(&mut self) {
+        debug!("Shutting down player thread ...");
+        self.commands = None;
+        if let Some(handle) = self.thread_handle.take() {
+            match handle.join() {
+                Ok(_) => (),
+                Err(_) => error!("Player thread panicked!")
+            }
+        }
     }
 }
 
@@ -143,7 +160,7 @@ impl PlayerState {
         match self {
             Paused { end_of_track, .. } |
             Playing { end_of_track, .. } => {
-                end_of_track.complete(())
+                let _ = end_of_track.send(());
             }
 
             Stopped => warn!("signal_end_of_track from stopped state"),
@@ -184,10 +201,21 @@ impl PlayerInternal {
     fn run(mut self) {
         loop {
             let cmd = if self.state.is_playing() {
-                match self.commands.try_recv() {
-                    Ok(cmd) => Some(cmd),
-                    Err(TryRecvError::Empty) => None,
-                    Err(TryRecvError::Disconnected) => return,
+                if self.sink_running
+                {
+                    match self.commands.try_recv() {
+                        Ok(cmd) => Some(cmd),
+                        Err(TryRecvError::Empty) => None,
+                        Err(TryRecvError::Disconnected) => return,
+                    }
+                }
+                else
+                {
+                    match self.commands.recv_timeout(Duration::from_secs(5)) {
+                        Ok(cmd) => Some(cmd),
+                        Err(RecvTimeoutError::Timeout) => None,
+                        Err(RecvTimeoutError::Disconnected) => return,
+                    }
                 }
             } else {
                 match self.commands.recv() {
@@ -200,16 +228,42 @@ impl PlayerInternal {
                 self.handle_command(cmd);
             }
 
-            let mut current_normalization_factor: f32 = 1.0;
-            let packet = if let PlayerState::Playing { ref mut decoder, normalization_factor, .. } = self.state {
-                current_normalization_factor = normalization_factor;
-                Some(decoder.next_packet().expect("Vorbis error"))
-            } else { None };
+            if self.state.is_playing() && ! self.sink_running {
+                self.start_sink();
+            }
 
-            if let Some(packet) = packet {
-                self.handle_packet(packet, current_normalization_factor);
+            if self.sink_running {
+                let mut current_normalization_factor: f32 = 1.0;
+                let packet = if let PlayerState::Playing { ref mut decoder, normalization_factor, .. } = self.state {
+                    current_normalization_factor = normalization_factor;
+                    Some(decoder.next_packet().expect("Vorbis error"))
+                } else {
+                    None
+                };
+
+                if let Some(packet) = packet {
+                    self.handle_packet(packet, current_normalization_factor);
+                }
             }
         }
+    }
+
+    fn start_sink(&mut self) {
+        match self.sink.start() {
+            Ok(()) => self.sink_running = true,
+            Err(err) => error!("Could not start audio: {}", err),
+        }
+    }
+
+    fn stop_sink_if_running(&mut self) {
+        if self.sink_running {
+            self.stop_sink();
+        }
+    }
+
+    fn stop_sink(&mut self) {
+        self.sink.stop().unwrap();
+        self.sink_running = false;
     }
 
     fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalization_factor: f32) {
@@ -218,7 +272,7 @@ impl PlayerInternal {
                 if let Some(ref editor) = self.audio_filter {
                     editor.modify_stream(&mut packet.data_mut())
                 };
-
+              
                 if self.config.normalization {
 
                     if normalization_factor != 1.0 {
@@ -228,12 +282,14 @@ impl PlayerInternal {
                     }
 
                 }
-
-                self.sink.write(&packet.data()).unwrap();
+                if let Err(err) = self.sink.write(&packet.data()) {
+                    error!("Could not write audio: {}", err);
+                    self.stop_sink();
+                }
             }
 
             None => {
-                self.sink.stop().unwrap();
+                self.stop_sink();
                 self.run_onstop();
 
                 let old_state = mem::replace(&mut self.state, PlayerState::Stopped);
@@ -247,7 +303,7 @@ impl PlayerInternal {
         match cmd {
             PlayerCommand::Load(track_id, play, position, end_of_track) => {
                 if self.state.is_playing() {
-                    self.sink.stop().unwrap();
+                    self.stop_sink_if_running();
                 }
 
                 match self.load_track(track_id, position as i64) {
@@ -256,7 +312,7 @@ impl PlayerInternal {
                             if !self.state.is_playing() {
                                 self.run_onstart();
                             }
-                            self.sink.start().unwrap();
+                            self.start_sink();
 
                             self.state = PlayerState::Playing {
                                 decoder: decoder,
@@ -277,7 +333,7 @@ impl PlayerInternal {
                     }
 
                     None => {
-                        end_of_track.complete(());
+                        let _ = end_of_track.send(());
                         if self.state.is_playing() {
                             self.run_onstop();
                         }
@@ -301,7 +357,7 @@ impl PlayerInternal {
                     self.state.paused_to_playing();
 
                     self.run_onstart();
-                    self.sink.start().unwrap();
+                    self.start_sink();
                 } else {
                     warn!("Player::play called from invalid state");
                 }
@@ -311,7 +367,7 @@ impl PlayerInternal {
                 if let PlayerState::Playing { .. } = self.state {
                     self.state.playing_to_paused();
 
-                    self.sink.stop().unwrap();
+                    self.stop_sink_if_running();
                     self.run_onstop();
                 } else {
                     warn!("Player::pause called from invalid state");
@@ -321,7 +377,7 @@ impl PlayerInternal {
             PlayerCommand::Stop => {
                 match self.state {
                     PlayerState::Playing { .. } => {
-                        self.sink.stop().unwrap();
+                        self.stop_sink_if_running();
                         self.run_onstop();
                         self.state = PlayerState::Stopped;
                     }
