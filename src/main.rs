@@ -103,7 +103,7 @@ fn setup(args: &[String]) -> Setup {
         .optflag("", "enable-volume-normalization", "Play all tracks at the same volume")
         .optopt("", "normalization-pre-gain", "Pre-gain (dB) applied by volume normalization", "PREGAIN")
         .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME")
-        .optopt("z", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT")
+        .optopt("z", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
