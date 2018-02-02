@@ -65,7 +65,7 @@ protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros", fea
 [features]
 alsa-backend = ["alsa"]
 portaudio-backend = ["portaudio-rs"]
-pulseaudio-backend = ["libpulse-sys, "libc"]
+pulseaudio-backend = ["libpulse-sys", "libc"]
 jackaudio-backend = ["jack"]
 
 with-tremor = ["librespot-audio/with-tremor"]
