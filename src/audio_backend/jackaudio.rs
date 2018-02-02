@@ -3,7 +3,6 @@ use super::{Open, Sink};
 use jack::prelude::{AudioOutPort, AudioOutSpec, Client, JackControl, ProcessScope, AsyncClient, client_options, ProcessHandler, Port };
 use std::sync::mpsc::{sync_channel, SyncSender, Receiver};
 
-#[allow(dead_code)]
 pub struct JackSink {
     send: SyncSender<i16>,
     active_client: AsyncClient<(),JackData>,
@@ -16,10 +15,7 @@ pub struct JackData {
 }
 
 fn pcm_to_f32(sample: i16) -> f32 {
-    let mut f: f32 = sample as f32 / 32768.0;
-    if f > 1.0 { f = 1.0; }
-    if f < -1.0 { f = -1.0; }
-    f
+    sample as f32 / 32768.0;
 }
 
 impl ProcessHandler for JackData {
