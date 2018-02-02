@@ -1,12 +1,10 @@
-// TODO: many items from tokio-core::io have been deprecated in favour of tokio-io
-#![allow(deprecated)]
-
 #[macro_use] extern crate log;
 extern crate env_logger;
 extern crate futures;
 extern crate getopts;
 extern crate librespot;
 extern crate tokio_core;
+extern crate tokio_io;
 extern crate tokio_signal;
 
 use env_logger::LogBuilder;
@@ -17,7 +15,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
 use tokio_core::reactor::{Handle, Core};
-use tokio_core::io::IoStream;
+use tokio_io::IoStream;
 use std::mem;
 
 use librespot::core::authentication::{get_credentials, Credentials};
@@ -83,6 +81,7 @@ struct Setup {
     connect_config: ConnectConfig,
     credentials: Option<Credentials>,
     enable_discovery: bool,
+    zeroconf_port: u16,
 }
 
 fn setup(args: &[String]) -> Setup {
@@ -100,7 +99,9 @@ fn setup(args: &[String]) -> Setup {
         .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
         .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
-        .optopt("", "mixer", "Mixer to use", "MIXER");
+        .optopt("", "mixer", "Mixer to use", "MIXER")
+        .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME")
+        .optopt("z", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -133,6 +134,31 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref())
         .expect("Invalid mixer");
+
+    let initial_volume: i32;
+    if matches.opt_present("initial-volume") && matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok() {
+        let iv = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap();
+        match iv {
+            iv if iv >= 0 && iv <= 100 => { initial_volume = iv * 0xFFFF / 100 }
+            _ => {
+                debug!("Volume needs to be a value from 0-100; set volume level to 50%");
+                initial_volume = 0x8000;
+            }
+        }
+    } else {
+        initial_volume = 0x8000;
+    }
+
+    let zeroconf_port: u16;
+    if matches.opt_present("zeroconf-port") && matches.opt_str("zeroconf-port").unwrap().parse::<u16>().is_ok() {
+        let z = matches.opt_str("zeroconf-port").unwrap().parse::<u16>().unwrap();
+        match z {
+            z if z >= 1024 => { zeroconf_port = z }
+            _ => { zeroconf_port = 0 }
+        }
+    } else {
+        zeroconf_port = 0
+    }
 
     let name = matches.opt_str("name").unwrap();
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
@@ -180,6 +206,7 @@ fn setup(args: &[String]) -> Setup {
         ConnectConfig {
             name: name,
             device_type: device_type,
+            volume: initial_volume,
         }
     };
 
@@ -194,6 +221,7 @@ fn setup(args: &[String]) -> Setup {
         credentials: credentials,
         device: device,
         enable_discovery: enable_discovery,
+        zeroconf_port: zeroconf_port,
         mixer: mixer,
     }
 }
@@ -235,14 +263,14 @@ impl Main {
             spirc: None,
             spirc_task: None,
             shutdown: false,
-            signal: tokio_signal::ctrl_c(&handle).flatten_stream().boxed(),
+            signal: Box::new(tokio_signal::ctrl_c(&handle).flatten_stream()),
         };
 
         if setup.enable_discovery {
             let config = task.connect_config.clone();
             let device_id = task.session_config.device_id.clone();
 
-            task.discovery = Some(discovery(&handle, config, device_id).unwrap());
+            task.discovery = Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
         }
 
         if let Some(credentials) = setup.credentials {
@@ -342,4 +370,3 @@ fn main() {
 
     core.run(Main::new(handle, setup(&args))).unwrap()
 }
-

@@ -2,9 +2,6 @@
 
 #![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
 
-// TODO: many items from tokio-core::io have been deprecated in favour of tokio-io
-#![allow(deprecated)]
-
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_json;
 #[macro_use] extern crate serde_derive;
@@ -13,7 +10,6 @@ extern crate base64;
 extern crate crypto;
 extern crate futures;
 extern crate hyper;
-extern crate mdns;
 extern crate num_bigint;
 extern crate protobuf;
 extern crate rand;
@@ -36,6 +32,15 @@ extern crate libpulse_sys;
 
 #[cfg(feature = "jackaudio-backend")]
 extern crate jack;
+
+#[cfg(feature = "libc")]
+extern crate libc;
+
+#[cfg(feature = "with-dns-sd")]
+extern crate dns_sd;
+
+#[cfg(not(feature = "with-dns-sd"))]
+extern crate mdns;
 
 pub mod audio_backend;
 pub mod discovery;

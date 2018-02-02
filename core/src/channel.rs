@@ -1,15 +1,15 @@
 use byteorder::{BigEndian, ByteOrder};
+use bytes::Bytes;
 use futures::sync::{BiLock, mpsc};
 use futures::{Poll, Async, Stream};
 use std::collections::HashMap;
-use tokio_core::io::EasyBuf;
 
 use util::SeqGenerator;
 
 component! {
     ChannelManager : ChannelManagerInner {
         sequence: SeqGenerator<u16> = SeqGenerator::new(0),
-        channels: HashMap<u16, mpsc::UnboundedSender<(u8, EasyBuf)>> = HashMap::new(),
+        channels: HashMap<u16, mpsc::UnboundedSender<(u8, Bytes)>> = HashMap::new(),
     }
 }
 
@@ -17,7 +17,7 @@ component! {
 pub struct ChannelError;
 
 pub struct Channel {
-    receiver: mpsc::UnboundedReceiver<(u8, EasyBuf)>,
+    receiver: mpsc::UnboundedReceiver<(u8, Bytes)>,
     state: ChannelState,
 }
 
@@ -26,12 +26,12 @@ pub struct ChannelData(BiLock<Channel>);
 
 pub enum ChannelEvent {
     Header(u8, Vec<u8>),
-    Data(EasyBuf),
+    Data(Bytes),
 }
 
 #[derive(Clone)]
 enum ChannelState {
-    Header(EasyBuf),
+    Header(Bytes),
     Data,
     Closed,
 }
@@ -48,27 +48,27 @@ impl ChannelManager {
 
         let channel = Channel {
             receiver: rx,
-            state: ChannelState::Header(EasyBuf::new()),
+            state: ChannelState::Header(Bytes::new()),
         };
 
         (seq, channel)
     }
 
-    pub fn dispatch(&self, cmd: u8, mut data: EasyBuf) {
+    pub fn dispatch(&self, cmd: u8, mut data: Bytes) {
         use std::collections::hash_map::Entry;
 
-        let id: u16 = BigEndian::read_u16(data.drain_to(2).as_ref());
+        let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
 
         self.lock(|inner| {
             if let Entry::Occupied(entry) = inner.channels.entry(id) {
-                let _ = entry.get().send((cmd, data));
+                let _ = entry.get().unbounded_send((cmd, data));
             }
         });
     }
 }
 
 impl Channel {
-    fn recv_packet(&mut self) -> Poll<EasyBuf, ChannelError> {
+    fn recv_packet(&mut self) -> Poll<Bytes, ChannelError> {
         let (cmd, packet) = match self.receiver.poll() {
             Ok(Async::Ready(t)) => t.expect("channel closed"),
             Ok(Async::NotReady) => return Ok(Async::NotReady),
@@ -107,13 +107,13 @@ impl Stream for Channel {
                         data = try_ready!(self.recv_packet());
                     }
 
-                    let length = BigEndian::read_u16(data.drain_to(2).as_ref()) as usize;
+                    let length = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
                     if length == 0 {
                         assert_eq!(data.len(), 0);
                         self.state = ChannelState::Data;
                     } else {
-                        let header_id = data.drain_to(1).as_ref()[0];
-                        let header_data = data.drain_to(length - 1).as_ref().to_owned();
+                        let header_id = data.split_to(1).as_ref()[0];
+                        let header_data = data.split_to(length - 1).as_ref().to_owned();
 
                         self.state = ChannelState::Header(data);
 
@@ -139,7 +139,7 @@ impl Stream for Channel {
 }
 
 impl Stream for ChannelData {
-    type Item = EasyBuf;
+    type Item = Bytes;
     type Error = ChannelError;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
