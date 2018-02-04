@@ -30,6 +30,9 @@ extern crate portaudio_rs;
 #[cfg(feature = "libpulse-sys")]
 extern crate libpulse_sys;
 
+#[cfg(feature = "jackaudio-backend")]
+extern crate jack;
+
 #[cfg(feature = "libc")]
 extern crate libc;
 

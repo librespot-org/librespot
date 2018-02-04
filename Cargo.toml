@@ -53,6 +53,7 @@ url = "1.3"
 alsa            = { git = "https://github.com/plietar/rust-alsa", optional = true }
 portaudio-rs    = { version = "0.3.0", optional = true }
 libpulse-sys    = { version = "0.0.0", optional = true }
+jack            = { version = "0.5.3", optional = true }
 libc            = { version = "0.2", optional = true }
 dns-sd          = { version = "0.1.3", optional = true }
 
@@ -65,6 +66,7 @@ protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros", fea
 alsa-backend = ["alsa"]
 portaudio-backend = ["portaudio-rs"]
 pulseaudio-backend = ["libpulse-sys", "libc"]
+jackaudio-backend = ["jack"]
 
 with-tremor = ["librespot-audio/with-tremor"]
 with-lewton = ["librespot-audio/with-lewton"]
