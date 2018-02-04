@@ -218,11 +218,7 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String, port
         http.serve_addr_handle(&format!("0.0.0.0:{}", port).parse().unwrap(), &handle, move || Ok(discovery.clone())).unwrap()
     };
 
-    #[cfg(feature = "with-dns-sd")]
-    let port = serve.incoming_ref().local_addr().port();
-
-    #[cfg(not(feature = "with-dns-sd"))]
-    let addr = serve.incoming_ref().local_addr();
+    let s_port = serve.incoming_ref().local_addr().port();
 
     let server_future = {
         let handle = handle.clone();
@@ -239,7 +235,7 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String, port
        "_spotify-connect._tcp",
        None,
        None,
-       port,
+       s_port,
        &["VERSION=1.0", "CPath=/"]).unwrap();
 
     #[cfg(not(feature = "with-dns-sd"))]
@@ -249,7 +245,7 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String, port
     let svc = responder.register(
         "_spotify-connect._tcp".to_owned(),
         config.name,
-        addr.port(),
+        s_port,
         &["VERSION=1.0", "CPath=/"]);
 
     Ok(DiscoveryStream {
