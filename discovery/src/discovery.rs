@@ -1,4 +1,8 @@
 use base64;
+use core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
+use core::authentication::Credentials;
+use core::util;
+use core::config::ConnectConfig;
 use crypto::digest::Digest;
 use crypto::mac::Mac;
 use crypto;
@@ -6,13 +10,6 @@ use futures::sync::mpsc;
 use futures::{Future, Stream, Poll};
 use hyper::server::{Service, Request, Response, Http};
 use hyper::{self, Get, Post, StatusCode};
-
-#[cfg(feature = "with-dns-sd")]
-use dns_sd::DNSService;
-
-#[cfg(not(feature = "with-dns-sd"))]
-use mdns;
-
 use num_bigint::BigUint;
 use rand;
 use std::collections::BTreeMap;
@@ -21,10 +18,11 @@ use std::sync::Arc;
 use tokio_core::reactor::Handle;
 use url;
 
-use core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
-use core::authentication::Credentials;
-use core::util;
-use core::config::ConnectConfig;
+#[cfg(feature = "with-dns-sd")]
+use dns_sd::DNSService;
+
+#[cfg(not(feature = "with-dns-sd"))]
+use mdns;
 
 #[derive(Clone)]
 struct Discovery(Arc<DiscoveryInner>);
