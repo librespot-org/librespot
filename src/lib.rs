@@ -18,6 +18,7 @@ extern crate url;
 
 pub extern crate librespot_audio as audio;
 pub extern crate librespot_core as core;
+pub extern crate librespot_discovery as discovery;
 pub extern crate librespot_protocol as protocol;
 pub extern crate librespot_metadata as metadata;
 
