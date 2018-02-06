@@ -75,6 +75,7 @@ pub trait Metadata : Send + Sized + 'static {
 pub struct Track {
     pub id: SpotifyId,
     pub name: String,
+    pub duration: i32,
     pub album: SpotifyId,
     pub artists: Vec<SpotifyId>,
     pub files: LinearMap<FileFormat, FileId>,
@@ -127,6 +128,7 @@ impl Metadata for Track {
         Track {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
+            duration: msg.get_duration(),
             album: SpotifyId::from_raw(msg.get_album().get_gid()),
             artists: artists,
             files: files,
@@ -215,4 +217,3 @@ impl Metadata for Artist {
         }
     }
 }
-
