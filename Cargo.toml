@@ -43,6 +43,7 @@ rand = "0.3.13"
 rpassword = "0.3.0"
 rust-crypto = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
 serde = "0.9.6"
+serde_derive = "0.9.6"
 serde_json = "0.9.5"
 tokio-core = "0.1.2"
 tokio-io = "0.1"
