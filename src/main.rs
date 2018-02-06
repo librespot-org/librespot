@@ -25,7 +25,7 @@ use librespot::core::session::Session;
 use librespot::core::version;
 
 use librespot::audio_backend::{self, Sink, BACKENDS};
-use librespot::discovery::{discovery, DiscoveryStream};
+use librespot::discovery::discovery::{discovery, DiscoveryStream};
 use librespot::mixer::{self, Mixer};
 use librespot::player::Player;
 use librespot::spirc::{Spirc, SpircTask};
