@@ -4,7 +4,6 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_json;
-#[macro_use] extern crate serde_derive;
 
 extern crate base64;
 extern crate crypto;
@@ -44,7 +43,6 @@ extern crate mdns;
 
 pub mod audio_backend;
 pub mod discovery;
-pub mod keymaster;
 pub mod mixer;
 pub mod player;
 

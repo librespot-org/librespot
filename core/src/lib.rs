@@ -34,6 +34,7 @@ pub mod cache;
 pub mod channel;
 pub mod config;
 pub mod diffie_hellman;
+pub mod keymaster;
 pub mod mercury;
 pub mod session;
 pub mod util;
