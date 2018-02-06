@@ -276,7 +276,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "lewton"
-version = "0.6.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -350,7 +350,7 @@ dependencies = [
  "bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "lewton 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lewton 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "librespot-core 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1172,7 +1172,7 @@ dependencies = [
 "checksum lazy_static 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)" = "76f033c7ad61445c5b347c7382dd1237847eb1bce590fe50365dcb33d546be73"
 "checksum lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c8f31047daa365f19be14b47c29df4f7c3b581832407daabe6ae77397619237d"
 "checksum lazycell 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a6f08839bc70ef4a3fe1d566d5350f519c5912ea86be0df1740a7d247c7fc0ef"
-"checksum lewton 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0de1cca3399919efa65ae7e01ed6696c961bd0fc9e844c05c80f90b638300bbf"
+"checksum lewton 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3d170da25c0b3541e3260f84aa8f9d323468083bd1ed6c4c15aec7ff33e2a1c4"
 "checksum libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)" = "1e5d97d6708edaa407429faa671b942dc0f2727222fb6b6539bf1db936e4b121"
 "checksum libloading 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "fd38073de8f7965d0c17d30546d4bb6da311ab428d1c7a3fc71dff7f9d4979b9"
 "checksum libpulse-sys 0.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9bb11b06faf883500c1b625cf4453e6c7737e9df9c7ba01df3f84b22b083e4ac"
