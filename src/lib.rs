@@ -44,7 +44,6 @@ extern crate mdns;
 
 pub mod audio_backend;
 pub mod discovery;
-pub mod keymaster;
 pub mod mixer;
 pub mod player;
 

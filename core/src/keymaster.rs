@@ -1,8 +1,8 @@
 use futures::Future;
 use serde_json;
 
-use core::mercury::MercuryError;
-use core::session::Session;
+use mercury::MercuryError;
+use session::Session;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
