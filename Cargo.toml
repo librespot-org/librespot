@@ -69,7 +69,7 @@ pulseaudio-backend = ["libpulse-sys", "libc"]
 jackaudio-backend = ["jack"]
 
 with-tremor = ["librespot-audio/with-tremor"]
-with-lewton = ["librespot-audio/with-lewton"]
+with-vorbis = ["librespot-audio/with-vorbis"]
 
 with-dns-sd = ["librespot-discovery/dns-sd"]
 
