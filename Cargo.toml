@@ -59,10 +59,10 @@ vergen          = "0.1.0"
 protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros", features = ["with-syntex"] }
 
 [features]
-alsa-backend = ["librespot-playback/alsa"]
-portaudio-backend = ["librespot-playback/portaudio-rs"]
-pulseaudio-backend = ["librespot-playback/libpulse-sys", "librespot-playback/libc"]
-jackaudio-backend = ["librespot-playback/jack"]
+alsa-backend = ["librespot-playback/alsa-backend"]
+portaudio-backend = ["librespot-playback/portaudio-backend"]
+pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
+jackaudio-backend = ["librespot-playback/jackaudio-backend"]
 
 with-tremor = ["librespot-audio/with-tremor"]
 with-vorbis = ["librespot-audio/with-vorbis"]
