@@ -100,6 +100,8 @@ fn setup(args: &[String]) -> Setup {
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
         .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
         .optopt("", "mixer", "Mixer to use", "MIXER")
+        .optflag("", "enable-volume-normalization", "Play all tracks at the same volume")
+        .optopt("", "normalization-pre-gain", "Pre-gain (dB) applied by volume normalization", "PREGAIN")
         .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME")
         .optopt("z", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT");
 
@@ -195,6 +197,10 @@ fn setup(args: &[String]) -> Setup {
             bitrate: bitrate,
             onstart: matches.opt_str("onstart"),
             onstop: matches.opt_str("onstop"),
+            normalization: matches.opt_present("enable-volume-normalization"),
+            normalization_pre_gain: matches.opt_str("normalization-pre-gain")
+                .map(|pre_gain| pre_gain.parse::<f32>().expect("Invalid pre-gain float value"))
+                .unwrap_or(PlayerConfig::default().normalization_pre_gain),
         }
     };
 

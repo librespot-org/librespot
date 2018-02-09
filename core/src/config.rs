@@ -105,6 +105,8 @@ pub struct PlayerConfig {
     pub bitrate: Bitrate,
     pub onstart: Option<String>,
     pub onstop: Option<String>,
+    pub normalization: bool,
+    pub normalization_pre_gain: f32,
 }
 
 impl Default for PlayerConfig {
@@ -113,6 +115,10 @@ impl Default for PlayerConfig {
             bitrate: Bitrate::default(),
             onstart: None,
             onstop: None,
+            normalization: false,
+            normalization_pre_gain: 0.0, //replaygain target is -14dbfs, may not be enough headroom
+                                         // macOS Spotify client adds 3.0
+                                         // https://community.spotify.com/t5/Social-Off-Topic/How-does-the-loudness-normalization-algorithm-work/td-p/1603671
         }
     }
 }

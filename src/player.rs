@@ -6,6 +6,9 @@ use std::sync::mpsc::{RecvError, TryRecvError, RecvTimeoutError};
 use std::thread;
 use std::time::Duration;
 use std;
+use std::io::Seek;
+use std::io::SeekFrom;
+use std::io::Read;
 
 use core::config::{Bitrate, PlayerConfig};
 use core::session::Session;
@@ -120,10 +123,12 @@ enum PlayerState {
     Stopped,
     Paused {
         decoder: Decoder,
+        normalization_factor: f32,
         end_of_track: oneshot::Sender<()>,
     },
     Playing {
         decoder: Decoder,
+        normalization_factor: f32,
         end_of_track: oneshot::Sender<()>,
     },
 
@@ -166,9 +171,10 @@ impl PlayerState {
     fn paused_to_playing(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Paused { decoder, end_of_track } => {
+            Paused { decoder, normalization_factor, end_of_track } => {
                 *self = Playing {
                     decoder: decoder,
+                    normalization_factor: normalization_factor,
                     end_of_track: end_of_track,
                 };
             }
@@ -179,9 +185,10 @@ impl PlayerState {
     fn playing_to_paused(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Playing { decoder, end_of_track } => {
+            Playing { decoder, normalization_factor, end_of_track } => {
                 *self = Paused {
                     decoder: decoder,
+                    normalization_factor: normalization_factor,
                     end_of_track: end_of_track,
                 };
             }
@@ -226,14 +233,16 @@ impl PlayerInternal {
             }
 
             if self.sink_running {
-                let packet = if let PlayerState::Playing { ref mut decoder, .. } = self.state {
+                let mut current_normalization_factor: f32 = 1.0;
+                let packet = if let PlayerState::Playing { ref mut decoder, normalization_factor, .. } = self.state {
+                    current_normalization_factor = normalization_factor;
                     Some(decoder.next_packet().expect("Vorbis error"))
                 } else {
                     None
                 };
 
                 if let Some(packet) = packet {
-                    self.handle_packet(packet);
+                    self.handle_packet(packet, current_normalization_factor);
                 }
             }
         }
@@ -257,13 +266,22 @@ impl PlayerInternal {
         self.sink_running = false;
     }
 
-    fn handle_packet(&mut self, packet: Option<VorbisPacket>) {
+    fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalization_factor: f32) {
         match packet {
             Some(mut packet) => {
                 if let Some(ref editor) = self.audio_filter {
                     editor.modify_stream(&mut packet.data_mut())
                 };
+              
+                if self.config.normalization {
 
+                    if normalization_factor != 1.0 {
+                        for x in packet.data_mut().iter_mut() {
+                            *x = (*x as f32 * normalization_factor) as i16;
+                        }
+                    }
+
+                }
                 if let Err(err) = self.sink.write(&packet.data()) {
                     error!("Could not write audio: {}", err);
                     self.stop_sink();
@@ -289,7 +307,7 @@ impl PlayerInternal {
                 }
 
                 match self.load_track(track_id, position as i64) {
-                    Some(decoder) => {
+                    Some((decoder, normalization_factor)) => {
                         if play {
                             if !self.state.is_playing() {
                                 self.run_onstart();
@@ -298,6 +316,7 @@ impl PlayerInternal {
 
                             self.state = PlayerState::Playing {
                                 decoder: decoder,
+                                normalization_factor: normalization_factor,
                                 end_of_track: end_of_track,
                             };
                         } else {
@@ -307,6 +326,7 @@ impl PlayerInternal {
 
                             self.state = PlayerState::Paused {
                                 decoder: decoder,
+                                normalization_factor: normalization_factor,
                                 end_of_track: end_of_track,
                             };
                         }
@@ -400,7 +420,7 @@ impl PlayerInternal {
         }
     }
 
-    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<Decoder> {
+    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<(Decoder, f32)> {
         let track = Track::get(&self.session, track_id).wait().unwrap();
 
         info!("Loading track \"{}\"", track.name);
@@ -430,7 +450,59 @@ impl PlayerInternal {
         let key = self.session.audio_key().request(track.id, file_id).wait().unwrap();
 
         let encrypted_file = AudioFile::open(&self.session, file_id).wait().unwrap();
-        let audio_file = Subfile::new(AudioDecrypt::new(key, encrypted_file), 0xa7);
+
+        let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+
+        let mut normalization_factor: f32 = 1.0;
+
+        if self.config.normalization {
+            //buffer for float bytes
+            let mut track_gain_float_bytes = [0; 4];
+
+            decrypted_file.seek(SeekFrom::Start(144)).unwrap(); // 4 bytes as LE float
+            decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            let track_gain_db: f32;
+            unsafe {
+                track_gain_db = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
+                debug!("Track gain: {}db", track_gain_db);
+            }
+
+            decrypted_file.seek(SeekFrom::Start(148)).unwrap(); // 4 bytes as LE float
+            decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            let track_peak: f32;
+            unsafe {
+                // track peak, 1.0 represents dbfs
+                track_peak = mem::transmute::<[u8; 4], f32>(track_gain_float_bytes);
+                debug!("Track peak: {}", track_peak);
+            }
+
+            // see http://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification#Loudness_normalization
+            normalization_factor = f32::powf(10.0, (track_gain_db + self.config.normalization_pre_gain) / 20.0);
+
+            if normalization_factor * track_peak > 1.0 {
+                warn!("Track would clip, reducing normalisation factor. \
+                    Please add negative pre-gain to avoid.");
+                normalization_factor = 1.0/track_peak;
+            }
+
+            info!("Applying normalization factor: {}", normalization_factor);
+
+            // TODO there are also values for album gain/peak, which should be used if an album is playing
+            // but I don't know how to determine if album is playing
+            decrypted_file.seek(SeekFrom::Start(152)).unwrap(); // 4 bytes as LE float
+            decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            unsafe {
+                debug!("Album gain: {}db", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
+            }
+            decrypted_file.seek(SeekFrom::Start(156)).unwrap(); // 4 bytes as LE float
+            decrypted_file.read(&mut track_gain_float_bytes).unwrap();
+            unsafe {
+                // album peak, 1.0 represents dbfs
+                debug!("Album peak: {}", mem::transmute::<[u8; 4], f32>(track_gain_float_bytes));
+            }
+        }
+
+        let audio_file = Subfile::new(decrypted_file, 0xa7);
 
         let mut decoder = VorbisDecoder::new(audio_file).unwrap();
 
@@ -441,7 +513,7 @@ impl PlayerInternal {
 
         info!("Track \"{}\" loaded", track.name);
 
-        Some(decoder)
+        Some((decoder, normalization_factor))
     }
 }
 
