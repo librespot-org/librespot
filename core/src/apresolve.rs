@@ -14,7 +14,7 @@ pub struct APResolveData {
     ap_list: Vec<String>
 }
 
-pub fn apresolve(handle: &Handle) -> Box<Future<Item=String, Error=Error>> {
+fn apresolve(handle: &Handle) -> Box<Future<Item=String, Error=Error>> {
     let url = Uri::from_str(APRESOLVE_ENDPOINT).expect("invalid AP resolve URL");
 
     let client = Client::new(handle);
@@ -44,10 +44,9 @@ pub fn apresolve(handle: &Handle) -> Box<Future<Item=String, Error=Error>> {
     Box::new(ap)
 }
 
-pub fn apresolve_or_fallback<E>(handle: &Handle)
-    -> Box<Future<Item=String, Error=E>>
-    where E: 'static
-{
+pub(crate) fn apresolve_or_fallback<E>(handle: &Handle)
+           -> Box<Future<Item=String, Error=E>>
+           where E: 'static {
     let ap = apresolve(handle).or_else(|e| {
         warn!("Failed to resolve Access Point: {}", e.description());
         warn!("Using fallback \"{}\"", AP_FALLBACK);

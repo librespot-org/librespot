@@ -27,7 +27,7 @@ extern crate uuid;
 extern crate librespot_protocol as protocol;
 
 #[macro_use] mod component;
-pub mod apresolve;
+mod apresolve;
 pub mod audio_key;
 pub mod authentication;
 pub mod cache;
