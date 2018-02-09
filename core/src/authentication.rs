@@ -121,14 +121,14 @@ impl Credentials {
         }
     }
 
-    pub fn from_reader<R: Read>(mut reader: R) -> Credentials {
+    fn from_reader<R: Read>(mut reader: R) -> Credentials {
         let mut contents = String::new();
         reader.read_to_string(&mut contents).unwrap();
 
         serde_json::from_str(&contents).unwrap()
     }
 
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Option<Credentials> {
+    pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Option<Credentials> {
         File::open(path).ok().map(Credentials::from_reader)
     }
 
