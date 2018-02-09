@@ -136,7 +136,7 @@ impl MercuryManager {
         }))
     }
 
-    pub fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         let seq_len = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
         let seq = data.split_to(seq_len).as_ref().to_owned();
 

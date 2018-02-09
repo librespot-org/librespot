@@ -22,7 +22,7 @@ component! {
 }
 
 impl AudioKeyManager {
-    pub fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         let seq = BigEndian::read_u32(data.split_to(4).as_ref());
 
         let sender = self.lock(|inner| inner.pending.remove(&seq));
