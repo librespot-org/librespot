@@ -132,12 +132,12 @@ impl Credentials {
         File::open(path).ok().map(Credentials::from_reader)
     }
 
-    pub fn save_to_writer<W: Write>(&self, writer: &mut W) {
+    fn save_to_writer<W: Write>(&self, writer: &mut W) {
         let contents = serde_json::to_string(&self.clone()).unwrap();
         writer.write_all(contents.as_bytes()).unwrap();
     }
 
-    pub fn save_to_file<P: AsRef<Path>>(&self, path: P) {
+    pub(crate) fn save_to_file<P: AsRef<Path>>(&self, path: P) {
         let mut file = File::create(path).unwrap();
         self.save_to_writer(&mut file)
     }
