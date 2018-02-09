@@ -17,26 +17,9 @@ extern crate url;
 pub extern crate librespot_audio as audio;
 pub extern crate librespot_core as core;
 pub extern crate librespot_discovery as discovery;
+pub extern crate librespot_playback as playback;
 pub extern crate librespot_protocol as protocol;
 pub extern crate librespot_metadata as metadata;
 
-#[cfg(feature = "alsa-backend")]
-extern crate alsa;
-
-#[cfg(feature = "portaudio-rs")]
-extern crate portaudio_rs;
-
-#[cfg(feature = "libpulse-sys")]
-extern crate libpulse_sys;
-
-#[cfg(feature = "jackaudio-backend")]
-extern crate jack;
-
-#[cfg(feature = "libc")]
-extern crate libc;
-
-pub mod audio_backend;
-pub mod mixer;
-pub mod player;
 
 include!(concat!(env!("OUT_DIR"), "/lib.rs"));
