@@ -184,7 +184,7 @@ impl Session {
         self.0.cache.as_ref()
     }
 
-    pub fn config(&self) -> &SessionConfig {
+    fn config(&self) -> &SessionConfig {
         &self.0.config
     }
 
@@ -200,7 +200,7 @@ impl Session {
         &self.config().device_id
     }
 
-    pub fn weak(&self) -> SessionWeak {
+    fn weak(&self) -> SessionWeak {
         SessionWeak(Arc::downgrade(&self.0))
     }
 
@@ -213,11 +213,11 @@ impl Session {
 pub struct SessionWeak(pub Weak<SessionInternal>);
 
 impl SessionWeak {
-    pub fn try_upgrade(&self) -> Option<Session> {
+    fn try_upgrade(&self) -> Option<Session> {
         self.0.upgrade().map(Session)
     }
 
-    pub fn upgrade(&self) -> Session {
+    pub(crate) fn upgrade(&self) -> Session {
         self.try_upgrade().expect("Session died")
     }
 }

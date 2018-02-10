@@ -6,7 +6,7 @@ use protobuf::{self, Message};
 use core::config::ConnectConfig;
 use core::mercury::MercuryError;
 use core::session::Session;
-use core::util::{now_ms, SpotifyId, SeqGenerator};
+use core::util::{SpotifyId, SeqGenerator};
 use core::version;
 
 use protocol;
@@ -18,6 +18,7 @@ use playback::player::Player;
 use std;
 use rand;
 use rand::Rng;
+use std::time::{UNIX_EPOCH, SystemTime};
 
 pub struct SpircTask {
     player: Player,
@@ -51,6 +52,14 @@ pub enum SpircCommand {
 
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
+}
+
+fn now_ms() -> i64 {
+    let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(dur) => dur,
+        Err(err) => err.duration(),
+    };
+    (dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000_000) as u64) as i64
 }
 
 fn initial_state() -> State {
