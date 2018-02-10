@@ -25,5 +25,3 @@ alsa-backend = ["alsa"]
 portaudio-backend = ["portaudio-rs"]
 pulseaudio-backend = ["libpulse-sys", "libc"]
 jackaudio-backend = ["jack"]
-
-default = ["portaudio-backend"]
