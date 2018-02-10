@@ -4,13 +4,14 @@ use std;
 use std::borrow::Cow;
 use std::io::{Read, Seek, SeekFrom, Result};
 use std::mem;
+use std::process::Command;
 use std::sync::mpsc::{RecvError, TryRecvError, RecvTimeoutError};
 use std::thread;
 use std::time::Duration;
 
 use core::config::{Bitrate, PlayerConfig};
 use core::session::Session;
-use core::util::{self, SpotifyId};
+use core::util::SpotifyId;
 
 use audio_backend::Sink;
 use audio::{AudioFile, AudioDecrypt};
@@ -376,13 +377,13 @@ impl PlayerInternal {
 
     fn run_onstart(&self) {
         if let Some(ref program) = self.config.onstart {
-            util::run_program(program)
+            run_program(program)
         }
     }
 
     fn run_onstop(&self) {
         if let Some(ref program) = self.config.onstop {
-            util::run_program(program)
+            run_program(program)
         }
     }
 
@@ -515,4 +516,14 @@ impl<T: Read + Seek> Seek for Subfile<T> {
             Ok(0)
         }
     }
+}
+
+fn run_program(program: &str) {
+    info!("Running {}", program);
+    let mut v: Vec<&str> = program.split_whitespace().collect();
+    let status = Command::new(&v.remove(0))
+            .args(&v)
+            .status()
+            .expect("program failed to start");
+    info!("Exit status: {}", status);
 }

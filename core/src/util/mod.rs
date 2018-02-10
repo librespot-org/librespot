@@ -4,7 +4,6 @@ use num_integer::Integer;
 use rand::{Rng, Rand};
 use std::mem;
 use std::ops::{Mul, Rem, Shr};
-use std::process::Command;
 
 mod int128;
 mod spotify_id;
@@ -14,16 +13,6 @@ pub use util::spotify_id::{SpotifyId, FileId};
 
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
-}
-
-pub fn run_program(program: &str) {
-    info!("Running {}", program);
-    let mut v: Vec<&str> = program.split_whitespace().collect();
-    let status = Command::new(&v.remove(0))
-            .args(&v)
-            .status()
-            .expect("program failed to start");
-    info!("Exit status: {}", status);
 }
 
 pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
