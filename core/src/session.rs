@@ -184,7 +184,7 @@ impl Session {
         self.0.cache.as_ref()
     }
 
-    pub fn config(&self) -> &SessionConfig {
+    fn config(&self) -> &SessionConfig {
         &self.0.config
     }
 
