@@ -11,7 +11,7 @@ pub struct MercurySender {
 
 impl MercurySender {
     // TODO: pub(super) when stable
-    pub fn new(mercury: MercuryManager, uri: String) -> MercurySender {
+    pub(crate) fn new(mercury: MercuryManager, uri: String) -> MercurySender {
         MercurySender {
             mercury: mercury,
             uri: uri,
