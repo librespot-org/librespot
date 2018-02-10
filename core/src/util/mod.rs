@@ -2,11 +2,8 @@ use num_bigint::BigUint;
 use num_traits::{Zero, One};
 use num_integer::Integer;
 use rand::{Rng, Rand};
-use std::io;
 use std::mem;
 use std::ops::{Mul, Rem, Shr};
-use std::fs;
-use std::path::Path;
 use std::process::Command;
 
 mod int128;
@@ -19,16 +16,6 @@ pub use util::subfile::Subfile;
 
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
-}
-
-pub fn mkdir_existing(path: &Path) -> io::Result<()> {
-    fs::create_dir(path).or_else(|err| {
-        if err.kind() == io::ErrorKind::AlreadyExists {
-            Ok(())
-        } else {
-            Err(err)
-        }
-    })
 }
 
 pub fn run_program(program: &str) {
