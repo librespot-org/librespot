@@ -8,11 +8,9 @@ use std::process::Command;
 
 mod int128;
 mod spotify_id;
-mod subfile;
 
 pub use util::int128::u128;
 pub use util::spotify_id::{SpotifyId, FileId};
-pub use util::subfile::Subfile;
 
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()

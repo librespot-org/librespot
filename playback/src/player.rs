@@ -1,15 +1,16 @@
 use futures::sync::oneshot;
 use futures::{future, Future};
+use std;
 use std::borrow::Cow;
+use std::io::{Read, Seek, SeekFrom, Result};
 use std::mem;
 use std::sync::mpsc::{RecvError, TryRecvError, RecvTimeoutError};
 use std::thread;
 use std::time::Duration;
-use std;
 
 use core::config::{Bitrate, PlayerConfig};
 use core::session::Session;
-use core::util::{self, SpotifyId, Subfile};
+use core::util::{self, SpotifyId};
 
 use audio_backend::Sink;
 use audio::{AudioFile, AudioDecrypt};
@@ -475,6 +476,43 @@ impl ::std::fmt::Debug for PlayerCommand {
                  .field(&position)
                  .finish()
             }
+        }
+    }
+}
+
+struct Subfile<T: Read + Seek> {
+    stream: T,
+    offset: u64,
+}
+
+impl<T: Read + Seek> Subfile<T> {
+    pub fn new(mut stream: T, offset: u64) -> Subfile<T> {
+        stream.seek(SeekFrom::Start(offset)).unwrap();
+        Subfile {
+            stream: stream,
+            offset: offset,
+        }
+    }
+}
+
+impl<T: Read + Seek> Read for Subfile<T> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        self.stream.read(buf)
+    }
+}
+
+impl<T: Read + Seek> Seek for Subfile<T> {
+    fn seek(&mut self, mut pos: SeekFrom) -> Result<u64> {
+        pos = match pos {
+            SeekFrom::Start(offset) => SeekFrom::Start(offset + self.offset),
+            x => x,
+        };
+
+        let newpos = try!(self.stream.seek(pos));
+        if newpos > self.offset {
+            Ok(newpos - self.offset)
+        } else {
+            Ok(0)
         }
     }
 }
