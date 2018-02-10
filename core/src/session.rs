@@ -200,7 +200,7 @@ impl Session {
         &self.config().device_id
     }
 
-    pub fn weak(&self) -> SessionWeak {
+    fn weak(&self) -> SessionWeak {
         SessionWeak(Arc::downgrade(&self.0))
     }
 
