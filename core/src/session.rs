@@ -213,11 +213,11 @@ impl Session {
 pub struct SessionWeak(pub Weak<SessionInternal>);
 
 impl SessionWeak {
-    pub fn try_upgrade(&self) -> Option<Session> {
+    fn try_upgrade(&self) -> Option<Session> {
         self.0.upgrade().map(Session)
     }
 
-    pub fn upgrade(&self) -> Session {
+    pub(crate) fn upgrade(&self) -> Session {
         self.try_upgrade().expect("Session died")
     }
 }
