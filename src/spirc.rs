@@ -12,8 +12,8 @@ use core::version;
 use protocol;
 use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
 
-use mixer::Mixer;
-use player::Player;
+use playback::mixer::Mixer;
+use playback::player::Player;
 
 use std;
 use rand;
@@ -132,12 +132,12 @@ fn volume_to_mixer(volume: u16) -> u16 {
 
     let mut val = std::u16::MAX;
     // Prevent val > std::u16::MAX due to rounding errors
-    if normalized_volume < 0.999 { 
+    if normalized_volume < 0.999 {
         let new_volume = (normalized_volume * IDEAL_FACTOR).exp() / 1000.0;
         val = (new_volume * std::u16::MAX as f64) as u16;
     }
 
-    debug!("input volume:{} to mixer: {}", volume, val);	
+    debug!("input volume:{} to mixer: {}", volume, val);
 
     // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
     val
@@ -575,7 +575,7 @@ impl SpircTask {
     }
 
     fn handle_end_of_track(&mut self) {
-        self.handle_next();   
+        self.handle_next();
         self.notify(None);
     }
 
