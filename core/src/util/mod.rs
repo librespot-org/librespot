@@ -8,7 +8,6 @@ use std::ops::{Mul, Rem, Shr};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::time::{UNIX_EPOCH, SystemTime};
 
 mod int128;
 mod spotify_id;
@@ -20,14 +19,6 @@ pub use util::subfile::Subfile;
 
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
-}
-
-pub fn now_ms() -> i64 {
-    let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(dur) => dur,
-        Err(err) => err.duration(),
-    };
-    (dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000_000) as u64) as i64
 }
 
 pub fn mkdir_existing(path: &Path) -> io::Result<()> {
