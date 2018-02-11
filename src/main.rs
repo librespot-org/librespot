@@ -20,11 +20,12 @@ use std::mem;
 
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
-use librespot::core::config::{Bitrate, DeviceType, PlayerConfig, SessionConfig, ConnectConfig};
+use librespot::core::config::{DeviceType, SessionConfig, ConnectConfig};
 use librespot::core::session::Session;
 use librespot::core::version;
 
 use librespot::playback::audio_backend::{self, Sink, BACKENDS};
+use librespot::playback::config::{Bitrate, PlayerConfig};
 use librespot::discovery::discovery::{discovery, DiscoveryStream};
 use librespot::playback::mixer::{self, Mixer};
 use librespot::playback::player::Player;
