@@ -5,7 +5,7 @@ use std::env;
 use tokio_core::reactor::Core;
 
 use librespot::core::authentication::Credentials;
-use librespot::core::config::{PlayerConfig, SessionConfig};
+use librespot::playback::config::{PlayerConfig, SessionConfig};
 use librespot::core::session::Session;
 use librespot::core::util::SpotifyId;
 

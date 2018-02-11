@@ -22,5 +22,6 @@ extern crate librespot_core as core;
 extern crate librespot_metadata as metadata;
 
 pub mod audio_backend;
+pub mod config;
 pub mod mixer;
 pub mod player;

@@ -316,8 +316,8 @@ dependencies = [
  "getopts 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "librespot-audio 0.1.0",
+ "librespot-connect 0.1.0",
  "librespot-core 0.1.0",
- "librespot-discovery 0.1.0",
  "librespot-metadata 0.1.0",
  "librespot-playback 0.1.0",
  "librespot-protocol 0.1.0",
@@ -388,7 +388,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "librespot-discovery"
+name = "librespot-connect"
 version = "0.1.0"
 dependencies = [
  "base64 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
