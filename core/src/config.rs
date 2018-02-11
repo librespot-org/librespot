@@ -1,10 +1,10 @@
-use uuid::Uuid;
-use std::str::FromStr;
 use std::fmt;
+use std::str::FromStr;
+use uuid::Uuid;
 
 use version;
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct SessionConfig {
     pub user_agent: String,
     pub device_id: String,
@@ -19,7 +19,6 @@ impl Default for SessionConfig {
         }
     }
 }
-
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
@@ -100,7 +99,7 @@ impl Default for DeviceType {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct PlayerConfig {
     pub bitrate: Bitrate,
     pub onstart: Option<String>,
@@ -117,7 +116,7 @@ impl Default for PlayerConfig {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct ConnectConfig {
     pub name: String,
     pub device_type: DeviceType,

@@ -1,7 +1,7 @@
 use num_bigint::BigUint;
-use num_traits::{Zero, One};
 use num_integer::Integer;
-use rand::{Rng, Rand};
+use num_traits::{One, Zero};
+use rand::{Rand, Rng};
 use std::mem;
 use std::ops::{Mul, Rem, Shr};
 
@@ -9,7 +9,7 @@ mod int128;
 mod spotify_id;
 
 pub use util::int128::u128;
-pub use util::spotify_id::{SpotifyId, FileId};
+pub use util::spotify_id::{FileId, SpotifyId};
 
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
@@ -57,8 +57,8 @@ impl<'s> Iterator for StrChunks<'s> {
     }
 }
 
-pub trait ReadSeek : ::std::io::Read + ::std::io::Seek { }
-impl <T: ::std::io::Read + ::std::io::Seek> ReadSeek for T { }
+pub trait ReadSeek: ::std::io::Read + ::std::io::Seek {}
+impl<T: ::std::io::Read + ::std::io::Seek> ReadSeek for T {}
 
 pub trait Seq {
     fn next(&self) -> Self;
@@ -77,7 +77,7 @@ impl_seq!(u8 u16 u32 u64 usize);
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct SeqGenerator<T: Seq>(T);
 
-impl <T: Seq> SeqGenerator<T> {
+impl<T: Seq> SeqGenerator<T> {
     pub fn new(value: T) -> Self {
         SeqGenerator(value)
     }

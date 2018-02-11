@@ -43,9 +43,11 @@ impl DHLocalKeys {
     }
 
     pub fn shared_secret(&self, remote_key: &[u8]) -> Vec<u8> {
-        let shared_key = util::powm(&BigUint::from_bytes_be(remote_key),
-                                    &self.private_key,
-                                    &DH_PRIME);
+        let shared_key = util::powm(
+            &BigUint::from_bytes_be(remote_key),
+            &self.private_key,
+            &DH_PRIME,
+        );
         shared_key.to_bytes_be()
     }
 }

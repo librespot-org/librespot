@@ -27,18 +27,17 @@ pub struct MercuryResponse {
     pub payload: Vec<Vec<u8>>,
 }
 
-#[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct MercuryError;
 
 impl ToString for MercuryMethod {
     fn to_string(&self) -> String {
         match *self {
-                MercuryMethod::GET => "GET",
-                MercuryMethod::SUB => "SUB",
-                MercuryMethod::UNSUB => "UNSUB",
-                MercuryMethod::SEND => "SEND",
-            }
-            .to_owned()
+            MercuryMethod::GET => "GET",
+            MercuryMethod::SUB => "SUB",
+            MercuryMethod::UNSUB => "UNSUB",
+            MercuryMethod::SEND => "SEND",
+        }.to_owned()
     }
 }
 
@@ -58,7 +57,9 @@ impl MercuryRequest {
         packet.write_u16::<BigEndian>(seq.len() as u16).unwrap();
         packet.write_all(seq).unwrap();
         packet.write_u8(1).unwrap(); // Flags: FINAL
-        packet.write_u16::<BigEndian>(1 + self.payload.len() as u16).unwrap(); // Part count
+        packet
+            .write_u16::<BigEndian>(1 + self.payload.len() as u16)
+            .unwrap(); // Part count
 
         let mut header = protocol::mercury::Header::new();
         header.set_uri(self.uri.clone());
@@ -68,7 +69,9 @@ impl MercuryRequest {
             header.set_content_type(content_type.clone());
         }
 
-        packet.write_u16::<BigEndian>(header.compute_size() as u16).unwrap();
+        packet
+            .write_u16::<BigEndian>(header.compute_size() as u16)
+            .unwrap();
         header.write_to_writer(&mut packet).unwrap();
 
         for p in &self.payload {

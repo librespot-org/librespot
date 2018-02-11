@@ -36,15 +36,15 @@ macro_rules! component {
     }
 }
 
-use std::sync::Mutex;
 use std::cell::UnsafeCell;
+use std::sync::Mutex;
 
 pub struct Lazy<T>(Mutex<bool>, UnsafeCell<Option<T>>);
-unsafe impl <T: Sync> Sync for Lazy<T> {}
-unsafe impl <T: Send> Send for Lazy<T> {}
+unsafe impl<T: Sync> Sync for Lazy<T> {}
+unsafe impl<T: Send> Send for Lazy<T> {}
 
 #[cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
-impl <T> Lazy<T> {
+impl<T> Lazy<T> {
     pub fn new() -> Lazy<T> {
         Lazy(Mutex::new(false), UnsafeCell::new(None))
     }

@@ -1,20 +1,21 @@
-use crypto::sha1::Sha1;
+use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use crypto::hmac::Hmac;
-use crypto::mac::Mac;use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use crypto::mac::Mac;
+use crypto::sha1::Sha1;
+use futures::{Async, Future, Poll};
 use protobuf::{self, Message, MessageStatic};
 use rand::thread_rng;
 use std::io::{self, Read};
 use std::marker::PhantomData;
 use tokio_io::{AsyncRead, AsyncWrite};
 use tokio_io::codec::Framed;
-use tokio_io::io::{write_all, WriteAll, read_exact, ReadExact, Window};
-use futures::{Poll, Async, Future};
+use tokio_io::io::{read_exact, write_all, ReadExact, Window, WriteAll};
 
+use super::codec::APCodec;
 use diffie_hellman::DHLocalKeys;
 use protocol;
-use protocol::keyexchange::{ClientHello, APResponseMessage, ClientResponsePlaintext};
+use protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
 use util;
-use super::codec::APCodec;
 
 pub struct Handshake<T> {
     keys: DHLocalKeys,
@@ -37,7 +38,7 @@ pub fn handshake<T: AsyncRead + AsyncWrite>(connection: T) -> Handshake<T> {
     }
 }
 
-impl <T: AsyncRead + AsyncWrite> Future for Handshake<T> {
+impl<T: AsyncRead + AsyncWrite> Future for Handshake<T> {
     type Item = Framed<T, APCodec>;
     type Error = io::Error;
 
@@ -47,22 +48,22 @@ impl <T: AsyncRead + AsyncWrite> Future for Handshake<T> {
             self.state = match self.state {
                 ClientHello(ref mut write) => {
                     let (connection, accumulator) = try_ready!(write.poll());
-                    
+
                     let read = recv_packet(connection, accumulator);
                     APResponse(read)
                 }
 
                 APResponse(ref mut read) => {
                     let (connection, message, accumulator) = try_ready!(read.poll());
-                    let remote_key = message.get_challenge()
+                    let remote_key = message
+                        .get_challenge()
                         .get_login_crypto_challenge()
                         .get_diffie_hellman()
                         .get_gs()
                         .to_owned();
 
                     let shared_secret = self.keys.shared_secret(&remote_key);
-                    let (challenge, send_key, recv_key) = compute_keys(&shared_secret,
-                                                                       &accumulator);
+                    let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator);
                     let codec = APCodec::new(&send_key, &recv_key);
 
                     let write = client_response(connection, challenge);
@@ -129,15 +130,17 @@ enum RecvPacket<T, M: MessageStatic> {
 }
 
 fn recv_packet<T: AsyncRead, M>(connection: T, acc: Vec<u8>) -> RecvPacket<T, M>
-    where T: Read,
-          M: MessageStatic
+where
+    T: Read,
+    M: MessageStatic,
 {
     RecvPacket::Header(read_into_accumulator(connection, 4, acc), PhantomData)
 }
 
-impl <T: AsyncRead, M> Future for RecvPacket<T, M>
-    where T: Read,
-          M: MessageStatic
+impl<T: AsyncRead, M> Future for RecvPacket<T, M>
+where
+    T: Read,
+    M: MessageStatic,
 {
     type Item = (T, M, Vec<u8>);
     type Error = io::Error;
@@ -167,7 +170,11 @@ impl <T: AsyncRead, M> Future for RecvPacket<T, M>
     }
 }
 
-fn read_into_accumulator<T: AsyncRead>(connection: T, size: usize, mut acc: Vec<u8>) -> ReadExact<T, Window<Vec<u8>>> {
+fn read_into_accumulator<T: AsyncRead>(
+    connection: T,
+    size: usize,
+    mut acc: Vec<u8>,
+) -> ReadExact<T, Window<Vec<u8>>> {
     let offset = acc.len();
     acc.resize(offset + size, 0);
 
@@ -191,5 +198,9 @@ fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<
     mac = Hmac::new(Sha1::new(), &data[..0x14]);
     mac.input(packets);
 
-    (mac.result().code().to_vec(), data[0x14..0x34].to_vec(), data[0x34..0x54].to_vec())
+    (
+        mac.result().code().to_vec(),
+        data[0x14..0x34].to_vec(),
+        data[0x34..0x54].to_vec(),
+    )
 }

@@ -1,7 +1,7 @@
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::{BiLock, mpsc};
-use futures::{Poll, Async, Stream};
+use futures::{Async, Poll, Stream};
+use futures::sync::{mpsc, BiLock};
 use std::collections::HashMap;
 
 use util::SeqGenerator;
@@ -13,7 +13,7 @@ component! {
     }
 }
 
-#[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct ChannelError;
 
 pub struct Channel {
