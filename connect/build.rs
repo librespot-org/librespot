@@ -10,5 +10,4 @@ fn main() {
 
     println!("cargo:rerun-if-changed=src/lib.in.rs");
     println!("cargo:rerun-if-changed=src/spirc.rs");
-
 }

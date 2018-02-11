@@ -1,24 +1,24 @@
+use futures::{Async, Future, Poll, Sink, Stream};
 use futures::future;
-use futures::sync::{oneshot, mpsc};
-use futures::{Future, Stream, Sink, Async, Poll};
+use futures::sync::{mpsc, oneshot};
 use protobuf::{self, Message};
 
 use core::config::ConnectConfig;
 use core::mercury::MercuryError;
 use core::session::Session;
-use core::util::{SpotifyId, SeqGenerator};
+use core::util::{SeqGenerator, SpotifyId};
 use core::version;
 
 use protocol;
-use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
+use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
 
 use playback::mixer::Mixer;
 use playback::player::Player;
 
-use std;
 use rand;
 use rand::Rng;
-use std::time::{UNIX_EPOCH, SystemTime};
+use std;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct SpircTask {
     player: Player,
@@ -47,7 +47,7 @@ pub enum SpircCommand {
     Next,
     VolumeUp,
     VolumeDown,
-    Shutdown
+    Shutdown,
 }
 
 pub struct Spirc {
@@ -152,11 +152,13 @@ fn volume_to_mixer(volume: u16) -> u16 {
     val
 }
 
-
 impl Spirc {
-    pub fn new(config: ConnectConfig, session: Session, player: Player, mixer: Box<Mixer>)
-        -> (Spirc, SpircTask)
-    {
+    pub fn new(
+        config: ConnectConfig,
+        session: Session,
+        player: Player,
+        mixer: Box<Mixer>,
+    ) -> (Spirc, SpircTask) {
         debug!("new Spirc[{}]", session.session_id());
 
         let ident = session.device_id().to_owned();
@@ -164,15 +166,20 @@ impl Spirc {
         let uri = format!("hm://remote/3/user/{}/", session.username());
 
         let subscription = session.mercury().subscribe(&uri as &str);
-        let subscription = subscription.map(|stream| stream.map_err(|_| MercuryError)).flatten_stream();
+        let subscription = subscription
+            .map(|stream| stream.map_err(|_| MercuryError))
+            .flatten_stream();
         let subscription = Box::new(subscription.map(|response| -> Frame {
             let data = response.payload.first().unwrap();
             protobuf::parse_from_bytes(data).unwrap()
         }));
 
-        let sender = Box::new(session.mercury().sender(uri).with(|frame: Frame| {
-            Ok(frame.write_to_bytes().unwrap())
-        }));
+        let sender = Box::new(
+            session
+                .mercury()
+                .sender(uri)
+                .with(|frame: Frame| Ok(frame.write_to_bytes().unwrap())),
+        );
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
@@ -200,9 +207,7 @@ impl Spirc {
             session: session.clone(),
         };
 
-        let spirc = Spirc {
-            commands: cmd_tx,
-        };
+        let spirc = Spirc { commands: cmd_tx };
 
         task.hello();
 
@@ -268,9 +273,7 @@ impl Future for SpircTask {
                         self.handle_end_of_track();
                     }
                     Ok(Async::NotReady) => (),
-                    Err(oneshot::Canceled) => {
-                        self.end_of_track = Box::new(future::empty())
-                    }
+                    Err(oneshot::Canceled) => self.end_of_track = Box::new(future::empty()),
                 }
             }
 
@@ -357,15 +360,18 @@ impl SpircTask {
     }
 
     fn handle_frame(&mut self, frame: Frame) {
-        debug!("{:?} {:?} {} {} {}",
-               frame.get_typ(),
-               frame.get_device_state().get_name(),
-               frame.get_ident(),
-               frame.get_seq_nr(),
-               frame.get_state_update_id());
+        debug!(
+            "{:?} {:?} {} {} {}",
+            frame.get_typ(),
+            frame.get_device_state().get_name(),
+            frame.get_ident(),
+            frame.get_seq_nr(),
+            frame.get_state_update_id()
+        );
 
-        if frame.get_ident() == self.ident ||
-           (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident)) {
+        if frame.get_ident() == self.ident
+            || (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident))
+        {
             return;
         }
 
@@ -383,7 +389,8 @@ impl SpircTask {
                 self.update_tracks(&frame);
 
                 if self.state.get_track().len() > 0 {
-                    self.state.set_position_ms(frame.get_state().get_position_ms());
+                    self.state
+                        .set_position_ms(frame.get_state().get_position_ms());
                     self.state.set_position_measured_at(now_ms() as u64);
 
                     let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
@@ -437,8 +444,7 @@ impl SpircTask {
 
             MessageType::kMessageTypeShuffle => {
                 self.state.set_shuffle(frame.get_state().get_shuffle());
-                if self.state.get_shuffle()
-                {
+                if self.state.get_shuffle() {
                     let current_index = self.state.get_playing_track_index();
                     {
                         let tracks = self.state.mut_track();
@@ -471,14 +477,13 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer.set_volume(volume_to_mixer(frame.get_volume() as u16));
+                self.mixer
+                    .set_volume(volume_to_mixer(frame.get_volume() as u16));
                 self.notify(None);
             }
 
             MessageType::kMessageTypeNotify => {
-                if self.device.get_is_active() &&
-                    frame.get_device_state().get_is_active()
-                {
+                if self.device.get_is_active() && frame.get_device_state().get_is_active() {
                     self.device.set_is_active(false);
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
