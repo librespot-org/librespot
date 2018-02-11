@@ -2,7 +2,6 @@
 name = "librespot"
 version = "0.1.0"
 authors = ["Paul Liétar <paul@lietar.net>"]
-build = "build.rs"
 license = "MIT"
 description = "Open Source Spotify client library"
 keywords = ["spotify"]
@@ -22,10 +21,10 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
+[dependencies.librespot-connect]
+path = "connect"
 [dependencies.librespot-core]
 path = "core"
-[dependencies.librespot-discovery]
-path = "discovery"
 [dependencies.librespot-metadata]
 path = "metadata"
 [dependencies.librespot-playback]
@@ -67,7 +66,7 @@ jackaudio-backend = ["librespot-playback/jackaudio-backend"]
 with-tremor = ["librespot-audio/with-tremor"]
 with-vorbis = ["librespot-audio/with-vorbis"]
 
-with-dns-sd = ["librespot-discovery/with-dns-sd"]
+with-dns-sd = ["librespot-connect/with-dns-sd"]
 
 default = ["librespot-playback/portaudio-backend"]
 
