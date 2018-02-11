@@ -1,5 +1,5 @@
+use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
 use std::collections::VecDeque;
-use futures::{Async, Poll, Future, Sink, StartSend, AsyncSink};
 
 use super::*;
 

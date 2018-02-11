@@ -1,10 +1,15 @@
 #![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
 
-#[macro_use] extern crate error_chain;
-#[macro_use] extern crate futures;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate log;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate error_chain;
+#[macro_use]
+extern crate futures;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate serde_derive;
 
 extern crate base64;
 extern crate byteorder;
@@ -26,7 +31,8 @@ extern crate uuid;
 
 extern crate librespot_protocol as protocol;
 
-#[macro_use] mod component;
+#[macro_use]
+mod component;
 mod apresolve;
 pub mod audio_key;
 pub mod authentication;

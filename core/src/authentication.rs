@@ -10,23 +10,22 @@ use protobuf::ProtobufEnum;
 use rpassword;
 use serde;
 use serde_json;
-use std::io::{self, stderr, Read, Write};
 use std::fs::File;
+use std::io::{self, stderr, Read, Write};
 use std::path::Path;
 
 use protocol::authentication::AuthenticationType;
 
-#[derive(Debug, Clone)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
     pub username: String,
 
-    #[serde(serialize_with="serialize_protobuf_enum")]
-    #[serde(deserialize_with="deserialize_protobuf_enum")]
+    #[serde(serialize_with = "serialize_protobuf_enum")]
+    #[serde(deserialize_with = "deserialize_protobuf_enum")]
     pub auth_type: AuthenticationType,
 
-    #[serde(serialize_with="serialize_base64")]
-    #[serde(deserialize_with="deserialize_base64")]
+    #[serde(serialize_with = "serialize_base64")]
+    #[serde(deserialize_with = "deserialize_base64")]
     pub auth_data: Vec<u8>,
 }
 
@@ -89,13 +88,18 @@ impl Credentials {
         let blob = {
             // Anyone know what this block mode is ?
             let mut data = vec![0u8; encrypted_blob.len()];
-            let mut cipher = aes::ecb_decryptor(aes::KeySize::KeySize192,
-                                                &key,
-                                                crypto::blockmodes::NoPadding);
-            cipher.decrypt(&mut crypto::buffer::RefReadBuffer::new(&encrypted_blob),
-                           &mut crypto::buffer::RefWriteBuffer::new(&mut data),
-                           true)
-                  .unwrap();
+            let mut cipher = aes::ecb_decryptor(
+                aes::KeySize::KeySize192,
+                &key,
+                crypto::blockmodes::NoPadding,
+            );
+            cipher
+                .decrypt(
+                    &mut crypto::buffer::RefReadBuffer::new(&encrypted_blob),
+                    &mut crypto::buffer::RefWriteBuffer::new(&mut data),
+                    true,
+                )
+                .unwrap();
 
             let l = encrypted_blob.len();
             for i in 0..l - 0x10 {
@@ -112,7 +116,7 @@ impl Credentials {
         let auth_type = read_int(&mut cursor).unwrap();
         let auth_type = AuthenticationType::from_i32(auth_type as i32).unwrap();
         read_u8(&mut cursor).unwrap();
-        let auth_data = read_bytes(&mut cursor).unwrap();;
+        let auth_data = read_bytes(&mut cursor).unwrap();
 
         Credentials {
             username: username,
@@ -144,42 +148,49 @@ impl Credentials {
 }
 
 fn serialize_protobuf_enum<T, S>(v: &T, ser: S) -> Result<S::Ok, S::Error>
-    where T: ProtobufEnum, S: serde::Serializer {
-
+where
+    T: ProtobufEnum,
+    S: serde::Serializer,
+{
     serde::Serialize::serialize(&v.value(), ser)
 }
 
 fn deserialize_protobuf_enum<T, D>(de: D) -> Result<T, D::Error>
-    where T: ProtobufEnum, D: serde::Deserializer {
-
-    let v : i32 = try!(serde::Deserialize::deserialize(de));
+where
+    T: ProtobufEnum,
+    D: serde::Deserializer,
+{
+    let v: i32 = try!(serde::Deserialize::deserialize(de));
     T::from_i32(v).ok_or_else(|| serde::de::Error::custom("Invalid enum value"))
 }
 
 fn serialize_base64<T, S>(v: &T, ser: S) -> Result<S::Ok, S::Error>
-    where T: AsRef<[u8]>, S: serde::Serializer {
-
+where
+    T: AsRef<[u8]>,
+    S: serde::Serializer,
+{
     serde::Serialize::serialize(&base64::encode(v.as_ref()), ser)
 }
 
 fn deserialize_base64<D>(de: D) -> Result<Vec<u8>, D::Error>
-    where D: serde::Deserializer {
-
-    let v : String = try!(serde::Deserialize::deserialize(de));
+where
+    D: serde::Deserializer,
+{
+    let v: String = try!(serde::Deserialize::deserialize(de));
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
-pub fn get_credentials(username: Option<String>, password: Option<String>,
-                       cached_credentials: Option<Credentials>)
-    -> Option<Credentials>
-{
+pub fn get_credentials(
+    username: Option<String>,
+    password: Option<String>,
+    cached_credentials: Option<Credentials>,
+) -> Option<Credentials> {
     match (username, password, cached_credentials) {
+        (Some(username), Some(password), _) => Some(Credentials::with_password(username, password)),
 
-        (Some(username), Some(password), _)
-            => Some(Credentials::with_password(username, password)),
-
-        (Some(ref username), _, Some(ref credentials))
-            if *username == credentials.username => Some(credentials.clone()),
+        (Some(ref username), _, Some(ref credentials)) if *username == credentials.username => {
+            Some(credentials.clone())
+        }
 
         (Some(username), None, _) => {
             write!(stderr(), "Password for {}: ", username).unwrap();
@@ -188,8 +199,7 @@ pub fn get_credentials(username: Option<String>, password: Option<String>,
             Some(Credentials::with_password(username.clone(), password))
         }
 
-        (None, _, Some(credentials))
-            => Some(credentials),
+        (None, _, Some(credentials)) => Some(credentials),
 
         (None, _, None) => None,
     }

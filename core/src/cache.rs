@@ -5,8 +5,8 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
-use util::FileId;
 use authentication::Credentials;
+use util::FileId;
 
 #[derive(Clone)]
 pub struct Cache {
@@ -31,7 +31,7 @@ impl Cache {
 
         Cache {
             root: location,
-            use_audio_cache: use_audio_cache
+            use_audio_cache: use_audio_cache,
         }
     }
 }

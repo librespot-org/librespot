@@ -1,6 +1,6 @@
 use std;
 
-#[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[allow(non_camel_case_types)]
 pub struct u128 {
     high: u64,
@@ -28,12 +28,7 @@ impl std::ops::Add<u128> for u128 {
     type Output = u128;
     fn add(self, rhs: u128) -> u128 {
         let low = self.low + rhs.low;
-        let high = self.high + rhs.high +
-                   if low < self.low {
-            1
-        } else {
-            0
-        };
+        let high = self.high + rhs.high + if low < self.low { 1 } else { 0 };
 
         u128::from_parts(high, low)
     }
@@ -43,12 +38,7 @@ impl<'a> std::ops::Add<&'a u128> for u128 {
     type Output = u128;
     fn add(self, rhs: &'a u128) -> u128 {
         let low = self.low + rhs.low;
-        let high = self.high + rhs.high +
-                   if low < self.low {
-            1
-        } else {
-            0
-        };
+        let high = self.high + rhs.high + if low < self.low { 1 } else { 0 };
 
         u128::from_parts(high, low)
     }
@@ -60,20 +50,23 @@ impl std::convert::From<u8> for u128 {
     }
 }
 
-
 impl std::ops::Mul<u128> for u128 {
     type Output = u128;
 
     fn mul(self, rhs: u128) -> u128 {
-        let top: [u64; 4] = [self.high >> 32,
-                             self.high & 0xFFFFFFFF,
-                             self.low >> 32,
-                             self.low & 0xFFFFFFFF];
+        let top: [u64; 4] = [
+            self.high >> 32,
+            self.high & 0xFFFFFFFF,
+            self.low >> 32,
+            self.low & 0xFFFFFFFF,
+        ];
 
-        let bottom: [u64; 4] = [rhs.high >> 32,
-                                rhs.high & 0xFFFFFFFF,
-                                rhs.low >> 32,
-                                rhs.low & 0xFFFFFFFF];
+        let bottom: [u64; 4] = [
+            rhs.high >> 32,
+            rhs.high & 0xFFFFFFFF,
+            rhs.low >> 32,
+            rhs.low & 0xFFFFFFFF,
+        ];
 
         let mut rows = [u128::zero(); 16];
         for i in 0..4 {

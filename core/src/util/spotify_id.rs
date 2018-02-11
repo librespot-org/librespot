@@ -1,16 +1,15 @@
+use byteorder::{BigEndian, ByteOrder};
 use std;
 use std::fmt;
 use util::u128;
-use byteorder::{BigEndian, ByteOrder};
 // Unneeded since 1.21
 #[allow(unused_imports)]
 use std::ascii::AsciiExt;
 
-#[derive(Debug,Copy,Clone,PartialEq,Eq,Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SpotifyId(u128);
 
-const BASE62_DIGITS: &'static [u8] =
-    b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const BASE62_DIGITS: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
 
 impl SpotifyId {
@@ -79,7 +78,7 @@ impl SpotifyId {
     }
 }
 
-#[derive(Copy,Clone,PartialEq,Eq,PartialOrd,Ord,Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FileId(pub [u8; 20]);
 
 impl FileId {
