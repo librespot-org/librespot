@@ -46,4 +46,5 @@ pub mod session;
 pub mod util;
 pub mod version;
 
-include!(concat!(env!("OUT_DIR"), "/lib.rs"));
+#[allow(unused_mut)]
+mod connection;

@@ -35,20 +35,30 @@ pub fn authenticate(
 ) -> Box<Future<Item = (Transport, Credentials), Error = io::Error>> {
     use protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
 
-    let packet = protobuf_init!(ClientResponseEncrypted::new(), {
-        login_credentials => {
-            username: credentials.username,
-            typ: credentials.auth_type,
-            auth_data: credentials.auth_data,
-        },
-        system_info => {
-            cpu_family: CpuFamily::CPU_UNKNOWN,
-            os: Os::OS_UNKNOWN,
-            system_information_string: format!("librespot_{}_{}", version::short_sha(), version::build_id()),
-            device_id: device_id,
-        },
-        version_string: version::version_string(),
-    });
+    let packet = {
+        let mut msg = ClientResponseEncrypted::new();
+        {
+            let mut msg = msg.mut_login_credentials();
+            msg.set_username(credentials.username);
+            msg.set_typ(credentials.auth_type);
+            msg.set_auth_data(credentials.auth_data);
+            msg
+        };
+        {
+            let mut msg = msg.mut_system_info();
+            msg.set_cpu_family(CpuFamily::CPU_UNKNOWN);
+            msg.set_os(Os::OS_UNKNOWN);
+            msg.set_system_information_string(format!(
+                "librespot_{}_{}",
+                version::short_sha(),
+                version::build_id()
+            ));
+            msg.set_device_id(device_id);
+            msg
+        };
+        msg.set_version_string(version::version_string());
+        msg
+    };
 
     let cmd = 0xab;
     let data = packet.write_to_bytes().unwrap();
