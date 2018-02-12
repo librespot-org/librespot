@@ -9,7 +9,7 @@ use std::sync::mpsc::{RecvError, TryRecvError, RecvTimeoutError};
 use std::thread;
 use std::time::Duration;
 
-use core::config::{Bitrate, PlayerConfig};
+use config::{Bitrate, PlayerConfig};
 use core::session::Session;
 use core::util::SpotifyId;
 
