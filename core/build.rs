@@ -33,9 +33,4 @@ pub fn build_id() -> &'static str {{
     if let Err(e) = version_file.write_all(build_id_fn.as_bytes()) {
         println!("{}", e);
     }
-
-    println!("cargo:rerun-if-changed=src/lib.in.rs");
-    println!("cargo:rerun-if-changed=src/connection/mod.rs");
-    println!("cargo:rerun-if-changed=src/connection/codec.rs");
-    println!("cargo:rerun-if-changed=src/connection/handshake.rs");
 }
