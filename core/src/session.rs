@@ -19,7 +19,7 @@ use audio_key::AudioKeyManager;
 use channel::ChannelManager;
 use mercury::MercuryManager;
 
-pub struct SessionData {
+struct SessionData {
     country: String,
     canonical_username: String,
 }
