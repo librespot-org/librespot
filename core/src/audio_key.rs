@@ -5,7 +5,7 @@ use futures::sync::oneshot;
 use std::collections::HashMap;
 use std::io::Write;
 
-use util::{FileId, SpotifyId};
+use spotify_id::{FileId, SpotifyId};
 use util::SeqGenerator;
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]

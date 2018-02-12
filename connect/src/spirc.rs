@@ -6,7 +6,8 @@ use protobuf::{self, Message};
 use core::config::ConnectConfig;
 use core::mercury::MercuryError;
 use core::session::Session;
-use core::util::{SeqGenerator, SpotifyId};
+use core::spotify_id::SpotifyId;
+use core::util::SeqGenerator;
 use core::version;
 
 use protocol;

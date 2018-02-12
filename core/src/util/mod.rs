@@ -6,10 +6,8 @@ use std::mem;
 use std::ops::{Mul, Rem, Shr};
 
 mod int128;
-mod spotify_id;
 
 pub use util::int128::u128;
-pub use util::spotify_id::{FileId, SpotifyId};
 
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()

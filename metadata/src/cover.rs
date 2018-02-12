@@ -3,7 +3,7 @@ use std::io::Write;
 
 use core::channel::ChannelData;
 use core::session::Session;
-use core::util::FileId;
+use core::spotify_id::FileId;
 
 pub fn get(session: &Session, file: FileId) -> ChannelData {
     let (channel_id, channel) = session.channel().allocate();

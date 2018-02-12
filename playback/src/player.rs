@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use config::{Bitrate, PlayerConfig};
 use core::session::Session;
-use core::util::SpotifyId;
+use core::spotify_id::SpotifyId;
 
 use audio_backend::Sink;
 use audio::{AudioFile, AudioDecrypt};
