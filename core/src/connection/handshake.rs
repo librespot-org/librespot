@@ -82,22 +82,27 @@ impl<T: AsyncRead + AsyncWrite> Future for Handshake<T> {
 }
 
 fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8>> {
-    let packet = protobuf_init!(ClientHello::new(), {
-        build_info => {
-            product: protocol::keyexchange::Product::PRODUCT_PARTNER,
-            platform: protocol::keyexchange::Platform::PLATFORM_LINUX_X86,
-            version: 0x10800000000,
-        },
-        cryptosuites_supported => [
-            protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON,
-        ],
-        login_crypto_hello.diffie_hellman => {
-            gc: gc,
-            server_keys_known: 1,
-        },
-        client_nonce: util::rand_vec(&mut thread_rng(), 0x10),
-        padding: vec![0x1e],
-    });
+    let mut packet = ClientHello::new();
+    packet
+        .mut_build_info()
+        .set_product(protocol::keyexchange::Product::PRODUCT_PARTNER);
+    packet
+        .mut_build_info()
+        .set_platform(protocol::keyexchange::Platform::PLATFORM_LINUX_X86);
+    packet.mut_build_info().set_version(0x10800000000);
+    packet
+        .mut_cryptosuites_supported()
+        .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);
+    packet
+        .mut_login_crypto_hello()
+        .mut_diffie_hellman()
+        .set_gc(gc);
+    packet
+        .mut_login_crypto_hello()
+        .mut_diffie_hellman()
+        .set_server_keys_known(1);
+    packet.set_client_nonce(util::rand_vec(&mut thread_rng(), 0x10));
+    packet.set_padding(vec![0x1e]);
 
     let mut buffer = vec![0, 4];
     let size = 2 + 4 + packet.compute_size();
@@ -108,13 +113,13 @@ fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8
 }
 
 fn client_response<T: AsyncWrite>(connection: T, challenge: Vec<u8>) -> WriteAll<T, Vec<u8>> {
-    let packet = protobuf_init!(ClientResponsePlaintext::new(), {
-        login_crypto_response.diffie_hellman => {
-            hmac: challenge
-        },
-        pow_response => {},
-        crypto_response => {},
-    });
+    let mut packet = ClientResponsePlaintext::new();
+    packet
+        .mut_login_crypto_response()
+        .mut_diffie_hellman()
+        .set_hmac(challenge);
+    packet.mut_pow_response();
+    packet.mut_crypto_response();
 
     let mut buffer = vec![];
     let size = 4 + packet.compute_size();

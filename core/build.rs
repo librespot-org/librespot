@@ -1,4 +1,3 @@
-extern crate protobuf_macros;
 extern crate rand;
 extern crate vergen;
 
@@ -34,11 +33,4 @@ pub fn build_id() -> &'static str {{
     if let Err(e) = version_file.write_all(build_id_fn.as_bytes()) {
         println!("{}", e);
     }
-
-    protobuf_macros::expand("src/lib.in.rs", &out.join("lib.rs")).unwrap();
-
-    println!("cargo:rerun-if-changed=src/lib.in.rs");
-    println!("cargo:rerun-if-changed=src/connection/mod.rs");
-    println!("cargo:rerun-if-changed=src/connection/codec.rs");
-    println!("cargo:rerun-if-changed=src/connection/handshake.rs");
 }

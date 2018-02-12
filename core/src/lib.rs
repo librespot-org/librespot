@@ -39,11 +39,10 @@ pub mod authentication;
 pub mod cache;
 pub mod channel;
 pub mod config;
+mod connection;
 pub mod diffie_hellman;
 pub mod keymaster;
 pub mod mercury;
 pub mod session;
 pub mod util;
 pub mod version;
-
-include!(concat!(env!("OUT_DIR"), "/lib.rs"));
