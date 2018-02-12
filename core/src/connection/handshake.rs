@@ -82,29 +82,27 @@ impl<T: AsyncRead + AsyncWrite> Future for Handshake<T> {
 }
 
 fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8>> {
-    let packet = {
-        let mut msg = ClientHello::new();
-        {
-            let mut msg = msg.mut_build_info();
-            msg.set_product(protocol::keyexchange::Product::PRODUCT_PARTNER);
-            msg.set_platform(protocol::keyexchange::Platform::PLATFORM_LINUX_X86);
-            msg.set_version(0x10800000000);
-            msg
-        };
-        {
-            let repeated = msg.mut_cryptosuites_supported();
-            repeated.push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON)
-        };
-        {
-            let mut msg = msg.mut_login_crypto_hello().mut_diffie_hellman();
-            msg.set_gc(gc);
-            msg.set_server_keys_known(1);
-            msg
-        };
-        msg.set_client_nonce(util::rand_vec(&mut thread_rng(), 0x10));
-        msg.set_padding(vec![0x1e]);
-        msg
-    };
+    let mut packet = ClientHello::new();
+    packet
+        .mut_build_info()
+        .set_product(protocol::keyexchange::Product::PRODUCT_PARTNER);
+    packet
+        .mut_build_info()
+        .set_platform(protocol::keyexchange::Platform::PLATFORM_LINUX_X86);
+    packet.mut_build_info().set_version(0x10800000000);
+    packet
+        .mut_cryptosuites_supported()
+        .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);
+    packet
+        .mut_login_crypto_hello()
+        .mut_diffie_hellman()
+        .set_gc(gc);
+    packet
+        .mut_login_crypto_hello()
+        .mut_diffie_hellman()
+        .set_server_keys_known(1);
+    packet.set_client_nonce(util::rand_vec(&mut thread_rng(), 0x10));
+    packet.set_padding(vec![0x1e]);
 
     let mut buffer = vec![0, 4];
     let size = 2 + 4 + packet.compute_size();
@@ -115,17 +113,13 @@ fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8
 }
 
 fn client_response<T: AsyncWrite>(connection: T, challenge: Vec<u8>) -> WriteAll<T, Vec<u8>> {
-    let packet = {
-        let mut msg = ClientResponsePlaintext::new();
-        {
-            let mut msg = msg.mut_login_crypto_response().mut_diffie_hellman();
-            msg.set_hmac(challenge);
-            msg
-        };
-        msg.mut_pow_response();
-        msg.mut_crypto_response();
-        msg
-    };
+    let mut packet = ClientResponsePlaintext::new();
+    packet
+        .mut_login_crypto_response()
+        .mut_diffie_hellman()
+        .set_hmac(challenge);
+    packet.mut_pow_response();
+    packet.mut_crypto_response();
 
     let mut buffer = vec![];
     let size = 4 + packet.compute_size();
