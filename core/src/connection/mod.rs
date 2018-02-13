@@ -34,6 +34,7 @@ pub fn authenticate(
     device_id: String,
 ) -> Box<Future<Item = (Transport, Credentials), Error = io::Error>> {
     use protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
+    use protocol::keyexchange::APLoginFailed;
 
     let mut packet = ClientResponseEncrypted::new();
     packet
@@ -79,7 +80,11 @@ pub fn authenticate(
                     Ok((transport, reusable_credentials))
                 }
 
-                Some((0xad, _)) => panic!("Authentication failed"),
+                Some((0xad, data)) => {
+                    let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref()).unwrap();
+                    panic!("Authentication failed with reason: {:?}", error_data.get_error_code())
+                }
+
                 Some((cmd, _)) => panic!("Unexpected packet {:?}", cmd),
                 None => panic!("EOF"),
             }),
