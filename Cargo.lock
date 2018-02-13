@@ -327,7 +327,7 @@ dependencies = [
  "protobuf_macros 0.6.0 (git+https://github.com/plietar/rust-protobuf-macros)",
  "rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rust-crypto 0.2.36 (git+https://github.com/awmath/rust-crypto.git?branch=avx2)",
+ "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -350,7 +350,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.1.41 (registry+https://github.com/rust-lang/crates.io-index)",
- "rust-crypto 0.2.36 (git+https://github.com/awmath/rust-crypto.git?branch=avx2)",
+ "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tremor 0.1.0 (git+https://github.com/plietar/rust-tremor)",
  "vorbis 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -373,7 +373,7 @@ dependencies = [
  "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf_macros 0.6.0 (git+https://github.com/plietar/rust-protobuf-macros)",
  "rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)",
- "rust-crypto 0.2.36 (git+https://github.com/awmath/rust-crypto.git?branch=avx2)",
+ "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -400,7 +400,7 @@ dependencies = [
  "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "rpassword 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rust-crypto 0.2.36 (git+https://github.com/awmath/rust-crypto.git?branch=avx2)",
+ "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.9.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -736,6 +736,12 @@ dependencies = [
  "rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.39 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "rust-crypto"
+version = "0.2.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+replace = "rust-crypto 0.2.36 (git+https://github.com/awmath/rust-crypto.git?branch=avx2)"
 
 [[package]]
 name = "rustc-serialize"
@@ -1245,6 +1251,7 @@ dependencies = [
 "checksum relay 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f301bafeb60867c85170031bdb2fcf24c8041f33aee09e7b116a58d4e9f781c5"
 "checksum rpassword 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ec4bdede957362ec6fdd550f7e79c6d14cad2bc26b2d062786234c6ee0cb27bb"
 "checksum rust-crypto 0.2.36 (git+https://github.com/awmath/rust-crypto.git?branch=avx2)" = "<none>"
+"checksum rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)" = "f76d05d3993fd5f4af9434e8e436db163a12a9d40e1a58a726f27a01dfd12a2a"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
 "checksum safemem 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e27a8b19b835f7aea908818e871f5cc3a5a186550c30773be987e155e8163d8f"
 "checksum scoped-tls 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f417c22df063e9450888a7561788e9bd46d3bb3c1466435b4eccb903807f147d"
