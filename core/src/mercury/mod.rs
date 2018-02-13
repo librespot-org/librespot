@@ -51,7 +51,7 @@ impl MercuryManager {
         seq
     }
 
-    pub fn request(&self, req: MercuryRequest) -> MercuryFuture<MercuryResponse> {
+    fn request(&self, req: MercuryRequest) -> MercuryFuture<MercuryResponse> {
         let (tx, rx) = oneshot::channel();
 
         let pending = MercuryPending {
