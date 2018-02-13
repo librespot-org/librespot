@@ -6,7 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use authentication::Credentials;
-use util::FileId;
+use spotify_id::FileId;
 
 #[derive(Clone)]
 pub struct Cache {

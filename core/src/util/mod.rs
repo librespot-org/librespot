@@ -6,10 +6,8 @@ use std::mem;
 use std::ops::{Mul, Rem, Shr};
 
 mod int128;
-mod spotify_id;
 
 pub use util::int128::u128;
-pub use util::spotify_id::{FileId, SpotifyId};
 
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
@@ -29,32 +27,6 @@ pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
     }
 
     result
-}
-
-pub struct StrChunks<'s>(&'s str, usize);
-
-pub trait StrChunksExt {
-    fn chunks(&self, size: usize) -> StrChunks;
-}
-
-impl StrChunksExt for str {
-    fn chunks(&self, size: usize) -> StrChunks {
-        StrChunks(self, size)
-    }
-}
-
-impl<'s> Iterator for StrChunks<'s> {
-    type Item = &'s str;
-    fn next(&mut self) -> Option<&'s str> {
-        let &mut StrChunks(data, size) = self;
-        if data.is_empty() {
-            None
-        } else {
-            let ret = Some(&data[..size]);
-            self.0 = &data[size..];
-            ret
-        }
-    }
 }
 
 pub trait ReadSeek: ::std::io::Read + ::std::io::Seek {}

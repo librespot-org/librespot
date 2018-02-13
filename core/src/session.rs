@@ -19,12 +19,12 @@ use audio_key::AudioKeyManager;
 use channel::ChannelManager;
 use mercury::MercuryManager;
 
-pub struct SessionData {
+struct SessionData {
     country: String,
     canonical_username: String,
 }
 
-pub struct SessionInternal {
+struct SessionInternal {
     config: SessionConfig,
     data: RwLock<SessionData>,
 
@@ -43,7 +43,7 @@ pub struct SessionInternal {
 static SESSION_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
 
 #[derive(Clone)]
-pub struct Session(pub Arc<SessionInternal>);
+pub struct Session(Arc<SessionInternal>);
 
 pub fn device_id(name: &str) -> String {
     let mut h = Sha1::new();
@@ -226,7 +226,7 @@ impl Session {
 }
 
 #[derive(Clone)]
-pub struct SessionWeak(pub Weak<SessionInternal>);
+pub struct SessionWeak(Weak<SessionInternal>);
 
 impl SessionWeak {
     fn try_upgrade(&self) -> Option<Session> {
