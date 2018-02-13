@@ -14,7 +14,6 @@ use linear_map::LinearMap;
 use core::mercury::MercuryError;
 use core::session::Session;
 use core::spotify_id::{FileId, SpotifyId};
-use core::util::StrChunksExt;
 
 pub use protocol::metadata::AudioFile_Format as FileFormat;
 
@@ -212,6 +211,32 @@ impl Metadata for Artist {
             id: SpotifyId::from_raw(msg.get_gid()),
             name: msg.get_name().to_owned(),
             top_tracks: top_tracks,
+        }
+    }
+}
+
+struct StrChunks<'s>(&'s str, usize);
+
+trait StrChunksExt {
+    fn chunks(&self, size: usize) -> StrChunks;
+}
+
+impl StrChunksExt for str {
+    fn chunks(&self, size: usize) -> StrChunks {
+        StrChunks(self, size)
+    }
+}
+
+impl<'s> Iterator for StrChunks<'s> {
+    type Item = &'s str;
+    fn next(&mut self) -> Option<&'s str> {
+        let &mut StrChunks(data, size) = self;
+        if data.is_empty() {
+            None
+        } else {
+            let ret = Some(&data[..size]);
+            self.0 = &data[size..];
+            ret
         }
     }
 }
