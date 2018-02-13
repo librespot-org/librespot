@@ -3,6 +3,7 @@ extern crate env_logger;
 extern crate futures;
 extern crate getopts;
 extern crate librespot;
+extern crate sentry_rs;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_signal;
@@ -14,6 +15,9 @@ use std::io::{self, stderr, Write};
 use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
+use std::thread;
+use sentry_rs::models::SentryCredentials;
+use sentry_rs::Sentry;
 use tokio_core::reactor::{Handle, Core};
 use tokio_io::IoStream;
 use std::mem;
@@ -56,6 +60,25 @@ fn setup_logging(verbose: bool) {
             builder.init().unwrap();
         }
     }
+}
+
+fn setup_error_reporting() {
+    thread::spawn(move || {
+        let credentials = SentryCredentials {
+            key: env::var("SENTRY_KEY").unwrap_or("576fd4f54c2346e9aa9b3fd733956d89".to_owned()),
+            secret: env::var("SENTRY_SECRET").unwrap_or("d34412cb53e14625908209b1ce7d00c3".to_owned()),
+            host: Some(env::var("SENTRY_HOST").unwrap_or("sentry.io".to_owned())),
+            project_id: env::var("SENTRY_PROJECT_ID").unwrap_or("279607".to_owned()),
+        };
+        const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
+        let sentry = Sentry::new(
+            format!("librespot_{}_{}", version::short_sha(), version::build_id()),
+            format!("{}", VERSION.unwrap_or("0.1.0")),
+            format!("Debug"),
+            credentials
+        );
+        sentry.register_panic_handler();
+    });
 }
 
 fn list_backends() {
@@ -355,6 +378,7 @@ impl Future for Main {
 }
 
 fn main() {
+    setup_error_reporting();
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
