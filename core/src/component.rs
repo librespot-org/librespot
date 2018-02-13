@@ -4,7 +4,7 @@ macro_rules! component {
         pub struct $name(::std::sync::Arc<($crate::session::SessionWeak, ::std::sync::Mutex<$inner>)>);
         impl $name {
             #[allow(dead_code)]
-            pub fn new(session: $crate::session::SessionWeak) -> $name {
+            pub(crate) fn new(session: $crate::session::SessionWeak) -> $name {
                 debug!(target:"librespot::component", "new {}", stringify!($name));
 
                 $name(::std::sync::Arc::new((session, ::std::sync::Mutex::new($inner {
