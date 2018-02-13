@@ -99,7 +99,7 @@ fn setup(args: &[String]) -> Setup {
         .optopt("p", "password", "Password", "PASSWORD")
         .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
-        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
+        .optopt("", "device", "Audio device to use. Use '?' to list options if using portaudio", "DEVICE")
         .optopt("", "mixer", "Mixer to use", "MIXER")
         .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME")
         .optopt("", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT");
