@@ -355,6 +355,7 @@ impl Future for Main {
 }
 
 fn main() {
+    env::set_var("RUST_BACKTRACE", "full");
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
