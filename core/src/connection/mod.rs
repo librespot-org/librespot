@@ -82,7 +82,10 @@ pub fn authenticate(
 
                 Some((0xad, data)) => {
                     let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref()).unwrap();
-                    panic!("Authentication failed with reason: {:?}", error_data.get_error_code())
+                    panic!(
+                        "Authentication failed with reason: {:?}",
+                        error_data.get_error_code()
+                    )
                 }
 
                 Some((cmd, _)) => panic!("Unexpected packet {:?}", cmd),
