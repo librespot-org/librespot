@@ -29,6 +29,11 @@ mod pulseaudio;
 #[cfg(feature = "pulseaudio-backend")]
 use self::pulseaudio::PulseAudioSink;
 
+#[cfg(feature = "jackaudio-backend")]
+mod jackaudio;
+#[cfg(feature = "jackaudio-backend")]
+use self::jackaudio::JackSink;
+
 mod pipe;
 use self::pipe::StdoutSink;
 
@@ -41,6 +46,8 @@ pub const BACKENDS : &'static [
     ("portaudio", mk_sink::<PortAudioSink>),
     #[cfg(feature = "pulseaudio-backend")]
     ("pulseaudio", mk_sink::<PulseAudioSink>),
+    #[cfg(feature = "jackaudio-backend")]
+    ("jackaudio", mk_sink::<JackSink>),
     ("pipe", mk_sink::<StdoutSink>),
 ];
 

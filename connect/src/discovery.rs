@@ -1,12 +1,18 @@
 use base64;
+use crypto;
 use crypto::digest::Digest;
 use crypto::mac::Mac;
-use crypto;
+use futures::{Future, Poll, Stream};
 use futures::sync::mpsc;
-use futures::{Future, Stream, Poll};
-use hyper::server::{Service, Request, Response, Http};
 use hyper::{self, Get, Post, StatusCode};
+use hyper::server::{Http, Request, Response, Service};
+
+#[cfg(feature = "with-dns-sd")]
+use dns_sd::DNSService;
+
+#[cfg(not(feature = "with-dns-sd"))]
 use mdns;
+
 use num_bigint::BigUint;
 use rand;
 use std::collections::BTreeMap;
@@ -15,10 +21,10 @@ use std::sync::Arc;
 use tokio_core::reactor::Handle;
 use url;
 
-use core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
 use core::authentication::Credentials;
-use core::util;
 use core::config::ConnectConfig;
+use core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
+use core::util;
 
 #[derive(Clone)]
 struct Discovery(Arc<DiscoveryInner>);
@@ -31,9 +37,10 @@ struct DiscoveryInner {
 }
 
 impl Discovery {
-    fn new(config: ConnectConfig, device_id: String)
-        -> (Discovery, mpsc::UnboundedReceiver<Credentials>)
-    {
+    fn new(
+        config: ConnectConfig,
+        device_id: String,
+    ) -> (Discovery, mpsc::UnboundedReceiver<Credentials>) {
         let (tx, rx) = mpsc::unbounded();
 
         let key_data = util::rand_vec(&mut rand::thread_rng(), 95);
@@ -53,9 +60,10 @@ impl Discovery {
 }
 
 impl Discovery {
-    fn handle_get_info(&self, _params: &BTreeMap<String, String>)
-        -> ::futures::Finished<Response, hyper::Error>
-    {
+    fn handle_get_info(
+        &self,
+        _params: &BTreeMap<String, String>,
+    ) -> ::futures::Finished<Response, hyper::Error> {
         let public_key = self.0.public_key.to_bytes_be();
         let public_key = base64::encode(&public_key);
 
@@ -79,9 +87,10 @@ impl Discovery {
         ::futures::finished(Response::new().with_body(body))
     }
 
-    fn handle_add_user(&self, params: &BTreeMap<String, String>)
-        -> ::futures::Finished<Response, hyper::Error>
-    {
+    fn handle_add_user(
+        &self,
+        params: &BTreeMap<String, String>,
+    ) -> ::futures::Finished<Response, hyper::Error> {
         let username = params.get("userName").unwrap();
         let encrypted_blob = params.get("blob").unwrap();
         let client_key = params.get("clientKey").unwrap();
@@ -127,8 +136,8 @@ impl Discovery {
 
         let decrypted = {
             let mut data = vec![0u8; encrypted.len()];
-            let mut cipher = crypto::aes::ctr(crypto::aes::KeySize::KeySize128,
-                                              &encryption_key[0..16], iv);
+            let mut cipher =
+                crypto::aes::ctr(crypto::aes::KeySize::KeySize128, &encryption_key[0..16], iv);
             cipher.process(encrypted, &mut data);
             String::from_utf8(data).unwrap()
         };
@@ -147,9 +156,7 @@ impl Discovery {
         ::futures::finished(Response::new().with_body(body))
     }
 
-    fn not_found(&self)
-        -> ::futures::Finished<Response, hyper::Error>
-    {
+    fn not_found(&self) -> ::futures::Finished<Response, hyper::Error> {
         ::futures::finished(Response::new().with_status(StatusCode::NotFound))
     }
 }
@@ -173,40 +180,61 @@ impl Service for Discovery {
         }
 
         let this = self.clone();
-        Box::new(body.fold(Vec::new(), |mut acc, chunk| {
-            acc.extend_from_slice(chunk.as_ref());
-            Ok::<_, hyper::Error>(acc)
-        }).map(move |body| {
-            params.extend(url::form_urlencoded::parse(&body).into_owned());
-            params
-        }).and_then(move |params| {
-            match (method, params.get("action").map(AsRef::as_ref)) {
-                (Get, Some("getInfo")) => this.handle_get_info(&params),
-                (Post, Some("addUser")) => this.handle_add_user(&params),
-                _ => this.not_found(),
-            }
-        }))
+        Box::new(
+            body.fold(Vec::new(), |mut acc, chunk| {
+                acc.extend_from_slice(chunk.as_ref());
+                Ok::<_, hyper::Error>(acc)
+            }).map(move |body| {
+                    params.extend(url::form_urlencoded::parse(&body).into_owned());
+                    params
+                })
+                .and_then(
+                    move |params| match (method, params.get("action").map(AsRef::as_ref)) {
+                        (Get, Some("getInfo")) => this.handle_get_info(&params),
+                        (Post, Some("addUser")) => this.handle_add_user(&params),
+                        _ => this.not_found(),
+                    },
+                ),
+        )
     }
 }
 
+#[cfg(feature = "with-dns-sd")]
+pub struct DiscoveryStream {
+    credentials: mpsc::UnboundedReceiver<Credentials>,
+    _svc: DNSService,
+}
+
+#[cfg(not(feature = "with-dns-sd"))]
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
     _svc: mdns::Service,
 }
 
-pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
-    -> io::Result<DiscoveryStream>
-{
+pub fn discovery(
+    handle: &Handle,
+    config: ConnectConfig,
+    device_id: String,
+    port: u16,
+) -> io::Result<DiscoveryStream> {
     let (discovery, creds_rx) = Discovery::new(config.clone(), device_id);
 
     let serve = {
         let http = Http::new();
-        http.serve_addr_handle(&"0.0.0.0:0".parse().unwrap(), &handle, move || Ok(discovery.clone())).unwrap()
+        debug!("Zeroconf server listening on 0.0.0.0:{}", port);
+        http.serve_addr_handle(
+            &format!("0.0.0.0:{}", port).parse().unwrap(),
+            &handle,
+            move || Ok(discovery.clone()),
+        ).unwrap()
     };
-    let addr = serve.incoming_ref().local_addr();
+
+    let s_port = serve.incoming_ref().local_addr().port();
+
     let server_future = {
         let handle = handle.clone();
-        serve.for_each(move |connection| {
+        serve
+            .for_each(move |connection| {
                 handle.spawn(connection.then(|_| Ok(())));
                 Ok(())
             })
@@ -214,12 +242,26 @@ pub fn discovery(handle: &Handle, config: ConnectConfig, device_id: String)
     };
     handle.spawn(server_future);
 
+    #[cfg(feature = "with-dns-sd")]
+    let svc = DNSService::register(
+        Some(&*config.name),
+        "_spotify-connect._tcp",
+        None,
+        None,
+        s_port,
+        &["VERSION=1.0", "CPath=/"],
+    ).unwrap();
+
+    #[cfg(not(feature = "with-dns-sd"))]
     let responder = mdns::Responder::spawn(&handle)?;
+
+    #[cfg(not(feature = "with-dns-sd"))]
     let svc = responder.register(
         "_spotify-connect._tcp".to_owned(),
         config.name,
-        addr.port(),
-        &["VERSION=1.0", "CPath=/"]);
+        s_port,
+        &["VERSION=1.0", "CPath=/"],
+    );
 
     Ok(DiscoveryStream {
         credentials: creds_rx,

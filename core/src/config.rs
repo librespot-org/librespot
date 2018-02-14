@@ -1,10 +1,10 @@
-use uuid::Uuid;
-use std::str::FromStr;
 use std::fmt;
+use std::str::FromStr;
+use uuid::Uuid;
 
 use version;
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct SessionConfig {
     pub user_agent: String,
     pub device_id: String,
@@ -17,32 +17,6 @@ impl Default for SessionConfig {
             user_agent: version::version_string(),
             device_id: device_id,
         }
-    }
-}
-
-
-#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub enum Bitrate {
-    Bitrate96,
-    Bitrate160,
-    Bitrate320,
-}
-
-impl FromStr for Bitrate {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "96" => Ok(Bitrate::Bitrate96),
-            "160" => Ok(Bitrate::Bitrate160),
-            "320" => Ok(Bitrate::Bitrate320),
-            _ => Err(()),
-        }
-    }
-}
-
-impl Default for Bitrate {
-    fn default() -> Bitrate {
-        Bitrate::Bitrate160
     }
 }
 
@@ -100,24 +74,7 @@ impl Default for DeviceType {
     }
 }
 
-#[derive(Clone,Debug)]
-pub struct PlayerConfig {
-    pub bitrate: Bitrate,
-    pub onstart: Option<String>,
-    pub onstop: Option<String>,
-}
-
-impl Default for PlayerConfig {
-    fn default() -> PlayerConfig {
-        PlayerConfig {
-            bitrate: Bitrate::default(),
-            onstart: None,
-            onstop: None,
-        }
-    }
-}
-
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct ConnectConfig {
     pub name: String,
     pub device_type: DeviceType,

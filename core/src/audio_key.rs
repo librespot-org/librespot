@@ -1,17 +1,17 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
-use futures::sync::oneshot;
 use futures::{Async, Future, Poll};
+use futures::sync::oneshot;
 use std::collections::HashMap;
 use std::io::Write;
 
+use spotify_id::{FileId, SpotifyId};
 use util::SeqGenerator;
-use util::{SpotifyId, FileId};
 
-#[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct AudioKey(pub [u8; 16]);
 
-#[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct AudioKeyError;
 
 component! {
@@ -22,7 +22,7 @@ component! {
 }
 
 impl AudioKeyManager {
-    pub fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         let seq = BigEndian::read_u32(data.split_to(4).as_ref());
 
         let sender = self.lock(|inner| inner.pending.remove(&seq));
@@ -35,7 +35,11 @@ impl AudioKeyManager {
                     let _ = sender.send(Ok(AudioKey(key)));
                 }
                 0xe => {
-                    warn!("error audio key {:x} {:x}", data.as_ref()[0], data.as_ref()[1]);
+                    warn!(
+                        "error audio key {:x} {:x}",
+                        data.as_ref()[0],
+                        data.as_ref()[1]
+                    );
                     let _ = sender.send(Err(AudioKeyError));
                 }
                 _ => (),
@@ -68,7 +72,7 @@ impl AudioKeyManager {
 }
 
 pub struct AudioKeyFuture<T>(oneshot::Receiver<Result<T, AudioKeyError>>);
-impl <T> Future for AudioKeyFuture<T> {
+impl<T> Future for AudioKeyFuture<T> {
     type Item = T;
     type Error = AudioKeyError;
 
@@ -81,4 +85,3 @@ impl <T> Future for AudioKeyFuture<T> {
         }
     }
 }
-

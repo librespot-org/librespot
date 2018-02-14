@@ -16,7 +16,7 @@ As the origin by [plietar](https://github.com/plietar/) is no longer actively ma
 More information can be found in the [wiki](https://github.com/librespot-org/librespot/wiki)
 
 # Building
-Rust 1.18.0 or later is required to build librespot.
+Rust 1.20.0 or later is required to build librespot.
 
 **If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build. This should have been fixed in more recent versions of Homebrew, but we're leaving this notice here as a warning.**
 
@@ -56,9 +56,11 @@ https://gitter.im/sashahilton00/spotify-connect-resources
 ## To-Do/Feature Requests
 If there is a feature request that is being considered, or has been widely requested, it should be listed below. Please do not use this for bug reports or special use case feature requests.
 
+- [ ] Add support for contexts (used by dynamic playlists, Spotify Radio, green now-playing bar, etc.) ([#57](https://github.com/librespot-org/librespot/issues/57))
 - [ ] Document the Spotify Protocol and provide reference example.
 - [ ] Implement API to allow wrappers to be written for librespot.
-- [ ] Logarithmic volume scaling ([#10](https://github.com/librespot-org/librespot/issues/10))
+- [x] Logarithmic volume scaling ([#10](https://github.com/librespot-org/librespot/issues/10))
+- [ ] Fix Shuffle & Repeat functionality
 - [ ] Provide automatic release binaries for download
 - [ ] Provide an adequate method for exporting metadata ([#7](https://github.com/librespot-org/librespot/issues/7))
   - [ ] Provide API Documentation

@@ -4,7 +4,7 @@ macro_rules! component {
         pub struct $name(::std::sync::Arc<($crate::session::SessionWeak, ::std::sync::Mutex<$inner>)>);
         impl $name {
             #[allow(dead_code)]
-            pub fn new(session: $crate::session::SessionWeak) -> $name {
+            pub(crate) fn new(session: $crate::session::SessionWeak) -> $name {
                 debug!(target:"librespot::component", "new {}", stringify!($name));
 
                 $name(::std::sync::Arc::new((session, ::std::sync::Mutex::new($inner {
@@ -36,20 +36,20 @@ macro_rules! component {
     }
 }
 
-use std::sync::Mutex;
 use std::cell::UnsafeCell;
+use std::sync::Mutex;
 
-pub struct Lazy<T>(Mutex<bool>, UnsafeCell<Option<T>>);
-unsafe impl <T: Sync> Sync for Lazy<T> {}
-unsafe impl <T: Send> Send for Lazy<T> {}
+pub(crate) struct Lazy<T>(Mutex<bool>, UnsafeCell<Option<T>>);
+unsafe impl<T: Sync> Sync for Lazy<T> {}
+unsafe impl<T: Send> Send for Lazy<T> {}
 
 #[cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
-impl <T> Lazy<T> {
-    pub fn new() -> Lazy<T> {
+impl<T> Lazy<T> {
+    pub(crate) fn new() -> Lazy<T> {
         Lazy(Mutex::new(false), UnsafeCell::new(None))
     }
 
-    pub fn get<F: FnOnce() -> T>(&self, f: F) -> &T {
+    pub(crate) fn get<F: FnOnce() -> T>(&self, f: F) -> &T {
         let mut inner = self.0.lock().unwrap();
         if !*inner {
             unsafe {

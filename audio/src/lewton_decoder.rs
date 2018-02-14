@@ -24,7 +24,9 @@ impl <R> VorbisDecoder<R>
     }
 
     pub fn next_packet(&mut self) -> Result<Option<VorbisPacket>, VorbisError> {
+        use self::lewton::OggReadError::NoCapturePatternFound;
         use self::lewton::VorbisError::BadAudio;
+        use self::lewton::VorbisError::OggError;
         use self::lewton::audio::AudioReadError::AudioIsHeader;
         loop {
             match self.0.read_dec_packet_itl() {
@@ -32,6 +34,7 @@ impl <R> VorbisDecoder<R>
                 Ok(None) => return Ok(None),
 
                 Err(BadAudio(AudioIsHeader)) => (),
+                Err(OggError(NoCapturePatternFound)) => (),
                 Err(err) => return Err(err.into()),
             }
         }

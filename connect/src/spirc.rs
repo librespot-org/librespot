@@ -1,22 +1,25 @@
+use futures::{Async, Future, Poll, Sink, Stream};
 use futures::future;
-use futures::sync::{oneshot, mpsc};
-use futures::{Future, Stream, Sink, Async, Poll};
+use futures::sync::{mpsc, oneshot};
 use protobuf::{self, Message};
 
 use core::config::ConnectConfig;
 use core::mercury::MercuryError;
 use core::session::Session;
-use core::util::{now_ms, SpotifyId, SeqGenerator};
+use core::spotify_id::SpotifyId;
+use core::util::SeqGenerator;
 use core::version;
 
 use protocol;
-use protocol::spirc::{PlayStatus, State, MessageType, Frame, DeviceState};
+use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
 
-use mixer::Mixer;
-use player::Player;
+use playback::mixer::Mixer;
+use playback::player::Player;
 
 use rand;
 use rand::Rng;
+use std;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct SpircTask {
     player: Player,
@@ -45,11 +48,19 @@ pub enum SpircCommand {
     Next,
     VolumeUp,
     VolumeDown,
-    Shutdown
+    Shutdown,
 }
 
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
+}
+
+fn now_ms() -> i64 {
+    let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(dur) => dur,
+        Err(err) => err.duration(),
+    };
+    (dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000_000) as u64) as i64
 }
 
 fn initial_state() -> State {
@@ -120,10 +131,35 @@ fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
     })
 }
 
+fn volume_to_mixer(volume: u16) -> u16 {
+    // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
+    // Convert the given volume [0..0xffff] to a dB gain
+    // We assume a dB range of 60dB.
+    // Use the equatation: a * exp(b * x)
+    // in which a = IDEAL_FACTOR, b = 1/1000
+    const IDEAL_FACTOR: f64 = 6.908;
+    let normalized_volume = volume as f64 / std::u16::MAX as f64; // To get a value between 0 and 1
+
+    let mut val = std::u16::MAX;
+    // Prevent val > std::u16::MAX due to rounding errors
+    if normalized_volume < 0.999 {
+        let new_volume = (normalized_volume * IDEAL_FACTOR).exp() / 1000.0;
+        val = (new_volume * std::u16::MAX as f64) as u16;
+    }
+
+    debug!("input volume:{} to mixer: {}", volume, val);
+
+    // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
+    val
+}
+
 impl Spirc {
-    pub fn new(config: ConnectConfig, session: Session, player: Player, mixer: Box<Mixer>)
-        -> (Spirc, SpircTask)
-    {
+    pub fn new(
+        config: ConnectConfig,
+        session: Session,
+        player: Player,
+        mixer: Box<Mixer>,
+    ) -> (Spirc, SpircTask) {
         debug!("new Spirc[{}]", session.session_id());
 
         let ident = session.device_id().to_owned();
@@ -131,21 +167,26 @@ impl Spirc {
         let uri = format!("hm://remote/3/user/{}/", session.username());
 
         let subscription = session.mercury().subscribe(&uri as &str);
-        let subscription = subscription.map(|stream| stream.map_err(|_| MercuryError)).flatten_stream();
+        let subscription = subscription
+            .map(|stream| stream.map_err(|_| MercuryError))
+            .flatten_stream();
         let subscription = Box::new(subscription.map(|response| -> Frame {
             let data = response.payload.first().unwrap();
             protobuf::parse_from_bytes(data).unwrap()
         }));
 
-        let sender = Box::new(session.mercury().sender(uri).with(|frame: Frame| {
-            Ok(frame.write_to_bytes().unwrap())
-        }));
+        let sender = Box::new(
+            session
+                .mercury()
+                .sender(uri)
+                .with(|frame: Frame| Ok(frame.write_to_bytes().unwrap())),
+        );
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
         let volume = config.volume as u16;
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume as u16);
+        mixer.set_volume(volume_to_mixer(volume as u16));
 
         let mut task = SpircTask {
             player: player,
@@ -167,9 +208,7 @@ impl Spirc {
             session: session.clone(),
         };
 
-        let spirc = Spirc {
-            commands: cmd_tx,
-        };
+        let spirc = Spirc { commands: cmd_tx };
 
         task.hello();
 
@@ -235,9 +274,7 @@ impl Future for SpircTask {
                         self.handle_end_of_track();
                     }
                     Ok(Async::NotReady) => (),
-                    Err(oneshot::Canceled) => {
-                        self.end_of_track = Box::new(future::empty())
-                    }
+                    Err(oneshot::Canceled) => self.end_of_track = Box::new(future::empty()),
                 }
             }
 
@@ -324,15 +361,18 @@ impl SpircTask {
     }
 
     fn handle_frame(&mut self, frame: Frame) {
-        debug!("{:?} {:?} {} {} {}",
-               frame.get_typ(),
-               frame.get_device_state().get_name(),
-               frame.get_ident(),
-               frame.get_seq_nr(),
-               frame.get_state_update_id());
+        debug!(
+            "{:?} {:?} {} {} {}",
+            frame.get_typ(),
+            frame.get_device_state().get_name(),
+            frame.get_ident(),
+            frame.get_seq_nr(),
+            frame.get_state_update_id()
+        );
 
-        if frame.get_ident() == self.ident ||
-           (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident)) {
+        if frame.get_ident() == self.ident
+            || (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident))
+        {
             return;
         }
 
@@ -350,7 +390,8 @@ impl SpircTask {
                 self.update_tracks(&frame);
 
                 if self.state.get_track().len() > 0 {
-                    self.state.set_position_ms(frame.get_state().get_position_ms());
+                    self.state
+                        .set_position_ms(frame.get_state().get_position_ms());
                     self.state.set_position_measured_at(now_ms() as u64);
 
                     let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
@@ -404,8 +445,7 @@ impl SpircTask {
 
             MessageType::kMessageTypeShuffle => {
                 self.state.set_shuffle(frame.get_state().get_shuffle());
-                if self.state.get_shuffle()
-                {
+                if self.state.get_shuffle() {
                     let current_index = self.state.get_playing_track_index();
                     {
                         let tracks = self.state.mut_track();
@@ -437,16 +477,14 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeVolume => {
-                let volume = frame.get_volume();
-                self.device.set_volume(volume);
-                self.mixer.set_volume(frame.get_volume() as u16);
+                self.device.set_volume(frame.get_volume());
+                self.mixer
+                    .set_volume(volume_to_mixer(frame.get_volume() as u16));
                 self.notify(None);
             }
 
             MessageType::kMessageTypeNotify => {
-                if self.device.get_is_active() &&
-                    frame.get_device_state().get_is_active()
-                {
+                if self.device.get_is_active() && frame.get_device_state().get_is_active() {
                     self.device.set_is_active(false);
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
@@ -491,35 +529,61 @@ impl SpircTask {
         }
     }
 
-    fn handle_next(&mut self) {
-        let current_index = self.state.get_playing_track_index();
-        let num_tracks = self.state.get_track().len() as u32;
-        let new_index = (current_index + 1) % num_tracks;
-
-        let mut was_last_track = (current_index + 1) >= num_tracks;
-        if self.state.get_repeat() {
-            was_last_track = false;
+    fn consume_queued_track(&mut self) -> usize {
+        // Removes current track if it is queued
+        // Returns the index of the next track
+        let current_index = self.state.get_playing_track_index() as usize;
+        if self.state.get_track()[current_index].get_queued() {
+            self.state.mut_track().remove(current_index);
+            return current_index;
         }
+        current_index + 1
+    }
 
+    fn handle_next(&mut self) {
+        let mut new_index = self.consume_queued_track() as u32;
+        let mut continue_playing = true;
+        if new_index >= self.state.get_track().len() as u32 {
+            new_index = 0; // Loop around back to start
+            continue_playing = self.state.get_repeat();
+        }
         self.state.set_playing_track_index(new_index);
         self.state.set_position_ms(0);
         self.state.set_position_measured_at(now_ms() as u64);
 
-        self.load_track(!was_last_track);
+        self.load_track(continue_playing);
     }
 
     fn handle_prev(&mut self) {
         // Previous behaves differently based on the position
-        // Under 3s it goes to the previous song
-        // Over 3s it seeks to zero
+        // Under 3s it goes to the previous song (starts playing)
+        // Over 3s it seeks to zero (retains previous play status)
         if self.position() < 3000 {
+            // Queued tracks always follow the currently playing track.
+            // They should not be considered when calculating the previous
+            // track so extract them beforehand and reinsert them after it.
+            let mut queue_tracks = Vec::new();
+            {
+                let queue_index = self.consume_queued_track();
+                let tracks = self.state.mut_track();
+                while queue_index < tracks.len() && tracks[queue_index].get_queued() {
+                    queue_tracks.push(tracks.remove(queue_index));
+                }
+            }
             let current_index = self.state.get_playing_track_index();
-
-            let new_index = if current_index == 0 {
+            let new_index = if current_index > 0 {
+                current_index - 1
+            } else if self.state.get_repeat() {
                 self.state.get_track().len() as u32 - 1
             } else {
-                current_index - 1
+                0
             };
+            // Reinsert queued tracks after the new playing track.
+            let mut pos = (new_index + 1) as usize;
+            for track in queue_tracks.into_iter() {
+                self.state.mut_track().insert(pos, track);
+                pos += 1;
+            }
 
             self.state.set_playing_track_index(new_index);
             self.state.set_position_ms(0);
@@ -534,25 +598,25 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let mut volume: u32 = self.mixer.volume() as u32 + 4096;
+        let mut volume: u32 = self.device.get_volume() as u32 + 4096;
         if volume > 0xFFFF {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer.set_volume(volume as u16);
+        self.mixer.set_volume(volume_to_mixer(volume as u16));
     }
 
     fn handle_volume_down(&mut self) {
-        let mut volume: i32 = self.mixer.volume() as i32 - 4096;
+        let mut volume: i32 = self.device.get_volume() as i32 - 4096;
         if volume < 0 {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume as u16);
+        self.mixer.set_volume(volume_to_mixer(volume as u16));
     }
 
     fn handle_end_of_track(&mut self) {
-        self.handle_next();   
+        self.handle_next();
         self.notify(None);
     }
 

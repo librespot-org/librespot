@@ -11,7 +11,7 @@ use tempfile::NamedTempFile;
 
 use core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
 use core::session::Session;
-use core::util::FileId;
+use core::spotify_id::FileId;
 
 const CHUNK_SIZE: usize = 0x20000;
 
@@ -115,7 +115,7 @@ impl Future for AudioFileOpenStreaming {
             if id == 0x3 {
                 let size = BigEndian::read_u32(&data) as usize * 4;
                 let file = self.finish(size);
-                
+
                 return Ok(Async::Ready(file));
             }
         }

@@ -20,15 +20,16 @@ use std::mem;
 
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
-use librespot::core::config::{Bitrate, DeviceType, PlayerConfig, SessionConfig, ConnectConfig};
+use librespot::core::config::{DeviceType, SessionConfig, ConnectConfig};
 use librespot::core::session::Session;
 use librespot::core::version;
 
-use librespot::audio_backend::{self, Sink, BACKENDS};
-use librespot::discovery::{discovery, DiscoveryStream};
-use librespot::mixer::{self, Mixer};
-use librespot::player::Player;
-use librespot::spirc::{Spirc, SpircTask};
+use librespot::playback::audio_backend::{self, Sink, BACKENDS};
+use librespot::playback::config::{Bitrate, PlayerConfig};
+use librespot::connect::discovery::{discovery, DiscoveryStream};
+use librespot::playback::mixer::{self, Mixer};
+use librespot::playback::player::Player;
+use librespot::connect::spirc::{Spirc, SpircTask};
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
@@ -81,6 +82,7 @@ struct Setup {
     connect_config: ConnectConfig,
     credentials: Option<Credentials>,
     enable_discovery: bool,
+    zeroconf_port: u16,
 }
 
 fn setup(args: &[String]) -> Setup {
@@ -97,9 +99,10 @@ fn setup(args: &[String]) -> Setup {
         .optopt("p", "password", "Password", "PASSWORD")
         .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt("", "backend", "Audio backend to use. Use '?' to list options", "BACKEND")
-        .optopt("", "device", "Audio device to use. Use '?' to list options", "DEVICE")
+        .optopt("", "device", "Audio device to use. Use '?' to list options if using portaudio", "DEVICE")
         .optopt("", "mixer", "Mixer to use", "MIXER")
-        .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME");
+        .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME")
+        .optopt("", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -132,33 +135,22 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref())
         .expect("Invalid mixer");
-    let initial_volume;
-    // check if initial-volume argument is present
-    if matches.opt_present("initial-volume"){
-        // check if value is a number
-        if matches.opt_str("initial-volume").unwrap().parse::<i32>().is_ok(){
-            // check if value is in [0-100] range, otherwise put the bound values
-            if matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap() < 0 {
-                initial_volume = 0 as i32;
+
+    let initial_volume = matches
+        .opt_str("initial-volume")
+        .map(|volume| {
+            let volume = volume.parse::<i32>().unwrap();
+            if volume < 0 || volume > 100 {
+                panic!("Initial volume must be in the range 0-100");
             }
-            else if matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap() > 100{
-                initial_volume = 0xFFFF as i32;
-            }
-            // checks ok
-            else{
-                initial_volume = matches.opt_str("initial-volume").unwrap().parse::<i32>().unwrap()* 0xFFFF as i32 / 100 ;
-            }
-        }
-        // if value is not a number use default value (50%)
-        else {
-            initial_volume = 0x8000 as i32;
-        }
-    }
-    // if argument not present use default values (50%)
-    else{
-        initial_volume = 0x8000 as i32;
-        }
-    debug!("Volume \"{}\" !", initial_volume);
+            volume * 0xFFFF / 100
+        })
+        .unwrap_or(0x8000);
+
+    let zeroconf_port =
+    matches.opt_str("zeroconf-port")
+           .map(|port| port.parse::<u16>().unwrap())
+           .unwrap_or(0);
 
     let name = matches.opt_str("name").unwrap();
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
@@ -221,6 +213,7 @@ fn setup(args: &[String]) -> Setup {
         credentials: credentials,
         device: device,
         enable_discovery: enable_discovery,
+        zeroconf_port: zeroconf_port,
         mixer: mixer,
     }
 }
@@ -269,7 +262,7 @@ impl Main {
             let config = task.connect_config.clone();
             let device_id = task.session_config.device_id.clone();
 
-            task.discovery = Some(discovery(&handle, config, device_id).unwrap());
+            task.discovery = Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
         }
 
         if let Some(credentials) = setup.credentials {
@@ -362,6 +355,9 @@ impl Future for Main {
 }
 
 fn main() {
+    if env::var("RUST_BACKTRACE").is_err() {
+        env::set_var("RUST_BACKTRACE", "full")
+    }
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 

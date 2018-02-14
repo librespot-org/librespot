@@ -1,7 +1,7 @@
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::{BiLock, mpsc};
-use futures::{Poll, Async, Stream};
+use futures::{Async, Poll, Stream};
+use futures::sync::{mpsc, BiLock};
 use std::collections::HashMap;
 
 use util::SeqGenerator;
@@ -13,7 +13,7 @@ component! {
     }
 }
 
-#[derive(Debug,Hash,PartialEq,Eq,Copy,Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct ChannelError;
 
 pub struct Channel {
@@ -54,7 +54,7 @@ impl ChannelManager {
         (seq, channel)
     }
 
-    pub fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         use std::collections::hash_map::Entry;
 
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());

@@ -1,14 +1,27 @@
-use std::path::PathBuf;
-use std::io::Read;
+use std::fs;
 use std::fs::File;
+use std::io;
+use std::io::Read;
+use std::path::Path;
+use std::path::PathBuf;
 
-use util::{FileId, mkdir_existing};
 use authentication::Credentials;
+use spotify_id::FileId;
 
 #[derive(Clone)]
 pub struct Cache {
     root: PathBuf,
     use_audio_cache: bool,
+}
+
+fn mkdir_existing(path: &Path) -> io::Result<()> {
+    fs::create_dir(path).or_else(|err| {
+        if err.kind() == io::ErrorKind::AlreadyExists {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    })
 }
 
 impl Cache {
@@ -18,7 +31,7 @@ impl Cache {
 
         Cache {
             root: location,
-            use_audio_cache: use_audio_cache
+            use_audio_cache: use_audio_cache,
         }
     }
 }

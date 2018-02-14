@@ -2,7 +2,6 @@
 name = "librespot"
 version = "0.1.0"
 authors = ["Paul Liétar <paul@lietar.net>"]
-build = "build.rs"
 license = "MIT"
 description = "Open Source Spotify client library"
 keywords = ["spotify"]
@@ -22,10 +21,14 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
+[dependencies.librespot-connect]
+path = "connect"
 [dependencies.librespot-core]
 path = "core"
 [dependencies.librespot-metadata]
 path = "metadata"
+[dependencies.librespot-playback]
+path = "playback"
 [dependencies.librespot-protocol]
 path = "protocol"
 
@@ -36,12 +39,11 @@ futures = "0.1.8"
 getopts = "0.2.14"
 hyper = "0.11.2"
 log = "0.3.5"
-mdns = { git = "https://github.com/plietar/rust-mdns" }
 num-bigint = "0.1.35"
 protobuf = "1.1"
 rand = "0.3.13"
 rpassword = "0.3.0"
-rust-crypto = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
+rust-crypto = "0.2.36"
 serde = "0.9.6"
 serde_derive = "0.9.6"
 serde_json = "0.9.5"
@@ -50,29 +52,30 @@ tokio-io = "0.1"
 tokio-signal = "0.1.2"
 url = "1.3"
 
-alsa            = { git = "https://github.com/plietar/rust-alsa", optional = true }
-portaudio-rs    = { version = "0.3.0", optional = true }
-libpulse-sys    = { version = "0.0.0", optional = true }
-libc            = { version = "0.2", optional = true }
-
 [build-dependencies]
 rand            = "0.3.13"
 vergen          = "0.1.0"
 protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros", features = ["with-syntex"] }
 
+[replace]
+"rust-crypto:0.2.36" = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
+
 [features]
-alsa-backend = ["alsa"]
-portaudio-backend = ["portaudio-rs"]
-pulseaudio-backend = ["libpulse-sys", "libc"]
+alsa-backend = ["librespot-playback/alsa-backend"]
+portaudio-backend = ["librespot-playback/portaudio-backend"]
+pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
+jackaudio-backend = ["librespot-playback/jackaudio-backend"]
 
 with-tremor = ["librespot-audio/with-tremor"]
-with-lewton = ["librespot-audio/with-lewton"]
+with-vorbis = ["librespot-audio/with-vorbis"]
 
-default = ["portaudio-backend"]
+with-dns-sd = ["librespot-connect/with-dns-sd"]
+
+default = ["librespot-playback/portaudio-backend"]
 
 [package.metadata.deb]
-maintainer = "nobody"
-copyright = "2016 Paul Liétar"
+maintainer = "librespot-org"
+copyright = "2018 Paul Liétar"
 license_file = ["LICENSE", "4"]
 depends = "$auto"
 extended_description = """\
