@@ -288,14 +288,13 @@ impl PlayerInternal {
             PlayerCommand::Load(track_id, play, position, end_of_track) => {
                 if self.state.is_playing() {
                     self.stop_sink_if_running();
+                    self.run_onstop();
                 }
 
                 match self.load_track(track_id, position as i64) {
                     Some(decoder) => {
                         if play {
-                            if !self.state.is_playing() {
-                                self.run_onstart();
-                            }
+                            self.run_onstart();
                             self.start_sink();
 
                             self.state = PlayerState::Playing {
@@ -303,10 +302,6 @@ impl PlayerInternal {
                                 end_of_track: end_of_track,
                             };
                         } else {
-                            if self.state.is_playing() {
-                                self.run_onstop();
-                            }
-
                             self.state = PlayerState::Paused {
                                 decoder: decoder,
                                 end_of_track: end_of_track,
@@ -316,9 +311,6 @@ impl PlayerInternal {
 
                     None => {
                         let _ = end_of_track.send(());
-                        if self.state.is_playing() {
-                            self.run_onstop();
-                        }
                     }
                 }
             }
