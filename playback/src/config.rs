@@ -1,4 +1,6 @@
 use std::str::FromStr;
+use core::spotify_id::SpotifyId;
+use std::sync::mpsc::Sender;
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
@@ -25,19 +27,33 @@ impl Default for Bitrate {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum PlayerEvent {
+    Started {
+        track_id: SpotifyId,
+    },
+
+    Changed {
+        old_track_id: SpotifyId,
+        new_track_id: SpotifyId,
+    },
+
+    Stopped {
+        track_id: SpotifyId,
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PlayerConfig {
     pub bitrate: Bitrate,
-    pub onstart: Option<String>,
-    pub onstop: Option<String>,
+    pub event_sender : Option<Sender<PlayerEvent>>,
 }
 
 impl Default for PlayerConfig {
     fn default() -> PlayerConfig {
         PlayerConfig {
             bitrate: Bitrate::default(),
-            onstart: None,
-            onstop: None,
+            event_sender: None,
         }
     }
 }

@@ -31,6 +31,9 @@ use librespot::playback::mixer::{self, Mixer};
 use librespot::playback::player::Player;
 use librespot::connect::spirc::{Spirc, SpircTask};
 
+mod player_event_handler;
+use player_event_handler::run_program_on_events;
+
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
     opts.usage(&brief)
@@ -94,6 +97,7 @@ fn setup(args: &[String]) -> Setup {
         .optopt("b", "bitrate", "Bitrate (96, 160 or 320). Defaults to 160", "BITRATE")
         .optopt("", "onstart", "Run PROGRAM when playback is about to begin.", "PROGRAM")
         .optopt("", "onstop", "Run PROGRAM when playback has ended.", "PROGRAM")
+        .optopt("", "onchange", "Run PROGRAM between two tracks.", "PROGRAM")
         .optflag("v", "verbose", "Enable verbose output")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
@@ -185,8 +189,9 @@ fn setup(args: &[String]) -> Setup {
 
         PlayerConfig {
             bitrate: bitrate,
-            onstart: matches.opt_str("onstart"),
-            onstop: matches.opt_str("onstop"),
+            event_sender: run_program_on_events(matches.opt_str("onstart"),
+                                                matches.opt_str("onstop"),
+                                                matches.opt_str("onchange"))
         }
     };
 
