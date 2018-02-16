@@ -64,71 +64,111 @@ fn now_ms() -> i64 {
 }
 
 fn initial_state() -> State {
-    protobuf_init!(protocol::spirc::State::new(), {
-        repeat: false,
-        shuffle: false,
-        status: PlayStatus::kPlayStatusStop,
-        position_ms: 0,
-        position_measured_at: 0,
-    })
+    {
+        let mut msg = protocol::spirc::State::new();
+        msg.set_repeat(false);
+        msg.set_shuffle(false);
+        msg.set_status(PlayStatus::kPlayStatusStop);
+        msg.set_position_ms(0);
+        msg.set_position_measured_at(0);
+        msg
+    }
 }
-
 fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
-    protobuf_init!(DeviceState::new(), {
-        sw_version: version::version_string(),
-        is_active: false,
-        can_play: true,
-        volume: volume as u32,
-        name: config.name,
-        capabilities => [
-            @{
-                typ: protocol::spirc::CapabilityType::kCanBePlayer,
-                intValue => [1]
-            },
-            @{
-                typ: protocol::spirc::CapabilityType::kDeviceType,
-                intValue => [config.device_type as i64]
-            },
-            @{
-                typ: protocol::spirc::CapabilityType::kGaiaEqConnectId,
-                intValue => [1]
-            },
-            @{
-                typ: protocol::spirc::CapabilityType::kSupportsLogout,
-                intValue => [0]
-            },
-            @{
-                typ: protocol::spirc::CapabilityType::kIsObservable,
-                intValue => [1]
-            },
-            @{
-                typ: protocol::spirc::CapabilityType::kVolumeSteps,
-                intValue => [64]
-            },
-            @{
-                typ: protocol::spirc::CapabilityType::kSupportedContexts,
-                stringValue => [
-                    "album",
-                    "playlist",
-                    "search",
-                    "inbox",
-                    "toplist",
-                    "starred",
-                    "publishedstarred",
-                    "track",
-                ]
-            },
-            @{
-                typ: protocol::spirc::CapabilityType::kSupportedTypes,
-                stringValue => [
-                    "audio/local",
-                    "audio/track",
-                    "local",
-                    "track",
-                ]
-            }
-        ],
-    })
+    {
+        let mut msg = DeviceState::new();
+        msg.set_sw_version(version::version_string());
+        msg.set_is_active(false);
+        msg.set_can_play(true);
+        msg.set_volume(volume as u32);
+        msg.set_name(config.name);
+        {
+            let repeated = msg.mut_capabilities();
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kCanBePlayer);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(1)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kDeviceType);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(config.device_type as i64)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kGaiaEqConnectId);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(1)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kSupportsLogout);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(0)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kIsObservable);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(1)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kVolumeSteps);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(64)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kSupportedContexts);
+                {
+                    let repeated = msg.mut_stringValue();
+                    repeated.push(::std::convert::Into::into("album"));
+                    repeated.push(::std::convert::Into::into("playlist"));
+                    repeated.push(::std::convert::Into::into("search"));
+                    repeated.push(::std::convert::Into::into("inbox"));
+                    repeated.push(::std::convert::Into::into("toplist"));
+                    repeated.push(::std::convert::Into::into("starred"));
+                    repeated.push(::std::convert::Into::into("publishedstarred"));
+                    repeated.push(::std::convert::Into::into("track"))
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kSupportedTypes);
+                {
+                    let repeated = msg.mut_stringValue();
+                    repeated.push(::std::convert::Into::into("audio/local"));
+                    repeated.push(::std::convert::Into::into("audio/track"));
+                    repeated.push(::std::convert::Into::into("local"));
+                    repeated.push(::std::convert::Into::into("track"))
+                };
+                msg
+            };
+        };
+        msg
+    }
 }
 
 fn volume_to_mixer(volume: u16) -> u16 {
@@ -678,17 +718,17 @@ struct CommandSender<'a> {
 
 impl<'a> CommandSender<'a> {
     fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender {
-        let frame = protobuf_init!(protocol::spirc::Frame::new(), {
-            version: 1,
-            protocol_version: "2.0.0",
-            ident: spirc.ident.clone(),
-            seq_nr: spirc.sequence.get(),
-            typ: cmd,
-
-            device_state: spirc.device.clone(),
-            state_update_id: now_ms(),
-        });
-
+        let frame = {
+            let mut msg = protocol::spirc::Frame::new();
+            msg.set_version(1);
+            msg.set_protocol_version(::std::convert::Into::into("2.0.0"));
+            msg.set_ident(spirc.ident.clone());
+            msg.set_seq_nr(spirc.sequence.get());
+            msg.set_typ(cmd);
+            msg.set_device_state(spirc.device.clone());
+            msg.set_state_update_id(now_ms());
+            msg
+        };
         CommandSender {
             spirc: spirc,
             frame: frame,

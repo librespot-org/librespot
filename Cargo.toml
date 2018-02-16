@@ -55,7 +55,6 @@ url = "1.3"
 [build-dependencies]
 rand            = "0.3.13"
 vergen          = "0.1.0"
-protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros", features = ["with-syntex"] }
 
 [replace]
 "rust-crypto:0.2.36" = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
