@@ -633,6 +633,8 @@ impl SpircTask {
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.into_iter().cloned().collect());
         self.state.set_context_uri(context_uri);
+        self.state.set_repeat(frame.get_state().get_repeat());
+        self.state.set_shuffle(frame.get_state().get_shuffle());
     }
 
     fn load_track(&mut self, play: bool) {
