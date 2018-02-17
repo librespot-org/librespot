@@ -24,5 +24,4 @@ extern crate librespot_playback as playback;
 extern crate librespot_protocol as protocol;
 
 pub mod discovery;
-
-include!(concat!(env!("OUT_DIR"), "/lib.rs"));
+pub mod spirc;
