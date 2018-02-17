@@ -628,9 +628,11 @@ impl SpircTask {
     fn update_tracks(&mut self, frame: &protocol::spirc::Frame) {
         let index = frame.get_state().get_playing_track_index();
         let tracks = frame.get_state().get_track();
+        let context_uri = frame.get_state().get_context_uri().to_owned();
 
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.into_iter().cloned().collect());
+        self.state.set_context_uri(context_uri);
     }
 
     fn load_track(&mut self, play: bool) {
