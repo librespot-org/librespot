@@ -64,16 +64,15 @@ fn now_ms() -> i64 {
 }
 
 fn initial_state() -> State {
-    {
-        let mut msg = protocol::spirc::State::new();
-        msg.set_repeat(false);
-        msg.set_shuffle(false);
-        msg.set_status(PlayStatus::kPlayStatusStop);
-        msg.set_position_ms(0);
-        msg.set_position_measured_at(0);
-        msg
-    }
+    let mut frame = protocol::spirc::State::new();
+    frame.set_repeat(false);
+    frame.set_shuffle(false);
+    frame.set_status(PlayStatus::kPlayStatusStop);
+    frame.set_position_ms(0);
+    frame.set_position_measured_at(0);
+    frame
 }
+
 fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
     {
         let mut msg = DeviceState::new();
@@ -718,17 +717,14 @@ struct CommandSender<'a> {
 
 impl<'a> CommandSender<'a> {
     fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender {
-        let frame = {
-            let mut msg = protocol::spirc::Frame::new();
-            msg.set_version(1);
-            msg.set_protocol_version(::std::convert::Into::into("2.0.0"));
-            msg.set_ident(spirc.ident.clone());
-            msg.set_seq_nr(spirc.sequence.get());
-            msg.set_typ(cmd);
-            msg.set_device_state(spirc.device.clone());
-            msg.set_state_update_id(now_ms());
-            msg
-        };
+        let mut frame = protocol::spirc::Frame::new();
+        frame.set_version(1);
+        frame.set_protocol_version(::std::convert::Into::into("2.0.0"));
+        frame.set_ident(spirc.ident.clone());
+        frame.set_seq_nr(spirc.sequence.get());
+        frame.set_typ(cmd);
+        frame.set_device_state(spirc.device.clone());
+        frame.set_state_update_id(now_ms());
         CommandSender {
             spirc: spirc,
             frame: frame,
