@@ -170,12 +170,24 @@ impl PlayerState {
         }
     }
 
-    fn signal_end_of_track(self) {
+    fn send_end_of_track(self) {
         use self::PlayerState::*;
         match self {
             Paused { end_of_track, .. } |
             Playing { end_of_track, .. } => {
                 let _ = end_of_track.send(());
+            },
+            _ => ()
+        }
+    }
+
+    fn playing_to_end_of_track(&mut self) {
+        use self::PlayerState::*;
+        match *self {
+            Paused { track_id, .. } |
+            Playing { track_id, .. } => {
+                let old_state = mem::replace(self, EndOfTrack { track_id });
+                old_state.send_end_of_track();
             }
 
             EndOfTrack { .. } => warn!("signal_end_of_track from end of track state"),
@@ -295,16 +307,7 @@ impl PlayerInternal {
 
             None => {
                 self.stop_sink();
-
-                let new_state = match self.state {
-                    PlayerState::Playing { track_id, .. }
-                    | PlayerState::Paused { track_id, .. } =>
-                        PlayerState::EndOfTrack { track_id },
-                    _ => PlayerState::Stopped,
-                };
-
-                let old_state = mem::replace(&mut self.state, new_state);
-                old_state.signal_end_of_track();
+                self.state.playing_to_end_of_track();
             }
         }
     }
