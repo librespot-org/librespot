@@ -416,10 +416,7 @@ impl PlayerInternal {
     }
 
     fn send_event(&mut self, event: PlayerEvent) {
-        match self.event_sender.unbounded_send(event.clone()) {
-            Ok(_) => info!("Sent event {:?} to event listener.", event),
-            Err(err) => error!("Failed to send event {:?} to listener: {:?}", event, err)
-        }
+        let _ = self.event_sender.unbounded_send(event.clone());
     }
 
     fn find_available_alternative<'a>(&self, track: &'a Track) -> Option<Cow<'a, Track>> {
