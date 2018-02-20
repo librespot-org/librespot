@@ -4,13 +4,12 @@ use librespot::playback::player::PlayerEvent;
 
 fn run_program(program: &str, env_vars: HashMap<&str, String>) {
     let mut v: Vec<&str> = program.split_whitespace().collect();
-    info!("Running {:?}", v);
-    let status = Command::new(&v.remove(0))
+    info!("Running {:?} with environment variables {:?}", v, env_vars);
+    Command::new(&v.remove(0))
         .args(&v)
         .envs(env_vars.iter())
-        .status()
+        .spawn()
         .expect("program failed to start");
-    info!("Exit status: {}", status);
 }
 
 pub fn run_program_on_events(event: PlayerEvent, onevent: &str) {
