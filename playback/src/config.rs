@@ -1,6 +1,7 @@
 use std::str::FromStr;
 use core::spotify_id::SpotifyId;
 use std::sync::mpsc::Sender;
+use player::PlayerEvent;
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
@@ -24,22 +25,6 @@ impl FromStr for Bitrate {
 impl Default for Bitrate {
     fn default() -> Bitrate {
         Bitrate::Bitrate160
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum PlayerEvent {
-    Started {
-        track_id: SpotifyId,
-    },
-
-    Changed {
-        old_track_id: SpotifyId,
-        new_track_id: SpotifyId,
-    },
-
-    Stopped {
-        track_id: SpotifyId,
     }
 }
 

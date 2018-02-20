@@ -8,7 +8,7 @@ use std::sync::mpsc::{RecvError, TryRecvError, RecvTimeoutError};
 use std::thread;
 use std::time::Duration;
 
-use config::{Bitrate, PlayerConfig, PlayerEvent};
+use config::{Bitrate, PlayerConfig};
 use core::session::Session;
 use core::spotify_id::SpotifyId;
 
@@ -41,6 +41,23 @@ enum PlayerCommand {
     Stop,
     Seek(u32),
 }
+
+#[derive(Debug, Clone)]
+pub enum PlayerEvent {
+    Started {
+        track_id: SpotifyId,
+    },
+
+    Changed {
+        old_track_id: SpotifyId,
+        new_track_id: SpotifyId,
+    },
+
+    Stopped {
+        track_id: SpotifyId,
+    }
+}
+
 
 impl Player {
     pub fn new<F>(config: PlayerConfig, session: Session,

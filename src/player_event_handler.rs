@@ -1,7 +1,7 @@
 use std::process::Command;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
-use librespot::playback::config::PlayerEvent;
+use librespot::playback::player::PlayerEvent;
 
 fn run_program(program: &str, args: Vec<String>) {
     info!("Running {}", program);
