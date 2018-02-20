@@ -188,11 +188,8 @@ impl PlayerState {
             Playing { track_id, .. } => {
                 let old_state = mem::replace(self, EndOfTrack { track_id });
                 old_state.send_end_of_track();
-            }
-
-            EndOfTrack { .. } => warn!("signal_end_of_track from end of track state"),
-            Stopped => warn!("signal_end_of_track from stopped state"),
-            Invalid => panic!("invalid state"),
+            },
+            _ => panic!("Called playing_to_end_of_track in non-playing state.")
         }
     }
 
