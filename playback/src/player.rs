@@ -1,5 +1,6 @@
 use futures::sync::oneshot;
 use futures::{future, Future};
+use futures::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded};
 use std;
 use std::borrow::Cow;
 use std::io::{Read, Seek, SeekFrom, Result};
@@ -32,6 +33,7 @@ struct PlayerInternal {
     sink: Box<Sink>,
     sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
+    event_sender: UnboundedSender<PlayerEvent>,
 }
 
 enum PlayerCommand {
@@ -58,14 +60,15 @@ pub enum PlayerEvent {
     }
 }
 
-
+type PlayerEventChannel = UnboundedReceiver<PlayerEvent>;
 impl Player {
     pub fn new<F>(config: PlayerConfig, session: Session,
                   audio_filter: Option<Box<AudioFilter + Send>>,
-                  sink_builder: F) -> Player
+                  sink_builder: F) -> (Player, PlayerEventChannel)
         where F: FnOnce() -> Box<Sink> + Send + 'static
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
+        let (event_sender, event_receiver) = unbounded();
 
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
@@ -79,15 +82,14 @@ impl Player {
                 sink: sink_builder(),
                 sink_running: false,
                 audio_filter: audio_filter,
+                event_sender: event_sender,
             };
 
             internal.run();
         });
 
-        Player {
-            commands: Some(cmd_tx),
-            thread_handle: Some(handle),
-        }
+        (Player { commands: Some(cmd_tx), thread_handle: Some(handle) },
+         event_receiver)
     }
 
     fn command(&self, cmd: PlayerCommand) {
@@ -414,11 +416,9 @@ impl PlayerInternal {
     }
 
     fn send_event(&mut self, event: PlayerEvent) {
-        if let Some(ref s) = self.config.event_sender {
-            match s.send(event.clone()) {
-                Ok(_) => info!("Sent event {:?} to event listener.", event),
-                Err(err) => error!("Failed to send event {:?} to listener: {:?}", event, err)
-            }
+        match self.event_sender.unbounded_send(event.clone()) {
+            Ok(_) => info!("Sent event {:?} to event listener.", event),
+            Err(err) => error!("Failed to send event {:?} to listener: {:?}", event, err)
         }
     }
 

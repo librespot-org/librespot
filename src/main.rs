@@ -9,6 +9,7 @@ extern crate tokio_signal;
 
 use env_logger::LogBuilder;
 use futures::{Future, Async, Poll, Stream};
+use futures::sync::mpsc::UnboundedReceiver;
 use std::env;
 use std::io::{self, stderr, Write};
 use std::path::PathBuf;
@@ -28,7 +29,7 @@ use librespot::playback::audio_backend::{self, Sink, BACKENDS};
 use librespot::playback::config::{Bitrate, PlayerConfig};
 use librespot::connect::discovery::{discovery, DiscoveryStream};
 use librespot::playback::mixer::{self, Mixer};
-use librespot::playback::player::Player;
+use librespot::playback::player::{Player, PlayerEvent};
 use librespot::connect::spirc::{Spirc, SpircTask};
 
 mod player_event_handler;
@@ -86,6 +87,7 @@ struct Setup {
     credentials: Option<Credentials>,
     enable_discovery: bool,
     zeroconf_port: u16,
+    player_event_program: Option<String>,
 }
 
 fn setup(args: &[String]) -> Setup {
@@ -185,10 +187,7 @@ fn setup(args: &[String]) -> Setup {
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or(Bitrate::default());
 
-        PlayerConfig {
-            bitrate: bitrate,
-            event_sender: matches.opt_str("onevent").map(run_program_on_events)
-        }
+        PlayerConfig { bitrate: bitrate }
     };
 
     let connect_config = {
@@ -216,6 +215,7 @@ fn setup(args: &[String]) -> Setup {
         enable_discovery: enable_discovery,
         zeroconf_port: zeroconf_port,
         mixer: mixer,
+        player_event_program: matches.opt_str("onevent"),
     }
 }
 
@@ -237,6 +237,9 @@ struct Main {
     connect: Box<Future<Item=Session, Error=io::Error>>,
 
     shutdown: bool,
+
+    player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
+    player_event_program: Option<String>,
 }
 
 impl Main {
@@ -257,6 +260,9 @@ impl Main {
             spirc_task: None,
             shutdown: false,
             signal: Box::new(tokio_signal::ctrl_c(&handle).flatten_stream()),
+
+            player_event_channel: None,
+            player_event_program: setup.player_event_program,
         };
 
         if setup.enable_discovery {
@@ -314,13 +320,14 @@ impl Future for Main {
 
                 let audio_filter = mixer.get_audio_filter();
                 let backend = self.backend;
-                let player = Player::new(player_config, session.clone(), audio_filter, move || {
+                let (player, event_channel) = Player::new(player_config, session.clone(), audio_filter, move || {
                     (backend)(device)
                 });
 
                 let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
                 self.spirc = Some(spirc);
                 self.spirc_task = Some(spirc_task);
+                self.player_event_channel = Some(event_channel);
 
                 progress = true;
             }
@@ -344,6 +351,14 @@ impl Future for Main {
                         return Ok(Async::Ready(()));
                     } else {
                         panic!("Spirc shut down unexpectedly");
+                    }
+                }
+            }
+
+            if let Some(ref mut player_event_channel) = self.player_event_channel {
+                if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
+                    if let Some(ref program) = self.player_event_program {
+                        run_program_on_events(event, program);
                     }
                 }
             }
