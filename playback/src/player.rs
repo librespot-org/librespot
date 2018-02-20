@@ -417,13 +417,11 @@ impl PlayerInternal {
     }
 
     fn send_event(&mut self, event: PlayerEvent) {
-        match self.config.event_sender {
-            Some(ref s) =>
-                match s.send(event.clone()) {
-                    Ok(_) => info!("Sent event {:?} to event listener.", event),
-                    Err(err) => error!("Failed to send event {:?} to listener: {:?}", event, err)
-                }
-            None => ()
+        if let Some(ref s) = self.config.event_sender {
+            match s.send(event.clone()) {
+                Ok(_) => info!("Sent event {:?} to event listener.", event),
+                Err(err) => error!("Failed to send event {:?} to listener: {:?}", event, err)
+            }
         }
     }
 
