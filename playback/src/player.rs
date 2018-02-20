@@ -346,6 +346,15 @@ impl PlayerInternal {
                                 decoder: decoder,
                                 end_of_track: end_of_track,
                             };
+                            match self.state {
+                                PlayerState::Playing { track_id: old_track_id, ..}
+                                | PlayerState::EndOfTrack { track_id: old_track_id, .. } =>
+                                    self.send_event(PlayerEvent::Changed {
+                                        old_track_id: old_track_id,
+                                        new_track_id: track_id
+                                    }),
+                                _ => (),
+                            }
                             self.send_event(PlayerEvent::Stopped { track_id });
                         }
                     }
