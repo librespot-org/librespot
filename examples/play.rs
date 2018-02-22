@@ -5,12 +5,13 @@ use std::env;
 use tokio_core::reactor::Core;
 
 use librespot::core::authentication::Credentials;
-use librespot::playback::config::{PlayerConfig, SessionConfig};
+use librespot::core::config::SessionConfig;
+use librespot::playback::config::PlayerConfig;
 use librespot::core::session::Session;
 use librespot::core::spotify_id::SpotifyId;
 
-use librespot::audio_backend;
-use librespot::player::Player;
+use librespot::playback::audio_backend;
+use librespot::playback::player::Player;
 
 fn main() {
     let mut core = Core::new().unwrap();
