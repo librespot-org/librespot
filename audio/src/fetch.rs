@@ -1,11 +1,11 @@
 use bit_set::BitSet;
-use byteorder::{ByteOrder, BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use futures::Stream;
-use futures::sync::{oneshot, mpsc};
-use futures::{Poll, Async, Future};
+use futures::sync::{mpsc, oneshot};
+use futures::{Async, Future, Poll};
 use std::cmp::min;
 use std::fs;
-use std::io::{self, Read, Write, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, Condvar, Mutex};
 use tempfile::NamedTempFile;
 
@@ -71,7 +71,12 @@ impl AudioFileOpenStreaming {
         let (seek_tx, seek_rx) = mpsc::unbounded();
 
         let fetcher = AudioFileFetch::new(
-            self.session.clone(), shared.clone(), data_rx, write_file, seek_rx, complete_tx
+            self.session.clone(),
+            shared.clone(),
+            data_rx,
+            write_file,
+            seek_rx,
+            complete_tx,
         );
         self.session.spawn(move |_| fetcher);
 
@@ -148,14 +153,16 @@ impl AudioFile {
 
         let session_ = session.clone();
         session.spawn(move |_| {
-            complete_rx.map(move |mut file| {
-                if let Some(cache) = session_.cache() {
-                    cache.save_file(file_id, &mut file);
-                    debug!("File {} complete, saving to cache", file_id);
-                } else {
-                    debug!("File {} complete", file_id);
-                }
-            }).or_else(|oneshot::Canceled| Ok(()))
+            complete_rx
+                .map(move |mut file| {
+                    if let Some(cache) = session_.cache() {
+                        cache.save_file(file_id, &mut file);
+                        debug!("File {} complete, saving to cache", file_id);
+                    } else {
+                        debug!("File {} complete", file_id);
+                    }
+                })
+                .or_else(|oneshot::Canceled| Ok(()))
         });
 
         AudioFileOpen::Streaming(open)
@@ -200,11 +207,14 @@ struct AudioFileFetch {
 }
 
 impl AudioFileFetch {
-    fn new(session: Session, shared: Arc<AudioFileShared>,
-           data_rx: ChannelData, output: NamedTempFile,
-           seek_rx: mpsc::UnboundedReceiver<u64>,
-           complete_tx: oneshot::Sender<NamedTempFile>) -> AudioFileFetch
-    {
+    fn new(
+        session: Session,
+        shared: Arc<AudioFileShared>,
+        data_rx: ChannelData,
+        output: NamedTempFile,
+        seek_rx: mpsc::UnboundedReceiver<u64>,
+        complete_tx: oneshot::Sender<NamedTempFile>,
+    ) -> AudioFileFetch {
         AudioFileFetch {
             session: session,
             shared: shared,
@@ -233,8 +243,11 @@ impl AudioFileFetch {
 
             let offset = self.index * CHUNK_SIZE;
 
-            self.output.as_mut().unwrap()
-                .seek(SeekFrom::Start(offset as u64)).unwrap();
+            self.output
+                .as_mut()
+                .unwrap()
+                .seek(SeekFrom::Start(offset as u64))
+                .unwrap();
 
             let (_headers, data) = request_chunk(&self.session, self.shared.file_id, self.index).split();
             self.data_rx = data;
@@ -275,13 +288,20 @@ impl Future for AudioFileFetch {
                 Ok(Async::Ready(Some(data))) => {
                     progress = true;
 
-                    self.output.as_mut().unwrap()
-                        .write_all(data.as_ref()).unwrap();
+                    self.output
+                        .as_mut()
+                        .unwrap()
+                        .write_all(data.as_ref())
+                        .unwrap();
                 }
-                 Ok(Async::Ready(None)) => {
+                Ok(Async::Ready(None)) => {
                     progress = true;
 
-                    trace!("chunk {} / {} complete", self.index, self.shared.chunk_count);
+                    trace!(
+                        "chunk {} / {} complete",
+                        self.index,
+                        self.shared.chunk_count
+                    );
 
                     let full = {
                         let mut bitmap = self.shared.bitmap.lock().unwrap();
@@ -303,7 +323,7 @@ impl Future for AudioFileFetch {
                 Err(ChannelError) => {
                     warn!("error from channel");
                     return Ok(Async::Ready(()));
-                },
+                }
             }
 
             if !progress {

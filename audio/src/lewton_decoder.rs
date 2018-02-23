@@ -10,8 +10,9 @@ pub struct VorbisDecoder<R: Read + Seek>(OggStreamReader<R>);
 pub struct VorbisPacket(Vec<i16>);
 pub struct VorbisError(lewton::VorbisError);
 
-impl <R> VorbisDecoder<R>
-    where R: Read + Seek
+impl<R> VorbisDecoder<R>
+where
+    R: Read + Seek,
 {
     pub fn new(input: R) -> Result<VorbisDecoder<R>, VorbisError> {
         Ok(VorbisDecoder(OggStreamReader::new(input)?))

@@ -4,18 +4,18 @@ use std::process::exit;
 use std::time::Duration;
 use portaudio_rs;
 use portaudio_rs::stream::*;
-use portaudio_rs::device::{DeviceIndex, DeviceInfo, get_default_output_index};
+use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
 
-pub struct PortAudioSink<'a>(Option<portaudio_rs::stream::Stream<'a, i16, i16>>, StreamParameters<i16>);
+pub struct PortAudioSink<'a>(
+    Option<portaudio_rs::stream::Stream<'a, i16, i16>>,
+    StreamParameters<i16>,
+);
 
-fn output_devices() -> Box<Iterator<Item=(DeviceIndex, DeviceInfo)>> {
+fn output_devices() -> Box<Iterator<Item = (DeviceIndex, DeviceInfo)>> {
     let count = portaudio_rs::device::get_count().unwrap();
     let devices = (0..count)
-        .filter_map(|idx| {
-            portaudio_rs::device::get_info(idx).map(|info| (idx, info))
-        }).filter(|&(_, ref info)| {
-            info.max_output_channels > 0
-        });
+        .filter_map(|idx| portaudio_rs::device::get_info(idx).map(|info| (idx, info)))
+        .filter(|&(_, ref info)| info.max_output_channels > 0);
 
     Box::new(devices)
 }
@@ -38,9 +38,8 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
         .map(|(idx, _)| idx)
 }
 
-impl <'a> Open for PortAudioSink<'a> {
+impl<'a> Open for PortAudioSink<'a> {
     fn open(device: Option<String>) -> PortAudioSink<'a> {
-
         debug!("Using PortAudio sink");
 
         portaudio_rs::initialize().unwrap();
@@ -71,16 +70,19 @@ impl <'a> Open for PortAudioSink<'a> {
     }
 }
 
-impl <'a> Sink for PortAudioSink<'a> {
+impl<'a> Sink for PortAudioSink<'a> {
     fn start(&mut self) -> io::Result<()> {
         if self.0.is_none() {
-            self.0 = Some(Stream::open(
-                None, Some(self.1),
-                44100.0,
-                FRAMES_PER_BUFFER_UNSPECIFIED,
-                StreamFlags::empty(),
-                None
-            ).unwrap());;
+            self.0 = Some(
+                Stream::open(
+                    None,
+                    Some(self.1),
+                    44100.0,
+                    FRAMES_PER_BUFFER_UNSPECIFIED,
+                    StreamFlags::empty(),
+                    None,
+                ).unwrap(),
+            );;
         }
 
         self.0.as_mut().unwrap().start().unwrap();
@@ -94,8 +96,7 @@ impl <'a> Sink for PortAudioSink<'a> {
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
         match self.0.as_mut().unwrap().write(data) {
             Ok(_) => (),
-            Err(portaudio_rs::PaError::OutputUnderflowed) =>
-                error!("PortAudio write underflow"),
+            Err(portaudio_rs::PaError::OutputUnderflowed) => error!("PortAudio write underflow"),
             Err(e) => panic!("PA Error {}", e),
         };
 
@@ -103,7 +104,7 @@ impl <'a> Sink for PortAudioSink<'a> {
     }
 }
 
-impl <'a> Drop for PortAudioSink<'a> {
+impl<'a> Drop for PortAudioSink<'a> {
     fn drop(&mut self) {
         portaudio_rs::terminate().unwrap();
     }
