@@ -1,11 +1,12 @@
+use byteorder::{LittleEndian, ReadBytesExt};
 use futures::sync::oneshot;
 use futures::{future, Future};
 use std;
 use std::borrow::Cow;
-use std::io::{Read, Seek, SeekFrom, Result};
+use std::io::{Read, Result, Seek, SeekFrom};
 use std::mem;
 use std::process::Command;
-use std::sync::mpsc::{RecvError, TryRecvError, RecvTimeoutError};
+use std::sync::mpsc::{RecvError, RecvTimeoutError, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
@@ -14,9 +15,9 @@ use core::session::Session;
 use core::spotify_id::SpotifyId;
 
 use audio_backend::Sink;
-use audio::{AudioFile, AudioDecrypt};
+use audio::{AudioDecrypt, AudioFile};
 use audio::{VorbisDecoder, VorbisPacket};
-use metadata::{FileFormat, Track, Metadata};
+use metadata::{FileFormat, Metadata, Track};
 use mixer::AudioFilter;
 
 pub struct Player {
@@ -43,11 +44,23 @@ enum PlayerCommand {
     Seek(u32),
 }
 
+#[derive(Debug)]
+struct NormalisationConfig {
+    track_gain_db: f32,
+    track_peak: f32,
+    album_gain_db: f32,
+    album_peak: f32,
+}
+
 impl Player {
-    pub fn new<F>(config: PlayerConfig, session: Session,
-                  audio_filter: Option<Box<AudioFilter + Send>>,
-                  sink_builder: F) -> Player
-        where F: FnOnce() -> Box<Sink> + Send + 'static
+    pub fn new<F>(
+        config: PlayerConfig,
+        session: Session,
+        audio_filter: Option<Box<AudioFilter + Send>>,
+        sink_builder: F,
+    ) -> Player
+    where
+        F: FnOnce() -> Box<Sink> + Send + 'static,
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
 
@@ -78,9 +91,12 @@ impl Player {
         self.commands.as_ref().unwrap().send(cmd).unwrap();
     }
 
-    pub fn load(&self, track: SpotifyId, start_playing: bool, position_ms: u32)
-        -> oneshot::Receiver<()>
-    {
+    pub fn load(
+        &self,
+        track: SpotifyId,
+        start_playing: bool,
+        position_ms: u32,
+    ) -> oneshot::Receiver<()> {
         let (tx, rx) = oneshot::channel();
         self.command(PlayerCommand::Load(track, start_playing, position_ms, tx));
 
@@ -111,7 +127,7 @@ impl Drop for Player {
         if let Some(handle) = self.thread_handle.take() {
             match handle.join() {
                 Ok(_) => (),
-                Err(_) => error!("Player thread panicked!")
+                Err(_) => error!("Player thread panicked!"),
             }
         }
     }
@@ -123,10 +139,12 @@ enum PlayerState {
     Paused {
         decoder: Decoder,
         end_of_track: oneshot::Sender<()>,
+        normalisation_factor: f32,
     },
     Playing {
         decoder: Decoder,
         end_of_track: oneshot::Sender<()>,
+        normalisation_factor: f32,
     },
 
     Invalid,
@@ -146,8 +164,12 @@ impl PlayerState {
         use self::PlayerState::*;
         match *self {
             Stopped => None,
-            Paused { ref mut decoder, .. } |
-            Playing { ref mut decoder, .. } => Some(decoder),
+            Paused {
+                ref mut decoder, ..
+            }
+            | Playing {
+                ref mut decoder, ..
+            } => Some(decoder),
             Invalid => panic!("invalid state"),
         }
     }
@@ -155,8 +177,7 @@ impl PlayerState {
     fn signal_end_of_track(self) {
         use self::PlayerState::*;
         match self {
-            Paused { end_of_track, .. } |
-            Playing { end_of_track, .. } => {
+            Paused { end_of_track, .. } | Playing { end_of_track, .. } => {
                 let _ = end_of_track.send(());
             }
 
@@ -168,10 +189,15 @@ impl PlayerState {
     fn paused_to_playing(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Paused { decoder, end_of_track } => {
+            Paused {
+                decoder,
+                end_of_track,
+                normalisation_factor,
+            } => {
                 *self = Playing {
                     decoder: decoder,
                     end_of_track: end_of_track,
+                    normalisation_factor: normalisation_factor,
                 };
             }
             _ => panic!("invalid state"),
@@ -181,10 +207,15 @@ impl PlayerState {
     fn playing_to_paused(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Playing { decoder, end_of_track } => {
+            Playing {
+                decoder,
+                end_of_track,
+                normalisation_factor,
+            } => {
                 *self = Paused {
                     decoder: decoder,
                     end_of_track: end_of_track,
+                    normalisation_factor: normalisation_factor,
                 };
             }
             _ => panic!("invalid state"),
@@ -196,16 +227,13 @@ impl PlayerInternal {
     fn run(mut self) {
         loop {
             let cmd = if self.state.is_playing() {
-                if self.sink_running
-                {
+                if self.sink_running {
                     match self.commands.try_recv() {
                         Ok(cmd) => Some(cmd),
                         Err(TryRecvError::Empty) => None,
                         Err(TryRecvError::Disconnected) => return,
                     }
-                }
-                else
-                {
+                } else {
                     match self.commands.recv_timeout(Duration::from_secs(5)) {
                         Ok(cmd) => Some(cmd),
                         Err(RecvTimeoutError::Timeout) => None,
@@ -223,19 +251,27 @@ impl PlayerInternal {
                 self.handle_command(cmd);
             }
 
-            if self.state.is_playing() && ! self.sink_running {
+            if self.state.is_playing() && !self.sink_running {
                 self.start_sink();
             }
 
             if self.sink_running {
-                let packet = if let PlayerState::Playing { ref mut decoder, .. } = self.state {
+                let mut current_normalisation_factor: f32 = 1.0;
+
+                let packet = if let PlayerState::Playing {
+                    ref mut decoder,
+                    normalisation_factor,
+                    ..
+                } = self.state
+                {
+                    current_normalisation_factor = normalisation_factor;
                     Some(decoder.next_packet().expect("Vorbis error"))
                 } else {
                     None
                 };
 
                 if let Some(packet) = packet {
-                    self.handle_packet(packet);
+                    self.handle_packet(packet, current_normalisation_factor);
                 }
             }
         }
@@ -259,12 +295,18 @@ impl PlayerInternal {
         self.sink_running = false;
     }
 
-    fn handle_packet(&mut self, packet: Option<VorbisPacket>) {
+    fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalisation_factor: f32) {
         match packet {
             Some(mut packet) => {
                 if let Some(ref editor) = self.audio_filter {
                     editor.modify_stream(&mut packet.data_mut())
                 };
+
+                if self.config.normalisation && normalisation_factor != 1.0 {
+                    for x in packet.data_mut().iter_mut() {
+                        *x = (*x as f32 * normalisation_factor) as i16;
+                    }
+                }
 
                 if let Err(err) = self.sink.write(&packet.data()) {
                     error!("Could not write audio: {}", err);
@@ -291,7 +333,7 @@ impl PlayerInternal {
                 }
 
                 match self.load_track(track_id, position as i64) {
-                    Some(decoder) => {
+                    Some((decoder, normalisation_factor)) => {
                         if play {
                             if !self.state.is_playing() {
                                 self.run_onstart();
@@ -301,6 +343,7 @@ impl PlayerInternal {
                             self.state = PlayerState::Playing {
                                 decoder: decoder,
                                 end_of_track: end_of_track,
+                                normalisation_factor: normalisation_factor,
                             };
                         } else {
                             if self.state.is_playing() {
@@ -310,6 +353,7 @@ impl PlayerInternal {
                             self.state = PlayerState::Paused {
                                 decoder: decoder,
                                 end_of_track: end_of_track,
+                                normalisation_factor: normalisation_factor,
                             };
                         }
                     }
@@ -356,22 +400,20 @@ impl PlayerInternal {
                 }
             }
 
-            PlayerCommand::Stop => {
-                match self.state {
-                    PlayerState::Playing { .. } => {
-                        self.stop_sink_if_running();
-                        self.run_onstop();
-                        self.state = PlayerState::Stopped;
-                    }
-                    PlayerState::Paused { .. } => {
-                        self.state = PlayerState::Stopped;
-                    },
-                    PlayerState::Stopped => {
-                        warn!("Player::stop called from invalid state");
-                    }
-                    PlayerState::Invalid => panic!("invalid state"),
+            PlayerCommand::Stop => match self.state {
+                PlayerState::Playing { .. } => {
+                    self.stop_sink_if_running();
+                    self.run_onstop();
+                    self.state = PlayerState::Stopped;
                 }
-            }
+                PlayerState::Paused { .. } => {
+                    self.state = PlayerState::Stopped;
+                }
+                PlayerState::Stopped => {
+                    warn!("Player::stop called from invalid state");
+                }
+                PlayerState::Invalid => panic!("invalid state"),
+            },
         }
     }
 
@@ -391,18 +433,50 @@ impl PlayerInternal {
         if track.available {
             Some(Cow::Borrowed(track))
         } else {
-            let alternatives = track.alternatives
+            let alternatives = track
+                .alternatives
                 .iter()
-                .map(|alt_id| {
-                    Track::get(&self.session, *alt_id)
-                });
+                .map(|alt_id| Track::get(&self.session, *alt_id));
             let alternatives = future::join_all(alternatives).wait().unwrap();
 
-            alternatives.into_iter().find(|alt| alt.available).map(Cow::Owned)
+            alternatives
+                .into_iter()
+                .find(|alt| alt.available)
+                .map(Cow::Owned)
         }
     }
 
-    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<Decoder> {
+    fn parse_normalisation<T: Read + Seek>(&self, file: &mut AudioDecrypt<T>) -> NormalisationConfig {
+        let track_gain_db: f32;
+        let track_peak: f32;
+        let album_gain_db: f32;
+        let album_peak: f32;
+
+        file.seek(SeekFrom::Start(144)).unwrap();
+        track_gain_db = file.read_f32::<LittleEndian>().unwrap();
+        debug!("Track gain: {}db", track_gain_db);
+
+        file.seek(SeekFrom::Start(148)).unwrap();
+        track_peak = file.read_f32::<LittleEndian>().unwrap();
+        debug!("Track peak: {}", track_peak);
+
+        file.seek(SeekFrom::Start(152)).unwrap();
+        album_gain_db = file.read_f32::<LittleEndian>().unwrap();
+        debug!("Album gain: {}db", album_gain_db);
+
+        file.seek(SeekFrom::Start(156)).unwrap();
+        album_peak = file.read_f32::<LittleEndian>().unwrap();
+        debug!("Album peak: {}", album_peak);
+
+        NormalisationConfig {
+            track_gain_db: track_gain_db,
+            track_peak: track_peak,
+            album_gain_db: album_gain_db,
+            album_peak: album_peak,
+        }
+    }
+
+    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<(Decoder, f32)> {
         let track = Track::get(&self.session, track_id).wait().unwrap();
 
         info!("Loading track \"{}\"", track.name);
@@ -424,15 +498,42 @@ impl PlayerInternal {
         let file_id = match track.files.get(&format) {
             Some(&file_id) => file_id,
             None => {
-                warn!("Track \"{}\" is not available in format {:?}", track.name, format);
+                warn!(
+                    "Track \"{}\" is not available in format {:?}",
+                    track.name, format
+                );
                 return None;
             }
         };
 
-        let key = self.session.audio_key().request(track.id, file_id).wait().unwrap();
+        let key = self.session
+            .audio_key()
+            .request(track.id, file_id)
+            .wait()
+            .unwrap();
 
         let encrypted_file = AudioFile::open(&self.session, file_id).wait().unwrap();
-        let audio_file = Subfile::new(AudioDecrypt::new(key, encrypted_file), 0xa7);
+
+        let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+
+        let mut normalisation_factor: f32 = 1.0;
+
+        if self.config.normalisation {
+            let normalisation_config = self.parse_normalisation(&mut decrypted_file);
+            normalisation_factor = f32::powf(
+                10.0,
+                (normalisation_config.track_gain_db + self.config.normalisation_pregain) / 20.0,
+            );
+
+            if normalisation_factor * normalisation_config.track_peak > 1.0 {
+                debug!("Reducing normalisation factor to prevent clipping. Please add negative pregain to avoid.");
+                normalisation_factor = 1.0 / normalisation_config.track_peak;
+            }
+
+            debug!("Applied normalization factor: {}", normalisation_factor);
+        }
+
+        let audio_file = Subfile::new(decrypted_file, 0xa7);
 
         let mut decoder = VorbisDecoder::new(audio_file).unwrap();
 
@@ -443,7 +544,7 @@ impl PlayerInternal {
 
         info!("Track \"{}\" loaded", track.name);
 
-        Some(decoder)
+        Some((decoder, normalisation_factor))
     }
 }
 
@@ -456,27 +557,15 @@ impl Drop for PlayerInternal {
 impl ::std::fmt::Debug for PlayerCommand {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
-            PlayerCommand::Load(track, play, position, _) => {
-                f.debug_tuple("Load")
-                 .field(&track)
-                 .field(&play)
-                 .field(&position)
-                 .finish()
-            }
-            PlayerCommand::Play => {
-                f.debug_tuple("Play").finish()
-            }
-            PlayerCommand::Pause => {
-                f.debug_tuple("Pause").finish()
-            }
-            PlayerCommand::Stop => {
-                f.debug_tuple("Stop").finish()
-            }
-            PlayerCommand::Seek(position) => {
-                f.debug_tuple("Seek")
-                 .field(&position)
-                 .finish()
-            }
+            PlayerCommand::Load(track, play, position, _) => f.debug_tuple("Load")
+                .field(&track)
+                .field(&play)
+                .field(&position)
+                .finish(),
+            PlayerCommand::Play => f.debug_tuple("Play").finish(),
+            PlayerCommand::Pause => f.debug_tuple("Pause").finish(),
+            PlayerCommand::Stop => f.debug_tuple("Stop").finish(),
+            PlayerCommand::Seek(position) => f.debug_tuple("Seek").field(&position).finish(),
         }
     }
 }
@@ -522,8 +611,8 @@ fn run_program(program: &str) {
     info!("Running {}", program);
     let mut v: Vec<&str> = program.split_whitespace().collect();
     let status = Command::new(&v.remove(0))
-            .args(&v)
-            .status()
-            .expect("program failed to start");
+        .args(&v)
+        .status()
+        .expect("program failed to start");
     info!("Exit status: {}", status);
 }

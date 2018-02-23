@@ -37,9 +37,7 @@ use self::jackaudio::JackSink;
 mod pipe;
 use self::pipe::StdoutSink;
 
-pub const BACKENDS : &'static [
-    (&'static str, fn(Option<String>) -> Box<Sink>)
-] = &[
+pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<Sink>)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
@@ -53,8 +51,16 @@ pub const BACKENDS : &'static [
 
 pub fn find(name: Option<String>) -> Option<fn(Option<String>) -> Box<Sink>> {
     if let Some(name) = name {
-        BACKENDS.iter().find(|backend| name == backend.0).map(|backend| backend.1)
+        BACKENDS
+            .iter()
+            .find(|backend| name == backend.0)
+            .map(|backend| backend.1)
     } else {
-        Some(BACKENDS.first().expect("No backends were enabled at build time").1)
+        Some(
+            BACKENDS
+                .first()
+                .expect("No backends were enabled at build time")
+                .1,
+        )
     }
 }
