@@ -1,6 +1,6 @@
 use futures::sync::oneshot;
 use futures::{future, Future};
-use futures::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded};
+use futures;
 use std;
 use std::borrow::Cow;
 use std::io::{Read, Seek, SeekFrom, Result};
@@ -33,7 +33,7 @@ struct PlayerInternal {
     sink: Box<Sink>,
     sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
-    event_sender: UnboundedSender<PlayerEvent>,
+    event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
 }
 
 enum PlayerCommand {
@@ -60,7 +60,7 @@ pub enum PlayerEvent {
     }
 }
 
-type PlayerEventChannel = UnboundedReceiver<PlayerEvent>;
+type PlayerEventChannel = futures::sync::mpsc::UnboundedReceiver<PlayerEvent>;
 impl Player {
     pub fn new<F>(config: PlayerConfig, session: Session,
                   audio_filter: Option<Box<AudioFilter + Send>>,
@@ -68,7 +68,7 @@ impl Player {
         where F: FnOnce() -> Box<Sink> + Send + 'static
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
-        let (event_sender, event_receiver) = unbounded();
+        let (event_sender, event_receiver) = futures::sync::mpsc::unbounded();
 
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
@@ -172,24 +172,12 @@ impl PlayerState {
         }
     }
 
-    fn send_end_of_track(self) {
-        use self::PlayerState::*;
-        match self {
-            Paused { end_of_track, .. } |
-            Playing { end_of_track, .. } => {
-                let _ = end_of_track.send(());
-            },
-            _ => ()
-        }
-    }
-
     fn playing_to_end_of_track(&mut self) {
         use self::PlayerState::*;
-        match *self {
-            Paused { track_id, .. } |
-            Playing { track_id, .. } => {
+        match mem::replace(self, Invalid) {
+            Playing { track_id, end_of_track, ..} => {
+                end_of_track.send(());
                 let old_state = mem::replace(self, EndOfTrack { track_id });
-                old_state.send_end_of_track();
             },
             _ => panic!("Called playing_to_end_of_track in non-playing state.")
         }
