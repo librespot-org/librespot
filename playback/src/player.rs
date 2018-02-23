@@ -72,7 +72,7 @@ impl NormalisationData {
     fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
         let mut normalisation_factor: f32 = 1.0;
 
-        debug!("Normalization Data: {:?}", data);
+        debug!("Normalisation Data: {:?}", data);
 
         if config.normalisation {
             normalisation_factor = f32::powf(10.0, (data.track_gain_db + config.normalisation_pregain) / 20.0);
@@ -82,7 +82,7 @@ impl NormalisationData {
                 normalisation_factor = 1.0 / data.track_peak;
             }
 
-            debug!("Applied normalization factor: {}", normalisation_factor);
+            debug!("Applied normalisation factor: {}", normalisation_factor);
         }
 
         normalisation_factor
