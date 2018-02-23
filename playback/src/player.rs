@@ -54,7 +54,8 @@ struct NormalisationData {
 
 impl NormalisationData {
     fn new<T: Read + Seek>(file: &mut AudioDecrypt<T>) -> NormalisationData {
-        file.seek(SeekFrom::Start(144)).unwrap();
+        static SPOTIFY_HEADER_START_OFFSET: u64 = 144;
+        file.seek(SeekFrom::Start(SPOTIFY_HEADER_START_OFFSET)).unwrap();
 
         let track_gain_db: f32 = file.read_f32::<LittleEndian>().unwrap();
         let track_peak: f32 = file.read_f32::<LittleEndian>().unwrap();
