@@ -177,7 +177,7 @@ impl PlayerState {
         match mem::replace(self, Invalid) {
             Playing { track_id, end_of_track, ..} => {
                 end_of_track.send(());
-                let old_state = mem::replace(self, EndOfTrack { track_id });
+                *self = EndOfTrack { track_id };
             },
             _ => panic!("Called playing_to_end_of_track in non-playing state.")
         }
