@@ -1,6 +1,4 @@
 use bytes::Bytes;
-use crypto::digest::Digest;
-use crypto::sha1::Sha1;
 use futures::{Async, Future, IntoFuture, Poll, Stream};
 use futures::sync::mpsc;
 use std::io;
@@ -44,12 +42,6 @@ static SESSION_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
 
 #[derive(Clone)]
 pub struct Session(Arc<SessionInternal>);
-
-pub fn device_id(name: &str) -> String {
-    let mut h = Sha1::new();
-    h.input_str(name);
-    h.result_str()
-}
 
 impl Session {
     pub fn connect(

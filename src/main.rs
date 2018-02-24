@@ -6,6 +6,7 @@ extern crate librespot;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_signal;
+extern crate crypto;
 
 use env_logger::LogBuilder;
 use futures::{Future, Async, Poll, Stream};
@@ -18,6 +19,8 @@ use std::str::FromStr;
 use tokio_core::reactor::{Handle, Core};
 use tokio_io::IoStream;
 use std::mem;
+use crypto::digest::Digest;
+use crypto::sha1::Sha1;
 
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
@@ -34,6 +37,12 @@ use librespot::connect::spirc::{Spirc, SpircTask};
 
 mod player_event_handler;
 use player_event_handler::run_program_on_events;
+
+fn device_id(name: &str) -> String {
+    let mut h = Sha1::new();
+    h.input_str(name);
+    h.result_str()
+}
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
@@ -106,7 +115,9 @@ fn setup(args: &[String]) -> Setup {
         .optopt("", "device", "Audio device to use. Use '?' to list options if using portaudio", "DEVICE")
         .optopt("", "mixer", "Mixer to use", "MIXER")
         .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME")
-        .optopt("", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT");
+        .optopt("", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT")
+        .optflag("", "enable-volume-normalisation", "Play all tracks at the same volume")
+        .optopt("", "normalisation-pregain", "Pregain (dB) applied by volume normalisation", "PREGAIN");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -174,7 +185,7 @@ fn setup(args: &[String]) -> Setup {
     };
 
     let session_config = {
-        let device_id = librespot::core::session::device_id(&name);
+        let device_id = device_id(&name);
 
         SessionConfig {
             user_agent: version::version_string(),
@@ -187,7 +198,13 @@ fn setup(args: &[String]) -> Setup {
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or(Bitrate::default());
 
-        PlayerConfig { bitrate: bitrate }
+        PlayerConfig {
+            bitrate: bitrate,
+            normalisation: matches.opt_present("enable-volume-normalisation"),
+            normalisation_pregain: matches.opt_str("normalisation-pregain")
+                .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_pregain),
+        }
     };
 
     let connect_config = {
