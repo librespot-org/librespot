@@ -2,7 +2,7 @@ use std;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[allow(non_camel_case_types)]
-pub struct u128 {
+pub(crate) struct u128 {
     high: u64,
     low: u64,
 }
