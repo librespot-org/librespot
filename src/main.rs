@@ -111,7 +111,9 @@ fn setup(args: &[String]) -> Setup {
         .optopt("", "device", "Audio device to use. Use '?' to list options if using portaudio", "DEVICE")
         .optopt("", "mixer", "Mixer to use", "MIXER")
         .optopt("", "initial-volume", "Initial volume in %, once connected (must be from 0 to 100)", "VOLUME")
-        .optopt("", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT");
+        .optopt("", "zeroconf-port", "The port the internal server advertised over zeroconf uses.", "ZEROCONF_PORT")
+        .optflag("", "enable-volume-normalisation", "Play all tracks at the same volume")
+        .optopt("", "normalisation-pregain", "Pregain (dB) applied by volume normalisation", "PREGAIN");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -196,6 +198,10 @@ fn setup(args: &[String]) -> Setup {
             bitrate: bitrate,
             onstart: matches.opt_str("onstart"),
             onstop: matches.opt_str("onstop"),
+            normalisation: matches.opt_present("enable-volume-normalisation"),
+            normalisation_pregain: matches.opt_str("normalisation-pregain")
+                .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_pregain),
         }
     };
 
