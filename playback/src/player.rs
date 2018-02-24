@@ -53,38 +53,35 @@ struct NormalisationData {
 }
 
 impl NormalisationData {
-    fn new<T: Read + Seek>(file: &mut AudioDecrypt<T>) -> NormalisationData {
-        static SPOTIFY_HEADER_START_OFFSET: u64 = 144;
-        file.seek(SeekFrom::Start(SPOTIFY_HEADER_START_OFFSET)).unwrap();
+    fn parse_from_file<T: Read + Seek>(mut file: T) -> Result<NormalisationData> {
+        const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
+        file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET)).unwrap();
 
-        let track_gain_db: f32 = file.read_f32::<LittleEndian>().unwrap();
-        let track_peak: f32 = file.read_f32::<LittleEndian>().unwrap();
-        let album_gain_db: f32 = file.read_f32::<LittleEndian>().unwrap();
-        let album_peak: f32 = file.read_f32::<LittleEndian>().unwrap();
+        let track_gain_db = file.read_f32::<LittleEndian>().unwrap();
+        let track_peak = file.read_f32::<LittleEndian>().unwrap();
+        let album_gain_db = file.read_f32::<LittleEndian>().unwrap();
+        let album_peak = file.read_f32::<LittleEndian>().unwrap();
 
-        NormalisationData {
+        let r = NormalisationData {
             track_gain_db: track_gain_db,
             track_peak: track_peak,
             album_gain_db: album_gain_db,
             album_peak: album_peak,
-        }
+        };
+
+        Ok(r)
     }
 
     fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
-        let mut normalisation_factor: f32 = 1.0;
+        let mut normalisation_factor = f32::powf(10.0, (data.track_gain_db + config.normalisation_pregain) / 20.0);
+
+        if normalisation_factor * data.track_peak > 1.0 {
+            warn!("Reducing normalisation factor to prevent clipping. Please add negative pregain to avoid.");
+            normalisation_factor = 1.0 / data.track_peak;
+        }
 
         debug!("Normalisation Data: {:?}", data);
-
-        if config.normalisation {
-            normalisation_factor = f32::powf(10.0, (data.track_gain_db + config.normalisation_pregain) / 20.0);
-
-            if normalisation_factor * data.track_peak > 1.0 {
-                warn!("Reducing normalisation factor to prevent clipping. Please add negative pregain to avoid.");
-                normalisation_factor = 1.0 / data.track_peak;
-            }
-
-            debug!("Applied normalisation factor: {}", normalisation_factor);
-        }
+        debug!("Applied normalisation factor: {}", normalisation_factor);
 
         normalisation_factor
     }
@@ -497,9 +494,13 @@ impl PlayerInternal {
 
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
-        let normalisation_data = NormalisationData::new(&mut decrypted_file);
-
-        let normalisation_factor: f32 = NormalisationData::get_factor(&self.config, normalisation_data);
+        let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
+            Ok(normalisation_data) => NormalisationData::get_factor(&self.config, normalisation_data),
+            Err(_) => {
+                warn!("Unable to extract normalisation data, using default value.");
+                1.0 as f32
+            },
+        };
 
         let audio_file = Subfile::new(decrypted_file, 0xa7);
 
