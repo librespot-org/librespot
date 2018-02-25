@@ -6,5 +6,5 @@ pub const FILES : &'static [(&'static str, u32)] = &[
     ("proto/mercury.proto", 709993906),
     ("proto/metadata.proto", 2474472423),
     ("proto/pubsub.proto", 2686584829),
-    ("proto/spirc.proto", 3618770573),
+    ("proto/spirc.proto", 3695752338),
 ];
