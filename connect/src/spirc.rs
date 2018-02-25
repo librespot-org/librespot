@@ -680,7 +680,7 @@ impl SpircTask {
         let index = self.state.get_playing_track_index();
         let track = {
             let gid = self.state.get_track()[index as usize].get_gid();
-            SpotifyId::from_raw(gid)
+            SpotifyId::from_raw(gid).unwrap()
         };
         let position = self.state.get_position_ms();
 

@@ -1,6 +1,7 @@
 use byteorder::{BigEndian, ByteOrder};
 use std;
 use std::fmt;
+use std::io::Result;
 use util::u128;
 // Unneeded since 1.21
 #[allow(unused_imports)]
@@ -13,7 +14,7 @@ const BASE62_DIGITS: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDE
 const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
 
 impl SpotifyId {
-    pub fn from_base16(id: &str) -> SpotifyId {
+    pub fn from_base16(id: &str) -> Result<SpotifyId> {
         assert!(id.is_ascii());
         let data = id.as_bytes();
 
@@ -24,10 +25,10 @@ impl SpotifyId {
             n = n + u128::from(d);
         }
 
-        SpotifyId(n)
+        Ok(SpotifyId(n))
     }
 
-    pub fn from_base62(id: &str) -> SpotifyId {
+    pub fn from_base62(id: &str) -> Result<SpotifyId> {
         assert!(id.is_ascii());
         let data = id.as_bytes();
 
@@ -38,16 +39,16 @@ impl SpotifyId {
             n = n + u128::from(d);
         }
 
-        SpotifyId(n)
+        Ok(SpotifyId(n))
     }
 
-    pub fn from_raw(data: &[u8]) -> SpotifyId {
+    pub fn from_raw(data: &[u8]) -> Result<SpotifyId> {
         assert_eq!(data.len(), 16);
 
         let high = BigEndian::read_u64(&data[0..8]);
         let low = BigEndian::read_u64(&data[8..16]);
 
-        SpotifyId(u128::from_parts(high, low))
+        Ok(SpotifyId(u128::from_parts(high, low)))
     }
 
     pub fn to_base16(&self) -> String {
