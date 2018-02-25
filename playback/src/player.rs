@@ -1,11 +1,11 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use futures::sync::oneshot;
 use futures::{future, Future};
+use futures;
 use std;
 use std::borrow::Cow;
 use std::io::{Read, Seek, SeekFrom, Result};
 use std::mem;
-use std::process::Command;
 use std::sync::mpsc::{RecvError, TryRecvError, RecvTimeoutError};
 use std::thread;
 use std::time::Duration;
@@ -34,6 +34,7 @@ struct PlayerInternal {
     sink: Box<Sink>,
     sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
+    event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
 }
 
 enum PlayerCommand {
@@ -43,6 +44,24 @@ enum PlayerCommand {
     Stop,
     Seek(u32),
 }
+
+#[derive(Debug, Clone)]
+pub enum PlayerEvent {
+    Started {
+        track_id: SpotifyId,
+    },
+
+    Changed {
+        old_track_id: SpotifyId,
+        new_track_id: SpotifyId,
+    },
+
+    Stopped {
+        track_id: SpotifyId,
+    }
+}
+
+type PlayerEventChannel = futures::sync::mpsc::UnboundedReceiver<PlayerEvent>;
 
 #[derive(Clone, Copy, Debug)]
 struct NormalisationData {
@@ -90,10 +109,11 @@ impl NormalisationData {
 impl Player {
     pub fn new<F>(config: PlayerConfig, session: Session,
                   audio_filter: Option<Box<AudioFilter + Send>>,
-                  sink_builder: F) -> Player
+                  sink_builder: F) -> (Player, PlayerEventChannel)
         where F: FnOnce() -> Box<Sink> + Send + 'static
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
+        let (event_sender, event_receiver) = futures::sync::mpsc::unbounded();
 
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
@@ -107,15 +127,14 @@ impl Player {
                 sink: sink_builder(),
                 sink_running: false,
                 audio_filter: audio_filter,
+                event_sender: event_sender,
             };
 
             internal.run();
         });
 
-        Player {
-            commands: Some(cmd_tx),
-            thread_handle: Some(handle),
-        }
+        (Player { commands: Some(cmd_tx), thread_handle: Some(handle) },
+         event_receiver)
     }
 
     fn command(&self, cmd: PlayerCommand) {
@@ -165,16 +184,18 @@ type Decoder = VorbisDecoder<Subfile<AudioDecrypt<AudioFile>>>;
 enum PlayerState {
     Stopped,
     Paused {
+        track_id: SpotifyId,
         decoder: Decoder,
         end_of_track: oneshot::Sender<()>,
         normalisation_factor: f32,
     },
     Playing {
+        track_id: SpotifyId,
         decoder: Decoder,
         end_of_track: oneshot::Sender<()>,
         normalisation_factor: f32,
     },
-
+    EndOfTrack { track_id: SpotifyId },
     Invalid,
 }
 
@@ -182,7 +203,7 @@ impl PlayerState {
     fn is_playing(&self) -> bool {
         use self::PlayerState::*;
         match *self {
-            Stopped | Paused { .. } => false,
+            Stopped | EndOfTrack { .. } | Paused { .. } => false,
             Playing { .. } => true,
             Invalid => panic!("invalid state"),
         }
@@ -191,31 +212,30 @@ impl PlayerState {
     fn decoder(&mut self) -> Option<&mut Decoder> {
         use self::PlayerState::*;
         match *self {
-            Stopped => None,
+            Stopped | EndOfTrack { .. } => None,
             Paused { ref mut decoder, .. } |
             Playing { ref mut decoder, .. } => Some(decoder),
             Invalid => panic!("invalid state"),
         }
     }
 
-    fn signal_end_of_track(self) {
+    fn playing_to_end_of_track(&mut self) {
         use self::PlayerState::*;
-        match self {
-            Paused { end_of_track, .. } |
-            Playing { end_of_track, .. } => {
+        match mem::replace(self, Invalid) {
+            Playing { track_id, end_of_track, ..} => {
                 let _ = end_of_track.send(());
-            }
-
-            Stopped => warn!("signal_end_of_track from stopped state"),
-            Invalid => panic!("invalid state"),
+                *self = EndOfTrack { track_id };
+            },
+            _ => panic!("Called playing_to_end_of_track in non-playing state.")
         }
     }
 
     fn paused_to_playing(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Paused { decoder, end_of_track, normalisation_factor } => {
+            Paused { track_id, decoder, end_of_track, normalisation_factor } => {
                 *self = Playing {
+                    track_id: track_id,
                     decoder: decoder,
                     end_of_track: end_of_track,
                     normalisation_factor: normalisation_factor,
@@ -228,8 +248,9 @@ impl PlayerState {
     fn playing_to_paused(&mut self) {
         use self::PlayerState::*;
         match ::std::mem::replace(self, Invalid) {
-            Playing { decoder, end_of_track, normalisation_factor } => {
+            Playing { track_id, decoder, end_of_track, normalisation_factor } => {
                 *self = Paused {
+                    track_id: track_id,
                     decoder: decoder,
                     end_of_track: end_of_track,
                     normalisation_factor: normalisation_factor,
@@ -331,10 +352,7 @@ impl PlayerInternal {
 
             None => {
                 self.stop_sink();
-                self.run_onstop();
-
-                let old_state = mem::replace(&mut self.state, PlayerState::Stopped);
-                old_state.signal_end_of_track();
+                self.state.playing_to_end_of_track();
             }
         }
     }
@@ -350,34 +368,46 @@ impl PlayerInternal {
                 match self.load_track(track_id, position as i64) {
                     Some((decoder, normalisation_factor)) => {
                         if play {
-                            if !self.state.is_playing() {
-                                self.run_onstart();
+                            match self.state {
+                                PlayerState::Playing { track_id: old_track_id, ..}
+                                | PlayerState::EndOfTrack { track_id: old_track_id, .. } =>
+                                    self.send_event(PlayerEvent::Changed {
+                                        old_track_id: old_track_id,
+                                        new_track_id: track_id
+                                    }),
+                                _ => self.send_event(PlayerEvent::Started { track_id }),
                             }
+
                             self.start_sink();
 
                             self.state = PlayerState::Playing {
+                                track_id: track_id,
                                 decoder: decoder,
                                 end_of_track: end_of_track,
                                 normalisation_factor: normalisation_factor,
                             };
                         } else {
-                            if self.state.is_playing() {
-                                self.run_onstop();
-                            }
-
                             self.state = PlayerState::Paused {
+                                track_id: track_id,
                                 decoder: decoder,
                                 end_of_track: end_of_track,
                                 normalisation_factor: normalisation_factor,
                             };
+                            match self.state {
+                                PlayerState::Playing { track_id: old_track_id, ..}
+                                | PlayerState::EndOfTrack { track_id: old_track_id, .. } =>
+                                    self.send_event(PlayerEvent::Changed {
+                                        old_track_id: old_track_id,
+                                        new_track_id: track_id
+                                    }),
+                                _ => (),
+                            }
+                            self.send_event(PlayerEvent::Stopped { track_id });
                         }
                     }
 
                     None => {
                         let _ = end_of_track.send(());
-                        if self.state.is_playing() {
-                            self.run_onstop();
-                        }
                     }
                 }
             }
@@ -394,10 +424,10 @@ impl PlayerInternal {
             }
 
             PlayerCommand::Play => {
-                if let PlayerState::Paused { .. } = self.state {
+                if let PlayerState::Paused { track_id, .. } = self.state {
                     self.state.paused_to_playing();
 
-                    self.run_onstart();
+                    self.send_event(PlayerEvent::Started { track_id });
                     self.start_sink();
                 } else {
                     warn!("Player::play called from invalid state");
@@ -405,11 +435,11 @@ impl PlayerInternal {
             }
 
             PlayerCommand::Pause => {
-                if let PlayerState::Playing { .. } = self.state {
+                if let PlayerState::Playing { track_id, .. } = self.state {
                     self.state.playing_to_paused();
 
                     self.stop_sink_if_running();
-                    self.run_onstop();
+                    self.send_event(PlayerEvent::Stopped { track_id });
                 } else {
                     warn!("Player::pause called from invalid state");
                 }
@@ -417,12 +447,11 @@ impl PlayerInternal {
 
             PlayerCommand::Stop => {
                 match self.state {
-                    PlayerState::Playing { .. } => {
+                    PlayerState::Playing { track_id, .. }
+                    | PlayerState::Paused { track_id, .. }
+                    | PlayerState::EndOfTrack { track_id } => {
                         self.stop_sink_if_running();
-                        self.run_onstop();
-                        self.state = PlayerState::Stopped;
-                    }
-                    PlayerState::Paused { .. } => {
+                        self.send_event(PlayerEvent::Stopped { track_id });
                         self.state = PlayerState::Stopped;
                     },
                     PlayerState::Stopped => {
@@ -434,16 +463,8 @@ impl PlayerInternal {
         }
     }
 
-    fn run_onstart(&self) {
-        if let Some(ref program) = self.config.onstart {
-            run_program(program)
-        }
-    }
-
-    fn run_onstop(&self) {
-        if let Some(ref program) = self.config.onstop {
-            run_program(program)
-        }
+    fn send_event(&mut self, event: PlayerEvent) {
+        let _ = self.event_sender.unbounded_send(event.clone());
     }
 
     fn find_available_alternative<'a>(&self, track: &'a Track) -> Option<Cow<'a, Track>> {
@@ -586,14 +607,4 @@ impl<T: Read + Seek> Seek for Subfile<T> {
             Ok(0)
         }
     }
-}
-
-fn run_program(program: &str) {
-    info!("Running {}", program);
-    let mut v: Vec<&str> = program.split_whitespace().collect();
-    let status = Command::new(&v.remove(0))
-            .args(&v)
-            .status()
-            .expect("program failed to start");
-    info!("Exit status: {}", status);
 }
