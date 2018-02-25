@@ -50,7 +50,7 @@ impl SpotifyId {
 
     pub fn from_raw(data: &[u8]) -> Result<SpotifyId, SpotifyIdError> {
         if data.len() != 16 {
-            return Err(SpotifyIdError)
+            return Err(SpotifyIdError);
         };
 
         let high = BigEndian::read_u64(&data[0..8]);
