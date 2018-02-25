@@ -193,9 +193,10 @@ pub fn get_credentials<F: FnOnce(&String) -> String>(
             Some(credentials.clone())
         }
 
-        (Some(username), None, _) => {
-            Some(Credentials::with_password(username.clone(), prompt(&username)))
-        }
+        (Some(username), None, _) => Some(Credentials::with_password(
+            username.clone(),
+            prompt(&username),
+        )),
 
         (None, _, Some(credentials)) => Some(credentials),
 

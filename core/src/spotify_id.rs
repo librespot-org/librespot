@@ -1,7 +1,6 @@
 use byteorder::{BigEndian, ByteOrder};
 use std;
 use std::fmt;
-use std::io::Result;
 use util::u128;
 // Unneeded since 1.21
 #[allow(unused_imports)]
@@ -10,17 +9,22 @@ use std::ascii::AsciiExt;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SpotifyId(u128);
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct SpotifyIdError;
+
 const BASE62_DIGITS: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
 
 impl SpotifyId {
-    pub fn from_base16(id: &str) -> Result<SpotifyId> {
-        assert!(id.is_ascii());
+    pub fn from_base16(id: &str) -> Result<SpotifyId, SpotifyIdError> {
         let data = id.as_bytes();
 
         let mut n: u128 = u128::zero();
         for c in data {
-            let d = BASE16_DIGITS.iter().position(|e| e == c).unwrap() as u8;
+            let d = match BASE16_DIGITS.iter().position(|e| e == c) {
+                None => return Err(SpotifyIdError),
+                Some(x) => x as u8,
+            };
             n = n * u128::from(16);
             n = n + u128::from(d);
         }
@@ -28,13 +32,15 @@ impl SpotifyId {
         Ok(SpotifyId(n))
     }
 
-    pub fn from_base62(id: &str) -> Result<SpotifyId> {
-        assert!(id.is_ascii());
+    pub fn from_base62(id: &str) -> Result<SpotifyId, SpotifyIdError> {
         let data = id.as_bytes();
 
         let mut n: u128 = u128::zero();
         for c in data {
-            let d = BASE62_DIGITS.iter().position(|e| e == c).unwrap() as u8;
+            let d = match BASE62_DIGITS.iter().position(|e| e == c) {
+                None => return Err(SpotifyIdError),
+                Some(x) => x as u8,
+            };
             n = n * u128::from(62);
             n = n + u128::from(d);
         }
@@ -42,8 +48,10 @@ impl SpotifyId {
         Ok(SpotifyId(n))
     }
 
-    pub fn from_raw(data: &[u8]) -> Result<SpotifyId> {
-        assert_eq!(data.len(), 16);
+    pub fn from_raw(data: &[u8]) -> Result<SpotifyId, SpotifyIdError> {
+        if data.len() != 16 {
+            return Err(SpotifyIdError)
+        };
 
         let high = BigEndian::read_u64(&data[0..8]);
         let low = BigEndian::read_u64(&data[8..16]);
