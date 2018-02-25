@@ -7,11 +7,11 @@ use crypto::hmac::Hmac;
 use crypto::pbkdf2::pbkdf2;
 use crypto::sha1::Sha1;
 use protobuf::ProtobufEnum;
-use rpassword;
 use serde;
 use serde_json;
 use std::fs::File;
-use std::io::{self, stderr, Read, Write};
+use std::io::{self, Read, Write};
+use std::ops::FnOnce;
 use std::path::Path;
 
 use protocol::authentication::AuthenticationType;
@@ -180,10 +180,11 @@ where
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
-pub fn get_credentials(
+pub fn get_credentials<F: FnOnce(&String) -> String>(
     username: Option<String>,
     password: Option<String>,
     cached_credentials: Option<Credentials>,
+    prompt: F,
 ) -> Option<Credentials> {
     match (username, password, cached_credentials) {
         (Some(username), Some(password), _) => Some(Credentials::with_password(username, password)),
@@ -193,10 +194,7 @@ pub fn get_credentials(
         }
 
         (Some(username), None, _) => {
-            write!(stderr(), "Password for {}: ", username).unwrap();
-            stderr().flush().unwrap();
-            let password = rpassword::read_password().unwrap();
-            Some(Credentials::with_password(username.clone(), password))
+            Some(Credentials::with_password(username.clone(), prompt(&username)))
         }
 
         (None, _, Some(credentials)) => Some(credentials),
