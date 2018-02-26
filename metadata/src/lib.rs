@@ -113,7 +113,7 @@ impl Metadata for Track {
         let artists = msg.get_artist()
             .iter()
             .filter(|artist| artist.has_gid())
-            .map(|artist| SpotifyId::from_raw(artist.get_gid()))
+            .map(|artist| SpotifyId::from_raw(artist.get_gid()).unwrap())
             .collect::<Vec<_>>();
 
         let files = msg.get_file()
@@ -127,15 +127,15 @@ impl Metadata for Track {
             .collect();
 
         Track {
-            id: SpotifyId::from_raw(msg.get_gid()),
+            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             duration: msg.get_duration(),
-            album: SpotifyId::from_raw(msg.get_album().get_gid()),
+            album: SpotifyId::from_raw(msg.get_album().get_gid()).unwrap(),
             artists: artists,
             files: files,
             alternatives: msg.get_alternative()
                 .iter()
-                .map(|alt| SpotifyId::from_raw(alt.get_gid()))
+                .map(|alt| SpotifyId::from_raw(alt.get_gid()).unwrap())
                 .collect(),
             available: parse_restrictions(msg.get_restriction(), &country, "premium"),
         }
@@ -153,14 +153,14 @@ impl Metadata for Album {
         let artists = msg.get_artist()
             .iter()
             .filter(|artist| artist.has_gid())
-            .map(|artist| SpotifyId::from_raw(artist.get_gid()))
+            .map(|artist| SpotifyId::from_raw(artist.get_gid()).unwrap())
             .collect::<Vec<_>>();
 
         let tracks = msg.get_disc()
             .iter()
             .flat_map(|disc| disc.get_track())
             .filter(|track| track.has_gid())
-            .map(|track| SpotifyId::from_raw(track.get_gid()))
+            .map(|track| SpotifyId::from_raw(track.get_gid()).unwrap())
             .collect::<Vec<_>>();
 
         let covers = msg.get_cover_group()
@@ -175,7 +175,7 @@ impl Metadata for Album {
             .collect::<Vec<_>>();
 
         Album {
-            id: SpotifyId::from_raw(msg.get_gid()),
+            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             artists: artists,
             tracks: tracks,
@@ -202,13 +202,13 @@ impl Metadata for Artist {
                 .get_track()
                 .iter()
                 .filter(|track| track.has_gid())
-                .map(|track| SpotifyId::from_raw(track.get_gid()))
+                .map(|track| SpotifyId::from_raw(track.get_gid()).unwrap())
                 .collect::<Vec<_>>(),
             None => Vec::new(),
         };
 
         Artist {
-            id: SpotifyId::from_raw(msg.get_gid()),
+            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             top_tracks: top_tracks,
         }

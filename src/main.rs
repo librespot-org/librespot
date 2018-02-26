@@ -3,6 +3,7 @@ extern crate env_logger;
 extern crate futures;
 extern crate getopts;
 extern crate librespot;
+extern crate rpassword;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_signal;
@@ -177,10 +178,17 @@ fn setup(args: &[String]) -> Setup {
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);
 
+        let password = |username: &String| -> String {
+            write!(stderr(), "Password for {}: ", username).unwrap();
+            stderr().flush().unwrap();
+            rpassword::read_password().unwrap()
+        };
+
         get_credentials(
             matches.opt_str("username"),
             matches.opt_str("password"),
-            cached_credentials
+            cached_credentials,
+            password
         )
     };
 

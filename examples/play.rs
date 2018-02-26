@@ -28,7 +28,7 @@ fn main() {
     let password = args[2].to_owned();
     let credentials = Credentials::with_password(username, password);
 
-    let track = SpotifyId::from_base62(&args[3]);
+    let track = SpotifyId::from_base62(&args[3]).unwrap();
 
     let backend = audio_backend::find(None).unwrap();
 
