@@ -6,9 +6,9 @@ use tokio_core::reactor::Core;
 
 use librespot::core::authentication::Credentials;
 use librespot::core::config::SessionConfig;
-use librespot::playback::config::PlayerConfig;
 use librespot::core::session::Session;
 use librespot::core::spotify_id::SpotifyId;
+use librespot::playback::config::PlayerConfig;
 
 use librespot::playback::audio_backend;
 use librespot::playback::player::Player;
@@ -20,7 +20,7 @@ fn main() {
     let session_config = SessionConfig::default();
     let player_config = PlayerConfig::default();
 
-    let args : Vec<_> = env::args().collect();
+    let args: Vec<_> = env::args().collect();
     if args.len() != 4 {
         println!("Usage: {} USERNAME PASSWORD TRACK", args[0]);
     }
@@ -33,9 +33,12 @@ fn main() {
     let backend = audio_backend::find(None).unwrap();
 
     println!("Connecting ..");
-    let session = core.run(Session::connect(session_config, credentials, None, handle)).unwrap();
+    let session = core.run(Session::connect(session_config, credentials, None, handle))
+        .unwrap();
 
-    let player = Player::new(player_config, session.clone(), None, move || (backend)(None));
+    let player = Player::new(player_config, session.clone(), None, move || {
+        (backend)(None)
+    });
 
     println!("Playing...");
     core.run(player.load(track, true, 0)).unwrap();

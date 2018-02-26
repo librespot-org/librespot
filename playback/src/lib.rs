@@ -1,7 +1,8 @@
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
-extern crate futures;
 extern crate byteorder;
+extern crate futures;
 
 #[cfg(feature = "alsa-backend")]
 extern crate alsa;

@@ -7,8 +7,9 @@ use std::ops::Add;
 
 use core::audio_key::AudioKey;
 
-const AUDIO_AESIV: &'static [u8] = &[0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77, 0xeb, 0xe8,
-                                     0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93];
+const AUDIO_AESIV: &'static [u8] = &[
+    0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77, 0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93
+];
 
 pub struct AudioDecrypt<T: io::Read> {
     cipher: Box<SynchronousStreamCipher + 'static>,
@@ -44,8 +45,8 @@ impl<T: io::Read + io::Seek> io::Seek for AudioDecrypt<T> {
         let skip = newpos % 16;
 
         let iv = BigUint::from_bytes_be(AUDIO_AESIV)
-                     .add(BigUint::from_u64(newpos / 16).unwrap())
-                     .to_bytes_be();
+            .add(BigUint::from_u64(newpos / 16).unwrap())
+            .to_bytes_be();
         self.cipher = aes::ctr(aes::KeySize::KeySize128, &self.key.0, &iv);
 
         let buf = vec![0u8; skip as usize];

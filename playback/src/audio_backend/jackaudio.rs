@@ -1,11 +1,12 @@
-use std::io;
 use super::{Open, Sink};
-use jack::prelude::{AudioOutPort, AudioOutSpec, Client, JackControl, ProcessScope, AsyncClient, client_options, ProcessHandler, Port };
-use std::sync::mpsc::{sync_channel, SyncSender, Receiver};
+use jack::prelude::{client_options, AsyncClient, AudioOutPort, AudioOutSpec, Client, JackControl, Port,
+                    ProcessHandler, ProcessScope};
+use std::io;
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 pub struct JackSink {
     send: SyncSender<i16>,
-    active_client: AsyncClient<(),JackData>,
+    active_client: AsyncClient<(), JackData>,
 }
 
 pub struct JackData {
@@ -43,15 +44,26 @@ impl Open for JackSink {
 
         let client_name = client_name.unwrap_or("librespot".to_string());
         let (client, _status) = Client::new(&client_name[..], client_options::NO_START_SERVER).unwrap();
-        let ch_r = client.register_port("out_0", AudioOutSpec::default()).unwrap();
-        let ch_l = client.register_port("out_1", AudioOutSpec::default()).unwrap();
+        let ch_r = client
+            .register_port("out_0", AudioOutSpec::default())
+            .unwrap();
+        let ch_l = client
+            .register_port("out_1", AudioOutSpec::default())
+            .unwrap();
         // buffer for samples from librespot (~10ms)
-        let (tx, rx) = sync_channel(2*1024*4);
-        let jack_data = JackData { rec: rx, port_l: ch_l, port_r: ch_r };
+        let (tx, rx) = sync_channel(2 * 1024 * 4);
+        let jack_data = JackData {
+            rec: rx,
+            port_l: ch_l,
+            port_r: ch_r,
+        };
         let active_client = AsyncClient::new(client, (), jack_data).unwrap();
 
-        JackSink { send: tx, active_client: active_client }
-   }
+        JackSink {
+            send: tx,
+            active_client: active_client,
+        }
+    }
 }
 
 impl Sink for JackSink {
