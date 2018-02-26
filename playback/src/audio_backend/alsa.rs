@@ -1,11 +1,11 @@
 use super::{Open, Sink};
+use alsa::{Access, Format, Mode, Stream, PCM};
 use std::io;
-use alsa::{PCM, Stream, Mode, Format, Access};
 
 pub struct AlsaSink(Option<PCM>, String);
 
 impl Open for AlsaSink {
-   fn open(device: Option<String>) -> AlsaSink {
+    fn open(device: Option<String>) -> AlsaSink {
         info!("Using alsa sink");
 
         let name = device.unwrap_or("default".to_string());
@@ -17,14 +17,22 @@ impl Open for AlsaSink {
 impl Sink for AlsaSink {
     fn start(&mut self) -> io::Result<()> {
         if self.0.is_none() {
-            match PCM::open(&*self.1,
-                                    Stream::Playback, Mode::Blocking,
-                                    Format::Signed16, Access::Interleaved,
-                                    2, 44100) {
+            match PCM::open(
+                &*self.1,
+                Stream::Playback,
+                Mode::Blocking,
+                Format::Signed16,
+                Access::Interleaved,
+                2,
+                44100,
+            ) {
                 Ok(f) => self.0 = Some(f),
                 Err(e) => {
-                    error!("Alsa error PCM open {}", e); 
-                    return Err(io::Error::new(io::ErrorKind::Other, "Alsa error: PCM open failed"));
+                    error!("Alsa error PCM open {}", e);
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Alsa error: PCM open failed",
+                    ));
                 }
             }
         }

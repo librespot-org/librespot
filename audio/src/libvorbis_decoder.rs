@@ -1,16 +1,19 @@
-#[cfg(not(feature = "with-tremor"))] extern crate vorbis;
-#[cfg(feature = "with-tremor")] extern crate tremor as vorbis;
+#[cfg(feature = "with-tremor")]
+extern crate tremor as vorbis;
+#[cfg(not(feature = "with-tremor"))]
+extern crate vorbis;
 
-use std::io::{Read, Seek};
-use std::fmt;
 use std::error;
+use std::fmt;
+use std::io::{Read, Seek};
 
 pub struct VorbisDecoder<R: Read + Seek>(vorbis::Decoder<R>);
 pub struct VorbisPacket(vorbis::Packet);
 pub struct VorbisError(vorbis::VorbisError);
 
-impl <R> VorbisDecoder<R>
-    where R: Read + Seek
+impl<R> VorbisDecoder<R>
+where
+    R: Read + Seek,
 {
     pub fn new(input: R) -> Result<VorbisDecoder<R>, VorbisError> {
         Ok(VorbisDecoder(vorbis::Decoder::new(input)?))

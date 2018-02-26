@@ -1,24 +1,22 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::Mixer;
 use super::AudioFilter;
+use super::Mixer;
 
 #[derive(Clone)]
 pub struct SoftMixer {
-  volume: Arc<AtomicUsize>
+    volume: Arc<AtomicUsize>,
 }
 
 impl Mixer for SoftMixer {
     fn open() -> SoftMixer {
         SoftMixer {
-            volume: Arc::new(AtomicUsize::new(0xFFFF))
+            volume: Arc::new(AtomicUsize::new(0xFFFF)),
         }
     }
-    fn start(&self) {
-    }
-    fn stop(&self) {
-    }
+    fn start(&self) {}
+    fn stop(&self) {}
     fn volume(&self) -> u16 {
         self.volume.load(Ordering::Relaxed) as u16
     }
@@ -26,12 +24,14 @@ impl Mixer for SoftMixer {
         self.volume.store(volume as usize, Ordering::Relaxed);
     }
     fn get_audio_filter(&self) -> Option<Box<AudioFilter + Send>> {
-        Some(Box::new(SoftVolumeApplier { volume: self.volume.clone() }))
+        Some(Box::new(SoftVolumeApplier {
+            volume: self.volume.clone(),
+        }))
     }
 }
 
 struct SoftVolumeApplier {
-  volume: Arc<AtomicUsize>
+    volume: Arc<AtomicUsize>,
 }
 
 impl AudioFilter for SoftVolumeApplier {

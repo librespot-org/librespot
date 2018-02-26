@@ -1,5 +1,7 @@
-pub trait Mixer : Send {
-    fn open() -> Self where Self: Sized;
+pub trait Mixer: Send {
+    fn open() -> Self
+    where
+        Self: Sized;
     fn start(&self);
     fn stop(&self);
     fn set_volume(&self, volume: u16);
