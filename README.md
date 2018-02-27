@@ -53,19 +53,6 @@ target/release/librespot --name DEVICENAME
 Come and hang out on gitter if you need help or want to offer some.
 https://gitter.im/sashahilton00/spotify-connect-resources
 
-## To-Do/Feature Requests
-If there is a feature request that is being considered, or has been widely requested, it should be listed below. Please do not use this for bug reports or special use case feature requests.
-
-- [ ] Add support for contexts (used by dynamic playlists, Spotify Radio, green now-playing bar, etc.) ([#57](https://github.com/librespot-org/librespot/issues/57))
-- [ ] Document the Spotify Protocol and provide reference example.
-- [ ] Implement API to allow wrappers to be written for librespot.
-- [x] Logarithmic volume scaling ([#10](https://github.com/librespot-org/librespot/issues/10))
-- [ ] Fix Shuffle & Repeat functionality
-- [ ] Provide automatic release binaries for download
-- [ ] Provide an adequate method for exporting metadata ([#7](https://github.com/librespot-org/librespot/issues/7))
-  - [ ] Provide API Documentation
-  - [ ] Provide Schema/Versioning
-
 ## Disclaimer
 Using this code to connect to Spotify's API is probably forbidden by them.
 Use at your own risk.
