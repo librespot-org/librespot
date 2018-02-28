@@ -5,10 +5,6 @@ use rand::{Rand, Rng};
 use std::mem;
 use std::ops::{Mul, Rem, Shr};
 
-mod int128;
-
-pub(crate) use util::int128::u128;
-
 pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
     rng.gen_iter().take(size).collect()
 }

@@ -533,7 +533,7 @@ impl PlayerInternal {
     fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<(Decoder, f32)> {
         let track = Track::get(&self.session, track_id).wait().unwrap();
 
-        info!("Loading track \"{}\"", track.name);
+        info!("Loading track \"{}\" with Spotify URI \"{}\"", track.name, track_id.to_base62());
 
         let track = match self.find_available_alternative(&track) {
             Some(track) => track,
