@@ -1,7 +1,7 @@
 use byteorder::{BigEndian, ByteOrder};
+use extprim::u128::u128;
 use std;
 use std::fmt;
-use extprim::u128::u128;
 // Unneeded since 1.21
 #[allow(unused_imports)]
 use std::ascii::AsciiExt;
@@ -76,7 +76,7 @@ impl SpotifyId {
         let mut data = [0u8; 22];
         let sixty_two = u128::new(62);
         for i in 0..22 {
-            data[21-i] = BASE62_DIGITS[(n % sixty_two).low64() as usize];
+            data[21 - i] = BASE62_DIGITS[(n % sixty_two).low64() as usize];
             n /= sixty_two;
         }
 
