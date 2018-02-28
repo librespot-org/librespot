@@ -534,7 +534,7 @@ impl PlayerInternal {
         let track = Track::get(&self.session, track_id).wait().unwrap();
 
         info!(
-            "Loading track \"{}\" with Spotify URI \"{}\"",
+            "Loading track \"{}\" with Spotify URI \"spotify:track:{}\"",
             track.name,
             track_id.to_base62()
         );
