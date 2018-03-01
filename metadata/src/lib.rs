@@ -52,6 +52,36 @@ where
         && (!has_allowed || countrylist_contains(allowed.as_str(), country))
 }
 
+// use event_hooks::Events;
+#[derive(Debug, Clone)]
+pub enum Events {
+    SessionActive {
+        became_active_at: i64,
+    },
+    SessionInactive {
+        became_inactive_at: i64,
+    },
+    SinkActive,
+    SinkInactive,
+    GotToken {
+        token: String,
+    },
+    // We could just pull in connect::spirc::SpircCommand;
+    // but it's a cyclic dependency //^._.^\\
+    Load {
+        track_id: SpotifyId,
+    },
+    Pause,
+    Play,  // add track_id to these as well.
+    Next,
+    Seek{
+        position_ms: u32,
+    },
+    Volume{
+        volume_to_mixer: u16,
+    },
+}
+
 pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::MessageStatic;
 

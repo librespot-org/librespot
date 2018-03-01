@@ -40,6 +40,10 @@ use librespot::playback::player::{Player, PlayerEvent};
 mod player_event_handler;
 use player_event_handler::run_program_on_events;
 
+mod event_hooks;
+use event_hooks::handle_events;
+use librespot::metadata::Events;
+
 fn device_id(name: &str) -> String {
     let mut h = Sha1::new();
     h.input_str(name);
@@ -323,6 +327,10 @@ struct Main {
 
     player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
     player_event_program: Option<String>,
+
+    session: Option<Session>,
+    event_channel: Option<UnboundedReceiver<Events>>,
+
 }
 
 impl Main {
@@ -346,6 +354,9 @@ impl Main {
 
             player_event_channel: None,
             player_event_program: setup.player_event_program,
+
+            event_channel: None,
+            session: None,
         };
 
         if setup.enable_discovery {
@@ -401,17 +412,22 @@ impl Future for Main {
                 let player_config = self.player_config.clone();
                 let connect_config = self.connect_config.clone();
 
+                // For event hooks
+                let (event_sender, event_receiver) = futures::sync::mpsc::unbounded();
+
                 let audio_filter = mixer.get_audio_filter();
                 let backend = self.backend;
                 let (player, event_channel) =
-                    Player::new(player_config, session.clone(), audio_filter, move || {
+                    Player::new(player_config, session.clone(),event_sender.clone(), audio_filter, move || {
                         (backend)(device)
                     });
 
-                let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
+                let (spirc, spirc_task) = Spirc::new(connect_config, session.clone(), player, mixer,event_sender.clone());
                 self.spirc = Some(spirc);
                 self.spirc_task = Some(spirc_task);
                 self.player_event_channel = Some(event_channel);
+                self.session = Some(session);
+                self.event_channel = Some(event_receiver);
 
                 progress = true;
             }
@@ -436,6 +452,13 @@ impl Future for Main {
                     } else {
                         panic!("Spirc shut down unexpectedly");
                     }
+                }
+            }
+
+            if let Some(ref mut event_channel) = self.event_channel {
+                if let Async::Ready(Some(event)) = event_channel.poll().unwrap() {
+                    // handle_events(event, &self.session.clone().unwrap());
+                    handle_events(event, self.session.clone().unwrap());
                 }
             }
 

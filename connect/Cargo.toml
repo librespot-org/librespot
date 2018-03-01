@@ -9,6 +9,8 @@ path = "../core"
 path = "../playback"
 [dependencies.librespot-protocol]
 path = "../protocol"
+[dependencies.librespot-metadata]
+path = "../metadata"
 
 [dependencies]
 base64 = "0.5.0"

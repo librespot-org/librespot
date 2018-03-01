@@ -17,7 +17,7 @@ use core::spotify_id::SpotifyId;
 use audio::{AudioDecrypt, AudioFile};
 use audio::{VorbisDecoder, VorbisPacket};
 use audio_backend::Sink;
-use metadata::{FileFormat, Metadata, Track};
+use metadata::{FileFormat, Metadata, Track, Events};
 use mixer::AudioFilter;
 
 pub struct Player {
@@ -35,6 +35,7 @@ struct PlayerInternal {
     sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
     event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
+    hook_event_sender: futures::sync::mpsc::UnboundedSender<Events>,
 }
 
 enum PlayerCommand {
@@ -114,6 +115,7 @@ impl Player {
     pub fn new<F>(
         config: PlayerConfig,
         session: Session,
+        hook_event_sender: futures::sync::mpsc::UnboundedSender<Events>,
         audio_filter: Option<Box<AudioFilter + Send>>,
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
@@ -136,6 +138,7 @@ impl Player {
                 sink_running: false,
                 audio_filter: audio_filter,
                 event_sender: event_sender,
+                hook_event_sender: hook_event_sender,
             };
 
             internal.run();
@@ -353,9 +356,13 @@ impl PlayerInternal {
 
     fn start_sink(&mut self) {
         match self.sink.start() {
-            Ok(()) => self.sink_running = true,
+            Ok(()) => {
+                self.sink_running = true;
+                self.send_hook_event(Events::SinkActive);
+            },
             Err(err) => error!("Could not start audio: {}", err),
         }
+
     }
 
     fn stop_sink_if_running(&mut self) {
@@ -366,6 +373,7 @@ impl PlayerInternal {
 
     fn stop_sink(&mut self) {
         self.sink.stop().unwrap();
+        self.send_hook_event(Events::SinkInactive);
         self.sink_running = false;
     }
 
@@ -511,6 +519,10 @@ impl PlayerInternal {
 
     fn send_event(&mut self, event: PlayerEvent) {
         let _ = self.event_sender.unbounded_send(event.clone());
+    }
+
+    fn send_hook_event(&mut self, event: Events) {
+        let _ = self.hook_event_sender.unbounded_send(event.clone());
     }
 
     fn find_available_alternative<'a>(&self, track: &'a Track) -> Option<Cow<'a, Track>> {
