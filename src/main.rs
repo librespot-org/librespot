@@ -287,7 +287,7 @@ fn setup(args: &[String]) -> Setup {
             name: name,
             device_type: device_type,
             volume: initial_volume,
-            linear_volume: matches.opt_present("linear-volume")
+            linear_volume: matches.opt_present("linear-volume"),
         }
     };
 

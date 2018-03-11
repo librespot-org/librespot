@@ -171,8 +171,6 @@ fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
     }
 }
 
-
-
 fn calc_logarithmic_volume(volume: u16) -> u16 {
     // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
     // Convert the given volume [0..0xffff] to a dB gain
@@ -532,8 +530,10 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer
-                    .set_volume(volume_to_mixer(frame.get_volume() as u16, self.linear_volume));
+                self.mixer.set_volume(volume_to_mixer(
+                    frame.get_volume() as u16,
+                    self.linear_volume,
+                ));
                 self.notify(None);
             }
 
@@ -657,7 +657,8 @@ impl SpircTask {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer.set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.mixer
+            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
     }
 
     fn handle_volume_down(&mut self) {
@@ -666,7 +667,8 @@ impl SpircTask {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.mixer
+            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
     }
 
     fn handle_end_of_track(&mut self) {
