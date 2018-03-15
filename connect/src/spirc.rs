@@ -445,7 +445,15 @@ impl SpircTask {
                     self.device.set_became_active_at(now_ms());
                     let _active_at = self.device.get_became_active_at();
                     self.send_event(Events::SessionActive { became_active_at: _active_at} );
-                    self.get_token();
+                    let client_id = option_env!("CLIENT_ID");
+                    match client_id {
+                        Some(c_id) => {
+                            let scopes = String::from("streaming,user-read-playback-state,user-modify-playback-state,user-read-currently-playing,user-read-private");
+                            self.request_access_token(c_id, &scopes);
+                        },
+                        None => (),
+                    }
+
                 }
 
                 self.update_tracks(&frame);
@@ -499,13 +507,16 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeRepeat => {
-                self.state.set_repeat(frame.get_state().get_repeat());
+                let status = frame.get_state().get_repeat();
+                self.state.set_repeat(status);
                 self.notify(None);
+                self.send_event(Events::Repeat{status: status});
             }
 
             MessageType::kMessageTypeShuffle => {
                 self.state.set_shuffle(frame.get_state().get_shuffle());
-                if self.state.get_shuffle() {
+                let shuffle_status = self.state.get_shuffle();
+                if shuffle_status {
                     let current_index = self.state.get_playing_track_index();
                     {
                         let tracks = self.state.mut_track();
@@ -519,6 +530,7 @@ impl SpircTask {
                     let context = self.state.get_context_uri();
                     debug!("{:?}", context);
                 }
+                self.send_event(Events::Shuffle{status: shuffle_status});
                 self.notify(None);
             }
 
@@ -564,7 +576,8 @@ impl SpircTask {
             self.player.play();
             self.state.set_status(PlayStatus::kPlayStatusPlay);
             self.state.set_position_measured_at(now_ms() as u64);
-            self.send_event(Events::Play);
+            let track_id = self.get_current_track_id();
+            self.send_event(Events::Play {track_id: track_id});
         }
     }
 
@@ -589,7 +602,8 @@ impl SpircTask {
 
             self.state.set_position_ms(position + diff as u32);
             self.state.set_position_measured_at(now);
-            self.send_event(Events::Pause);
+            let track_id = self.get_current_track_id();
+            self.send_event(Events::Pause {track_id: track_id});
         }
     }
 
@@ -607,6 +621,7 @@ impl SpircTask {
     fn handle_next(&mut self) {
         let mut new_index = self.consume_queued_track() as u32;
         let mut continue_playing = true;
+        info!("get_context_uri: {:?}", self.state.get_context_uri());
         if new_index >= self.state.get_track().len() as u32 {
             new_index = 0; // Loop around back to start
             continue_playing = self.state.get_repeat();
@@ -616,7 +631,8 @@ impl SpircTask {
         self.state.set_position_measured_at(now_ms() as u64);
 
         self.load_track(continue_playing);
-        self.send_event(Events::Next);
+        let track_id = self.get_current_track_id();
+        self.send_event(Events::Next {track_id: track_id});
     }
 
     fn handle_prev(&mut self) {
@@ -669,6 +685,7 @@ impl SpircTask {
         }
         self.device.set_volume(volume);
         self.mixer.set_volume(volume_to_mixer(volume as u16));
+        info!("Events::Volume");
         self.send_event(Events::Volume{volume_to_mixer: volume as u16});
     }
 
@@ -735,11 +752,19 @@ impl SpircTask {
         }
         cs.send();
     }
-    fn get_token(&mut self){
-        //TODO Add a compile flag/option_env! to this
-        let client_id = env!("CLIENT_ID");
-        let access    = String::from("streaming,user-read-playback-state,user-modify-playback-state,user-read-currently-playing,user-read-private");
-        self.token_fut = keymaster::get_token(&self.session, &client_id, &access)
+
+    fn get_current_track_id(&mut self) -> SpotifyId {
+        let index = self.state.get_playing_track_index();
+        let track = {
+            let gid = self.state.get_track()[index as usize].get_gid();
+            SpotifyId::from_raw(gid).unwrap()
+        };
+
+        track
+    }
+
+    fn request_access_token(&mut self, client_id: &str, scopes: &str){
+        self.token_fut = keymaster::get_token(&self.session, client_id, scopes)
     }
 
     fn send_event(&mut self, event: Events) {

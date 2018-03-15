@@ -71,14 +71,29 @@ pub enum Events {
     Load {
         track_id: SpotifyId,
     },
-    Pause,
-    Play,  // add track_id to these as well.
-    Next,
+    Pause {
+        track_id: SpotifyId,
+    },
+    Play {
+        track_id: SpotifyId,
+    },
+    Next {
+        track_id: SpotifyId,
+    },
+    Previous{
+        track_id: SpotifyId,
+    },
     Seek{
         position_ms: u32,
     },
     Volume{
         volume_to_mixer: u16,
+    },
+    Repeat{
+        status: bool,
+    },
+    Shuffle{
+        status: bool,
     },
 }
 
