@@ -330,7 +330,6 @@ struct Main {
 
     session: Option<Session>,
     event_channel: Option<UnboundedReceiver<Events>>,
-
 }
 
 impl Main {
@@ -417,12 +416,21 @@ impl Future for Main {
 
                 let audio_filter = mixer.get_audio_filter();
                 let backend = self.backend;
-                let (player, event_channel) =
-                    Player::new(player_config, session.clone(),event_sender.clone(), audio_filter, move || {
-                        (backend)(device)
-                    });
+                let (player, event_channel) = Player::new(
+                    player_config,
+                    session.clone(),
+                    event_sender.clone(),
+                    audio_filter,
+                    move || (backend)(device),
+                );
 
-                let (spirc, spirc_task) = Spirc::new(connect_config, session.clone(), player, mixer,event_sender.clone());
+                let (spirc, spirc_task) = Spirc::new(
+                    connect_config,
+                    session.clone(),
+                    player,
+                    mixer,
+                    event_sender.clone(),
+                );
                 self.spirc = Some(spirc);
                 self.spirc_task = Some(spirc_task);
                 self.player_event_channel = Some(event_channel);

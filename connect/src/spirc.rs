@@ -4,13 +4,13 @@ use futures::sync::{mpsc, oneshot};
 use protobuf::{self, Message};
 
 use core::config::ConnectConfig;
+use core::keymaster;
 use core::mercury::MercuryError;
 use core::session::Session;
 use core::spotify_id::SpotifyId;
 use core::util::SeqGenerator;
 use core::version;
-use metadata::{Events};
-use core::keymaster;
+use metadata::Events;
 
 use protocol;
 use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
@@ -22,7 +22,6 @@ use rand;
 use rand::Rng;
 use std;
 use std::time::{SystemTime, UNIX_EPOCH};
-
 
 pub struct SpircTask {
     player: Player,
@@ -325,15 +324,15 @@ impl Future for SpircTask {
                 }
 
                 match self.token_fut.poll() {
-                        Ok(Async::Ready(token)) => {
-                            self.send_event(Events::GotToken {token: token.access_token});
-                            // info!("Got token! {:?}", token);
-                            // Reset the future to avoid polling it agian.
-                            self.token_fut = Box::new(future::empty());
-                        }
-                        Ok(Async::NotReady) => (),
-                        Err(err) => info!("Error: {:?}",err),
+                    Ok(Async::Ready(token)) => {
+                        self.send_event(Events::GotToken {
+                            token: token.access_token,
+                        });
+                        self.token_fut = Box::new(future::empty());
                     }
+                    Ok(Async::NotReady) => (),
+                    Err(err) => info!("Error: {:?}", err),
+                }
             }
 
             let poll_sender = self.sender.poll_complete().unwrap();
@@ -444,16 +443,17 @@ impl SpircTask {
                     self.device.set_is_active(true);
                     self.device.set_became_active_at(now_ms());
                     let _active_at = self.device.get_became_active_at();
-                    self.send_event(Events::SessionActive { became_active_at: _active_at} );
+                    self.send_event(Events::SessionActive {
+                        became_active_at: _active_at,
+                    });
                     let client_id = option_env!("CLIENT_ID");
                     match client_id {
                         Some(c_id) => {
                             let scopes = String::from("streaming,user-read-playback-state,user-modify-playback-state,user-read-currently-playing,user-read-private");
                             self.request_access_token(c_id, &scopes);
-                        },
+                        }
                         None => (),
                     }
-
                 }
 
                 self.update_tracks(&frame);
@@ -510,7 +510,7 @@ impl SpircTask {
                 let status = frame.get_state().get_repeat();
                 self.state.set_repeat(status);
                 self.notify(None);
-                self.send_event(Events::Repeat{status: status});
+                self.send_event(Events::Repeat { status: status });
             }
 
             MessageType::kMessageTypeShuffle => {
@@ -530,7 +530,9 @@ impl SpircTask {
                     let context = self.state.get_context_uri();
                     debug!("{:?}", context);
                 }
-                self.send_event(Events::Shuffle{status: shuffle_status});
+                self.send_event(Events::Shuffle {
+                    status: shuffle_status,
+                });
                 self.notify(None);
             }
 
@@ -541,7 +543,9 @@ impl SpircTask {
                 self.state.set_position_measured_at(now_ms() as u64);
                 self.player.seek(position);
                 self.notify(None);
-                self.send_event(Events::Seek{position_ms:position});
+                self.send_event(Events::Seek {
+                    position_ms: position,
+                });
             }
 
             MessageType::kMessageTypeReplace => {
@@ -562,7 +566,9 @@ impl SpircTask {
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
                     self.mixer.stop();
-                    self.send_event(Events::SessionInactive { became_inactive_at: now_ms()});
+                    self.send_event(Events::SessionInactive {
+                        became_inactive_at: now_ms(),
+                    });
                 }
             }
 
@@ -577,7 +583,7 @@ impl SpircTask {
             self.state.set_status(PlayStatus::kPlayStatusPlay);
             self.state.set_position_measured_at(now_ms() as u64);
             let track_id = self.get_current_track_id();
-            self.send_event(Events::Play {track_id: track_id});
+            self.send_event(Events::Play { track_id: track_id });
         }
     }
 
@@ -603,7 +609,7 @@ impl SpircTask {
             self.state.set_position_ms(position + diff as u32);
             self.state.set_position_measured_at(now);
             let track_id = self.get_current_track_id();
-            self.send_event(Events::Pause {track_id: track_id});
+            self.send_event(Events::Pause { track_id: track_id });
         }
     }
 
@@ -621,7 +627,6 @@ impl SpircTask {
     fn handle_next(&mut self) {
         let mut new_index = self.consume_queued_track() as u32;
         let mut continue_playing = true;
-        info!("get_context_uri: {:?}", self.state.get_context_uri());
         if new_index >= self.state.get_track().len() as u32 {
             new_index = 0; // Loop around back to start
             continue_playing = self.state.get_repeat();
@@ -632,7 +637,7 @@ impl SpircTask {
 
         self.load_track(continue_playing);
         let track_id = self.get_current_track_id();
-        self.send_event(Events::Next {track_id: track_id});
+        self.send_event(Events::Next { track_id: track_id });
     }
 
     fn handle_prev(&mut self) {
@@ -685,8 +690,9 @@ impl SpircTask {
         }
         self.device.set_volume(volume);
         self.mixer.set_volume(volume_to_mixer(volume as u16));
-        info!("Events::Volume");
-        self.send_event(Events::Volume{volume_to_mixer: volume as u16});
+        self.send_event(Events::Volume {
+            volume_to_mixer: volume as u16,
+        });
     }
 
     fn handle_volume_down(&mut self) {
@@ -696,7 +702,9 @@ impl SpircTask {
         }
         self.device.set_volume(volume as u32);
         self.mixer.set_volume(volume_to_mixer(volume as u16));
-        self.send_event(Events::Volume{volume_to_mixer: volume as u16});
+        self.send_event(Events::Volume {
+            volume_to_mixer: volume as u16,
+        });
     }
 
     fn handle_end_of_track(&mut self) {
@@ -738,7 +746,7 @@ impl SpircTask {
         }
 
         self.end_of_track = Box::new(end_of_track);
-        self.send_event(Events::Load {track_id: track});
+        self.send_event(Events::Load { track_id: track });
     }
 
     fn hello(&mut self) {
@@ -763,7 +771,7 @@ impl SpircTask {
         track
     }
 
-    fn request_access_token(&mut self, client_id: &str, scopes: &str){
+    fn request_access_token(&mut self, client_id: &str, scopes: &str) {
         self.token_fut = keymaster::get_token(&self.session, client_id, scopes)
     }
 

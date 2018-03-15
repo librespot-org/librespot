@@ -17,7 +17,7 @@ use core::spotify_id::SpotifyId;
 use audio::{AudioDecrypt, AudioFile};
 use audio::{VorbisDecoder, VorbisPacket};
 use audio_backend::Sink;
-use metadata::{FileFormat, Metadata, Track, Events};
+use metadata::{Events, FileFormat, Metadata, Track};
 use mixer::AudioFilter;
 
 pub struct Player {
@@ -359,10 +359,9 @@ impl PlayerInternal {
             Ok(()) => {
                 self.sink_running = true;
                 self.send_hook_event(Events::SinkActive);
-            },
+            }
             Err(err) => error!("Could not start audio: {}", err),
         }
-
     }
 
     fn stop_sink_if_running(&mut self) {

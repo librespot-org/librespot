@@ -55,46 +55,20 @@ where
 // use event_hooks::Events;
 #[derive(Debug, Clone)]
 pub enum Events {
-    SessionActive {
-        became_active_at: i64,
-    },
-    SessionInactive {
-        became_inactive_at: i64,
-    },
+    SessionActive { became_active_at: i64 },
+    SessionInactive { became_inactive_at: i64 },
     SinkActive,
     SinkInactive,
-    GotToken {
-        token: String,
-    },
-    // We could just pull in connect::spirc::SpircCommand;
-    // but it's a cyclic dependency //^._.^\\
-    Load {
-        track_id: SpotifyId,
-    },
-    Pause {
-        track_id: SpotifyId,
-    },
-    Play {
-        track_id: SpotifyId,
-    },
-    Next {
-        track_id: SpotifyId,
-    },
-    Previous{
-        track_id: SpotifyId,
-    },
-    Seek{
-        position_ms: u32,
-    },
-    Volume{
-        volume_to_mixer: u16,
-    },
-    Repeat{
-        status: bool,
-    },
-    Shuffle{
-        status: bool,
-    },
+    GotToken { token: String },
+    Load { track_id: SpotifyId },
+    Pause { track_id: SpotifyId },
+    Play { track_id: SpotifyId },
+    Next { track_id: SpotifyId },
+    Previous { track_id: SpotifyId },
+    Seek { position_ms: u32 },
+    Volume { volume_to_mixer: u16 },
+    Repeat { status: bool },
+    Shuffle { status: bool },
 }
 
 pub trait Metadata: Send + Sized + 'static {
