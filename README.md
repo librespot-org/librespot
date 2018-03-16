@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/librespot-org/librespot.svg?branch=master)](https://travis-ci.org/librespot-org/librespot)
-[![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/sashahilton00/spotify-connect-resources)
+[![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/librespot-org/spotify-connect-resources)
 
 # librespot
 *librespot* is an open source client library for Spotify. It enables
@@ -12,13 +12,25 @@ Note: librespot only works with Spotify Premium
 ## This fork
 As the origin by [plietar](https://github.com/plietar/) is no longer actively maintained, this organisation and repository have been set up so that the project may be maintained and upgraded in the future.
 
-# Wiki
-More information can be found in the [wiki](https://github.com/librespot-org/librespot/wiki)
+# Documentation
+Documentation is currently a work in progress. 
+
+There is some brief documentation on how the protocol works in the [docs](https://github.com/librespot-org/librespot/tree/master/docs) folder, and more general usage and compilation information is available on the [wiki](https://github.com/librespot-org/librespot/wiki). 
+
+[CONTRIBUTING.md](https://github.com/librespot-org/librespot/blob/master/CONTRIBUTING.md) also contains detailed instructions on setting up a development environment, compilation, and contributing guidelines. 
+
+If you wish to learn more about how librespot works overall, the best way is to simply read the code, and ask any questions you have in the Gitter chat linked above.
+
+# Issues
+
+If you run into a bug when using librespot, please search the existing issues before opening a new one. Chances are, we've encountered it before, and have provided a resolution. If not, please open a new one, and where possible, include the backtrace librespot generates on crashing, along with anything we can use to reproduce the issue, eg. the Spotify URI of the song that caused the crash.
 
 # Building
 Rust 1.20.0 or later is required to build librespot.
 
 **If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build. This should have been fixed in more recent versions of Homebrew, but we're leaving this notice here as a warning.**
+
+**We strongly suggest you install rust using rustup, for ease of installation and maintenance.**
 
 It also requires a C, with portaudio.
 
@@ -49,9 +61,17 @@ Once you've built *librespot*, run it using :
 target/release/librespot --name DEVICENAME 
 ```
 
+The above is a minimal example. Here is a more fully fledged one:
+```shell
+target/release/librespot -n "Librespot" -b 320 -c ./cache --enable-volume-normalisation --initial-volume 75 --device-type avr
+```
+The above command will create a receiver named ```Librespot```, with bitrate set to 320kbps, initial volume at 75%, with volume normalisation enabled, and the device displayed in the app as an Audio/Video Receiver. A folder named ```cache``` will be created/used in the current directory, and be used to cache audio data and credentials.
+
+A full list of runtime options are available [here](https://github.com/librespot-org/librespot/wiki/Options)
+
 ## Contact
 Come and hang out on gitter if you need help or want to offer some.
-https://gitter.im/sashahilton00/spotify-connect-resources
+https://gitter.im/librespot-org/spotify-connect-resources
 
 ## Disclaimer
 Using this code to connect to Spotify's API is probably forbidden by them.
