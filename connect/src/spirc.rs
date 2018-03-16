@@ -26,6 +26,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub struct SpircTask {
     player: Player,
     mixer: Box<Mixer>,
+    linear_volume: bool,
 
     sequence: SeqGenerator<u32>,
 
@@ -174,7 +175,7 @@ fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
     }
 }
 
-fn volume_to_mixer(volume: u16) -> u16 {
+fn calc_logarithmic_volume(volume: u16) -> u16 {
     // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
     // Convert the given volume [0..0xffff] to a dB gain
     // We assume a dB range of 60dB.
@@ -194,6 +195,15 @@ fn volume_to_mixer(volume: u16) -> u16 {
 
     // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
     val
+}
+
+fn volume_to_mixer(volume: u16, linear_volume: bool) -> u16 {
+    if linear_volume {
+        debug!("linear volume: {}", volume);
+        volume
+    } else {
+        calc_logarithmic_volume(volume)
+    }
 }
 
 impl Spirc {
@@ -229,12 +239,15 @@ impl Spirc {
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
         let volume = config.volume as u16;
+        let linear_volume = config.linear_volume;
+
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume_to_mixer(volume as u16));
+        mixer.set_volume(volume_to_mixer(volume as u16, linear_volume));
 
         let mut task = SpircTask {
             player: player,
             mixer: mixer,
+            linear_volume: linear_volume,
 
             sequence: SeqGenerator::new(1),
 
@@ -555,8 +568,10 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer
-                    .set_volume(volume_to_mixer(frame.get_volume() as u16));
+                self.mixer.set_volume(volume_to_mixer(
+                    frame.get_volume() as u16,
+                    self.linear_volume,
+                ));
                 self.notify(None);
             }
 
@@ -689,7 +704,8 @@ impl SpircTask {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer.set_volume(volume_to_mixer(volume as u16));
+        self.mixer
+            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
         self.send_event(Events::Volume {
             volume_to_mixer: volume as u16,
         });
@@ -701,7 +717,8 @@ impl SpircTask {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume_to_mixer(volume as u16));
+        self.mixer
+            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
         self.send_event(Events::Volume {
             volume_to_mixer: volume as u16,
         });

@@ -170,6 +170,11 @@ fn setup(args: &[String]) -> Setup {
             "normalisation-pregain",
             "Pregain (dB) applied by volume normalisation",
             "PREGAIN",
+        )
+        .optflag(
+            "",
+            "linear-volume",
+            "increase volume linear instead of logarithmic.",
         );
 
     let matches = match opts.parse(&args[1..]) {
@@ -286,6 +291,7 @@ fn setup(args: &[String]) -> Setup {
             name: name,
             device_type: device_type,
             volume: initial_volume,
+            linear_volume: matches.opt_present("linear-volume"),
         }
     };
 

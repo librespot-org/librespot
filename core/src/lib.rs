@@ -15,6 +15,7 @@ extern crate base64;
 extern crate byteorder;
 extern crate bytes;
 extern crate crypto;
+extern crate extprim;
 extern crate hyper;
 extern crate num_bigint;
 extern crate num_integer;
