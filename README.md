@@ -79,3 +79,13 @@ Use at your own risk.
 
 ## License
 Everything in this repository is licensed under the MIT license.
+
+## Related Projects
+This is a non exhaustive list of projects that either use or have modified librespot. If you'd like to include yours, submit a PR.
+
+- [librespot-golang](https://github.com/librespot-org/librespot-golang) - A golang port of librespot.
+- [plugin.audio.spotify](https://github.com/marcelveldt/plugin.audio.spotify) - A Kodi plugin for Spotify.
+- [raspotify](https://github.com/dtcooper/raspotify) - Spotify Connect client for the Raspberry Pi that Just Works™
+- [Spotifyd](https://github.com/Spotifyd/spotifyd) - A stripped down librespot UNIX daemon.
+- [Spotcontrol](https://github.com/badfortrains/spotcontrol) - A golang implementation of a Spotify Connect controller. No playback functionality.
+
