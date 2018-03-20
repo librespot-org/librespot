@@ -112,6 +112,7 @@ impl Sink for PulseAudioSink {
         } else {
             let ptr = data.as_ptr() as *const libc::c_void;
             let len = data.len() as usize * mem::size_of::<i16>();
+            assert!(len > 0);
             call_pulseaudio(
                 |err| unsafe { pa_simple_write(self.s, ptr, len, err) },
                 |ret| ret < 0,
