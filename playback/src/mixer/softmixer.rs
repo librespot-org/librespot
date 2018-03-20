@@ -10,7 +10,7 @@ pub struct SoftMixer {
 }
 
 impl Mixer for SoftMixer {
-    fn open() -> SoftMixer {
+    fn open(_: Option<String>) -> SoftMixer {
         SoftMixer {
             volume: Arc::new(AtomicUsize::new(0xFFFF)),
         }
