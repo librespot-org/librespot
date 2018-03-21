@@ -5,14 +5,29 @@ use alsa;
 
 #[derive(Clone)]
 pub struct AlsaMixer {
-    name: String
+    card: String,
+    mixer: String,
 }
+
+// Doesn't work - Selem is borrowed from Mixer
+// impl AlsaMixer {
+//     fn get_selem(&self ) -> Result<(alsa::mixer::Selem), Box<Error>> {
+//
+//         let selem_id = alsa::mixer::SelemId::new(self.mixer, 0);
+//         let mixer = alsa::mixer::Mixer::new(self.card, false)?;
+//         let selem = mixer.find_selem(&selem_id).unwrap();
+//
+//         Ok((selem))
+//     }
+// }
 
 impl Mixer for AlsaMixer {
     fn open(device: Option<String>) -> AlsaMixer {
-        let name = device.unwrap_or("default".to_string());
+        let card = device.unwrap_or(String::from("default"));
+        let mixer = String::from("PCM");
         AlsaMixer {
-            name: name
+            card: card,
+            mixer: mixer,
         }
     }
 
@@ -23,8 +38,8 @@ impl Mixer for AlsaMixer {
     }
 
     fn volume(&self) -> u16 {
-        let mixer = alsa::mixer::Mixer::new(&self.name, false).unwrap();
-        let selem_id = alsa::mixer::SelemId::new("Master", 0);
+        let mixer = alsa::mixer::Mixer::new(&self.card, false).unwrap();
+        let selem_id = alsa::mixer::SelemId::new(&self.mixer, 0);
         let selem = mixer.find_selem(&selem_id).unwrap();
         let (min, max) = selem.get_playback_volume_range();
         let volume: i64 = selem.get_playback_volume(alsa::mixer::SelemChannelId::FrontLeft).unwrap();
@@ -40,8 +55,8 @@ impl Mixer for AlsaMixer {
     }
 
     fn set_volume(&self, volume: u16) {
-        let mixer = alsa::mixer::Mixer::new(&self.name, false).unwrap();
-        let selem_id = alsa::mixer::SelemId::new("Master", 0);
+        let mixer = alsa::mixer::Mixer::new(&self.card, false).unwrap();
+        let selem_id = alsa::mixer::SelemId::new(&self.mixer, 0);
         let selem = mixer.find_selem(&selem_id).unwrap();
         let (min, max) = selem.get_playback_volume_range();
 
@@ -52,7 +67,7 @@ impl Mixer for AlsaMixer {
         let resolution = max - min + 1;
         let factor: u16 = (((0xFFFF + 1) / resolution) - 1) as u16;
         let volume: i64 = (volume / factor) as i64;
-
+        info!("Setting volume: {:?}", volume);
         selem.set_playback_volume_all(volume).unwrap();
     }
 

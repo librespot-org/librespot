@@ -15,7 +15,7 @@ futures = "0.1.8"
 log = "0.3.5"
 byteorder = "1.2.1"
 
-alsa            = { version = "0.1.5", optional = true }
+alsa            = { git = "https://github.com/diwic/alsa-rs.git", optional = true }
 portaudio-rs    = { version = "0.3.0", optional = true }
 libpulse-sys    = { version = "0.0.0", optional = true }
 jack            = { version = "0.5.3", optional = true }
