@@ -42,7 +42,7 @@ use player_event_handler::run_program_on_events;
 
 mod event_hooks;
 use event_hooks::handle_events;
-use librespot::metadata::Events;
+use librespot::core::events::Event;
 
 fn device_id(name: &str) -> String {
     let mut h = Sha1::new();
@@ -335,7 +335,7 @@ struct Main {
     player_event_program: Option<String>,
 
     session: Option<Session>,
-    event_channel: Option<UnboundedReceiver<Events>>,
+    event_channel: Option<UnboundedReceiver<Event>>,
 }
 
 impl Main {

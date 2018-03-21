@@ -11,13 +11,14 @@ use std::thread;
 use std::time::Duration;
 
 use config::{Bitrate, PlayerConfig};
+use core::events::Event;
 use core::session::Session;
 use core::spotify_id::SpotifyId;
 
 use audio::{AudioDecrypt, AudioFile};
 use audio::{VorbisDecoder, VorbisPacket};
 use audio_backend::Sink;
-use metadata::{Events, FileFormat, Metadata, Track};
+use metadata::{FileFormat, Metadata, Track};
 use mixer::AudioFilter;
 
 pub struct Player {
@@ -35,7 +36,7 @@ struct PlayerInternal {
     sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
     event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
-    hook_event_sender: futures::sync::mpsc::UnboundedSender<Events>,
+    hook_event_sender: futures::sync::mpsc::UnboundedSender<Event>,
 }
 
 enum PlayerCommand {
@@ -115,7 +116,7 @@ impl Player {
     pub fn new<F>(
         config: PlayerConfig,
         session: Session,
-        hook_event_sender: futures::sync::mpsc::UnboundedSender<Events>,
+        hook_event_sender: futures::sync::mpsc::UnboundedSender<Event>,
         audio_filter: Option<Box<AudioFilter + Send>>,
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
@@ -358,7 +359,7 @@ impl PlayerInternal {
         match self.sink.start() {
             Ok(()) => {
                 self.sink_running = true;
-                self.send_hook_event(Events::SinkActive);
+                self.send_hook_event(Event::SinkActive);
             }
             Err(err) => error!("Could not start audio: {}", err),
         }
@@ -372,7 +373,7 @@ impl PlayerInternal {
 
     fn stop_sink(&mut self) {
         self.sink.stop().unwrap();
-        self.send_hook_event(Events::SinkInactive);
+        self.send_hook_event(Event::SinkInactive);
         self.sink_running = false;
     }
 
@@ -520,7 +521,7 @@ impl PlayerInternal {
         let _ = self.event_sender.unbounded_send(event.clone());
     }
 
-    fn send_hook_event(&mut self, event: Events) {
+    fn send_hook_event(&mut self, event: Event) {
         let _ = self.hook_event_sender.unbounded_send(event.clone());
     }
 

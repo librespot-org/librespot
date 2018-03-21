@@ -20,7 +20,6 @@ extern crate dns_sd;
 extern crate mdns;
 
 extern crate librespot_core as core;
-extern crate librespot_metadata as metadata;
 extern crate librespot_playback as playback;
 extern crate librespot_protocol as protocol;
 
