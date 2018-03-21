@@ -35,14 +35,11 @@ use librespot::connect::spirc::{Spirc, SpircTask};
 use librespot::playback::audio_backend::{self, Sink, BACKENDS};
 use librespot::playback::config::{Bitrate, PlayerConfig};
 use librespot::playback::mixer::{self, Mixer};
-use librespot::playback::player::{Player, PlayerEvent};
+use librespot::playback::player::Player;
 
+use librespot::core::events::Event;
 mod player_event_handler;
 use player_event_handler::run_program_on_events;
-
-mod event_hooks;
-use event_hooks::handle_events;
-use librespot::core::events::Event;
 
 fn device_id(name: &str) -> String {
     let mut h = Sha1::new();
@@ -331,7 +328,6 @@ struct Main {
 
     shutdown: bool,
 
-    player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
     player_event_program: Option<String>,
 
     session: Option<Session>,
@@ -357,7 +353,6 @@ impl Main {
             shutdown: false,
             signal: Box::new(tokio_signal::ctrl_c(&handle).flatten_stream()),
 
-            player_event_channel: None,
             player_event_program: setup.player_event_program,
 
             event_channel: None,
@@ -422,7 +417,7 @@ impl Future for Main {
 
                 let audio_filter = mixer.get_audio_filter();
                 let backend = self.backend;
-                let (player, event_channel) = Player::new(
+                let player = Player::new(
                     player_config,
                     session.clone(),
                     event_sender.clone(),
@@ -439,7 +434,6 @@ impl Future for Main {
                 );
                 self.spirc = Some(spirc);
                 self.spirc_task = Some(spirc_task);
-                self.player_event_channel = Some(event_channel);
                 self.session = Some(session);
                 self.event_channel = Some(event_receiver);
 
@@ -471,13 +465,7 @@ impl Future for Main {
 
             if let Some(ref mut event_channel) = self.event_channel {
                 if let Async::Ready(Some(event)) = event_channel.poll().unwrap() {
-                    // handle_events(event, &self.session.clone().unwrap());
-                    handle_events(event, self.session.clone().unwrap());
-                }
-            }
-
-            if let Some(ref mut player_event_channel) = self.player_event_channel {
-                if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
+                    info!("Event: {:?}", event);
                     if let Some(ref program) = self.player_event_program {
                         run_program_on_events(event, program);
                     }

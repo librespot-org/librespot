@@ -35,8 +35,7 @@ struct PlayerInternal {
     sink: Box<Sink>,
     sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
-    event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
-    hook_event_sender: futures::sync::mpsc::UnboundedSender<Event>,
+    event_sender: futures::sync::mpsc::UnboundedSender<Event>,
 }
 
 enum PlayerCommand {
@@ -46,24 +45,6 @@ enum PlayerCommand {
     Stop,
     Seek(u32),
 }
-
-#[derive(Debug, Clone)]
-pub enum PlayerEvent {
-    Started {
-        track_id: SpotifyId,
-    },
-
-    Changed {
-        old_track_id: SpotifyId,
-        new_track_id: SpotifyId,
-    },
-
-    Stopped {
-        track_id: SpotifyId,
-    },
-}
-
-type PlayerEventChannel = futures::sync::mpsc::UnboundedReceiver<PlayerEvent>;
 
 #[derive(Clone, Copy, Debug)]
 struct NormalisationData {
@@ -116,15 +97,14 @@ impl Player {
     pub fn new<F>(
         config: PlayerConfig,
         session: Session,
-        hook_event_sender: futures::sync::mpsc::UnboundedSender<Event>,
+        event_sender: futures::sync::mpsc::UnboundedSender<Event>,
         audio_filter: Option<Box<AudioFilter + Send>>,
         sink_builder: F,
-    ) -> (Player, PlayerEventChannel)
+    ) -> (Player)
     where
         F: FnOnce() -> Box<Sink> + Send + 'static,
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
-        let (event_sender, event_receiver) = futures::sync::mpsc::unbounded();
 
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
@@ -139,19 +119,15 @@ impl Player {
                 sink_running: false,
                 audio_filter: audio_filter,
                 event_sender: event_sender,
-                hook_event_sender: hook_event_sender,
             };
 
             internal.run();
         });
 
-        (
-            Player {
-                commands: Some(cmd_tx),
-                thread_handle: Some(handle),
-            },
-            event_receiver,
-        )
+        Player {
+            commands: Some(cmd_tx),
+            thread_handle: Some(handle),
+        }
     }
 
     fn command(&self, cmd: PlayerCommand) {
@@ -359,7 +335,7 @@ impl PlayerInternal {
         match self.sink.start() {
             Ok(()) => {
                 self.sink_running = true;
-                self.send_hook_event(Event::SinkActive);
+                self.send_event(Event::SinkActive);
             }
             Err(err) => error!("Could not start audio: {}", err),
         }
@@ -373,7 +349,7 @@ impl PlayerInternal {
 
     fn stop_sink(&mut self) {
         self.sink.stop().unwrap();
-        self.send_hook_event(Event::SinkInactive);
+        self.send_event(Event::SinkInactive);
         self.sink_running = false;
     }
 
@@ -422,11 +398,11 @@ impl PlayerInternal {
                                 | PlayerState::EndOfTrack {
                                     track_id: old_track_id,
                                     ..
-                                } => self.send_event(PlayerEvent::Changed {
+                                } => self.send_event(Event::TrackChanged {
                                     old_track_id: old_track_id,
-                                    new_track_id: track_id,
+                                    track_id: track_id,
                                 }),
-                                _ => self.send_event(PlayerEvent::Started { track_id }),
+                                _ => self.send_event(Event::PlaybackStarted { track_id }),
                             }
 
                             self.start_sink();
@@ -452,13 +428,13 @@ impl PlayerInternal {
                                 | PlayerState::EndOfTrack {
                                     track_id: old_track_id,
                                     ..
-                                } => self.send_event(PlayerEvent::Changed {
+                                } => self.send_event(Event::TrackChanged {
                                     old_track_id: old_track_id,
-                                    new_track_id: track_id,
+                                    track_id: track_id,
                                 }),
                                 _ => (),
                             }
-                            self.send_event(PlayerEvent::Stopped { track_id });
+                            self.send_event(Event::PlaybackStopped { track_id });
                         }
                     }
 
@@ -483,7 +459,7 @@ impl PlayerInternal {
                 if let PlayerState::Paused { track_id, .. } = self.state {
                     self.state.paused_to_playing();
 
-                    self.send_event(PlayerEvent::Started { track_id });
+                    self.send_event(Event::PlaybackStarted { track_id });
                     self.start_sink();
                 } else {
                     warn!("Player::play called from invalid state");
@@ -495,7 +471,7 @@ impl PlayerInternal {
                     self.state.playing_to_paused();
 
                     self.stop_sink_if_running();
-                    self.send_event(PlayerEvent::Stopped { track_id });
+                    self.send_event(Event::PlaybackStopped { track_id });
                 } else {
                     warn!("Player::pause called from invalid state");
                 }
@@ -506,7 +482,7 @@ impl PlayerInternal {
                 | PlayerState::Paused { track_id, .. }
                 | PlayerState::EndOfTrack { track_id } => {
                     self.stop_sink_if_running();
-                    self.send_event(PlayerEvent::Stopped { track_id });
+                    self.send_event(Event::PlaybackStopped { track_id });
                     self.state = PlayerState::Stopped;
                 }
                 PlayerState::Stopped => {
@@ -517,12 +493,8 @@ impl PlayerInternal {
         }
     }
 
-    fn send_event(&mut self, event: PlayerEvent) {
+    fn send_event(&mut self, event: Event) {
         let _ = self.event_sender.unbounded_send(event.clone());
-    }
-
-    fn send_hook_event(&mut self, event: Event) {
-        let _ = self.hook_event_sender.unbounded_send(event.clone());
     }
 
     fn find_available_alternative<'a>(&self, track: &'a Track) -> Option<Cow<'a, Track>> {
