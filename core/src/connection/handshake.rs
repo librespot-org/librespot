@@ -93,10 +93,7 @@ fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8
     packet
         .mut_cryptosuites_supported()
         .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);
-    packet
-        .mut_login_crypto_hello()
-        .mut_diffie_hellman()
-        .set_gc(gc);
+    packet.mut_login_crypto_hello().mut_diffie_hellman().set_gc(gc);
     packet
         .mut_login_crypto_hello()
         .mut_diffie_hellman()

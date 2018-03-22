@@ -88,8 +88,7 @@ impl Decoder for APCodec {
 
                 let mut payload = buf.split_to(size + MAC_SIZE);
 
-                self.decode_cipher
-                    .decrypt(&mut payload.get_mut(..size).unwrap());
+                self.decode_cipher.decrypt(&mut payload.get_mut(..size).unwrap());
                 let mac = payload.split_off(size);
                 self.decode_cipher.check_mac(mac.as_ref())?;
 

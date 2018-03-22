@@ -31,7 +31,7 @@ pub fn run_program_on_events(event: Event, onevent: &str) {
             env_vars.insert("PLAYER_EVENT", "stop".to_string());
             env_vars.insert("TRACK_ID", track_id.to_base16());
         }
-        _ => ()
+        _ => (),
     }
     run_program(onevent, env_vars);
 }

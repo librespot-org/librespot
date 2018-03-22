@@ -124,11 +124,7 @@ impl Session {
             .map(|_| ());
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task = Box::new(
-            (receiver_task, sender_task)
-                .into_future()
-                .map(|((), ())| ()),
-        );
+        let task = Box::new((receiver_task, sender_task).into_future().map(|((), ())| ()));
 
         (session, task)
     }

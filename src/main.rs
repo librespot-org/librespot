@@ -109,11 +109,7 @@ fn setup(args: &[String]) -> Setup {
         "cache",
         "Path to a directory where files will be cached.",
         "CACHE",
-    ).optflag(
-            "",
-            "disable-audio-cache",
-            "Disable caching of the audio data.",
-        )
+    ).optflag("", "disable-audio-cache", "Disable caching of the audio data.")
         .reqopt("n", "name", "Device name", "NAME")
         .optopt("", "device-type", "Displayed device type", "DEVICE_TYPE")
         .optopt(
@@ -177,12 +173,7 @@ fn setup(args: &[String]) -> Setup {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            writeln!(
-                stderr(),
-                "error: {}\n{}",
-                f.to_string(),
-                usage(&args[0], &opts)
-            ).unwrap();
+            writeln!(stderr(), "error: {}\n{}", f.to_string(), usage(&args[0], &opts)).unwrap();
             exit(1);
         }
     };
