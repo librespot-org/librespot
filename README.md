@@ -26,7 +26,7 @@ If you wish to learn more about how librespot works overall, the best way is to 
 If you run into a bug when using librespot, please search the existing issues before opening a new one. Chances are, we've encountered it before, and have provided a resolution. If not, please open a new one, and where possible, include the backtrace librespot generates on crashing, along with anything we can use to reproduce the issue, eg. the Spotify URI of the song that caused the crash.
 
 # Building
-Rust 1.20.0 or later is required to build librespot.
+Rust 1.21.0 or later is required to build librespot.
 
 **If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build. This should have been fixed in more recent versions of Homebrew, but we're leaving this notice here as a warning.**
 
