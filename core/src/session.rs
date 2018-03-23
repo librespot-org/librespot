@@ -56,7 +56,7 @@ impl Session {
         let proxy = config.proxy.clone();
         let connection = access_point.and_then(move |addr| {
             info!("Connecting to AP \"{}\"", addr);
-            connection::connect::<&str>(&addr, &handle_, &proxy)
+            connection::connect(addr, &handle_, &proxy)
         });
 
         let device_id = config.device_id.clone();

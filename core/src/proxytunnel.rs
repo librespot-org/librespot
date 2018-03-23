@@ -1,12 +1,12 @@
+use std::error::Error;
+use std::io;
+use std::str::FromStr;
+
 use futures::{Async, Future, Poll};
 use httparse;
-
-use std::io;
-use std::net::SocketAddr;
+use hyper::Uri;
 use tokio_io::io::{read, write_all, Read, Window, WriteAll};
 use tokio_io::{AsyncRead, AsyncWrite};
-
-use std::error::Error;
 
 pub struct ProxyTunnel<T> {
     state: ProxyState<T>,
@@ -17,7 +17,7 @@ enum ProxyState<T> {
     ProxyResponse(Read<T, Window<Vec<u8>>>),
 }
 
-pub fn connect<T: AsyncRead + AsyncWrite>(connection: T, connect_url: SocketAddr) -> ProxyTunnel<T> {
+pub fn connect<T: AsyncRead + AsyncWrite>(connection: T, connect_url: &str) -> ProxyTunnel<T> {
     let proxy = proxy_connect(connection, connect_url);
     ProxyTunnel {
         state: ProxyState::ProxyConnect(proxy),
@@ -95,14 +95,13 @@ impl<T: AsyncRead + AsyncWrite> Future for ProxyTunnel<T> {
     }
 }
 
-fn proxy_connect<T: AsyncWrite>(connection: T, connect_url: SocketAddr) -> WriteAll<T, Vec<u8>> {
-    // TODO: It would be better to use a non-resolved url here. This usually works,
-    //       but it may fail in some environments and it will leak DNS requests.
+fn proxy_connect<T: AsyncWrite>(connection: T, connect_url: &str) -> WriteAll<T, Vec<u8>> {
+    let uri = Uri::from_str(&connect_url).unwrap();
     let buffer = format!(
         "CONNECT {0}:{1} HTTP/1.1\r\n\
          \r\n",
-        connect_url.ip(),
-        connect_url.port()
+        uri.host().expect(&format!("No host in {}", uri)),
+        uri.port().expect(&format!("No port in {}", uri))
     ).into_bytes();
 
     write_all(connection, buffer)

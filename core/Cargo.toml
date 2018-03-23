@@ -16,6 +16,7 @@ extprim = "1.5.1"
 futures = "0.1.8"
 httparse = "1.2.4"
 hyper = "0.11.2"
+hyper-proxy = { version = "0.4.1", default_features = false }
 lazy_static = "0.2.0"
 log = "0.3.5"
 num-bigint = "0.1.35"

@@ -18,6 +18,7 @@ extern crate crypto;
 extern crate extprim;
 extern crate httparse;
 extern crate hyper;
+extern crate hyper_proxy;
 extern crate num_bigint;
 extern crate num_integer;
 extern crate num_traits;

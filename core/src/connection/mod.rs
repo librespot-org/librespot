@@ -21,8 +21,8 @@ use proxytunnel;
 
 pub type Transport = Framed<TcpStream, APCodec>;
 
-pub fn connect<A: ToSocketAddrs>(
-    addr: A,
+pub fn connect(
+    addr: String,
     handle: &Handle,
     proxy: &Option<String>,
 ) -> Box<Future<Item = Transport, Error = io::Error>> {
@@ -38,7 +38,7 @@ pub fn connect<A: ToSocketAddrs>(
                     .unwrap()
                     .next()
                     .unwrap(),
-                Some(addr.to_socket_addrs().unwrap().next().unwrap()),
+                Some(addr.clone()),
             )
         }
         None => (addr.to_socket_addrs().unwrap().next().unwrap(), None),
@@ -46,8 +46,8 @@ pub fn connect<A: ToSocketAddrs>(
 
     let socket = TcpStream::connect(&addr, handle);
     if let Some(connect_url) = connect_url {
-        let connection =
-            socket.and_then(move |socket| proxytunnel::connect(socket, connect_url).and_then(handshake));
+        let connection = socket
+            .and_then(move |socket| proxytunnel::connect(socket, &connect_url).and_then(handshake));
         Box::new(connection)
     } else {
         let connection = socket.and_then(handshake);
