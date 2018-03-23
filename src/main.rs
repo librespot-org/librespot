@@ -126,6 +126,7 @@ fn setup(args: &[String]) -> Setup {
         .optflag("v", "verbose", "Enable verbose output")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
+        .optopt("", "proxy", "HTTP proxy to use when connecting", "PROXY")
         .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt(
             "",
@@ -247,6 +248,7 @@ fn setup(args: &[String]) -> Setup {
         SessionConfig {
             user_agent: version::version_string(),
             device_id: device_id,
+            proxy: matches.opt_str("proxy").or(std::env::var("http_proxy").ok()),
         }
     };
 

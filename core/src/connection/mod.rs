@@ -5,9 +5,11 @@ pub use self::codec::APCodec;
 pub use self::handshake::handshake;
 
 use futures::{Future, Sink, Stream};
+use hyper::Uri;
 use protobuf::{self, Message};
 use std::io;
 use std::net::ToSocketAddrs;
+use std::str::FromStr;
 use tokio_core::net::TcpStream;
 use tokio_core::reactor::Handle;
 use tokio_io::codec::Framed;
@@ -15,17 +17,42 @@ use tokio_io::codec::Framed;
 use authentication::Credentials;
 use version;
 
+use proxytunnel;
+
 pub type Transport = Framed<TcpStream, APCodec>;
 
 pub fn connect<A: ToSocketAddrs>(
     addr: A,
     handle: &Handle,
+    proxy: &Option<String>,
 ) -> Box<Future<Item = Transport, Error = io::Error>> {
-    let addr = addr.to_socket_addrs().unwrap().next().unwrap();
-    let socket = TcpStream::connect(&addr, handle);
-    let connection = socket.and_then(|socket| handshake(socket));
+    let (addr, connect_url) = match *proxy {
+        Some(ref url) => {
+            let url = Uri::from_str(url).expect("Malformed proxy address");
+            let host = url.host().expect("Malformed proxy address: no host");
+            let port = url.port().unwrap_or(3128);
 
-    Box::new(connection)
+            (
+                format!("{}:{}", host, port)
+                    .to_socket_addrs()
+                    .unwrap()
+                    .next()
+                    .unwrap(),
+                Some(addr.to_socket_addrs().unwrap().next().unwrap()),
+            )
+        }
+        None => (addr.to_socket_addrs().unwrap().next().unwrap(), None),
+    };
+
+    let socket = TcpStream::connect(&addr, handle);
+    if let Some(connect_url) = connect_url {
+        let connection =
+            socket.and_then(move |socket| proxytunnel::connect(socket, connect_url).and_then(handshake));
+        Box::new(connection)
+    } else {
+        let connection = socket.and_then(handshake);
+        Box::new(connection)
+    }
 }
 
 pub fn authenticate(

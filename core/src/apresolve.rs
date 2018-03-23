@@ -1,7 +1,7 @@
-const AP_FALLBACK: &'static str = "ap.spotify.com:80";
+const AP_FALLBACK: &'static str = "ap.spotify.com:443";
 const APRESOLVE_ENDPOINT: &'static str = "http://apresolve.spotify.com/";
 
-use futures::{Future, Stream};
+use futures::{future, Future, Stream};
 use hyper::{self, Client, Uri};
 use serde_json;
 use std::str::FromStr;
@@ -40,15 +40,24 @@ fn apresolve(handle: &Handle) -> Box<Future<Item = String, Error = Error>> {
     Box::new(ap)
 }
 
-pub(crate) fn apresolve_or_fallback<E>(handle: &Handle) -> Box<Future<Item = String, Error = E>>
+pub(crate) fn apresolve_or_fallback<E>(
+    handle: &Handle,
+    proxy: &Option<String>,
+) -> Box<Future<Item = String, Error = E>>
 where
     E: 'static,
 {
-    let ap = apresolve(handle).or_else(|e| {
-        warn!("Failed to resolve Access Point: {}", e.description());
-        warn!("Using fallback \"{}\"", AP_FALLBACK);
-        Ok(AP_FALLBACK.into())
-    });
-
-    Box::new(ap)
+    if proxy.is_some() {
+        // TODO: Use a proper proxy library and filter out a 443 proxy instead of relying on fallback.
+        //       The problem with current libraries (hyper-proxy, reqwest) is that they depend on TLS
+        //       and this is a dependency we might not want.
+        Box::new(future::result(Ok(AP_FALLBACK.into())))
+    } else {
+        let ap = apresolve(handle).or_else(|e| {
+            warn!("Failed to resolve Access Point: {}", e.description());
+            warn!("Using fallback \"{}\"", AP_FALLBACK);
+            Ok(AP_FALLBACK.into())
+        });
+        Box::new(ap)
+    }
 }

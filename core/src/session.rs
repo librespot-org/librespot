@@ -50,12 +50,13 @@ impl Session {
         cache: Option<Cache>,
         handle: Handle,
     ) -> Box<Future<Item = Session, Error = io::Error>> {
-        let access_point = apresolve_or_fallback::<io::Error>(&handle);
+        let access_point = apresolve_or_fallback::<io::Error>(&handle, &config.proxy);
 
         let handle_ = handle.clone();
+        let proxy = config.proxy.clone();
         let connection = access_point.and_then(move |addr| {
             info!("Connecting to AP \"{}\"", addr);
-            connection::connect::<&str>(&addr, &handle_)
+            connection::connect::<&str>(&addr, &handle_, &proxy)
         });
 
         let device_id = config.device_id.clone();
