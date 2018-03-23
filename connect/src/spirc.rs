@@ -1,6 +1,6 @@
-use futures::{Async, Future, Poll, Sink, Stream};
 use futures::future;
 use futures::sync::{mpsc, oneshot};
+use futures::{Async, Future, Poll, Sink, Stream};
 use protobuf::{self, Message};
 
 use core::config::ConnectConfig;
@@ -442,8 +442,7 @@ impl SpircTask {
                 self.update_tracks(&frame);
 
                 if self.state.get_track().len() > 0 {
-                    self.state
-                        .set_position_ms(frame.get_state().get_position_ms());
+                    self.state.set_position_ms(frame.get_state().get_position_ms());
                     self.state.set_position_measured_at(now_ms() as u64);
 
                     let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
@@ -530,10 +529,8 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer.set_volume(volume_to_mixer(
-                    frame.get_volume() as u16,
-                    self.linear_volume,
-                ));
+                self.mixer
+                    .set_volume(volume_to_mixer(frame.get_volume() as u16, self.linear_volume));
                 self.notify(None);
             }
 

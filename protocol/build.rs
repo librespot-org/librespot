@@ -7,10 +7,7 @@ fn main() {
     for &(path, expected_checksum) in files::FILES {
         let actual = cksum_file(path).unwrap();
         if expected_checksum != actual {
-            panic!(
-                "Checksum for {:?} does not match. Try running build.sh",
-                path
-            );
+            panic!("Checksum for {:?} does not match. Try running build.sh", path);
         }
     }
 }

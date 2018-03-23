@@ -1,9 +1,9 @@
 use bytes::Bytes;
-use futures::{Async, Future, IntoFuture, Poll, Stream};
 use futures::sync::mpsc;
+use futures::{Async, Future, IntoFuture, Poll, Stream};
 use std::io;
-use std::sync::{Arc, RwLock, Weak};
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::{Arc, RwLock, Weak};
 use tokio_core::reactor::{Handle, Remote};
 
 use apresolve::apresolve_or_fallback;
@@ -124,11 +124,7 @@ impl Session {
             .map(|_| ());
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task = Box::new(
-            (receiver_task, sender_task)
-                .into_future()
-                .map(|((), ())| ()),
-        );
+        let task = Box::new((receiver_task, sender_task).into_future().map(|((), ())| ()));
 
         (session, task)
     }

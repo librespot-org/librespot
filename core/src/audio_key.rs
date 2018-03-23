@@ -1,7 +1,7 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
-use futures::{Async, Future, Poll};
 use futures::sync::oneshot;
+use futures::{Async, Future, Poll};
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -35,11 +35,7 @@ impl AudioKeyManager {
                     let _ = sender.send(Ok(AudioKey(key)));
                 }
                 0xe => {
-                    warn!(
-                        "error audio key {:x} {:x}",
-                        data.as_ref()[0],
-                        data.as_ref()[1]
-                    );
+                    warn!("error audio key {:x} {:x}", data.as_ref()[0], data.as_ref()[1]);
                     let _ = sender.send(Err(AudioKeyError));
                 }
                 _ => (),

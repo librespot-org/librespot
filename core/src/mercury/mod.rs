@@ -1,7 +1,7 @@
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::{Async, Future, Poll};
 use futures::sync::{mpsc, oneshot};
+use futures::{Async, Future, Poll};
 use protobuf;
 use protocol;
 use std::collections::HashMap;

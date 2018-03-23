@@ -1,8 +1,8 @@
 use bit_set::BitSet;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use futures::{Async, Future, Poll};
 use futures::Stream;
 use futures::sync::{mpsc, oneshot};
+use futures::{Async, Future, Poll};
 use std::cmp::min;
 use std::fs;
 use std::io::{self, Read, Seek, SeekFrom, Write};
@@ -288,20 +288,12 @@ impl Future for AudioFileFetch {
                 Ok(Async::Ready(Some(data))) => {
                     progress = true;
 
-                    self.output
-                        .as_mut()
-                        .unwrap()
-                        .write_all(data.as_ref())
-                        .unwrap();
+                    self.output.as_mut().unwrap().write_all(data.as_ref()).unwrap();
                 }
                 Ok(Async::Ready(None)) => {
                     progress = true;
 
-                    trace!(
-                        "chunk {} / {} complete",
-                        self.index,
-                        self.shared.chunk_count
-                    );
+                    trace!("chunk {} / {} complete", self.index, self.shared.chunk_count);
 
                     let full = {
                         let mut bitmap = self.shared.bitmap.lock().unwrap();
