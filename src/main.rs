@@ -9,6 +9,7 @@ extern crate rpassword;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_signal;
+extern crate url;
 
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
@@ -23,6 +24,7 @@ use std::process::exit;
 use std::str::FromStr;
 use tokio_core::reactor::{Core, Handle};
 use tokio_io::IoStream;
+use url::Url;
 
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
@@ -248,7 +250,23 @@ fn setup(args: &[String]) -> Setup {
         SessionConfig {
             user_agent: version::version_string(),
             device_id: device_id,
-            proxy: matches.opt_str("proxy").or(std::env::var("http_proxy").ok()),
+            proxy: matches.opt_str("proxy").or(std::env::var("http_proxy").ok()).map(
+                |s| {
+                    match Url::parse(&s) {
+                Ok(url) => {
+                    if url.host().is_none() || url.port().is_none() {
+                        panic!("Invalid proxy url, only urls on the format \"http://host:port\" are allowed");
+                    }
+
+                    if url.scheme() != "http" {
+                        panic!("Only unsecure http:// proxies are supported");
+                    }
+                    url
+                },
+                Err(err) => panic!("Invalid proxy url: {}, only urls on the format \"http://host:port\" are allowed", err)
+            }
+                },
+            ),
         }
     };
 

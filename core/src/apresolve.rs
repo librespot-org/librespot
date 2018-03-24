@@ -8,6 +8,7 @@ use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use serde_json;
 use std::str::FromStr;
 use tokio_core::reactor::Handle;
+use url::Url;
 
 error_chain!{}
 
@@ -16,14 +17,14 @@ pub struct APResolveData {
     ap_list: Vec<String>,
 }
 
-fn apresolve(handle: &Handle, proxy: &Option<String>) -> Box<Future<Item = String, Error = Error>> {
+fn apresolve(handle: &Handle, proxy: &Option<Url>) -> Box<Future<Item = String, Error = Error>> {
     let url = Uri::from_str(APRESOLVE_ENDPOINT).expect("invalid AP resolve URL");
     let use_proxy = proxy.is_some();
 
     let mut req = Request::new(Method::Get, url.clone());
-    let response = match proxy {
-        &Some(ref val) => {
-            let proxy_url = Uri::from_str(&val).expect("invalid http proxy");
+    let response = match *proxy {
+        Some(ref val) => {
+            let proxy_url = Uri::from_str(val.as_str()).expect("invalid http proxy");
             let proxy = Proxy::new(Intercept::All, proxy_url);
             let connector = HttpConnector::new(4, handle);
             let proxy_connector = ProxyConnector::from_proxy_unsecured(connector, proxy);
@@ -73,7 +74,7 @@ fn apresolve(handle: &Handle, proxy: &Option<String>) -> Box<Future<Item = Strin
 
 pub(crate) fn apresolve_or_fallback<E>(
     handle: &Handle,
-    proxy: &Option<String>,
+    proxy: &Option<Url>,
 ) -> Box<Future<Item = String, Error = E>>
 where
     E: 'static,

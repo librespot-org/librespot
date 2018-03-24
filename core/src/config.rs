@@ -1,5 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
+use url::Url;
 use uuid::Uuid;
 
 use version;
@@ -8,7 +9,7 @@ use version;
 pub struct SessionConfig {
     pub user_agent: String,
     pub device_id: String,
-    pub proxy: Option<String>,
+    pub proxy: Option<Url>,
 }
 
 impl Default for SessionConfig {

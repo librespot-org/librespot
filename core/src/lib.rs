@@ -30,6 +30,7 @@ extern crate serde_json;
 extern crate shannon;
 extern crate tokio_core;
 extern crate tokio_io;
+extern crate url;
 extern crate uuid;
 
 extern crate librespot_protocol as protocol;

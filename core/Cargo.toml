@@ -32,6 +32,7 @@ serde_json = "0.9.5"
 shannon = "0.2.0"
 tokio-core = "0.1.2"
 tokio-io = "0.1"
+url = "1.7.0"
 uuid = { version = "0.4", features = ["v4"] }
 
 [build-dependencies]

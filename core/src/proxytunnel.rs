@@ -96,7 +96,7 @@ impl<T: AsyncRead + AsyncWrite> Future for ProxyTunnel<T> {
 }
 
 fn proxy_connect<T: AsyncWrite>(connection: T, connect_url: &str) -> WriteAll<T, Vec<u8>> {
-    let uri = Uri::from_str(&connect_url).unwrap();
+    let uri = Uri::from_str(connect_url).unwrap();
     let buffer = format!(
         "CONNECT {0}:{1} HTTP/1.1\r\n\
          \r\n",
