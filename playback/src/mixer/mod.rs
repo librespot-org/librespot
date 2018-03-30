@@ -39,12 +39,16 @@ impl Default for MixerConfig {
 pub mod softmixer;
 use self::softmixer::SoftMixer;
 
+pub mod nullmixer;
+use self::nullmixer::NullMixer;
+
 fn mk_sink<M: Mixer + 'static>(device: Option<MixerConfig>) -> Box<Mixer> {
     Box::new(M::open(device))
 }
 
 pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<fn(Option<MixerConfig>) -> Box<Mixer>> {
     match name.as_ref().map(AsRef::as_ref) {
+        Some("null") => Some(mk_sink::<NullMixer>),
         None | Some("softvol") => Some(mk_sink::<SoftMixer>),
         #[cfg(feature = "alsa-backend")]
         Some("alsa") => Some(mk_sink::<AlsaMixer>),
