@@ -88,11 +88,8 @@ impl Credentials {
         let blob = {
             // Anyone know what this block mode is ?
             let mut data = vec![0u8; encrypted_blob.len()];
-            let mut cipher = aes::ecb_decryptor(
-                aes::KeySize::KeySize192,
-                &key,
-                crypto::blockmodes::NoPadding,
-            );
+            let mut cipher =
+                aes::ecb_decryptor(aes::KeySize::KeySize192, &key, crypto::blockmodes::NoPadding);
             cipher
                 .decrypt(
                     &mut crypto::buffer::RefReadBuffer::new(&encrypted_blob),
@@ -193,10 +190,9 @@ pub fn get_credentials<F: FnOnce(&String) -> String>(
             Some(credentials.clone())
         }
 
-        (Some(username), None, _) => Some(Credentials::with_password(
-            username.clone(),
-            prompt(&username),
-        )),
+        (Some(username), None, _) => {
+            Some(Credentials::with_password(username.clone(), prompt(&username)))
+        }
 
         (None, _, Some(credentials)) => Some(credentials),
 

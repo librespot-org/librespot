@@ -1,9 +1,9 @@
 use bytes::Bytes;
-use futures::{Async, Future, IntoFuture, Poll, Stream};
 use futures::sync::mpsc;
+use futures::{Async, Future, IntoFuture, Poll, Stream};
 use std::io;
-use std::sync::{Arc, RwLock, Weak};
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::{Arc, RwLock, Weak};
 use tokio_core::reactor::{Handle, Remote};
 
 use apresolve::apresolve_or_fallback;
@@ -50,12 +50,13 @@ impl Session {
         cache: Option<Cache>,
         handle: Handle,
     ) -> Box<Future<Item = Session, Error = io::Error>> {
-        let access_point = apresolve_or_fallback::<io::Error>(&handle);
+        let access_point = apresolve_or_fallback::<io::Error>(&handle, &config.proxy);
 
         let handle_ = handle.clone();
+        let proxy = config.proxy.clone();
         let connection = access_point.and_then(move |addr| {
             info!("Connecting to AP \"{}\"", addr);
-            connection::connect::<&str>(&addr, &handle_)
+            connection::connect(addr, &handle_, &proxy)
         });
 
         let device_id = config.device_id.clone();
@@ -124,11 +125,7 @@ impl Session {
             .map(|_| ());
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task = Box::new(
-            (receiver_task, sender_task)
-                .into_future()
-                .map(|((), ())| ()),
-        );
+        let task = Box::new((receiver_task, sender_task).into_future().map(|((), ())| ()));
 
         (session, task)
     }

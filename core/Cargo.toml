@@ -11,10 +11,12 @@ path = "../protocol"
 base64 = "0.5.0"
 byteorder = "1.0"
 bytes = "0.4"
-error-chain = { version = "0.9.0", default_features = false }
-extprim = "1.5.1" 
+error-chain = { version = "0.11.0", default_features = false }
+extprim = "1.5.1"
 futures = "0.1.8"
+httparse = "1.2.4"
 hyper = "0.11.2"
+hyper-proxy = { version = "0.4.1", default_features = false }
 lazy_static = "0.2.0"
 log = "0.3.5"
 num-bigint = "0.1.35"
@@ -30,6 +32,7 @@ serde_json = "0.9.5"
 shannon = "0.2.0"
 tokio-core = "0.1.2"
 tokio-io = "0.1"
+url = "1.7.0"
 uuid = { version = "0.4", features = ["v4"] }
 
 [build-dependencies]

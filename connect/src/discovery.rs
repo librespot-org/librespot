@@ -2,10 +2,10 @@ use base64;
 use crypto;
 use crypto::digest::Digest;
 use crypto::mac::Mac;
-use futures::{Future, Poll, Stream};
 use futures::sync::mpsc;
-use hyper::{self, Get, Post, StatusCode};
+use futures::{Future, Poll, Stream};
 use hyper::server::{Http, Request, Response, Service};
+use hyper::{self, Get, Post, StatusCode};
 
 #[cfg(feature = "with-dns-sd")]
 use dns_sd::DNSService;

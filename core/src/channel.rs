@@ -1,7 +1,7 @@
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::{Async, Poll, Stream};
 use futures::sync::{mpsc, BiLock};
+use futures::{Async, Poll, Stream};
 use std::collections::HashMap;
 
 use util::SeqGenerator;

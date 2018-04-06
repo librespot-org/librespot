@@ -11,21 +11,37 @@ use std::net::ToSocketAddrs;
 use tokio_core::net::TcpStream;
 use tokio_core::reactor::Handle;
 use tokio_io::codec::Framed;
+use url::Url;
 
 use authentication::Credentials;
 use version;
 
+use proxytunnel;
+
 pub type Transport = Framed<TcpStream, APCodec>;
 
-pub fn connect<A: ToSocketAddrs>(
-    addr: A,
+pub fn connect(
+    addr: String,
     handle: &Handle,
+    proxy: &Option<Url>,
 ) -> Box<Future<Item = Transport, Error = io::Error>> {
-    let addr = addr.to_socket_addrs().unwrap().next().unwrap();
-    let socket = TcpStream::connect(&addr, handle);
-    let connection = socket.and_then(|socket| handshake(socket));
+    let (addr, connect_url) = match *proxy {
+        Some(ref url) => {
+            info!("Using proxy \"{}\"", url);
+            (url.to_socket_addrs().unwrap().next().unwrap(), Some(addr))
+        }
+        None => (addr.to_socket_addrs().unwrap().next().unwrap(), None),
+    };
 
-    Box::new(connection)
+    let socket = TcpStream::connect(&addr, handle);
+    if let Some(connect_url) = connect_url {
+        let connection = socket
+            .and_then(move |socket| proxytunnel::connect(socket, &connect_url).and_then(handshake));
+        Box::new(connection)
+    } else {
+        let connection = socket.and_then(handshake);
+        Box::new(connection)
+    }
 }
 
 pub fn authenticate(
@@ -37,26 +53,18 @@ pub fn authenticate(
     use protocol::keyexchange::APLoginFailed;
 
     let mut packet = ClientResponseEncrypted::new();
-    packet
-        .mut_login_credentials()
-        .set_username(credentials.username);
-    packet
-        .mut_login_credentials()
-        .set_typ(credentials.auth_type);
+    packet.mut_login_credentials().set_username(credentials.username);
+    packet.mut_login_credentials().set_typ(credentials.auth_type);
     packet
         .mut_login_credentials()
         .set_auth_data(credentials.auth_data);
-    packet
-        .mut_system_info()
-        .set_cpu_family(CpuFamily::CPU_UNKNOWN);
+    packet.mut_system_info().set_cpu_family(CpuFamily::CPU_UNKNOWN);
     packet.mut_system_info().set_os(Os::OS_UNKNOWN);
-    packet
-        .mut_system_info()
-        .set_system_information_string(format!(
-            "librespot_{}_{}",
-            version::short_sha(),
-            version::build_id()
-        ));
+    packet.mut_system_info().set_system_information_string(format!(
+        "librespot_{}_{}",
+        version::short_sha(),
+        version::build_id()
+    ));
     packet.mut_system_info().set_device_id(device_id);
     packet.set_version_string(version::version_string());
 

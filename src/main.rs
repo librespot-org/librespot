@@ -9,12 +9,13 @@ extern crate rpassword;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_signal;
+extern crate url;
 
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 use env_logger::LogBuilder;
-use futures::{Async, Future, Poll, Stream};
 use futures::sync::mpsc::UnboundedReceiver;
+use futures::{Async, Future, Poll, Stream};
 use std::env;
 use std::io::{self, stderr, Write};
 use std::mem;
@@ -23,6 +24,7 @@ use std::process::exit;
 use std::str::FromStr;
 use tokio_core::reactor::{Core, Handle};
 use tokio_io::IoStream;
+use url::Url;
 
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
@@ -108,11 +110,7 @@ fn setup(args: &[String]) -> Setup {
         "cache",
         "Path to a directory where files will be cached.",
         "CACHE",
-    ).optflag(
-            "",
-            "disable-audio-cache",
-            "Disable caching of the audio data.",
-        )
+    ).optflag("", "disable-audio-cache", "Disable caching of the audio data.")
         .reqopt("n", "name", "Device name", "NAME")
         .optopt("", "device-type", "Displayed device type", "DEVICE_TYPE")
         .optopt(
@@ -130,6 +128,7 @@ fn setup(args: &[String]) -> Setup {
         .optflag("v", "verbose", "Enable verbose output")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
+        .optopt("", "proxy", "HTTP proxy to use when connecting", "PROXY")
         .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt(
             "",
@@ -176,12 +175,7 @@ fn setup(args: &[String]) -> Setup {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            writeln!(
-                stderr(),
-                "error: {}\n{}",
-                f.to_string(),
-                usage(&args[0], &opts)
-            ).unwrap();
+            writeln!(stderr(), "error: {}\n{}", f.to_string(), usage(&args[0], &opts)).unwrap();
             exit(1);
         }
     };
@@ -256,6 +250,23 @@ fn setup(args: &[String]) -> Setup {
         SessionConfig {
             user_agent: version::version_string(),
             device_id: device_id,
+            proxy: matches.opt_str("proxy").or(std::env::var("http_proxy").ok()).map(
+                |s| {
+                    match Url::parse(&s) {
+                Ok(url) => {
+                    if url.host().is_none() || url.port().is_none() {
+                        panic!("Invalid proxy url, only urls on the format \"http://host:port\" are allowed");
+                    }
+
+                    if url.scheme() != "http" {
+                        panic!("Only unsecure http:// proxies are supported");
+                    }
+                    url
+                },
+                Err(err) => panic!("Invalid proxy url: {}, only urls on the format \"http://host:port\" are allowed", err)
+            }
+                },
+            ),
         }
     };
 
