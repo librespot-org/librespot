@@ -189,7 +189,9 @@ impl MercuryManager {
             payload: pending.parts,
         };
 
-        if response.status_code >= 400 {
+        if response.status_code >= 500 {
+            panic!("Spotify servers returned an error. Restart librespot.");
+        } else if response.status_code >= 400 {
             warn!("error {} for uri {}", response.status_code, &response.uri);
             if let Some(cb) = pending.callback {
                 let _ = cb.send(Err(MercuryError));
