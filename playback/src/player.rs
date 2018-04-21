@@ -341,6 +341,10 @@ impl PlayerInternal {
                     self.handle_packet(packet, current_normalisation_factor);
                 }
             }
+
+            if self.session.is_invalid() {
+                return;
+            }
         }
     }
 
