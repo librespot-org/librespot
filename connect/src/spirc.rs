@@ -301,6 +301,10 @@ impl Future for SpircTask {
         loop {
             let mut progress = false;
 
+            if self.session.is_invalid() {
+                return Ok(Async::Ready(()));
+            }
+
             if !self.shutdown {
                 match self.subscription.poll().unwrap() {
                     Async::Ready(Some(frame)) => {
