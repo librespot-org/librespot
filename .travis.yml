@@ -20,10 +20,6 @@ before_script:
     - echo '[target.armv7-unknown-linux-gnueabihf]' > ~/.cargo/config
     - echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
     - rustup target add armv7-unknown-linux-gnueabihf
-    - if [[ $TRAVIS_RUST_VERSION == *"nightly"* ]]; then
-         rustup component add rustfmt-preview;
-         cargo fmt --all -- --write-mode=diff;
-      fi
 
 script:
     - cargo build --locked --no-default-features
