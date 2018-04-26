@@ -2,9 +2,6 @@ use byteorder::{BigEndian, ByteOrder};
 use extprim::u128::u128;
 use std;
 use std::fmt;
-// Unneeded since 1.21
-#[allow(unused_imports)]
-use std::ascii::AsciiExt;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SpotifyId(u128);
