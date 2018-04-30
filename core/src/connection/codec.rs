@@ -45,7 +45,7 @@ impl Encoder for APCodec {
 
         buf.reserve(3 + payload.len());
         buf.put_u8(cmd);
-        buf.put_u16::<BigEndian>(payload.len() as u16);
+        buf.put_u16_be(payload.len() as u16);
         buf.extend_from_slice(&payload);
 
         self.encode_cipher.nonce_u32(self.encode_nonce);
