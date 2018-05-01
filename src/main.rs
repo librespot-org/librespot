@@ -468,10 +468,6 @@ impl Future for Main {
             if !progress {
                 return Ok(Async::NotReady);
             }
-
-            if self.shutdown {
-                return Ok(Async::Ready(()));
-            }
         }
     }
 }
