@@ -90,6 +90,7 @@ fn list_backends() {
 struct Setup {
     backend: fn(Option<String>) -> Box<Sink>,
     device: Option<String>,
+    metadata_pipe: Option<String>,
 
     mixer: fn() -> Box<Mixer>,
 
@@ -143,6 +144,7 @@ fn setup(args: &[String]) -> Setup {
             "DEVICE",
         )
         .optopt("", "mixer", "Mixer to use", "MIXER")
+        .optopt("", "metadata-pipe", "Pipe to write metadata", "METADATA_PIPE")
         .optopt(
             "",
             "initial-volume",
@@ -200,6 +202,8 @@ fn setup(args: &[String]) -> Setup {
     let backend = audio_backend::find(backend_name).expect("Invalid backend");
 
     let device = matches.opt_str("device");
+
+    let metadata_pipe = matches.opt_str("metadata-pipe");
 
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
@@ -312,6 +316,7 @@ fn setup(args: &[String]) -> Setup {
         connect_config: connect_config,
         credentials: credentials,
         device: device,
+        metadata_pipe: metadata_pipe,
         enable_discovery: enable_discovery,
         zeroconf_port: zeroconf_port,
         mixer: mixer,
@@ -326,6 +331,7 @@ struct Main {
     connect_config: ConnectConfig,
     backend: fn(Option<String>) -> Box<Sink>,
     device: Option<String>,
+    metadata_pipe: Option<String>,
     mixer: fn() -> Box<Mixer>,
     handle: Handle,
 
@@ -352,6 +358,7 @@ impl Main {
             connect_config: setup.connect_config,
             backend: setup.backend,
             device: setup.device,
+            metadata_pipe: setup.metadata_pipe,
             mixer: setup.mixer,
 
             connect: Box::new(futures::future::empty()),
@@ -414,16 +421,22 @@ impl Future for Main {
             if let Async::Ready(session) = self.connect.poll().unwrap() {
                 self.connect = Box::new(futures::future::empty());
                 let device = self.device.clone();
-                let mixer = (self.mixer)();
+                let mut mixer = (self.mixer)();
                 let player_config = self.player_config.clone();
                 let connect_config = self.connect_config.clone();
+                let metadata_pipe = self.metadata_pipe.clone();
+
+                mixer.set_metadata_pipe(metadata_pipe.clone());
 
                 let audio_filter = mixer.get_audio_filter();
                 let backend = self.backend;
-                let (player, event_channel) =
-                    Player::new(player_config, session.clone(), audio_filter, move || {
-                        (backend)(device)
-                    });
+                let (player, event_channel) = Player::new(
+                    player_config,
+                    session.clone(),
+                    audio_filter,
+                    metadata_pipe,
+                    move || (backend)(device),
+                );
 
                 let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
                 self.spirc = Some(spirc);

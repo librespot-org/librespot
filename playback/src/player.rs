@@ -1,5 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use futures;
+use base64;
 use futures::sync::oneshot;
 use futures::{future, Future};
 use std;
@@ -9,6 +10,8 @@ use std::mem;
 use std::sync::mpsc::{RecvError, RecvTimeoutError, TryRecvError};
 use std::thread;
 use std::time::Duration;
+use std::fs::File;
+use std::io::Write;
 
 use config::{Bitrate, PlayerConfig};
 use core::session::Session;
@@ -17,7 +20,7 @@ use core::spotify_id::SpotifyId;
 use audio::{AudioDecrypt, AudioFile};
 use audio::{VorbisDecoder, VorbisPacket};
 use audio_backend::Sink;
-use metadata::{FileFormat, Metadata, Track};
+use metadata::{FileFormat, Metadata, Track, Album, Artist};
 use mixer::AudioFilter;
 
 pub struct Player {
@@ -35,6 +38,8 @@ struct PlayerInternal {
     sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
     event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
+
+    metadata_pipe: Option<String>,
 }
 
 enum PlayerCommand {
@@ -113,6 +118,7 @@ impl Player {
         config: PlayerConfig,
         session: Session,
         audio_filter: Option<Box<AudioFilter + Send>>,
+        metadata_pipe: Option<String>,
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
     where
@@ -133,6 +139,7 @@ impl Player {
                 sink: sink_builder(),
                 sink_running: false,
                 audio_filter: audio_filter,
+                metadata_pipe: metadata_pipe,
                 event_sender: event_sender,
             };
 
@@ -534,6 +541,39 @@ impl PlayerInternal {
             track.name,
             track_id.to_base62()
         );
+
+        if let Some(path) = self.metadata_pipe.as_ref() {
+            let mut f = File::create(path).expect("Unable to open pipe");
+
+            // title
+            let title = track.name.clone();
+            let title_len = title.chars().count();
+            let title_string = base64::encode(&title);
+            let title_xml = format!("<item><type>636f7265</type><code>6d696e6d</code><length>{}</length>\n<data encoding=\"base64\">\n{}</data></item>", title_len, title_string);
+            f.write_all(title_xml.as_bytes()).expect("Unable to write title");
+
+            // album
+            let album = Album::get(&self.session, track.album).wait().unwrap();
+            let album_name = album.name.clone();
+            let album_name_len = album_name.chars().count();
+            let album_name_string = base64::encode(&album_name);
+            let album_name_xml = format!("<item><type>636f7265</type><code>6173616c</code><length>{}</length>\n<data encoding=\"base64\">\n{}</data></item>", album_name_len, album_name_string);
+            f.write_all(album_name_xml.as_bytes()).expect("Unable to write album");
+
+            // artist
+            let mut artists = String::new();
+            for id in &track.artists {
+                if artists != "" {
+                    artists.push_str(" & ");
+                }
+                let artist = Artist::get(&self.session, *id).wait().unwrap();
+                artists.push_str(&artist.name);
+            }
+            let artists_len = artists.chars().count();
+            let artists_string = base64::encode(&artists);
+            let artists_xml = format!("<item><type>636f7265</type><code>61736172</code><length>{}</length>\n<data encoding=\"base64\">\n{}</data></item>", artists_len, artists_string);
+            f.write_all(artists_xml.as_bytes()).expect("Unable to write artists");
+        }
 
         let track = match self.find_available_alternative(&track) {
             Some(track) => track,
