@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate log;
-
+extern crate base64;
 extern crate byteorder;
 extern crate futures;
 
