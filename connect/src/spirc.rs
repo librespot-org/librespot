@@ -25,6 +25,7 @@ pub struct SpircTask {
     player: Player,
     mixer: Box<Mixer>,
     linear_volume: bool,
+    persist_volume: Option<String>,
 
     sequence: SeqGenerator<u32>,
 
@@ -243,6 +244,7 @@ impl Spirc {
             player: player,
             mixer: mixer,
             linear_volume: linear_volume,
+            persist_volume: persist_volume,
 
             sequence: SeqGenerator::new(1),
 

@@ -305,6 +305,7 @@ fn setup(args: &[String]) -> Setup {
             device_type: device_type,
             volume: initial_volume,
             linear_volume: matches.opt_present("linear-volume"),
+            persist_volume: persist_volume,
         }
     };
 
