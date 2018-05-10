@@ -1,6 +1,8 @@
 use super::{Open, Sink};
-use jack::prelude::{client_options, AsyncClient, AudioOutPort, AudioOutSpec, Client, JackControl, Port,
-                    ProcessHandler, ProcessScope};
+use jack::prelude::{
+    client_options, AsyncClient, AudioOutPort, AudioOutSpec, Client, JackControl, Port, ProcessHandler,
+    ProcessScope,
+};
 use std::io;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 

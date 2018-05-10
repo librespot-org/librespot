@@ -200,7 +200,8 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
 fn write_volume(volume: u16, filepath: Option<String>) {
     let volume = volume as i32 * 100 / 0xFFFF;
     let mut file = File::create(filepath.unwrap()).expect("Could not create persistent volume");
-    file.write_all(volume.to_string().as_bytes()).expect("Could not write persistent volume");
+    file.write_all(volume.to_string().as_bytes())
+        .expect("Could not write persistent volume");
 }
 
 fn volume_to_mixer(volume: u16, linear_volume: bool, persist_volume: Option<String>) -> u16 {

@@ -92,8 +92,11 @@ fn list_backends() {
 fn read_volume(filepath: String) -> i32 {
     let mut data = String::new();
     let mut file = File::open(filepath).expect("Could not open persistent volume");
-    file.read_to_string(&mut data).expect("Could not read persistent volume");
-    let volume = data.trim().parse::<i32>().expect("Persistent volume must be an integer");
+    file.read_to_string(&mut data)
+        .expect("Could not read persistent volume");
+    let volume = data.trim()
+        .parse::<i32>()
+        .expect("Persistent volume must be an integer");
     if volume < 0 || volume > 100 {
         panic!("Initial volume must be in the range 0-100");
     }
@@ -163,12 +166,7 @@ fn setup(args: &[String]) -> Setup {
             "Initial volume in %, once connected (must be from 0 to 100)",
             "VOLUME",
         )
-        .optopt(
-            "",
-            "persist-volume",
-            "Persist software volume to file",
-            "FILE"
-        )
+        .optopt("", "persist-volume", "Persist software volume to file", "FILE")
         .optopt(
             "",
             "zeroconf-port",
