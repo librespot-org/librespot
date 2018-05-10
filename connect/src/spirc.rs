@@ -238,9 +238,14 @@ impl Spirc {
 
         let volume = config.volume as u16;
         let linear_volume = config.linear_volume;
+        let persist_volume = config.persist_volume.clone();
 
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume_to_mixer(volume as u16, linear_volume));
+        mixer.set_volume(volume_to_mixer(
+            volume as u16,
+            linear_volume,
+            persist_volume.clone(),
+        ));
 
         let mut task = SpircTask {
             player: player,
@@ -537,8 +542,11 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer
-                    .set_volume(volume_to_mixer(frame.get_volume() as u16, self.linear_volume));
+                self.mixer.set_volume(volume_to_mixer(
+                    frame.get_volume() as u16,
+                    self.linear_volume,
+                    self.persist_volume.clone(),
+                ));
                 self.notify(None);
             }
 
@@ -662,8 +670,11 @@ impl SpircTask {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer
-            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.mixer.set_volume(volume_to_mixer(
+            volume as u16,
+            self.linear_volume,
+            self.persist_volume.clone(),
+        ));
     }
 
     fn handle_volume_down(&mut self) {
@@ -672,8 +683,11 @@ impl SpircTask {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer
-            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.mixer.set_volume(volume_to_mixer(
+            volume as u16,
+            self.linear_volume,
+            self.persist_volume.clone(),
+        ));
     }
 
     fn handle_end_of_track(&mut self) {
