@@ -151,6 +151,12 @@ fn setup(args: &[String]) -> Setup {
         )
         .optopt(
             "",
+            "persist-volume",
+            "Persist software volume to file",
+            "FILE"
+        )
+        .optopt(
+            "",
             "zeroconf-port",
             "The port the internal server advertised over zeroconf uses.",
             "ZEROCONF_PORT",
