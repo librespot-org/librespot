@@ -17,9 +17,10 @@ use env_logger::LogBuilder;
 use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
 use std::env;
-use std::io::{self, stderr, Write};
+use std::fs::File;
+use std::io::{self, stderr, Read, Write};
 use std::mem;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::str::FromStr;
 use tokio_core::reactor::{Core, Handle};
@@ -86,6 +87,22 @@ fn list_backends() {
     }
 }
 
+// read linear volume (0..100) from file
+// convert to 0..0xFFFF scale
+fn read_volume(filepath: String) -> i32 {
+    let mut data = String::new();
+    let mut file = File::open(filepath).expect("Could not open persistent volume");
+    file.read_to_string(&mut data)
+        .expect("Could not read persistent volume");
+    let volume = data.trim()
+        .parse::<i32>()
+        .expect("Persistent volume must be an integer");
+    if volume < 0 || volume > 100 {
+        panic!("Initial volume must be in the range 0-100");
+    }
+    volume * 0xFFFF / 100
+}
+
 #[derive(Clone)]
 struct Setup {
     backend: fn(Option<String>) -> Box<Sink>,
@@ -149,6 +166,7 @@ fn setup(args: &[String]) -> Setup {
             "Initial volume in %, once connected (must be from 0 to 100)",
             "VOLUME",
         )
+        .optopt("", "persist-volume", "Persist software volume to file", "FILE")
         .optopt(
             "",
             "zeroconf-port",
@@ -204,7 +222,7 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
-    let initial_volume = matches
+    let mut initial_volume = matches
         .opt_str("initial-volume")
         .map(|volume| {
             let volume = volume.parse::<i32>().unwrap();
@@ -214,6 +232,13 @@ fn setup(args: &[String]) -> Setup {
             volume * 0xFFFF / 100
         })
         .unwrap_or(0x8000);
+
+    // check if user has requested persistent volume
+    // if the file exists, override initial volume
+    let persist_volume = matches.opt_str("persist-volume");
+    if persist_volume.is_some() && Path::new(&persist_volume.clone().unwrap()).exists() {
+        initial_volume = read_volume(persist_volume.clone().unwrap());
+    }
 
     let zeroconf_port = matches
         .opt_str("zeroconf-port")
@@ -299,6 +324,7 @@ fn setup(args: &[String]) -> Setup {
             device_type: device_type,
             volume: initial_volume,
             linear_volume: matches.opt_present("linear-volume"),
+            persist_volume: persist_volume,
         }
     };
 

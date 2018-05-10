@@ -19,12 +19,15 @@ use playback::player::Player;
 use rand;
 use rand::Rng;
 use std;
+use std::fs::File;
+use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct SpircTask {
     player: Player,
     mixer: Box<Mixer>,
     linear_volume: bool,
+    persist_volume: Option<String>,
 
     sequence: SeqGenerator<u32>,
 
@@ -193,7 +196,18 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
     val
 }
 
-fn volume_to_mixer(volume: u16, linear_volume: bool) -> u16 {
+// write linear volume (0..100) to file
+fn write_volume(volume: u16, filepath: Option<String>) {
+    let volume = volume as i32 * 100 / 0xFFFF;
+    let mut file = File::create(filepath.unwrap()).expect("Could not create persistent volume");
+    file.write_all(volume.to_string().as_bytes())
+        .expect("Could not write persistent volume");
+}
+
+fn volume_to_mixer(volume: u16, linear_volume: bool, persist_volume: Option<String>) -> u16 {
+    if persist_volume.is_some() {
+        write_volume(volume, persist_volume);
+    }
     if linear_volume {
         debug!("linear volume: {}", volume);
         volume
@@ -235,14 +249,20 @@ impl Spirc {
 
         let volume = config.volume as u16;
         let linear_volume = config.linear_volume;
+        let persist_volume = config.persist_volume.clone();
 
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume_to_mixer(volume as u16, linear_volume));
+        mixer.set_volume(volume_to_mixer(
+            volume as u16,
+            linear_volume,
+            persist_volume.clone(),
+        ));
 
         let mut task = SpircTask {
             player: player,
             mixer: mixer,
             linear_volume: linear_volume,
+            persist_volume: persist_volume,
 
             sequence: SeqGenerator::new(1),
 
@@ -533,8 +553,11 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer
-                    .set_volume(volume_to_mixer(frame.get_volume() as u16, self.linear_volume));
+                self.mixer.set_volume(volume_to_mixer(
+                    frame.get_volume() as u16,
+                    self.linear_volume,
+                    self.persist_volume.clone(),
+                ));
                 self.notify(None);
             }
 
@@ -658,8 +681,11 @@ impl SpircTask {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer
-            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.mixer.set_volume(volume_to_mixer(
+            volume as u16,
+            self.linear_volume,
+            self.persist_volume.clone(),
+        ));
     }
 
     fn handle_volume_down(&mut self) {
@@ -668,8 +694,11 @@ impl SpircTask {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer
-            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.mixer.set_volume(volume_to_mixer(
+            volume as u16,
+            self.linear_volume,
+            self.persist_volume.clone(),
+        ));
     }
 
     fn handle_end_of_track(&mut self) {

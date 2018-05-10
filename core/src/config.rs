@@ -83,4 +83,5 @@ pub struct ConnectConfig {
     pub device_type: DeviceType,
     pub volume: i32,
     pub linear_volume: bool,
+    pub persist_volume: Option<String>,
 }
