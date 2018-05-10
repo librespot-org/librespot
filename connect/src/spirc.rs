@@ -19,6 +19,8 @@ use playback::player::Player;
 use rand;
 use rand::Rng;
 use std;
+use std::fs::File;
+use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct SpircTask {
