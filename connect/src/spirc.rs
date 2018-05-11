@@ -3,6 +3,8 @@ use futures::sync::{mpsc, oneshot};
 use futures::{Async, Future, Poll, Sink, Stream};
 use protobuf::{self, Message};
 
+use core::cache::Cache;
+use core::volume::Volume;
 use core::config::ConnectConfig;
 use core::mercury::MercuryError;
 use core::session::Session;
@@ -193,7 +195,13 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
     val
 }
 
-fn volume_to_mixer(volume: u16, linear_volume: bool) -> u16 {
+fn volume_to_mixer(volume: u16, linear_volume: bool, cache: Option<Cache>) -> u16 {
+    let vol = Volume {
+        volume: volume as i32
+    };
+    if cache.is_some() {
+        cache.as_ref().unwrap().save_volume(&vol);
+    }
     if linear_volume {
         debug!("linear volume: {}", volume);
         volume
