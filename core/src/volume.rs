@@ -2,7 +2,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
-
 pub struct Volume {
     pub volume: i32,
 }
@@ -18,7 +17,7 @@ impl Volume {
             panic!("Cached volume must be in the range 0-100");
         }
         Volume {
-            volume: volume * 0xFFFF / 100
+            volume: volume * 0xFFFF / 100,
         }
     }
 

@@ -4,13 +4,13 @@ use futures::{Async, Future, Poll, Sink, Stream};
 use protobuf::{self, Message};
 
 use core::cache::Cache;
-use core::volume::Volume;
 use core::config::ConnectConfig;
 use core::mercury::MercuryError;
 use core::session::Session;
 use core::spotify_id::SpotifyId;
 use core::util::SeqGenerator;
 use core::version;
+use core::volume::Volume;
 
 use protocol;
 use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
@@ -198,7 +198,7 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
 
 fn volume_to_mixer(volume: u16, linear_volume: bool, cache: Option<Cache>) -> u16 {
     let vol = Volume {
-        volume: volume as i32
+        volume: volume as i32,
     };
     if cache.is_some() {
         cache.as_ref().unwrap().save_volume(&vol);
@@ -544,8 +544,11 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer
-                    .set_volume(volume_to_mixer(frame.get_volume() as u16, self.linear_volume, self.cache.clone()));
+                self.mixer.set_volume(volume_to_mixer(
+                    frame.get_volume() as u16,
+                    self.linear_volume,
+                    self.cache.clone(),
+                ));
                 self.notify(None);
             }
 
@@ -669,8 +672,11 @@ impl SpircTask {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer
-            .set_volume(volume_to_mixer(volume as u16, self.linear_volume, self.cache.clone()));
+        self.mixer.set_volume(volume_to_mixer(
+            volume as u16,
+            self.linear_volume,
+            self.cache.clone(),
+        ));
     }
 
     fn handle_volume_down(&mut self) {
@@ -679,8 +685,11 @@ impl SpircTask {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer
-            .set_volume(volume_to_mixer(volume as u16, self.linear_volume, self.cache.clone()));
+        self.mixer.set_volume(volume_to_mixer(
+            volume as u16,
+            self.linear_volume,
+            self.cache.clone(),
+        ));
     }
 
     fn handle_end_of_track(&mut self) {
