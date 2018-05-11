@@ -204,6 +204,21 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
+    let use_audio_cache = !matches.opt_present("disable-audio-cache");
+
+    let cache = matches
+        .opt_str("c")
+        .map(|cache_location| Cache::new(PathBuf::from(cache_location), use_audio_cache));
+
+    let mut default_volume = 0x8000;
+    let cached_volume = cache.as_ref().and_then(Cache::volume);
+
+    // override default volume with cached volume if found
+    if cached_volume.is_some() {
+        default_volume = cached_volume.unwrap().volume;
+    }
+
+    // override default/cached volume with initial volume if found
     let initial_volume = matches
         .opt_str("initial-volume")
         .map(|volume| {
@@ -213,7 +228,7 @@ fn setup(args: &[String]) -> Setup {
             }
             volume * 0xFFFF / 100
         })
-        .unwrap_or(0x8000);
+        .unwrap_or(default_volume);
 
     let zeroconf_port = matches
         .opt_str("zeroconf-port")
@@ -221,11 +236,6 @@ fn setup(args: &[String]) -> Setup {
         .unwrap_or(0);
 
     let name = matches.opt_str("name").unwrap();
-    let use_audio_cache = !matches.opt_present("disable-audio-cache");
-
-    let cache = matches
-        .opt_str("c")
-        .map(|cache_location| Cache::new(PathBuf::from(cache_location), use_audio_cache));
 
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);
