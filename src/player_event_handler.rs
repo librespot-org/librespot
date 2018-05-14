@@ -8,7 +8,7 @@ fn run_program(program: &str, env_vars: HashMap<&str, String>) {
     Command::new(&v.remove(0))
         .args(&v)
         .envs(env_vars.iter())
-        .spawn()
+        .status()
         .expect("program failed to start");
 }
 
