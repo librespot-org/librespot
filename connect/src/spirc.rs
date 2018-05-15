@@ -3,14 +3,12 @@ use futures::sync::{mpsc, oneshot};
 use futures::{Async, Future, Poll, Sink, Stream};
 use protobuf::{self, Message};
 
-use core::cache::Cache;
 use core::config::ConnectConfig;
 use core::mercury::MercuryError;
 use core::session::Session;
 use core::spotify_id::SpotifyId;
 use core::util::SeqGenerator;
 use core::version;
-use core::volume::Volume;
 
 use protocol;
 use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
@@ -27,7 +25,6 @@ pub struct SpircTask {
     player: Player,
     mixer: Box<Mixer>,
     linear_volume: bool,
-    cache: Option<Cache>,
 
     sequence: SeqGenerator<u32>,
 
@@ -196,13 +193,7 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
     val
 }
 
-fn volume_to_mixer(volume: u16, linear_volume: bool, cache: Option<Cache>) -> u16 {
-    let vol = Volume {
-        volume: volume as i32,
-    };
-    if cache.is_some() {
-        cache.as_ref().unwrap().save_volume(&vol);
-    }
+fn volume_to_mixer(volume: u16, linear_volume: bool) -> u16 {
     if linear_volume {
         debug!("linear volume: {}", volume);
         volume
@@ -217,7 +208,6 @@ impl Spirc {
         session: Session,
         player: Player,
         mixer: Box<Mixer>,
-        cache: Option<Cache>,
     ) -> (Spirc, SpircTask) {
         debug!("new Spirc[{}]", session.session_id());
 
@@ -247,13 +237,12 @@ impl Spirc {
         let linear_volume = config.linear_volume;
 
         let device = initial_device_state(config, volume);
-        mixer.set_volume(volume_to_mixer(volume as u16, linear_volume, cache.clone()));
+        mixer.set_volume(volume_to_mixer(volume as u16, linear_volume));
 
         let mut task = SpircTask {
             player: player,
             mixer: mixer,
             linear_volume: linear_volume,
-            cache: cache,
 
             sequence: SeqGenerator::new(1),
 
@@ -544,11 +533,8 @@ impl SpircTask {
 
             MessageType::kMessageTypeVolume => {
                 self.device.set_volume(frame.get_volume());
-                self.mixer.set_volume(volume_to_mixer(
-                    frame.get_volume() as u16,
-                    self.linear_volume,
-                    self.cache.clone(),
-                ));
+                self.mixer
+                    .set_volume(volume_to_mixer(frame.get_volume() as u16, self.linear_volume));
                 self.notify(None);
             }
 
@@ -672,11 +658,8 @@ impl SpircTask {
             volume = 0xFFFF;
         }
         self.device.set_volume(volume);
-        self.mixer.set_volume(volume_to_mixer(
-            volume as u16,
-            self.linear_volume,
-            self.cache.clone(),
-        ));
+        self.mixer
+            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
     }
 
     fn handle_volume_down(&mut self) {
@@ -685,11 +668,8 @@ impl SpircTask {
             volume = 0;
         }
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume_to_mixer(
-            volume as u16,
-            self.linear_volume,
-            self.cache.clone(),
-        ));
+        self.mixer
+            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
     }
 
     fn handle_end_of_track(&mut self) {

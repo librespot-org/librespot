@@ -427,7 +427,6 @@ impl Future for Main {
                 let mixer = (self.mixer)();
                 let player_config = self.player_config.clone();
                 let connect_config = self.connect_config.clone();
-                let cache = self.cache.clone();
 
                 let audio_filter = mixer.get_audio_filter();
                 let backend = self.backend;
@@ -436,7 +435,7 @@ impl Future for Main {
                         (backend)(device)
                     });
 
-                let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer, cache);
+                let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
                 self.spirc = Some(spirc);
                 self.spirc_task = Some(spirc_task);
                 self.player_event_channel = Some(event_channel);
