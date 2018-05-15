@@ -64,7 +64,7 @@ impl Cache {
         Volume::from_file(path)
     }
 
-    pub fn save_volume(&self, volume: &Volume) {
+    pub fn save_volume(&self, volume: Volume) {
         let path = self.volume_path();
         volume.save_to_file(&path);
     }
