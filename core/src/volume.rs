@@ -4,7 +4,7 @@ use std::path::Path;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Volume {
-    pub volume: i32,
+    pub volume: u16,
 }
 
 impl Volume {
@@ -13,12 +13,12 @@ impl Volume {
     fn from_reader<R: Read>(mut reader: R) -> Volume {
         let mut contents = String::new();
         reader.read_to_string(&mut contents).unwrap();
-        let volume = contents.trim().parse::<i32>().unwrap();
+        let mut volume = contents.trim().parse::<u16>().unwrap();
         if volume > 100 {
             volume = 100;
         }
         Volume {
-            volume: volume * 0xFFFF / 100,
+            volume: (volume as i32 * 0xFFFF / 100) as u16,
         }
     }
 
@@ -29,7 +29,7 @@ impl Volume {
     // convert volume from 0..0xFFFF to 0..100
     // write to plaintext file
     fn save_to_writer<W: Write>(&self, writer: &mut W) {
-        let volume = self.volume * 100 / 0xFFFF;
+        let volume = (self.volume as f32 * 100.0 / 0xFFFF as f32).round() as u16;
         writer.write_all(volume.to_string().as_bytes()).unwrap();
     }
 

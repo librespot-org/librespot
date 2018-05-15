@@ -215,7 +215,7 @@ fn setup(args: &[String]) -> Setup {
 
     // override default volume with cached volume if found
     if cached_volume.is_some() {
-        default_volume = cached_volume.unwrap().volume;
+        default_volume = cached_volume.unwrap().volume as i32;
     }
 
     // override default/cached volume with initial volume if found
