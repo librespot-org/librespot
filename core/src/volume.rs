@@ -14,8 +14,8 @@ impl Volume {
         let mut contents = String::new();
         reader.read_to_string(&mut contents).unwrap();
         let volume = contents.trim().parse::<i32>().unwrap();
-        if volume < 0 || volume > 100 {
-            panic!("Cached volume must be in the range 0-100");
+        if volume > 100 {
+            volume = 100;
         }
         Volume {
             volume: volume * 0xFFFF / 100,
