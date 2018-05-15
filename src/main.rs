@@ -210,23 +210,23 @@ fn setup(args: &[String]) -> Setup {
         .opt_str("c")
         .map(|cache_location| Cache::new(PathBuf::from(cache_location), use_audio_cache));
 
-    let mut default_volume = 0x8000;
+    let mut default_volume: u16 = 0x8000;
     let cached_volume = cache.as_ref().and_then(Cache::volume);
 
     // override default volume with cached volume if found
     if cached_volume.is_some() {
-        default_volume = cached_volume.unwrap().volume as i32;
+        default_volume = cached_volume.unwrap().volume;
     }
 
     // override default/cached volume with initial volume if found
     let initial_volume = matches
         .opt_str("initial-volume")
         .map(|volume| {
-            let volume = volume.parse::<i32>().unwrap();
-            if volume < 0 || volume > 100 {
+            let volume = volume.parse::<u16>().unwrap();
+            if volume > 100 {
                 panic!("Initial volume must be in the range 0-100");
             }
-            volume * 0xFFFF / 100
+            (volume as i32 * 0xFFFF / 100) as u16
         })
         .unwrap_or(default_volume);
 

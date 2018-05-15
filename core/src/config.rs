@@ -81,6 +81,6 @@ impl Default for DeviceType {
 pub struct ConnectConfig {
     pub name: String,
     pub device_type: DeviceType,
-    pub volume: i32,
+    pub volume: u16,
     pub linear_volume: bool,
 }
