@@ -16,7 +16,7 @@ pub struct JackData {
 }
 
 fn pcm_to_f32(sample: i16) -> f32 {
-    sample as f32 / 32768.0;
+    sample as f32 / 32768.0
 }
 
 impl ProcessHandler for JackData {
