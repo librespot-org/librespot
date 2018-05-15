@@ -9,6 +9,7 @@ use core::session::Session;
 use core::spotify_id::SpotifyId;
 use core::util::SeqGenerator;
 use core::version;
+use core::volume::Volume;
 
 use protocol;
 use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
@@ -259,6 +260,8 @@ impl Spirc {
             shutdown: false,
             session: session.clone(),
         };
+
+        task.cache_volume(volume);
 
         let spirc = Spirc { commands: cmd_tx };
 
@@ -535,6 +538,7 @@ impl SpircTask {
                 self.device.set_volume(frame.get_volume());
                 self.mixer
                     .set_volume(volume_to_mixer(frame.get_volume() as u16, self.linear_volume));
+                self.cache_volume(frame.get_volume() as u16);
                 self.notify(None);
             }
 
@@ -660,6 +664,7 @@ impl SpircTask {
         self.device.set_volume(volume);
         self.mixer
             .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.cache_volume(volume as u16);
     }
 
     fn handle_volume_down(&mut self) {
@@ -670,6 +675,7 @@ impl SpircTask {
         self.device.set_volume(volume as u32);
         self.mixer
             .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.cache_volume(volume as u16);
     }
 
     fn handle_end_of_track(&mut self) {
@@ -723,6 +729,13 @@ impl SpircTask {
             cs = cs.recipient(&s);
         }
         cs.send();
+    }
+
+    fn cache_volume(&self, volume: u16) {
+        if self.session.cache().is_some() {
+            let vol = Volume { volume: volume };
+            self.session.cache().as_ref().unwrap().save_volume(vol);
+        }
     }
 }
 
