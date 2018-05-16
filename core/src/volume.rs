@@ -8,17 +8,12 @@ pub struct Volume {
 }
 
 impl Volume {
-    // read volume from file, enforce upper/lower bounds
-    // convert volume from 0..100 to 0..0xFFFF
+    // read volume from file
     fn from_reader<R: Read>(mut reader: R) -> Volume {
         let mut contents = String::new();
         reader.read_to_string(&mut contents).unwrap();
-        let mut volume = contents.trim().parse::<u16>().unwrap();
-        if volume > 100 {
-            volume = 100;
-        }
         Volume {
-            volume: (volume as i32 * 0xFFFF / 100) as u16,
+            volume: contents.trim().parse::<u16>().unwrap(),
         }
     }
 
@@ -26,11 +21,9 @@ impl Volume {
         File::open(path).ok().map(Volume::from_reader)
     }
 
-    // convert volume from 0..0xFFFF to 0..100
-    // write to plaintext file
+    // write volume to file
     fn save_to_writer<W: Write>(&self, writer: &mut W) {
-        let volume = (self.volume as f32 * 100.0 / 0xFFFF as f32).round() as u16;
-        writer.write_all(volume.to_string().as_bytes()).unwrap();
+        writer.write_all(self.volume.to_string().as_bytes()).unwrap();
     }
 
     pub(crate) fn save_to_file<P: AsRef<Path>>(&self, path: P) {
