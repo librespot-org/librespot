@@ -204,15 +204,22 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
+    let use_audio_cache = !matches.opt_present("disable-audio-cache");
+
+    let cache = matches
+        .opt_str("c")
+        .map(|cache_location| Cache::new(PathBuf::from(cache_location), use_audio_cache));
+
     let initial_volume = matches
         .opt_str("initial-volume")
         .map(|volume| {
-            let volume = volume.parse::<i32>().unwrap();
-            if volume < 0 || volume > 100 {
+            let volume = volume.parse::<u16>().unwrap();
+            if volume > 100 {
                 panic!("Initial volume must be in the range 0-100");
             }
-            volume * 0xFFFF / 100
+            (volume as i32 * 0xFFFF / 100) as u16
         })
+        .or_else(|| cache.as_ref().and_then(Cache::volume))
         .unwrap_or(0x8000);
 
     let zeroconf_port = matches
@@ -221,11 +228,6 @@ fn setup(args: &[String]) -> Setup {
         .unwrap_or(0);
 
     let name = matches.opt_str("name").unwrap();
-    let use_audio_cache = !matches.opt_present("disable-audio-cache");
-
-    let cache = matches
-        .opt_str("c")
-        .map(|cache_location| Cache::new(PathBuf::from(cache_location), use_audio_cache));
 
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);

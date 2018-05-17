@@ -9,6 +9,7 @@ use core::session::Session;
 use core::spotify_id::SpotifyId;
 use core::util::SeqGenerator;
 use core::version;
+use core::volume::Volume;
 
 use protocol;
 use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
@@ -74,13 +75,13 @@ fn initial_state() -> State {
     frame
 }
 
-fn initial_device_state(config: ConnectConfig, volume: u16) -> DeviceState {
+fn initial_device_state(config: ConnectConfig) -> DeviceState {
     {
         let mut msg = DeviceState::new();
         msg.set_sw_version(version::version_string());
         msg.set_is_active(false);
         msg.set_can_play(true);
-        msg.set_volume(volume as u32);
+        msg.set_volume(0);
         msg.set_name(config.name);
         {
             let repeated = msg.mut_capabilities();
@@ -233,11 +234,10 @@ impl Spirc {
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
-        let volume = config.volume as u16;
+        let volume = config.volume;
         let linear_volume = config.linear_volume;
 
-        let device = initial_device_state(config, volume);
-        mixer.set_volume(volume_to_mixer(volume as u16, linear_volume));
+        let device = initial_device_state(config);
 
         let mut task = SpircTask {
             player: player,
@@ -259,6 +259,8 @@ impl Spirc {
             shutdown: false,
             session: session.clone(),
         };
+
+        task.set_volume(volume);
 
         let spirc = Spirc { commands: cmd_tx };
 
@@ -532,9 +534,7 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeVolume => {
-                self.device.set_volume(frame.get_volume());
-                self.mixer
-                    .set_volume(volume_to_mixer(frame.get_volume() as u16, self.linear_volume));
+                self.set_volume(frame.get_volume() as u16);
                 self.notify(None);
             }
 
@@ -657,9 +657,7 @@ impl SpircTask {
         if volume > 0xFFFF {
             volume = 0xFFFF;
         }
-        self.device.set_volume(volume);
-        self.mixer
-            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.set_volume(volume as u16);
     }
 
     fn handle_volume_down(&mut self) {
@@ -667,9 +665,7 @@ impl SpircTask {
         if volume < 0 {
             volume = 0;
         }
-        self.device.set_volume(volume as u32);
-        self.mixer
-            .set_volume(volume_to_mixer(volume as u16, self.linear_volume));
+        self.set_volume(volume as u16);
     }
 
     fn handle_end_of_track(&mut self) {
@@ -723,6 +719,14 @@ impl SpircTask {
             cs = cs.recipient(&s);
         }
         cs.send();
+    }
+
+    fn set_volume(&mut self, volume: u16) {
+        self.device.set_volume(volume as u32);
+        self.mixer.set_volume(volume_to_mixer(volume, self.linear_volume));
+        if let Some(cache) = self.session.cache() {
+            cache.save_volume(Volume { volume })
+        }
     }
 }
 
