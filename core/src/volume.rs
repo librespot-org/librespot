@@ -9,15 +9,13 @@ pub struct Volume {
 
 impl Volume {
     // read volume from file
-    fn from_reader<R: Read>(mut reader: R) -> Volume {
+    fn from_reader<R: Read>(mut reader: R) -> u16 {
         let mut contents = String::new();
         reader.read_to_string(&mut contents).unwrap();
-        Volume {
-            volume: contents.trim().parse::<u16>().unwrap(),
-        }
+        contents.trim().parse::<u16>().unwrap()
     }
 
-    pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Option<Volume> {
+    pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Option<u16> {
         File::open(path).ok().map(Volume::from_reader)
     }
 

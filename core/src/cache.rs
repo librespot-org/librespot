@@ -59,7 +59,7 @@ impl Cache {
         self.root.join("volume")
     }
 
-    pub fn volume(&self) -> Option<Volume> {
+    pub fn volume(&self) -> Option<u16> {
         let path = self.volume_path();
         Volume::from_file(path)
     }

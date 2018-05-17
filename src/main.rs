@@ -210,15 +210,6 @@ fn setup(args: &[String]) -> Setup {
         .opt_str("c")
         .map(|cache_location| Cache::new(PathBuf::from(cache_location), use_audio_cache));
 
-    let mut default_volume: u16 = 0x8000;
-    let cached_volume = cache.as_ref().and_then(Cache::volume);
-
-    // override default volume with cached volume if found
-    if cached_volume.is_some() {
-        default_volume = cached_volume.unwrap().volume;
-    }
-
-    // override default/cached volume with initial volume if found
     let initial_volume = matches
         .opt_str("initial-volume")
         .map(|volume| {
@@ -228,7 +219,8 @@ fn setup(args: &[String]) -> Setup {
             }
             (volume as i32 * 0xFFFF / 100) as u16
         })
-        .unwrap_or(default_volume);
+        .or_else(|| cache.as_ref().and_then(Cache::volume))
+        .unwrap_or(0x8000);
 
     let zeroconf_port = matches
         .opt_str("zeroconf-port")
