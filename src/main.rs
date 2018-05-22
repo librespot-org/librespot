@@ -114,6 +114,7 @@ fn setup(args: &[String]) -> Setup {
         .optflag("v", "verbose", "Enable verbose output")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
+        .optopt("t", "token", "Spotify OAuth token with scope 'streaming'. Use 'user' as username.", "TOKEN")
         .optopt("", "proxy", "HTTP proxy to use when connecting", "PROXY")
         .optopt("", "ap-port", "Connect to AP with specified port. If no AP with that port are present fallback AP will be used. Available ports are usually 80, 443 and 4070", "AP_PORT")
         .optflag("", "disable-discovery", "Disable discovery mode")
@@ -273,6 +274,7 @@ fn setup(args: &[String]) -> Setup {
             matches.opt_str("username"),
             matches.opt_str("password"),
             cached_credentials,
+            matches.opt_str("token"),
             password,
         )
     };

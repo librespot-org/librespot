@@ -37,6 +37,14 @@ impl Credentials {
         }
     }
 
+    pub fn with_token(username: String, token: String) -> Credentials {
+        Credentials {
+            username: username,
+            auth_type: AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN,
+            auth_data: token.into_bytes(),
+        }
+    }
+
     pub fn with_blob(username: String, encrypted_blob: &str, device_id: &str) -> Credentials {
         fn read_u8<R: Read>(stream: &mut R) -> io::Result<u8> {
             let mut data = [0u8];
@@ -172,22 +180,29 @@ pub fn get_credentials<F: FnOnce(&String) -> String>(
     username: Option<String>,
     password: Option<String>,
     cached_credentials: Option<Credentials>,
+    token: Option<String>,
     prompt: F,
 ) -> Option<Credentials> {
-    match (username, password, cached_credentials) {
-        (Some(username), Some(password), _) => Some(Credentials::with_password(username, password)),
+    match (username, password, cached_credentials, token) {
+        (Some(username), Some(password), _, _) => {
+            Some(Credentials::with_password(username, password))
+        }
 
-        (Some(ref username), _, Some(ref credentials)) if *username == credentials.username => {
+        (Some(ref username), _, Some(ref credentials), _) if *username == credentials.username => {
             Some(credentials.clone())
         }
 
-        (Some(username), None, _) => Some(Credentials::with_password(
+        (Some(username), _, _, Some(token)) => {
+            Some(Credentials::with_token(username.clone(), token))
+        }
+
+        (Some(username), None, _, _) => Some(Credentials::with_password(
             username.clone(),
             prompt(&username),
         )),
 
-        (None, _, Some(credentials)) => Some(credentials),
+        (None, _, Some(credentials), _) => Some(credentials),
 
-        (None, _, None) => None,
+        (None, _, None, _) => None,
     }
 }
