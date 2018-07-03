@@ -10,6 +10,7 @@ pub struct SessionConfig {
     pub user_agent: String,
     pub device_id: String,
     pub proxy: Option<Url>,
+    pub ap_port: Option<u16>,
 }
 
 impl Default for SessionConfig {
@@ -19,6 +20,7 @@ impl Default for SessionConfig {
             user_agent: version::version_string(),
             device_id: device_id,
             proxy: None,
+            ap_port: None,
         }
     }
 }
