@@ -33,7 +33,8 @@ fn main() {
     let backend = audio_backend::find(None).unwrap();
 
     println!("Connecting ..");
-    let session = core.run(Session::connect(session_config, credentials, None, handle))
+    let session = core
+        .run(Session::connect(session_config, credentials, None, handle))
         .unwrap();
 
     let (player, _) = Player::new(player_config, session.clone(), None, move || (backend)(None));
