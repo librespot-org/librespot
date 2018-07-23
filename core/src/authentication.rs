@@ -1,11 +1,11 @@
 use base64;
 use byteorder::{BigEndian, ByteOrder};
-use crypto;
-use crypto::aes;
-use crypto::digest::Digest;
-use crypto::hmac::Hmac;
-use crypto::pbkdf2::pbkdf2;
-use crypto::sha1::Sha1;
+use aes::Aes192;
+use block_modes::{Ecb, BlockMode};
+use block_modes::block_padding::ZeroPadding;
+use hmac::Hmac;
+use sha1::{Sha1, Digest};
+use pbkdf2::pbkdf2;
 use protobuf::ProtobufEnum;
 use serde;
 use serde_json;
@@ -63,42 +63,26 @@ impl Credentials {
             Ok(data)
         }
 
-        let encrypted_blob = base64::decode(encrypted_blob).unwrap();
-
-        let secret = {
-            let mut data = [0u8; 20];
-            let mut h = crypto::sha1::Sha1::new();
-            h.input(device_id.as_bytes());
-            h.result(&mut data);
-            data
-        };
+        let secret = Sha1::digest(device_id.as_bytes());
 
         let key = {
-            let mut data = [0u8; 24];
-            let mut mac = Hmac::new(Sha1::new(), &secret);
-            pbkdf2(&mut mac, username.as_bytes(), 0x100, &mut data[0..20]);
+            let mut key = [0u8; 24];
+            pbkdf2::<Hmac<Sha1>>(&secret, username.as_bytes(), 0x100, &mut key[0..20]);
 
-            let mut hash = Sha1::new();
-            hash.input(&data[0..20]);
-            hash.result(&mut data[0..20]);
-            BigEndian::write_u32(&mut data[20..], 20);
-            data
+            let hash = &Sha1::digest(&key[..20]);
+            key[..20].copy_from_slice(hash);
+            BigEndian::write_u32(&mut key[20..], 20);
+            key
         };
 
+        let mut data = base64::decode(encrypted_blob).unwrap();
         let blob = {
             // Anyone know what this block mode is ?
-            let mut data = vec![0u8; encrypted_blob.len()];
-            let mut cipher =
-                aes::ecb_decryptor(aes::KeySize::KeySize192, &key, crypto::blockmodes::NoPadding);
-            cipher
-                .decrypt(
-                    &mut crypto::buffer::RefReadBuffer::new(&encrypted_blob),
-                    &mut crypto::buffer::RefWriteBuffer::new(&mut data),
-                    true,
-                )
-                .unwrap();
+            let mut cipher = Ecb::<Aes192, ZeroPadding>::new_varkey(&key)
+                .expect("never fails, key is 24 bytes long");
+            cipher.decrypt_nopad(&mut data).unwrap();
 
-            let l = encrypted_blob.len();
+            let l = data.len();
             for i in 0..l - 0x10 {
                 data[l - i - 1] ^= data[l - i - 0x11];
             }

@@ -43,7 +43,6 @@ num-bigint = "0.1.35"
 protobuf = "1.1"
 rand = "0.3.13"
 rpassword = "0.3.0"
-rust-crypto = "0.2.36"
 serde = "0.9.6"
 serde_derive = "0.9.6"
 serde_json = "0.9.5"
@@ -51,13 +50,12 @@ tokio-core = "0.1.2"
 tokio-io = "0.1"
 tokio-signal = "0.1.2"
 url = "1.7.0"
+sha-1 = "0.7.0"
+hex = "0.3.2"
 
 [build-dependencies]
 rand            = "0.3.13"
 vergen          = "0.1.0"
-
-[replace]
-"rust-crypto:0.2.36" = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]

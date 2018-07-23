@@ -4,7 +4,6 @@ extern crate log;
 extern crate serde_json;
 
 extern crate base64;
-extern crate crypto;
 extern crate futures;
 extern crate hyper;
 extern crate num_bigint;
@@ -12,6 +11,11 @@ extern crate protobuf;
 extern crate rand;
 extern crate tokio_core;
 extern crate url;
+
+extern crate sha1;
+extern crate hmac;
+extern crate aes;
+extern crate block_modes;
 
 #[cfg(feature = "with-dns-sd")]
 extern crate dns_sd;

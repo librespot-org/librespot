@@ -18,12 +18,15 @@ log = "0.3.5"
 num-bigint = "0.1.35"
 protobuf = "1.1"
 rand = "0.3.13"
-rust-crypto = "0.2.36"
 serde = "0.9.6"
 serde_derive = "0.9.6"
 serde_json = "0.9.5"
 tokio-core = "0.1.2"
 url = "1.3"
+sha-1 = "0.7.0"
+hmac = "0.6.2"
+aes = "0.1.0"
+block-modes = "0.1.0"
 
 dns-sd = { version = "0.1.3", optional = true }
 mdns = { git = "https://github.com/plietar/rust-mdns", optional = true }
