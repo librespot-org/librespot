@@ -15,7 +15,7 @@ log = "0.3.5"
 num-bigint = "0.1.35"
 num-traits = "0.1.36"
 tempfile = "2.1"
-aes = "0.1"
+aes-ctr = "0.1.0"
 
 tremor = { git = "https://github.com/plietar/rust-tremor", optional = true }
 vorbis = { version ="0.1.0", optional = true }

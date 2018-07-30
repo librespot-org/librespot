@@ -1,7 +1,9 @@
 use base64;
 use sha1::{Sha1, Digest};
 use hmac::{Hmac, Mac};
-use aes::Aes128;
+use aes_ctr::Aes128Ctr;
+use aes_ctr::stream_cipher::{NewFixStreamCipher, StreamCipherCore};
+use aes_ctr::stream_cipher::generic_array::GenericArray;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Stream};
 use hyper::server::{Http, Request, Response, Service};
@@ -135,10 +137,12 @@ impl Discovery {
         assert_eq!(&mac[..], cksum);
 
         let decrypted = {
-            let mut data = vec![0u8; encrypted.len()];
-            //let mut cipher =
-            //    crypto::aes::ctr(crypto::aes::KeySize::KeySize128, &encryption_key[0..16], iv);
-            //cipher.process(encrypted, &mut data);
+            let mut data = encrypted.to_vec();
+            let mut cipher = Aes128Ctr::new(
+                &GenericArray::from_slice(&encryption_key[0..16]),
+                &GenericArray::from_slice(iv),
+            );
+            cipher.apply_keystream(&mut data);
             String::from_utf8(data).unwrap()
         };
 
