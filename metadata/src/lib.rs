@@ -110,13 +110,15 @@ impl Metadata for Track {
     fn parse(msg: &Self::Message, session: &Session) -> Self {
         let country = session.country();
 
-        let artists = msg.get_artist()
+        let artists = msg
+            .get_artist()
             .iter()
             .filter(|artist| artist.has_gid())
             .map(|artist| SpotifyId::from_raw(artist.get_gid()).unwrap())
             .collect::<Vec<_>>();
 
-        let files = msg.get_file()
+        let files = msg
+            .get_file()
             .iter()
             .filter(|file| file.has_file_id())
             .map(|file| {
@@ -133,7 +135,8 @@ impl Metadata for Track {
             album: SpotifyId::from_raw(msg.get_album().get_gid()).unwrap(),
             artists: artists,
             files: files,
-            alternatives: msg.get_alternative()
+            alternatives: msg
+                .get_alternative()
                 .iter()
                 .map(|alt| SpotifyId::from_raw(alt.get_gid()).unwrap())
                 .collect(),
@@ -150,20 +153,23 @@ impl Metadata for Album {
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
-        let artists = msg.get_artist()
+        let artists = msg
+            .get_artist()
             .iter()
             .filter(|artist| artist.has_gid())
             .map(|artist| SpotifyId::from_raw(artist.get_gid()).unwrap())
             .collect::<Vec<_>>();
 
-        let tracks = msg.get_disc()
+        let tracks = msg
+            .get_disc()
             .iter()
             .flat_map(|disc| disc.get_track())
             .filter(|track| track.has_gid())
             .map(|track| SpotifyId::from_raw(track.get_gid()).unwrap())
             .collect::<Vec<_>>();
 
-        let covers = msg.get_cover_group()
+        let covers = msg
+            .get_cover_group()
             .get_image()
             .iter()
             .filter(|image| image.has_file_id())
@@ -194,7 +200,8 @@ impl Metadata for Artist {
     fn parse(msg: &Self::Message, session: &Session) -> Self {
         let country = session.country();
 
-        let top_tracks: Vec<SpotifyId> = match msg.get_top_track()
+        let top_tracks: Vec<SpotifyId> = match msg
+            .get_top_track()
             .iter()
             .find(|tt| !tt.has_country() || countrylist_contains(tt.get_country(), &country))
         {
