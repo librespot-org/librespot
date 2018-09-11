@@ -1,5 +1,5 @@
 pub trait Mixer: Send {
-    fn open(Option<String>) -> Self
+    fn open(Option<MixerConfig>) -> Self
     where
         Self: Sized;
     fn start(&self);
@@ -20,14 +20,30 @@ pub mod alsamixer;
 #[cfg(feature = "alsa-backend")]
 use self::alsamixer::AlsaMixer;
 
+#[derive(Debug, Clone)]
+pub struct MixerConfig {
+    pub card: String,
+    pub mixer: String,
+    pub index: u32,
+}
+
+impl Default for MixerConfig {
+    fn default() -> MixerConfig { MixerConfig {
+        card: String::from("default"),
+        mixer: String::from("PCM"),
+        index: 0,
+        }
+    }
+}
+
 pub mod softmixer;
 use self::softmixer::SoftMixer;
 
-fn mk_sink<M: Mixer + 'static>(device: Option<String>) -> Box<Mixer> {
+fn mk_sink<M: Mixer + 'static>(device: Option<MixerConfig>) -> Box<Mixer> {
     Box::new(M::open(device))
 }
 
-pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<fn(Option<String>) -> Box<Mixer>> {
+pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<fn(Option<MixerConfig>) -> Box<Mixer>> {
     match name.as_ref().map(AsRef::as_ref) {
         None | Some("softvol") => Some(mk_sink::<SoftMixer>),
         #[cfg(feature = "alsa-backend")]

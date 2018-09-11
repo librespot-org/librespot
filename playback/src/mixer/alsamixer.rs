@@ -1,22 +1,19 @@
 use super::AudioFilter;
-use super::Mixer;
-use std::env;
+use super::{Mixer, MixerConfig};
 use std::error::Error;
 
 use alsa;
 
 #[derive(Clone)]
 pub struct AlsaMixer {
-    card: String,
-    mixer: String,
-    index: u32,
+    config: MixerConfig,
 }
 
 impl AlsaMixer {
 
     fn map_volume(&self, set_volume:Option<u16>) -> Result<(u16),Box<Error>> {
-        let mixer  = alsa::mixer::Mixer::new(&self.card, false)?;
-        let sid    = alsa::mixer::SelemId::new(&*self.mixer, self.index);
+        let mixer  = alsa::mixer::Mixer::new(&self.config.card, false)?;
+        let sid    = alsa::mixer::SelemId::new(&*self.config.mixer, self.config.index);
 
         let selem = mixer.find_selem(&sid).expect("Coundn't find SelemId");
         let (min, max) = selem.get_playback_volume_range();
@@ -41,19 +38,13 @@ impl AlsaMixer {
 }
 
 impl Mixer for AlsaMixer {
-    fn open(device: Option<String>) -> AlsaMixer {
-        let card = env::var("LIBRESPOT_CARD").unwrap_or(device.unwrap_or(String::from("default")));
-        let mixer = env::var("LIBRESPOT_MIXER").unwrap_or(String::from("PCM"));
-        let index: u32 = 0;
+    fn open(config: Option<MixerConfig>) -> AlsaMixer {
+        let config = config.unwrap_or_default();
         info!(
             "Setting up new mixer: card:{} mixer:{} index:{}",
-            card, mixer, index
+            config.card, config.mixer, config.index
         );
-        AlsaMixer {
-            card: card,
-            mixer: mixer,
-            index: index,
-        }
+        AlsaMixer { config: config }
     }
 
     fn start(&self) {
@@ -67,7 +58,7 @@ impl Mixer for AlsaMixer {
         match self.map_volume(None){
                 Ok(vol) => vol,
                 Err(e)  => {
-                        error!("Error getting volume for <{}>, {:?}",self.card, e);
+                        error!("Error getting volume for <{}>, {:?}",self.config.card, e);
                         0 }
         }
     }
@@ -75,7 +66,7 @@ impl Mixer for AlsaMixer {
     fn set_volume(&self, volume: u16) {
         match self.map_volume(Some(volume)){
                 Ok(_) => (),
-                Err(e)  => error!("Error setting volume for <{}>, {:?}",self.card, e),
+                Err(e)  => error!("Error setting volume for <{}>, {:?}",self.config.card, e),
         }
     }
 
