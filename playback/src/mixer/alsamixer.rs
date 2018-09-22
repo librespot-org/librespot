@@ -36,10 +36,13 @@ impl AlsaMixer {
         let selem = mixer.find_selem(&sid).expect("Couldn't find SelemId");
         let (min, max) = selem.get_playback_volume_range();
         let (min_db, max_db) = selem.get_playback_db_range();
+        let hw_mix = selem
+            .get_playback_vol_db(alsa::mixer::SelemChannelId::mono())
+            .is_ok();
 
         info!(
-            "Alsa min: {} ({:?}[dB]) -- max: {} ({:?}[dB])",
-            min, min_db, max, max_db
+            "Alsa min: {} ({:?}[dB]) -- max: {} ({:?}[dB]) HW: {:?}",
+            min, min_db, max, max_db, hw_mix
         );
 
         if config.mapped_volume && (max_db - min_db <= alsa::mixer::MilliBel(24)) {
@@ -48,8 +51,8 @@ impl AlsaMixer {
                 max_db - min_db
             );
             config.mapped_volume = false;
-        } else {
-            info!("Using Alsa mapped volume: dB range: {:?}", max_db - min_db);
+        } else if !config.mapped_volume {
+            info!("Using Alsa linear volume");
         }
 
         Ok(AlsaMixer {
@@ -74,37 +77,56 @@ impl AlsaMixer {
             .expect("Couldn't get current volume");
         let cur_vol_db = selem
             .get_playback_vol_db(alsa::mixer::SelemChannelId::mono())
-            .expect("Couldn't get current volume");
+            .unwrap_or(alsa::mixer::MilliBel(9999));
 
         let new_vol: u16;
-        debug!("Current alsa volume: {}[i64] {:?}", cur_vol, cur_vol_db);
+        info!("Current alsa volume: {}[i64] {:?}", cur_vol, cur_vol_db);
 
         if let Some(vol) = set_volume {
-            let alsa_volume = if self.config.mapped_volume {
-                ((self.pvol(vol, 0x0000, 0xFFFF)).log10() * 6000.0).floor() as i64 + self.params.max
+            if self.config.mapped_volume {
+                info!("Using mapped_volume");
+                //TODO Check if min is not mute!
+                let vol_db = ((self.pvol(vol, 0x0000, 0xFFFF)).log10() * 6000.0).floor() as i64
+                    + self.params.max;
+                selem
+                    .set_playback_volume_all(vol_db)
+                    .expect("Couldn't set alsa dB volume");
+                info!(
+                    "Mapping volume [{:.3}%] {:?} [u16] ->> Alsa [{:.3}%] {:?} [dB]",
+                    self.pvol(vol, 0x0000, 0xFFFF) * 100.0,
+                    vol,
+                    self.pvol(
+                        vol_db as f64,
+                        self.params.min_db.to_db() as f64,
+                        self.params.max_db.to_db() as f64
+                    ) * 100.0,
+                    vol_db as f64 / 100.0,
+                );
             } else {
-                ((vol as f64 / 0xFFFF as f64) * self.params.range) as i64 + self.params.min
+                info!("Using linear vol");
+                let alsa_volume =
+                    ((vol as f64 / 0xFFFF as f64) * self.params.range) as i64 + self.params.min;
+                selem
+                    .set_playback_volume_all(alsa_volume)
+                    .expect("Couldn't set alsa raw volume");
+                info!(
+                    "Mapping volume [{:.3}%] {:?} [u16] ->> Alsa [{:.3}%] {:?} [i64]",
+                    self.pvol(vol, 0x0000, 0xFFFF) * 100.0,
+                    vol,
+                    self.pvol(
+                        alsa_volume as f64,
+                        self.params.min as f64,
+                        self.params.max as f64
+                    ) * 100.0,
+                    alsa_volume
+                );
             };
-            debug!(
-                "Maping volume [{:.3}%] {:?} [u16] ->> Alsa [{:.3}%] {:?} [i64]",
-                self.pvol(vol, 0x0000, 0xFFFF) * 100.0,
-                vol,
-                self.pvol(
-                    alsa_volume as f64,
-                    self.params.min as f64,
-                    self.params.max as f64
-                ) * 100.0,
-                alsa_volume
-            );
-            selem
-                .set_playback_volume_all(alsa_volume)
-                .expect("Couldn't set alsa volume");
             new_vol = vol; // Meh
         } else {
             new_vol =
                 (((cur_vol - self.params.min) as f64 / self.params.range) * 0xFFFF as f64) as u16;
-            debug!(
-                "Maping volume [{:.3}%] {:?} [u16] <<- Alsa [{:.3}%] {:?} [i64]",
+            info!(
+                "Mapping volume [{:.3}%] {:?} [u16] <<- Alsa [{:.3}%] {:?} [i64]",
                 self.pvol(new_vol, 0x0000, 0xFFFF),
                 new_vol,
                 self.pvol(
