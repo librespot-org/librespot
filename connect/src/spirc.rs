@@ -168,6 +168,7 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
                     let repeated = msg.mut_stringValue();
                     repeated.push(::std::convert::Into::into("audio/local"));
                     repeated.push(::std::convert::Into::into("audio/track"));
+                    repeated.push(::std::convert::Into::into("audio/episode"));
                     repeated.push(::std::convert::Into::into("local"));
                     repeated.push(::std::convert::Into::into("track"))
                 };
@@ -796,6 +797,7 @@ impl SpircTask {
     }
 
     fn update_tracks(&mut self, frame: &protocol::spirc::Frame) {
+        // debug!("State: {:?}", frame.get_state());
         let index = frame.get_state().get_playing_track_index();
         let context_uri = frame.get_state().get_context_uri().to_owned();
         let tracks = frame.get_state().get_track();
@@ -812,7 +814,14 @@ impl SpircTask {
     }
 
     fn load_track(&mut self, play: bool) {
-        let track = {
+        let context_uri = self.state.get_context_uri().to_owned();
+        let index = self.state.get_playing_track_index();
+        info!("context: {}", context_uri);
+        // Redundant check here
+        let track = if context_uri.contains(":show:") || context_uri.contains(":episode:") {
+            let uri = self.state.get_track()[index as usize].get_uri();
+            SpotifyId::from_uri(uri).expect("Unable to parse uri")
+        } else {
             let mut index = self.state.get_playing_track_index();
             // Check for malformed gid
             let tracks_len = self.state.get_track().len() as u32;

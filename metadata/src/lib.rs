@@ -94,6 +94,28 @@ pub struct Album {
 }
 
 #[derive(Debug, Clone)]
+pub struct Episode {
+    pub id: SpotifyId,
+    pub name: String,
+    pub external_url: String,
+    pub duration: i32,
+    pub language: String,
+    pub show: SpotifyId,
+    pub files: LinearMap<FileFormat, FileId>,
+    pub covers: Vec<FileId>,
+    pub available: bool,
+    pub explicit: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct Show {
+    pub id: SpotifyId,
+    pub name: String,
+    pub episodes: Vec<SpotifyId>,
+    pub covers: Vec<FileId>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Artist {
     pub id: SpotifyId,
     pub name: String,
@@ -218,6 +240,91 @@ impl Metadata for Artist {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             top_tracks: top_tracks,
+        }
+    }
+}
+
+// Podcast
+impl Metadata for Episode {
+    type Message = protocol::metadata::Episode;
+
+    fn base_url() -> &'static str {
+        "hm://metadata/3/episode"
+    }
+
+    fn parse(msg: &Self::Message, session: &Session) -> Self {
+        let country = session.country();
+
+        let files = msg
+            .get_file()
+            .iter()
+            .filter(|file| file.has_file_id())
+            .map(|file| {
+                let mut dst = [0u8; 20];
+                dst.clone_from_slice(file.get_file_id());
+                (file.get_format(), FileId(dst))
+            })
+            .collect();
+
+        let covers = msg
+            .get_covers()
+            .get_image()
+            .iter()
+            .filter(|image| image.has_file_id())
+            .map(|image| {
+                let mut dst = [0u8; 20];
+                dst.clone_from_slice(image.get_file_id());
+                FileId(dst)
+            })
+            .collect::<Vec<_>>();
+
+        Episode {
+            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
+            name: msg.get_name().to_owned(),
+            external_url: msg.get_external_url().to_owned(),
+            duration: msg.get_duration().to_owned(),
+            language: msg.get_language().to_owned(),
+            show: SpotifyId::from_raw(msg.get_show().get_gid()).unwrap(),
+            covers: covers,
+            files: files,
+            available: parse_restrictions(msg.get_restriction(), &country, "premium"),
+            explicit: msg.get_explicit().to_owned(),
+        }
+    }
+}
+
+impl Metadata for Show {
+    type Message = protocol::metadata::Show;
+
+    fn base_url() -> &'static str {
+        "hm://metadata/3/show"
+    }
+
+    fn parse(msg: &Self::Message, _: &Session) -> Self {
+        let episodes = msg
+            .get_episode()
+            .iter()
+            .filter(|episode| episode.has_gid())
+            .map(|episode| SpotifyId::from_raw(episode.get_gid()).unwrap())
+            .collect::<Vec<_>>();
+
+        let covers = msg
+            .get_covers()
+            .get_image()
+            .iter()
+            .filter(|image| image.has_file_id())
+            .map(|image| {
+                let mut dst = [0u8; 20];
+                dst.clone_from_slice(image.get_file_id());
+                FileId(dst)
+            })
+            .collect::<Vec<_>>();
+
+        Show {
+            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
+            name: msg.get_name().to_owned(),
+            episodes: episodes,
+            covers: covers,
         }
     }
 }
