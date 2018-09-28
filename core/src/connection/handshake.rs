@@ -3,7 +3,7 @@ use crypto::hmac::Hmac;
 use crypto::mac::Mac;
 use crypto::sha1::Sha1;
 use futures::{Async, Future, Poll};
-use protobuf::{self, Message, MessageStatic};
+use protobuf::{self, Message};
 use rand::thread_rng;
 use std::io::{self, Read};
 use std::marker::PhantomData;
@@ -126,7 +126,7 @@ fn client_response<T: AsyncWrite>(connection: T, challenge: Vec<u8>) -> WriteAll
     write_all(connection, buffer)
 }
 
-enum RecvPacket<T, M: MessageStatic> {
+enum RecvPacket<T, M: Message> {
     Header(ReadExact<T, Window<Vec<u8>>>, PhantomData<M>),
     Body(ReadExact<T, Window<Vec<u8>>>, PhantomData<M>),
 }
@@ -134,7 +134,7 @@ enum RecvPacket<T, M: MessageStatic> {
 fn recv_packet<T: AsyncRead, M>(connection: T, acc: Vec<u8>) -> RecvPacket<T, M>
 where
     T: Read,
-    M: MessageStatic,
+    M: Message,
 {
     RecvPacket::Header(read_into_accumulator(connection, 4, acc), PhantomData)
 }
@@ -142,7 +142,7 @@ where
 impl<T: AsyncRead, M> Future for RecvPacket<T, M>
 where
     T: Read,
-    M: MessageStatic,
+    M: Message,
 {
     type Item = (T, M, Vec<u8>);
     type Error = io::Error;

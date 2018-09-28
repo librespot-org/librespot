@@ -7,7 +7,7 @@ authors = ["Paul Lietar <paul@lietar.net>"]
 byteorder = "1.0"
 futures = "0.1.8"
 linear-map = "1.0"
-protobuf = "1.1"
+protobuf = "2.0.5"
 
 [dependencies.librespot-core]
 path = "../core"

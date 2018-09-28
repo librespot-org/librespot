@@ -53,7 +53,7 @@ where
 }
 
 pub trait Metadata: Send + Sized + 'static {
-    type Message: protobuf::MessageStatic;
+    type Message: protobuf::Message;
 
     fn base_url() -> &'static str;
     fn parse(msg: &Self::Message, session: &Session) -> Self;
