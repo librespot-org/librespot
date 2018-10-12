@@ -1,15 +1,19 @@
 use librespot::playback::player::PlayerEvent;
 use std::collections::HashMap;
 use std::process::Command;
+use std::thread;
 
 fn run_program(program: &str, env_vars: HashMap<&str, String>) {
     let mut v: Vec<&str> = program.split_whitespace().collect();
     info!("Running {:?} with environment variables {:?}", v, env_vars);
-    Command::new(&v.remove(0))
+    let mut child = Command::new(&v.remove(0))
         .args(&v)
         .envs(env_vars.iter())
         .spawn()
         .expect("program failed to start");
+    thread::spawn(move || {
+        child.wait().expect("failed to wait for program to finish");
+    });
 }
 
 pub fn run_program_on_events(event: PlayerEvent, onevent: &str) {
