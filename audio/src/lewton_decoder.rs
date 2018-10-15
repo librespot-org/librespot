@@ -24,6 +24,13 @@ where
         Ok(())
     }
 
+    pub fn postion(&self) -> Result<i64, VorbisError> {
+        match self.0.get_last_absgp() {
+            Some(absgp) => Ok((absgp * 1000 / 44100) as i64), // in ms
+            None => Ok(0),
+        }
+    }
+
     pub fn next_packet(&mut self) -> Result<Option<VorbisPacket>, VorbisError> {
         use self::lewton::audio::AudioReadError::AudioIsHeader;
         use self::lewton::OggReadError::NoCapturePatternFound;

@@ -37,6 +37,7 @@ pub struct SpircTask {
     sender: Box<Sink<SinkItem = Frame, SinkError = MercuryError>>,
     commands: mpsc::UnboundedReceiver<SpircCommand>,
     end_of_track: Box<Future<Item = (), Error = oneshot::Canceled>>,
+    prefetch_next_track: Box<Future<Item = (), Error = oneshot::Canceled>>,
 
     shutdown: bool,
     session: Session,
@@ -255,6 +256,7 @@ impl Spirc {
             sender: sender,
             commands: cmd_rx,
             end_of_track: Box::new(future::empty()),
+            prefetch_next_track: Box::new(future::empty()),
 
             shutdown: false,
             session: session.clone(),
@@ -333,6 +335,14 @@ impl Future for SpircTask {
                     }
                     Ok(Async::NotReady) => (),
                     Err(oneshot::Canceled) => self.end_of_track = Box::new(future::empty()),
+                }
+                match self.prefetch_next_track.poll() {
+                    Ok(Async::Ready(())) => {
+                        progress = true;
+                        self.handle_prefetch_next_track();
+                    }
+                    Ok(Async::NotReady) => (),
+                    Err(oneshot::Canceled) => self.prefetch_next_track = Box::new(future::empty()),
                 }
             }
 
@@ -673,6 +683,17 @@ impl SpircTask {
         self.notify(None);
     }
 
+    fn handle_prefetch_next_track(&mut self) {
+        let index = self.state.get_playing_track_index();
+        if index <= self.state.get_track().len() as u32 {
+            let track = {
+                let gid = self.state.get_track()[(index + 1) as usize].get_gid();
+                SpotifyId::from_raw(gid).unwrap()
+            };
+            self.player.prefetch(track);
+        };
+    }
+
     fn position(&mut self) -> u32 {
         let diff = now_ms() as u64 - self.state.get_position_measured_at();
         self.state.get_position_ms() + diff as u32
@@ -698,7 +719,7 @@ impl SpircTask {
         };
         let position = self.state.get_position_ms();
 
-        let end_of_track = self.player.load(track, play, position);
+        let (end_of_track, prefetch_next_track) = self.player.load(track, play, position);
 
         if play {
             self.state.set_status(PlayStatus::kPlayStatusPlay);
@@ -707,6 +728,7 @@ impl SpircTask {
         }
 
         self.end_of_track = Box::new(end_of_track);
+        self.prefetch_next_track = Box::new(prefetch_next_track);
     }
 
     fn hello(&mut self) {

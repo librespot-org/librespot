@@ -35,10 +35,12 @@ struct PlayerInternal {
     sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
     event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
+    prefetch_sender: Option<oneshot::Sender<()>>,
 }
 
 enum PlayerCommand {
-    Load(SpotifyId, bool, u32, oneshot::Sender<()>),
+    Load(SpotifyId, bool, u32, oneshot::Sender<()>, oneshot::Sender<()>),
+    Prefetch(SpotifyId),
     Play,
     Pause,
     Stop,
@@ -134,6 +136,7 @@ impl Player {
                 sink_running: false,
                 audio_filter: audio_filter,
                 event_sender: event_sender,
+                prefetch_sender: None,
             };
 
             internal.run();
@@ -152,16 +155,27 @@ impl Player {
         self.commands.as_ref().unwrap().send(cmd).unwrap();
     }
 
+    pub fn prefetch(&self, track: SpotifyId) {
+        self.command(PlayerCommand::Prefetch(track))
+    }
+
     pub fn load(
         &self,
         track: SpotifyId,
         start_playing: bool,
         position_ms: u32,
-    ) -> oneshot::Receiver<()> {
-        let (tx, rx) = oneshot::channel();
-        self.command(PlayerCommand::Load(track, start_playing, position_ms, tx));
+    ) -> (oneshot::Receiver<()>, oneshot::Receiver<()>) {
+        let (tx_eof, rx_eof) = oneshot::channel();
+        let (tx_prefetch, rx_prefetch) = oneshot::channel();
+        self.command(PlayerCommand::Load(
+            track,
+            start_playing,
+            position_ms,
+            tx_eof,
+            tx_prefetch,
+        ));
 
-        rx
+        (rx_eof, rx_prefetch)
     }
 
     pub fn play(&self) {
@@ -202,12 +216,16 @@ enum PlayerState {
         decoder: Decoder,
         end_of_track: oneshot::Sender<()>,
         normalisation_factor: f32,
+        duration: i32,
+        // prefetch_next_track: Option<oneshot::Sender<()>>,
     },
     Playing {
         track_id: SpotifyId,
         decoder: Decoder,
         end_of_track: oneshot::Sender<()>,
         normalisation_factor: f32,
+        duration: i32,
+        // prefetch_next_track: Option<oneshot::Sender<()>>,
     },
     EndOfTrack {
         track_id: SpotifyId,
@@ -224,6 +242,32 @@ impl PlayerState {
             Invalid => panic!("invalid state"),
         }
     }
+
+    // fn signal_prefetch(&mut self) {
+    //     use self::PlayerState::*;
+    //     *self = match *self {
+    //         Playing {
+    //             track_id,
+    //             ref decoder,
+    //             end_of_track,
+    //             normalisation_factor,
+    //             duration,
+    //             ref mut prefetch_next_track,
+    //         } => {
+    //             let tx_prefetch = prefetch_next_track.unwrap();
+    //             let _ = tx_prefetch.send(());
+    //
+    //             Playing {
+    //                 track_id,
+    //                 decoder,
+    //                 end_of_track,
+    //                 normalisation_factor,
+    //                 duration,
+    //                 prefetch_next_track: mem::replace(prefetch_next_track, None),
+    //             }
+    //         }
+    //     }
+    // }
 
     fn decoder(&mut self) -> Option<&mut Decoder> {
         use self::PlayerState::*;
@@ -242,6 +286,7 @@ impl PlayerState {
                 end_of_track,
                 ..
             } => {
+                info!("Sending EndOfTrack");
                 let _ = end_of_track.send(());
                 *self = EndOfTrack { track_id };
             }
@@ -257,12 +302,16 @@ impl PlayerState {
                 decoder,
                 end_of_track,
                 normalisation_factor,
+                duration,
+                // prefetch_next_track,
             } => {
                 *self = Playing {
                     track_id: track_id,
                     decoder: decoder,
                     end_of_track: end_of_track,
                     normalisation_factor: normalisation_factor,
+                    duration: duration,
+                    // prefetch_next_track: prefetch_next_track,
                 };
             }
             _ => panic!("invalid state"),
@@ -277,12 +326,16 @@ impl PlayerState {
                 decoder,
                 end_of_track,
                 normalisation_factor,
+                duration,
+                // prefetch_next_track,
             } => {
                 *self = Paused {
                     track_id: track_id,
                     decoder: decoder,
                     end_of_track: end_of_track,
                     normalisation_factor: normalisation_factor,
+                    duration: duration,
+                    // prefetch_next_track: prefetch_next_track,
                 };
             }
             _ => panic!("invalid state"),
@@ -324,20 +377,27 @@ impl PlayerInternal {
 
             if self.sink_running {
                 let mut current_normalisation_factor: f32 = 1.0;
-
+                let mut signal_prefetch = false;
                 let packet = if let PlayerState::Playing {
                     ref mut decoder,
                     normalisation_factor,
+                    duration,
                     ..
                 } = self.state
                 {
                     current_normalisation_factor = normalisation_factor;
+                    if i64::from(duration) - decoder.postion().unwrap() <= 2000 {
+                        signal_prefetch = true;
+                    }
                     Some(decoder.next_packet().expect("Vorbis error"))
                 } else {
                     None
                 };
 
                 if let Some(packet) = packet {
+                    if signal_prefetch {
+                        let _ = self.signal_prefetch();
+                    }
                     self.handle_packet(packet, current_normalisation_factor);
                 }
             }
@@ -345,6 +405,13 @@ impl PlayerInternal {
             if self.session.is_invalid() {
                 return;
             }
+        }
+    }
+
+    fn signal_prefetch(&mut self) {
+        if let Some(prefetch_sender) = self.prefetch_sender.take() {
+            let _ = prefetch_sender.send(());
+            self.prefetch_sender = None;
         }
     }
 
@@ -397,13 +464,14 @@ impl PlayerInternal {
     fn handle_command(&mut self, cmd: PlayerCommand) {
         debug!("command={:?}", cmd);
         match cmd {
-            PlayerCommand::Load(track_id, play, position, end_of_track) => {
+            PlayerCommand::Load(track_id, play, position, end_of_track, prefetch_next_track) => {
+                self.prefetch_sender = Some(prefetch_next_track);
                 if self.state.is_playing() {
                     self.stop_sink_if_running();
                 }
 
                 match self.load_track(track_id, position as i64) {
-                    Some((decoder, normalisation_factor)) => {
+                    Some((decoder, normalisation_factor, duration)) => {
                         if play {
                             match self.state {
                                 PlayerState::Playing {
@@ -427,6 +495,8 @@ impl PlayerInternal {
                                 decoder: decoder,
                                 end_of_track: end_of_track,
                                 normalisation_factor: normalisation_factor,
+                                duration: duration,
+                                // prefetch_next_track: Some(prefetch_next_track),
                             };
                         } else {
                             self.state = PlayerState::Paused {
@@ -434,6 +504,8 @@ impl PlayerInternal {
                                 decoder: decoder,
                                 end_of_track: end_of_track,
                                 normalisation_factor: normalisation_factor,
+                                duration: duration,
+                                // prefetch_next_track: Some(prefetch_next_track),
                             };
                             match self.state {
                                 PlayerState::Playing {
@@ -454,9 +526,14 @@ impl PlayerInternal {
                     }
 
                     None => {
+                        info!("Sending EndOfTrack (no track loaded)");
                         let _ = end_of_track.send(());
                     }
                 }
+            }
+
+            PlayerCommand::Prefetch(track_id) => {
+                self.prefetch_track(track_id);
             }
 
             PlayerCommand::Seek(position) => {
@@ -526,13 +603,39 @@ impl PlayerInternal {
         }
     }
 
-    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<(Decoder, f32)> {
+    fn prefetch_track(&self, track_id: SpotifyId) -> Option<AudioFile> {
         let track = Track::get(&self.session, track_id).wait().unwrap();
+        info!("Prefetching \"spotify:track:{}\"", track_id.to_base62());
+        let track = match self.find_available_alternative(&track) {
+            Some(track) => track,
+            None => {
+                warn!("Track \"{}\" is not available", track.name);
+                return None;
+            }
+        };
+        let format = match self.config.bitrate {
+            Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
+            Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
+            Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
+        };
+        let file_id = match track.files.get(&format) {
+            Some(&file_id) => file_id,
+            None => {
+                warn!("Track \"{}\" is not available in format {:?}", track.name, format);
+                return None;
+            }
+        };
+        let encrypted_file = AudioFile::open(&self.session, file_id).wait().unwrap();
 
+        Some(encrypted_file)
+    }
+
+    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<(Decoder, f32, i32)> {
+        let track = Track::get(&self.session, track_id).wait().unwrap();
         info!(
             "Loading track \"{}\" with Spotify URI \"spotify:track:{}\"",
             track.name,
-            track_id.to_base62()
+            track_id.to_base62(),
         );
 
         let track = match self.find_available_alternative(&track) {
@@ -587,7 +690,7 @@ impl PlayerInternal {
 
         info!("Track \"{}\" loaded", track.name);
 
-        Some((decoder, normalisation_factor))
+        Some((decoder, normalisation_factor, track.duration))
     }
 }
 
@@ -600,12 +703,13 @@ impl Drop for PlayerInternal {
 impl ::std::fmt::Debug for PlayerCommand {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
-            PlayerCommand::Load(track, play, position, _) => f
+            PlayerCommand::Load(track, play, position, _, _) => f
                 .debug_tuple("Load")
                 .field(&track)
                 .field(&play)
                 .field(&position)
                 .finish(),
+            PlayerCommand::Prefetch(track) => f.debug_tuple("Prefetch").field(&track).finish(),
             PlayerCommand::Play => f.debug_tuple("Play").finish(),
             PlayerCommand::Pause => f.debug_tuple("Pause").finish(),
             PlayerCommand::Stop => f.debug_tuple("Stop").finish(),
