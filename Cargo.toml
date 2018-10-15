@@ -50,7 +50,7 @@ tokio-core = "0.1.2"
 tokio-io = "0.1"
 tokio-signal = "0.1.2"
 url = "1.7.0"
-sha-1 = "0.7.0"
+sha-1 = "0.8.0"
 hex = "0.3.2"
 
 [build-dependencies]
