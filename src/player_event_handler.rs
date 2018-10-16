@@ -1,7 +1,8 @@
 use librespot::playback::player::PlayerEvent;
+use tokio_process::{Child, CommandExt};
 use std::collections::HashMap;
 use std::io;
-use std::process::{Child, Command};
+use std::process::Command;
 
 fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Child> {
     let mut v: Vec<&str> = program.split_whitespace().collect();
@@ -9,7 +10,7 @@ fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Chi
     Command::new(&v.remove(0))
         .args(&v)
         .envs(env_vars.iter())
-        .spawn()
+        .spawn_async()
 }
 
 pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> io::Result<Child> {

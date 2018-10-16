@@ -8,6 +8,7 @@ extern crate log;
 extern crate rpassword;
 extern crate tokio_core;
 extern crate tokio_io;
+extern crate tokio_process;
 extern crate tokio_signal;
 extern crate url;
 
@@ -38,9 +39,6 @@ use librespot::playback::audio_backend::{self, Sink, BACKENDS};
 use librespot::playback::config::{Bitrate, PlayerConfig};
 use librespot::playback::mixer::{self, Mixer};
 use librespot::playback::player::{Player, PlayerEvent};
-
-mod child_wait_future;
-use child_wait_future::ChildWaitFuture;
 
 mod player_event_handler;
 use player_event_handler::run_program_on_events;
@@ -470,15 +468,14 @@ impl Future for Main {
                 if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
                     if let Some(ref program) = self.player_event_program {
                         let child = run_program_on_events(event, program)
-                            .expect("program failed to start");
-
-                        let wait_future = ChildWaitFuture { child }
+                            .expect("program failed to start")
                             .map(|status| if !status.success() {
                                 error!("child exited with status {:?}", status.code());
                             })
                             .map_err(|e| error!("failed to wait on child process: {}", e));
 
-                        self.handle.spawn(wait_future);
+                        self.handle.spawn(child);
+
                     }
                 }
             }
