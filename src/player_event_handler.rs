@@ -1,18 +1,19 @@
 use librespot::playback::player::PlayerEvent;
+use tokio_process::{Child, CommandExt};
 use std::collections::HashMap;
+use std::io;
 use std::process::Command;
 
-fn run_program(program: &str, env_vars: HashMap<&str, String>) {
+fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Child> {
     let mut v: Vec<&str> = program.split_whitespace().collect();
     info!("Running {:?} with environment variables {:?}", v, env_vars);
     Command::new(&v.remove(0))
         .args(&v)
         .envs(env_vars.iter())
-        .spawn()
-        .expect("program failed to start");
+        .spawn_async()
 }
 
-pub fn run_program_on_events(event: PlayerEvent, onevent: &str) {
+pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> io::Result<Child> {
     let mut env_vars = HashMap::new();
     match event {
         PlayerEvent::Changed {
@@ -32,5 +33,5 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) {
             env_vars.insert("TRACK_ID", track_id.to_base16());
         }
     }
-    run_program(onevent, env_vars);
+    run_program(onevent, env_vars)
 }
