@@ -13,11 +13,11 @@ Note: librespot only works with Spotify Premium
 As the origin by [plietar](https://github.com/plietar/) is no longer actively maintained, this organisation and repository have been set up so that the project may be maintained and upgraded in the future.
 
 # Documentation
-Documentation is currently a work in progress. 
+Documentation is currently a work in progress.
 
-There is some brief documentation on how the protocol works in the [docs](https://github.com/librespot-org/librespot/tree/master/docs) folder, and more general usage and compilation information is available on the [wiki](https://github.com/librespot-org/librespot/wiki). 
+There is some brief documentation on how the protocol works in the [docs](https://github.com/librespot-org/librespot/tree/master/docs) folder, and more general usage and compilation information is available on the [wiki](https://github.com/librespot-org/librespot/wiki).
 
-[CONTRIBUTING.md](https://github.com/librespot-org/librespot/blob/master/CONTRIBUTING.md) also contains detailed instructions on setting up a development environment, compilation, and contributing guidelines. 
+[CONTRIBUTING.md](https://github.com/librespot-org/librespot/blob/master/CONTRIBUTING.md) also contains detailed instructions on setting up a development environment, compilation, and contributing guidelines.
 
 If you wish to learn more about how librespot works overall, the best way is to simply read the code, and ask any questions you have in the Gitter chat linked above.
 
@@ -26,7 +26,7 @@ If you wish to learn more about how librespot works overall, the best way is to 
 If you run into a bug when using librespot, please search the existing issues before opening a new one. Chances are, we've encountered it before, and have provided a resolution. If not, please open a new one, and where possible, include the backtrace librespot generates on crashing, along with anything we can use to reproduce the issue, eg. the Spotify URI of the song that caused the crash.
 
 # Building
-Rust 1.21.0 or later is required to build librespot.
+Rust 1.23.0 or later is required to build librespot.
 
 **If you are building librespot on macOS, the homebrew provided rust may fail due to the way in which homebrew installs rust. In this case, uninstall the homebrew version of rust and use [rustup](https://www.rustup.rs/), and librespot should then build. This should have been fixed in more recent versions of Homebrew, but we're leaving this notice here as a warning.**
 
@@ -58,7 +58,7 @@ cargo build --release
 A sample program implementing a headless Spotify Connect receiver is provided.
 Once you've built *librespot*, run it using :
 ```shell
-target/release/librespot --name DEVICENAME 
+target/release/librespot --name DEVICENAME
 ```
 
 The above is a minimal example. Here is a more fully fledged one:
@@ -90,4 +90,3 @@ This is a non exhaustive list of projects that either use or have modified libre
 - [Spotcontrol](https://github.com/badfortrains/spotcontrol) - A golang implementation of a Spotify Connect controller. No playback
 functionality.
 - [librespot-java](https://github.com/devgianlu/librespot-java) - A Java port of librespot.
-
