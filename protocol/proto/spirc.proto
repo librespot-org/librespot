@@ -76,7 +76,7 @@ enum CapabilityType {
     kSupportsRename = 0xb;
     kHidden = 0xc;
     kSupportsPlaylistV2 = 0xd;
-    kUnknown = 0xe;
+    kSupportsExternalEpisodes = 0xe;
 }
 
 message Goodbye {
