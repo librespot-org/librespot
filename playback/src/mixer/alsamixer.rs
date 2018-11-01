@@ -14,25 +14,27 @@ impl AlsaMixer {
         let mixer = alsa::mixer::Mixer::new(&self.config.card, false)?;
         let sid = alsa::mixer::SelemId::new(&*self.config.mixer, self.config.index);
 
-        let selem = mixer.find_selem(&sid).expect("Couldn't find SelemId");
+        let selem = mixer
+            .find_selem(&sid)
+            .expect(format!("Couldn't find simple mixer control for {}", self.config.mixer).as_str());
         let (min, max) = selem.get_playback_volume_range();
-        let cur_vol = selem
-            .get_playback_volume(alsa::mixer::SelemChannelId::mono())
-            .expect("Couldn't get current volume");
         let range = (max - min) as f64;
 
         let new_vol: u16;
 
         if let Some(vol) = set_volume {
             let alsa_volume: i64 = ((vol as f64 / 0xFFFF as f64) * range) as i64 + min;
-            debug!("Mapping volume {:?} [u16] ->> alsa {:?} [i64]", vol, alsa_volume);
+            debug!("Mapping volume {:?} ->> alsa {:?}", vol, alsa_volume);
             selem
                 .set_playback_volume_all(alsa_volume)
                 .expect("Couldn't set alsa volume");
             new_vol = vol;
         } else {
+            let cur_vol = selem
+                .get_playback_volume(alsa::mixer::SelemChannelId::mono())
+                .expect("Couldn't get current volume");
             new_vol = (((cur_vol - min) as f64 / range) * 0xFFFF as f64) as u16;
-            debug!("Mapping volume {:?} [u16] <<- alsa {:?} [i64]", new_vol, cur_vol);
+            debug!("Mapping volume {:?} <<- alsa {:?}", new_vol, cur_vol);
         }
 
         Ok(new_vol)

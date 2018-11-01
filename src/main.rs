@@ -140,10 +140,10 @@ fn setup(args: &[String]) -> Setup {
         .optopt(
             "",
             "device",
-            "Audio device to use. Use '?' to list options if using portaudio",
+            "Audio device to use. Use '?' to list options if using portaudio or alsa",
             "DEVICE",
         )
-        .optopt("", "mixer", "Mixer to use (Alsa or softmixer)", "MIXER")
+        .optopt("", "mixer", "Mixer to use (alsa or softmixer)", "MIXER")
         .optopt(
             "m",
             "mixer-name",
@@ -228,9 +228,12 @@ fn setup(args: &[String]) -> Setup {
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
     let mixer_config = MixerConfig {
-            card:  matches.opt_str("mixer-card").unwrap_or(String::from("default")),
-            mixer: matches.opt_str("mixer-name").unwrap_or(String::from("PCM")),
-            index: matches.opt_str("mixer-index").map(|index| index.parse::<u32>().unwrap()).unwrap_or(0),
+        card: matches.opt_str("mixer-card").unwrap_or(String::from("default")),
+        mixer: matches.opt_str("mixer-name").unwrap_or(String::from("PCM")),
+        index: matches
+            .opt_str("mixer-index")
+            .map(|index| index.parse::<u32>().unwrap())
+            .unwrap_or(0),
     };
 
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
@@ -247,8 +250,7 @@ fn setup(args: &[String]) -> Setup {
                 panic!("Initial volume must be in the range 0-100");
             }
             (volume as i32 * 0xFFFF / 100) as u16
-        })
-        .or_else(|| cache.as_ref().and_then(Cache::volume))
+        }).or_else(|| cache.as_ref().and_then(Cache::volume))
         .unwrap_or(0x8000);
 
     let zeroconf_port = matches

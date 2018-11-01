@@ -2,7 +2,6 @@ use super::{Open, Sink};
 use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, HwParams, PCM};
 use alsa::{Direction, Error, ValueOr};
-use std::env;
 use std::ffi::CString;
 use std::io;
 use std::process::exit;
@@ -15,7 +14,7 @@ fn list_outputs() {
         let i = HintIter::new(None, &*CString::new(*t).unwrap()).unwrap();
         for a in i {
             if let Some(Direction::Playback) = a.direction {
-                println!("{:#?}", a)
+                println!("{}\n\t{}", a.name.unwrap(), a.desc.unwrap());
             }
         }
     }
