@@ -14,7 +14,12 @@ fn list_outputs() {
         let i = HintIter::new(None, &*CString::new(*t).unwrap()).unwrap();
         for a in i {
             if let Some(Direction::Playback) = a.direction {
-                println!("{}\n\t{}", a.name.unwrap(), a.desc.unwrap());
+                // mimic aplay -L
+                println!(
+                    "{}\n\t{}\n",
+                    a.name.unwrap(),
+                    a.desc.unwrap().replace("\n", "\n\t")
+                );
             }
         }
     }
@@ -37,8 +42,11 @@ fn open_device(dev_name: &str) -> Result<(PCM), Box<Error>> {
         hwp.set_rate(44100, ValueOr::Nearest)?;
         hwp.set_channels(2)?;
         hwp.set_buffer_size_near(22050)?; // ~ 0.5s latency
-
         pcm.hw_params(&hwp)?;
+
+        let swp = pcm.sw_params_current()?;
+        swp.set_start_threshold(hwp.get_buffer_size()? - hwp.get_period_size()?)?;
+        pcm.sw_params(&swp)?;
     }
 
     Ok(pcm)
