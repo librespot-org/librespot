@@ -348,11 +348,16 @@ impl Read for AudioFileStreaming {
 impl Seek for AudioFileStreaming {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.position = try!(self.read_file.seek(pos));
+        // Do not seek past EOF
+        if (self.position as usize % CHUNK_SIZE) != 0  {
+            // Notify the fetch thread to get the correct block
+            // This can fail if fetch thread has completed, in which case the
+            // block is ready. Just ignore the error.
+            let _ = self.seek.unbounded_send(self.position);
+        } else {
+            warn!("Trying to seek past EOF");
+        }
 
-        // Notify the fetch thread to get the correct block
-        // This can fail if fetch thread has completed, in which case the
-        // block is ready. Just ignore the error.
-        let _ = self.seek.unbounded_send(self.position);
         Ok(self.position)
     }
 }
