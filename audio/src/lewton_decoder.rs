@@ -24,7 +24,7 @@ where
         Ok(())
     }
 
-    pub fn postion(&self) -> Result<i64, VorbisError> {
+    pub fn position(&self) -> Result<i64, VorbisError> {
         match self.0.get_last_absgp() {
             Some(absgp) => Ok((absgp * 1000 / 44100) as i64), // in ms
             None => Ok(0),

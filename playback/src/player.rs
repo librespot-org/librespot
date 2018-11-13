@@ -386,7 +386,7 @@ impl PlayerInternal {
                 } = self.state
                 {
                     current_normalisation_factor = normalisation_factor;
-                    if i64::from(duration) - decoder.postion().unwrap() <= 2000 {
+                    if i64::from(duration) - decoder.position().unwrap() <= 30000 {
                         signal_prefetch = true;
                     }
                     Some(decoder.next_packet().expect("Vorbis error"))
