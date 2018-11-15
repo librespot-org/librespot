@@ -3,10 +3,37 @@ extern crate cpal;
 use std::io;
 use std::thread;
 use std::sync::mpsc::{sync_channel, SyncSender};
+use std::process::exit;
 
 pub struct CpalSink {
     // event_loop: cpal::EventLoop,
     send: SyncSender<i16>,
+}
+
+fn list_outputs() {
+    println!("Default Audio Device:\n  {:?}", cpal::default_output_device().map(|e| e.name()));
+
+    println!("Available Audio Devices:");
+    for device in cpal::output_devices() {
+        println!("- {}", device.name());
+        // Output formats
+        if let Ok(fmt) = device.default_output_format() {
+            println!("  Default format:\n    {:?}", fmt);
+        }
+        let mut output_formats = match device.supported_output_formats() {
+            Ok(f) => f.peekable(),
+            Err(e) => {
+                println!("Error: {:?}", e);
+                continue;
+            },
+        };
+        if output_formats.peek().is_some() {
+            println!("  All formats:");
+            for format in output_formats {
+                println!("    {:?}", format);
+            }
+        }
+    }
 }
 
 impl Open for CpalSink {
@@ -18,6 +45,10 @@ impl Open for CpalSink {
         let event_loop = cpal::EventLoop::new();
 
         if device.is_some() {
+            if device == Some("?".to_string()) {
+                list_outputs();
+                exit(0)
+            }
             // N.B. This is perfectly possible to support.
             // TODO: First need to enable listing of devices.
                 // Remember to filter to those which support Stereo 16bit 44100Hz
