@@ -34,6 +34,11 @@ mod jackaudio;
 #[cfg(feature = "jackaudio-backend")]
 use self::jackaudio::JackSink;
 
+#[cfg(feature = "cpal-backend")]
+mod cpal;
+#[cfg(feature = "cpal-backend")]
+use self::cpal::CpalSink;
+
 mod pipe;
 use self::pipe::StdoutSink;
 
@@ -46,6 +51,8 @@ pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<Sink>)] =
     ("pulseaudio", mk_sink::<PulseAudioSink>),
     #[cfg(feature = "jackaudio-backend")]
     ("jackaudio", mk_sink::<JackSink>),
+    #[cfg(feature = "cpal-backend")]
+    ("cpal", mk_sink::<CpalSink>),
     ("pipe", mk_sink::<StdoutSink>),
 ];
 

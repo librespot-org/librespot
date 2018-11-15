@@ -63,6 +63,7 @@ alsa-backend = ["librespot-playback/alsa-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
 jackaudio-backend = ["librespot-playback/jackaudio-backend"]
+cpal-backend = ["librespot-playback/cpal-backend"]
 
 with-tremor = ["librespot-audio/with-tremor"]
 with-vorbis = ["librespot-audio/with-vorbis"]
