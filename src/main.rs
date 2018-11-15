@@ -200,6 +200,10 @@ fn setup(args: &[String]) -> Setup {
     let backend = audio_backend::find(backend_name).expect("Invalid backend");
 
     let device = matches.opt_str("device");
+    if device == Some("?".into()) {
+        backend(device);
+        exit(0);
+    }
 
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
