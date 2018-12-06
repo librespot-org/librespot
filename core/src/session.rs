@@ -51,7 +51,7 @@ impl Session {
         cache: Option<Cache>,
         handle: Handle,
     ) -> Box<Future<Item = Session, Error = io::Error>> {
-        let access_point = apresolve_or_fallback::<io::Error>(&handle, &config.proxy);
+        let access_point = apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
 
         let handle_ = handle.clone();
         let proxy = config.proxy.clone();

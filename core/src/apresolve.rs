@@ -17,7 +17,11 @@ pub struct APResolveData {
     ap_list: Vec<String>,
 }
 
-fn apresolve(handle: &Handle, proxy: &Option<Url>) -> Box<Future<Item = String, Error = Error>> {
+fn apresolve(
+    handle: &Handle,
+    proxy: &Option<Url>,
+    ap_port: &Option<u16>,
+) -> Box<Future<Item = String, Error = Error>> {
     let url = Uri::from_str(APRESOLVE_ENDPOINT).expect("invalid AP resolve URL");
     let use_proxy = proxy.is_some();
 
@@ -53,9 +57,15 @@ fn apresolve(handle: &Handle, proxy: &Option<Url>) -> Box<Future<Item = String, 
     let data =
         body.and_then(|body| serde_json::from_str::<APResolveData>(&body).chain_err(|| "invalid JSON"));
 
+    let p = ap_port.clone();
+
     let ap = data.and_then(move |data| {
         let mut aps = data.ap_list.iter().filter(|ap| {
-            if use_proxy {
+            if p.is_some() {
+                Uri::from_str(ap)
+                    .ok()
+                    .map_or(false, |uri| uri.port().map_or(false, |port| port == p.unwrap()))
+            } else if use_proxy {
                 // It is unlikely that the proxy will accept CONNECT on anything other than 443.
                 Uri::from_str(ap)
                     .ok()
@@ -75,11 +85,12 @@ fn apresolve(handle: &Handle, proxy: &Option<Url>) -> Box<Future<Item = String, 
 pub(crate) fn apresolve_or_fallback<E>(
     handle: &Handle,
     proxy: &Option<Url>,
+    ap_port: &Option<u16>,
 ) -> Box<Future<Item = String, Error = E>>
 where
     E: 'static,
 {
-    let ap = apresolve(handle, proxy).or_else(|e| {
+    let ap = apresolve(handle, proxy, ap_port).or_else(|e| {
         warn!("Failed to resolve Access Point: {}", e.description());
         warn!("Using fallback \"{}\"", AP_FALLBACK);
         Ok(AP_FALLBACK.into())

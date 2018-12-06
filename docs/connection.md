@@ -6,7 +6,7 @@ An AP is randomly picked from that list to connect to.
 
 The connection is done using a bare TCP socket. Despite many APs using ports 80 and 443, neither HTTP nor TLS are used to connect.
 
-If `http://apresolve.spotify.com` is unresponsive, `ap.spotify.com:80` is used as a fallback.
+If `http://apresolve.spotify.com` is unresponsive, `ap.spotify.com:443` is used as a fallback.
 
 ## Connection Hello
 The first 3 packets exchanged are unencrypted, and have the following format :

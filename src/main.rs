@@ -7,6 +7,7 @@ extern crate log;
 extern crate rpassword;
 extern crate tokio_core;
 extern crate tokio_io;
+extern crate tokio_process;
 extern crate tokio_signal;
 extern crate url;
 extern crate sha1;
@@ -127,6 +128,7 @@ fn setup(args: &[String]) -> Setup {
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
         .optopt("", "proxy", "HTTP proxy to use when connecting", "PROXY")
+        .optopt("", "ap-port", "Connect to AP with specified port. If no AP with that port are present fallback AP will be used. Available ports are usually 80, 443 and 4070", "AP_PORT")
         .optflag("", "disable-discovery", "Disable discovery mode")
         .optopt(
             "",
@@ -253,20 +255,23 @@ fn setup(args: &[String]) -> Setup {
             proxy: matches.opt_str("proxy").or(std::env::var("http_proxy").ok()).map(
                 |s| {
                     match Url::parse(&s) {
-                Ok(url) => {
-                    if url.host().is_none() || url.port().is_none() {
-                        panic!("Invalid proxy url, only urls on the format \"http://host:port\" are allowed");
-                    }
+                        Ok(url) => {
+                            if url.host().is_none() || url.port().is_none() {
+                                panic!("Invalid proxy url, only urls on the format \"http://host:port\" are allowed");
+                            }
 
-                    if url.scheme() != "http" {
-                        panic!("Only unsecure http:// proxies are supported");
+                            if url.scheme() != "http" {
+                                panic!("Only unsecure http:// proxies are supported");
+                            }
+                            url
+                        },
+                    Err(err) => panic!("Invalid proxy url: {}, only urls on the format \"http://host:port\" are allowed", err)
                     }
-                    url
-                },
-                Err(err) => panic!("Invalid proxy url: {}, only urls on the format \"http://host:port\" are allowed", err)
-            }
                 },
             ),
+            ap_port: matches
+                .opt_str("ap-port")
+                .map(|port| port.parse::<u16>().expect("Invalid port")),
         }
     };
 
@@ -460,7 +465,15 @@ impl Future for Main {
             if let Some(ref mut player_event_channel) = self.player_event_channel {
                 if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
                     if let Some(ref program) = self.player_event_program {
-                        run_program_on_events(event, program);
+                        let child = run_program_on_events(event, program)
+                            .expect("program failed to start")
+                            .map(|status| if !status.success() {
+                                error!("child exited with status {:?}", status.code());
+                            })
+                            .map_err(|e| error!("failed to wait on child process: {}", e));
+
+                        self.handle.spawn(child);
+
                     }
                 }
             }
