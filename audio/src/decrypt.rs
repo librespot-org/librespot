@@ -2,7 +2,7 @@ use std::io;
 
 use aes_ctr::Aes128Ctr;
 use aes_ctr::stream_cipher::{
-    NewFixStreamCipher, StreamCipherCore, StreamCipherSeek
+    NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek
 };
 use aes_ctr::stream_cipher::generic_array::GenericArray;
 
