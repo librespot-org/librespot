@@ -22,6 +22,7 @@ jack            = { version = "0.5.3", optional = true }
 libc            = { version = "0.2", optional = true }
 rodio           = { git = "https://github.com/tomaka/rodio", optional = true, default-features = false }
 cpal            = { version = "*", optional = true }
+sdl2            = { version = "0.32", optional = true }
 
 [features]
 alsa-backend = ["alsa"]
@@ -29,3 +30,4 @@ portaudio-backend = ["portaudio-rs"]
 pulseaudio-backend = ["libpulse-sys", "libc"]
 jackaudio-backend = ["jack"]
 rodio-backend = ["rodio", "cpal"]
+sdl-backend = ["sdl2"]

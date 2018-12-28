@@ -16,6 +16,9 @@ extern crate libpulse_sys;
 #[cfg(feature = "jackaudio-backend")]
 extern crate jack;
 
+#[cfg(feature = "sdl-backend")]
+extern crate sdl2;
+
 #[cfg(feature = "libc")]
 extern crate libc;
 

@@ -38,6 +38,10 @@ use self::jackaudio::JackSink;
 mod rodio;
 #[cfg(feature = "rodio-backend")]
 use self::rodio::RodioSink;
+#[cfg(feature = "sdl-backend")]
+mod sdl;
+#[cfg(feature = "sdl-backend")]
+use self::sdl::SdlSink;
 
 mod pipe;
 use self::pipe::StdoutSink;
@@ -53,6 +57,8 @@ pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<Sink>)] =
     ("jackaudio", mk_sink::<JackSink>),
     #[cfg(feature = "rodio-backend")]
     ("rodio", mk_sink::<RodioSink>),
+    #[cfg(feature = "sdl-backend")]
+    ("sdl", mk_sink::<SdlSink>),
     ("pipe", mk_sink::<StdoutSink>),
 ];
 
