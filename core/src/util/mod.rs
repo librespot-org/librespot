@@ -1,12 +1,12 @@
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{One, Zero};
-use rand::{Rand, Rng};
+use rand::Rng;
 use std::mem;
 use std::ops::{Mul, Rem, Shr};
 
-pub fn rand_vec<G: Rng, R: Rand>(rng: &mut G, size: usize) -> Vec<R> {
-    rng.gen_iter().take(size).collect()
+pub fn rand_vec<G: Rng>(rng: &mut G, size: usize) -> Vec<u8> {
+    ::std::iter::repeat(()).map(|()| rng.gen()).take(size).collect()
 }
 
 pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
