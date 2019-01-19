@@ -2,8 +2,8 @@ use librespot::playback::player::PlayerEvent;
 use tokio_process::{Child, CommandExt};
 use std::collections::HashMap;
 use std::io;
-use std::io::Write;
-use std::fs::{File, LineWriter};
+use std::io::{LineWriter, Write};
+use std::fs::File;
 use std::process::Command;
 
 fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Child> {
