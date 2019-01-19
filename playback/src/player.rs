@@ -49,15 +49,18 @@ enum PlayerCommand {
 pub enum PlayerEvent {
     Started {
         track_id: SpotifyId,
+        new_state: String,
     },
 
     Changed {
         old_track_id: SpotifyId,
         new_track_id: SpotifyId,
+        new_state: String,
     },
 
     Stopped {
         track_id: SpotifyId,
+        new_state: String,
     },
 }
 
@@ -413,11 +416,18 @@ impl PlayerInternal {
                                 | PlayerState::EndOfTrack {
                                     track_id: old_track_id,
                                     ..
-                                } => self.send_event(PlayerEvent::Changed {
-                                    old_track_id: old_track_id,
-                                    new_track_id: track_id,
-                                }),
-                                _ => self.send_event(PlayerEvent::Started { track_id }),
+                                } => {
+                                    let new_state = "play".to_string();
+                                    self.send_event(PlayerEvent::Changed {
+                                        old_track_id: old_track_id,
+                                        new_track_id: track_id,
+                                        new_state: new_state,
+                                    });
+                                },
+                                _ => {
+                                    let new_state = "play".to_string();
+                                    self.send_event(PlayerEvent::Started { track_id, new_state });
+                                },
                             }
 
                             self.start_sink();
@@ -443,13 +453,18 @@ impl PlayerInternal {
                                 | PlayerState::EndOfTrack {
                                     track_id: old_track_id,
                                     ..
-                                } => self.send_event(PlayerEvent::Changed {
-                                    old_track_id: old_track_id,
-                                    new_track_id: track_id,
-                                }),
+                                } => {
+                                    let new_state = "pause".to_string();
+                                    self.send_event(PlayerEvent::Changed {
+                                        old_track_id: old_track_id,
+                                        new_track_id: track_id,
+                                        new_state: new_state,
+                                    })
+                                },
                                 _ => (),
                             }
-                            self.send_event(PlayerEvent::Stopped { track_id });
+                            let new_state = "pause".to_string();
+                            self.send_event(PlayerEvent::Stopped { track_id, new_state });
                         }
                     }
 
@@ -474,7 +489,8 @@ impl PlayerInternal {
                 if let PlayerState::Paused { track_id, .. } = self.state {
                     self.state.paused_to_playing();
 
-                    self.send_event(PlayerEvent::Started { track_id });
+                    let new_state = "play".to_string();
+                    self.send_event(PlayerEvent::Started { track_id, new_state });
                     self.start_sink();
                 } else {
                     warn!("Player::play called from invalid state");
@@ -486,7 +502,8 @@ impl PlayerInternal {
                     self.state.playing_to_paused();
 
                     self.stop_sink_if_running();
-                    self.send_event(PlayerEvent::Stopped { track_id });
+                    let new_state = "pause".to_string();
+                    self.send_event(PlayerEvent::Stopped { track_id, new_state });
                 } else {
                     warn!("Player::pause called from invalid state");
                 }
@@ -497,7 +514,8 @@ impl PlayerInternal {
                 | PlayerState::Paused { track_id, .. }
                 | PlayerState::EndOfTrack { track_id } => {
                     self.stop_sink_if_running();
-                    self.send_event(PlayerEvent::Stopped { track_id });
+                    let new_state = "stop".to_string();
+                    self.send_event(PlayerEvent::Stopped { track_id, new_state });
                     self.state = PlayerState::Stopped;
                 }
                 PlayerState::Stopped => {
