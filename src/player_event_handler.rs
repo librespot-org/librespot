@@ -18,7 +18,7 @@ fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Chi
 pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> io::Result<Child> {
     let mut env_vars = HashMap::new();
     let mut fifo = File::open("/var/run/librespot").expect("file not found");
-    let mut fifo = LineWriter::new(fifo)
+    let mut fifo = LineWriter::new(fifo);
     match event {
         PlayerEvent::Changed {
             old_track_id,
