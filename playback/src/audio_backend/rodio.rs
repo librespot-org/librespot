@@ -68,12 +68,15 @@ impl Open for RodioSink {
 
 impl Sink for RodioSink {
     fn start(&mut self) -> io::Result<()> {
-        self.rodio_sink.play();
+        // More similar to an "unpause" than "play". Doesn't undo "stop".
+        // self.rodio_sink.play();
         Ok(())
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        self.rodio_sink.stop();
+        // This will immediately stop playback, but the sink is then unusable.
+        // We just have to let the current buffer play till the end.
+        // self.rodio_sink.stop();
         Ok(())
     }
 
