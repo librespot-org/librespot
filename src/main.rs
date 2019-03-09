@@ -8,6 +8,7 @@ extern crate log;
 extern crate rpassword;
 extern crate tokio_core;
 extern crate tokio_io;
+extern crate tokio_process;
 extern crate tokio_signal;
 extern crate url;
 
@@ -466,7 +467,15 @@ impl Future for Main {
             if let Some(ref mut player_event_channel) = self.player_event_channel {
                 if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
                     if let Some(ref program) = self.player_event_program {
-                        run_program_on_events(event, program);
+                        let child = run_program_on_events(event, program)
+                            .expect("program failed to start")
+                            .map(|status| if !status.success() {
+                                error!("child exited with status {:?}", status.code());
+                            })
+                            .map_err(|e| error!("failed to wait on child process: {}", e));
+
+                        self.handle.spawn(child);
+
                     }
                 }
             }
