@@ -580,9 +580,12 @@ impl PlayerInternal {
 
         let mut decoder = VorbisDecoder::new(audio_file).unwrap();
 
-        match decoder.seek(position) {
-            Ok(_) => (),
-            Err(err) => error!("Vorbis error: {:?}", err),
+        if position != 0 {
+            info!("seek {}", position);
+            match decoder.seek(position) {
+                Ok(_) => (),
+                Err(err) => error!("Vorbis error: {:?}", err),
+            }
         }
 
         info!("Track \"{}\" loaded", track.name);
