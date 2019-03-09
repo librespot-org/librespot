@@ -561,11 +561,11 @@ impl PlayerInternal {
             .session
             .audio_key()
             .request(track.id, file_id)
-            .wait()
-            .unwrap();
+        let encrypted_file = AudioFile::open(&self.session, file_id);
 
-        let encrypted_file = AudioFile::open(&self.session, file_id).wait().unwrap();
 
+        let encrypted_file = encrypted_file.wait().unwrap();
+        let key = key.wait().unwrap();
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
         let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
