@@ -70,7 +70,7 @@ with-vorbis = ["librespot-audio/with-vorbis"]
 
 with-dns-sd = ["librespot-connect/with-dns-sd"]
 
-default = ["librespot-playback/portaudio-backend"]
+default = ["librespot-playback/rodio-backend"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
