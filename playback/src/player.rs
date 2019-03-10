@@ -4,18 +4,17 @@ use futures::sync::oneshot;
 use futures::{future, Future};
 use std;
 use std::borrow::Cow;
-use std::io::{Read, Result, Seek, SeekFrom};
+use std::io::{Error, ErrorKind, Read, Result, Seek, SeekFrom};
 use std::mem;
-use std::sync::mpsc::{RecvError, RecvTimeoutError, TryRecvError};
+use std::sync::mpsc::{RecvError, TryRecvError};
 use std::thread;
-use std::time::Duration;
 
 use config::{Bitrate, PlayerConfig};
 use core::session::Session;
 use core::spotify_id::SpotifyId;
 
+use audio::VorbisDecoder;
 use audio::{AudioDecrypt, AudioFile};
-use audio::{VorbisDecoder, VorbisPacket};
 use audio_backend::Sink;
 use metadata::{FileFormat, Metadata, Track};
 use mixer::AudioFilter;
@@ -31,8 +30,8 @@ struct PlayerInternal {
     commands: std::sync::mpsc::Receiver<PlayerCommand>,
 
     state: PlayerState,
+    track: Option<LoadedTrack>,
     sink: Box<Sink>,
-    sink_running: bool,
     audio_filter: Option<Box<AudioFilter + Send>>,
     event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
 }
@@ -43,22 +42,23 @@ enum PlayerCommand {
     Pause,
     Stop,
     Seek(u32),
+    /// Update volume of the player.
+    Volume(Option<f32>),
 }
 
 #[derive(Debug, Clone)]
 pub enum PlayerEvent {
-    Started {
-        track_id: SpotifyId,
-    },
+    /// The given track has been loaded into the player.
+    Started { track_id: SpotifyId },
 
+    /// The track has been changed in the player.
     Changed {
         old_track_id: SpotifyId,
         new_track_id: SpotifyId,
     },
 
-    Stopped {
-        track_id: SpotifyId,
-    },
+    /// The given track has been unloaded from the player.
+    Stopped { track_id: SpotifyId },
 }
 
 type PlayerEventChannel = futures::sync::mpsc::UnboundedReceiver<PlayerEvent>;
@@ -131,12 +131,14 @@ impl Player {
 
                 state: PlayerState::Stopped,
                 sink: sink_builder(),
-                sink_running: false,
+                track: None,
                 audio_filter: audio_filter,
                 event_sender: event_sender,
             };
 
-            internal.run();
+            if let Err(e) = internal.run() {
+                panic!("player thread errored: {}", e);
+            }
         });
 
         (
@@ -150,6 +152,11 @@ impl Player {
 
     fn command(&self, cmd: PlayerCommand) {
         self.commands.as_ref().unwrap().send(cmd).unwrap();
+    }
+
+    /// Update the volume of the player.
+    pub fn volume(&self, volume: Option<f32>) {
+        self.command(PlayerCommand::Volume(volume))
     }
 
     pub fn load(
@@ -195,317 +202,263 @@ impl Drop for Player {
 }
 
 type Decoder = VorbisDecoder<Subfile<AudioDecrypt<AudioFile>>>;
+
+#[derive(Debug, Clone, Copy)]
 enum PlayerState {
+    /// Stop the sink and close the current track.
     Stopped,
-    Paused {
-        track_id: SpotifyId,
-        decoder: Decoder,
-        end_of_track: oneshot::Sender<()>,
-        normalisation_factor: f32,
-    },
-    Playing {
-        track_id: SpotifyId,
-        decoder: Decoder,
-        end_of_track: oneshot::Sender<()>,
-        normalisation_factor: f32,
-    },
-    EndOfTrack {
-        track_id: SpotifyId,
-    },
-    Invalid,
+    /// Pause playback.
+    Paused,
+    /// Start playing.
+    Playing,
+}
+
+struct LoadedTrack {
+    track_id: SpotifyId,
+    decoder: Decoder,
+    /// oneshot that must called when a track is unloaded.
+    end_of_track: Option<oneshot::Sender<()>>,
+    normalisation_factor: f32,
+}
+
+impl Drop for LoadedTrack {
+    fn drop(&mut self) {
+        if let Some(end_of_track) = mem::replace(&mut self.end_of_track, None) {
+            let _ = end_of_track.send(());
+        }
+    }
 }
 
 impl PlayerState {
     fn is_playing(&self) -> bool {
-        use self::PlayerState::*;
         match *self {
-            Stopped | EndOfTrack { .. } | Paused { .. } => false,
-            Playing { .. } => true,
-            Invalid => panic!("invalid state"),
-        }
-    }
-
-    fn decoder(&mut self) -> Option<&mut Decoder> {
-        use self::PlayerState::*;
-        match *self {
-            Stopped | EndOfTrack { .. } => None,
-            Paused { ref mut decoder, .. } | Playing { ref mut decoder, .. } => Some(decoder),
-            Invalid => panic!("invalid state"),
-        }
-    }
-
-    fn playing_to_end_of_track(&mut self) {
-        use self::PlayerState::*;
-        match mem::replace(self, Invalid) {
-            Playing {
-                track_id,
-                end_of_track,
-                ..
-            } => {
-                let _ = end_of_track.send(());
-                *self = EndOfTrack { track_id };
-            }
-            _ => panic!("Called playing_to_end_of_track in non-playing state."),
-        }
-    }
-
-    fn paused_to_playing(&mut self) {
-        use self::PlayerState::*;
-        match ::std::mem::replace(self, Invalid) {
-            Paused {
-                track_id,
-                decoder,
-                end_of_track,
-                normalisation_factor,
-            } => {
-                *self = Playing {
-                    track_id: track_id,
-                    decoder: decoder,
-                    end_of_track: end_of_track,
-                    normalisation_factor: normalisation_factor,
-                };
-            }
-            _ => panic!("invalid state"),
-        }
-    }
-
-    fn playing_to_paused(&mut self) {
-        use self::PlayerState::*;
-        match ::std::mem::replace(self, Invalid) {
-            Playing {
-                track_id,
-                decoder,
-                end_of_track,
-                normalisation_factor,
-            } => {
-                *self = Paused {
-                    track_id: track_id,
-                    decoder: decoder,
-                    end_of_track: end_of_track,
-                    normalisation_factor: normalisation_factor,
-                };
-            }
-            _ => panic!("invalid state"),
+            PlayerState::Playing => true,
+            PlayerState::Stopped | PlayerState::Paused => false,
         }
     }
 }
 
 impl PlayerInternal {
-    fn run(mut self) {
+    fn run(mut self) -> Result<()> {
         loop {
             let cmd = if self.state.is_playing() {
-                if self.sink_running {
-                    match self.commands.try_recv() {
-                        Ok(cmd) => Some(cmd),
-                        Err(TryRecvError::Empty) => None,
-                        Err(TryRecvError::Disconnected) => return,
-                    }
-                } else {
-                    match self.commands.recv_timeout(Duration::from_secs(5)) {
-                        Ok(cmd) => Some(cmd),
-                        Err(RecvTimeoutError::Timeout) => None,
-                        Err(RecvTimeoutError::Disconnected) => return,
-                    }
+                match self.commands.try_recv() {
+                    Ok(cmd) => Some(cmd),
+                    Err(TryRecvError::Empty) => None,
+                    Err(TryRecvError::Disconnected) => return Ok(()),
                 }
             } else {
                 match self.commands.recv() {
                     Ok(cmd) => Some(cmd),
-                    Err(RecvError) => return,
+                    Err(RecvError) => return Ok(()),
                 }
             };
 
             if let Some(cmd) = cmd {
-                self.handle_command(cmd);
+                self.handle_command(cmd)?;
             }
 
-            if self.state.is_playing() && !self.sink_running {
-                self.start_sink();
-            }
-
-            if self.sink_running {
-                let mut current_normalisation_factor: f32 = 1.0;
-
-                let packet = if let PlayerState::Playing {
-                    ref mut decoder,
-                    normalisation_factor,
-                    ..
-                } = self.state
-                {
-                    current_normalisation_factor = normalisation_factor;
-                    Some(decoder.next_packet().expect("Vorbis error"))
-                } else {
-                    None
-                };
-
-                if let Some(packet) = packet {
-                    self.handle_packet(packet, current_normalisation_factor);
+            if self.handle_packet()? {
+                if let Some(track) = self.track.take() {
+                    self.sink.stop()?;
+                    self.send_event(PlayerEvent::Stopped {
+                        track_id: track.track_id,
+                    });
                 }
+
+                self.state = PlayerState::Stopped;
             }
 
             if self.session.is_invalid() {
-                return;
+                return Err(Error::new(ErrorKind::Other, "session not valid"));
             }
         }
     }
 
-    fn start_sink(&mut self) {
-        match self.sink.start() {
-            Ok(()) => self.sink_running = true,
-            Err(err) => error!("Could not start audio: {}", err),
+    /// Handle processing of a single packet.
+    ///
+    /// Returns `true` when the track has ended.
+    fn handle_packet(&mut self) -> Result<bool> {
+        if !self.state.is_playing() {
+            return Ok(false);
         }
-    }
 
-    fn stop_sink_if_running(&mut self) {
-        if self.sink_running {
-            self.stop_sink();
+        let track = match self.track.as_mut() {
+            Some(track) => track,
+            None => return Ok(false),
+        };
+
+        let mut normalisation_factor = track.normalisation_factor;
+
+        let mut packet = match track
+            .decoder
+            .next_packet()
+            .map_err(|e| Error::new(ErrorKind::Other, e))?
+        {
+            Some(packet) => packet,
+            // end of track
+            None => return Ok(true),
+        };
+
+        if let Some(volume) = self.config.volume {
+            normalisation_factor *= volume;
         }
-    }
 
-    fn stop_sink(&mut self) {
-        self.sink.stop().unwrap();
-        self.sink_running = false;
-    }
+        if packet.data().len() > 0 {
+            if let Some(ref editor) = self.audio_filter {
+                editor.modify_stream(&mut packet.data_mut())
+            };
 
-    fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalisation_factor: f32) {
-        match packet {
-            Some(mut packet) => {
-                if packet.data().len() > 0 {
-                    if let Some(ref editor) = self.audio_filter {
-                        editor.modify_stream(&mut packet.data_mut())
-                    };
+            let adjusted = self.config.normalisation || self.config.volume.is_some();
 
-                    if self.config.normalisation && normalisation_factor != 1.0 {
-                        for x in packet.data_mut().iter_mut() {
-                            *x = (*x as f32 * normalisation_factor) as i16;
-                        }
-                    }
-
-                    if let Err(err) = self.sink.write(&packet.data()) {
-                        error!("Could not write audio: {}", err);
-                        self.stop_sink();
-                    }
+            if adjusted && normalisation_factor != 1.0 {
+                for x in packet.data_mut() {
+                    *x = (*x as f32 * normalisation_factor) as i16;
                 }
             }
 
-            None => {
-                self.stop_sink();
-                self.state.playing_to_end_of_track();
+            // on errors, stop the sink and end the current track.
+            // this gives the user a chance to e.g. skip the current song.
+            if let Err(e) = self.sink.write(&packet.data()) {
+                error!("sink error: {}", e);
+                return Ok(true);
             }
         }
+
+        Ok(false)
     }
 
-    fn handle_command(&mut self, cmd: PlayerCommand) {
+    fn handle_command(&mut self, cmd: PlayerCommand) -> Result<()> {
         debug!("command={:?}", cmd);
+
         match cmd {
             PlayerCommand::Load(track_id, play, position, end_of_track) => {
-                if self.state.is_playing() {
-                    self.stop_sink_if_running();
+                let (decoder, normalisation_factor) = match self.load_track(track_id, position as i64) {
+                    Some(result) => result,
+                    None => return Err(Error::new(ErrorKind::Other, "failed to load track")),
+                };
+
+                // NB: we always swap out the loaded track.
+                let mut track = mem::replace(
+                    &mut self.track,
+                    Some(LoadedTrack {
+                        track_id,
+                        decoder,
+                        end_of_track: Some(end_of_track),
+                        normalisation_factor,
+                    }),
+                );
+
+                if let Some(old_track_id) = track.map(|t| t.track_id) {
+                    self.send_event(PlayerEvent::Changed {
+                        old_track_id,
+                        new_track_id: track_id,
+                    })
+                } else {
+                    self.send_event(PlayerEvent::Started { track_id })
                 }
 
-                match self.load_track(track_id, position as i64) {
-                    Some((decoder, normalisation_factor)) => {
-                        if play {
-                            match self.state {
-                                PlayerState::Playing {
-                                    track_id: old_track_id,
-                                    ..
-                                }
-                                | PlayerState::EndOfTrack {
-                                    track_id: old_track_id,
-                                    ..
-                                } => self.send_event(PlayerEvent::Changed {
-                                    old_track_id: old_track_id,
-                                    new_track_id: track_id,
-                                }),
-                                _ => self.send_event(PlayerEvent::Started { track_id }),
-                            }
-
-                            self.start_sink();
-
-                            self.state = PlayerState::Playing {
-                                track_id: track_id,
-                                decoder: decoder,
-                                end_of_track: end_of_track,
-                                normalisation_factor: normalisation_factor,
-                            };
-                        } else {
-                            self.state = PlayerState::Paused {
-                                track_id: track_id,
-                                decoder: decoder,
-                                end_of_track: end_of_track,
-                                normalisation_factor: normalisation_factor,
-                            };
-                            match self.state {
-                                PlayerState::Playing {
-                                    track_id: old_track_id,
-                                    ..
-                                }
-                                | PlayerState::EndOfTrack {
-                                    track_id: old_track_id,
-                                    ..
-                                } => self.send_event(PlayerEvent::Changed {
-                                    old_track_id: old_track_id,
-                                    new_track_id: track_id,
-                                }),
-                                _ => (),
-                            }
-                            self.send_event(PlayerEvent::Stopped { track_id });
-                        }
+                match (play, self.state) {
+                    (true, PlayerState::Paused) => {
+                        self.sink.start()?;
+                        self.state = PlayerState::Playing;
                     }
-
-                    None => {
-                        let _ = end_of_track.send(());
+                    (false, PlayerState::Paused) => {
+                        // ignore: wants to pause but already paused.
+                    }
+                    (true, PlayerState::Playing) => {
+                        // ignore: wants to play but already playing.
+                    }
+                    (false, PlayerState::Playing) => {
+                        self.sink.stop()?;
+                        self.state = PlayerState::Paused;
+                    }
+                    (true, PlayerState::Stopped) => {
+                        self.sink.start()?;
+                        self.state = PlayerState::Playing;
+                    }
+                    (false, PlayerState::Stopped) => {
+                        self.state = PlayerState::Paused;
                     }
                 }
             }
 
             PlayerCommand::Seek(position) => {
-                if let Some(decoder) = self.state.decoder() {
-                    match decoder.seek(position as i64) {
-                        Ok(_) => (),
-                        Err(err) => error!("Vorbis error: {:?}", err),
+                if let Some(track) = self.track.as_mut() {
+                    if let Err(e) = track.decoder.seek(position as i64) {
+                        error!("seek error: {}", e);
                     }
-                } else {
-                    warn!("Player::seek called from invalid state");
                 }
             }
 
             PlayerCommand::Play => {
-                if let PlayerState::Paused { track_id, .. } = self.state {
-                    self.state.paused_to_playing();
+                let track_id = match self.track.as_ref() {
+                    Some(track) => track.track_id,
+                    None => {
+                        warn!("no track loaded");
+                        return Ok(());
+                    }
+                };
 
-                    self.send_event(PlayerEvent::Started { track_id });
-                    self.start_sink();
-                } else {
-                    warn!("Player::play called from invalid state");
+                match self.state {
+                    PlayerState::Playing => {
+                        warn!("already playing");
+                    }
+                    PlayerState::Stopped => {
+                        self.sink.start()?;
+                        self.state = PlayerState::Playing;
+                        self.send_event(PlayerEvent::Started { track_id });
+                    }
+                    PlayerState::Paused => {
+                        self.sink.start()?;
+                        self.state = PlayerState::Playing;
+                    }
                 }
             }
 
-            PlayerCommand::Pause => {
-                if let PlayerState::Playing { track_id, .. } = self.state {
-                    self.state.playing_to_paused();
-
-                    self.stop_sink_if_running();
-                    self.send_event(PlayerEvent::Stopped { track_id });
-                } else {
-                    warn!("Player::pause called from invalid state");
-                }
-            }
-
-            PlayerCommand::Stop => match self.state {
-                PlayerState::Playing { track_id, .. }
-                | PlayerState::Paused { track_id, .. }
-                | PlayerState::EndOfTrack { track_id } => {
-                    self.stop_sink_if_running();
-                    self.send_event(PlayerEvent::Stopped { track_id });
-                    self.state = PlayerState::Stopped;
+            PlayerCommand::Pause => match self.state {
+                PlayerState::Playing => {
+                    self.sink.stop()?;
+                    self.state = PlayerState::Paused;
                 }
                 PlayerState::Stopped => {
-                    warn!("Player::stop called from invalid state");
+                    warn!("player is stopped");
                 }
-                PlayerState::Invalid => panic!("invalid state"),
+                PlayerState::Paused => {
+                    // ignore
+                }
             },
+
+            // unload current track.
+            PlayerCommand::Stop => {
+                let mut track = match self.track.take() {
+                    Some(track) => track,
+                    None => {
+                        warn!("no track loaded");
+                        return Ok(());
+                    }
+                };
+
+                match self.state {
+                    PlayerState::Playing | PlayerState::Paused => {
+                        self.sink.stop()?;
+                        self.send_event(PlayerEvent::Stopped {
+                            track_id: track.track_id,
+                        });
+                        self.state = PlayerState::Stopped;
+                    }
+                    PlayerState::Stopped => {
+                        // ignore
+                    }
+                }
+            }
+
+            PlayerCommand::Volume(volume) => {
+                self.config.volume = volume;
+            }
         }
+
+        Ok(())
     }
 
     fn send_event(&mut self, event: PlayerEvent) {
@@ -612,6 +565,7 @@ impl ::std::fmt::Debug for PlayerCommand {
             PlayerCommand::Pause => f.debug_tuple("Pause").finish(),
             PlayerCommand::Stop => f.debug_tuple("Stop").finish(),
             PlayerCommand::Seek(position) => f.debug_tuple("Seek").field(&position).finish(),
+            PlayerCommand::Volume(volume) => f.debug_tuple("Volume").field(&volume).finish(),
         }
     }
 }

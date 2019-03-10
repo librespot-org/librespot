@@ -2,9 +2,15 @@ use super::{Open, Sink};
 use portaudio_rs;
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
 use portaudio_rs::stream::*;
+use portaudio_rs::PaError;
 use std::io;
 use std::process::exit;
 use std::time::Duration;
+
+/// Helper function to convert a portaudio error into an io::Error.
+fn into_io_error(e: PaError) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, format!("portaudio error: {}", e))
+}
 
 pub struct PortAudioSink<'a>(
     Option<portaudio_rs::stream::Stream<'a, i16, i16>>,
@@ -51,7 +57,8 @@ impl<'a> Open for PortAudioSink<'a> {
             }
             Some(device) => find_output(device),
             None => get_default_output_index(),
-        }.expect("Could not find device");
+        }
+        .expect("Could not find device");
 
         let info = portaudio_rs::device::get_info(device_idx);
         let latency = match info {
@@ -72,35 +79,41 @@ impl<'a> Open for PortAudioSink<'a> {
 
 impl<'a> Sink for PortAudioSink<'a> {
     fn start(&mut self) -> io::Result<()> {
-        if self.0.is_none() {
-            self.0 = Some(
-                Stream::open(
+        let stream = match self.0.take() {
+            Some(stream) => stream,
+            None => {
+                let stream = Stream::open(
                     None,
                     Some(self.1),
                     44100.0,
                     FRAMES_PER_BUFFER_UNSPECIFIED,
                     StreamFlags::empty(),
                     None,
-                ).unwrap(),
-            );;
-        }
+                )
+                .map_err(into_io_error)?;
 
-        self.0.as_mut().unwrap().start().unwrap();
-        Ok(())
-    }
-    fn stop(&mut self) -> io::Result<()> {
-        self.0.as_mut().unwrap().stop().unwrap();
-        self.0 = None;
-        Ok(())
-    }
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        match self.0.as_mut().unwrap().write(data) {
-            Ok(_) => (),
-            Err(portaudio_rs::PaError::OutputUnderflowed) => error!("PortAudio write underflow"),
-            Err(e) => panic!("PA Error {}", e),
+                stream.start().map_err(into_io_error)?;
+                stream
+            }
         };
 
+        self.0 = Some(stream);
         Ok(())
+    }
+
+    fn stop(&mut self) -> io::Result<()> {
+        if let Some(stream) = self.0.take() {
+            stream.stop().map_err(into_io_error)?;
+        }
+
+        Ok(())
+    }
+
+    fn write(&mut self, data: &[i16]) -> io::Result<()> {
+        match self.0.as_mut() {
+            Some(stream) => stream.write(data).map_err(into_io_error),
+            None => Err(io::Error::new(io::ErrorKind::Other, "stream closed")),
+        }
     }
 }
 
