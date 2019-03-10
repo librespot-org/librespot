@@ -18,7 +18,7 @@ use playback::mixer::Mixer;
 use playback::player::Player;
 
 use rand;
-use rand::Rng;
+use rand::seq::SliceRandom;
 use std;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -509,7 +509,8 @@ impl SpircTask {
                         let tracks = self.state.mut_track();
                         tracks.swap(0, current_index as usize);
                         if let Some((_, rest)) = tracks.split_first_mut() {
-                            rand::thread_rng().shuffle(rest);
+                            let mut rng = rand::thread_rng();
+                            rest.shuffle(&mut rng);
                         }
                     }
                     self.state.set_playing_track_index(0);

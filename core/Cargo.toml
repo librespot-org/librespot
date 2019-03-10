@@ -23,7 +23,7 @@ num-bigint = "0.1.35"
 num-integer = "0.1.32"
 num-traits = "0.1.36"
 protobuf = "2.0.5"
-rand = "0.3.13"
+rand = "0.6"
 rpassword = "0.3.0"
 rust-crypto = "0.2.36"
 serde = "0.9.6"
@@ -36,5 +36,5 @@ url = "1.7.0"
 uuid = { version = "0.4", features = ["v4"] }
 
 [build-dependencies]
-rand = "0.3.13"
+rand = "0.6"
 vergen = "0.1.0"
