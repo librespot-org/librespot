@@ -560,8 +560,7 @@ impl PlayerInternal {
         let key = self
             .session
             .audio_key()
-            .request(track.id, file_id)
-	    ;
+            .request(track.id, file_id);
         let encrypted_file = AudioFile::open(&self.session, file_id);
 
 
@@ -582,7 +581,6 @@ impl PlayerInternal {
         let mut decoder = VorbisDecoder::new(audio_file).unwrap();
 
         if position != 0 {
-            info!("seek {}", position);
             match decoder.seek(position) {
                 Ok(_) => (),
                 Err(err) => error!("Vorbis error: {:?}", err),
