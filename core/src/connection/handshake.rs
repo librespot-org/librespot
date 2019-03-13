@@ -89,7 +89,7 @@ fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8
     packet
         .mut_build_info()
         .set_platform(protocol::keyexchange::Platform::PLATFORM_LINUX_X86);
-    packet.mut_build_info().set_version(0x10800000000);
+    packet.mut_build_info().set_version(109800078);
     packet
         .mut_cryptosuites_supported()
         .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);
