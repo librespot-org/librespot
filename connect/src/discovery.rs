@@ -231,7 +231,6 @@ pub fn discovery(
 
     let serve = {
         let http = Http::new();
-        debug!("Zeroconf server listening on 0.0.0.0:{}", port);
         http.serve_addr_handle(
             &format!("0.0.0.0:{}", port).parse().unwrap(),
             &handle,
@@ -240,6 +239,7 @@ pub fn discovery(
     };
 
     let s_port = serve.incoming_ref().local_addr().port();
+    debug!("Zeroconf server listening on 0.0.0.0:{}", s_port);
 
     let server_future = {
         let handle = handle.clone();
