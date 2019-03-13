@@ -132,7 +132,17 @@ impl Discovery {
             h.result().code().to_owned()
         };
 
-        assert_eq!(&mac[..], cksum);
+        if mac != cksum {
+            warn!("Login error for user {:?}: MAC mismatch", username);
+            let result = json!({
+                "status": 102,
+                "spotifyError": 1,
+                "statusString": "ERROR-MAC"
+            });
+
+            let body = result.to_string();
+            return ::futures::finished(Response::new().with_body(body))
+        }
 
         let decrypted = {
             let mut data = vec![0u8; encrypted.len()];
