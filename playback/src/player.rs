@@ -335,7 +335,10 @@ impl PlayerInternal {
             PlayerCommand::Load(track_id, play, position, end_of_track) => {
                 let (decoder, normalisation_factor) = match self.load_track(track_id, position as i64) {
                     Some(result) => result,
-                    None => return Err(Error::new(ErrorKind::Other, "failed to load track")),
+                    None => {
+                        let _ = end_of_track.send(());
+                        return Ok(());
+                    },
                 };
 
                 // NB: we always swap out the loaded track.
