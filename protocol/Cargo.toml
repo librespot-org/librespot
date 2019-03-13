@@ -8,4 +8,4 @@ build = "build.rs"
 protobuf = "2.0.5"
 
 [build-dependencies]
-protoc-rust = "2.0.5"
+protobuf-codegen-pure = "2.0.5"
