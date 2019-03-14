@@ -132,7 +132,17 @@ impl Discovery {
             h.result().code().to_owned()
         };
 
-        assert_eq!(&mac[..], cksum);
+        if mac != cksum {
+            warn!("Login error for user {:?}: MAC mismatch", username);
+            let result = json!({
+                "status": 102,
+                "spotifyError": 1,
+                "statusString": "ERROR-MAC"
+            });
+
+            let body = result.to_string();
+            return ::futures::finished(Response::new().with_body(body))
+        }
 
         let decrypted = {
             let mut data = vec![0u8; encrypted.len()];
@@ -221,7 +231,6 @@ pub fn discovery(
 
     let serve = {
         let http = Http::new();
-        debug!("Zeroconf server listening on 0.0.0.0:{}", port);
         http.serve_addr_handle(
             &format!("0.0.0.0:{}", port).parse().unwrap(),
             &handle,
@@ -230,6 +239,7 @@ pub fn discovery(
     };
 
     let s_port = serve.incoming_ref().local_addr().port();
+    debug!("Zeroconf server listening on 0.0.0.0:{}", s_port);
 
     let server_future = {
         let handle = handle.clone();
