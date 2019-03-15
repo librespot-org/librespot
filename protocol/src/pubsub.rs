@@ -273,9 +273,10 @@ impl ::protobuf::reflect::ProtobufValue for Subscription {
 }
 
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x0cpubsub.proto\"Y\n\x0cSubscription\x12\x10\n\x03uri\x18\x01\x20\x01\
-    (\tR\x03uri\x12\x16\n\x06expiry\x18\x02\x20\x01(\x05R\x06expiry\x12\x1f\
-    \n\x0bstatus_code\x18\x03\x20\x01(\x05R\nstatusCode\
+    \n\x0cpubsub.proto\x12\0\"L\n\x0cSubscription\x12\x0f\n\x03uri\x18\x01\
+    \x20\x01(\tB\x02\x18\0\x12\x12\n\x06expiry\x18\x02\x20\x01(\x05B\x02\x18\
+    \0\x12\x17\n\x0bstatus_code\x18\x03\x20\x01(\x05B\x02\x18\0B\0b\x06proto\
+    2\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

@@ -443,6 +443,8 @@ impl Future for Main {
                 if !self.shutdown {
                     if let Some(ref spirc) = self.spirc {
                         spirc.shutdown();
+                    } else {
+                        return Ok(Async::Ready(()));
                     }
                     self.shutdown = true;
                 } else {
