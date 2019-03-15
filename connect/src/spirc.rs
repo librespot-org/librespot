@@ -794,30 +794,25 @@ impl SpircTask {
     }
 
     fn load_track(&mut self, play: bool) {
-        let mut index = self.state.get_playing_track_index();
         let track = {
-            // let gid = self.state.get_track()[index as usize].get_gid();
-            let track_ref = self.state.get_track()[index as usize].to_owned();
-            let mut gid = track_ref.get_gid();
-            if gid.len() != 16 {
-                let track_len = self.state.get_track().len() as u32;
-                if index < track_len - 1 {
-                    index = 0;
-                } else {
-                    index = index + 1;
-                }
+            let mut index = self.state.get_playing_track_index();
+            // Check for malformed gid
+            let tracks_len = self.state.get_track().len() as u32;
+            let mut track_ref = &self.state.get_track()[index as usize];
+            while track_ref.get_gid().len() != 16 {
                 warn!(
                     "Skipping track {:?} at position [{}] of {}",
                     track_ref.get_uri(),
                     index,
-                    track_len
+                    tracks_len
                 );
-                gid = self.state.get_track()[index as usize].get_gid();
+                index = if index + 1 < tracks_len { index + 1 } else { 0 };
+                track_ref = &self.state.get_track()[index as usize];
             }
-            SpotifyId::from_raw(gid).unwrap()
+            SpotifyId::from_raw(track_ref.get_gid()).unwrap()
         };
-        let position = self.state.get_position_ms();
 
+        let position = self.state.get_position_ms();
         let end_of_track = self.player.load(track, play, position);
 
         if play {
