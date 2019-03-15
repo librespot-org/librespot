@@ -142,10 +142,10 @@ where
     serde::Serialize::serialize(&v.value(), ser)
 }
 
-fn deserialize_protobuf_enum<T, D>(de: D) -> Result<T, D::Error>
+fn deserialize_protobuf_enum<'de, T, D>(de: D) -> Result<T, D::Error>
 where
     T: ProtobufEnum,
-    D: serde::Deserializer,
+    D: serde::Deserializer<'de>,
 {
     let v: i32 = try!(serde::Deserialize::deserialize(de));
     T::from_i32(v).ok_or_else(|| serde::de::Error::custom("Invalid enum value"))
@@ -159,9 +159,9 @@ where
     serde::Serialize::serialize(&base64::encode(v.as_ref()), ser)
 }
 
-fn deserialize_base64<D>(de: D) -> Result<Vec<u8>, D::Error>
+fn deserialize_base64<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
 where
-    D: serde::Deserializer,
+    D: serde::Deserializer<'de>,
 {
     let v: String = try!(serde::Deserialize::deserialize(de));
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
