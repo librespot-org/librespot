@@ -57,6 +57,9 @@ pub enum SpircCommand {
     Shutdown,
 }
 
+const CONTEXT_TRACKS_HISTORY: usize = 10;
+const CONTEXT_FETCH_THRESHOLD: u32 = 5;
+
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
 }
@@ -655,11 +658,11 @@ impl SpircTask {
             new_index,
             self.state.get_track().len(),
             self.state.get_context_uri(),
-            self.state.get_track().len() as u32 - new_index < 5
+            self.state.get_track().len() as u32 - new_index < CONTEXT_FETCH_THRESHOLD
         );
         let context_uri = self.state.get_context_uri().to_owned();
         if (context_uri.starts_with("spotify:station:") || context_uri.starts_with("spotify:dailymix:"))
-            && ((self.state.get_track().len() as u32) - new_index) < 5
+            && ((self.state.get_track().len() as u32) - new_index) < CONTEXT_FETCH_THRESHOLD
         {
             self.context_fut = self.resolve_station(&context_uri);
             self.update_tracks_from_context();
@@ -768,12 +771,25 @@ impl SpircTask {
 
             let new_tracks = &context.tracks;
             debug!("Adding {:?} tracks from context to playlist", new_tracks.len());
-            // Can we just push the new tracks and forget it?
-            let tracks = self.state.mut_track();
-            // tracks.append(new_tracks.to_owned());
-            for t in new_tracks {
-                tracks.push(t.to_owned());
+            let current_index = self.state.get_playing_track_index();
+            let mut new_index = 0;
+            {
+                let mut tracks = self.state.mut_track();
+                // Does this need to be optimised - we don't need to actually traverse the len of tracks
+                let tracks_len = tracks.len();
+                if tracks_len > CONTEXT_TRACKS_HISTORY {
+                    tracks.rotate_right(tracks_len - CONTEXT_TRACKS_HISTORY);
+                    tracks.truncate(CONTEXT_TRACKS_HISTORY);
+                }
+                // tracks.extend_from_slice(&mut new_tracks); // method doesn't exist for protobuf::RepeatedField
+                for t in new_tracks {
+                    tracks.push(t.to_owned());
+                }
+                if current_index > CONTEXT_TRACKS_HISTORY as u32 {
+                    new_index = current_index - CONTEXT_TRACKS_HISTORY as u32;
+                }
             }
+            self.state.set_playing_track_index(new_index);
         }
     }
 
