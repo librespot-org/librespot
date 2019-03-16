@@ -35,7 +35,6 @@ extern crate sha1;
 extern crate hmac;
 extern crate pbkdf2;
 extern crate aes;
-extern crate block_modes;
 
 extern crate librespot_protocol as protocol;
 

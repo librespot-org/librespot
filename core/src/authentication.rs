@@ -1,8 +1,6 @@
 use base64;
 use byteorder::{BigEndian, ByteOrder};
 use aes::Aes192;
-use block_modes::{Ecb, BlockMode};
-use block_modes::block_padding::ZeroPadding;
 use hmac::Hmac;
 use sha1::{Sha1, Digest};
 use pbkdf2::pbkdf2;
@@ -75,12 +73,20 @@ impl Credentials {
             key
         };
 
-        let mut data = base64::decode(encrypted_blob).unwrap();
+        // decrypt data using ECB mode without padding
         let blob = {
-            // Anyone know what this block mode is ?
-            let mut cipher = Ecb::<Aes192, ZeroPadding>::new_varkey(&key)
-                .expect("never fails, key is 24 bytes long");
-            cipher.decrypt_nopad(&mut data).unwrap();
+            use aes::block_cipher_trait::BlockCipher;
+            use aes::block_cipher_trait::generic_array::GenericArray;
+            use aes::block_cipher_trait::generic_array::typenum::Unsigned;
+
+            let mut data = base64::decode(encrypted_blob).unwrap();
+            let cipher = Aes192::new(GenericArray::from_slice(&key));
+            let block_size = <Aes192 as BlockCipher>::BlockSize::to_usize();
+            assert_eq!(data.len() % block_size, 0);
+            // replace to chunks_exact_mut with MSRV bump to 1.31
+            for chunk in data.chunks_mut(block_size) {
+                cipher.decrypt_block(GenericArray::from_mut_slice(chunk));
+            }
 
             let l = data.len();
             for i in 0..l - 0x10 {
