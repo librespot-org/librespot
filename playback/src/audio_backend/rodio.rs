@@ -12,7 +12,7 @@ fn list_formats(ref device: &rodio::Device) {
     let default_fmt = match device.default_output_format() {
         Ok(fmt) => cpal::SupportedFormat::from(fmt),
         Err(e) => {
-            info!("Error getting default rodio::Sink format: {:?}", e);
+            warn!("Error getting default rodio::Sink format: {:?}", e);
             return;
         },
     };
@@ -20,7 +20,7 @@ fn list_formats(ref device: &rodio::Device) {
     let mut output_formats = match device.supported_output_formats() {
         Ok(f) => f.peekable(),
         Err(e) => {
-            info!("Error getting supported rodio::Sink formats: {:?}", e);
+            warn!("Error getting supported rodio::Sink formats: {:?}", e);
             return;
         },
     };
