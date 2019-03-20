@@ -1,6 +1,6 @@
 use super::{Open, Sink};
 extern crate rodio;
-use std::io;
+use std::{io, thread, time};
 use std::process::exit;
 
 pub struct RodioSink {
@@ -83,6 +83,14 @@ impl Sink for RodioSink {
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
         let source = rodio::buffer::SamplesBuffer::new(2, 44100, data);
         self.rodio_sink.append(source);
+
+        // Chunk sizes seem to be about 256 to 3000 ish items long.
+        // Assuming they're on average 1628 then a half second buffer is:
+        // 44100 elements --> about 27 chunks
+        while self.rodio_sink.len() > 26 {
+            // sleep and wait for rodio to drain a bit
+            thread::sleep(time::Duration::from_millis(10));
+        }
         Ok(())
     }
 }
