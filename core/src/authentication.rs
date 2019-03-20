@@ -22,6 +22,7 @@ pub struct Credentials {
     #[serde(deserialize_with = "deserialize_protobuf_enum")]
     pub auth_type: AuthenticationType,
 
+    #[serde(alias = "encoded_auth_blob")]
     #[serde(serialize_with = "serialize_base64")]
     #[serde(deserialize_with = "deserialize_base64")]
     pub auth_data: Vec<u8>,
