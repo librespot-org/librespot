@@ -65,9 +65,9 @@ pub struct MetadataContext {
 }
 
 #[allow(non_snake_case)]
-fn deserialize_protobuf_TrackRef<D>(de: D) -> Result<Vec<TrackRef>, D::Error>
+fn deserialize_protobuf_TrackRef<'d, D>(de: D) -> Result<Vec<TrackRef>, D::Error>
 where
-    D: serde::Deserializer,
+    D: serde::Deserializer<'d>,
 {
     let v: Vec<TrackContext> = try!(serde::Deserialize::deserialize(de));
     let track_vec = v
