@@ -5,7 +5,8 @@ use std::{io, thread, time};
 use std::process::exit;
 
 pub struct RodioSink {
-    rodio_sink: rodio::Sink,
+    rodio_sink: Option<rodio::Sink>,
+    device_name: Option<String>,
 }
 
 fn list_formats(ref device: &rodio::Device) {
@@ -52,61 +53,68 @@ fn list_outputs() {
     }
 }
 
-impl Open for RodioSink {
-    fn open(device: Option<String>) -> RodioSink {
-        debug!("Using rodio sink");
-
-        let mut rodio_device = rodio::default_output_device().expect("no output device available");
-        if device.is_some() {
-            let device_name = device.unwrap();
-
-            if device_name == "?".to_string() {
-                list_outputs();
-                exit(0)
-            }
-            let mut found = false;
-            for d in rodio::output_devices() {
-                if d.name() == device_name {
-                    rodio_device = d;
-                    found = true;
+fn match_output(device_name: Option<String>) -> cpal::Device {
+    match device_name {
+        Some(dn) => {
+            let mut rodio_device = None;
+            for device in cpal::output_devices() {
+                if device.name() == dn {
+                    rodio_device = Some(device);
                     break;
                 }
             }
-            if !found {
-                println!("No output sink matching '{}' found.", device_name);
-                exit(0)
+            match rodio_device {
+                Some(cd) => cd,
+                None => {
+                    println!("No output sink matching '{}' found.", dn);
+                    exit(0)
+                }
             }
+        },
+        None => rodio::default_output_device().expect("no output device available")
+    }
+}
+
+impl Open for RodioSink {
+    fn open(device_name: Option<String>) -> RodioSink {
+        debug!("Using rodio sink");
+
+        if device_name == Some("?".to_string()) {
+            list_outputs();
+            exit(0)
         }
-        let sink = rodio::Sink::new(&rodio_device);
 
         RodioSink {
-            rodio_sink: sink,
+            device_name,
+            rodio_sink: None,
         }
     }
 }
 
 impl Sink for RodioSink {
     fn start(&mut self) -> io::Result<()> {
-        // More similar to an "unpause" than "play". Doesn't undo "stop".
-        // self.rodio_sink.play();
+        let rodio_device = match_output(self.device_name.clone());
+        let sink = rodio::Sink::new(&rodio_device);
+        self.rodio_sink = Some(sink);
         Ok(())
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        // This will immediately stop playback, but the sink is then unusable.
-        // We just have to let the current buffer play till the end.
-        // self.rodio_sink.stop();
+        let sink = self.rodio_sink.as_mut().expect("stop called before start");
+        sink.stop();
         Ok(())
     }
 
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
+        let sink = self.rodio_sink.as_mut().expect("write called before start");
+
         let source = rodio::buffer::SamplesBuffer::new(2, 44100, data);
-        self.rodio_sink.append(source);
+        sink.append(source);
 
         // Chunk sizes seem to be about 256 to 3000 ish items long.
         // Assuming they're on average 1628 then a half second buffer is:
         // 44100 elements --> about 27 chunks
-        while self.rodio_sink.len() > 26 {
+        while sink.len() > 26 {
             // sleep and wait for rodio to drain a bit
             thread::sleep(time::Duration::from_millis(10));
         }
