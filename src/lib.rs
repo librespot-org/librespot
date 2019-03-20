@@ -2,7 +2,6 @@
 #![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
 
 extern crate base64;
-extern crate crypto;
 extern crate futures;
 extern crate hyper;
 extern crate num_bigint;

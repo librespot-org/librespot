@@ -1,4 +1,3 @@
-extern crate crypto;
 extern crate env_logger;
 extern crate futures;
 extern crate getopts;
@@ -11,9 +10,10 @@ extern crate tokio_io;
 extern crate tokio_process;
 extern crate tokio_signal;
 extern crate url;
+extern crate sha1;
+extern crate hex;
 
-use crypto::digest::Digest;
-use crypto::sha1::Sha1;
+use sha1::{Sha1, Digest};
 use env_logger::LogBuilder;
 use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
@@ -44,9 +44,7 @@ mod player_event_handler;
 use player_event_handler::run_program_on_events;
 
 fn device_id(name: &str) -> String {
-    let mut h = Sha1::new();
-    h.input_str(name);
-    h.result_str()
+    hex::encode(Sha1::digest(name.as_bytes()))
 }
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
@@ -202,6 +200,10 @@ fn setup(args: &[String]) -> Setup {
     let backend = audio_backend::find(backend_name).expect("Invalid backend");
 
     let device = matches.opt_str("device");
+    if device == Some("?".into()) {
+        backend(device);
+        exit(0);
+    }
 
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
@@ -445,6 +447,8 @@ impl Future for Main {
                 if !self.shutdown {
                     if let Some(ref spirc) = self.spirc {
                         spirc.shutdown();
+                    } else {
+                        return Ok(Async::Ready(()));
                     }
                     self.shutdown = true;
                 } else {

@@ -1,7 +1,6 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use crypto::hmac::Hmac;
-use crypto::mac::Mac;
-use crypto::sha1::Sha1;
+use hmac::{Hmac, Mac};
+use sha1::Sha1;
 use futures::{Async, Future, Poll};
 use protobuf::{self, Message};
 use rand::thread_rng;
@@ -89,7 +88,7 @@ fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8
     packet
         .mut_build_info()
         .set_platform(protocol::keyexchange::Platform::PLATFORM_LINUX_X86);
-    packet.mut_build_info().set_version(0x10800000000);
+    packet.mut_build_info().set_version(109800078);
     packet
         .mut_cryptosuites_supported()
         .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);
@@ -187,17 +186,19 @@ fn read_into_accumulator<T: AsyncRead>(
 }
 
 fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-    let mut data = Vec::with_capacity(0x64);
-    let mut mac = Hmac::new(Sha1::new(), &shared_secret);
+    type HmacSha1 = Hmac<Sha1>;
 
+    let mut data = Vec::with_capacity(0x64);
     for i in 1..6 {
+        let mut mac = HmacSha1::new_varkey(&shared_secret)
+            .expect("HMAC can take key of any size");
         mac.input(packets);
         mac.input(&[i]);
         data.extend_from_slice(&mac.result().code());
-        mac.reset();
     }
 
-    mac = Hmac::new(Sha1::new(), &data[..0x14]);
+    let mut mac = HmacSha1::new_varkey(&data[..0x14])
+        .expect("HMAC can take key of any size");;
     mac.input(packets);
 
     (

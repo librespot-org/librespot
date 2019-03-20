@@ -1,7 +1,9 @@
 use base64;
-use crypto;
-use crypto::digest::Digest;
-use crypto::mac::Mac;
+use sha1::{Sha1, Digest};
+use hmac::{Hmac, Mac};
+use aes_ctr::Aes128Ctr;
+use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
+use aes_ctr::stream_cipher::generic_array::GenericArray;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Stream};
 use hyper::server::{Http, Request, Response, Service};
@@ -25,6 +27,8 @@ use core::authentication::Credentials;
 use core::config::ConnectConfig;
 use core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
 use core::util;
+
+type HmacSha1 = Hmac<Sha1>;
 
 #[derive(Clone)]
 struct Discovery(Arc<DiscoveryInner>);
@@ -106,39 +110,45 @@ impl Discovery {
         let encrypted = &encrypted_blob[16..encrypted_blob.len() - 20];
         let cksum = &encrypted_blob[encrypted_blob.len() - 20..encrypted_blob.len()];
 
-        let base_key = {
-            let mut data = [0u8; 20];
-            let mut h = crypto::sha1::Sha1::new();
-            h.input(&shared_key.to_bytes_be());
-            h.result(&mut data);
-            data[..16].to_owned()
-        };
+        let base_key = Sha1::digest(&shared_key.to_bytes_be());
+        let base_key = &base_key[..16];
 
         let checksum_key = {
-            let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &base_key);
+            let mut h = HmacSha1::new_varkey(base_key)
+                .expect("HMAC can take key of any size");
             h.input(b"checksum");
-            h.result().code().to_owned()
+            h.result().code()
         };
 
         let encryption_key = {
-            let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &base_key);
+            let mut h = HmacSha1::new_varkey(&base_key)
+                .expect("HMAC can take key of any size");
             h.input(b"encryption");
-            h.result().code().to_owned()
+            h.result().code()
         };
 
-        let mac = {
-            let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &checksum_key);
-            h.input(encrypted);
-            h.result().code().to_owned()
-        };
+        let mut h = HmacSha1::new_varkey(&checksum_key)
+            .expect("HMAC can take key of any size");
+        h.input(encrypted);
+        if let Err(_) = h.verify(cksum) {
+            warn!("Login error for user {:?}: MAC mismatch", username);
+            let result = json!({
+                "status": 102,
+                "spotifyError": 1,
+                "statusString": "ERROR-MAC"
+            });
 
-        assert_eq!(&mac[..], cksum);
+            let body = result.to_string();
+            return ::futures::finished(Response::new().with_body(body))
+        }
 
         let decrypted = {
-            let mut data = vec![0u8; encrypted.len()];
-            let mut cipher =
-                crypto::aes::ctr(crypto::aes::KeySize::KeySize128, &encryption_key[0..16], iv);
-            cipher.process(encrypted, &mut data);
+            let mut data = encrypted.to_vec();
+            let mut cipher = Aes128Ctr::new(
+                &GenericArray::from_slice(&encryption_key[0..16]),
+                &GenericArray::from_slice(iv),
+            );
+            cipher.apply_keystream(&mut data);
             String::from_utf8(data).unwrap()
         };
 
@@ -221,7 +231,6 @@ pub fn discovery(
 
     let serve = {
         let http = Http::new();
-        debug!("Zeroconf server listening on 0.0.0.0:{}", port);
         http.serve_addr_handle(
             &format!("0.0.0.0:{}", port).parse().unwrap(),
             &handle,
@@ -230,6 +239,7 @@ pub fn discovery(
     };
 
     let s_port = serve.incoming_ref().local_addr().port();
+    debug!("Zeroconf server listening on 0.0.0.0:{}", s_port);
 
     let server_future = {
         let handle = handle.clone();
