@@ -90,3 +90,4 @@ This is a non exhaustive list of projects that either use or have modified libre
 - [Spotcontrol](https://github.com/badfortrains/spotcontrol) - A golang implementation of a Spotify Connect controller. No playback
 functionality.
 - [librespot-java](https://github.com/devgianlu/librespot-java) - A Java port of librespot.
+- [ncspot](https://github.com/hrkfdn/ncspot) - Cross-platform ncurses Spotify client.
