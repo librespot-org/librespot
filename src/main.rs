@@ -102,6 +102,7 @@ struct Setup {
     enable_discovery: bool,
     zeroconf_port: u16,
     player_event_program: Option<String>,
+    pass_through: bool,
 }
 
 fn setup(args: &[String]) -> Setup {
@@ -172,6 +173,11 @@ fn setup(args: &[String]) -> Setup {
             "",
             "linear-volume",
             "increase volume linear instead of logarithmic.",
+        )
+        .optflag(
+            "",
+            "pass-through",
+            "Pass raw stream to output, only works for \"pipe\"."
         );
 
     let matches = match opts.parse(&args[1..]) {
@@ -311,6 +317,8 @@ fn setup(args: &[String]) -> Setup {
 
     let enable_discovery = !matches.opt_present("disable-discovery");
 
+    let pass_through = matches.opt_present("pass-through");
+
     Setup {
         backend: backend,
         cache: cache,
@@ -323,6 +331,7 @@ fn setup(args: &[String]) -> Setup {
         zeroconf_port: zeroconf_port,
         mixer: mixer,
         player_event_program: matches.opt_str("onevent"),
+        pass_through,
     }
 }
 
