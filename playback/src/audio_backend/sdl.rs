@@ -13,7 +13,7 @@ impl Open for SdlSink {
         debug!("Using SDL sink");
 
         if device.is_some() {
-            panic!("SDL sink does not support specifyng a device name");
+            panic!("SDL sink does not support specifying a device name");
         }
 
         let ctx = sdl2::init().expect("Could not init SDL");
@@ -22,7 +22,7 @@ impl Open for SdlSink {
         let desired_spec = AudioSpecDesired {
             freq: Some(44_100),
             channels: Some(2),
-            samples: None, // default
+            samples: None,
         };
         let queue = audio
             .open_queue(None, &desired_spec)
@@ -34,7 +34,7 @@ impl Open for SdlSink {
 
 impl Sink for SdlSink {
     fn start(&mut self) -> io::Result<()> {
-        self.queue.clear(); //
+        self.queue.clear();
         self.queue.resume();
         Ok(())
     }
