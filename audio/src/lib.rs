@@ -23,7 +23,19 @@ mod libvorbis_decoder;
 pub use decrypt::AudioDecrypt;
 pub use fetch::{AudioFile, AudioFileOpen};
 
+pub struct AudioPacket(Vec<i16>);
+
+impl AudioPacket {
+    pub fn data(&self) -> &[i16] {
+        &self.0
+    }
+
+    pub fn data_mut(&mut self) -> &mut [i16] {
+        &mut self.0
+    }
+}
+
 #[cfg(not(any(feature = "with-tremor", feature = "with-vorbis")))]
-pub use lewton_decoder::{VorbisDecoder, VorbisError, VorbisPacket};
+pub use lewton_decoder::{VorbisDecoder, VorbisError};
 #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
-pub use libvorbis_decoder::{VorbisDecoder, VorbisError, VorbisPacket};
+pub use libvorbis_decoder::{VorbisDecoder, VorbisError};

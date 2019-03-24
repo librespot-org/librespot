@@ -3,12 +3,12 @@ extern crate tremor as vorbis;
 #[cfg(not(feature = "with-tremor"))]
 extern crate vorbis;
 
+use super::AudioPacket;
 use std::error;
 use std::fmt;
 use std::io::{Read, Seek};
 
 pub struct VorbisDecoder<R: Read + Seek>(vorbis::Decoder<R>);
-pub struct VorbisPacket(vorbis::Packet);
 pub struct VorbisError(vorbis::VorbisError);
 
 impl<R> VorbisDecoder<R>
@@ -31,26 +31,16 @@ where
         Ok(())
     }
 
-    pub fn next_packet(&mut self) -> Result<Option<VorbisPacket>, VorbisError> {
+    pub fn next_packet(&mut self) -> Result<Option<AudioPacket>, VorbisError> {
         loop {
             match self.0.packets().next() {
-                Some(Ok(packet)) => return Ok(Some(VorbisPacket(packet))),
+                Some(Ok(packet)) => return Ok(Some(AudioPacket(packet.data))),
                 None => return Ok(None),
 
                 Some(Err(vorbis::VorbisError::Hole)) => (),
                 Some(Err(err)) => return Err(err.into()),
             }
         }
-    }
-}
-
-impl VorbisPacket {
-    pub fn data(&self) -> &[i16] {
-        &self.0.data
-    }
-
-    pub fn data_mut(&mut self) -> &mut [i16] {
-        &mut self.0.data
     }
 }
 

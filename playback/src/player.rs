@@ -15,7 +15,7 @@ use core::session::Session;
 use core::spotify_id::SpotifyId;
 
 use audio::{AudioDecrypt, AudioFile};
-use audio::{VorbisDecoder, VorbisPacket};
+use audio::{VorbisDecoder, AudioPacket};
 use audio_backend::Sink;
 use metadata::{FileFormat, Metadata, Track};
 use mixer::AudioFilter;
@@ -366,7 +366,7 @@ impl PlayerInternal {
         self.sink_running = false;
     }
 
-    fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalisation_factor: f32) {
+    fn handle_packet(&mut self, packet: Option<AudioPacket>, normalisation_factor: f32) {
         match packet {
             Some(mut packet) => {
                 if packet.data().len() > 0 {
