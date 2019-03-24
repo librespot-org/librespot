@@ -1,8 +1,15 @@
+use std;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use futures::{Async, Future, Poll, Sink, Stream};
 use futures::future;
 use futures::sync::{mpsc, oneshot};
-use futures::{Async, Future, Poll, Sink, Stream};
 use protobuf::{self, Message};
+use rand;
+use rand::seq::SliceRandom;
+use serde_json;
 
+use context::StationContext;
 use core::config::ConnectConfig;
 use core::mercury::MercuryError;
 use core::session::Session;
@@ -10,19 +17,10 @@ use core::spotify_id::SpotifyId;
 use core::util::SeqGenerator;
 use core::version;
 use core::volume::Volume;
-
-use protocol;
-use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
-
 use playback::mixer::Mixer;
 use playback::player::Player;
-use serde_json;
-
-use context::StationContext;
-use rand;
-use rand::seq::SliceRandom;
-use std;
-use std::time::{SystemTime, UNIX_EPOCH};
+use protocol;
+use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
 
 pub struct SpircTask {
     player: Player,
@@ -62,14 +60,6 @@ const CONTEXT_FETCH_THRESHOLD: u32 = 5;
 
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
-}
-
-fn now_ms() -> i64 {
-    let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(dur) => dur,
-        Err(err) => err.duration(),
-    };
-    (dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000_000) as u64) as i64
 }
 
 fn initial_state() -> State {
@@ -404,6 +394,14 @@ impl Future for SpircTask {
 }
 
 impl SpircTask {
+    fn now_ms(&mut self) -> i64 {
+        let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
+            Ok(dur) => dur,
+            Err(err) => err.duration(),
+        };
+        ((dur.as_secs() + self.session.time_delta()) * 1000 + (dur.subsec_nanos() / 1000_000) as u64) as i64
+    }
+
     fn handle_command(&mut self, cmd: SpircCommand) {
         let active = self.device.get_is_active();
         match cmd {
@@ -494,15 +492,17 @@ impl SpircTask {
 
             MessageType::kMessageTypeLoad => {
                 if !self.device.get_is_active() {
+                    let now = self.now_ms();
                     self.device.set_is_active(true);
-                    self.device.set_became_active_at(now_ms());
+                    self.device.set_became_active_at(now);
                 }
 
                 self.update_tracks(&frame);
 
                 if self.state.get_track().len() > 0 {
+                    let now = self.now_ms();
                     self.state.set_position_ms(frame.get_state().get_position_ms());
-                    self.state.set_position_measured_at(now_ms() as u64);
+                    self.state.set_position_measured_at(now as u64);
 
                     let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
                     self.load_track(play);
@@ -577,8 +577,9 @@ impl SpircTask {
             MessageType::kMessageTypeSeek => {
                 let position = frame.get_position();
 
+                let now = self.now_ms();
                 self.state.set_position_ms(position);
-                self.state.set_position_measured_at(now_ms() as u64);
+                self.state.set_position_measured_at(now as u64);
                 self.player.seek(position);
                 self.notify(None);
             }
@@ -611,7 +612,8 @@ impl SpircTask {
             self.mixer.start();
             self.player.play();
             self.state.set_status(PlayStatus::kPlayStatusPlay);
-            self.state.set_position_measured_at(now_ms() as u64);
+            let now = self.now_ms();
+            self.state.set_position_measured_at(now as u64);
         }
     }
 
@@ -629,7 +631,7 @@ impl SpircTask {
             self.mixer.stop();
             self.state.set_status(PlayStatus::kPlayStatusPause);
 
-            let now = now_ms() as u64;
+            let now = self.now_ms() as u64;
             let position = self.state.get_position_ms();
 
             let diff = now - self.state.get_position_measured_at();
@@ -674,7 +676,8 @@ impl SpircTask {
         }
         self.state.set_playing_track_index(new_index);
         self.state.set_position_ms(0);
-        self.state.set_position_measured_at(now_ms() as u64);
+        let now = self.now_ms();
+        self.state.set_position_measured_at(now as u64);
 
         self.load_track(continue_playing);
     }
@@ -710,14 +713,16 @@ impl SpircTask {
                 pos += 1;
             }
 
+            let now = self.now_ms();
             self.state.set_playing_track_index(new_index);
             self.state.set_position_ms(0);
-            self.state.set_position_measured_at(now_ms() as u64);
+            self.state.set_position_measured_at(now as u64);
 
             self.load_track(true);
         } else {
+            let now = self.now_ms();
             self.state.set_position_ms(0);
-            self.state.set_position_measured_at(now_ms() as u64);
+            self.state.set_position_measured_at(now as u64);
             self.player.seek(0);
         }
     }
@@ -744,7 +749,7 @@ impl SpircTask {
     }
 
     fn position(&mut self) -> u32 {
-        let diff = now_ms() as u64 - self.state.get_position_measured_at();
+        let diff = self.now_ms() as u64 - self.state.get_position_measured_at();
         self.state.get_position_ms() + diff as u32
     }
 
@@ -881,7 +886,7 @@ impl<'a> CommandSender<'a> {
         frame.set_seq_nr(spirc.sequence.get());
         frame.set_typ(cmd);
         frame.set_device_state(spirc.device.clone());
-        frame.set_state_update_id(now_ms());
+        frame.set_state_update_id(spirc.now_ms());
         CommandSender {
             spirc: spirc,
             frame: frame,
