@@ -14,8 +14,8 @@ use config::{Bitrate, PlayerConfig};
 use core::session::Session;
 use core::spotify_id::SpotifyId;
 
+use audio::{AudioDecoder, AudioPacket, VorbisDecoder};
 use audio::{AudioDecrypt, AudioFile};
-use audio::{VorbisDecoder, AudioPacket};
 use audio_backend::Sink;
 use metadata::{FileFormat, Metadata, Track};
 use mixer::AudioFilter;
@@ -194,7 +194,7 @@ impl Drop for Player {
     }
 }
 
-type Decoder = VorbisDecoder<Subfile<AudioDecrypt<AudioFile>>>;
+type Decoder = Box<AudioDecoder>;
 enum PlayerState {
     Stopped,
     Paused {
@@ -578,7 +578,7 @@ impl PlayerInternal {
 
         let audio_file = Subfile::new(decrypted_file, 0xa7);
 
-        let mut decoder = VorbisDecoder::new(audio_file).unwrap();
+        let mut decoder = Box::new(VorbisDecoder::new(audio_file).unwrap()) as Decoder;
 
         if position != 0 {
             match decoder.seek(position) {
