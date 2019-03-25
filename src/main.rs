@@ -37,7 +37,7 @@ use librespot::connect::discovery::{discovery, DiscoveryStream};
 use librespot::connect::spirc::{Spirc, SpircTask};
 use librespot::playback::audio_backend::{self, Sink, BACKENDS};
 use librespot::playback::config::{Bitrate, PlayerConfig};
-use librespot::playback::mixer::{self, Mixer};
+use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{Player, PlayerEvent};
 
 mod player_event_handler;
@@ -90,12 +90,13 @@ struct Setup {
     backend: fn(Option<String>) -> Box<Sink>,
     device: Option<String>,
 
-    mixer: fn() -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
 
     cache: Option<Cache>,
     player_config: PlayerConfig,
     session_config: SessionConfig,
     connect_config: ConnectConfig,
+    mixer_config: MixerConfig,
     credentials: Option<Credentials>,
     enable_discovery: bool,
     zeroconf_port: u16,
@@ -139,10 +140,28 @@ fn setup(args: &[String]) -> Setup {
         .optopt(
             "",
             "device",
-            "Audio device to use. Use '?' to list options if using portaudio",
+            "Audio device to use. Use '?' to list options if using portaudio or alsa",
             "DEVICE",
         )
-        .optopt("", "mixer", "Mixer to use", "MIXER")
+        .optopt("", "mixer", "Mixer to use (alsa or softmixer)", "MIXER")
+        .optopt(
+            "m",
+            "mixer-name",
+            "Alsa mixer name, e.g \"PCM\" or \"Master\". Defaults to 'PCM'",
+            "MIXER_NAME",
+        )
+        .optopt(
+            "",
+            "mixer-card",
+            "Alsa mixer card, e.g \"hw:0\" or similar from `aplay -l`. Defaults to 'default' ",
+            "MIXER_CARD",
+        )
+        .optopt(
+            "",
+            "mixer-index",
+            "Alsa mixer index, Index of the cards mixer. Defaults to 0",
+            "MIXER_INDEX",
+        )
         .optopt(
             "",
             "initial-volume",
@@ -208,6 +227,15 @@ fn setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
+    let mixer_config = MixerConfig {
+        card: matches.opt_str("mixer-card").unwrap_or(String::from("default")),
+        mixer: matches.opt_str("mixer-name").unwrap_or(String::from("PCM")),
+        index: matches
+            .opt_str("mixer-index")
+            .map(|index| index.parse::<u32>().unwrap())
+            .unwrap_or(0),
+    };
+
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
 
     let cache = matches
@@ -222,8 +250,7 @@ fn setup(args: &[String]) -> Setup {
                 panic!("Initial volume must be in the range 0-100");
             }
             (volume as i32 * 0xFFFF / 100) as u16
-        })
-        .or_else(|| cache.as_ref().and_then(Cache::volume))
+        }).or_else(|| cache.as_ref().and_then(Cache::volume))
         .unwrap_or(0x8000);
 
     let zeroconf_port = matches
@@ -324,6 +351,7 @@ fn setup(args: &[String]) -> Setup {
         enable_discovery: enable_discovery,
         zeroconf_port: zeroconf_port,
         mixer: mixer,
+        mixer_config: mixer_config,
         player_event_program: matches.opt_str("onevent"),
     }
 }
@@ -335,7 +363,8 @@ struct Main {
     connect_config: ConnectConfig,
     backend: fn(Option<String>) -> Box<Sink>,
     device: Option<String>,
-    mixer: fn() -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer_config: MixerConfig,
     handle: Handle,
 
     discovery: Option<DiscoveryStream>,
@@ -362,6 +391,7 @@ impl Main {
             backend: setup.backend,
             device: setup.device,
             mixer: setup.mixer,
+            mixer_config: setup.mixer_config,
 
             connect: Box::new(futures::future::empty()),
             discovery: None,
@@ -422,13 +452,14 @@ impl Future for Main {
 
             if let Async::Ready(session) = self.connect.poll().unwrap() {
                 self.connect = Box::new(futures::future::empty());
-                let device = self.device.clone();
-                let mixer = (self.mixer)();
+                let mixer_config = self.mixer_config.clone();
+                let mixer = (self.mixer)(Some(mixer_config));
                 let player_config = self.player_config.clone();
                 let connect_config = self.connect_config.clone();
 
                 let audio_filter = mixer.get_audio_filter();
                 let backend = self.backend;
+                let device = self.device.clone();
                 let (player, event_channel) =
                     Player::new(player_config, session.clone(), audio_filter, move || {
                         (backend)(device)
