@@ -19,6 +19,7 @@ mod fetch;
 mod lewton_decoder;
 #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
 mod libvorbis_decoder;
+mod passthrough_decoder;
 
 pub use decrypt::AudioDecrypt;
 pub use fetch::{AudioFile, AudioFileOpen};
@@ -41,15 +42,18 @@ impl AudioPacket {
 pub use lewton_decoder::{VorbisDecoder, VorbisError};
 #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
 pub use libvorbis_decoder::{VorbisDecoder, VorbisError};
+pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
 
 #[derive(Debug)]
 pub enum AudioError {
+    PassthroughError(PassthroughError),
     VorbisError(VorbisError),
 }
 
 impl fmt::Display for AudioError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            AudioError::PassthroughError(err) => write!(f, "PassthroughError({})", err),
             AudioError::VorbisError(err) => write!(f, "VorbisError({})", err),
         }
     }
@@ -58,11 +62,13 @@ impl fmt::Display for AudioError {
 impl error::Error for AudioError {
     fn description(&self) -> &str {
         match self {
+            AudioError::PassthroughError(err) => err.description(),
             AudioError::VorbisError(err) => err.description(),
         }
     }
     fn cause(&self) -> Option<&error::Error> {
         match self {
+            AudioError::PassthroughError(err) => err.cause(),
             AudioError::VorbisError(err) => err.cause(),
         }
     }
