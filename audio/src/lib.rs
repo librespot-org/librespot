@@ -22,6 +22,8 @@ mod libvorbis_decoder;
 
 pub use decrypt::AudioDecrypt;
 pub use fetch::{AudioFile, AudioFileOpen};
+use std::error;
+use std::fmt;
 
 pub struct AudioPacket(Vec<i16>);
 
@@ -39,3 +41,35 @@ impl AudioPacket {
 pub use lewton_decoder::{VorbisDecoder, VorbisError};
 #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
 pub use libvorbis_decoder::{VorbisDecoder, VorbisError};
+
+#[derive(Debug)]
+pub enum AudioError {
+    VorbisError(VorbisError),
+}
+
+impl From<VorbisError> for AudioError {
+    fn from(err: VorbisError) -> AudioError {
+        AudioError::VorbisError(err)
+    }
+}
+
+impl fmt::Display for AudioError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AudioError::VorbisError(err) => write!(f, "VorbisError({})", err),
+        }
+    }
+}
+
+impl error::Error for AudioError {
+    fn description(&self) -> &str {
+        match self {
+            AudioError::VorbisError(err) => err.description(),
+        }
+    }
+    fn cause(&self) -> Option<&error::Error> {
+        match self {
+            AudioError::VorbisError(err) => err.cause(),
+        }
+    }
+}
