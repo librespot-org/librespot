@@ -3,7 +3,7 @@ extern crate tremor as vorbis;
 #[cfg(not(feature = "with-tremor"))]
 extern crate vorbis;
 
-use super::AudioPacket;
+use super::{AudioDecoder, AudioError, AudioPacket};
 use std::error;
 use std::fmt;
 use std::io::{Read, Seek};
@@ -44,9 +44,44 @@ where
     }
 }
 
+impl<R> AudioDecoder for VorbisDecoder<R>
+where
+    R: Read + Seek,
+{
+    #[cfg(not(feature = "with-tremor"))]
+    fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
+        self.0.time_seek(ms as f64 / 1000f64)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "with-tremor")]
+    fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
+        self.0.time_seek(ms)?;
+        Ok(())
+    }
+
+    fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError> {
+        loop {
+            match self.0.packets().next() {
+                Some(Ok(packet)) => return Ok(Some(AudioPacket(packet.data))),
+                None => return Ok(None),
+
+                Some(Err(vorbis::VorbisError::Hole)) => (),
+                Some(Err(err)) => return Err(err.into()),
+            }
+        }
+    }
+}
+
 impl From<vorbis::VorbisError> for VorbisError {
     fn from(err: vorbis::VorbisError) -> VorbisError {
         VorbisError(err)
+    }
+}
+
+impl From<vorbis::VorbisError> for AudioError {
+    fn from(err: vorbis::VorbisError) -> AudioError {
+        AudioError::VorbisError(VorbisError(err))
     }
 }
 

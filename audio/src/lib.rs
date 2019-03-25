@@ -47,12 +47,6 @@ pub enum AudioError {
     VorbisError(VorbisError),
 }
 
-impl From<VorbisError> for AudioError {
-    fn from(err: VorbisError) -> AudioError {
-        AudioError::VorbisError(err)
-    }
-}
-
 impl fmt::Display for AudioError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -72,4 +66,9 @@ impl error::Error for AudioError {
             AudioError::VorbisError(err) => err.cause(),
         }
     }
+}
+
+pub trait AudioDecoder {
+    fn seek(&mut self, ms: i64) -> Result<(), AudioError>;
+    fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError>;
 }
