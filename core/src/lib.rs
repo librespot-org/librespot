@@ -23,7 +23,6 @@ extern crate num_integer;
 extern crate num_traits;
 extern crate protobuf;
 extern crate rand;
-extern crate rpassword;
 extern crate serde;
 extern crate serde_json;
 extern crate shannon;
