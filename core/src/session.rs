@@ -21,7 +21,7 @@ use mercury::MercuryManager;
 
 struct SessionData {
     country: String,
-    time_delta: u64,
+    time_delta: i64,
     canonical_username: String,
     invalid: bool,
 }
@@ -150,7 +150,7 @@ impl Session {
         self.0.mercury.get(|| MercuryManager::new(self.weak()))
     }
 
-    pub fn time_delta(&self) -> u64 {
+    pub fn time_delta(&self) -> i64 {
         self.0.data.read().unwrap().time_delta
     }
 
@@ -176,11 +176,12 @@ impl Session {
     fn dispatch(&self, cmd: u8, data: Bytes) {
         match cmd {
             0x4 => {
-                let server_timestamp = BigEndian::read_u32(data.as_ref()) as u64;
+                let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
                 let timestamp = match SystemTime::now().duration_since(UNIX_EPOCH) {
                     Ok(dur) => dur,
                     Err(err) => err.duration(),
-                }.as_secs() as u64;
+                }
+                .as_secs() as i64;
 
                 self.0.data.write().unwrap().time_delta = server_timestamp - timestamp;
 
