@@ -172,6 +172,11 @@ fn setup(args: &[String]) -> Setup {
             "",
             "linear-volume",
             "increase volume linear instead of logarithmic.",
+        )
+        .optflag(
+            "",
+            "pass-through",
+            "Pass raw stream to output, only works for \"pipe\"."
         );
 
     let matches = match opts.parse(&args[1..]) {
@@ -277,6 +282,8 @@ fn setup(args: &[String]) -> Setup {
         }
     };
 
+    let pass_through = matches.opt_present("pass-through");
+
     let player_config = {
         let bitrate = matches
             .opt_str("b")
@@ -291,6 +298,7 @@ fn setup(args: &[String]) -> Setup {
                 .opt_str("normalisation-pregain")
                 .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
                 .unwrap_or(PlayerConfig::default().normalisation_pregain),
+            pass_through,
         }
     };
 
