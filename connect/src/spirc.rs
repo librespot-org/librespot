@@ -1,9 +1,9 @@
 use std;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use futures::{Async, Future, Poll, Sink, Stream};
 use futures::future;
 use futures::sync::{mpsc, oneshot};
+use futures::{Async, Future, Poll, Sink, Stream};
 use protobuf::{self, Message};
 use rand;
 use rand::seq::SliceRandom;
@@ -776,26 +776,22 @@ impl SpircTask {
             self.context_fut = self.resolve_uri(&context.next_page_url);
 
             let new_tracks = &context.tracks;
-            debug!("Adding {:?} tracks from context to playlist", new_tracks.len());
-            let current_index = self.state.get_playing_track_index();
-            let mut new_index = 0;
-            {
-                let mut tracks = self.state.mut_track();
-                // Does this need to be optimised - we don't need to actually traverse the len of tracks
-                let tracks_len = tracks.len();
-                if tracks_len > CONTEXT_TRACKS_HISTORY {
-                    tracks.rotate_right(tracks_len - CONTEXT_TRACKS_HISTORY);
-                    tracks.truncate(CONTEXT_TRACKS_HISTORY);
-                }
-                // tracks.extend_from_slice(&mut new_tracks); // method doesn't exist for protobuf::RepeatedField
-                for t in new_tracks {
-                    tracks.push(t.to_owned());
-                }
-                if current_index > CONTEXT_TRACKS_HISTORY as u32 {
-                    new_index = current_index - CONTEXT_TRACKS_HISTORY as u32;
-                }
+            debug!("Adding {:?} tracks from context to frame", new_tracks.len());
+            let mut track_vec = self.state.take_track().into_vec();
+            if let Some(head) = track_vec.len().checked_sub(CONTEXT_TRACKS_HISTORY) {
+                track_vec.drain(0..head);
             }
-            self.state.set_playing_track_index(new_index);
+            track_vec.extend_from_slice(&new_tracks);
+            self.state.set_track(protobuf::RepeatedField::from_vec(track_vec));
+
+            // Update playing index
+            if let Some(new_index) = self
+                .state
+                .get_playing_track_index()
+                .checked_sub(CONTEXT_TRACKS_HISTORY as u32)
+            {
+                self.state.set_playing_track_index(new_index);
+            }
         }
     }
 
