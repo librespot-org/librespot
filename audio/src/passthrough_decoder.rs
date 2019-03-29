@@ -1,7 +1,7 @@
 use super::{AudioDecoder, AudioError, AudioPacket};
 use std::error;
 use std::fmt;
-use std::io::{Read, Seek};
+use std::io::{Error, Read, Seek};
 use std::mem;
 use std::slice;
 
@@ -9,7 +9,7 @@ pub struct PassthroughDecoder<R: Read + Seek>(R);
 
 impl<R: Read + Seek> PassthroughDecoder<R> {
     pub fn new(input: R) -> Result<Self, PassthroughError> {
-        Ok(Self(input))
+        Ok(PassthroughDecoder(input))
     }
 }
 
@@ -38,7 +38,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
 #[derive(Debug)]
 pub enum PassthroughError {
     SeekNotAllowed,
-    IOError(std::io::Error),
+    IOError(Error),
 }
 
 impl From<PassthroughError> for AudioError {
@@ -47,8 +47,8 @@ impl From<PassthroughError> for AudioError {
     }
 }
 
-impl From<std::io::Error> for AudioError {
-    fn from(err: std::io::Error) -> AudioError {
+impl From<Error> for AudioError {
+    fn from(err: Error) -> AudioError {
         AudioError::PassthroughError(PassthroughError::IOError(err))
     }
 }
