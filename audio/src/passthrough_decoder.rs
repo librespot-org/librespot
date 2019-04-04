@@ -27,6 +27,11 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                 break;
             }
         }
+		
+		if rd == 0 {
+			return Ok(None);
+		}
+		
         // This will insert an extraneous 0 byte at EOF if the file size was not an even number of bytes
         let s16 = mem::size_of::<i16>(); // Yes, I know it is always 2
         rd += (s16 - (rd % s16)) % s16;
