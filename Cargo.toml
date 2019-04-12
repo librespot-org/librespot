@@ -61,6 +61,7 @@ portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
 jackaudio-backend = ["librespot-playback/jackaudio-backend"]
 rodio-backend = ["librespot-playback/rodio-backend"]
+sdl-backend = ["librespot-playback/sdl-backend"]
 
 with-tremor = ["librespot-audio/with-tremor"]
 with-vorbis = ["librespot-audio/with-vorbis"]
