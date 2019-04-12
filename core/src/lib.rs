@@ -26,6 +26,7 @@ extern crate rand;
 extern crate serde;
 extern crate serde_json;
 extern crate shannon;
+extern crate tokio_codec;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate url;

@@ -6,7 +6,7 @@ use protobuf::{self, Message};
 use rand::thread_rng;
 use std::io::{self, Read};
 use std::marker::PhantomData;
-use tokio_io::codec::Framed;
+use tokio_codec::{Decoder, Framed};
 use tokio_io::io::{read_exact, write_all, ReadExact, Window, WriteAll};
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -72,7 +72,7 @@ impl<T: AsyncRead + AsyncWrite> Future for Handshake<T> {
                 ClientResponse(ref mut codec, ref mut write) => {
                     let (connection, _) = try_ready!(write.poll());
                     let codec = codec.take().unwrap();
-                    let framed = connection.framed(codec);
+                    let framed = codec.framed(connection);
                     return Ok(Async::Ready(framed));
                 }
             }
