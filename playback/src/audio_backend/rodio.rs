@@ -100,8 +100,7 @@ impl Sink for RodioSink {
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        let sink = self.rodio_sink.as_mut().expect("stop called before start");
-        sink.stop();
+        self.rodio_sink = None;
         Ok(())
     }
 
