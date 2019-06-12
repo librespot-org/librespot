@@ -14,8 +14,7 @@ use crate::playback::mixer::Mixer;
 use crate::playback::player::{Player, PlayerEvent, PlayerEventChannel};
 use crate::protocol;
 use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
-
-use librespot_core::config::ConnectConfig;
+use librespot_core::config::{ConnectConfig, VolumeCtrl};
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
@@ -80,7 +79,7 @@ pub enum SpircCommand {
 }
 
 struct SpircTaskConfig {
-    linear_volume: bool,
+    volume_ctrl: VolumeCtrl,
     autoplay: bool,
 }
 
@@ -161,7 +160,11 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
                 msg.set_typ(protocol::spirc::CapabilityType::kVolumeSteps);
                 {
                     let repeated = msg.mut_intValue();
-                    repeated.push(64)
+                    if let VolumeCtrl::Fixed = config.volume_ctrl {
+                        repeated.push(0)
+                    } else {
+                        repeated.push(64)
+                    }
                 };
                 msg
             };
@@ -170,7 +173,7 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
                 msg.set_typ(protocol::spirc::CapabilityType::kSupportsPlaylistV2);
                 {
                     let repeated = msg.mut_intValue();
-                    repeated.push(64)
+                    repeated.push(1)
                 };
                 msg
             };
@@ -230,12 +233,14 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
     val
 }
 
-fn volume_to_mixer(volume: u16, linear_volume: bool) -> u16 {
-    if linear_volume {
-        debug!("linear volume: {}", volume);
-        volume
-    } else {
-        calc_logarithmic_volume(volume)
+fn volume_to_mixer(volume: u16, volume_ctrl: &VolumeCtrl) -> u16 {
+    match volume_ctrl {
+        VolumeCtrl::Linear => {
+            debug!("linear volume: {}", volume);
+            volume
+        }
+        VolumeCtrl::Log => calc_logarithmic_volume(volume),
+        VolumeCtrl::Fixed => volume,
     }
 }
 
@@ -274,9 +279,10 @@ impl Spirc {
 
         let volume = config.volume;
         let task_config = SpircTaskConfig {
-            linear_volume: config.linear_volume,
+            volume_ctrl: config.volume_ctrl.to_owned(),
             autoplay: config.autoplay,
         };
+
         let device = initial_device_state(config);
 
         let player_events = player.get_player_event_channel();
@@ -1292,7 +1298,7 @@ impl SpircTask {
     fn set_volume(&mut self, volume: u16) {
         self.device.set_volume(volume as u32);
         self.mixer
-            .set_volume(volume_to_mixer(volume, self.config.linear_volume));
+            .set_volume(volume_to_mixer(volume, &self.config.volume_ctrl));
         if let Some(cache) = self.session.cache() {
             cache.save_volume(Volume { volume })
         }

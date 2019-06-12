@@ -84,6 +84,32 @@ pub struct ConnectConfig {
     pub name: String,
     pub device_type: DeviceType,
     pub volume: u16,
-    pub linear_volume: bool,
+    pub volume_ctrl: VolumeCtrl,
     pub autoplay: bool,
+}
+
+#[derive(Clone, Debug)]
+pub enum VolumeCtrl {
+    Linear,
+    Log,
+    Fixed,
+}
+
+impl FromStr for VolumeCtrl {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use self::VolumeCtrl::*;
+        match s.to_lowercase().as_ref() {
+            "linear" => Ok(Linear),
+            "log" => Ok(Log),
+            "fixed" => Ok(Fixed),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Default for VolumeCtrl {
+    fn default() -> VolumeCtrl {
+        VolumeCtrl::Linear
+    }
 }
