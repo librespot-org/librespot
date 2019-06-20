@@ -527,69 +527,131 @@ impl PlayerInternal {
     }
 
     fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<(Decoder, f32)> {
-        let track = Track::get(&self.session, track_id).wait().unwrap();
+        // load a normal track
+        if self.session.isEpisode() == false
+        {
+            let track = Track::get(&self.session, track_id).wait().unwrap();
 
-        info!(
-            "Loading track \"{}\" with Spotify URI \"spotify:track:{}\"",
-            track.name,
-            track_id.to_base62()
-        );
+            info!(
+                "Loading track \"{}\" with Spotify URI \"spotify:track:{}\"",
+                track.name,
+                track_id.to_base62()
+            );
 
-        let track = match self.find_available_alternative(&track) {
-            Some(track) => track,
-            None => {
-                warn!("Track \"{}\" is not available", track.name);
-                return None;
+            let track = match self.find_available_alternative(&track) {
+                Some(track) => track,
+                None => {
+                    warn!("Track \"{}\" is not available", track.name);
+                    return None;
+                }
+            };
+
+            let format = match self.config.bitrate {
+                Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
+                Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
+                Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
+            };
+
+            let file_id = match track.files.get(&format) {
+                Some(&file_id) => file_id,
+                None => {
+                    warn!("Track \"{}\" is not available in format {:?}", track.name, format);
+                    return None;
+                }
+            };
+
+            let key = self
+                .session
+                .audio_key()
+                .request(track.id, file_id);
+            let encrypted_file = AudioFile::open(&self.session, file_id);
+
+
+            let encrypted_file = encrypted_file.wait().unwrap();
+            let key = key.wait().unwrap();
+            let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+
+            let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
+                Ok(normalisation_data) => NormalisationData::get_factor(&self.config, normalisation_data),
+                Err(_) => {
+                    warn!("Unable to extract normalisation data, using default value.");
+                    1.0 as f32
+                }
+            };
+
+            let audio_file = Subfile::new(decrypted_file, 0xa7);
+
+            let mut decoder = VorbisDecoder::new(audio_file).unwrap();
+
+            if position != 0 {
+                match decoder.seek(position) {
+                    Ok(_) => (),
+                    Err(err) => error!("Vorbis error: {:?}", err),
+                }
             }
-        };
 
-        let format = match self.config.bitrate {
-            Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
-            Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
-            Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
-        };
+            info!("Track \"{}\" loaded", track.name);
 
-        let file_id = match track.files.get(&format) {
-            Some(&file_id) => file_id,
-            None => {
-                warn!("Track \"{}\" is not available in format {:?}", track.name, format);
-                return None;
-            }
-        };
-
-        let key = self
-            .session
-            .audio_key()
-            .request(track.id, file_id);
-        let encrypted_file = AudioFile::open(&self.session, file_id);
-
-
-        let encrypted_file = encrypted_file.wait().unwrap();
-        let key = key.wait().unwrap();
-        let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
-
-        let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
-            Ok(normalisation_data) => NormalisationData::get_factor(&self.config, normalisation_data),
-            Err(_) => {
-                warn!("Unable to extract normalisation data, using default value.");
-                1.0 as f32
-            }
-        };
-
-        let audio_file = Subfile::new(decrypted_file, 0xa7);
-
-        let mut decoder = VorbisDecoder::new(audio_file).unwrap();
-
-        if position != 0 {
-            match decoder.seek(position) {
-                Ok(_) => (),
-                Err(err) => error!("Vorbis error: {:?}", err),
-            }
+            Some((decoder, normalisation_factor))
         }
+        else
+        {
+            let track = Episode::get(&self.session, track_id).wait().unwrap();
+            info!(
+                "Loading episode \"{}\" with Spotify URI \"spotify:track:{}\"",
+                track.name,
+                track_id.to_base62()
+            );
 
-        info!("Track \"{}\" loaded", track.name);
+            // episodes have lower bitrates and some other codecsAsMut
+            // ignoring for now. fix this
+            let format = match self.config.bitrate {
+                Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
+                Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_96,
+                Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_96,
+            };
 
-        Some((decoder, normalisation_factor))
+            let file_id = match track.files.get(&format) {
+                Some(&file_id) => file_id,
+                None => {
+                    warn!("Episode \"{}\" is not available in format {:?}", track.name, format);
+                    return None;
+                }
+            };
+
+            let key = self
+                .session
+                .audio_key()
+                .request(track.id, file_id);
+            let encrypted_file = AudioFile::open(&self.session, file_id);
+
+
+            let encrypted_file = encrypted_file.wait().unwrap();
+            let key = key.wait().unwrap();
+            let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+
+            let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
+                Ok(normalisation_data) => NormalisationData::get_factor(&self.config, normalisation_data),
+                Err(_) => {
+                    warn!("Unable to extract normalisation data, using default value.");
+                    1.0 as f32
+                }
+            };
+
+            let audio_file = Subfile::new(decrypted_file, 0xa7);
+
+            let mut decoder = VorbisDecoder::new(audio_file).unwrap();
+
+            if position != 0 {
+                match decoder.seek(position) {
+                    Ok(_) => (),
+                    Err(err) => error!("Vorbis error: {:?}", err),
+                }
+            }
+
+            info!("Episode \"{}\" loaded", track.name);
+            Some((decoder, normalisation_factor))
+        }
     }
 }
 
