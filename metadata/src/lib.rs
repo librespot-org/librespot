@@ -84,6 +84,19 @@ pub struct Track {
     pub available: bool,
 }
 
+// copy of track. but track does not have album information
+#[derive(Debug, Clone)]
+pub struct Episode {
+    pub id: SpotifyId,
+    pub name: String,
+    pub duration: i32,
+    //pub album: SpotifyId,
+    pub artists: Vec<SpotifyId>,
+    pub files: LinearMap<FileFormat, FileId>,
+    pub alternatives: Vec<SpotifyId>,
+    pub available: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct Album {
     pub id: SpotifyId,
@@ -144,6 +157,57 @@ impl Metadata for Track {
         }
     }
 }
+
+// slightly ugly.
+// metadata for the new episode
+// base url is changed, also no album parsing
+impl Metadata for Episode {
+    type Message = protocol::metadata::Track;
+
+    fn base_url() -> &'static str {
+        "hm://metadata/3/episode"
+    }
+
+    fn parse(msg: &Self::Message, session: &Session) -> Self {
+        println!("{:?}",msg);
+        let country = session.country();
+
+        let artists = msg
+            .get_artist()
+            .iter()
+            .filter(|artist| artist.has_gid())
+            .map(|artist| SpotifyId::from_raw(artist.get_gid()).unwrap())
+            .collect::<Vec<_>>();
+
+        let files = msg
+            .get_file()
+            .iter()
+            .filter(|file| file.has_file_id())
+            .map(|file| {
+                let mut dst = [0u8; 20];
+                dst.clone_from_slice(file.get_file_id());
+                (file.get_format(), FileId(dst))
+            })
+            .collect();
+
+        Episode {
+            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
+            name: msg.get_name().to_owned(),
+            duration: msg.get_duration(),
+            //album: SpotifyId::from_raw(msg.get_album().get_gid()).unwrap(),
+            artists: artists,
+            files: files,
+            alternatives: msg
+                .get_alternative()
+                .iter()
+                .map(|alt| SpotifyId::from_raw(alt.get_gid()).unwrap())
+                .collect(),
+            available: parse_restrictions(msg.get_restriction(), &country, "premium"),
+        }
+    }
+}
+
+
 
 impl Metadata for Album {
     type Message = protocol::metadata::Album;
