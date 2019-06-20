@@ -809,6 +809,10 @@ impl SpircTask {
         if context_uri.starts_with("spotify:show:"){
             self.session.setEpisode(true);
         }
+        else
+        {
+            self.session.setEpisode(false);
+        }
 
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.into_iter().cloned().collect());
