@@ -56,6 +56,17 @@ impl SpotifyId {
         Ok(SpotifyId(u128::from_parts(high, low)))
     }
 
+    // for episode support
+    // extract the spotify id from the uri
+    pub fn from_rawURI(data: &str) -> Result<SpotifyId, SpotifyIdError> {
+        let parts = data.split(":");
+        let vec = parts.collect::<Vec<&str>>();
+        let uri = vec.last().unwrap();
+        let decoded = u128::from_str_radix(uri, 16);
+        let value = decoded.unwrap();
+        Ok(SpotifyId(value))
+    }
+
     pub fn to_base16(&self) -> String {
         let &SpotifyId(ref n) = self;
 
