@@ -62,9 +62,7 @@ impl SpotifyId {
         let parts = data.split(":");
         let vec = parts.collect::<Vec<&str>>();
         let uri = vec.last().unwrap();
-        let decoded = u128::from_str_radix(uri, 16);
-        let value = decoded.unwrap();
-        Ok(SpotifyId(value))
+        SpotifyId::from_base62(uri)
     }
 
     pub fn to_base16(&self) -> String {
