@@ -804,6 +804,11 @@ impl SpircTask {
         if context_uri.starts_with("spotify:station:") || context_uri.starts_with("spotify:dailymix:") {
             self.context_fut = self.resolve_station(&context_uri);
         }
+        // for episode support:
+        // set the episode bool to true
+        if context_uri.starts_with("spotify:show:"){
+            self.session.setEpisode(true);
+        }
 
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.into_iter().cloned().collect());
@@ -818,6 +823,17 @@ impl SpircTask {
             // Check for malformed gid
             let tracks_len = self.state.get_track().len() as u32;
             let mut track_ref = &self.state.get_track()[index as usize];
+            if track_ref.get_gid().len() != 0
+            {
+                SpotifyId::from_raw(track_ref.get_gid()).unwrap()
+            }
+            else
+            {
+                SpotifyId::from_rawURI(track_ref.get_uri()).unwrap()
+            }
+            // commented out for episode support
+            // don't know how to handle thisAsMut
+            /*
             while track_ref.get_gid().len() != 16 {
                 warn!(
                     "Skipping track {:?} at position [{}] of {}",
@@ -828,7 +844,8 @@ impl SpircTask {
                 index = if index + 1 < tracks_len { index + 1 } else { 0 };
                 track_ref = &self.state.get_track()[index as usize];
             }
-            SpotifyId::from_raw(track_ref.get_gid()).unwrap()
+            */
+            //SpotifyId::from_raw(track_ref.get_gid()).unwrap()
         };
 
         let position = self.state.get_position_ms();
