@@ -51,10 +51,6 @@ url = "1.7"
 sha-1 = "0.8"
 hex = "0.3"
 
-[build-dependencies]
-rand            = "0.7"
-vergen          = "3.0"
-
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
