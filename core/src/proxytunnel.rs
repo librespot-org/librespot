@@ -103,7 +103,7 @@ fn proxy_connect<T: AsyncWrite>(connection: T, connect_url: &str) -> WriteAll<T,
         "CONNECT {0}:{1} HTTP/1.1\r\n\
          \r\n",
         uri.host().expect(&format!("No host in {}", uri)),
-        uri.port().expect(&format!("No port in {}", uri))
+        uri.port_u16().expect(&format!("No port in {}", uri))
     )
     .into_bytes();
 
