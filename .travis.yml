@@ -20,8 +20,10 @@ before_script:
     - echo '[target.armv7-unknown-linux-gnueabihf]' > ~/.cargo/config
     - echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
     - rustup target add armv7-unknown-linux-gnueabihf
+    - rustup component add rustfmt
 
 script:
+    - cargo fmt --all -- --check
     - cargo build --locked --no-default-features
     - cargo build --locked --no-default-features --features "with-tremor"
     - cargo build --locked --no-default-features --features "with-vorbis"
