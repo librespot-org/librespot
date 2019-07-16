@@ -2,38 +2,30 @@
 
 ## Setup
 
-In order to contribute to librespot, you will first need to set up a suitable rust build environment, with the necessary dependenices installed. These instructions will walk you through setting up a simple build environment.
+In order to contribute to librespot, you will first need to set up a suitable Rust build environment, with the necessary dependencies installed. These instructions will walk you through setting up a simple build environment.
 
-You will need to have C compiler, rust, and portaudio installed.
+You will need to have C compiler, Rust, and alsa/portaudio libraries installed.
 
 ### Install Rust
 
-The easiest, and recommended way to get rust setu is to use [rustup](https://rustup.rs). You can install rustup with this command:
+The easiest, and recommended way to get Rust is to use [rustup](https://rustup.rs). You can install `rustup` with this command:
 
 ```bash
 curl https://sh.rustup.rs -sSf | sh
 ```
 
-Follow any prompts it gives you to install rust. Once that’s done, rust is ready to use.
- 
+Follow any prompts it gives you to install Rust. Once that’s done, Rust's standard tools should be setup and ready to use.
+
+#### Additional Rust tools - `rustfmt`
+To ensure a consistent codebase, install [`rustfmt`](https://github.com/rust-lang/rustfmt) via `rustup`.
+This is not optional, as Travis CI is set up to check that code is compliant with this repos style guides.
+```bash
+rustup component add rustfmt
+```
+
 ### Install Other Dependencies
-On debian / ubuntu, the following command will install these dependencies :
 
-```bash
-sudo apt-get install build-essential portaudio19-dev
-```
-
-On Fedora systems, the following command will install these dependencies :
-
-```bash
-sudo dnf install portaudio-devel make gcc
-```
-
-On macOS, using homebrew :
-
-```bash
-brew install portaudio
-```
+Install the required dependencies as described in the [Readme](https://github.com/librespot-org/librespot#building)
 
 ### Getting the Source
 
@@ -47,22 +39,6 @@ CD to the newly cloned repo...
 
 ```bash
 cd librespot
-```
-
-### Development Extra Steps
-
-If you are looking to carry out development on librespot:
-
-```bash
-rustup override set nightly
-```
-
-The command above overrides the default rust in the directory housing librespot to use the ```nightly``` version, as opposed to the ```stable``` version.
-
-Then, run the command below to install [rustfmt](https://github.com/rust-lang-nursery/rustfmt) for the ```nightly``` toolchain. This is not optional, as Travis CI is set up to check that code is compliant with rustfmt.
-
-```bash
-rustup component add rustfmt-preview
 ```
 
 ## Compiling & Running
@@ -87,7 +63,7 @@ You will most likely want to build debug builds when developing, as they are fas
 
 There are also a number of compiler feature flags that you can add, in the event that you want to have certain additional features also compiled. The list of these is available on the [wiki](https://github.com/librespot-org/librespot/wiki/Compiling#addition-features).
 
-By default, librespot compiles with the ```portaudio-backend``` feature. To compile without default features, you can run with:
+By default, librespot compiles with the ```rodio-backend``` feature. To compile without default features, you can run with:
 
 ```bash
 cargo build --no-default-features
@@ -112,7 +88,7 @@ If you have encountered a bug, please report it, as we rely on user reports to f
 Please also make sure that your issues are helpful. To ensure that your issue is helpful, please read over this brief checklist to avoid the more common pitfalls:
 
 	- Please take a moment to search/read previous similar issues to ensure you aren’t posting a duplicate. Duplicates will be closed immediately.
-	- Please include a clear description of what the issue is. Issues with descriptions such as ‘It hangs after 40 minutes’ will be closed immediately. 
+	- Please include a clear description of what the issue is. Issues with descriptions such as ‘It hangs after 40 minutes’ will be closed immediately.
 	- Please include, where possible, steps to reproduce the bug, along with any other material that is related to the bug. For example, if librespot consistently crashes when you try to play a song, please include the Spotify URI of that song. This can be immensely helpful in quickly pinpointing and resolving issues.
 	- Lastly, and perhaps most importantly, please include a backtrace where possible. Recent versions of librespot should produce these automatically when it crashes, and print them to the console, but in some cases, you may need to run ‘export RUST_BACKTRACE=full’ before running librespot to enable backtraces.
 
@@ -126,14 +102,13 @@ Fork -> Fix -> PR -> Review -> Merge
 
 This is how all code is added to the repository, even by those with write access.
 
-#### Steps before Commiting
+#### Steps before Committing
 
 In order to prepare for a PR, you will need to do a couple of things first:
 
 Make any changes that you are going to make to the code, but do not commit yet.
 
-Make sure you are using rust ```nightly``` to build librespot. Once this is confirmed, you will need to run the following command:
-
+Make sure that the code is formatted by running:
 ```bash
 cargo fmt --all
 ```

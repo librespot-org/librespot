@@ -4,10 +4,10 @@
 # librespot
 *librespot* is an open source client library for Spotify. It enables
 applications to use Spotify's service, without using the official but
-closed-source libspotify. Additionally, it will provide extra features
+closed-source `libspotify`. Additionally, it will provide extra features
 which are not available in the official library.
 
-_Note: librespot only works with Spotify Premium. This will remain the case for the forseeable future, as we are unlikely to work on implementing the features such as limited skips and adverts that would be required to make librespot compliant with free accounts._
+_Note: librespot only works with Spotify Premium. This will remain the case for the foreseeable future, as we are unlikely to work on implementing the features such as limited skips and adverts that would be required to make librespot compliant with free accounts._
 
 ## This fork
 As the origin by [plietar](https://github.com/plietar/) is no longer actively maintained, this organisation and repository have been set up so that the project may be maintained and upgraded in the future.
@@ -28,9 +28,11 @@ If you run into a bug when using librespot, please search the existing issues be
 # Building
 Rust 1.30.0 or later is required to build librespot.
 
-We recently switched to using [Rodio](https://github.com/tomaka/rodio) for audio playback by default, hene for macOS and Windows, you should just be able to clone and build librespot (with the command below). For linux, you will need to run the additional commands below, depending on your distro.
+## Additional Dependencies
+We recently switched to using [Rodio](https://github.com/tomaka/rodio) for audio playback by default, hence for macOS and Windows, you should just be able to clone and build librespot (with the command below).
+For Linux, you will need to run the additional commands below, depending on your distro.
 
-On debian / ubuntu, the following command will install these dependencies :
+On Debian/Ubuntu, the following command will install these dependencies :
 ```shell
 sudo apt-get install build-essential libasound2-dev
 ```
@@ -40,7 +42,19 @@ On Fedora systems, the following command will install these dependencies :
 sudo dnf install alsa-lib-devel make gcc
 ```
 
-Once you've cloned this repository you can build *librespot* using `cargo`.
+librespot currently offers the a selection of [audio backends](https://github.com/librespot-org/librespot/wiki/Audio-Backends).
+```
+Rodio (default)
+ALSA
+PortAudio
+PulseAudio
+JACK
+SDL
+Pipe
+```
+Please check the corresponding [compiling wiki entry](https://github.com/librespot-org/librespot/wiki/Compiling#dependencies) for backend specific dependencies.
+
+Once you've installed the dependencies and cloned this repository you can build *librespot* with the default backend using Cargo.
 ```shell
 cargo build --release
 ```
