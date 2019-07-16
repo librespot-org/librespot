@@ -1,12 +1,12 @@
 use std::io;
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::sync::{Arc, RwLock, Weak};
-use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::{Async, Future, IntoFuture, Poll, Stream};
 use futures::sync::mpsc;
+use futures::{Async, Future, IntoFuture, Poll, Stream};
 use tokio_core::reactor::{Handle, Remote};
 
 use apresolve::apresolve_or_fallback;
@@ -289,7 +289,8 @@ where
                     session.shutdown();
                     return Err(From::from(e));
                 }
-            }.expect("connection closed");
+            }
+            .expect("connection closed");
 
             session.dispatch(cmd, data);
         }

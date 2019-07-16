@@ -1,8 +1,8 @@
 extern crate rand;
 extern crate vergen;
 
-use rand::Rng;
 use rand::distributions::Alphanumeric;
+use rand::Rng;
 use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -14,7 +14,10 @@ fn main() {
     vergen::vergen(vergen::OutputFns::all()).unwrap();
 
     let mut rng = rand::thread_rng();
-    let build_id: String = ::std::iter::repeat(()).map(|()| rng.sample(Alphanumeric)).take(8).collect();
+    let build_id: String = ::std::iter::repeat(())
+        .map(|()| rng.sample(Alphanumeric))
+        .take(8)
+        .collect();
 
     let mut version_file = OpenOptions::new()
         .write(true)

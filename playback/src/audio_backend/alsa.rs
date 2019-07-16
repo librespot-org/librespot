@@ -64,7 +64,8 @@ impl Open for AlsaSink {
             }
             Some(device) => device,
             None => "default",
-        }.to_string();
+        }
+        .to_string();
 
         AlsaSink(None, name)
     }

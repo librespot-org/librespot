@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use hmac::{Hmac, Mac};
-use sha1::Sha1;
 use futures::{Async, Future, Poll};
+use hmac::{Hmac, Mac};
 use protobuf::{self, Message};
 use rand::thread_rng;
+use sha1::Sha1;
 use std::io::{self, Read};
 use std::marker::PhantomData;
 use tokio_codec::{Decoder, Framed};
@@ -190,15 +190,13 @@ fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<
 
     let mut data = Vec::with_capacity(0x64);
     for i in 1..6 {
-        let mut mac = HmacSha1::new_varkey(&shared_secret)
-            .expect("HMAC can take key of any size");
+        let mut mac = HmacSha1::new_varkey(&shared_secret).expect("HMAC can take key of any size");
         mac.input(packets);
         mac.input(&[i]);
         data.extend_from_slice(&mac.result().code());
     }
 
-    let mut mac = HmacSha1::new_varkey(&data[..0x14])
-        .expect("HMAC can take key of any size");;
+    let mut mac = HmacSha1::new_varkey(&data[..0x14]).expect("HMAC can take key of any size");;
     mac.input(packets);
 
     (

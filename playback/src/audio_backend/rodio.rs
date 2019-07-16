@@ -1,8 +1,8 @@
 use super::{Open, Sink};
-extern crate rodio;
 extern crate cpal;
-use std::{io, thread, time};
+extern crate rodio;
 use std::process::exit;
+use std::{io, thread, time};
 
 pub struct RodioSink {
     rodio_sink: rodio::Sink,
@@ -14,7 +14,7 @@ fn list_formats(ref device: &rodio::Device) {
         Err(e) => {
             warn!("Error getting default rodio::Sink format: {:?}", e);
             return;
-        },
+        }
     };
 
     let mut output_formats = match device.supported_output_formats() {
@@ -22,13 +22,16 @@ fn list_formats(ref device: &rodio::Device) {
         Err(e) => {
             warn!("Error getting supported rodio::Sink formats: {:?}", e);
             return;
-        },
+        }
     };
 
     if output_formats.peek().is_some() {
         debug!("  Available formats:");
         for format in output_formats {
-            let s = format!("{}ch, {:?}, min {:?}, max {:?}", format.channels, format.data_type, format.min_sample_rate, format.max_sample_rate);
+            let s = format!(
+                "{}ch, {:?}, min {:?}, max {:?}",
+                format.channels, format.data_type, format.min_sample_rate, format.max_sample_rate
+            );
             if format == default_fmt {
                 debug!("    (default) {}", s);
             } else {
@@ -79,9 +82,7 @@ impl Open for RodioSink {
         }
         let sink = rodio::Sink::new(&rodio_device);
 
-        RodioSink {
-            rodio_sink: sink,
-        }
+        RodioSink { rodio_sink: sink }
     }
 }
 

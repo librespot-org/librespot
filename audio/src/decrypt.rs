@@ -1,16 +1,13 @@
 use std::io;
 
-use aes_ctr::Aes128Ctr;
-use aes_ctr::stream_cipher::{
-    NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek
-};
 use aes_ctr::stream_cipher::generic_array::GenericArray;
+use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek};
+use aes_ctr::Aes128Ctr;
 
 use core::audio_key::AudioKey;
 
 const AUDIO_AESIV: [u8; 16] = [
-    0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77,
-    0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93,
+    0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77, 0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93,
 ];
 
 pub struct AudioDecrypt<T: io::Read> {

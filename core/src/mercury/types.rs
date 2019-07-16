@@ -37,7 +37,8 @@ impl ToString for MercuryMethod {
             MercuryMethod::SUB => "SUB",
             MercuryMethod::UNSUB => "UNSUB",
             MercuryMethod::SEND => "SEND",
-        }.to_owned()
+        }
+        .to_owned()
     }
 }
 

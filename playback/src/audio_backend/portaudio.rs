@@ -51,7 +51,8 @@ impl<'a> Open for PortAudioSink<'a> {
             }
             Some(device) => find_output(device),
             None => get_default_output_index(),
-        }.expect("Could not find device");
+        }
+        .expect("Could not find device");
 
         let info = portaudio_rs::device::get_info(device_idx);
         let latency = match info {
@@ -81,7 +82,8 @@ impl<'a> Sink for PortAudioSink<'a> {
                     FRAMES_PER_BUFFER_UNSPECIFIED,
                     StreamFlags::empty(),
                     None,
-                ).unwrap(),
+                )
+                .unwrap(),
             );;
         }
 

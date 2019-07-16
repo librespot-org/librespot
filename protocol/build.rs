@@ -19,7 +19,8 @@ fn main() {
                 input: &[path],
                 includes: &["proto"],
                 customize: Customize { ..Default::default() },
-            }).expect("protoc");
+            })
+            .expect("protoc");
             let new_checksum = cksum_file(path).unwrap();
             f_str = f_str.replace(&expected_checksum.to_string(), &new_checksum.to_string());
             changed = true;

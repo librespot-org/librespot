@@ -10,7 +10,7 @@ use std::str::FromStr;
 use tokio_core::reactor::Handle;
 use url::Url;
 
-error_chain!{}
+error_chain! {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct APResolveData {

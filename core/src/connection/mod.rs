@@ -8,9 +8,9 @@ use futures::{Future, Sink, Stream};
 use protobuf::{self, Message};
 use std::io;
 use std::net::ToSocketAddrs;
+use tokio_codec::Framed;
 use tokio_core::net::TcpStream;
 use tokio_core::reactor::Handle;
-use tokio_codec::Framed;
 use url::Url;
 
 use authentication::Credentials;
