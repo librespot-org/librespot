@@ -14,6 +14,8 @@ addons:
       - libc6-dev-armhf-cross
       - libpulse-dev
       - portaudio19-dev
+      - libasound2-dev
+      - libsdl2-dev
 
 before_script:
     - mkdir -p ~/.cargo
@@ -25,9 +27,12 @@ script:
     - cargo build --locked --no-default-features
     - cargo build --locked --no-default-features --features "with-tremor"
     - cargo build --locked --no-default-features --features "with-vorbis"
+    - cargo build --locked --no-default-features --features "alsa-backend"
     - cargo build --locked --no-default-features --features "portaudio-backend"
     - cargo build --locked --no-default-features --features "pulseaudio-backend"
-    - cargo build --locked --no-default-features --features "alsa-backend"
+    - cargo build --locked --no-default-features --features "jackaudio-backend"
+    - cargo build --locked --no-default-features --features "rodio-backend"
+    - cargo build --locked --no-default-features --features "sdl-backend"
     - cargo build --locked --no-default-features --target armv7-unknown-linux-gnueabihf
 
 notifications:
