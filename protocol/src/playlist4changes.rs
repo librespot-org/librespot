@@ -2759,7 +2759,6 @@ pub struct SelectedListContent {
     resolveAction: ::protobuf::RepeatedField<super::playlist4issues::ClientResolveAction>,
     issues: ::protobuf::RepeatedField<super::playlist4issues::ClientIssue>,
     nonces: ::std::vec::Vec<i32>,
-    owner_username: ::protobuf::SingularField<::std::string::String>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -3133,42 +3132,6 @@ impl SelectedListContent {
     pub fn take_nonces(&mut self) -> ::std::vec::Vec<i32> {
         ::std::mem::replace(&mut self.nonces, ::std::vec::Vec::new())
     }
-
-    // optional string owner_username = 16;
-
-
-    pub fn get_owner_username(&self) -> &str {
-        match self.owner_username.as_ref() {
-            Some(v) => &v,
-            None => "",
-        }
-    }
-    pub fn clear_owner_username(&mut self) {
-        self.owner_username.clear();
-    }
-
-    pub fn has_owner_username(&self) -> bool {
-        self.owner_username.is_some()
-    }
-
-    // Param is passed by value, moved
-    pub fn set_owner_username(&mut self, v: ::std::string::String) {
-        self.owner_username = ::protobuf::SingularField::some(v);
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_owner_username(&mut self) -> &mut ::std::string::String {
-        if self.owner_username.is_none() {
-            self.owner_username.set_default();
-        }
-        self.owner_username.as_mut().unwrap()
-    }
-
-    // Take field
-    pub fn take_owner_username(&mut self) -> ::std::string::String {
-        self.owner_username.take().unwrap_or_else(|| ::std::string::String::new())
-    }
 }
 
 impl ::protobuf::Message for SelectedListContent {
@@ -3266,9 +3229,6 @@ impl ::protobuf::Message for SelectedListContent {
                 14 => {
                     ::protobuf::rt::read_repeated_int32_into(wire_type, is, &mut self.nonces)?;
                 },
-                16 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.owner_username)?;
-                },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
@@ -3327,9 +3287,6 @@ impl ::protobuf::Message for SelectedListContent {
         for value in &self.nonces {
             my_size += ::protobuf::rt::value_size(14, *value, ::protobuf::wire_format::WireTypeVarint);
         };
-        if let Some(ref v) = self.owner_username.as_ref() {
-            my_size += ::protobuf::rt::string_size(16, &v);
-        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -3389,9 +3346,6 @@ impl ::protobuf::Message for SelectedListContent {
         for v in &self.nonces {
             os.write_int32(14, *v)?;
         };
-        if let Some(ref v) = self.owner_username.as_ref() {
-            os.write_string(16, &v)?;
-        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -3499,11 +3453,6 @@ impl ::protobuf::Message for SelectedListContent {
                     |m: &SelectedListContent| { &m.nonces },
                     |m: &mut SelectedListContent| { &mut m.nonces },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "owner_username",
-                    |m: &SelectedListContent| { &m.owner_username },
-                    |m: &mut SelectedListContent| { &mut m.owner_username },
-                ));
                 ::protobuf::reflect::MessageDescriptor::new::<SelectedListContent>(
                     "SelectedListContent",
                     fields,
@@ -3539,7 +3488,6 @@ impl ::protobuf::Clear for SelectedListContent {
         self.resolveAction.clear();
         self.issues.clear();
         self.nonces.clear();
-        self.owner_username.clear();
         self.unknown_fields.clear();
     }
 }
@@ -3586,7 +3534,7 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     eltaB\0\x12\x20\n\x16wantResultingRevisions\x18\x03\x20\x01(\x08B\0\x12\
     \x18\n\x0ewantSyncResult\x18\x04\x20\x01(\x08B\0\x12\x19\n\x04dump\x18\
     \x05\x20\x01(\x0b2\t.ListDumpB\0\x12\x10\n\x06nonces\x18\x06\x20\x03(\
-    \x05B\0:\0\"\xa1\x03\n\x13SelectedListContent\x12\x12\n\x08revision\x18\
+    \x05B\0:\0\"\x87\x03\n\x13SelectedListContent\x12\x12\n\x08revision\x18\
     \x01\x20\x01(\x0cB\0\x12\x10\n\x06length\x18\x02\x20\x01(\x05B\0\x12%\n\
     \nattributes\x18\x03\x20\x01(\x0b2\x0f.ListAttributesB\0\x12!\n\x08check\
     sum\x18\x04\x20\x01(\x0b2\r.ListChecksumB\0\x12\x1e\n\x08contents\x18\
@@ -3596,8 +3544,7 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     ipleHeads\x18\t\x20\x01(\x08B\0\x12\x12\n\x08upToDate\x18\n\x20\x01(\x08\
     B\0\x12-\n\rresolveAction\x18\x0c\x20\x03(\x0b2\x14.ClientResolveActionB\
     \0\x12\x1e\n\x06issues\x18\r\x20\x03(\x0b2\x0c.ClientIssueB\0\x12\x10\n\
-    \x06nonces\x18\x0e\x20\x03(\x05B\0\x12\x18\n\x0eowner_username\x18\x10\
-    \x20\x01(\tB\0:\0B\0b\x06proto2\
+    \x06nonces\x18\x0e\x20\x03(\x05B\0:\0B\0b\x06proto2\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

@@ -146,6 +146,29 @@ pub trait Metadata: Send + Sized + 'static {
     }
 }
 
+pub trait PlaylistMeta: Send + Sized + 'static {
+    type Message: protobuf::Message;
+
+    fn base_url() -> &'static str;
+    fn parse(msg: &Self::Message, session: &Session) -> Self;
+
+    fn get(session: &Session, id: SpotifyId, user: String, start: i32, len: i32) -> Box<Future<Item = Self, Error = MercuryError>> {
+        //let uri = format!("hm://playlist/{}?from={}&length={}",id.to_base62(), 0, 100);
+        let uri = format!("hm://playlist/user/{}/playlist/{}?from={}&length={}", user, id.to_base62(), start, len);
+        println!("request uri: {}", uri);
+        let request = session.mercury().get(uri);
+        println!("a");
+        let session = session.clone();
+        Box::new(request.and_then(move |response| {
+            println!("{:?}", response);
+            let data = response.payload.first().expect("Empty payload");
+            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
+            println!("{:?}", msg);
+            Ok(Self::parse(&msg, &session))
+        }))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Track {
     pub id: SpotifyId,
@@ -192,7 +215,7 @@ pub struct Show {
 
 #[derive(Debug, Clone)]
 pub struct Playlist {
-    pub user: String,
+    //pub id: SpotifyId,
     pub length: i32,
     pub name: String,
     pub tracks: Vec<SpotifyId>,
@@ -295,12 +318,13 @@ impl Metadata for Album {
     }
 }
 
-impl Metadata for Playlist {
+impl PlaylistMeta for Playlist {
     type Message = protocol::playlist4changes::SelectedListContent;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!("hm://playlist/v2/playlist/{}", id.to_base62())
+    fn base_url() -> &'static str {
+        "hm://playlist/'?from=' + from + '&length=' + length"
     }
+
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
 
@@ -321,7 +345,6 @@ impl Metadata for Playlist {
             name: msg.get_attributes().get_name().to_owned(),
             length: msg.get_length(),
             tracks: tracks,
-            user: msg.get_owner_username().to_string(),
         }
     }
 }
