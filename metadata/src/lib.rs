@@ -72,6 +72,29 @@ pub trait Metadata: Send + Sized + 'static {
     }
 }
 
+pub trait PlaylistMeta: Send + Sized + 'static {
+    type Message: protobuf::Message;
+
+    fn base_url() -> &'static str;
+    fn parse(msg: &Self::Message, session: &Session) -> Self;
+
+    fn get(session: &Session, id: SpotifyId, user: String, start: i32, len: i32) -> Box<Future<Item = Self, Error = MercuryError>> {
+        //let uri = format!("hm://playlist/{}?from={}&length={}",id.to_base62(), 0, 100);
+        let uri = format!("hm://playlist/user/{}/playlist/{}?from={}&length={}", user, id.to_base62(), start, len);
+        println!("request uri: {}", uri);
+        let request = session.mercury().get(uri);
+        println!("a");
+        let session = session.clone();
+        Box::new(request.and_then(move |response| {
+            println!("{:?}", response);
+            let data = response.payload.first().expect("Empty payload");
+            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
+            println!("{:?}", msg);
+            Ok(Self::parse(&msg, &session))
+        }))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Track {
     pub id: SpotifyId,
@@ -91,6 +114,14 @@ pub struct Album {
     pub artists: Vec<SpotifyId>,
     pub tracks: Vec<SpotifyId>,
     pub covers: Vec<FileId>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Playlist {
+    //pub id: SpotifyId,
+    pub length: i32,
+    pub name: String,
+    pub tracks: Vec<SpotifyId>,
 }
 
 #[derive(Debug, Clone)]
@@ -186,6 +217,37 @@ impl Metadata for Album {
             artists: artists,
             tracks: tracks,
             covers: covers,
+        }
+    }
+}
+
+impl PlaylistMeta for Playlist {
+    type Message = protocol::playlist4changes::SelectedListContent;
+
+    fn base_url() -> &'static str {
+        "hm://playlist/'?from=' + from + '&length=' + length"
+    }
+
+
+    fn parse(msg: &Self::Message, _: &Session) -> Self {
+
+        let tracks = msg
+            .get_contents()
+            .get_items()
+            .iter()
+            .map(|item| {
+                let uri_split = item.get_uri().split(":");
+                let uri_parts: Vec<&str> = uri_split.collect();
+                SpotifyId::from_base62(uri_parts[2]).unwrap()
+            })
+            .collect::<Vec<_>>();
+        
+        println!("parse Message: {:?}", msg);
+        Playlist {
+            //id: SpotifyId::from_raw(msg.get_attributes().get_id()).unwrap(),
+            name: msg.get_attributes().get_name().to_owned(),
+            length: msg.get_length(),
+            tracks: tracks,
         }
     }
 }
