@@ -71,6 +71,7 @@ message ListChanges {
 message SelectedListContent {
     optional bytes revision = 0x1;
     optional int32 length = 0x2;
+    optional string owner_username =0x10;
     optional ListAttributes attributes = 0x3;
     optional ListChecksum checksum = 0x4;
     optional ListItems contents = 0x5;
