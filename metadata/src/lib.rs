@@ -298,21 +298,8 @@ impl Metadata for Album {
 impl Metadata for Playlist {
     type Message = protocol::playlist4changes::SelectedListContent;
 
-    fn base_url() -> &'static str {
-        "hm://playlist/v2/playlist"
-    }
-
-    fn get(session: &Session, id: SpotifyId) -> Box<Future<Item = Self, Error = MercuryError>> {
-        let uri = format!("{}/{}", Self::base_url(), id.to_base62());
-        let request = session.mercury().get(uri);
-
-        let session = session.clone();
-        Box::new(request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty payload");
-            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
-
-            Ok(Self::parse(&msg, &session))
-        }))
+    fn request_url(id: SpotifyId) -> String {
+        format!("hm://playlist/v2/playlist/{}", id.to_base62())
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
