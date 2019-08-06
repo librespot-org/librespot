@@ -2748,6 +2748,7 @@ pub struct SelectedListContent {
     // message fields
     revision: ::protobuf::SingularField<::std::vec::Vec<u8>>,
     length: ::std::option::Option<i32>,
+    owner_username: ::protobuf::SingularField<::std::string::String>,
     attributes: ::protobuf::SingularPtrField<super::playlist4meta::ListAttributes>,
     checksum: ::protobuf::SingularPtrField<super::playlist4meta::ListChecksum>,
     contents: ::protobuf::SingularPtrField<super::playlist4content::ListItems>,
@@ -2828,6 +2829,42 @@ impl SelectedListContent {
     // Param is passed by value, moved
     pub fn set_length(&mut self, v: i32) {
         self.length = ::std::option::Option::Some(v);
+    }
+
+    // optional string owner_username = 16;
+
+
+    pub fn get_owner_username(&self) -> &str {
+        match self.owner_username.as_ref() {
+            Some(v) => &v,
+            None => "",
+        }
+    }
+    pub fn clear_owner_username(&mut self) {
+        self.owner_username.clear();
+    }
+
+    pub fn has_owner_username(&self) -> bool {
+        self.owner_username.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_owner_username(&mut self, v: ::std::string::String) {
+        self.owner_username = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_owner_username(&mut self) -> &mut ::std::string::String {
+        if self.owner_username.is_none() {
+            self.owner_username.set_default();
+        }
+        self.owner_username.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_owner_username(&mut self) -> ::std::string::String {
+        self.owner_username.take().unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional .ListAttributes attributes = 3;
@@ -3188,6 +3225,9 @@ impl ::protobuf::Message for SelectedListContent {
                     let tmp = is.read_int32()?;
                     self.length = ::std::option::Option::Some(tmp);
                 },
+                16 => {
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.owner_username)?;
+                },
                 3 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.attributes)?;
                 },
@@ -3247,6 +3287,9 @@ impl ::protobuf::Message for SelectedListContent {
         if let Some(v) = self.length {
             my_size += ::protobuf::rt::value_size(2, v, ::protobuf::wire_format::WireTypeVarint);
         }
+        if let Some(ref v) = self.owner_username.as_ref() {
+            my_size += ::protobuf::rt::string_size(16, &v);
+        }
         if let Some(ref v) = self.attributes.as_ref() {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
@@ -3298,6 +3341,9 @@ impl ::protobuf::Message for SelectedListContent {
         }
         if let Some(v) = self.length {
             os.write_int32(2, v)?;
+        }
+        if let Some(ref v) = self.owner_username.as_ref() {
+            os.write_string(16, &v)?;
         }
         if let Some(ref v) = self.attributes.as_ref() {
             os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
@@ -3398,6 +3444,11 @@ impl ::protobuf::Message for SelectedListContent {
                     |m: &SelectedListContent| { &m.length },
                     |m: &mut SelectedListContent| { &mut m.length },
                 ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "owner_username",
+                    |m: &SelectedListContent| { &m.owner_username },
+                    |m: &mut SelectedListContent| { &mut m.owner_username },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListAttributes>>(
                     "attributes",
                     |m: &SelectedListContent| { &m.attributes },
@@ -3477,6 +3528,7 @@ impl ::protobuf::Clear for SelectedListContent {
     fn clear(&mut self) {
         self.revision.clear();
         self.length = ::std::option::Option::None;
+        self.owner_username.clear();
         self.attributes.clear();
         self.checksum.clear();
         self.contents.clear();
@@ -3534,17 +3586,18 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     eltaB\0\x12\x20\n\x16wantResultingRevisions\x18\x03\x20\x01(\x08B\0\x12\
     \x18\n\x0ewantSyncResult\x18\x04\x20\x01(\x08B\0\x12\x19\n\x04dump\x18\
     \x05\x20\x01(\x0b2\t.ListDumpB\0\x12\x10\n\x06nonces\x18\x06\x20\x03(\
-    \x05B\0:\0\"\x87\x03\n\x13SelectedListContent\x12\x12\n\x08revision\x18\
-    \x01\x20\x01(\x0cB\0\x12\x10\n\x06length\x18\x02\x20\x01(\x05B\0\x12%\n\
-    \nattributes\x18\x03\x20\x01(\x0b2\x0f.ListAttributesB\0\x12!\n\x08check\
-    sum\x18\x04\x20\x01(\x0b2\r.ListChecksumB\0\x12\x1e\n\x08contents\x18\
-    \x05\x20\x01(\x0b2\n.ListItemsB\0\x12\x15\n\x04diff\x18\x06\x20\x01(\x0b\
-    2\x05.DiffB\0\x12\x1b\n\nsyncResult\x18\x07\x20\x01(\x0b2\x05.DiffB\0\
-    \x12\x1c\n\x12resultingRevisions\x18\x08\x20\x03(\x0cB\0\x12\x17\n\rmult\
-    ipleHeads\x18\t\x20\x01(\x08B\0\x12\x12\n\x08upToDate\x18\n\x20\x01(\x08\
-    B\0\x12-\n\rresolveAction\x18\x0c\x20\x03(\x0b2\x14.ClientResolveActionB\
-    \0\x12\x1e\n\x06issues\x18\r\x20\x03(\x0b2\x0c.ClientIssueB\0\x12\x10\n\
-    \x06nonces\x18\x0e\x20\x03(\x05B\0:\0B\0b\x06proto2\
+    \x05B\0:\0\"\xa1\x03\n\x13SelectedListContent\x12\x12\n\x08revision\x18\
+    \x01\x20\x01(\x0cB\0\x12\x10\n\x06length\x18\x02\x20\x01(\x05B\0\x12\x18\
+    \n\x0eowner_username\x18\x10\x20\x01(\tB\0\x12%\n\nattributes\x18\x03\
+    \x20\x01(\x0b2\x0f.ListAttributesB\0\x12!\n\x08checksum\x18\x04\x20\x01(\
+    \x0b2\r.ListChecksumB\0\x12\x1e\n\x08contents\x18\x05\x20\x01(\x0b2\n.Li\
+    stItemsB\0\x12\x15\n\x04diff\x18\x06\x20\x01(\x0b2\x05.DiffB\0\x12\x1b\n\
+    \nsyncResult\x18\x07\x20\x01(\x0b2\x05.DiffB\0\x12\x1c\n\x12resultingRev\
+    isions\x18\x08\x20\x03(\x0cB\0\x12\x17\n\rmultipleHeads\x18\t\x20\x01(\
+    \x08B\0\x12\x12\n\x08upToDate\x18\n\x20\x01(\x08B\0\x12-\n\rresolveActio\
+    n\x18\x0c\x20\x03(\x0b2\x14.ClientResolveActionB\0\x12\x1e\n\x06issues\
+    \x18\r\x20\x03(\x0b2\x0c.ClientIssueB\0\x12\x10\n\x06nonces\x18\x0e\x20\
+    \x03(\x05B\0:\0B\0b\x06proto2\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
