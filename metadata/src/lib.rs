@@ -55,11 +55,11 @@ where
 pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::Message;
 
-    fn base_url() -> &'static str;
+    fn request_url(id: SpotifyId) -> String;
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 
     fn get(session: &Session, id: SpotifyId) -> Box<Future<Item = Self, Error = MercuryError>> {
-        let uri = format!("{}/{}", Self::base_url(), id.to_base16());
+        let uri = Self::request_url(id);
         let request = session.mercury().get(uri);
 
         let session = session.clone();
@@ -111,8 +111,8 @@ pub struct Artist {
 impl Metadata for Track {
     type Message = protocol::metadata::Track;
 
-    fn base_url() -> &'static str {
-        "hm://metadata/3/track"
+    fn request_url(id: SpotifyId) -> String {
+        format!("hm://metadata/3/track/{}", id.to_base16())
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
@@ -156,8 +156,8 @@ impl Metadata for Track {
 impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
-    fn base_url() -> &'static str {
-        "hm://metadata/3/album"
+    fn request_url(id: SpotifyId) -> String {
+        format!("hm://metadata/3/album/{}", id.to_base16())
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
@@ -201,21 +201,8 @@ impl Metadata for Album {
 impl Metadata for Playlist {
     type Message = protocol::playlist4changes::SelectedListContent;
 
-    fn base_url() -> &'static str {
-        "hm://playlist/v2/playlist"
-    }
-
-    fn get(session: &Session, id: SpotifyId) -> Box<Future<Item = Self, Error = MercuryError>> {
-        let uri = format!("{}/{}", Self::base_url(), id.to_base62());
-        let request = session.mercury().get(uri);
-
-        let session = session.clone();
-        Box::new(request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty payload");
-            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
-
-            Ok(Self::parse(&msg, &session))
-        }))
+    fn request_url(id: SpotifyId) -> String {
+        format!("hm://playlist/v2/playlist/{}", id.to_base62())
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
@@ -245,8 +232,8 @@ impl Metadata for Playlist {
 impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
-    fn base_url() -> &'static str {
-        "hm://metadata/3/artist"
+    fn request_url(id: SpotifyId) -> String {
+        format!("hm://metadata/3/artist/{}", id.to_base16())
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
