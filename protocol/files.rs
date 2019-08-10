@@ -7,7 +7,7 @@ pub const FILES: &'static [(&'static str, u32)] = &[
     ("proto/metadata.proto", 2474472423),
     ("proto/pubsub.proto", 2686584829),
     ("proto/spirc.proto", 1587493382),
-    ("proto/playlist4changes.proto", 2679224745),
+    ("proto/playlist4changes.proto", 14429579),
     ("proto/playlist4content.proto", 1696452804),
     ("proto/playlist4issues.proto", 1150350731),
     ("proto/playlist4meta.proto", 1605295973),
