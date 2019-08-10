@@ -15,8 +15,6 @@ use librespot::core::authentication::Credentials;
 use librespot::core::config::SessionConfig;
 use librespot::core::session::Session;
 use librespot::core::spotify_id::SpotifyId;
-use librespot::playback::config::PlayerConfig;
-use librespot::playback::config::Bitrate;
 use librespot::metadata::{Metadata, Track, Playlist};
 
 fn main() {
@@ -25,8 +23,6 @@ fn main() {
     let handle = core.handle();
 
     let session_config = SessionConfig::default();
-    let mut player_config = PlayerConfig::default();
-    player_config.bitrate = Bitrate::Bitrate320;
 
     let args: Vec<_> = env::args().collect();
     if args.len() != 4 {
