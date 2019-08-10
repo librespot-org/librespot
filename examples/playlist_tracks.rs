@@ -3,10 +3,8 @@ extern crate env_logger;
 
 extern crate librespot;
 extern crate tokio_core;
-//extern crate tokio_fs;
 extern crate tokio_io;
 extern crate futures;
-//extern crate futures_cpupool;
 
 use std::env;
 use tokio_core::reactor::Core;
