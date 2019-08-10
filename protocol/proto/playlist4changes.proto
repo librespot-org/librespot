@@ -71,7 +71,6 @@ message ListChanges {
 message SelectedListContent {
     optional bytes revision = 0x1;
     optional int32 length = 0x2;
-    optional string owner_username =0x10;
     optional ListAttributes attributes = 0x3;
     optional ListChecksum checksum = 0x4;
     optional ListItems contents = 0x5;
@@ -83,5 +82,6 @@ message SelectedListContent {
     repeated ClientResolveAction resolveAction = 0xc;
     repeated ClientIssue issues = 0xd;
     repeated int32 nonces = 0xe;
+    optional string owner_username =0x10;
 }
 
