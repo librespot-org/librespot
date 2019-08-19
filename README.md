@@ -1,6 +1,9 @@
 [![Build Status](https://travis-ci.org/librespot-org/librespot.svg?branch=master)](https://travis-ci.org/librespot-org/librespot)
 [![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/librespot-org/spotify-connect-resources)
 
+## Request for maintainers
+Activity on librespot as of late has been somewhat limited. I’ve been busy with other projects, and have also bought a Spotify Connect speaker, hence my needs for librespot are diminished. It would be great for this project to live on though, and the many contributions that have been provided over the years clearly show that it’s used by more than a few. Thus, I’m requesting that anyone who would be interested in taking over the maintenance of this project leave a note in [#363](https://github.com/librespot-org/librespot/issues/363). Regular contributors have priority, but all interested parties invited. Also, I will not be the sole individual choosing a new maintainer, anyone who has contributed to librespot is welcome to suggest a new maintainer or offer support for an individual in the previously linked thread. After a few weeks, we’ll hopefully choose a new maintainer :)
+
 # librespot
 *librespot* is an open source client library for Spotify. It enables
 applications to use Spotify's service, without using the official but
