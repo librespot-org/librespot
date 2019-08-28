@@ -315,9 +315,7 @@ impl Metadata for Playlist {
             })
             .collect::<Vec<_>>();
         
-        println!("parse Message: {:?}", msg);
         Playlist {
-            //id: SpotifyId::from_raw(msg.get_attributes().get_id()).unwrap(),
             name: msg.get_attributes().get_name().to_owned(),
             length: msg.get_length(),
             tracks: tracks,
