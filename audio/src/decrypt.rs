@@ -6,7 +6,7 @@ use aes_ctr::stream_cipher::{
 };
 use aes_ctr::stream_cipher::generic_array::GenericArray;
 
-use core::audio_key::AudioKey;
+use librespot_core::audio_key::AudioKey;
 
 const AUDIO_AESIV: [u8; 16] = [
     0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77,

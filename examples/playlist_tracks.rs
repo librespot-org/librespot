@@ -9,10 +9,10 @@ extern crate futures;
 use std::env;
 use tokio_core::reactor::Core;
 
-use librespot::core::authentication::Credentials;
-use librespot::core::config::SessionConfig;
-use librespot::core::session::Session;
-use librespot::core::spotify_id::SpotifyId;
+use librespot::librespot_core::authentication::Credentials;
+use librespot::librespot_core::config::SessionConfig;
+use librespot::librespot_core::session::Session;
+use librespot::librespot_core::spotify_id::SpotifyId;
 use librespot::metadata::{Metadata, Track, Playlist};
 
 fn main() {
