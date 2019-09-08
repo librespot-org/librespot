@@ -9,3 +9,4 @@ protobuf = "2.8.*"
 
 [build-dependencies]
 protobuf-codegen-pure = "2.8.*"
+protobuf-codegen = "*"
