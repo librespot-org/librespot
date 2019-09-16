@@ -23,10 +23,10 @@ use std::sync::Arc;
 use tokio_core::reactor::Handle;
 use url;
 
-use core::authentication::Credentials;
-use core::config::ConnectConfig;
-use core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
-use core::util;
+use librespot_core::authentication::Credentials;
+use librespot_core::config::ConnectConfig;
+use librespot_core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
+use librespot_core::util;
 
 type HmacSha1 = Hmac<Sha1>;
 
