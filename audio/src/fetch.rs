@@ -9,9 +9,9 @@ use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, Condvar, Mutex};
 use tempfile::NamedTempFile;
 
-use core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
-use core::session::Session;
-use core::spotify_id::FileId;
+use librespot_core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
+use librespot_core::session::Session;
+use librespot_core::spotify_id::FileId;
 
 const CHUNK_SIZE: usize = 0x20000;
 
