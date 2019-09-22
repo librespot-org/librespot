@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate log;
+
 extern crate byteorder;
 extern crate futures;
 extern crate linear_map;
@@ -192,8 +195,8 @@ pub struct Show {
 
 #[derive(Debug, Clone)]
 pub struct Playlist {
+    pub revision: Vec<u8>,
     pub user: String,
-    pub length: i32,
     pub name: String,
     pub tracks: Vec<SpotifyId>,
 }
@@ -315,9 +318,13 @@ impl Metadata for Playlist {
             })
             .collect::<Vec<_>>();
         
+        if tracks.len() != msg.get_length() as usize {
+            warn!("Got {} tracks, but the playlist should contain {} tracks.", tracks.len(), msg.get_length());
+        }
+
         Playlist {
+            revision: msg.get_revision().to_vec(),
             name: msg.get_attributes().get_name().to_owned(),
-            length: msg.get_length(),
             tracks: tracks,
             user: msg.get_owner_username().to_string(),
         }
