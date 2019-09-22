@@ -8,6 +8,7 @@ byteorder = "1.3"
 futures = "0.1"
 linear-map = "1.2"
 protobuf = "2.8.*"
+log = "0.4"
 
 [dependencies.librespot-core]
 path = "../core"

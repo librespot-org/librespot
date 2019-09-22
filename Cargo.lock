@@ -927,6 +927,7 @@ dependencies = [
  "librespot-core 0.1.0",
  "librespot-protocol 0.1.0",
  "linear-map 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
