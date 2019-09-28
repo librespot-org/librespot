@@ -861,6 +861,18 @@ impl SpircTask {
             cache.save_volume(Volume { volume })
         }
     }
+
+    pub fn get_queue_uids(&self) -> Vec<String> {
+        self.state
+            .get_track()
+            .iter()
+            .map(|track| SpotifyId::from_raw(track.get_gid()).unwrap().to_base16())
+            .collect::<Vec<String>>()
+    }
+
+    pub fn get_current_index(&self) -> u32 {
+        self.state.get_playing_track_index()
+    }
 }
 
 impl Drop for SpircTask {

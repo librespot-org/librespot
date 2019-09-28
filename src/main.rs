@@ -5,17 +5,20 @@ extern crate librespot;
 #[macro_use]
 extern crate log;
 extern crate rpassword;
+extern crate sha1;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_process;
 extern crate tokio_signal;
 extern crate url;
-extern crate sha1;
+extern crate ws;
+#[macro_use]
+extern crate serde_json;
 extern crate hex;
 
-use sha1::{Sha1, Digest};
 use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
+use sha1::{Digest, Sha1};
 use std::env;
 use std::io::{self, stderr, Write};
 use std::mem;
@@ -39,8 +42,12 @@ use librespot::playback::config::{Bitrate, PlayerConfig};
 use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{Player, PlayerEvent};
 
+mod ws_server;
 mod player_event_handler;
 use player_event_handler::run_program_on_events;
+
+mod player_ws_server;
+use player_ws_server::{PlayerCommandMessage, PlayerWsServer};
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -100,6 +107,7 @@ struct Setup {
     enable_discovery: bool,
     zeroconf_port: u16,
     player_event_program: Option<String>,
+    ws_server_port: Option<u16>,
 }
 
 fn setup(args: &[String]) -> Setup {
@@ -123,6 +131,12 @@ fn setup(args: &[String]) -> Setup {
             "onevent",
             "Run PROGRAM when playback is about to begin.",
             "PROGRAM",
+        )
+        .optopt(
+            "",
+            "ws-port",
+            "Run a web socket server listening at the specified port to communicate player events and receive commands",
+            "WSPORT"
         )
         .optflag("v", "verbose", "Enable verbose output")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
@@ -352,6 +366,7 @@ fn setup(args: &[String]) -> Setup {
         mixer: mixer,
         mixer_config: mixer_config,
         player_event_program: matches.opt_str("onevent"),
+        ws_server_port: matches.opt_str("ws-port").map(|port_str| port_str.parse::<u16>().expect("Port must be a number")),
     }
 }
 
@@ -365,6 +380,7 @@ struct Main {
     mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
     mixer_config: MixerConfig,
     handle: Handle,
+    player_ws_server: Option<PlayerWsServer>,
 
     discovery: Option<DiscoveryStream>,
     signal: IoStream<()>,
@@ -377,10 +393,14 @@ struct Main {
 
     player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
     player_event_program: Option<String>,
+
+    credentials_from_setup: Option<Credentials>,
 }
 
 impl Main {
     fn new(handle: Handle, setup: Setup) -> Main {
+        let player_ws_server = setup.ws_server_port.map(|port| PlayerWsServer::new(port));
+
         let mut task = Main {
             handle: handle.clone(),
             cache: setup.cache,
@@ -391,6 +411,7 @@ impl Main {
             device: setup.device,
             mixer: setup.mixer,
             mixer_config: setup.mixer_config,
+            player_ws_server,
 
             connect: Box::new(futures::future::empty()),
             discovery: None,
@@ -401,6 +422,8 @@ impl Main {
 
             player_event_channel: None,
             player_event_program: setup.player_event_program,
+
+            credentials_from_setup: setup.credentials,
         };
 
         if setup.enable_discovery {
@@ -410,7 +433,7 @@ impl Main {
             task.discovery = Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
         }
 
-        if let Some(credentials) = setup.credentials {
+        if let Some(credentials) = task.credentials_from_setup.clone() {
             task.credentials(credentials);
         }
 
@@ -498,10 +521,29 @@ impl Future for Main {
                 }
             }
 
+            if let (Some(player_ws_server), Some(spirc)) = (&mut self.player_ws_server, &self.spirc) {
+                if let Async::Ready(Some(message)) = player_ws_server.poll().unwrap() {
+                    match message {
+                        PlayerCommandMessage::Prev => spirc.prev(),
+                        PlayerCommandMessage::Next => spirc.next(),
+                        PlayerCommandMessage::Play => spirc.play(),
+                        PlayerCommandMessage::Pause => spirc.pause(),
+                        PlayerCommandMessage::Reauth => {
+                            if let Some(credentials) = self.credentials_from_setup.clone() {
+                                if let Some(ref spirc) = self.spirc {
+                                    spirc.shutdown();
+                                }
+                                self.credentials(credentials);
+                            }
+                        }
+                    }
+                }
+            }
+
             if let Some(ref mut player_event_channel) = self.player_event_channel {
                 if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
                     if let Some(ref program) = self.player_event_program {
-                        let child = run_program_on_events(event, program)
+                        let child = run_program_on_events(&event, program)
                             .expect("program failed to start")
                             .map(|status| if !status.success() {
                                 error!("child exited with status {:?}", status.code());
@@ -509,7 +551,9 @@ impl Future for Main {
                             .map_err(|e| error!("failed to wait on child process: {}", e));
 
                         self.handle.spawn(child);
-
+                    }
+                    if let (Some(player_ws_server), Some(spirc_task)) = (&self.player_ws_server, &self.spirc_task) {
+                        player_ws_server.broadcast_event(&event, spirc_task);
                     }
                 }
             }
@@ -530,5 +574,5 @@ fn main() {
 
     let args: Vec<String> = std::env::args().collect();
 
-    core.run(Main::new(handle, setup(&args))).unwrap()
+    core.run(Main::new(handle, setup(&args))).unwrap();
 }

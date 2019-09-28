@@ -13,7 +13,7 @@ fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Chi
         .spawn_async()
 }
 
-pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> io::Result<Child> {
+pub fn run_program_on_events(event: &PlayerEvent, onevent: &str) -> io::Result<Child> {
     let mut env_vars = HashMap::new();
     match event {
         PlayerEvent::Changed {
