@@ -4,7 +4,12 @@ use std;
 use std::fmt;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct SpotifyId(u128);
+pub enum SpotifyId {
+    Track(u128),
+    Episode(u128),
+    NonPlayable(u128),
+}
+
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SpotifyIdError;
@@ -13,7 +18,7 @@ const BASE62_DIGITS: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDE
 const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
 
 impl SpotifyId {
-    pub fn from_base16(id: &str) -> Result<SpotifyId, SpotifyIdError> {
+    pub fn from_base16(id: &str, podcast: bool) -> Result<SpotifyId, SpotifyIdError> {
         let data = id.as_bytes();
 
         let mut n: u128 = u128::zero();
@@ -25,35 +30,49 @@ impl SpotifyId {
             n = n * u128::new(16);
             n = n + u128::new(d);
         }
+        if podcast {
+            Ok(SpotifyId::Episode(n))
 
-        Ok(SpotifyId(n))
+        }
+        else {
+            Ok(SpotifyId::Track(n))
+        }
     }
 
-    pub fn from_base62(id: &str) -> Result<SpotifyId, SpotifyIdError> {
+    pub fn from_base62(id: &str, podcast: bool) -> Result<SpotifyId, SpotifyIdError> {
         let data = id.as_bytes();
 
         let mut n: u128 = u128::zero();
         for c in data {
             let d = match BASE62_DIGITS.iter().position(|e| e == c) {
-                None => return Err(SpotifyIdError),
+                None => {
+                    warn!("Got an error decoding");
+                    return Err(SpotifyIdError)
+                },
                 Some(x) => x as u64,
             };
             n = n * u128::new(62);
             n = n + u128::new(d);
         }
+        if podcast {
+            Ok(SpotifyId::Episode(n))
 
-        Ok(SpotifyId(n))
+        }
+        else {
+            Ok(SpotifyId::Track(n))
+        }
     }
 
+    // Shouldn't be used, from_rawURI should be the only usage
     pub fn from_raw(data: &[u8]) -> Result<SpotifyId, SpotifyIdError> {
+        debug!("Called from_raw()");
         if data.len() != 16 {
             return Err(SpotifyIdError);
         };
 
         let high = BigEndian::read_u64(&data[0..8]);
         let low = BigEndian::read_u64(&data[8..16]);
-
-        Ok(SpotifyId(u128::from_parts(high, low)))
+        Ok(SpotifyId::Track(u128::from_parts(high, low)))
     }
 
     // for episode support
@@ -62,11 +81,18 @@ impl SpotifyId {
         let parts = data.split(":");
         let vec = parts.collect::<Vec<&str>>();
         let uri = vec.last().unwrap();
-        SpotifyId::from_base62(uri)
+        let spotify_type = vec[1];
+        SpotifyId::from_base62(uri, spotify_type == "episode")
     }
 
     pub fn to_base16(&self) -> String {
-        let &SpotifyId(ref n) = self;
+        // This code seems idiotic, but should do the job
+        // Need someone with rust expertise to do better
+        let n = match self {
+            SpotifyId::Episode(ref number) => number,
+            SpotifyId::NonPlayable(ref number)=> number,
+            SpotifyId::Track(ref number) => number
+        };
 
         let mut data = [0u8; 32];
         for i in 0..32 {
@@ -77,7 +103,11 @@ impl SpotifyId {
     }
 
     pub fn to_base62(&self) -> String {
-        let &SpotifyId(mut n) = self;
+        let mut n = match self {
+            SpotifyId::Episode(ref number) => *number,
+            SpotifyId::NonPlayable(ref number)=> *number,
+            SpotifyId::Track(ref number) => *number
+        };
 
         let mut data = [0u8; 22];
         let sixty_two = u128::new(62);
@@ -90,7 +120,11 @@ impl SpotifyId {
     }
 
     pub fn to_raw(&self) -> [u8; 16] {
-        let &SpotifyId(ref n) = self;
+        let ref n = match self {
+            SpotifyId::Episode(ref number) => number,
+            SpotifyId::NonPlayable(ref number)=> number,
+            SpotifyId::Track(ref number) => number
+        };
 
         let mut data = [0u8; 16];
 

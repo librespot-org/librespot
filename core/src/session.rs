@@ -24,7 +24,6 @@ struct SessionData {
     time_delta: i64,
     canonical_username: String,
     invalid: bool,
-    isEpisode: bool,
 }
 
 struct SessionInternal {
@@ -113,7 +112,6 @@ impl Session {
                 canonical_username: username,
                 invalid: false,
                 time_delta: 0,
-                isEpisode: false,
             }),
 
             tx_connection: sender_tx,
@@ -244,16 +242,6 @@ impl Session {
     pub fn is_invalid(&self) -> bool {
         self.0.data.read().unwrap().invalid
     }
-
-    // get and set methods for isEpisode
-    pub fn isEpisode(&self) -> bool {
-        self.0.data.read().unwrap().isEpisode
-    }
-
-    pub fn setEpisode(&self, value:bool) {
-        self.0.data.write().unwrap().isEpisode = value;
-    }
-
 }
 
 #[derive(Clone)]

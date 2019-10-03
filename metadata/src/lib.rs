@@ -56,6 +56,9 @@ pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::Message;
 
     fn base_url() -> &'static str;
+    fn actual_base_url(&self) -> &'static str {
+        Self::base_url()
+    }
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 
     fn get(session: &Session, id: SpotifyId) -> Box<Future<Item = Self, Error = MercuryError>> {
@@ -77,20 +80,7 @@ pub struct Track {
     pub id: SpotifyId,
     pub name: String,
     pub duration: i32,
-    pub album: SpotifyId,
-    pub artists: Vec<SpotifyId>,
-    pub files: LinearMap<FileFormat, FileId>,
-    pub alternatives: Vec<SpotifyId>,
-    pub available: bool,
-}
-
-// copy of track. but track does not have album information
-#[derive(Debug, Clone)]
-pub struct Episode {
-    pub id: SpotifyId,
-    pub name: String,
-    pub duration: i32,
-    //pub album: SpotifyId,
+    pub album: Option<SpotifyId>,
     pub artists: Vec<SpotifyId>,
     pub files: LinearMap<FileFormat, FileId>,
     pub alternatives: Vec<SpotifyId>,
@@ -145,7 +135,10 @@ impl Metadata for Track {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             duration: msg.get_duration(),
-            album: SpotifyId::from_raw(msg.get_album().get_gid()).unwrap(),
+            album: match SpotifyId::from_raw(msg.get_album().get_gid()) {
+                Ok(x) => Some(x),
+                Err(err) => None,
+            },
             artists: artists,
             files: files,
             alternatives: msg
@@ -156,58 +149,27 @@ impl Metadata for Track {
             available: parse_restrictions(msg.get_restriction(), &country, "premium"),
         }
     }
-}
 
-// slightly ugly.
-// metadata for the new episode
-// base url is changed, also no album parsing
-impl Metadata for Episode {
-    type Message = protocol::metadata::Track;
 
-    fn base_url() -> &'static str {
-        "hm://metadata/3/episode"
-    }
+    fn get(session: &Session, id: SpotifyId) -> Box<Future<Item = Self, Error = MercuryError>> {
+        let uri_base = match id {
+            SpotifyId::Episode(_) => "hm://metadata/3/episode",
+            SpotifyId::Track(_) => "hm://metadata/3/track",
+            SpotifyId::NonPlayable(_) => "hm://invalid_call"
+        };
+        println!("{}", uri_base);
+        let uri = format!("{}/{}", uri_base, id.to_base16());
+        let request = session.mercury().get(uri);
 
-    fn parse(msg: &Self::Message, session: &Session) -> Self {
-        println!("{:?}",msg);
-        let country = session.country();
+        let session = session.clone();
+        Box::new(request.and_then(move |response| {
+            let data = response.payload.first().expect("Empty payload");
+            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
 
-        let artists = msg
-            .get_artist()
-            .iter()
-            .filter(|artist| artist.has_gid())
-            .map(|artist| SpotifyId::from_raw(artist.get_gid()).unwrap())
-            .collect::<Vec<_>>();
-
-        let files = msg
-            .get_file()
-            .iter()
-            .filter(|file| file.has_file_id())
-            .map(|file| {
-                let mut dst = [0u8; 20];
-                dst.clone_from_slice(file.get_file_id());
-                (file.get_format(), FileId(dst))
-            })
-            .collect();
-
-        Episode {
-            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
-            name: msg.get_name().to_owned(),
-            duration: msg.get_duration(),
-            //album: SpotifyId::from_raw(msg.get_album().get_gid()).unwrap(),
-            artists: artists,
-            files: files,
-            alternatives: msg
-                .get_alternative()
-                .iter()
-                .map(|alt| SpotifyId::from_raw(alt.get_gid()).unwrap())
-                .collect(),
-            available: parse_restrictions(msg.get_restriction(), &country, "premium"),
-        }
+            Ok(Self::parse(&msg, &session))
+        }))
     }
 }
-
-
 
 impl Metadata for Album {
     type Message = protocol::metadata::Album;

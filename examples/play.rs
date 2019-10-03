@@ -28,7 +28,7 @@ fn main() {
     let password = args[2].to_owned();
     let credentials = Credentials::with_password(username, password);
 
-    let track = SpotifyId::from_base62(&args[3]).unwrap();
+    let track = SpotifyId::from_base62(&args[3], false).unwrap(); // Is this code only for debugging purposes?
 
     let backend = audio_backend::find(None).unwrap();
 
