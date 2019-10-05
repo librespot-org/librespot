@@ -4,3 +4,5 @@ spotify_appkey.key
 .vagrant/
 .project
 .history
+/protocol/src/*.rs
+!/protocol/src/lib.rs
