@@ -19,7 +19,7 @@ const BASE62_DIGITS: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDE
 const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
 
 impl SpotifyId {
-    pub fn from_base16(id: &str, podcast: bool) -> Result<SpotifyId, SpotifyIdError> {
+    pub fn from_base16(id: &str) -> Result<SpotifyId, SpotifyIdError> {
         let data = id.as_bytes();
 
         let mut n: u128 = u128::zero();
