@@ -30,7 +30,7 @@ If you run into a bug when using librespot, please search the existing issues be
 # Building
 Rust 1.32.0 or later is required to build librespot.
 
-We recently switched to using [Rodio](https://github.com/tomaka/rodio) for audio playback by default, hene for macOS and Windows, you should just be able to clone and build librespot (with the command below). For linux, you will need to run the additional commands below, depending on your distro.
+We recently switched to using [Rodio](https://github.com/tomaka/rodio) for audio playback by default, hence for macOS and Windows, you should just be able to clone and build librespot (with the command below). For linux, you will need to run the additional commands below, depending on your distro.
 
 On debian / ubuntu, the following command will install these dependencies :
 ```shell
