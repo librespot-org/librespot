@@ -2,6 +2,7 @@ use byteorder::{BigEndian, ByteOrder};
 use extprim::u128::u128;
 use std;
 use std::fmt;
+use spotify_id::SpotifyId::Track;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum SpotifyId {
@@ -39,7 +40,7 @@ impl SpotifyId {
         }
     }
 
-    pub fn from_base62(id: &str, podcast: bool) -> Result<SpotifyId, SpotifyIdError> {
+    pub fn from_base62(id: &str) -> Result<SpotifyId, SpotifyIdError> {
         let data = id.as_bytes();
 
         let mut n: u128 = u128::zero();
@@ -54,13 +55,7 @@ impl SpotifyId {
             n = n * u128::new(62);
             n = n + u128::new(d);
         }
-        if podcast {
-            Ok(SpotifyId::Episode(n))
-
-        }
-        else {
-            Ok(SpotifyId::Track(n))
-        }
+        Ok(SpotifyId::Track(n))
     }
 
     // Shouldn't be used, from_rawURI should be the only usage
@@ -82,7 +77,18 @@ impl SpotifyId {
         let vec = parts.collect::<Vec<&str>>();
         let uri = vec.last().unwrap();
         let spotify_type = vec[1];
-        SpotifyId::from_base62(uri, spotify_type == "episode")
+        let id = SpotifyId::from_base62(uri);
+        if spotify_type == "episode" {
+            let n = match id.unwrap() {
+                SpotifyId::Track(n) => n,
+                SpotifyId::NonPlayable(n) => n,
+                SpotifyId::Episode(n) => n,
+            };
+            Ok(SpotifyId::Episode(n))
+        }
+        else {
+            id
+        }
     }
 
     pub fn to_base16(&self) -> String {

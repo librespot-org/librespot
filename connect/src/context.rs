@@ -75,7 +75,7 @@ where
         .map(|v| {
             let mut t = TrackRef::new();
             //  This has got to be the most round about way of doing this.
-            t.set_gid(SpotifyId::from_base62(&v.gid, false).unwrap().to_raw().to_vec());
+            t.set_gid(SpotifyId::from_base62(&v.gid).unwrap().to_raw().to_vec());
             t.set_uri(v.uri.to_owned());
 
             t
