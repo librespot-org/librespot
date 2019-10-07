@@ -8896,6 +8896,7 @@ impl ::protobuf::reflect::ProtobufValue for MediaType {
 pub enum PassthroughEnum {
     UNKNOWN = 0,
     NONE = 1,
+    ALLOWED = 2,
 }
 
 impl ::protobuf::ProtobufEnum for PassthroughEnum {
@@ -8907,6 +8908,7 @@ impl ::protobuf::ProtobufEnum for PassthroughEnum {
         match value {
             0 => ::std::option::Option::Some(PassthroughEnum::UNKNOWN),
             1 => ::std::option::Option::Some(PassthroughEnum::NONE),
+            2 => ::std::option::Option::Some(PassthroughEnum::ALLOWED),
             _ => ::std::option::Option::None
         }
     }
@@ -8915,6 +8917,7 @@ impl ::protobuf::ProtobufEnum for PassthroughEnum {
         static values: &'static [PassthroughEnum] = &[
             PassthroughEnum::UNKNOWN,
             PassthroughEnum::NONE,
+            PassthroughEnum::ALLOWED,
         ];
         values
     }
@@ -9057,9 +9060,9 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \rOriginalAudio\x12\x0e\n\x04uuid\x18\x01\x20\x01(\x0cB\0:\0*>\n\x10Cons\
     umptionOrder\x12\x0e\n\nSEQUENTIAL\x10\x01\x12\x0c\n\x08EPISODIC\x10\x02\
     \x12\n\n\x06RECENT\x10\x03\x1a\0*.\n\tMediaType\x12\t\n\x05MIXED\x10\0\
-    \x12\t\n\x05AUDIO\x10\x01\x12\t\n\x05VIDEO\x10\x02\x1a\0**\n\x0fPassthro\
-    ughEnum\x12\x0b\n\x07UNKNOWN\x10\0\x12\x08\n\x04NONE\x10\x01\x1a\0B\0b\
-    \x06proto2\
+    \x12\t\n\x05AUDIO\x10\x01\x12\t\n\x05VIDEO\x10\x02\x1a\0*7\n\x0fPassthro\
+    ughEnum\x12\x0b\n\x07UNKNOWN\x10\0\x12\x08\n\x04NONE\x10\x01\x12\x0b\n\
+    \x07ALLOWED\x10\x02\x1a\0B\0b\x06proto2\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

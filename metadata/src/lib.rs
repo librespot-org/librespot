@@ -13,7 +13,7 @@ use linear_map::LinearMap;
 
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
-use librespot_core::spotify_id::{FileId, SpotifyId};
+use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId};
 
 pub use protocol::metadata::AudioFile_Format as FileFormat;
 
@@ -52,13 +52,78 @@ where
         && (!has_allowed || countrylist_contains(allowed.as_str(), country))
 }
 
+// A wrapper with fields the player needs
+#[derive(Debug, Clone)]
+pub struct AudioItem {
+    pub id: SpotifyId,
+    pub uri: String,
+    pub files: LinearMap<FileFormat, FileId>,
+    pub name: String,
+    pub available: bool,
+    pub alternatives: Option<Vec<SpotifyId>>,
+}
+
+impl AudioItem {
+    pub fn get_audio_item(
+        session: &Session,
+        id: SpotifyId,
+    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
+        match id.audio_type {
+            SpotifyAudioType::Track => Track::get_audio_item(session, id),
+            SpotifyAudioType::Podcast => Episode::get_audio_item(session, id),
+        }
+    }
+}
+
+trait AudioFiles {
+    fn get_audio_item(
+        session: &Session,
+        id: SpotifyId,
+    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>>;
+}
+
+impl AudioFiles for Track {
+    fn get_audio_item(
+        session: &Session,
+        id: SpotifyId,
+    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
+        Box::new(Self::get(session, id).and_then(move |item| {
+            Ok(AudioItem {
+                id: id,
+                uri: format!("spotify:track:{}", id.to_base62()),
+                files: item.files,
+                name: item.name,
+                available: item.available,
+                alternatives: Some(item.alternatives),
+            })
+        }))
+    }
+}
+
+impl AudioFiles for Episode {
+    fn get_audio_item(
+        session: &Session,
+        id: SpotifyId,
+    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
+        Box::new(Self::get(session, id).and_then(move |item| {
+            Ok(AudioItem {
+                id: id,
+                uri: format!("spotify:episode:{}", id.to_base62()),
+                files: item.files,
+                name: item.name,
+                available: item.available,
+                alternatives: None,
+            })
+        }))
+    }
+}
 pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::Message;
 
     fn base_url() -> &'static str;
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 
-    fn get(session: &Session, id: SpotifyId) -> Box<Future<Item = Self, Error = MercuryError>> {
+    fn get(session: &Session, id: SpotifyId) -> Box<dyn Future<Item = Self, Error = MercuryError>> {
         let uri = format!("{}/{}", Self::base_url(), id.to_base16());
         let request = session.mercury().get(uri);
 
@@ -111,6 +176,7 @@ pub struct Episode {
 pub struct Show {
     pub id: SpotifyId,
     pub name: String,
+    pub publisher: String,
     pub episodes: Vec<SpotifyId>,
     pub covers: Vec<FileId>,
 }
@@ -323,6 +389,7 @@ impl Metadata for Show {
         Show {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
+            publisher: msg.get_publisher().to_owned(),
             episodes: episodes,
             covers: covers,
         }

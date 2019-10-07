@@ -207,6 +207,7 @@ enum MediaType {
 enum PassthroughEnum {
     UNKNOWN = 0;
     NONE = 1;
+    ALLOWED = 2;
 }
 
 message Episode {
