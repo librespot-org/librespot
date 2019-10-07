@@ -1,6 +1,8 @@
 [![Build Status](https://travis-ci.org/librespot-org/librespot.svg?branch=master)](https://travis-ci.org/librespot-org/librespot)
 [![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/librespot-org/spotify-connect-resources)
 
+Current maintainer is @awiouy folks.
+
 # librespot
 *librespot* is an open source client library for Spotify. It enables
 applications to use Spotify's service, without using the official but
@@ -26,7 +28,7 @@ If you wish to learn more about how librespot works overall, the best way is to 
 If you run into a bug when using librespot, please search the existing issues before opening a new one. Chances are, we've encountered it before, and have provided a resolution. If not, please open a new one, and where possible, include the backtrace librespot generates on crashing, along with anything we can use to reproduce the issue, eg. the Spotify URI of the song that caused the crash.
 
 # Building
-Rust 1.30.0 or later is required to build librespot.
+Rust 1.32.0 or later is required to build librespot.
 
 We recently switched to using [Rodio](https://github.com/tomaka/rodio) for audio playback by default, hene for macOS and Windows, you should just be able to clone and build librespot (with the command below). For linux, you will need to run the additional commands below, depending on your distro.
 

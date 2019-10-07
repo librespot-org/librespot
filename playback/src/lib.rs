@@ -23,7 +23,7 @@ extern crate sdl2;
 extern crate libc;
 
 extern crate librespot_audio as audio;
-extern crate librespot_core as core;
+extern crate librespot_core;
 extern crate librespot_metadata as metadata;
 
 pub mod audio_backend;

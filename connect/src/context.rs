@@ -1,4 +1,4 @@
-use core::spotify_id::SpotifyId;
+use librespot_core::spotify_id::SpotifyId;
 use protocol::spirc::TrackRef;
 
 use serde;

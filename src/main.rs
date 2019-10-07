@@ -397,7 +397,7 @@ impl Main {
             spirc: None,
             spirc_task: None,
             shutdown: false,
-            signal: Box::new(tokio_signal::ctrl_c(&handle).flatten_stream()),
+            signal: Box::new(tokio_signal::ctrl_c().flatten_stream()),
 
             player_event_channel: None,
             player_event_program: setup.player_event_program,

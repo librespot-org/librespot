@@ -3,7 +3,7 @@ extern crate futures;
 extern crate linear_map;
 extern crate protobuf;
 
-extern crate librespot_core as core;
+extern crate librespot_core;
 extern crate librespot_protocol as protocol;
 
 pub mod cover;
@@ -11,9 +11,9 @@ pub mod cover;
 use futures::Future;
 use linear_map::LinearMap;
 
-use core::mercury::MercuryError;
-use core::session::Session;
-use core::spotify_id::{FileId, SpotifyId};
+use librespot_core::mercury::MercuryError;
+use librespot_core::session::Session;
+use librespot_core::spotify_id::{FileId, SpotifyId};
 
 pub use protocol::metadata::AudioFile_Format as FileFormat;
 
