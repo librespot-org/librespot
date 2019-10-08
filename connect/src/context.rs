@@ -1,5 +1,5 @@
+use crate::protocol::spirc::TrackRef;
 use librespot_core::spotify_id::SpotifyId;
-use protocol::spirc::TrackRef;
 
 use serde;
 
@@ -69,7 +69,7 @@ fn deserialize_protobuf_TrackRef<'d, D>(de: D) -> Result<Vec<TrackRef>, D::Error
 where
     D: serde::Deserializer<'d>,
 {
-    let v: Vec<TrackContext> = try!(serde::Deserialize::deserialize(de));
+    let v: Vec<TrackContext> = serde::Deserialize::deserialize(de)?;
     let track_vec = v
         .iter()
         .map(|v| {

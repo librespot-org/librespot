@@ -1,18 +1,18 @@
+use aes::Aes192;
 use base64;
 use byteorder::{BigEndian, ByteOrder};
-use aes::Aes192;
 use hmac::Hmac;
-use sha1::{Sha1, Digest};
 use pbkdf2::pbkdf2;
 use protobuf::ProtobufEnum;
 use serde;
 use serde_json;
+use sha1::{Digest, Sha1};
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::ops::FnOnce;
 use std::path::Path;
 
-use protocol::authentication::AuthenticationType;
+use crate::protocol::authentication::AuthenticationType;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
@@ -40,24 +40,24 @@ impl Credentials {
     pub fn with_blob(username: String, encrypted_blob: &str, device_id: &str) -> Credentials {
         fn read_u8<R: Read>(stream: &mut R) -> io::Result<u8> {
             let mut data = [0u8];
-            try!(stream.read_exact(&mut data));
+            stream.read_exact(&mut data)?;
             Ok(data[0])
         }
 
         fn read_int<R: Read>(stream: &mut R) -> io::Result<u32> {
-            let lo = try!(read_u8(stream)) as u32;
+            let lo = read_u8(stream)? as u32;
             if lo & 0x80 == 0 {
                 return Ok(lo);
             }
 
-            let hi = try!(read_u8(stream)) as u32;
+            let hi = read_u8(stream)? as u32;
             Ok(lo & 0x7f | hi << 7)
         }
 
         fn read_bytes<R: Read>(stream: &mut R) -> io::Result<Vec<u8>> {
-            let length = try!(read_int(stream));
+            let length = read_int(stream)?;
             let mut data = vec![0u8; length as usize];
-            try!(stream.read_exact(&mut data));
+            stream.read_exact(&mut data)?;
 
             Ok(data)
         }
@@ -76,9 +76,9 @@ impl Credentials {
 
         // decrypt data using ECB mode without padding
         let blob = {
-            use aes::block_cipher_trait::BlockCipher;
-            use aes::block_cipher_trait::generic_array::GenericArray;
             use aes::block_cipher_trait::generic_array::typenum::Unsigned;
+            use aes::block_cipher_trait::generic_array::GenericArray;
+            use aes::block_cipher_trait::BlockCipher;
 
             let mut data = base64::decode(encrypted_blob).unwrap();
             let cipher = Aes192::new(GenericArray::from_slice(&key));
@@ -148,7 +148,7 @@ where
     T: ProtobufEnum,
     D: serde::Deserializer<'de>,
 {
-    let v: i32 = try!(serde::Deserialize::deserialize(de));
+    let v: i32 = serde::Deserialize::deserialize(de)?;
     T::from_i32(v).ok_or_else(|| serde::de::Error::custom("Invalid enum value"))
 }
 
@@ -164,7 +164,7 @@ fn deserialize_base64<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let v: String = try!(serde::Deserialize::deserialize(de));
+    let v: String = serde::Deserialize::deserialize(de)?;
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
@@ -181,9 +181,10 @@ pub fn get_credentials<F: FnOnce(&String) -> String>(
             Some(credentials.clone())
         }
 
-        (Some(username), None, _) => {
-            Some(Credentials::with_password(username.clone(), prompt(&username)))
-        }
+        (Some(username), None, _) => Some(Credentials::with_password(
+            username.clone(),
+            prompt(&username),
+        )),
 
         (None, _, Some(credentials)) => Some(credentials),
 

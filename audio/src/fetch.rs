@@ -1009,7 +1009,7 @@ impl Read for AudioFileStreaming {
 
         self.position = self.read_file.seek(SeekFrom::Start(offset as u64)).unwrap();
         let read_len = min(length, available_length);
-        let read_len = try!(self.read_file.read(&mut output[..read_len]));
+        let read_len = self.read_file.read(&mut output[..read_len])?;
 
         if download_message_printed {
             debug!(
@@ -1031,7 +1031,7 @@ impl Read for AudioFileStreaming {
 
 impl Seek for AudioFileStreaming {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.position = try!(self.read_file.seek(pos));
+        self.position = self.read_file.seek(pos)?;
         // Do not seek past EOF
         self.shared
             .read_position

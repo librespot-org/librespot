@@ -19,7 +19,7 @@ use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId};
 
-pub use protocol::metadata::AudioFile_Format as FileFormat;
+pub use crate::protocol::metadata::AudioFile_Format as FileFormat;
 
 fn countrylist_contains(list: &str, country: &str) -> bool {
     list.chunks(2).any(|cc| cc == country)

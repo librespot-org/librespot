@@ -1,7 +1,7 @@
 use std::io;
 
 pub trait Open {
-    fn open(Option<String>) -> Self;
+    fn open(_: Option<String>) -> Self;
 }
 
 pub trait Sink {
@@ -10,7 +10,7 @@ pub trait Sink {
     fn write(&mut self, data: &[i16]) -> io::Result<()>;
 }
 
-fn mk_sink<S: Sink + Open + 'static>(device: Option<String>) -> Box<Sink> {
+fn mk_sink<S: Sink + Open + 'static>(device: Option<String>) -> Box<dyn Sink> {
     Box::new(S::open(device))
 }
 
@@ -46,7 +46,7 @@ use self::sdl::SdlSink;
 mod pipe;
 use self::pipe::StdoutSink;
 
-pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<Sink>)] = &[
+pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
@@ -62,7 +62,7 @@ pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<Sink>)] =
     ("pipe", mk_sink::<StdoutSink>),
 ];
 
-pub fn find(name: Option<String>) -> Option<fn(Option<String>) -> Box<Sink>> {
+pub fn find(name: Option<String>) -> Option<fn(Option<String>) -> Box<dyn Sink>> {
     if let Some(name) = name {
         BACKENDS
             .iter()
