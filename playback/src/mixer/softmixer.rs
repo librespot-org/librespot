@@ -23,7 +23,7 @@ impl Mixer for SoftMixer {
     fn set_volume(&self, volume: u16) {
         self.volume.store(volume as usize, Ordering::Relaxed);
     }
-    fn get_audio_filter(&self) -> Option<Box<AudioFilter + Send>> {
+    fn get_audio_filter(&self) -> Option<Box<dyn AudioFilter + Send>> {
         Some(Box::new(SoftVolumeApplier {
             volume: self.volume.clone(),
         }))

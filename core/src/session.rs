@@ -53,7 +53,7 @@ impl Session {
         credentials: Credentials,
         cache: Option<Cache>,
         handle: Handle,
-    ) -> Box<Future<Item = Session, Error = io::Error>> {
+    ) -> Box<dyn Future<Item = Session, Error = io::Error>> {
         let access_point = apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
 
         let handle_ = handle.clone();
@@ -97,7 +97,7 @@ impl Session {
         config: SessionConfig,
         cache: Option<Cache>,
         username: String,
-    ) -> (Session, Box<Future<Item = (), Error = io::Error>>) {
+    ) -> (Session, Box<dyn Future<Item = (), Error = io::Error>>) {
         let (sink, stream) = transport.split();
 
         let (sender_tx, sender_rx) = mpsc::unbounded();
@@ -197,7 +197,7 @@ impl Session {
 
             0x9 | 0xa => self.channel().dispatch(cmd, data),
             0xd | 0xe => self.audio_key().dispatch(cmd, data),
-            0xb2...0xb6 => self.mercury().dispatch(cmd, data),
+            0xb2..=0xb6 => self.mercury().dispatch(cmd, data),
             _ => (),
         }
     }

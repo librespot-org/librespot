@@ -24,7 +24,7 @@ pub fn connect(
     addr: String,
     handle: &Handle,
     proxy: &Option<Url>,
-) -> Box<Future<Item = Transport, Error = io::Error>> {
+) -> Box<dyn Future<Item = Transport, Error = io::Error>> {
     let (addr, connect_url) = match *proxy {
         Some(ref url) => {
             info!("Using proxy \"{}\"", url);
@@ -48,7 +48,7 @@ pub fn authenticate(
     transport: Transport,
     credentials: Credentials,
     device_id: String,
-) -> Box<Future<Item = (Transport, Credentials), Error = io::Error>> {
+) -> Box<dyn Future<Item = (Transport, Credentials), Error = io::Error>> {
     use protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
     use protocol::keyexchange::APLoginFailed;
 

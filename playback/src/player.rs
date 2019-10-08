@@ -31,9 +31,9 @@ struct PlayerInternal {
     commands: std::sync::mpsc::Receiver<PlayerCommand>,
 
     state: PlayerState,
-    sink: Box<Sink>,
+    sink: Box<dyn Sink>,
     sink_running: bool,
-    audio_filter: Option<Box<AudioFilter + Send>>,
+    audio_filter: Option<Box<dyn AudioFilter + Send>>,
     event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
 }
 
@@ -112,11 +112,11 @@ impl Player {
     pub fn new<F>(
         config: PlayerConfig,
         session: Session,
-        audio_filter: Option<Box<AudioFilter + Send>>,
+        audio_filter: Option<Box<dyn AudioFilter + Send>>,
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
     where
-        F: FnOnce() -> Box<Sink> + Send + 'static,
+        F: FnOnce() -> Box<dyn Sink> + Send + 'static,
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
         let (event_sender, event_receiver) = futures::sync::mpsc::unbounded();

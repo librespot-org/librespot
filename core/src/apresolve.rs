@@ -21,7 +21,7 @@ fn apresolve(
     handle: &Handle,
     proxy: &Option<Url>,
     ap_port: &Option<u16>,
-) -> Box<Future<Item = String, Error = Error>> {
+) -> Box<dyn Future<Item = String, Error = Error>> {
     let url = Uri::from_str(APRESOLVE_ENDPOINT).expect("invalid AP resolve URL");
     let use_proxy = proxy.is_some();
 
@@ -86,7 +86,7 @@ pub(crate) fn apresolve_or_fallback<E>(
     handle: &Handle,
     proxy: &Option<Url>,
     ap_port: &Option<u16>,
-) -> Box<Future<Item = String, Error = E>>
+) -> Box<dyn Future<Item = String, Error = E>>
 where
     E: 'static,
 {

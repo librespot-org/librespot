@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::mem;
 use std::slice;
 
-pub struct StdoutSink(Box<Write>);
+pub struct StdoutSink(Box<dyn Write>);
 
 impl Open for StdoutSink {
     fn open(path: Option<String>) -> StdoutSink {

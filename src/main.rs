@@ -86,10 +86,10 @@ fn list_backends() {
 
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<Sink>,
+    backend: fn(Option<String>) -> Box<dyn Sink>,
     device: Option<String>,
 
-    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
 
     cache: Option<Cache>,
     player_config: PlayerConfig,
@@ -360,9 +360,9 @@ struct Main {
     player_config: PlayerConfig,
     session_config: SessionConfig,
     connect_config: ConnectConfig,
-    backend: fn(Option<String>) -> Box<Sink>,
+    backend: fn(Option<String>) -> Box<dyn Sink>,
     device: Option<String>,
-    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
     mixer_config: MixerConfig,
     handle: Handle,
 
@@ -371,7 +371,7 @@ struct Main {
 
     spirc: Option<Spirc>,
     spirc_task: Option<SpircTask>,
-    connect: Box<Future<Item = Session, Error = io::Error>>,
+    connect: Box<dyn Future<Item = Session, Error = io::Error>>,
 
     shutdown: bool,
 

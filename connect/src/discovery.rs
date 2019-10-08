@@ -175,7 +175,7 @@ impl Service for Discovery {
     type Request = Request;
     type Response = Response;
     type Error = hyper::Error;
-    type Future = Box<Future<Item = Response, Error = hyper::Error>>;
+    type Future = Box<dyn Future<Item = Response, Error = hyper::Error>>;
 
     fn call(&self, request: Request) -> Self::Future {
         let mut params = BTreeMap::new();

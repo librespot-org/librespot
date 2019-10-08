@@ -80,7 +80,7 @@ impl Cache {
         File::open(self.file_path(file)).ok()
     }
 
-    pub fn save_file(&self, file: FileId, contents: &mut Read) {
+    pub fn save_file(&self, file: FileId, contents: &mut dyn Read) {
         if self.use_audio_cache {
             let path = self.file_path(file);
 
