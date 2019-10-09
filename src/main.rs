@@ -26,11 +26,11 @@ use tokio_core::reactor::{Core, Handle};
 use tokio_io::IoStream;
 use url::Url;
 
-use librespot::librespot_core::authentication::{get_credentials, Credentials};
-use librespot::librespot_core::cache::Cache;
-use librespot::librespot_core::config::{ConnectConfig, DeviceType, SessionConfig};
-use librespot::librespot_core::session::Session;
-use librespot::librespot_core::version;
+use librespot::core::authentication::{get_credentials, Credentials};
+use librespot::core::cache::Cache;
+use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig};
+use librespot::core::session::Session;
+use librespot::core::version;
 
 use librespot::connect::discovery::{discovery, DiscoveryStream};
 use librespot::connect::spirc::{Spirc, SpircTask};
