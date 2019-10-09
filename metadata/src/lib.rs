@@ -8,6 +8,7 @@ extern crate librespot_protocol as protocol;
 
 pub mod cover;
 
+use futures::future;
 use futures::Future;
 use linear_map::LinearMap;
 
@@ -71,6 +72,9 @@ impl AudioItem {
         match id.audio_type {
             SpotifyAudioType::Track => Track::get_audio_item(session, id),
             SpotifyAudioType::Podcast => Episode::get_audio_item(session, id),
+            SpotifyAudioType::NonPlayable => {
+                Box::new(future::err::<AudioItem, MercuryError>(MercuryError))
+            }
         }
     }
 }
