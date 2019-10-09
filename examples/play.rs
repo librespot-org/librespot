@@ -4,10 +4,10 @@ extern crate tokio_core;
 use std::env;
 use tokio_core::reactor::Core;
 
-use librespot::librespot_core::authentication::Credentials;
-use librespot::librespot_core::config::SessionConfig;
-use librespot::librespot_core::session::Session;
-use librespot::librespot_core::spotify_id::SpotifyId;
+use librespot::core::authentication::Credentials;
+use librespot::core::config::SessionConfig;
+use librespot::core::session::Session;
+use librespot::core::spotify_id::SpotifyId;
 use librespot::playback::config::PlayerConfig;
 
 use librespot::playback::audio_backend;
