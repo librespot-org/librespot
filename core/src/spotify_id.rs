@@ -55,7 +55,7 @@ impl SpotifyId {
     }
 
     pub fn to_base16(&self) -> String {
-        format!("{:0>32}", format!("{:x}", self.0))
+        format!("{:032x}", self.0)
     }
 
     pub fn to_base62(&self) -> String {
