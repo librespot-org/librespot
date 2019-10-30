@@ -13,10 +13,10 @@ use tokio_core::reactor::Handle;
 use tokio_codec::Framed;
 use url::Url;
 
-use authentication::Credentials;
-use version;
+use crate::authentication::Credentials;
+use crate::version;
 
-use proxytunnel;
+use crate::proxytunnel;
 
 pub type Transport = Framed<TcpStream, APCodec>;
 
@@ -49,8 +49,8 @@ pub fn authenticate(
     credentials: Credentials,
     device_id: String,
 ) -> Box<dyn Future<Item = (Transport, Credentials), Error = io::Error>> {
-    use protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
-    use protocol::keyexchange::APLoginFailed;
+    use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
+    use crate::protocol::keyexchange::APLoginFailed;
 
     let mut packet = ClientResponseEncrypted::new();
     packet.mut_login_credentials().set_username(credentials.username);

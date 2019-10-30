@@ -2,7 +2,7 @@ use num_bigint::BigUint;
 use num_traits::FromPrimitive;
 use rand::Rng;
 
-use util;
+use crate::util;
 
 lazy_static! {
     pub static ref DH_GENERATOR: BigUint = BigUint::from_u64(0x2).unwrap();

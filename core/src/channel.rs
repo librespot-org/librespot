@@ -4,7 +4,7 @@ use futures::sync::{mpsc, BiLock};
 use futures::{Async, Poll, Stream};
 use std::collections::HashMap;
 
-use util::SeqGenerator;
+use crate::util::SeqGenerator;
 
 component! {
     ChannelManager : ChannelManagerInner {

@@ -40,7 +40,7 @@ use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{Player, PlayerEvent};
 
 mod player_event_handler;
-use player_event_handler::run_program_on_events;
+use crate::player_event_handler::run_program_on_events;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))

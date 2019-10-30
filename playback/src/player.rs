@@ -10,15 +10,15 @@ use std::sync::mpsc::{RecvError, RecvTimeoutError, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
-use config::{Bitrate, PlayerConfig};
+use crate::config::{Bitrate, PlayerConfig};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::SpotifyId;
 
-use audio::{AudioDecrypt, AudioFile};
-use audio::{VorbisDecoder, VorbisPacket};
-use audio_backend::Sink;
-use metadata::{FileFormat, Metadata, Track};
-use mixer::AudioFilter;
+use crate::audio::{AudioDecrypt, AudioFile};
+use crate::audio::{VorbisDecoder, VorbisPacket};
+use crate::audio_backend::Sink;
+use crate::metadata::{FileFormat, Metadata, Track};
+use crate::mixer::AudioFilter;
 
 pub struct Player {
     commands: Option<std::sync::mpsc::Sender<PlayerCommand>>,
@@ -644,7 +644,7 @@ impl<T: Read + Seek> Seek for Subfile<T> {
             x => x,
         };
 
-        let newpos = try!(self.stream.seek(pos));
+        let newpos = r#try!(self.stream.seek(pos));
         if newpos > self.offset {
             Ok(newpos - self.offset)
         } else {

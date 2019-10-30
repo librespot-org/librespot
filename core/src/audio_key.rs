@@ -5,8 +5,8 @@ use futures::{Async, Future, Poll};
 use std::collections::HashMap;
 use std::io::Write;
 
-use spotify_id::{FileId, SpotifyId};
-use util::SeqGenerator;
+use crate::spotify_id::{FileId, SpotifyId};
+use crate::util::SeqGenerator;
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct AudioKey(pub [u8; 16]);

@@ -1,7 +1,7 @@
 use std::io;
 
 pub trait Open {
-    fn open(Option<String>) -> Self;
+    fn open(_: Option<String>) -> Self;
 }
 
 pub trait Sink {

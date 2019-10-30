@@ -11,10 +11,10 @@ use tokio_io::io::{read_exact, write_all, ReadExact, Window, WriteAll};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use super::codec::APCodec;
-use diffie_hellman::DHLocalKeys;
-use protocol;
-use protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
-use util;
+use crate::diffie_hellman::DHLocalKeys;
+use crate::protocol;
+use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
+use crate::util;
 
 pub struct Handshake<T> {
     keys: DHLocalKeys,

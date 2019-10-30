@@ -20,10 +20,10 @@ mod lewton_decoder;
 #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
 mod libvorbis_decoder;
 
-pub use decrypt::AudioDecrypt;
-pub use fetch::{AudioFile, AudioFileOpen};
+pub use crate::decrypt::AudioDecrypt;
+pub use crate::fetch::{AudioFile, AudioFileOpen};
 
 #[cfg(not(any(feature = "with-tremor", feature = "with-vorbis")))]
-pub use lewton_decoder::{VorbisDecoder, VorbisError, VorbisPacket};
+pub use crate::lewton_decoder::{VorbisDecoder, VorbisError, VorbisPacket};
 #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
 pub use libvorbis_decoder::{VorbisDecoder, VorbisError, VorbisPacket};

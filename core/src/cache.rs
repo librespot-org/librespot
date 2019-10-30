@@ -5,9 +5,9 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 
-use authentication::Credentials;
-use spotify_id::FileId;
-use volume::Volume;
+use crate::authentication::Credentials;
+use crate::spotify_id::FileId;
+use crate::volume::Volume;
 
 #[derive(Clone)]
 pub struct Cache {

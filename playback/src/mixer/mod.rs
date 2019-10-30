@@ -1,5 +1,5 @@
 pub trait Mixer: Send {
-    fn open(Option<MixerConfig>) -> Self
+    fn open(_: Option<MixerConfig>) -> Self
     where
         Self: Sized;
     fn start(&self);

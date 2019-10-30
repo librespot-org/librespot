@@ -2,7 +2,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use protobuf::Message;
 use std::io::Write;
 
-use protocol;
+use crate::protocol;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {

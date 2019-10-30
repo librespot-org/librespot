@@ -30,7 +30,7 @@ impl<T: io::Read> AudioDecrypt<T> {
 
 impl<T: io::Read> io::Read for AudioDecrypt<T> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
-        let len = try!(self.reader.read(output));
+        let len = r#try!(self.reader.read(output));
 
         self.cipher.apply_keystream(&mut output[..len]);
 
@@ -40,7 +40,7 @@ impl<T: io::Read> io::Read for AudioDecrypt<T> {
 
 impl<T: io::Read + io::Seek> io::Seek for AudioDecrypt<T> {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        let newpos = try!(self.reader.seek(pos));
+        let newpos = r#try!(self.reader.seek(pos));
 
         self.cipher.seek(newpos);
 

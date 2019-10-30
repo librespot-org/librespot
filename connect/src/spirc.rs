@@ -9,7 +9,7 @@ use rand;
 use rand::seq::SliceRandom;
 use serde_json;
 
-use context::StationContext;
+use crate::context::StationContext;
 use librespot_core::config::ConnectConfig;
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
@@ -17,10 +17,10 @@ use librespot_core::spotify_id::SpotifyId;
 use librespot_core::util::SeqGenerator;
 use librespot_core::version;
 use librespot_core::volume::Volume;
-use playback::mixer::Mixer;
-use playback::player::Player;
-use protocol;
-use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
+use crate::playback::mixer::Mixer;
+use crate::playback::player::Player;
+use crate::protocol;
+use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
 
 pub struct SpircTask {
     player: Player,
