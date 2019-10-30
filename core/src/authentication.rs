@@ -40,24 +40,24 @@ impl Credentials {
     pub fn with_blob(username: String, encrypted_blob: &str, device_id: &str) -> Credentials {
         fn read_u8<R: Read>(stream: &mut R) -> io::Result<u8> {
             let mut data = [0u8];
-            r#try!(stream.read_exact(&mut data));
+            stream.read_exact(&mut data)?;
             Ok(data[0])
         }
 
         fn read_int<R: Read>(stream: &mut R) -> io::Result<u32> {
-            let lo = r#try!(read_u8(stream)) as u32;
+            let lo = read_u8(stream)? as u32;
             if lo & 0x80 == 0 {
                 return Ok(lo);
             }
 
-            let hi = r#try!(read_u8(stream)) as u32;
+            let hi = read_u8(stream)? as u32;
             Ok(lo & 0x7f | hi << 7)
         }
 
         fn read_bytes<R: Read>(stream: &mut R) -> io::Result<Vec<u8>> {
-            let length = r#try!(read_int(stream));
+            let length = read_int(stream)?;
             let mut data = vec![0u8; length as usize];
-            r#try!(stream.read_exact(&mut data));
+            stream.read_exact(&mut data)?;
 
             Ok(data)
         }
@@ -148,7 +148,7 @@ where
     T: ProtobufEnum,
     D: serde::Deserializer<'de>,
 {
-    let v: i32 = r#try!(serde::Deserialize::deserialize(de));
+    let v: i32 = serde::Deserialize::deserialize(de)?;
     T::from_i32(v).ok_or_else(|| serde::de::Error::custom("Invalid enum value"))
 }
 
@@ -164,7 +164,7 @@ fn deserialize_base64<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let v: String = r#try!(serde::Deserialize::deserialize(de));
+    let v: String = serde::Deserialize::deserialize(de)?;
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 

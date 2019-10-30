@@ -337,7 +337,7 @@ impl Read for AudioFileStreaming {
         }
         drop(bitmap);
 
-        let read_len = r#try!(self.read_file.read(&mut output[..len]));
+        let read_len = self.read_file.read(&mut output[..len])?;
 
         self.position += read_len as u64;
 
@@ -347,7 +347,7 @@ impl Read for AudioFileStreaming {
 
 impl Seek for AudioFileStreaming {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.position = r#try!(self.read_file.seek(pos));
+        self.position = self.read_file.seek(pos)?;
         // Do not seek past EOF
         if (self.position as usize % CHUNK_SIZE) != 0  {
             // Notify the fetch thread to get the correct block
