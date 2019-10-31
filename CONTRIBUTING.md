@@ -4,7 +4,7 @@
 
 In order to contribute to librespot, you will first need to set up a suitable Rust build environment, with the necessary dependencies installed. These instructions will walk you through setting up a simple build environment.
 
-You will need to have C compiler, Rust, and alsa/portaudio libraries installed.
+You will need to have a C compiler, Rust, and the development libraries for the audio backend(s) you want installed.
 
 ### Install Rust
 
@@ -17,27 +17,57 @@ curl https://sh.rustup.rs -sSf | sh
 Follow any prompts it gives you to install Rust. Once that’s done, Rust's standard tools should be setup and ready to use.
 
 #### Additional Rust tools - `rustfmt`
-To ensure a consistent codebase, install [`rustfmt`](https://github.com/rust-lang/rustfmt) via `rustup`.
-This is not optional, as Travis CI is set up to check that code is compliant with this repos style guides.
+To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-lang/rustfmt), which is installed by default with `rustup` these days, else it can be installed manually with:
 ```bash
 rustup component add rustfmt
 ```
+Using `rustfmt` is not optional, as our CI checks against this repo's rules.
 
-### Install Other Dependencies
+### General dependencies
+Along with Rust, you will also require a C compiler. 
+ 
+On Debian/Ubuntu, install with:
+```shell
+sudo apt-get install build-essential
 
-Install the required dependencies as described in the [Readme](https://github.com/librespot-org/librespot#building)
+```
+On Fedora systems, install with:
+```shell
+sudo dnf install gcc 
+```
+### Audio library dependencies
+Depending on the chosen backend, specific development libraries are required. 
+
+*_Note this is an non extensive list, open a PR to add to it!_*
+
+| Audio backend               | Debian/Ubuntu                    | Fedora  | macOS |
+|--------------------|------------------------------| ------------------------------| -- |
+|Rodio (default)| `libasound2-dev` | `alsa-lib-devel` | 
+|ALSA| `libasound2-dev, pkg-config` |`alsa-lib-devel` |
+|PortAudio| `portaudio19-dev`| `portaudio-devel`| `portaudio`
+|PulseAudio| `libpulse-dev`| `pulseaudio-libs-devel` | 
+|JACK| `libjack-dev` | `jack-audio-connection-kit-devel` | 
+|SDL| `libsdl2-dev`| `SDL2-devel` | 
+|Pipe| - | - | - |
+
+###### For example, to build an ALSA based backend, you would need to run the following:
+
+On Debian/Ubuntu:
+```shell
+sudo apt-get install libasound2-dev pkg-config
+
+```
+On Fedora systems:
+```shell
+sudo dnf install alsa-lib-devel
+```
 
 ### Getting the Source
 
-The recommended method is to first fork the repo, so that you have a copy that you have read/write access to. After that, it’s a simple case of git cloning.
+The recommended method is to first fork the repo, so that you have a copy that you have read/write access to. After that, it’s a simple case of cloning your fork.
 
 ```bash
 git clone git@github.com:YOURUSERNAME/librespot.git
-```
-
-CD to the newly cloned repo...
-
-```bash
 cd librespot
 ```
 
@@ -108,7 +138,7 @@ In order to prepare for a PR, you will need to do a couple of things first:
 
 Make any changes that you are going to make to the code, but do not commit yet.
 
-Make sure that the code is formatted by running:
+Make sure that the code is correctly formatted by running:
 ```bash
 cargo fmt --all
 ```
@@ -125,7 +155,7 @@ Once it has built, and you have confirmed there are no warnings or errors, you s
 git commit -a -m “My fancy fix”
 ```
 
-**N.B.** Please, for the sake of a readable history, do not bundle multipe major changes into a single commit. Instead, break it up into multiple commits.
+**N.B.** Please, for the sake of a readable history, do not bundle multiple major changes into a single commit. Instead, break it up into multiple commits.
 
 Once you have made the commits you wish to have merged, push them to your forked repo:
 
