@@ -557,12 +557,8 @@ impl PlayerInternal {
             }
         };
 
-        let key = self
-            .session
-            .audio_key()
-            .request(track.id, file_id);
+        let key = self.session.audio_key().request(track.id, file_id);
         let encrypted_file = AudioFile::open(&self.session, file_id);
-
 
         let encrypted_file = encrypted_file.wait().unwrap();
         let key = key.wait().unwrap();

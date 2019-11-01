@@ -28,10 +28,11 @@ pub struct MixerConfig {
 }
 
 impl Default for MixerConfig {
-    fn default() -> MixerConfig { MixerConfig {
-        card: String::from("default"),
-        mixer: String::from("PCM"),
-        index: 0,
+    fn default() -> MixerConfig {
+        MixerConfig {
+            card: String::from("default"),
+            mixer: String::from("PCM"),
+            index: 0,
         }
     }
 }

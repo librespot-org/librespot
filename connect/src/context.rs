@@ -1,5 +1,5 @@
-use librespot_core::spotify_id::SpotifyId;
 use crate::protocol::spirc::TrackRef;
+use librespot_core::spotify_id::SpotifyId;
 
 use serde;
 

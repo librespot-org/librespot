@@ -1,9 +1,9 @@
+use crate::protocol;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures::sync::{mpsc, oneshot};
 use futures::{Async, Future, Poll};
 use protobuf;
-use crate::protocol;
 use std::collections::HashMap;
 use std::mem;
 

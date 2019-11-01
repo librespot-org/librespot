@@ -10,6 +10,10 @@ use rand::seq::SliceRandom;
 use serde_json;
 
 use crate::context::StationContext;
+use crate::playback::mixer::Mixer;
+use crate::playback::player::Player;
+use crate::protocol;
+use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
 use librespot_core::config::ConnectConfig;
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
@@ -17,10 +21,6 @@ use librespot_core::spotify_id::SpotifyId;
 use librespot_core::util::SeqGenerator;
 use librespot_core::version;
 use librespot_core::volume::Volume;
-use crate::playback::mixer::Mixer;
-use crate::playback::player::Player;
-use crate::protocol;
-use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
 
 pub struct SpircTask {
     player: Player,
@@ -754,7 +754,10 @@ impl SpircTask {
         self.state.get_position_ms() + diff as u32
     }
 
-    fn resolve_station(&self, uri: &str) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
+    fn resolve_station(
+        &self,
+        uri: &str,
+    ) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
         let radio_uri = format!("hm://radio-apollo/v3/stations/{}", uri);
 
         self.resolve_uri(&radio_uri)
