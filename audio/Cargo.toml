@@ -9,6 +9,7 @@ path = "../core"
 [dependencies]
 bit-set = "0.4.0"
 byteorder = "1.0"
+bytes = "0.4"
 futures = "0.1.8"
 lewton = "0.9.3"
 log = "0.3.5"
@@ -16,6 +17,7 @@ num-bigint = "0.1.35"
 num-traits = "0.1.36"
 rust-crypto = "0.2.36"
 tempfile = "2.1"
+tokio = "0.1.2"
 
 tremor = { git = "https://github.com/plietar/rust-tremor", optional = true }
 vorbis = { version ="0.1.0", optional = true }
