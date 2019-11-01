@@ -67,7 +67,7 @@ impl StreamLoaderController {
 
     pub fn range_available(&self, range: Range) -> bool {
         if let Some(ref shared) = self.stream_shared {
-            let mut download_status = shared.download_status.lock().unwrap();
+            let download_status = shared.download_status.lock().unwrap();
             if range.length <= download_status.downloaded.contained_length_from_value(range.start) {
                 return true;
             } else {
@@ -218,7 +218,7 @@ impl AudioFileOpenStreaming {
         });
 
         let mut write_file = NamedTempFile::new().unwrap();
-        write_file.set_len(size as u64).unwrap();
+        write_file.as_file().set_len(size as u64).unwrap();
         write_file.seek(SeekFrom::Start(0)).unwrap();
 
         let read_file = write_file.reopen().unwrap();
@@ -450,7 +450,7 @@ impl Future for AudioFileFetchDataReceiver {
                 Ok(Async::Ready(Some(data))) => {
                     if let Some(request_sent_time) = self.request_sent_time {
                         let duration = Instant::now() - request_sent_time;
-                        let mut duration_ms: u64;
+                        let duration_ms: u64;
                         if duration.as_secs() > MAXIMUM_ASSUMED_PING_TIME_SECONDS {
                             duration_ms = MAXIMUM_ASSUMED_PING_TIME_SECONDS * 1000;
                         }else {
