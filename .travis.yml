@@ -18,12 +18,14 @@ addons:
       - libsdl2-dev
 
 before_script:
+    - rustup component add rustfmt
     - mkdir -p ~/.cargo
     - echo '[target.armv7-unknown-linux-gnueabihf]' > ~/.cargo/config
     - echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
     - rustup target add armv7-unknown-linux-gnueabihf
 
 script:
+    - cargo fmt --all -- --check
     - cargo build --locked --no-default-features
     - cargo build --locked --no-default-features --features "with-tremor"
     - cargo build --locked --no-default-features --features "with-vorbis"
