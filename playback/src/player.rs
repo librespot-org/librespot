@@ -576,6 +576,8 @@ impl PlayerInternal {
             track_id.to_base62()
         );
 
+	info!("find_available_alternative");
+
         let track = match self.find_available_alternative(&track) {
             Some(track) => track,
             None => {
@@ -584,11 +586,16 @@ impl PlayerInternal {
             }
         };
 
+	info!("config.bitrate");
+
+
         let format = match self.config.bitrate {
             Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
             Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
             Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
         };
+
+	info!("file_id");
 
         let file_id = match track.files.get(&format) {
             Some(&file_id) => file_id,
@@ -598,12 +605,21 @@ impl PlayerInternal {
             }
         };
 
+	info!("key");
+
         let key = self
             .session
             .audio_key()
             .request(track.id, file_id);
+            //.wait()
+            //.unwrap()
+
+	info!("encrypted_file");
+
         let encrypted_file = AudioFile::open(&self.session, file_id);
 
+
+	info!("waiting for encrypted_file");
 
         let encrypted_file = encrypted_file.wait().unwrap();
 
@@ -621,8 +637,15 @@ impl PlayerInternal {
         }
 
 
+
+	info!("wait for key");
         let key = key.wait().unwrap();
+
+	info!("decrypted_file");
+
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+
+	info!("normalisation_factor");
 
         let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
             Ok(normalisation_data) => NormalisationData::get_factor(&self.config, normalisation_data),
@@ -632,7 +655,11 @@ impl PlayerInternal {
             }
         };
 
+	info!("new Subfile");
+
         let audio_file = Subfile::new(decrypted_file, 0xa7);
+
+	info!("new VorbisDecoder");
 
         let mut decoder = VorbisDecoder::new(audio_file).unwrap();
 
