@@ -5,7 +5,8 @@ authors = ["Paul Liétar <paul@lietar.net>"]
 build = "build.rs"
 
 [dependencies]
-protobuf = "2.0.5"
+protobuf = "2.8.*"
 
 [build-dependencies]
-protobuf-codegen-pure = "2.0.5"
+protobuf-codegen-pure = "2.8.*"
+protobuf-codegen = "*"

@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 use tempfile::NamedTempFile;
 use range_set::{Range, RangeSet};
 
-use core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
-use core::session::Session;
-use core::spotify_id::FileId;
+use librespot_core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
+use librespot_core::session::Session;
+use librespot_core::spotify_id::FileId;
 use futures::sync::mpsc::unbounded;
 use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;

@@ -14,7 +14,6 @@ extern crate serde_derive;
 extern crate base64;
 extern crate byteorder;
 extern crate bytes;
-extern crate crypto;
 extern crate extprim;
 extern crate httparse;
 extern crate hyper;
@@ -24,14 +23,18 @@ extern crate num_integer;
 extern crate num_traits;
 extern crate protobuf;
 extern crate rand;
-extern crate rpassword;
 extern crate serde;
 extern crate serde_json;
 extern crate shannon;
+extern crate tokio_codec;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate url;
 extern crate uuid;
+extern crate sha1;
+extern crate hmac;
+extern crate pbkdf2;
+extern crate aes;
 
 extern crate librespot_protocol as protocol;
 
