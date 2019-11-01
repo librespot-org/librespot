@@ -1,24 +1,27 @@
-use bytes::Bytes;
-use futures::sync::mpsc;
-use futures::{Async, Future, IntoFuture, Poll, Stream};
 use std::io;
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::sync::{Arc, RwLock, Weak};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use byteorder::{BigEndian, ByteOrder};
+use bytes::Bytes;
+use futures::{Async, Future, IntoFuture, Poll, Stream};
+use futures::sync::mpsc;
 use tokio_core::reactor::{Handle, Remote};
 
 use apresolve::apresolve_or_fallback;
+use audio_key::AudioKeyManager;
 use authentication::Credentials;
 use cache::Cache;
+use channel::ChannelManager;
 use component::Lazy;
 use config::SessionConfig;
 use connection;
-
-use audio_key::AudioKeyManager;
-use channel::ChannelManager;
 use mercury::MercuryManager;
 
 struct SessionData {
     country: String,
+    time_delta: i64,
     canonical_username: String,
     invalid: bool,
 }
@@ -39,7 +42,7 @@ struct SessionInternal {
     session_id: usize,
 }
 
-static SESSION_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
+static SESSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone)]
 pub struct Session(Arc<SessionInternal>);
@@ -108,6 +111,7 @@ impl Session {
                 country: String::new(),
                 canonical_username: username,
                 invalid: false,
+                time_delta: 0,
             }),
 
             tx_connection: sender_tx,
@@ -146,6 +150,10 @@ impl Session {
         self.0.mercury.get(|| MercuryManager::new(self.weak()))
     }
 
+    pub fn time_delta(&self) -> i64 {
+        self.0.data.read().unwrap().time_delta
+    }
+
     pub fn spawn<F, R>(&self, f: F)
     where
         F: FnOnce(&Handle) -> R + Send + 'static,
@@ -168,8 +176,17 @@ impl Session {
     fn dispatch(&self, cmd: u8, data: Bytes) {
         match cmd {
             0x4 => {
+                let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
+                let timestamp = match SystemTime::now().duration_since(UNIX_EPOCH) {
+                    Ok(dur) => dur,
+                    Err(err) => err.duration(),
+                }
+                .as_secs() as i64;
+
+                self.0.data.write().unwrap().time_delta = server_timestamp - timestamp;
+
                 self.debug_info();
-                self.send_packet(0x49, data.as_ref().to_owned());
+                self.send_packet(0x49, vec![0, 0, 0, 0]);
             }
             0x4a => (),
             0x1b => {

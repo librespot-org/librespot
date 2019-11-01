@@ -6,13 +6,12 @@ extern crate log;
 extern crate bit_set;
 extern crate byteorder;
 extern crate bytes;
-extern crate crypto;
 extern crate num_bigint;
 extern crate num_traits;
 extern crate tempfile;
-extern crate tokio;
+extern crate aes_ctr;
 
-extern crate librespot_core as core;
+extern crate librespot_core;
 
 mod decrypt;
 mod fetch;
@@ -31,4 +30,3 @@ pub use fetch::{AudioFile, AudioFileOpen, StreamLoaderController};
 pub use lewton_decoder::{VorbisDecoder, VorbisError, VorbisPacket};
 #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
 pub use libvorbis_decoder::{VorbisDecoder, VorbisError, VorbisPacket};
-

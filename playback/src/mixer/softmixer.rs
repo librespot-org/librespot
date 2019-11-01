@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use super::AudioFilter;
-use super::Mixer;
+use super::{Mixer, MixerConfig};
 
 #[derive(Clone)]
 pub struct SoftMixer {
@@ -10,7 +10,7 @@ pub struct SoftMixer {
 }
 
 impl Mixer for SoftMixer {
-    fn open() -> SoftMixer {
+    fn open(_: Option<MixerConfig>) -> SoftMixer {
         SoftMixer {
             volume: Arc::new(AtomicUsize::new(0xFFFF)),
         }

@@ -11,8 +11,8 @@ use std::thread;
 use std::time::Duration;
 
 use config::{Bitrate, PlayerConfig};
-use core::session::Session;
-use core::spotify_id::SpotifyId;
+use librespot_core::session::Session;
+use librespot_core::spotify_id::SpotifyId;
 
 use audio::{AudioDecrypt, AudioFile, StreamLoaderController};
 use audio::{VorbisDecoder, VorbisPacket};
@@ -495,7 +495,9 @@ impl PlayerInternal {
                 let stream_data_rate = self.stream_data_rate();
                 if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                     stream_loader_controller.set_stream_mode();
-                    if let PlayerState::Playing{..} = self.state {
+                }
+                if let PlayerState::Playing{..} = self.state {
+                    if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                         let wait_for_data_length = (2 * stream_loader_controller.ping_time_ms() * stream_data_rate) / 1000;
                         stream_loader_controller.fetch_next_blocking(wait_for_data_length);
                     }
