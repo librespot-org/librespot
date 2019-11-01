@@ -149,7 +149,8 @@ impl Discovery {
             String::from_utf8(data).unwrap()
         };
 
-        let credentials = Credentials::with_blob(username.to_owned(), &decrypted, &self.0.device_id);
+        let credentials =
+            Credentials::with_blob(username.to_owned(), &decrypted, &self.0.device_id);
 
         self.0.tx.unbounded_send(credentials).unwrap();
 

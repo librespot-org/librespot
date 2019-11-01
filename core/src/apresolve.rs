@@ -52,19 +52,20 @@ fn apresolve(
         })
     });
     let body = body.then(|result| result.chain_err(|| "HTTP error"));
-    let body = body.and_then(|body| String::from_utf8(body).chain_err(|| "invalid UTF8 in response"));
+    let body =
+        body.and_then(|body| String::from_utf8(body).chain_err(|| "invalid UTF8 in response"));
 
-    let data =
-        body.and_then(|body| serde_json::from_str::<APResolveData>(&body).chain_err(|| "invalid JSON"));
+    let data = body
+        .and_then(|body| serde_json::from_str::<APResolveData>(&body).chain_err(|| "invalid JSON"));
 
     let p = ap_port.clone();
 
     let ap = data.and_then(move |data| {
         let mut aps = data.ap_list.iter().filter(|ap| {
             if p.is_some() {
-                Uri::from_str(ap)
-                    .ok()
-                    .map_or(false, |uri| uri.port().map_or(false, |port| port == p.unwrap()))
+                Uri::from_str(ap).ok().map_or(false, |uri| {
+                    uri.port().map_or(false, |port| port == p.unwrap())
+                })
             } else if use_proxy {
                 // It is unlikely that the proxy will accept CONNECT on anything other than 443.
                 Uri::from_str(ap)

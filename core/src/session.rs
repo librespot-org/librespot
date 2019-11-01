@@ -54,7 +54,8 @@ impl Session {
         cache: Option<Cache>,
         handle: Handle,
     ) -> Box<dyn Future<Item = Session, Error = io::Error>> {
-        let access_point = apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
+        let access_point =
+            apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
 
         let handle_ = handle.clone();
         let proxy = config.proxy.clone();
@@ -64,8 +65,9 @@ impl Session {
         });
 
         let device_id = config.device_id.clone();
-        let authentication = connection
-            .and_then(move |connection| connection::authenticate(connection, credentials, device_id));
+        let authentication = connection.and_then(move |connection| {
+            connection::authenticate(connection, credentials, device_id)
+        });
 
         let result = authentication.map(move |(transport, reusable_credentials)| {
             info!("Authenticated as \"{}\" !", reusable_credentials.username);
@@ -133,7 +135,11 @@ impl Session {
             .map(|_| ());
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task = Box::new((receiver_task, sender_task).into_future().map(|((), ())| ()));
+        let task = Box::new(
+            (receiver_task, sender_task)
+                .into_future()
+                .map(|((), ())| ()),
+        );
 
         (session, task)
     }

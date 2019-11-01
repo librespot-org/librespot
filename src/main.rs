@@ -193,7 +193,13 @@ fn setup(args: &[String]) -> Setup {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            writeln!(stderr(), "error: {}\n{}", f.to_string(), usage(&args[0], &opts)).unwrap();
+            writeln!(
+                stderr(),
+                "error: {}\n{}",
+                f.to_string(),
+                usage(&args[0], &opts)
+            )
+            .unwrap();
             exit(1);
         }
     };
@@ -227,7 +233,9 @@ fn setup(args: &[String]) -> Setup {
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
     let mixer_config = MixerConfig {
-        card: matches.opt_str("mixer-card").unwrap_or(String::from("default")),
+        card: matches
+            .opt_str("mixer-card")
+            .unwrap_or(String::from("default")),
         mixer: matches.opt_str("mixer-name").unwrap_or(String::from("PCM")),
         index: matches
             .opt_str("mixer-index")
@@ -408,7 +416,8 @@ impl Main {
             let config = task.connect_config.clone();
             let device_id = task.session_config.device_id.clone();
 
-            task.discovery = Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
+            task.discovery =
+                Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
         }
 
         if let Some(credentials) = setup.credentials {
@@ -441,7 +450,9 @@ impl Future for Main {
         loop {
             let mut progress = false;
 
-            if let Some(Async::Ready(Some(creds))) = self.discovery.as_mut().map(|d| d.poll().unwrap()) {
+            if let Some(Async::Ready(Some(creds))) =
+                self.discovery.as_mut().map(|d| d.poll().unwrap())
+            {
                 if let Some(ref spirc) = self.spirc {
                     spirc.shutdown();
                 }

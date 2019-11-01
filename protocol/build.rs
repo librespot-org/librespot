@@ -8,7 +8,9 @@ use protobuf_codegen_pure::parse_and_typecheck;
 use protobuf_codegen_pure::Customize;
 
 fn main() {
-    let customizations = Customize { ..Default::default() };
+    let customizations = Customize {
+        ..Default::default()
+    };
 
     let lib_str = read_to_string("src/lib.rs").unwrap();
 

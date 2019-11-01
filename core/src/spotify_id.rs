@@ -7,7 +7,8 @@ pub struct SpotifyId(u128);
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SpotifyIdError;
 
-const BASE62_DIGITS: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const BASE62_DIGITS: &'static [u8] =
+    b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
 
 impl SpotifyId {

@@ -93,8 +93,10 @@ impl NormalisationData {
     }
 
     fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
-        let mut normalisation_factor =
-            f32::powf(10.0, (data.track_gain_db + config.normalisation_pregain) / 20.0);
+        let mut normalisation_factor = f32::powf(
+            10.0,
+            (data.track_gain_db + config.normalisation_pregain) / 20.0,
+        );
 
         if normalisation_factor * data.track_peak > 1.0 {
             warn!("Reducing normalisation factor to prevent clipping. Please add negative pregain to avoid.");
@@ -229,7 +231,12 @@ impl PlayerState {
         use self::PlayerState::*;
         match *self {
             Stopped | EndOfTrack { .. } => None,
-            Paused { ref mut decoder, .. } | Playing { ref mut decoder, .. } => Some(decoder),
+            Paused {
+                ref mut decoder, ..
+            }
+            | Playing {
+                ref mut decoder, ..
+            } => Some(decoder),
             Invalid => panic!("invalid state"),
         }
     }
@@ -522,7 +529,10 @@ impl PlayerInternal {
                 .map(|alt_id| Track::get(&self.session, *alt_id));
             let alternatives = future::join_all(alternatives).wait().unwrap();
 
-            alternatives.into_iter().find(|alt| alt.available).map(Cow::Owned)
+            alternatives
+                .into_iter()
+                .find(|alt| alt.available)
+                .map(Cow::Owned)
         }
     }
 
@@ -552,7 +562,10 @@ impl PlayerInternal {
         let file_id = match track.files.get(&format) {
             Some(&file_id) => file_id,
             None => {
-                warn!("Track \"{}\" is not available in format {:?}", track.name, format);
+                warn!(
+                    "Track \"{}\" is not available in format {:?}",
+                    track.name, format
+                );
                 return None;
             }
         };
@@ -565,7 +578,9 @@ impl PlayerInternal {
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
         let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
-            Ok(normalisation_data) => NormalisationData::get_factor(&self.config, normalisation_data),
+            Ok(normalisation_data) => {
+                NormalisationData::get_factor(&self.config, normalisation_data)
+            }
             Err(_) => {
                 warn!("Unable to extract normalisation data, using default value.");
                 1.0 as f32

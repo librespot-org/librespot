@@ -57,7 +57,9 @@ impl<T: AsyncRead + AsyncWrite> Future for ProxyTunnel<T> {
                     let mut response = httparse::Response::new(&mut headers);
                     let status = match response.parse(&buf) {
                         Ok(status) => status,
-                        Err(err) => return Err(io::Error::new(io::ErrorKind::Other, err.description())),
+                        Err(err) => {
+                            return Err(io::Error::new(io::ErrorKind::Other, err.description()))
+                        }
                     };
 
                     if status.is_complete() {

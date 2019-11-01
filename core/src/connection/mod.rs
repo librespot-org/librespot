@@ -53,18 +53,26 @@ pub fn authenticate(
     use crate::protocol::keyexchange::APLoginFailed;
 
     let mut packet = ClientResponseEncrypted::new();
-    packet.mut_login_credentials().set_username(credentials.username);
-    packet.mut_login_credentials().set_typ(credentials.auth_type);
+    packet
+        .mut_login_credentials()
+        .set_username(credentials.username);
+    packet
+        .mut_login_credentials()
+        .set_typ(credentials.auth_type);
     packet
         .mut_login_credentials()
         .set_auth_data(credentials.auth_data);
-    packet.mut_system_info().set_cpu_family(CpuFamily::CPU_UNKNOWN);
+    packet
+        .mut_system_info()
+        .set_cpu_family(CpuFamily::CPU_UNKNOWN);
     packet.mut_system_info().set_os(Os::OS_UNKNOWN);
-    packet.mut_system_info().set_system_information_string(format!(
-        "librespot_{}_{}",
-        version::short_sha(),
-        version::build_id()
-    ));
+    packet
+        .mut_system_info()
+        .set_system_information_string(format!(
+            "librespot_{}_{}",
+            version::short_sha(),
+            version::build_id()
+        ));
     packet.mut_system_info().set_device_id(device_id);
     packet.set_version_string(version::version_string());
 
@@ -77,7 +85,8 @@ pub fn authenticate(
             .and_then(|transport| transport.into_future().map_err(|(err, _stream)| err))
             .and_then(|(packet, transport)| match packet {
                 Some((0xac, data)) => {
-                    let welcome_data: APWelcome = protobuf::parse_from_bytes(data.as_ref()).unwrap();
+                    let welcome_data: APWelcome =
+                        protobuf::parse_from_bytes(data.as_ref()).unwrap();
 
                     let reusable_credentials = Credentials {
                         username: welcome_data.get_canonical_username().to_owned(),
@@ -89,7 +98,8 @@ pub fn authenticate(
                 }
 
                 Some((0xad, data)) => {
-                    let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref()).unwrap();
+                    let error_data: APLoginFailed =
+                        protobuf::parse_from_bytes(data.as_ref()).unwrap();
                     panic!(
                         "Authentication failed with reason: {:?}",
                         error_data.get_error_code()

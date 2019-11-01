@@ -95,7 +95,8 @@ impl MercuryManager {
     pub fn subscribe<T: Into<String>>(
         &self,
         uri: T,
-    ) -> Box<dyn Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>> {
+    ) -> Box<dyn Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>>
+    {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
             method: MercuryMethod::SUB,

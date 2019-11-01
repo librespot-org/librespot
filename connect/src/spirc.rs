@@ -502,7 +502,8 @@ impl SpircTask {
 
                 if self.state.get_track().len() > 0 {
                     let now = self.now_ms();
-                    self.state.set_position_ms(frame.get_state().get_position_ms());
+                    self.state
+                        .set_position_ms(frame.get_state().get_position_ms());
                     self.state.set_position_measured_at(now as u64);
 
                     let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
@@ -664,7 +665,8 @@ impl SpircTask {
             self.state.get_track().len() as u32 - new_index < CONTEXT_FETCH_THRESHOLD
         );
         let context_uri = self.state.get_context_uri().to_owned();
-        if (context_uri.starts_with("spotify:station:") || context_uri.starts_with("spotify:dailymix:"))
+        if (context_uri.starts_with("spotify:station:")
+            || context_uri.starts_with("spotify:dailymix:"))
             && ((self.state.get_track().len() as u32) - new_index) < CONTEXT_FETCH_THRESHOLD
         {
             self.context_fut = self.resolve_station(&context_uri);
@@ -763,11 +765,17 @@ impl SpircTask {
         self.resolve_uri(&radio_uri)
     }
 
-    fn resolve_uri(&self, uri: &str) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
+    fn resolve_uri(
+        &self,
+        uri: &str,
+    ) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
         let request = self.session.mercury().get(uri);
 
         Box::new(request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty payload on context uri");
+            let data = response
+                .payload
+                .first()
+                .expect("Empty payload on context uri");
             let response: serde_json::Value = serde_json::from_slice(&data).unwrap();
 
             Ok(response)
@@ -785,7 +793,8 @@ impl SpircTask {
                 track_vec.drain(0..head);
             }
             track_vec.extend_from_slice(&new_tracks);
-            self.state.set_track(protobuf::RepeatedField::from_vec(track_vec));
+            self.state
+                .set_track(protobuf::RepeatedField::from_vec(track_vec));
 
             // Update playing index
             if let Some(new_index) = self
@@ -803,7 +812,9 @@ impl SpircTask {
         let context_uri = frame.get_state().get_context_uri().to_owned();
         let tracks = frame.get_state().get_track();
         debug!("Frame has {:?} tracks", tracks.len());
-        if context_uri.starts_with("spotify:station:") || context_uri.starts_with("spotify:dailymix:") {
+        if context_uri.starts_with("spotify:station:")
+            || context_uri.starts_with("spotify:dailymix:")
+        {
             self.context_fut = self.resolve_station(&context_uri);
         }
 
@@ -859,7 +870,8 @@ impl SpircTask {
 
     fn set_volume(&mut self, volume: u16) {
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume_to_mixer(volume, self.linear_volume));
+        self.mixer
+            .set_volume(volume_to_mixer(volume, self.linear_volume));
         if let Some(cache) = self.session.cache() {
             cache.save_volume(Volume { volume })
         }
