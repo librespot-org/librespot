@@ -44,6 +44,10 @@ RUN mkdir /build && \
 ENV CARGO_TARGET_DIR /build
 ENV CARGO_HOME /build/cache
 ENV PKG_CONFIG_ALLOW_CROSS=1
+ENV PKG_CONFIG_PATH_aarch64-unknown-linux-gnu=/usr/lib/aarch64-linux-gnu/pkgconfig/
+ENV PKG_CONFIG_PATH_arm-unknown-linux-gnueabihf=/usr/lib/arm-linux-gnueabihf/pkgconfig/
+ENV PKG_CONFIG_PATH_arm-unknown-linux-gnueabi=/usr/lib/arm-linux-gnueabi/pkgconfig/
+ENV PKG_CONFIG_PATH_mipsel-unknown-linux-gnu=/usr/lib/mipsel-linux-gnu/pkgconfig/
 
 ADD . /src
 WORKDIR /src
