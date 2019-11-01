@@ -11,7 +11,7 @@ pub struct PortAudioSink<'a>(
     StreamParameters<i16>,
 );
 
-fn output_devices() -> Box<Iterator<Item = (DeviceIndex, DeviceInfo)>> {
+fn output_devices() -> Box<dyn Iterator<Item = (DeviceIndex, DeviceInfo)>> {
     let count = portaudio_rs::device::get_count().unwrap();
     let devices = (0..count)
         .filter_map(|idx| portaudio_rs::device::get_info(idx).map(|info| (idx, info)))
