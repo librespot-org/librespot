@@ -731,7 +731,7 @@ impl AudioFileFetch {
                     // record the response time
                     self.network_response_times_ms.push(response_time_ms);
 
-                    // prone old response times. Keep at most three.
+                    // prune old response times. Keep at most three.
                     while self.network_response_times_ms.len() > 3 {
                         self.network_response_times_ms.remove(0);
                     }
