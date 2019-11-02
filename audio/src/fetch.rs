@@ -302,10 +302,10 @@ impl AudioFile {
         debug!("Downloading file {}", file_id);
 
         let (complete_tx, complete_rx) = oneshot::channel();
-	debug!("calling request_chunk");
+        trace!("calling request_chunk");
         let initial_data_length = MINIMUM_CHUNK_SIZE;
         let (headers, data) = request_range(session, file_id, 0, initial_data_length).split();
-	debug!("returned from request_chunk");
+        trace!("returned from request_chunk");
 
         let open = AudioFileOpenStreaming {
             session: session.clone(),
@@ -319,7 +319,7 @@ impl AudioFile {
             complete_tx: Some(complete_tx),
         };
 
-	debug!("cloning into cache session");
+        trace!("cloning into cache session");
         let session_ = session.clone();
         session.spawn(move |_| {
             complete_rx
@@ -334,7 +334,7 @@ impl AudioFile {
                 .or_else(|oneshot::Canceled| Ok(()))
         });
 
-	debug!("returning open stream");
+        trace!("returning open stream");
         AudioFileOpen::Streaming(open)
     }
 
@@ -802,7 +802,9 @@ impl AudioFileFetch {
 
         loop {
             match self.stream_loader_command_rx.poll() {
-                Ok(Async::Ready(None)) => {}
+                Ok(Async::Ready(None)) => {
+                    return Ok(Async::Ready(()));
+                }
                 Ok(Async::Ready(Some(StreamLoaderCommand::Fetch(request)))) => {
                     self.download_range(request.start, request.length);
                 }
@@ -900,7 +902,7 @@ impl Read for AudioFileStreaming {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length));
 
-        debug!("reading at postion {} (length : {})", offset, length);
+        trace!("reading at postion {} (length : {})", offset, length);
 
         let mut download_status = self.shared.download_status.lock().unwrap();
         ranges_to_request.subtract_range_set(&download_status.downloaded);
@@ -908,14 +910,14 @@ impl Read for AudioFileStreaming {
 
 
         for range in ranges_to_request.iter() {
-            debug!("requesting data at position {} (length : {})", range.start, range.length);
+            trace!("requesting data at position {} (length : {})", range.start, range.length);
             self.stream_loader_command_tx.unbounded_send(StreamLoaderCommand::Fetch(range.clone())).unwrap();
         }
 
         while !download_status.downloaded.contains(offset) {
-            debug!("waiting for download");
+            trace!("waiting for download");
             download_status = self.shared.cond.wait_timeout(download_status, Duration::from_millis(1000)).unwrap().0;
-            debug!("re-checking data availability at offset {}.", offset);
+            trace!("re-checking data availability at offset {}.", offset);
         }
         let available_length = download_status.downloaded.contained_length_from_value(offset);
         assert!(available_length > 0);
@@ -926,7 +928,7 @@ impl Read for AudioFileStreaming {
         let read_len = min(length, available_length);
         let read_len = try!(self.read_file.read(&mut output[..read_len]));
 
-        debug!("read at postion {} (length : {})", offset, read_len);
+        trace!("read at postion {} (length : {})", offset, read_len);
 
         self.position += read_len as u64;
         self.shared.read_position.store(self.position as usize, atomic::Ordering::Relaxed);
