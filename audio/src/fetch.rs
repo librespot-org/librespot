@@ -1,4 +1,3 @@
-//use bit_set::BitSet;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
 use futures::sync::{mpsc, oneshot};
