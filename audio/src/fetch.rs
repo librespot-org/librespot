@@ -460,7 +460,6 @@ impl Future for AudioFileFetchDataReceiver {
 
     fn poll(&mut self) -> Poll<(), ()> {
         loop {
-            trace!("Looping data_receiver for offset {} and length {}", self.data_offset, self.request_length);
             match self.data_rx.poll() {
                 Ok(Async::Ready(Some(data))) => {
                     if self.measure_ping_time {
@@ -733,7 +732,7 @@ impl AudioFileFetch {
                             full = true;
                         }
 
-                        trace!("Downloaded: {} Requested: {}", download_status.downloaded, download_status.requested);
+                        trace!("Downloaded: {} Requested: {}", download_status.downloaded, download_status.requested.minus(&download_status.downloaded));
 
                         drop(download_status);
                     }
@@ -829,7 +828,8 @@ impl Future for AudioFileFetch {
 
             let ping_time = self.shared.ping_time_ms.load(atomic::Ordering::Relaxed);
 
-            if bytes_pending < 2 * ping_time * self.streaming_data_rate {
+            if bytes_pending < 2 * ping_time * self.streaming_data_rate / 1000 {
+                trace!("Prefetching more data. pending bytes({}) < 2 * ping time ({}) * data rate({}) / 1000.",bytes_pending, ping_time, self.streaming_data_rate);
                 self.pre_fetch_more_data();
             }
         }
