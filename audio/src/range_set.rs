@@ -1,6 +1,7 @@
 
 use std::cmp::{max,min};
 use std::slice::Iter;
+use std::fmt;
 
 
 
@@ -9,6 +10,13 @@ pub struct Range {
     pub start: usize,
     pub length: usize,
 }
+
+impl fmt::Display for Range {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        return write!(f, "[{}, {}]", self.start, self.start+self.length-1);
+    }
+}
+
 
 impl Range {
 
@@ -25,10 +33,22 @@ impl Range {
 
 }
 
+
 #[derive(Clone)]
 pub struct RangeSet {
     ranges: Vec<Range>,
 }
+
+impl fmt::Display for RangeSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(").unwrap();
+        for range in self.ranges.iter() {
+            write!(f, "{}", range).unwrap();
+        }
+        write!(f, ")")
+    }
+}
+
 
 
 impl RangeSet {
