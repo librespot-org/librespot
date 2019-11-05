@@ -57,6 +57,7 @@ pub struct StreamLoaderController {
     channel_tx: Option<mpsc::UnboundedSender<StreamLoaderCommand>>,
     stream_shared: Option<Arc<AudioFileShared>>,
     file_size: usize,
+    bytes_per_second: usize,
 }
 
 
@@ -64,6 +65,8 @@ impl StreamLoaderController {
     pub fn len(&self) -> usize {
         return self.file_size;
     }
+
+    pub fn data_rate(&self) -> usize { return self.bytes_per_second; }
 
     pub fn range_available(&self, range: Range) -> bool {
         if let Some(ref shared) = self.stream_shared {
@@ -168,6 +171,7 @@ impl StreamLoaderController {
 
     pub fn set_stream_data_rate(&mut self, bytes_per_second: usize) {
         // when optimising for streaming, assume a streaming rate of this many bytes per second.
+        self.bytes_per_second = bytes_per_second;
         self.send_stream_loader_command(StreamLoaderCommand::StreamDataRate(bytes_per_second));
     }
 
@@ -335,20 +339,24 @@ impl AudioFile {
         AudioFileOpen::Streaming(open)
     }
 
-    pub fn get_stream_loader_controller(&self) -> StreamLoaderController {
+    pub fn get_stream_loader_controller(&self, bytes_per_second: usize) -> StreamLoaderController {
         match self {
             AudioFile::Streaming(stream) => {
-                return StreamLoaderController {
+                let mut result = StreamLoaderController {
                     channel_tx: Some(stream.stream_loader_command_tx.clone()),
                     stream_shared: Some(stream.shared.clone()),
                     file_size: stream.shared.file_size,
-                }
+                    bytes_per_second: bytes_per_second,
+                };
+                result.set_stream_data_rate(bytes_per_second);
+                return result;
             }
             AudioFile::Cached(ref file) => {
                 return StreamLoaderController {
                     channel_tx: None,
                     stream_shared: None,
                     file_size: file.metadata().unwrap().len() as usize,
+                    bytes_per_second: bytes_per_second,
                 }
             }
         }

@@ -490,12 +490,12 @@ impl PlayerInternal {
                 }
 
                 // If we're playing, ensure, that we have enough data leaded to avoid a buffer underrun.
-                let stream_data_rate = self.stream_data_rate();
                 if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                     stream_loader_controller.set_stream_mode();
                 }
                 if let PlayerState::Playing{..} = self.state {
                     if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
+                        let stream_data_rate = stream_loader_controller.data_rate();
                         let wait_for_data_length = (2 * stream_loader_controller.ping_time_ms() * stream_data_rate) / 1000;
                         stream_loader_controller.fetch_next_blocking(wait_for_data_length);
                     }
@@ -561,11 +561,22 @@ impl PlayerInternal {
         }
     }
 
-    fn stream_data_rate(&self) -> usize {
-        match self.config.bitrate {
-            Bitrate::Bitrate96 => 12 * 1024,
-            Bitrate::Bitrate160 => 20 * 1024,
-            Bitrate::Bitrate320 => 40 * 1024,
+    fn stream_data_rate(&self, format: FileFormat) -> usize {
+        match format {
+            FileFormat::OGG_VORBIS_96 =>  12 * 1024,
+            FileFormat::OGG_VORBIS_160 => 20 * 1024,
+            FileFormat::OGG_VORBIS_320=> 40 * 1024,
+            FileFormat::MP3_256 => 32 * 1024,
+            FileFormat::MP3_320 => 40 * 1024,
+            FileFormat::MP3_160 => 20 * 1024,
+            FileFormat::MP3_96 => 12 * 1024,
+            FileFormat::MP3_160_ENC => 20 * 1024,
+            FileFormat::MP4_128_DUAL => 16 * 1024,
+            FileFormat::OTHER3 => 40 * 1024, // better some high guess than nothing
+            FileFormat::AAC_160 => 20 * 1024,
+            FileFormat::AAC_320 => 40 * 1024,
+            FileFormat::MP4_128 => 16 * 1024,
+            FileFormat::OTHER5 => 40 * 1024, // better some high guess than nothing
         }
     }
 
@@ -618,10 +629,7 @@ impl PlayerInternal {
 
         let encrypted_file = encrypted_file.wait().unwrap();
 
-        let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
-
-        // tell the stream loader how to optimise its strategy.
-        stream_loader_controller.set_stream_data_rate(self.stream_data_rate());
+        let mut stream_loader_controller = encrypted_file.get_stream_loader_controller(self.stream_data_rate(*format));
 
         if position == 0 {
             // No need to seek -> we stream from the beginning
