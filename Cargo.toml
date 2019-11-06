@@ -34,7 +34,7 @@ path = "protocol"
 
 [dependencies]
 base64 = "0.10"
-env_logger = "0.6"
+env_logger =  {version = "0.6", default-features = false, features = ["termcolor","humantime","atty"]} 
 futures = "0.1"
 getopts = "0.2"
 hyper = "0.11"
