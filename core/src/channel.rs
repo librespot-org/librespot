@@ -59,8 +59,6 @@ impl ChannelManager {
 
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
 
-        trace!("Received data for channel {}: {} bytes.", id, data.len());
-
         self.lock(|inner| {
             if let Entry::Occupied(entry) = inner.channels.entry(id) {
                 let _ = entry.get().unbounded_send((cmd, data));
