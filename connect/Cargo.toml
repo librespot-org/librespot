@@ -2,6 +2,8 @@
 name = "librespot-connect"
 version = "0.1.0"
 authors = ["Paul Lietar <paul@lietar.net>"]
+description="The discovery and Spotify Connect logic for librespot"
+license="MIT"
 
 [dependencies.librespot-core]
 path = "../core"

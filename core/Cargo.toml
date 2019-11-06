@@ -3,9 +3,12 @@ name = "librespot-core"
 version = "0.1.0"
 authors = ["Paul Lietar <paul@lietar.net>"]
 build = "build.rs"
+description="The core functionality provided by librespot"
+license="MIT"
 
 [dependencies.librespot-protocol]
 path = "../protocol"
+version = "0.1.0"
 
 [dependencies]
 base64 = "0.10"
