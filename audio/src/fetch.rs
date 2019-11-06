@@ -18,7 +18,7 @@ use futures::sync::mpsc::unbounded;
 use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
 
-const MINIMUM_CHUNK_SIZE: usize = 1024 * 16;
+const MINIMUM_CHUNK_SIZE: usize = 1024 * 16; // This number MUST be divisible by 4.
 const MAXIMUM_CHUNK_SIZE: usize = 1024 * 128;
 const MAXIMUM_ASSUMED_PING_TIME_SECONDS: u64 = 5;
 
