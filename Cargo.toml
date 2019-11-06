@@ -1,11 +1,11 @@
 [package]
 name = "librespot"
 version = "0.1.0"
-authors = ["Paul Liétar <paul@lietar.net>"]
+authors = ["Librespot Org"]
 license = "MIT"
 description = "Open Source Spotify client library"
 keywords = ["spotify"]
-repository = "https://github.com/plietar/librespot"
+repository = "https://github.com/librespot-org/librespot"
 readme = "README.md"
 
 [workspace]
