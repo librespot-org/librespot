@@ -7,10 +7,13 @@ license="MIT"
 
 [dependencies.librespot-audio]
 path = "../audio"
+version = "0.1.0"
 [dependencies.librespot-core]
 path = "../core"
+version = "0.1.0"
 [dependencies.librespot-metadata]
 path = "../metadata"
+version = "0.1.0"
 
 [dependencies]
 futures = "0.1"

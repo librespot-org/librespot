@@ -21,16 +21,22 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
+version = "0.1.0"
 [dependencies.librespot-connect]
 path = "connect"
+version = "0.1.0"
 [dependencies.librespot-core]
 path = "core"
+version = "0.1.0"
 [dependencies.librespot-metadata]
 path = "metadata"
+version = "0.1.0"
 [dependencies.librespot-playback]
 path = "playback"
+version = "0.1.0"
 [dependencies.librespot-protocol]
 path = "protocol"
+version = "0.1.0"
 
 [dependencies]
 base64 = "0.10"

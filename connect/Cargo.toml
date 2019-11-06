@@ -7,10 +7,13 @@ license="MIT"
 
 [dependencies.librespot-core]
 path = "../core"
+version = "0.1.0"
 [dependencies.librespot-playback]
 path = "../playback"
+version = "0.1.0"
 [dependencies.librespot-protocol]
 path = "../protocol"
+version = "0.1.0"
 
 [dependencies]
 base64 = "0.10"
