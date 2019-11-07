@@ -9,12 +9,14 @@ use std::mem;
 use std::sync::mpsc::{RecvError, RecvTimeoutError, TryRecvError};
 use std::thread;
 use std::time::Duration;
+use std::cmp::max;
 
 use config::{Bitrate, PlayerConfig};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::SpotifyId;
 
 use audio::{AudioDecrypt, AudioFile, StreamLoaderController};
+use audio::{READ_AHEAD_BEFORE_PLAYBACK_SECONDS, READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS, READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS};
 use audio::{VorbisDecoder, VorbisPacket};
 use audio_backend::Sink;
 use metadata::{AudioItem, FileFormat};
@@ -203,6 +205,7 @@ enum PlayerState {
         end_of_track: oneshot::Sender<()>,
         normalisation_factor: f32,
         stream_loader_controller: StreamLoaderController,
+        bytes_per_second: usize,
     },
     Playing {
         track_id: SpotifyId,
@@ -210,6 +213,7 @@ enum PlayerState {
         end_of_track: oneshot::Sender<()>,
         normalisation_factor: f32,
         stream_loader_controller: StreamLoaderController,
+        bytes_per_second: usize,
     },
     EndOfTrack {
         track_id: SpotifyId,
@@ -269,6 +273,7 @@ impl PlayerState {
                 end_of_track,
                 normalisation_factor,
                 stream_loader_controller,
+                bytes_per_second
             } => {
                 *self = Playing {
                     track_id: track_id,
@@ -276,6 +281,7 @@ impl PlayerState {
                     end_of_track: end_of_track,
                     normalisation_factor: normalisation_factor,
                     stream_loader_controller: stream_loader_controller,
+                    bytes_per_second: bytes_per_second,
                 };
             }
             _ => panic!("invalid state"),
@@ -291,6 +297,7 @@ impl PlayerState {
                 end_of_track,
                 normalisation_factor,
                 stream_loader_controller,
+                bytes_per_second,
             } => {
                 *self = Paused {
                     track_id: track_id,
@@ -298,6 +305,7 @@ impl PlayerState {
                     end_of_track: end_of_track,
                     normalisation_factor: normalisation_factor,
                     stream_loader_controller: stream_loader_controller,
+                    bytes_per_second: bytes_per_second,
                 };
             }
             _ => panic!("invalid state"),
@@ -418,7 +426,7 @@ impl PlayerInternal {
                 }
 
                 match self.load_track(track_id, position as i64) {
-                    Some((decoder, normalisation_factor, stream_loader_controller)) => {
+                    Some((decoder, normalisation_factor, stream_loader_controller, bytes_per_second)) => {
                         if play {
                             match self.state {
                                 PlayerState::Playing {
@@ -443,6 +451,7 @@ impl PlayerInternal {
                                 end_of_track: end_of_track,
                                 normalisation_factor: normalisation_factor,
                                 stream_loader_controller: stream_loader_controller,
+                                bytes_per_second: bytes_per_second,
                             };
                         } else {
                             self.state = PlayerState::Paused {
@@ -451,6 +460,7 @@ impl PlayerInternal {
                                 end_of_track: end_of_track,
                                 normalisation_factor: normalisation_factor,
                                 stream_loader_controller: stream_loader_controller,
+                                bytes_per_second: bytes_per_second,
                             };
                             match self.state {
                                 PlayerState::Playing {
@@ -493,10 +503,21 @@ impl PlayerInternal {
                 if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                     stream_loader_controller.set_stream_mode();
                 }
-                if let PlayerState::Playing{..} = self.state {
+                if let PlayerState::Playing{bytes_per_second, ..} = self.state {
                     if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
-                        let stream_data_rate = stream_loader_controller.data_rate();
-                        let wait_for_data_length = (2 * stream_loader_controller.ping_time_ms() * stream_data_rate) / 1000;
+
+                        // Request our read ahead range
+                        let request_data_length = max(
+                            (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS * (0.001 * stream_loader_controller.ping_time_ms() as f64) * bytes_per_second as f64) as usize,
+                            (READ_AHEAD_DURING_PLAYBACK_SECONDS * bytes_per_second as f64) as usize
+                        );
+                        stream_loader_controller.fetch_next(request_data_length);
+
+                        // Request the part we want to wait for blocking. This effecively means we wait for the previous request to partially complete.
+                        let wait_for_data_length = max(
+                            (READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS * (0.001 * stream_loader_controller.ping_time_ms() as f64) * bytes_per_second as f64) as usize,
+                            (READ_AHEAD_BEFORE_PLAYBACK_SECONDS * bytes_per_second as f64) as usize
+                        );
                         stream_loader_controller.fetch_next_blocking(wait_for_data_length);
                     }
                 }
@@ -580,7 +601,7 @@ impl PlayerInternal {
         }
     }
 
-    fn load_track(&self, spotify_id: SpotifyId, position: i64) -> Option<(Decoder, f32, StreamLoaderController)> {
+    fn load_track(&self, spotify_id: SpotifyId, position: i64) -> Option<(Decoder, f32, StreamLoaderController, usize)> {
         let audio = AudioItem::get_audio_item(&self.session, spotify_id)
             .wait()
             .unwrap();
@@ -624,14 +645,17 @@ impl PlayerInternal {
             }
         };
 
+        let bytes_per_second = self.stream_data_rate(*format);
+        let play_from_beginning = position==0;
+
         let key = self.session.audio_key().request(spotify_id, file_id);
-        let encrypted_file = AudioFile::open(&self.session, file_id);
+        let encrypted_file = AudioFile::open(&self.session, file_id, bytes_per_second, play_from_beginning);
 
         let encrypted_file = encrypted_file.wait().unwrap();
 
-        let mut stream_loader_controller = encrypted_file.get_stream_loader_controller(self.stream_data_rate(*format));
+        let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
 
-        if position == 0 {
+        if play_from_beginning {
             // No need to seek -> we stream from the beginning
             stream_loader_controller.set_stream_mode();
         } else {
@@ -663,7 +687,7 @@ impl PlayerInternal {
             stream_loader_controller.set_stream_mode();
         }
         info!("<{}> loaded", audio.name);
-        Some((decoder, normalisation_factor, stream_loader_controller))
+        Some((decoder, normalisation_factor, stream_loader_controller, bytes_per_second))
     }
 }
 
