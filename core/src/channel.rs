@@ -14,7 +14,6 @@ component! {
         download_rate_estimate: usize = 0,
         download_measurement_start: Option<Instant> = None,
         download_measurement_bytes: usize = 0,
-        download_measurement_last_received: Option<Instant> = None,
     }
 }
 
@@ -72,23 +71,15 @@ impl ChannelManager {
 
             let current_time = Instant::now();
             if let Some(download_measurement_start) = inner.download_measurement_start {
-                if let Some(download_measurement_last_received) = inner.download_measurement_last_received {
-                    if (current_time - download_measurement_start).as_millis() > 1000 {
-                        if (current_time - download_measurement_last_received).as_millis() <= 500 {
-                            inner.download_rate_estimate = 1000 * inner.download_measurement_bytes / (current_time - download_measurement_start).as_millis() as usize;
-                        } else {
-                            inner.download_rate_estimate = 1000 * inner.download_measurement_bytes / (500+(download_measurement_last_received - download_measurement_start).as_millis() as usize);
-                        }
-
-                        inner.download_measurement_start = Some(current_time);
-                        inner.download_measurement_bytes = 0;
-                    }
+                if (current_time - download_measurement_start).as_millis() > 1000 {
+                    inner.download_rate_estimate = 1000 * inner.download_measurement_bytes / (current_time - download_measurement_start).as_millis() as usize;
+                    inner.download_measurement_start = Some(current_time);
+                    inner.download_measurement_bytes = 0;
                 }
             } else {
                 inner.download_measurement_start = Some(current_time);
             }
 
-            inner.download_measurement_last_received = Some(current_time);
             inner.download_measurement_bytes += data.len();
 
             if let Entry::Occupied(entry) = inner.channels.entry(id) {

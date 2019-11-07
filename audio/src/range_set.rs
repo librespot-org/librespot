@@ -186,6 +186,7 @@ impl RangeSet {
                 }
 
                 if index < self.ranges.len() && self.ranges[index].start < range.end() {
+                    self.ranges[index].length -= range.end() - self.ranges[index].start;
                     self.ranges[index].start = range.end();
                 }
 
@@ -199,6 +200,7 @@ impl RangeSet {
                     length: range.start - self.ranges[index].start,
                 };
 
+                self.ranges[index].length -= range.end() - self.ranges[index].start;
                 self.ranges[index].start = range.end();
 
                 self.ranges.insert(index, first_range);

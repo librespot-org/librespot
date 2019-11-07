@@ -541,7 +541,7 @@ impl Future for AudioFileFetchDataReceiver {
                             if 0.001 * (duration.as_millis() as f64) > MAXIMUM_ASSUMED_PING_TIME_SECONDS {
                                 duration_ms = (MAXIMUM_ASSUMED_PING_TIME_SECONDS * 1000.0) as u64;
                             } else {
-                                duration_ms = duration.as_secs() * 1000 + duration.subsec_millis() as u64;
+                                duration_ms = duration.as_millis() as u64;
                             }
                             let _ = self.file_data_tx.unbounded_send(ReceivedData::ResponseTimeMs(duration_ms as usize));
                             self.measure_ping_time = false;
@@ -896,15 +896,16 @@ impl Future for AudioFileFetch {
                 download_status.requested.minus(&download_status.downloaded).len()
             };
 
-            let ping_time_seconds = 0.0001 * self.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as f64;
+            let ping_time_seconds = 0.001 * self.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as f64;
+            let download_rate = self.session.channel().get_download_rate_estimate();
 
             let desired_pending_bytes = max(
                 (PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * self.shared.stream_data_rate as f64) as usize,
-                (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * self.session.channel().get_download_rate_estimate() as f64) as usize
+                (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * download_rate as f64) as usize
             );
 
             if bytes_pending < desired_pending_bytes {
-                trace!("Prefetching more data. pending bytes({}) < {}",bytes_pending, desired_pending_bytes);
+                trace!("Prefetching more data. pending: {}, desired: {}, ping: {}, rate: {}", bytes_pending, desired_pending_bytes, ping_time_seconds, download_rate);
                 self.pre_fetch_more_data(desired_pending_bytes - bytes_pending);
             }
         }
