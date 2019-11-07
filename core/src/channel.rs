@@ -63,10 +63,6 @@ impl ChannelManager {
 
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
 
-
-
-        trace!("Received data for channel {}: {} bytes.", id, data.len());
-
         self.lock(|inner| {
 
             let current_time = Instant::now();
