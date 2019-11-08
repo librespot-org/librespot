@@ -35,6 +35,7 @@ before_script:
 
 script:
     - cargo build --locked --no-default-features
+    - cargo build --locked --examples
     - cargo build --locked --no-default-features --features "with-tremor"
     - cargo build --locked --no-default-features --features "with-vorbis"
     - cargo build --locked --no-default-features --features "alsa-backend"
