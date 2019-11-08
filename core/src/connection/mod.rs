@@ -8,9 +8,8 @@ use futures::{Future, Sink, Stream};
 use protobuf::{self, Message};
 use std::io;
 use std::net::ToSocketAddrs;
+use tokio::net::TcpStream;
 use tokio_codec::Framed;
-use tokio_core::net::TcpStream;
-use tokio_core::reactor::Handle;
 use url::Url;
 
 use crate::authentication::Credentials;
@@ -22,7 +21,6 @@ pub type Transport = Framed<TcpStream, APCodec>;
 
 pub fn connect(
     addr: String,
-    handle: &Handle,
     proxy: &Option<Url>,
 ) -> Box<dyn Future<Item = Transport, Error = io::Error>> {
     let (addr, connect_url) = match *proxy {
@@ -51,7 +49,7 @@ pub fn connect(
         }
     };
 
-    let socket = TcpStream::connect(&addr, handle);
+    let socket = TcpStream::connect(&addr);
     if let Some(connect_url) = connect_url {
         let connection = socket
             .and_then(move |socket| proxytunnel::connect(socket, &connect_url).and_then(handshake));
