@@ -70,7 +70,7 @@ function updateRepo {
 }
 
 function run {
-  # switchBranch
+  switchBranch
   updateVersion $1
   commitAndTag $1
   publishCrates
