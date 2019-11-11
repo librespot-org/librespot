@@ -460,13 +460,6 @@ fn request_range(session: &Session, file: FileId, offset: usize, length: usize) 
 
     let (id, channel) = session.channel().allocate();
 
-    trace!(
-        "requesting range starting at {} of length {} on channel {}.",
-        offset,
-        length,
-        id
-    );
-
     let mut data: Vec<u8> = Vec::new();
     data.write_u16::<BigEndian>(id).unwrap();
     data.write_u8(0).unwrap();
@@ -576,7 +569,6 @@ impl Future for AudioFileFetchDataReceiver {
                         }
                     }
                     let data_size = data.len();
-                    trace!("data_receiver for range {} (+{}) got {} bytes of data starting at {}. ({} bytes pending).", self.initial_data_offset, self.initial_request_length, data_size, self.data_offset, self.request_length - data_size);
                     let _ = self
                         .file_data_tx
                         .unbounded_send(ReceivedData::Data(PartialFileData {
@@ -591,11 +583,6 @@ impl Future for AudioFileFetchDataReceiver {
                         self.request_length -= data_size;
                     }
                     if self.request_length == 0 {
-                        trace!(
-                            "Data receiver for range {} (+{}) completed.",
-                            self.initial_data_offset,
-                            self.initial_request_length
-                        );
                         self.finish();
                         return Ok(Async::Ready(()));
                     }
@@ -784,7 +771,7 @@ impl AudioFileFetch {
                     return Ok(Async::Ready(()));
                 }
                 Ok(Async::Ready(Some(ReceivedData::ResponseTimeMs(response_time_ms)))) => {
-                    trace!("Received ping time estimate: {} ms.", response_time_ms);
+                    trace!("Ping time estimated as: {} ms.", response_time_ms);
 
                     // record the response time
                     self.network_response_times_ms.push(response_time_ms);
@@ -841,12 +828,6 @@ impl AudioFileFetch {
                             full = true;
                         }
 
-                        trace!(
-                            "Downloaded: {} Requested: {}",
-                            download_status.downloaded,
-                            download_status.requested.minus(&download_status.downloaded)
-                        );
-
                         drop(download_status);
                     }
 
@@ -888,7 +869,6 @@ impl AudioFileFetch {
     }
 
     fn finish(&mut self) {
-        trace!("====== FINISHED DOWNLOADING FILE! ======");
         let mut output = self.output.take().unwrap();
         let complete_tx = self.complete_tx.take().unwrap();
 
@@ -935,13 +915,6 @@ impl Future for AudioFileFetch {
             );
 
             if bytes_pending < desired_pending_bytes {
-                trace!(
-                    "Prefetching more data. pending: {}, desired: {}, ping: {}, rate: {}",
-                    bytes_pending,
-                    desired_pending_bytes,
-                    ping_time_seconds,
-                    download_rate
-                );
                 self.pre_fetch_more_data(desired_pending_bytes - bytes_pending);
             }
         }
@@ -982,18 +955,11 @@ impl Read for AudioFileStreaming {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length_to_request));
 
-        trace!("reading at postion {} (length : {})", offset, length);
-
         let mut download_status = self.shared.download_status.lock().unwrap();
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
 
         for range in ranges_to_request.iter() {
-            trace!(
-                "requesting data at position {} (length : {})",
-                range.start,
-                range.length
-            );
             self.stream_loader_command_tx
                 .unbounded_send(StreamLoaderCommand::Fetch(range.clone()))
                 .unwrap();
@@ -1003,15 +969,18 @@ impl Read for AudioFileStreaming {
             return Ok(0);
         }
 
+        let mut download_message_printed = false;
         while !download_status.downloaded.contains(offset) {
-            trace!("waiting for download");
+            if !download_message_printed {
+                debug!("Waiting for download of file position {}. Downloaded ranges: {}. Pending ranges: {}", offset, download_status.downloaded, download_status.requested.minus(&download_status.downloaded));
+                download_message_printed = true;
+            }
             download_status = self
                 .shared
                 .cond
                 .wait_timeout(download_status, Duration::from_millis(1000))
                 .unwrap()
                 .0;
-            trace!("re-checking data availability at offset {}.", offset);
         }
         let available_length = download_status.downloaded.contained_length_from_value(offset);
         assert!(available_length > 0);
@@ -1021,7 +990,9 @@ impl Read for AudioFileStreaming {
         let read_len = min(length, available_length);
         let read_len = try!(self.read_file.read(&mut output[..read_len]));
 
-        trace!("read successfully at postion {} (length : {})", offset, read_len);
+        if download_message_printed {
+            debug!("Read at postion {} completed. {} bytes returned, {} bytes were requested.", offset, read_len, output.len());
+        }
 
         self.position += read_len as u64;
         self.shared
