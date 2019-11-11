@@ -15,7 +15,7 @@ _Note: librespot only works with Spotify Premium. This will remain the case for 
 ## Quick start
 We're available on [crates.io](https://crates.io/crates/librespot) as the _librespot_ package. Simply run `cargo install librespot` to install librespot on your system. Check the wiki for more info and possible [usage options](https://github.com/librespot-org/librespot/wiki/Options).
 
-After installation, you can run librespot form the CLI using a command such as `librespot -n "Librespot Speaker" -b 192` to create a speaker called _Librespot Speaker_ serving 192kbps audio.
+After installation, you can run librespot form the CLI using a command such as `librespot -n "Librespot Speaker" -b 160` to create a speaker called _Librespot Speaker_ serving 160kbps audio.
 
 ## This fork
 As the origin by [plietar](https://github.com/plietar/) is no longer actively maintained, this organisation and repository have been set up so that the project may be maintained and upgraded in the future.
