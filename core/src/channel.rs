@@ -3,7 +3,7 @@ use bytes::Bytes;
 use futures::sync::{mpsc, BiLock};
 use futures::{Async, Poll, Stream};
 use std::collections::HashMap;
-use std::time::{Instant};
+use std::time::Instant;
 
 use util::SeqGenerator;
 
@@ -64,11 +64,11 @@ impl ChannelManager {
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
 
         self.lock(|inner| {
-
             let current_time = Instant::now();
             if let Some(download_measurement_start) = inner.download_measurement_start {
                 if (current_time - download_measurement_start).as_millis() > 1000 {
-                    inner.download_rate_estimate = 1000 * inner.download_measurement_bytes / (current_time - download_measurement_start).as_millis() as usize;
+                    inner.download_rate_estimate = 1000 * inner.download_measurement_bytes
+                        / (current_time - download_measurement_start).as_millis() as usize;
                     inner.download_measurement_start = Some(current_time);
                     inner.download_measurement_bytes = 0;
                 }
@@ -85,12 +85,8 @@ impl ChannelManager {
     }
 
     pub fn get_download_rate_estimate(&self) -> usize {
-        return self.lock(|inner| {
-            inner.download_rate_estimate
-        });
-
+        return self.lock(|inner| inner.download_rate_estimate);
     }
-
 }
 
 impl Channel {

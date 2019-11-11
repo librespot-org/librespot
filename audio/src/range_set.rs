@@ -1,9 +1,6 @@
-
-use std::cmp::{max,min};
-use std::slice::Iter;
+use std::cmp::{max, min};
 use std::fmt;
-
-
+use std::slice::Iter;
 
 #[derive(Copy, Clone)]
 pub struct Range {
@@ -13,26 +10,22 @@ pub struct Range {
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        return write!(f, "[{}, {}]", self.start, self.start+self.length-1);
+        return write!(f, "[{}, {}]", self.start, self.start + self.length - 1);
     }
 }
 
-
 impl Range {
-
     pub fn new(start: usize, length: usize) -> Range {
         return Range {
             start: start,
             length: length,
-        }
+        };
     }
 
     pub fn end(&self) -> usize {
         return self.start + self.length;
     }
-
 }
-
 
 #[derive(Clone)]
 pub struct RangeSet {
@@ -49,11 +42,9 @@ impl fmt::Display for RangeSet {
     }
 }
 
-
-
 impl RangeSet {
     pub fn new() -> RangeSet {
-        RangeSet{
+        RangeSet {
             ranges: Vec::<Range>::new(),
         }
     }
@@ -98,7 +89,6 @@ impl RangeSet {
             }
         }
         return 0;
-
     }
 
     #[allow(dead_code)]
@@ -111,23 +101,20 @@ impl RangeSet {
         return true;
     }
 
-
-    pub fn add_range(&mut self, range:&Range) {
-
+    pub fn add_range(&mut self, range: &Range) {
         if range.length <= 0 {
             // the interval is empty or invalid -> nothing to do.
             return;
         }
 
-
         for index in 0..self.ranges.len() {
             // the new range is clear of any ranges we already iterated over.
-            if  range.end() < self.ranges[index].start{
+            if range.end() < self.ranges[index].start {
                 // the new range starts after anything we already passed and ends before the next range starts (they don't touch) -> insert it.
                 self.ranges.insert(index, range.clone());
                 return;
-
-            } else if range.start <= self.ranges[index].end() &&  self.ranges[index].start <= range.end() {
+            } else if range.start <= self.ranges[index].end() && self.ranges[index].start <= range.end()
+            {
                 // the new range overlaps (or touches) the first range. They are to be merged.
                 // In addition we might have to merge further ranges in as well.
 
@@ -142,7 +129,6 @@ impl RangeSet {
 
                 self.ranges.insert(index, new_range);
                 return;
-
             }
         }
 
@@ -165,7 +151,6 @@ impl RangeSet {
     }
 
     pub fn subtract_range(&mut self, range: &Range) {
-
         if range.length <= 0 {
             return;
         }
@@ -175,8 +160,7 @@ impl RangeSet {
 
             if range.end() <= self.ranges[index].start {
                 // the remaining ranges are past the one to subtract. -> we're done.
-                return
-
+                return;
             } else if range.start <= self.ranges[index].start && self.ranges[index].start < range.end() {
                 // the range to subtract started before the current range and reaches into the current range
                 // -> we have to remove the beginning of the range or the entire range and do the same for following ranges.
@@ -191,7 +175,6 @@ impl RangeSet {
                 }
 
                 return;
-
             } else if range.end() < self.ranges[index].end() {
                 // the range to subtract punches a hole into the current range -> we need to create two smaller ranges.
 
@@ -206,11 +189,9 @@ impl RangeSet {
                 self.ranges.insert(index, first_range);
 
                 return;
-
             } else if range.start < self.ranges[index].end() {
                 // the range truncates the existing range -> truncate the range. Let the for loop take care of overlaps with other ranges.
                 self.ranges[index].length = range.start - self.ranges[index].start;
-
             }
         }
     }
@@ -245,19 +226,15 @@ impl RangeSet {
                 let new_start = max(self.ranges[self_index].start, other.ranges[other_index].start);
                 let new_end = min(self.ranges[self_index].end(), other.ranges[other_index].end());
                 assert!(new_start <= new_end);
-                result.add_range(&Range::new(new_start, new_end-new_start));
+                result.add_range(&Range::new(new_start, new_end - new_start));
                 if self.ranges[self_index].end() <= other.ranges[other_index].end() {
                     self_index += 1;
                 } else {
                     other_index += 1;
                 }
-
             }
-
         }
 
         return result;
     }
-
 }
-
