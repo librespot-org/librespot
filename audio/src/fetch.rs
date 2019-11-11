@@ -971,9 +971,11 @@ impl Read for AudioFileStreaming {
 
         let mut download_message_printed = false;
         while !download_status.downloaded.contains(offset) {
-            if !download_message_printed {
-                debug!("Waiting for download of file position {}. Downloaded ranges: {}. Pending ranges: {}", offset, download_status.downloaded, download_status.requested.minus(&download_status.downloaded));
-                download_message_printed = true;
+            if let DownloadStrategy::Streaming() = *self.shared.download_strategy.lock().unwrap() {
+                if !download_message_printed {
+                    debug!("Stream waiting for download of file position {}. Downloaded ranges: {}. Pending ranges: {}", offset, download_status.downloaded, download_status.requested.minus(&download_status.downloaded));
+                    download_message_printed = true;
+                }
             }
             download_status = self
                 .shared
