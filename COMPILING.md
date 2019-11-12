@@ -37,7 +37,7 @@ sudo dnf install gcc
 ### Audio library dependencies
 Depending on the chosen backend, specific development libraries are required. 
 
-*_Note this is an non extensive list, open a PR to add to it!_*
+*_Note this is an non-exhaustive list, open a PR to add to it!_*
 
 | Audio backend               | Debian/Ubuntu                    | Fedora  | macOS |
 |--------------------|------------------------------| ------------------------------| -- |
@@ -49,7 +49,7 @@ Depending on the chosen backend, specific development libraries are required.
 |SDL| `libsdl2-dev`| `SDL2-devel` | 
 |Pipe| - | - | - |
 
-###### For example, to build an ALSA based backend, you would need to run the following:
+###### For example, to build an ALSA based backend, you would need to run the following to install the required dependencies:
 
 On Debian/Ubuntu:
 ```shell
@@ -76,7 +76,7 @@ Once your build environment is setup, compiling the code is pretty simple.
 
 ### Compiling
 
-To build a ```debug``` build, from the project root:
+To build a ```debug``` build with the default backend, from the project root run:
 
 ```bash
 cargo build
@@ -88,7 +88,7 @@ And for ```release```:
 cargo build --release
 ```
 
-You will most likely want to build debug builds when developing, as they are faster, and more verbose, for the purposes of debugging.
+You will most likely want to build debug builds when developing, as they compile faster, and more verbose, and as the name suggests, are for the purposes of debugging. When submitting a bug report, it is recommended to use a debug build to capture stack traces.
 
 There are also a number of compiler feature flags that you can add, in the event that you want to have certain additional features also compiled. The list of these is available on the [wiki](https://github.com/librespot-org/librespot/wiki/Compiling#addition-features).
 
@@ -96,6 +96,11 @@ By default, librespot compiles with the ```rodio-backend``` feature. To compile 
 
 ```bash
 cargo build --no-default-features
+```
+
+Similarly, to build with the ALSA backend:
+```bash
+cargo build --no-default-features --features "alsa-backend"
 ```
 
 ### Running
