@@ -24,7 +24,7 @@ extern crate block_modes;
 extern crate dns_sd;
 
 #[cfg(not(feature = "with-dns-sd"))]
-extern crate mdns;
+extern crate libmdns;
 
 extern crate librespot_core;
 extern crate librespot_playback as playback;

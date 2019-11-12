@@ -3,6 +3,7 @@ use bytes::Bytes;
 use futures::sync::{mpsc, BiLock};
 use futures::{Async, Poll, Stream};
 use std::collections::HashMap;
+use std::time::Instant;
 
 use util::SeqGenerator;
 
@@ -10,6 +11,9 @@ component! {
     ChannelManager : ChannelManagerInner {
         sequence: SeqGenerator<u16> = SeqGenerator::new(0),
         channels: HashMap<u16, mpsc::UnboundedSender<(u8, Bytes)>> = HashMap::new(),
+        download_rate_estimate: usize = 0,
+        download_measurement_start: Option<Instant> = None,
+        download_measurement_bytes: usize = 0,
     }
 }
 
@@ -60,10 +64,28 @@ impl ChannelManager {
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
 
         self.lock(|inner| {
+            let current_time = Instant::now();
+            if let Some(download_measurement_start) = inner.download_measurement_start {
+                if (current_time - download_measurement_start).as_millis() > 1000 {
+                    inner.download_rate_estimate = 1000 * inner.download_measurement_bytes
+                        / (current_time - download_measurement_start).as_millis() as usize;
+                    inner.download_measurement_start = Some(current_time);
+                    inner.download_measurement_bytes = 0;
+                }
+            } else {
+                inner.download_measurement_start = Some(current_time);
+            }
+
+            inner.download_measurement_bytes += data.len();
+
             if let Entry::Occupied(entry) = inner.channels.entry(id) {
                 let _ = entry.get().unbounded_send((cmd, data));
             }
         });
+    }
+
+    pub fn get_download_rate_estimate(&self) -> usize {
+        return self.lock(|inner| inner.download_rate_estimate);
     }
 }
 

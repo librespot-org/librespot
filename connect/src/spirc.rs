@@ -13,14 +13,14 @@ use context::StationContext;
 use librespot_core::config::ConnectConfig;
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
-use librespot_core::spotify_id::SpotifyId;
+use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
 use librespot_core::util::SeqGenerator;
 use librespot_core::version;
 use librespot_core::volume::Volume;
 use playback::mixer::Mixer;
 use playback::player::Player;
 use protocol;
-use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State};
+use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
 
 pub struct SpircTask {
     player: Player,
@@ -168,6 +168,7 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
                     let repeated = msg.mut_stringValue();
                     repeated.push(::std::convert::Into::into("audio/local"));
                     repeated.push(::std::convert::Into::into("audio/track"));
+                    repeated.push(::std::convert::Into::into("audio/episode"));
                     repeated.push(::std::convert::Into::into("local"));
                     repeated.push(::std::convert::Into::into("track"))
                 };
@@ -796,6 +797,7 @@ impl SpircTask {
     }
 
     fn update_tracks(&mut self, frame: &protocol::spirc::Frame) {
+        debug!("State: {:?}", frame.get_state());
         let index = frame.get_state().get_playing_track_index();
         let context_uri = frame.get_state().get_context_uri().to_owned();
         let tracks = frame.get_state().get_track();
@@ -811,24 +813,50 @@ impl SpircTask {
         self.state.set_shuffle(frame.get_state().get_shuffle());
     }
 
+    // should this be a method of SpotifyId directly?
+    fn get_spotify_id_for_track(&self, track_ref: &TrackRef) -> Result<SpotifyId, SpotifyIdError> {
+        SpotifyId::from_raw(track_ref.get_gid()).or_else(|_| {
+            let uri = track_ref.get_uri();
+            debug!("Malformed or no gid, attempting to parse URI <{}>", uri);
+            SpotifyId::from_uri(uri)
+        })
+    }
+
     fn load_track(&mut self, play: bool) {
+        let context_uri = self.state.get_context_uri().to_owned();
+        let mut index = self.state.get_playing_track_index();
+        let start_index = index;
+        let tracks_len = self.state.get_track().len() as u32;
+        debug!(
+            "Loading context: <{}> index: [{}] of {}",
+            context_uri, index, tracks_len
+        );
+        // Cycle through all tracks, break if we don't find any playable tracks
+        // TODO: This will panic if no playable tracks are found!
+        // tracks in each frame either have a gid or uri (that may or may not be a valid track)
+        // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
         let track = {
-            let mut index = self.state.get_playing_track_index();
-            // Check for malformed gid
-            let tracks_len = self.state.get_track().len() as u32;
-            let mut track_ref = &self.state.get_track()[index as usize];
-            while track_ref.get_gid().len() != 16 {
+            let mut track_ref = self.state.get_track()[index as usize].clone();
+            let mut track_id = self.get_spotify_id_for_track(&track_ref);
+            while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable {
                 warn!(
-                    "Skipping track {:?} at position [{}] of {}",
+                    "Skipping track <{:?}> at position [{}] of {}",
                     track_ref.get_uri(),
                     index,
                     tracks_len
                 );
                 index = if index + 1 < tracks_len { index + 1 } else { 0 };
-                track_ref = &self.state.get_track()[index as usize];
+                self.state.set_playing_track_index(index);
+                if index == start_index {
+                    warn!("No playable track found in state: {:?}", self.state);
+                    break;
+                }
+                track_ref = self.state.get_track()[index as usize].clone();
+                track_id = self.get_spotify_id_for_track(&track_ref);
             }
-            SpotifyId::from_raw(track_ref.get_gid()).unwrap()
-        };
+            track_id
+        }
+        .expect("Invalid SpotifyId");
 
         let position = self.state.get_position_ms();
         let end_of_track = self.player.load(track, play, position);

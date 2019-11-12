@@ -1,12 +1,22 @@
 language: rust
 rust:
-  - 1.32.0
+  - 1.33.0
   - stable
   - beta
   - nightly
 
 cache: cargo
-
+# Reduce cache bloat 
+before_cache:
+  - rm -rfv "$TRAVIS_HOME/.cargo/registry/src"
+  - rm -rfv target/debug/incremental/{librespot,build_script_build}-*
+  - rm -rfv target/debug/.fingerprint/librespot-*
+  - rm -rfv target/debug/build/librespot-*
+  - rm -rfv target/debug/deps/liblibrespot-*
+  - rm -rfv target/debug/deps/librespot-*
+  - rm -rfv target/debug/{librespot,liblibrespot}.d
+  - cargo clean -p librespot librespot-core librespot-connect librespot-audio librespot-metadata  librespot-playback
+  
 addons:
   apt:
     packages:
@@ -25,6 +35,7 @@ before_script:
 
 script:
     - cargo build --locked --no-default-features
+    - cargo build --locked --examples
     - cargo build --locked --no-default-features --features "with-tremor"
     - cargo build --locked --no-default-features --features "with-vorbis"
     - cargo build --locked --no-default-features --features "alsa-backend"
