@@ -3,7 +3,7 @@ name = "librespot"
 version = "0.1.0"
 authors = ["Librespot Org"]
 license = "MIT"
-description = "Open Source Spotify client library"
+description = "An open source client library for Spotify, with support for Spotify Connect"
 keywords = ["spotify"]
 repository = "https://github.com/librespot-org/librespot"
 readme = "README.md"
@@ -40,7 +40,7 @@ version = "0.1.0"
 
 [dependencies]
 base64 = "0.10"
-env_logger = "0.6"
+env_logger =  {version = "0.6", default-features = false, features = ["termcolor","humantime","atty"]} 
 futures = "0.1"
 getopts = "0.2"
 hyper = "0.11"
