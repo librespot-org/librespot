@@ -5,12 +5,12 @@ extern crate log;
 
 extern crate bit_set;
 extern crate byteorder;
-extern crate crypto;
 extern crate num_bigint;
 extern crate num_traits;
 extern crate tempfile;
+extern crate aes_ctr;
 
-extern crate librespot_core as core;
+extern crate librespot_core;
 
 mod decrypt;
 mod fetch;

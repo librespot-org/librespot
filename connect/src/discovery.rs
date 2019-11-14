@@ -1,7 +1,9 @@
 use base64;
-use crypto;
-use crypto::digest::Digest;
-use crypto::mac::Mac;
+use sha1::{Sha1, Digest};
+use hmac::{Hmac, Mac};
+use aes_ctr::Aes128Ctr;
+use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
+use aes_ctr::stream_cipher::generic_array::GenericArray;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Stream};
 use hyper::server::{Http, Request, Response, Service};
@@ -11,7 +13,7 @@ use hyper::{self, Get, Post, StatusCode};
 use dns_sd::DNSService;
 
 #[cfg(not(feature = "with-dns-sd"))]
-use mdns;
+use libmdns;
 
 use num_bigint::BigUint;
 use rand;
@@ -21,10 +23,12 @@ use std::sync::Arc;
 use tokio_core::reactor::Handle;
 use url;
 
-use core::authentication::Credentials;
-use core::config::ConnectConfig;
-use core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
-use core::util;
+use librespot_core::authentication::Credentials;
+use librespot_core::config::ConnectConfig;
+use librespot_core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
+use librespot_core::util;
+
+type HmacSha1 = Hmac<Sha1>;
 
 #[derive(Clone)]
 struct Discovery(Arc<DiscoveryInner>);
@@ -106,33 +110,27 @@ impl Discovery {
         let encrypted = &encrypted_blob[16..encrypted_blob.len() - 20];
         let cksum = &encrypted_blob[encrypted_blob.len() - 20..encrypted_blob.len()];
 
-        let base_key = {
-            let mut data = [0u8; 20];
-            let mut h = crypto::sha1::Sha1::new();
-            h.input(&shared_key.to_bytes_be());
-            h.result(&mut data);
-            data[..16].to_owned()
-        };
+        let base_key = Sha1::digest(&shared_key.to_bytes_be());
+        let base_key = &base_key[..16];
 
         let checksum_key = {
-            let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &base_key);
+            let mut h = HmacSha1::new_varkey(base_key)
+                .expect("HMAC can take key of any size");
             h.input(b"checksum");
-            h.result().code().to_owned()
+            h.result().code()
         };
 
         let encryption_key = {
-            let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &base_key);
+            let mut h = HmacSha1::new_varkey(&base_key)
+                .expect("HMAC can take key of any size");
             h.input(b"encryption");
-            h.result().code().to_owned()
+            h.result().code()
         };
 
-        let mac = {
-            let mut h = crypto::hmac::Hmac::new(crypto::sha1::Sha1::new(), &checksum_key);
-            h.input(encrypted);
-            h.result().code().to_owned()
-        };
-
-        if mac != cksum {
+        let mut h = HmacSha1::new_varkey(&checksum_key)
+            .expect("HMAC can take key of any size");
+        h.input(encrypted);
+        if let Err(_) = h.verify(cksum) {
             warn!("Login error for user {:?}: MAC mismatch", username);
             let result = json!({
                 "status": 102,
@@ -145,10 +143,12 @@ impl Discovery {
         }
 
         let decrypted = {
-            let mut data = vec![0u8; encrypted.len()];
-            let mut cipher =
-                crypto::aes::ctr(crypto::aes::KeySize::KeySize128, &encryption_key[0..16], iv);
-            cipher.process(encrypted, &mut data);
+            let mut data = encrypted.to_vec();
+            let mut cipher = Aes128Ctr::new(
+                &GenericArray::from_slice(&encryption_key[0..16]),
+                &GenericArray::from_slice(iv),
+            );
+            cipher.apply_keystream(&mut data);
             String::from_utf8(data).unwrap()
         };
 
@@ -218,7 +218,7 @@ pub struct DiscoveryStream {
 #[cfg(not(feature = "with-dns-sd"))]
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
-    _svc: mdns::Service,
+    _svc: libmdns::Service,
 }
 
 pub fn discovery(
@@ -263,7 +263,7 @@ pub fn discovery(
     ).unwrap();
 
     #[cfg(not(feature = "with-dns-sd"))]
-    let responder = mdns::Responder::spawn(&handle)?;
+    let responder = libmdns::Responder::spawn(&handle)?;
 
     #[cfg(not(feature = "with-dns-sd"))]
     let svc = responder.register(

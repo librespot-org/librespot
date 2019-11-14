@@ -1,5 +1,5 @@
 #[cfg(feature = "with-tremor")]
-extern crate tremor as vorbis;
+extern crate librespot_tremor as vorbis;
 #[cfg(not(feature = "with-tremor"))]
 extern crate vorbis;
 

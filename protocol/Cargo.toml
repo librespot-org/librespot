@@ -3,9 +3,12 @@ name = "librespot-protocol"
 version = "0.1.0"
 authors = ["Paul Liétar <paul@lietar.net>"]
 build = "build.rs"
+description="The protobuf logic for communicating with Spotify servers"
+license="MIT"
 
 [dependencies]
-protobuf = "2.0.5"
+protobuf = "2.8.1"
 
 [build-dependencies]
-protobuf-codegen-pure = "2.0.5"
+protobuf-codegen-pure = "2.8.1"
+protobuf-codegen = "2.8.1"

@@ -11,13 +11,13 @@ use std::thread;
 use std::time::Duration;
 
 use config::{Bitrate, PlayerConfig};
-use core::session::Session;
-use core::spotify_id::SpotifyId;
+use librespot_core::session::Session;
+use librespot_core::spotify_id::SpotifyId;
 
 use audio::{AudioDecoder, AudioPacket, PassthroughDecoder, VorbisDecoder};
 use audio::{AudioDecrypt, AudioFile};
 use audio_backend::Sink;
-use metadata::{FileFormat, Metadata, Track};
+use metadata::{AudioItem, FileFormat};
 use mixer::AudioFilter;
 
 pub struct Player {
@@ -514,57 +514,68 @@ impl PlayerInternal {
         let _ = self.event_sender.unbounded_send(event.clone());
     }
 
-    fn find_available_alternative<'a>(&self, track: &'a Track) -> Option<Cow<'a, Track>> {
-        if track.available {
-            Some(Cow::Borrowed(track))
+    fn find_available_alternative<'a>(&self, audio: &'a AudioItem) -> Option<Cow<'a, AudioItem>> {
+        if audio.available {
+            Some(Cow::Borrowed(audio))
         } else {
-            let alternatives = track
-                .alternatives
-                .iter()
-                .map(|alt_id| Track::get(&self.session, *alt_id));
-            let alternatives = future::join_all(alternatives).wait().unwrap();
-
-            alternatives.into_iter().find(|alt| alt.available).map(Cow::Owned)
+            if let Some(alternatives) = &audio.alternatives {
+                let alternatives = alternatives
+                    .iter()
+                    .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id));
+                let alternatives = future::join_all(alternatives).wait().unwrap();
+                alternatives.into_iter().find(|alt| alt.available).map(Cow::Owned)
+            } else {
+                None
+            }
         }
     }
 
-    fn load_track(&self, track_id: SpotifyId, position: i64) -> Option<(Decoder, f32)> {
-        let track = Track::get(&self.session, track_id).wait().unwrap();
+    fn load_track(&self, spotify_id: SpotifyId, position: i64) -> Option<(Decoder, f32)> {
+        let audio = AudioItem::get_audio_item(&self.session, spotify_id)
+            .wait()
+            .unwrap();
+        info!("Loading <{}> with Spotify URI <{}>", audio.name, audio.uri);
 
-        info!(
-            "Loading track \"{}\" with Spotify URI \"spotify:track:{}\"",
-            track.name,
-            track_id.to_base62()
-        );
-
-        let track = match self.find_available_alternative(&track) {
-            Some(track) => track,
+        let audio = match self.find_available_alternative(&audio) {
+            Some(audio) => audio,
             None => {
-                warn!("Track \"{}\" is not available", track.name);
+                warn!("<{}> is not available", audio.uri);
                 return None;
             }
         };
-
-        let format = match self.config.bitrate {
-            Bitrate::Bitrate96 => FileFormat::OGG_VORBIS_96,
-            Bitrate::Bitrate160 => FileFormat::OGG_VORBIS_160,
-            Bitrate::Bitrate320 => FileFormat::OGG_VORBIS_320,
+        // (Most) podcasts seem to support only 96 bit Vorbis, so fall back to it
+        let formats = match self.config.bitrate {
+            Bitrate::Bitrate96 => [
+                FileFormat::OGG_VORBIS_96,
+                FileFormat::OGG_VORBIS_160,
+                FileFormat::OGG_VORBIS_320,
+            ],
+            Bitrate::Bitrate160 => [
+                FileFormat::OGG_VORBIS_160,
+                FileFormat::OGG_VORBIS_96,
+                FileFormat::OGG_VORBIS_320,
+            ],
+            Bitrate::Bitrate320 => [
+                FileFormat::OGG_VORBIS_320,
+                FileFormat::OGG_VORBIS_160,
+                FileFormat::OGG_VORBIS_96,
+            ],
         };
+        let format = formats
+            .iter()
+            .find(|format| audio.files.contains_key(format))
+            .unwrap();
 
-        let file_id = match track.files.get(&format) {
+        let file_id = match audio.files.get(&format) {
             Some(&file_id) => file_id,
             None => {
-                warn!("Track \"{}\" is not available in format {:?}", track.name, format);
+                warn!("<{}> in not available in format {:?}", audio.name, format);
                 return None;
             }
         };
 
-        let key = self
-            .session
-            .audio_key()
-            .request(track.id, file_id);
+        let key = self.session.audio_key().request(spotify_id, file_id);
         let encrypted_file = AudioFile::open(&self.session, file_id);
-
 
         let encrypted_file = encrypted_file.wait().unwrap();
         let key = key.wait().unwrap();
@@ -592,9 +603,7 @@ impl PlayerInternal {
                 Err(err) => error!("Vorbis error: {:?}", err),
             }
         }
-
-        info!("Track \"{}\" loaded", track.name);
-
+        info!("<{}> loaded", audio.name);
         Some((decoder, normalisation_factor))
     }
 }

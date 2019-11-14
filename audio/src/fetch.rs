@@ -9,9 +9,9 @@ use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, Condvar, Mutex};
 use tempfile::NamedTempFile;
 
-use core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
-use core::session::Session;
-use core::spotify_id::FileId;
+use librespot_core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
+use librespot_core::session::Session;
+use librespot_core::spotify_id::FileId;
 
 const CHUNK_SIZE: usize = 0x20000;
 
@@ -61,7 +61,7 @@ impl AudioFileOpenStreaming {
         });
 
         let mut write_file = NamedTempFile::new().unwrap();
-        write_file.set_len(size as u64).unwrap();
+        write_file.as_file().set_len(size as u64).unwrap();
         write_file.seek(SeekFrom::Start(0)).unwrap();
 
         let read_file = write_file.reopen().unwrap();

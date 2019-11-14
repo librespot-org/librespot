@@ -1,11 +1,11 @@
 [package]
 name = "librespot"
 version = "0.1.0"
-authors = ["Paul Liétar <paul@lietar.net>"]
+authors = ["Librespot Org"]
 license = "MIT"
 description = "Open Source Spotify client library"
 keywords = ["spotify"]
-repository = "https://github.com/plietar/librespot"
+repository = "https://github.com/librespot-org/librespot"
 readme = "README.md"
 
 [workspace]
@@ -21,57 +21,56 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
+version = "0.1.0"
 [dependencies.librespot-connect]
 path = "connect"
+version = "0.1.0"
 [dependencies.librespot-core]
 path = "core"
+version = "0.1.0"
 [dependencies.librespot-metadata]
 path = "metadata"
+version = "0.1.0"
 [dependencies.librespot-playback]
 path = "playback"
+version = "0.1.0"
 [dependencies.librespot-protocol]
 path = "protocol"
+version = "0.1.0"
 
 [dependencies]
-base64 = "0.5.0"
-env_logger = "0.4.0"
-futures = "0.1.8"
-getopts = "0.2.14"
-hyper = "0.11.2"
-log = "0.3.5"
-num-bigint = "0.1.35"
-protobuf = "1.1"
-rand = "0.6"
-rpassword = "0.3.0"
-rust-crypto = "0.2.36"
-serde = "0.9.6"
-serde_derive = "0.9.6"
-serde_json = "0.9.5"
-tokio-core = "0.1.2"
+base64 = "0.10"
+env_logger = "0.6"
+futures = "0.1"
+getopts = "0.2"
+hyper = "0.11"
+log = "0.4"
+num-bigint = "0.2"
+protobuf = "2.8.1"
+rand = "0.7"
+rpassword = "3.0"
+tokio-core = "0.1"
 tokio-io = "0.1"
-tokio-process = "0.2.2"
-tokio-signal = "0.1.2"
-url = "1.7.0"
-
-[build-dependencies]
-rand            = "0.6"
-vergen          = "0.1.0"
-
-[replace]
-"rust-crypto:0.2.36" = { git = "https://github.com/awmath/rust-crypto.git", branch = "avx2" }
+tokio-process = "0.2"
+tokio-signal = "0.2"
+url = "1.7"
+sha-1 = "0.8"
+hex = "0.3"
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
 jackaudio-backend = ["librespot-playback/jackaudio-backend"]
+rodio-backend = ["librespot-playback/rodio-backend"]
+sdl-backend = ["librespot-playback/sdl-backend"]
 
 with-tremor = ["librespot-audio/with-tremor"]
 with-vorbis = ["librespot-audio/with-vorbis"]
 
 with-dns-sd = ["librespot-connect/with-dns-sd"]
 
-default = ["librespot-playback/portaudio-backend"]
+default = ["librespot-playback/rodio-backend"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"

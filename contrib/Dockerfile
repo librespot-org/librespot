@@ -21,7 +21,7 @@ RUN dpkg --add-architecture armel
 RUN dpkg --add-architecture mipsel
 RUN apt-get update
 
-RUN apt-get install -y curl git build-essential crossbuild-essential-arm64 crossbuild-essential-armel crossbuild-essential-armhf crossbuild-essential-mipsel
+RUN apt-get install -y curl git build-essential crossbuild-essential-arm64 crossbuild-essential-armel crossbuild-essential-armhf crossbuild-essential-mipsel pkg-config
 RUN apt-get install -y libasound2-dev libasound2-dev:arm64 libasound2-dev:armel libasound2-dev:armhf libasound2-dev:mipsel
 
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
@@ -43,6 +43,11 @@ RUN mkdir /build && \
 
 ENV CARGO_TARGET_DIR /build
 ENV CARGO_HOME /build/cache
+ENV PKG_CONFIG_ALLOW_CROSS=1
+ENV PKG_CONFIG_PATH_aarch64-unknown-linux-gnu=/usr/lib/aarch64-linux-gnu/pkgconfig/
+ENV PKG_CONFIG_PATH_arm-unknown-linux-gnueabihf=/usr/lib/arm-linux-gnueabihf/pkgconfig/
+ENV PKG_CONFIG_PATH_arm-unknown-linux-gnueabi=/usr/lib/arm-linux-gnueabi/pkgconfig/
+ENV PKG_CONFIG_PATH_mipsel-unknown-linux-gnu=/usr/lib/mipsel-linux-gnu/pkgconfig/
 
 ADD . /src
 WORKDIR /src
