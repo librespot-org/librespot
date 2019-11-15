@@ -15,26 +15,27 @@ _Note: librespot only works with Spotify Premium. This will remain the case for 
 ## Quick start
 We're available on [crates.io](https://crates.io/crates/librespot) as the _librespot_ package. Simply run `cargo install librespot` to install librespot on your system. Check the wiki for more info and possible [usage options](https://github.com/librespot-org/librespot/wiki/Options).
 
-After installation, you can run librespot form the CLI using a command such as `librespot -n "Librespot Speaker" -b 160` to create a speaker called _Librespot Speaker_ serving 160kbps audio.
+After installation, you can run librespot from the CLI using a command such as `librespot -n "Librespot Speaker" -b 160` to create a speaker called _Librespot Speaker_ serving 160kbps audio.
 
 ## This fork
 As the origin by [plietar](https://github.com/plietar/) is no longer actively maintained, this organisation and repository have been set up so that the project may be maintained and upgraded in the future.
 
 # Documentation
-Documentation is currently a work in progress.
+Documentation is currently a work in progress, contributions are welcome!
 
-There is some brief documentation on how the protocol works in the [docs](https://github.com/librespot-org/librespot/tree/master/docs) folder, and more general usage and compilation information is available on the [wiki](https://github.com/librespot-org/librespot/wiki).
+There is some brief documentation on how the protocol works in the [docs](https://github.com/librespot-org/librespot/tree/master/docs) folder, 
 
-[CONTRIBUTING.md](https://github.com/librespot-org/librespot/blob/master/CONTRIBUTING.md) also contains detailed instructions on setting up a development environment, compilation, and contributing guidelines.
+[COMPILING.md](https://github.com/librespot-org/librespot/blob/master/COMPILING.md) contains detailed instructions on setting up a development environment, and compiling librespot. More general usage and compilation information is available on the [wiki](https://github.com/librespot-org/librespot/wiki).
+[CONTRIBUTING.md](https://github.com/librespot-org/librespot/blob/master/CONTRIBUTING.md) also contains our contributing guidelines.
 
-If you wish to learn more about how librespot works overall, the best way is to simply read the code, and ask any questions you have in the Gitter chat linked above.
+If you wish to learn more about how librespot works overall, the best way is to simply read the code, and ask any questions you have in our [Gitter Room](https://gitter.im/librespot-org/spotify-connect-resources).
 
 # Issues
 
 If you run into a bug when using librespot, please search the existing issues before opening a new one. Chances are, we've encountered it before, and have provided a resolution. If not, please open a new one, and where possible, include the backtrace librespot generates on crashing, along with anything we can use to reproduce the issue, eg. the Spotify URI of the song that caused the crash.
 
 # Building
-Rust 1.32.0 or later is required to build librespot.
+A quick walk through of the build process is outlined here, while a detailed compilation guide can be found [here](https://github.com/librespot-org/librespot/blob/master/COMPILING.md). 
 
 ## Additional Dependencies
 We recently switched to using [Rodio](https://github.com/tomaka/rodio) for audio playback by default, hence for macOS and Windows, you should just be able to clone and build librespot (with the command below).
@@ -60,7 +61,7 @@ JACK
 SDL
 Pipe
 ```
-Please check the corresponding [compiling wiki entry](https://github.com/librespot-org/librespot/wiki/Compiling#dependencies) for backend specific dependencies.
+Please check the corresponding [compiling entry](https://github.com/librespot-org/librespot/wiki/Compiling#general-dependencies) for backend specific dependencies.
 
 Once you've installed the dependencies and cloned this repository you can build *librespot* with the default backend using Cargo.
 ```shell

@@ -5,7 +5,7 @@
 In order to compile librespot, you will first need to set up a suitable Rust build environment, with the necessary dependencies installed. You will need to have a C compiler, Rust, and the development libraries for the audio backend(s) you want installed. These instructions will walk you through setting up a simple build environment.
 
 ### Install Rust
-The easiest, and recommended way to get Rust is to use [rustup](https://rustup.rs). You can install `rustup` with this command:
+The easiest, and recommended way to get Rust is to use [rustup](https://rustup.rs). On Unix/MacOS You can install `rustup` with this command:
 
 ```bash
 curl https://sh.rustup.rs -sSf | sh
