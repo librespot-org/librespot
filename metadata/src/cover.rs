@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, WriteBytesExt};
 use std::io::Write;
 
-use core::channel::ChannelData;
-use core::session::Session;
-use core::spotify_id::FileId;
+use librespot_core::channel::ChannelData;
+use librespot_core::session::Session;
+use librespot_core::spotify_id::FileId;
 
 pub fn get(session: &Session, file: FileId) -> ChannelData {
     let (channel_id, channel) = session.channel().allocate();

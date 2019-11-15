@@ -99,7 +99,7 @@ impl error::Error for VorbisError {
         error::Error::description(&self.0)
     }
 
-    fn cause(&self) -> Option<&error::Error> {
-        error::Error::cause(&self.0)
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        error::Error::source(&self.0)
     }
 }

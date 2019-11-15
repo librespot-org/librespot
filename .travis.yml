@@ -1,12 +1,22 @@
 language: rust
 rust:
-  - 1.26.0
+  - 1.33.0
   - stable
   - beta
   - nightly
 
 cache: cargo
-
+# Reduce cache bloat 
+before_cache:
+  - rm -rfv "$TRAVIS_HOME/.cargo/registry/src"
+  - rm -rfv target/debug/incremental/{librespot,build_script_build}-*
+  - rm -rfv target/debug/.fingerprint/librespot-*
+  - rm -rfv target/debug/build/librespot-*
+  - rm -rfv target/debug/deps/liblibrespot-*
+  - rm -rfv target/debug/deps/librespot-*
+  - rm -rfv target/debug/{librespot,liblibrespot}.d
+  - cargo clean -p librespot librespot-core librespot-connect librespot-audio librespot-metadata  librespot-playback
+  
 addons:
   apt:
     packages:
@@ -14,6 +24,8 @@ addons:
       - libc6-dev-armhf-cross
       - libpulse-dev
       - portaudio19-dev
+      - libasound2-dev
+      - libsdl2-dev
 
 before_script:
     - mkdir -p ~/.cargo
@@ -23,11 +35,15 @@ before_script:
 
 script:
     - cargo build --locked --no-default-features
+    - cargo build --locked --examples
     - cargo build --locked --no-default-features --features "with-tremor"
     - cargo build --locked --no-default-features --features "with-vorbis"
+    - cargo build --locked --no-default-features --features "alsa-backend"
     - cargo build --locked --no-default-features --features "portaudio-backend"
     - cargo build --locked --no-default-features --features "pulseaudio-backend"
-    - cargo build --locked --no-default-features --features "alsa-backend"
+    - cargo build --locked --no-default-features --features "jackaudio-backend"
+    - cargo build --locked --no-default-features --features "rodio-backend"
+    - cargo build --locked --no-default-features --features "sdl-backend"
     - cargo build --locked --no-default-features --target armv7-unknown-linux-gnueabihf
 
 notifications:
