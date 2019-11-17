@@ -49,13 +49,13 @@ pub const READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS: f64 = 2.0;
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
-pub const READ_AHEAD_DURING_PLAYBACK_SECONDS: f64 = 1.0;
+pub const READ_AHEAD_DURING_PLAYBACK_SECONDS: f64 = 5.0;
 // While playing back, this many seconds of data ahead of the current read position are
 // requested.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
-pub const READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS: f64 = 2.0;
+pub const READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS: f64 = 10.0;
 // Same as READ_AHEAD_DURING_PLAYBACK_SECONDS, but the time is taken as a factor of the ping
 // time to the Spotify server.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
@@ -76,6 +76,13 @@ const FAST_PREFETCH_THRESHOLD_FACTOR: f64 = 1.5;
 // the download rate ramps up. However, this comes at the cost that it might hurt ping-time if a seek is
 // performed while downloading. Values smaller than 1 cause the download rate to collapse and effectively
 // only PREFETCH_THRESHOLD_FACTOR is in effect. Thus, set to zero if bandwidth saturation is not wanted.
+
+const MAX_PREFETCH_REQUESTS: usize = 4;
+// Limit the number of requests that are pending simultaneously before pre-fetching data. Pending
+// requests share bandwidth. Thus, havint too many requests can lead to the one that is needed next
+// for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
+// pre-fetch request is only sent if less than MAX_PREFETCH_REQUESTS are pending.
+
 
 pub enum AudioFile {
     Cached(fs::File),
@@ -726,10 +733,11 @@ impl AudioFileFetch {
         }
     }
 
-    fn pre_fetch_more_data(&mut self, bytes: usize) {
+    fn pre_fetch_more_data(&mut self, bytes: usize, max_requests_to_send: usize) {
         let mut bytes_to_go = bytes;
+        let mut requests_to_go = max_requests_to_send;
 
-        while bytes_to_go > 0 {
+        while bytes_to_go > 0 && requests_to_go > 0 {
             // determine what is still missing
             let mut missing_data = RangeSet::new();
             missing_data.add_range(&Range::new(0, self.shared.file_size));
@@ -750,6 +758,7 @@ impl AudioFileFetch {
                 let offset = range.start;
                 let length = min(range.length, bytes_to_go);
                 self.download_range(offset, length);
+                requests_to_go -=1;
                 bytes_to_go -= length;
             } else if !missing_data.is_empty() {
                 // ok, the tail is downloaded, download something fom the beginning.
@@ -757,6 +766,7 @@ impl AudioFileFetch {
                 let offset = range.start;
                 let length = min(range.length, bytes_to_go);
                 self.download_range(offset, length);
+                requests_to_go -=1;
                 bytes_to_go -= length;
             } else {
                 return;
@@ -899,23 +909,29 @@ impl Future for AudioFileFetch {
         }
 
         if let DownloadStrategy::Streaming() = self.get_download_strategy() {
-            let bytes_pending: usize = {
-                let download_status = self.shared.download_status.lock().unwrap();
-                download_status.requested.minus(&download_status.downloaded).len()
-            };
 
-            let ping_time_seconds =
-                0.001 * self.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as f64;
-            let download_rate = self.session.channel().get_download_rate_estimate();
+            let number_of_open_requests = self.shared.number_of_open_requests.load(atomic::Ordering::SeqCst);
+            let max_requests_to_send = MAX_PREFETCH_REQUESTS - min(MAX_PREFETCH_REQUESTS, number_of_open_requests);
 
-            let desired_pending_bytes = max(
-                (PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * self.shared.stream_data_rate as f64)
-                    as usize,
-                (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * download_rate as f64) as usize,
-            );
+            if (max_requests_to_send > 0) {
+                let bytes_pending: usize = {
+                    let download_status = self.shared.download_status.lock().unwrap();
+                    download_status.requested.minus(&download_status.downloaded).len()
+                };
 
-            if bytes_pending < desired_pending_bytes {
-                self.pre_fetch_more_data(desired_pending_bytes - bytes_pending);
+                let ping_time_seconds =
+                    0.001 * self.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as f64;
+                let download_rate = self.session.channel().get_download_rate_estimate();
+
+                let desired_pending_bytes = max(
+                    (PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * self.shared.stream_data_rate as f64)
+                        as usize,
+                    (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * download_rate as f64) as usize,
+                );
+
+                if bytes_pending < desired_pending_bytes {
+                    self.pre_fetch_more_data(desired_pending_bytes - bytes_pending, max_requests_to_send);
+                }
             }
         }
 
