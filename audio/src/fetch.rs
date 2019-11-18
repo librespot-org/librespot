@@ -83,7 +83,6 @@ const MAX_PREFETCH_REQUESTS: usize = 4;
 // for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
 // pre-fetch request is only sent if less than MAX_PREFETCH_REQUESTS are pending.
 
-
 pub enum AudioFile {
     Cached(fs::File),
     Streaming(AudioFileStreaming),
@@ -758,7 +757,7 @@ impl AudioFileFetch {
                 let offset = range.start;
                 let length = min(range.length, bytes_to_go);
                 self.download_range(offset, length);
-                requests_to_go -=1;
+                requests_to_go -= 1;
                 bytes_to_go -= length;
             } else if !missing_data.is_empty() {
                 // ok, the tail is downloaded, download something fom the beginning.
@@ -766,7 +765,7 @@ impl AudioFileFetch {
                 let offset = range.start;
                 let length = min(range.length, bytes_to_go);
                 self.download_range(offset, length);
-                requests_to_go -=1;
+                requests_to_go -= 1;
                 bytes_to_go -= length;
             } else {
                 return;
@@ -909,11 +908,12 @@ impl Future for AudioFileFetch {
         }
 
         if let DownloadStrategy::Streaming() = self.get_download_strategy() {
+            let number_of_open_requests =
+                self.shared.number_of_open_requests.load(atomic::Ordering::SeqCst);
+            let max_requests_to_send =
+                MAX_PREFETCH_REQUESTS - min(MAX_PREFETCH_REQUESTS, number_of_open_requests);
 
-            let number_of_open_requests = self.shared.number_of_open_requests.load(atomic::Ordering::SeqCst);
-            let max_requests_to_send = MAX_PREFETCH_REQUESTS - min(MAX_PREFETCH_REQUESTS, number_of_open_requests);
-
-            if (max_requests_to_send > 0) {
+            if max_requests_to_send > 0 {
                 let bytes_pending: usize = {
                     let download_status = self.shared.download_status.lock().unwrap();
                     download_status.requested.minus(&download_status.downloaded).len()
@@ -930,7 +930,10 @@ impl Future for AudioFileFetch {
                 );
 
                 if bytes_pending < desired_pending_bytes {
-                    self.pre_fetch_more_data(desired_pending_bytes - bytes_pending, max_requests_to_send);
+                    self.pre_fetch_more_data(
+                        desired_pending_bytes - bytes_pending,
+                        max_requests_to_send,
+                    );
                 }
             }
         }
@@ -1009,7 +1012,12 @@ impl Read for AudioFileStreaming {
         let read_len = try!(self.read_file.read(&mut output[..read_len]));
 
         if download_message_printed {
-            debug!("Read at postion {} completed. {} bytes returned, {} bytes were requested.", offset, read_len, output.len());
+            debug!(
+                "Read at postion {} completed. {} bytes returned, {} bytes were requested.",
+                offset,
+                read_len,
+                output.len()
+            );
         }
 
         self.position += read_len as u64;
