@@ -25,7 +25,7 @@ use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackR
 pub struct SpircTask {
     player: Player,
     mixer: Box<Mixer>,
-    linear_volume: bool,
+    config: SpircTaskConfig,
 
     sequence: SeqGenerator<u32>,
 
@@ -41,6 +41,7 @@ pub struct SpircTask {
     shutdown: bool,
     session: Session,
     context_fut: Box<Future<Item = serde_json::Value, Error = MercuryError>>,
+    autoplay_fut: Box<Future<Item = String, Error = MercuryError>>,
     context: Option<StationContext>,
 }
 
@@ -53,6 +54,11 @@ pub enum SpircCommand {
     VolumeUp,
     VolumeDown,
     Shutdown,
+}
+
+struct SpircTaskConfig {
+    linear_volume: bool,
+    autoplay: bool,
 }
 
 const CONTEXT_TRACKS_HISTORY: usize = 10;
@@ -243,14 +249,16 @@ impl Spirc {
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
         let volume = config.volume;
-        let linear_volume = config.linear_volume;
-
+        let task_config = SpircTaskConfig {
+            linear_volume: config.linear_volume,
+            autoplay: config.autoplay,
+        };
         let device = initial_device_state(config);
 
         let mut task = SpircTask {
             player: player,
             mixer: mixer,
-            linear_volume: linear_volume,
+            config: task_config,
 
             sequence: SeqGenerator::new(1),
 
@@ -268,6 +276,7 @@ impl Spirc {
             session: session.clone(),
 
             context_fut: Box::new(future::empty()),
+            autoplay_fut: Box::new(future::empty()),
             context: None,
         };
 
@@ -345,7 +354,7 @@ impl Future for SpircTask {
                     Ok(Async::NotReady) => (),
                     Err(oneshot::Canceled) => self.end_of_track = Box::new(future::empty()),
                 }
-
+                // TODO: Refactor
                 match self.context_fut.poll() {
                     Ok(Async::Ready(value)) => {
                         let r_context = serde_json::from_value::<StationContext>(value.clone());
@@ -376,6 +385,20 @@ impl Future for SpircTask {
                     Err(err) => {
                         self.context_fut = Box::new(future::empty());
                         error!("ContextError: {:?}", err)
+                    }
+                }
+
+                match self.autoplay_fut.poll() {
+                    Ok(Async::Ready(autoplay_station_uri)) => {
+                        info!("Autoplay uri resolved to <{:?}>", autoplay_station_uri);
+                        self.context_fut = self.resolve_station(&autoplay_station_uri);
+                        progress = true;
+                        self.autoplay_fut = Box::new(future::empty());
+                    }
+                    Ok(Async::NotReady) => (),
+                    Err(err) => {
+                        self.autoplay_fut = Box::new(future::empty());
+                        error!("AutoplayError: {:?}", err)
                     }
                 }
             }
@@ -657,12 +680,13 @@ impl SpircTask {
     fn handle_next(&mut self) {
         let mut new_index = self.consume_queued_track() as u32;
         let mut continue_playing = true;
+        let tracks_len = self.state.get_track().len() as u32;
         debug!(
             "At track {:?} of {:?} <{:?}> update [{}]",
             new_index,
             self.state.get_track().len(),
             self.state.get_context_uri(),
-            self.state.get_track().len() as u32 - new_index < CONTEXT_FETCH_THRESHOLD
+            tracks_len - new_index < CONTEXT_FETCH_THRESHOLD
         );
         let context_uri = self.state.get_context_uri().to_owned();
         if (context_uri.starts_with("spotify:station:") || context_uri.starts_with("spotify:dailymix:"))
@@ -671,8 +695,14 @@ impl SpircTask {
             self.context_fut = self.resolve_station(&context_uri);
             self.update_tracks_from_context();
         }
-
-        if new_index >= self.state.get_track().len() as u32 {
+        if self.config.autoplay && new_index == tracks_len - 1 {
+            // Extend the playlist
+            // Note: This doesn't seem to reflect in the UI
+            // the additional tracks in the frame don't show up as with station view
+            debug!("Extending playlist <{}>", context_uri);
+            self.update_tracks_from_context();
+        }
+        if new_index >= tracks_len {
             new_index = 0; // Loop around back to start
             continue_playing = self.state.get_repeat();
         }
@@ -761,6 +791,17 @@ impl SpircTask {
         self.resolve_uri(&radio_uri)
     }
 
+    fn resolve_autoplay_uri(&self, uri: &str) -> Box<Future<Item = String, Error = MercuryError>> {
+        let query_uri = format!("hm://autoplay-enabled/query?uri={}", uri);
+        let request = self.session.mercury().get(query_uri);
+        Box::new(request.and_then(move |response| {
+            let data = response.payload.first().expect("Empty autoplay uri").to_vec();
+            let autoplay_uri = String::from_utf8(data).unwrap();
+
+            Ok(autoplay_uri)
+        }))
+    }
+
     fn resolve_uri(&self, uri: &str) -> Box<Future<Item = serde_json::Value, Error = MercuryError>> {
         let request = self.session.mercury().get(uri);
 
@@ -793,6 +834,8 @@ impl SpircTask {
             {
                 self.state.set_playing_track_index(new_index);
             }
+        } else {
+            warn!("No context to update from!");
         }
     }
 
@@ -804,6 +847,10 @@ impl SpircTask {
         debug!("Frame has {:?} tracks", tracks.len());
         if context_uri.starts_with("spotify:station:") || context_uri.starts_with("spotify:dailymix:") {
             self.context_fut = self.resolve_station(&context_uri);
+        } else if self.config.autoplay {
+            info!("Fetching autoplay context uri");
+            // Get autoplay_station_uri for regular playlists
+            self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
         }
 
         self.state.set_playing_track_index(index);
@@ -884,7 +931,8 @@ impl SpircTask {
 
     fn set_volume(&mut self, volume: u16) {
         self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume_to_mixer(volume, self.linear_volume));
+        self.mixer
+            .set_volume(volume_to_mixer(volume, self.config.linear_volume));
         if let Some(cache) = self.session.cache() {
             cache.save_volume(Volume { volume })
         }
