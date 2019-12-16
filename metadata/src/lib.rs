@@ -131,7 +131,7 @@ pub trait Metadata: Send + Sized + 'static {
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 
     fn get(session: &Session, id: SpotifyId) -> Box<dyn Future<Item = Self, Error = MercuryError>> {
-        let uri = format!("{}/{}", Self::base_url(), id.to_base16());
+        let uri = Self::request_url(id);
         let request = session.mercury().get(uri);
 
         let session = session.clone();
@@ -362,8 +362,8 @@ impl Metadata for Artist {
 impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 
-    fn base_url() -> &'static str {
-        "hm://metadata/3/episode"
+    fn request_url(id: SpotifyId) -> String {
+        format!("hm://metadata/3/episode/{}", id.to_base16())
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
@@ -410,8 +410,8 @@ impl Metadata for Episode {
 impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
-    fn base_url() -> &'static str {
-        "hm://metadata/3/show"
+    fn request_url(id: SpotifyId) -> String {
+        format!("hm://metadata/3/show/{}", id.to_base16())
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
