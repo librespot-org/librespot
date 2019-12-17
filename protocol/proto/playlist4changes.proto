@@ -82,5 +82,6 @@ message SelectedListContent {
     repeated ClientResolveAction resolveAction = 0xc;
     repeated ClientIssue issues = 0xd;
     repeated int32 nonces = 0xe;
+    optional string owner_username =0x10;
 }
 
