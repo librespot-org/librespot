@@ -25,11 +25,11 @@ impl Open for GstreamerSink {
 
         gst::init().unwrap();
         let pipelinee = gst::parse_launch(&*pipeline_str).expect("New Pipeline error");
-        let pipeline = pipelinee.dynamic_cast::<gst::Pipeline>().expect("Couldnt cast pipeline element at runtime!");
+        let pipeline = pipelinee.dynamic_cast::<gst::Pipeline>().expect("Couldn't cast pipeline element at runtime!");
         let mut bus = pipeline.get_bus().expect("Couldn't get bus from pipeline");
         let mut mainloop = glib::MainLoop::new(None, false);
         let mut appsrce : gst::Element = pipeline.get_by_name("appsrc0").expect("Couldn't get appsrc from pipeline");
-        let mut appsrc : gst_app::AppSrc = appsrce.dynamic_cast::<gst_app::AppSrc>().expect("Couldnt cast AppSrc element at runtime!");
+        let mut appsrc : gst_app::AppSrc = appsrce.dynamic_cast::<gst_app::AppSrc>().expect("Couldn't cast AppSrc element at runtime!");
         let bufferpool = gst::BufferPool::new();
         let appsrc_caps = appsrc.get_caps().expect("get appsrc caps failed");
         let mut conf = bufferpool.get_config();
@@ -40,11 +40,14 @@ impl Open for GstreamerSink {
         let (tx, rx) = sync_channel::<Vec<u8>>(128);
         thread::spawn(move || {
             for data in rx {
-                let mut buffer = bufferpool.acquire_buffer(None).expect("acquire buffer");
-                let mutbuf = buffer.make_mut();
-                mutbuf.set_size(data.len());
-                mutbuf.copy_from_slice(0, data.as_bytes());
-                let res = appsrc.push_buffer(buffer).expect("Failed to push buffer");
+                let mut buffer = bufferpool.acquire_buffer(None);
+                if(!buffer.is_err()) {
+                    let mut okbuffer = buffer.unwrap();
+                    let mutbuf = okbuffer.make_mut();
+                    mutbuf.set_size(data.len());
+                    mutbuf.copy_from_slice(0, data.as_bytes());
+                    let eat = appsrc.push_buffer(okbuffer);
+                }
             }
         });
 
@@ -88,7 +91,7 @@ impl Sink for GstreamerSink {
         Ok(())
     }
     fn stop(&mut self) -> io::Result<()> {
-        self.pipeline.set_state(gst::State::Paused).expect("Unable to set the pipeline to the `Paused` state");
+        self.pipeline.set_state(gst::State::Ready).expect("Unable to set the pipeline to the `Ready` state");
         Ok(())
     }
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
