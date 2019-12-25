@@ -78,6 +78,8 @@ impl Open for GstreamerSink {
             }
         });
 
+        pipeline.set_state(gst::State::Playing).expect("Unable to set the pipeline to the `Playing` state");
+
         GstreamerSink {
             tx: tx,
             pipeline: pipeline
@@ -87,11 +89,9 @@ impl Open for GstreamerSink {
 
 impl Sink for GstreamerSink {
     fn start(&mut self) -> io::Result<()> {
-        self.pipeline.set_state(gst::State::Playing).expect("Unable to set the pipeline to the `Playing` state");
         Ok(())
     }
     fn stop(&mut self) -> io::Result<()> {
-        self.pipeline.set_state(gst::State::Ready).expect("Unable to set the pipeline to the `Ready` state");
         Ok(())
     }
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
