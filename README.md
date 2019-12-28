@@ -2,13 +2,10 @@
 [![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/librespot-org/spotify-connect-resources)
 [![Crates.io](https://img.shields.io/crates/v/librespot.svg)](https://crates.io/crates/librespot)
 
-Current maintainer is @awiouy folks.
+Current maintainer is [@awiouy](https://github.com/awiouy) folks.
 
 # librespot
-*librespot* is an open source client library for Spotify. It enables
-applications to use Spotify's service, without using the official but
-closed-source `libspotify`. Additionally, it will provide extra features
-which are not available in the official library.
+*librespot* is an open source client library for Spotify. It enables applications to use Spotify's service to control and play music via various backends, and to act as a Spotify Connect receiver. It is an alternative to the official and [now deprecated](https://github.com/mopidy/mopidy-spotify/issues/110) closed-source `libspotify`. Additionally, it will provide extra features which are not available in the official library.
 
 _Note: librespot only works with Spotify Premium. This will remain the case for the foreseeable future, as we are unlikely to work on implementing the features such as limited skips and adverts that would be required to make librespot compliant with free accounts._
 
@@ -31,7 +28,6 @@ There is some brief documentation on how the protocol works in the [docs](https:
 If you wish to learn more about how librespot works overall, the best way is to simply read the code, and ask any questions you have in our [Gitter Room](https://gitter.im/librespot-org/spotify-connect-resources).
 
 # Issues
-
 If you run into a bug when using librespot, please search the existing issues before opening a new one. Chances are, we've encountered it before, and have provided a resolution. If not, please open a new one, and where possible, include the backtrace librespot generates on crashing, along with anything we can use to reproduce the issue, eg. the Spotify URI of the song that caused the crash.
 
 # Building
