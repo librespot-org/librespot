@@ -795,10 +795,14 @@ impl SpircTask {
         let query_uri = format!("hm://autoplay-enabled/query?uri={}", uri);
         let request = self.session.mercury().get(query_uri);
         Box::new(request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty autoplay uri").to_vec();
-            let autoplay_uri = String::from_utf8(data).unwrap();
-
-            Ok(autoplay_uri)
+            if response.status_code == 200 {
+                let data = response.payload.first().expect("Empty autoplay uri").to_vec();
+                let autoplay_uri = String::from_utf8(data).unwrap();
+                Ok(autoplay_uri)
+            } else {
+                warn!("No autoplay_uri found");
+                Err(MercuryError)
+            }
         }))
     }
 
