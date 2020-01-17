@@ -23,10 +23,9 @@ fn main() {
 
         let name;
         if line.starts_with("pub mod ") {
-            name = &line[8..len-1]; // Remove keywords and semi-colon
-        }
-        else {
-            name = &line[4..len-1]; // Remove keywords and semi-colon
+            name = &line[8..len - 1]; // Remove keywords and semi-colon
+        } else {
+            name = &line[4..len - 1]; // Remove keywords and semi-colon
         }
 
         // Build the paths to relevant files.

@@ -1,5 +1,5 @@
-use log::info;
 use librespot::playback::player::PlayerEvent;
+use log::info;
 use std::collections::HashMap;
 use std::io;
 use std::process::Command;

@@ -1,7 +1,7 @@
 use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
-use sha1::{Digest, Sha1};
 use log::{error, info, trace, warn};
+use sha1::{Digest, Sha1};
 use std::env;
 use std::io::{self, stderr, Write};
 use std::mem;

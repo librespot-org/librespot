@@ -525,7 +525,10 @@ impl PlayerInternal {
                 if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                     stream_loader_controller.set_stream_mode();
                 }
-                if let PlayerState::Playing { bytes_per_second, .. } = self.state {
+                if let PlayerState::Playing {
+                    bytes_per_second, ..
+                } = self.state
+                {
                     if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                         // Request our read ahead range
                         let request_data_length = max(
@@ -599,7 +602,10 @@ impl PlayerInternal {
                     .iter()
                     .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id));
                 let alternatives = future::join_all(alternatives).wait().unwrap();
-                alternatives.into_iter().find(|alt| alt.available).map(Cow::Owned)
+                alternatives
+                    .into_iter()
+                    .find(|alt| alt.available)
+                    .map(Cow::Owned)
             } else {
                 None
             }
@@ -677,8 +683,12 @@ impl PlayerInternal {
         let play_from_beginning = position == 0;
 
         let key = self.session.audio_key().request(spotify_id, file_id);
-        let encrypted_file =
-            AudioFile::open(&self.session, file_id, bytes_per_second, play_from_beginning);
+        let encrypted_file = AudioFile::open(
+            &self.session,
+            file_id,
+            bytes_per_second,
+            play_from_beginning,
+        );
 
         let encrypted_file = encrypted_file.wait().unwrap();
 

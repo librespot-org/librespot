@@ -796,12 +796,19 @@ impl SpircTask {
         self.resolve_uri(&radio_uri)
     }
 
-    fn resolve_autoplay_uri(&self, uri: &str) -> Box<dyn Future<Item = String, Error = MercuryError>> {
+    fn resolve_autoplay_uri(
+        &self,
+        uri: &str,
+    ) -> Box<dyn Future<Item = String, Error = MercuryError>> {
         let query_uri = format!("hm://autoplay-enabled/query?uri={}", uri);
         let request = self.session.mercury().get(query_uri);
         Box::new(request.and_then(move |response| {
             if response.status_code == 200 {
-                let data = response.payload.first().expect("Empty autoplay uri").to_vec();
+                let data = response
+                    .payload
+                    .first()
+                    .expect("Empty autoplay uri")
+                    .to_vec();
                 let autoplay_uri = String::from_utf8(data).unwrap();
                 Ok(autoplay_uri)
             } else {
@@ -811,7 +818,10 @@ impl SpircTask {
         }))
     }
 
-    fn resolve_uri(&self, uri: &str) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
+    fn resolve_uri(
+        &self,
+        uri: &str,
+    ) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
         let request = self.session.mercury().get(uri);
 
         Box::new(request.and_then(move |response| {
@@ -900,7 +910,8 @@ impl SpircTask {
         let track = {
             let mut track_ref = self.state.get_track()[index as usize].clone();
             let mut track_id = self.get_spotify_id_for_track(&track_ref);
-            while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable {
+            while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
+            {
                 warn!(
                     "Skipping track <{:?}> at position [{}] of {}",
                     track_ref.get_uri(),
