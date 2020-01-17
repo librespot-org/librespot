@@ -1,9 +1,9 @@
+use crate::range_set::{Range, RangeSet};
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
 use futures::sync::{mpsc, oneshot};
 use futures::Stream;
 use futures::{Async, Future, Poll};
-use range_set::{Range, RangeSet};
 use std::cmp::{max, min};
 use std::fs;
 use std::io::{self, Read, Seek, SeekFrom, Write};

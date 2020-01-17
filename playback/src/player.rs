@@ -15,15 +15,15 @@ use crate::config::{Bitrate, PlayerConfig};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::SpotifyId;
 
-use audio::{AudioDecrypt, AudioFile, StreamLoaderController};
-use audio::{VorbisDecoder, VorbisPacket};
-use audio::{
+use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
+use crate::audio::{VorbisDecoder, VorbisPacket};
+use crate::audio::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
 };
-use audio_backend::Sink;
-use metadata::{AudioItem, FileFormat};
-use mixer::AudioFilter;
+use crate::audio_backend::Sink;
+use crate::metadata::{AudioItem, FileFormat};
+use crate::mixer::AudioFilter;
 
 pub struct Player {
     commands: Option<std::sync::mpsc::Sender<PlayerCommand>>,
