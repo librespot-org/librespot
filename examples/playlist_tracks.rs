@@ -1,11 +1,5 @@
-extern crate log;
-extern crate env_logger;
 
-extern crate librespot;
-extern crate tokio_core;
-extern crate tokio_io;
-extern crate futures;
-
+use env_logger;
 use std::env;
 use tokio_core::reactor::Core;
 

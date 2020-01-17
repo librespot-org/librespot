@@ -1,6 +1,3 @@
-extern crate librespot;
-extern crate tokio_core;
-
 use std::env;
 use tokio_core::reactor::Core;
 

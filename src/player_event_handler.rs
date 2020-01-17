@@ -1,3 +1,4 @@
+use log::info;
 use librespot::playback::player::PlayerEvent;
 use tokio_process::{Child, CommandExt};
 use std::collections::HashMap;

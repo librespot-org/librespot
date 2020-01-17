@@ -1,21 +1,7 @@
-extern crate env_logger;
-extern crate futures;
-extern crate getopts;
-extern crate librespot;
-#[macro_use]
-extern crate log;
-extern crate hex;
-extern crate rpassword;
-extern crate sha1;
-extern crate tokio_core;
-extern crate tokio_io;
-extern crate tokio_process;
-extern crate tokio_signal;
-extern crate url;
-
 use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
 use sha1::{Digest, Sha1};
+use log::{error, info, trace, warn};
 use std::env;
 use std::io::{self, stderr, Write};
 use std::mem;
@@ -40,7 +26,7 @@ use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{Player, PlayerEvent};
 
 mod player_event_handler;
-use player_event_handler::run_program_on_events;
+use crate::player_event_handler::run_program_on_events;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -86,10 +72,10 @@ fn list_backends() {
 
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<Sink>,
+    backend: fn(Option<String>) -> Box<dyn Sink>,
     device: Option<String>,
 
-    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
 
     cache: Option<Cache>,
     player_config: PlayerConfig,
@@ -367,9 +353,9 @@ struct Main {
     player_config: PlayerConfig,
     session_config: SessionConfig,
     connect_config: ConnectConfig,
-    backend: fn(Option<String>) -> Box<Sink>,
+    backend: fn(Option<String>) -> Box<dyn Sink>,
     device: Option<String>,
-    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
     mixer_config: MixerConfig,
     handle: Handle,
 
@@ -378,7 +364,7 @@ struct Main {
 
     spirc: Option<Spirc>,
     spirc_task: Option<SpircTask>,
-    connect: Box<Future<Item = Session, Error = io::Error>>,
+    connect: Box<dyn Future<Item = Session, Error = io::Error>>,
 
     shutdown: bool,
 
