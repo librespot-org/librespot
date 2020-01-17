@@ -1,17 +1,21 @@
-use crate::range_set::{Range, RangeSet};
+use std::task::Poll;
+use std::task::Context;
+use std::pin::Pin;
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
-use futures::sync::{mpsc, oneshot};
-use futures::Stream;
-use futures::{Async, Future, Poll};
+use futures::channel::{mpsc, oneshot};
+use futures::{ready, Future, Stream};
+use log::{debug, warn, trace};
+use crate::range_set::{Range, RangeSet};
 use std::cmp::{max, min};
 use std::fs;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
+use tokio::prelude::*;
 use tempfile::NamedTempFile;
 
-use futures::sync::mpsc::unbounded;
+use futures::channel::mpsc::unbounded;
 use librespot_core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::FileId;
@@ -328,7 +332,7 @@ impl AudioFileOpenStreaming {
             stream_loader_command_rx,
             complete_tx,
         );
-        self.session.spawn(move |_| fetcher);
+        tokio::spawn(move |_| fetcher);
 
         AudioFileStreaming {
             read_file: read_file,
@@ -343,36 +347,34 @@ impl AudioFileOpenStreaming {
 }
 
 impl Future for AudioFileOpen {
-    type Item = AudioFile;
-    type Error = ChannelError;
+    type Output = Result<AudioFile, ChannelError>;
 
-    fn poll(&mut self) -> Poll<AudioFile, ChannelError> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<AudioFile, ChannelError>> {
         match *self {
             AudioFileOpen::Streaming(ref mut open) => {
-                let file = try_ready!(open.poll());
-                Ok(Async::Ready(AudioFile::Streaming(file)))
+                let file = ready!(open.compat().poll());
+                Poll::Ready(Ok(AudioFile::Streaming(file)))
             }
             AudioFileOpen::Cached(ref mut file) => {
                 let file = file.take().unwrap();
-                Ok(Async::Ready(AudioFile::Cached(file)))
+                Poll::Ready(Ok(AudioFile::Cached(file)))
             }
         }
     }
 }
 
 impl Future for AudioFileOpenStreaming {
-    type Item = AudioFileStreaming;
-    type Error = ChannelError;
+    type Output = Result<AudioFileStreaming, ChannelError>;
 
-    fn poll(&mut self) -> Poll<AudioFileStreaming, ChannelError> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<AudioFileStreaming, ChannelError>> {
         loop {
-            let (id, data) = try_ready!(self.headers.poll()).unwrap();
+            let (id, data) = ready!(self.headers.poll()).unwrap();
 
             if id == 0x3 {
                 let size = BigEndian::read_u32(&data) as usize * 4;
                 let file = self.finish(size);
 
-                return Ok(Async::Ready(file));
+                return Poll::Ready(Ok(file));
             }
         }
     }
@@ -416,8 +418,8 @@ impl AudioFile {
             file_id: file_id,
 
             headers: headers,
-            initial_data_rx: Some(data),
             initial_data_length: Some(initial_data_length),
+            initial_data_rx: Some(data),
             initial_request_sent_time: Instant::now(),
 
             complete_tx: Some(complete_tx),
@@ -563,13 +565,12 @@ impl AudioFileFetchDataReceiver {
 }
 
 impl Future for AudioFileFetchDataReceiver {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<(), ()> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         loop {
             match self.data_rx.poll() {
-                Ok(Async::Ready(Some(data))) => {
+                Poll::Ready(Some(data)) => {
                     if self.measure_ping_time {
                         if let Some(request_sent_time) = self.request_sent_time {
                             let duration = Instant::now() - request_sent_time;
@@ -603,18 +604,18 @@ impl Future for AudioFileFetchDataReceiver {
                     }
                     if self.request_length == 0 {
                         self.finish();
-                        return Ok(Async::Ready(()));
+                        return Poll::Ready(());
                     }
                 }
-                Ok(Async::Ready(None)) => {
+                Poll::Ready(None) => {
                     if self.request_length > 0 {
                         warn!("Data receiver for range {} (+{}) received less data from server than requested.", self.initial_data_offset, self.initial_request_length);
                     }
                     self.finish();
-                    return Ok(Async::Ready(()));
+                    return Poll::Ready(());
                 }
-                Ok(Async::NotReady) => {
-                    return Ok(Async::NotReady);
+                Poll::Pending => {
+                    return Poll::Pending;
                 }
                 Err(ChannelError) => {
                     warn!(
@@ -622,7 +623,7 @@ impl Future for AudioFileFetchDataReceiver {
                         self.initial_data_offset, self.initial_request_length
                     );
                     self.finish();
-                    return Ok(Async::Ready(()));
+                    return Poll::Ready(());
                 }
             }
         }
@@ -671,7 +672,7 @@ impl AudioFileFetch {
             initial_request_sent_time,
         );
 
-        session.spawn(move |_| initial_data_receiver);
+        tokio::spawn(move |_| initial_data_receiver);
 
         AudioFileFetch {
             session: session,
@@ -746,7 +747,7 @@ impl AudioFileFetch {
                 Instant::now(),
             );
 
-            self.session.spawn(move |_| receiver);
+            tokio::spawn(move |_| receiver);
         }
     }
 
@@ -794,13 +795,13 @@ impl AudioFileFetch {
         }
     }
 
-    fn poll_file_data_rx(&mut self) -> Poll<(), ()> {
+    fn poll_file_data_rx(&mut self) -> Poll<()> {
         loop {
             match self.file_data_rx.poll() {
-                Ok(Async::Ready(None)) => {
-                    return Ok(Async::Ready(()));
+                Poll::Ready(None) => {
+                    return Poll::Ready(());
                 }
-                Ok(Async::Ready(Some(ReceivedData::ResponseTimeMs(response_time_ms)))) => {
+                Poll::Ready(Some(ReceivedData::ResponseTimeMs(response_time_ms))) => {
                     trace!("Ping time estimated as: {} ms.", response_time_ms);
 
                     // record the response time
@@ -832,7 +833,7 @@ impl AudioFileFetch {
                         .ping_time_ms
                         .store(ping_time_ms, atomic::Ordering::Relaxed);
                 }
-                Ok(Async::Ready(Some(ReceivedData::Data(data)))) => {
+                Poll::Ready(Some(ReceivedData::Data(data))) => {
                     self.output
                         .as_mut()
                         .unwrap()
@@ -864,38 +865,38 @@ impl AudioFileFetch {
 
                     if full {
                         self.finish();
-                        return Ok(Async::Ready(()));
+                        return Poll::Ready(());
                     }
                 }
-                Ok(Async::NotReady) => {
-                    return Ok(Async::NotReady);
+                Poll::Pending => {
+                    return Poll::Pending;
                 }
                 Err(()) => unreachable!(),
             }
         }
     }
 
-    fn poll_stream_loader_command_rx(&mut self) -> Poll<(), ()> {
+    fn poll_stream_loader_command_rx(&mut self) -> Poll<()> {
         loop {
             match self.stream_loader_command_rx.poll() {
-                Ok(Async::Ready(None)) => {
-                    return Ok(Async::Ready(()));
+                Poll::Ready(None) => {
+                    return Poll::Ready(());
                 }
-                Ok(Async::Ready(Some(StreamLoaderCommand::Fetch(request)))) => {
+                Poll::Ready(Some(StreamLoaderCommand::Fetch(request))) => {
                     self.download_range(request.start, request.length);
                 }
-                Ok(Async::Ready(Some(StreamLoaderCommand::RandomAccessMode()))) => {
+                Poll::Ready(Some(StreamLoaderCommand::RandomAccessMode())) => {
                     *(self.shared.download_strategy.lock().unwrap()) =
                         DownloadStrategy::RandomAccess();
                 }
-                Ok(Async::Ready(Some(StreamLoaderCommand::StreamMode()))) => {
+                Poll::Ready(Some(StreamLoaderCommand::StreamMode())) => {
                     *(self.shared.download_strategy.lock().unwrap()) =
                         DownloadStrategy::Streaming();
                 }
-                Ok(Async::Ready(Some(StreamLoaderCommand::Close()))) => {
-                    return Ok(Async::Ready(()));
+                Poll::Ready(Some(StreamLoaderCommand::Close())) => {
+                    return Poll::Ready(());
                 }
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
+                Poll::Pending => return Poll::Pending,
                 Err(()) => unreachable!(),
             }
         }
@@ -911,24 +912,21 @@ impl AudioFileFetch {
 }
 
 impl Future for AudioFileFetch {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<(), ()> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<()> {
         match self.poll_stream_loader_command_rx() {
-            Ok(Async::NotReady) => (),
-            Ok(Async::Ready(_)) => {
-                return Ok(Async::Ready(()));
+            Poll::Pending => (),
+            Poll::Ready(_) => {
+                return Poll::Ready(());
             }
-            Err(()) => unreachable!(),
         }
 
         match self.poll_file_data_rx() {
-            Ok(Async::NotReady) => (),
-            Ok(Async::Ready(_)) => {
-                return Ok(Async::Ready(()));
+            Poll::Pending => (),
+            Poll::Ready(_) => {
+                return Poll::Ready(());
             }
-            Err(()) => unreachable!(),
         }
 
         if let DownloadStrategy::Streaming() = self.get_download_strategy() {
@@ -969,7 +967,7 @@ impl Future for AudioFileFetch {
             }
         }
 
-        return Ok(Async::NotReady);
+        return Poll::Pending;
     }
 }
 

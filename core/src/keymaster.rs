@@ -17,7 +17,7 @@ pub fn get_token(
     session: &Session,
     client_id: &str,
     scopes: &str,
-) -> Box<dyn Future<Item = Token, Error = MercuryError>> {
+) -> Box<dyn Future<Output = Result<Token, MercuryError>>> {
     let url = format!(
         "hm://keymaster/token/authenticated?client_id={}&scope={}",
         client_id, scopes

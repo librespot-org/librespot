@@ -378,7 +378,7 @@ struct Main {
 
     spirc: Option<Spirc>,
     spirc_task: Option<SpircTask>,
-    connect: Box<dyn Future<Item = Session, Error = io::Error>>,
+    connect: Box<dyn Future<Output = Result<Session, io::Error>>>,
 
     shutdown: bool,
     last_credentials: Option<Credentials>,

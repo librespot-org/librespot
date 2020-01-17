@@ -1,11 +1,12 @@
 use crate::protocol;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::{mpsc, oneshot};
-use futures::{Async, Future, Poll};
+use futures::channel::{mpsc, oneshot};
+use futures::Future;
 use protobuf;
 use std::collections::HashMap;
 use std::mem;
+use std::task::Poll;
 
 use crate::util::SeqGenerator;
 
@@ -32,14 +33,13 @@ pub struct MercuryPending {
 
 pub struct MercuryFuture<T>(oneshot::Receiver<Result<T, MercuryError>>);
 impl<T> Future for MercuryFuture<T> {
-    type Item = T;
-    type Error = MercuryError;
+    type Output = Result<T, MercuryError>;
 
-    fn poll(&mut self) -> Poll<T, MercuryError> {
+    fn poll(&mut self) -> Poll<Self::Output> {
         match self.0.poll() {
-            Ok(Async::Ready(Ok(value))) => Ok(Async::Ready(value)),
-            Ok(Async::Ready(Err(err))) => Err(err),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Poll::Ready(Ok(Ok(value))) => Poll::Ready(Ok(value)),
+            Poll::Ready(Ok(Err(err))) => Err(err),
+            Poll::Pending => Poll::Pending,
             Err(oneshot::Canceled) => Err(MercuryError),
         }
     }
@@ -97,11 +97,10 @@ impl MercuryManager {
         MercurySender::new(self.clone(), uri.into())
     }
 
-    pub fn subscribe<T: Into<String>>(
+    pub async fn subscribe<T: Into<String>>(
         &self,
         uri: T,
-    ) -> Box<dyn Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>>
-    {
+    ) -> Result<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError> {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
             method: MercuryMethod::SUB,
@@ -111,32 +110,33 @@ impl MercuryManager {
         });
 
         let manager = self.clone();
-        Box::new(request.map(move |response| {
-            let (tx, rx) = mpsc::unbounded();
 
-            manager.lock(move |inner| {
-                if !inner.invalid {
-                    debug!("subscribed uri={} count={}", uri, response.payload.len());
-                    if response.payload.len() > 0 {
-                        // Old subscription protocol, watch the provided list of URIs
-                        for sub in response.payload {
-                            let mut sub: protocol::pubsub::Subscription =
-                                protobuf::parse_from_bytes(&sub).unwrap();
-                            let sub_uri = sub.take_uri();
+        let response = request.await?;
 
-                            debug!("subscribed sub_uri={}", sub_uri);
+        let (tx, rx) = mpsc::unbounded();
 
-                            inner.subscriptions.push((sub_uri, tx.clone()));
-                        }
-                    } else {
-                        // New subscription protocol, watch the requested URI
-                        inner.subscriptions.push((uri, tx));
+        manager.lock(move |inner| {
+            if !inner.invalid {
+                debug!("subscribed uri={} count={}", uri, response.payload.len());
+                if response.payload.len() > 0 {
+                    // Old subscription protocol, watch the provided list of URIs
+                    for sub in response.payload {
+                        let mut sub: protocol::pubsub::Subscription =
+                            protobuf::parse_from_bytes(&sub).unwrap();
+                        let sub_uri = sub.take_uri();
+
+                        debug!("subscribed sub_uri={}", sub_uri);
+
+                        inner.subscriptions.push((sub_uri, tx.clone()));
                     }
+                } else {
+                    // New subscription protocol, watch the requested URI
+                    inner.subscriptions.push((uri, tx));
                 }
-            });
+            }
+        });
 
-            rx
-        }))
+        Ok(rx)
     }
 
     pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {

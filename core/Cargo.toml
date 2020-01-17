@@ -16,12 +16,15 @@ base64 = "0.10"
 byteorder = "1.3"
 bytes = "0.4"
 error-chain = { version = "0.12", default_features = false }
-futures = "0.1"
+# unstable is required for bilock
+futures = { version = "0.3", features = ["unstable", "bilock"] }
 httparse = "1.3"
-hyper = "0.11"
-hyper-proxy = { version = "0.4", default_features = false }
+http = "0.2"
+hyper = "0.13"
+hyper-proxy = { version = "0.7", default_features = false }
 lazy_static = "1.3"
 log = "0.4"
+native-tls = { version = "0.2", optional = true }
 num-bigint = "0.2"
 num-integer = "0.1"
 num-traits = "0.2"
@@ -31,9 +34,12 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 shannon = "0.2.0"
-tokio-codec = "0.1"
-tokio-core = "0.1"
-tokio-io = "0.1"
+# tokio-codec = "0.1"
+# tokio-core = "0.1"
+# tokio-io = "0.1"
+tokio-util = { version = "0.3", features = ["codec", "compat"] }
+tokio = { version = "0.2", features = ["full"] }
+tokio-tls = { version = "0.3", optional = true }
 url = "1.7"
 uuid = { version = "0.7", features = ["v4"] }
 sha-1 = "0.8"
@@ -44,3 +50,6 @@ aes = "0.3"
 [build-dependencies]
 rand = "0.7"
 vergen = "3.0.4"
+
+[features]
+tls = ["native-tls", "tokio-tls"]

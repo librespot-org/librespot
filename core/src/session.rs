@@ -1,13 +1,18 @@
+use futures::future::{IntoFuture, Remote};
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock, Weak};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::task::{Context, Poll};
+use std::{
+    pin::Pin,
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tokio::runtime::Handle;
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::mpsc;
-use futures::{Async, Future, IntoFuture, Poll, Stream};
-use tokio_core::reactor::{Handle, Remote};
+use futures::channel::mpsc;
+use futures::{Future, Stream};
 
 use crate::apresolve::apresolve_or_fallback;
 use crate::audio_key::AudioKeyManager;
@@ -37,8 +42,7 @@ struct SessionInternal {
     mercury: Lazy<MercuryManager>,
     cache: Option<Arc<Cache>>,
 
-    handle: Remote,
-
+    // handle: Remote,
     session_id: usize,
 }
 
@@ -53,7 +57,7 @@ impl Session {
         credentials: Credentials,
         cache: Option<Cache>,
         handle: Handle,
-    ) -> Box<dyn Future<Item = Session, Error = io::Error>> {
+    ) -> Box<dyn Future<Output = Result<Session, io::Error>>> {
         let access_point =
             apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
 
@@ -99,7 +103,7 @@ impl Session {
         config: SessionConfig,
         cache: Option<Cache>,
         username: String,
-    ) -> (Session, Box<dyn Future<Item = (), Error = io::Error>>) {
+    ) -> (Session, Box<dyn Future<Output = Result<(), io::Error>>>) {
         let (sink, stream) = transport.split();
 
         let (sender_tx, sender_rx) = mpsc::unbounded();
@@ -160,14 +164,14 @@ impl Session {
         self.0.data.read().unwrap().time_delta
     }
 
-    pub fn spawn<F, R>(&self, f: F)
-    where
-        F: FnOnce(&Handle) -> R + Send + 'static,
-        R: IntoFuture<Item = (), Error = ()>,
-        R::Future: 'static,
-    {
-        self.0.handle.spawn(f)
-    }
+    // pub fn spawn<F, R>(&self, f: F)
+    // where
+    //     F: FnOnce(&Handle) -> R + Send + 'static,
+    //     R: Into<dyn Future<Output = ()>>,
+    //     R::Future: 'static,
+    // {
+    //     self.0.handle.spawn(f)
+    // }
 
     fn debug_info(&self) {
         debug!(
@@ -278,27 +282,25 @@ where
 impl<S> Future for DispatchTask<S>
 where
     S: Stream<Item = (u8, Bytes)>,
-    <S as Stream>::Error: ::std::fmt::Debug,
 {
-    type Item = ();
-    type Error = S::Error;
+    type Output = ();
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let session = match self.1.try_upgrade() {
             Some(session) => session,
-            None => return Ok(Async::Ready(())),
+            None => return Poll::Ready(()),
         };
 
         loop {
             let (cmd, data) = match self.0.poll() {
-                Ok(Async::Ready(Some(t))) => t,
-                Ok(Async::Ready(None)) => {
+                Poll::Ready(Ok(Some(t))) => t,
+                Poll::Ready(Ok(None)) => {
                     warn!("Connection to server closed.");
                     session.shutdown();
-                    return Ok(Async::Ready(()));
+                    return Ok(Poll::Ready(()));
                 }
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Err(e) => {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Err(e)) => {
                     session.shutdown();
                     return Err(From::from(e));
                 }
