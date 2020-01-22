@@ -238,6 +238,7 @@ impl Session {
         debug!("Invalidating session[{}]", self.0.session_id);
         self.0.data.write().unwrap().invalid = true;
         self.mercury().shutdown();
+        self.channel().shutdown();
     }
 
     pub fn is_invalid(&self) -> bool {
