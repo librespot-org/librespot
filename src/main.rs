@@ -381,6 +381,7 @@ struct Main {
     connect: Box<Future<Item = Session, Error = io::Error>>,
 
     shutdown: bool,
+    last_credentials: Option<Credentials>,
 
     player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
     player_event_program: Option<String>,
@@ -404,6 +405,7 @@ impl Main {
             spirc: None,
             spirc_task: None,
             shutdown: false,
+            last_credentials: None,
             signal: Box::new(tokio_signal::ctrl_c().flatten_stream()),
 
             player_event_channel: None,
@@ -425,6 +427,7 @@ impl Main {
     }
 
     fn credentials(&mut self, credentials: Credentials) {
+        self.last_credentials = Some(credentials.clone());
         let config = self.session_config.clone();
         let handle = self.handle.clone();
 
@@ -502,6 +505,10 @@ impl Future for Main {
                     } else {
                         warn!("Spirc shut down unexpectedly");
                         self.spirc_task = None;
+                        if let Some(credentials) = self.last_credentials.clone() {
+                            self.credentials(credentials);
+                            progress = true;
+                        }
                     }
                 }
             }
