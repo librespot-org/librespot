@@ -623,9 +623,15 @@ impl PlayerInternal {
         spotify_id: SpotifyId,
         position: i64,
     ) -> Option<(Decoder, f32, StreamLoaderController, usize)> {
-        let audio = AudioItem::get_audio_item(&self.session, spotify_id)
-            .wait()
-            .unwrap();
+
+        let audio = match AudioItem::get_audio_item(&self.session, spotify_id).wait() {
+            Ok(audio) => audio,
+            Err(_) => {
+                error!("Unable to load audio item.");
+                return None
+            },
+        };
+
         info!("Loading <{}> with Spotify URI <{}>", audio.name, audio.uri);
 
         let audio = match self.find_available_alternative(&audio) {
@@ -673,7 +679,13 @@ impl PlayerInternal {
         let encrypted_file =
             AudioFile::open(&self.session, file_id, bytes_per_second, play_from_beginning);
 
-        let encrypted_file = encrypted_file.wait().unwrap();
+        let encrypted_file = match encrypted_file.wait() {
+            Ok(encrypted_file) => encrypted_file,
+            Err(_) => {
+                error!("Unable to load encrypted file.");
+                return None;
+            }
+        };
 
         let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
 
@@ -685,7 +697,14 @@ impl PlayerInternal {
             stream_loader_controller.set_random_access_mode();
         }
 
-        let key = key.wait().unwrap();
+        let key = match key.wait() {
+            Ok(key) => key,
+            Err(_) => {
+                error!("Unable to load decryption key");
+                return None;
+            }
+        };
+
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
         let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
