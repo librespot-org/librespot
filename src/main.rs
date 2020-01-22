@@ -500,7 +500,8 @@ impl Future for Main {
                     if self.shutdown {
                         return Ok(Async::Ready(()));
                     } else {
-                        panic!("Spirc shut down unexpectedly");
+                        warn!("Spirc shut down unexpectedly");
+                        self.spirc_task = None;
                     }
                 }
             }

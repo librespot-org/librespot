@@ -283,13 +283,18 @@ where
 
         loop {
             let (cmd, data) = match self.0.poll() {
-                Ok(Async::Ready(t)) => t,
+                Ok(Async::Ready(Some(t))) => t,
+                Ok(Async::Ready(None)) => {
+                    warn!("Connection to server closed.");
+                    session.shutdown();
+                    return Ok(Async::Ready(()));
+                },
                 Ok(Async::NotReady) => return Ok(Async::NotReady),
                 Err(e) => {
                     session.shutdown();
                     return Err(From::from(e));
                 }
-            }.expect("connection closed");
+            };
 
             session.dispatch(cmd, data);
         }
