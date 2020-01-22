@@ -92,7 +92,8 @@ impl ChannelManager {
 impl Channel {
     fn recv_packet(&mut self) -> Poll<Bytes, ChannelError> {
         let (cmd, packet) = match self.receiver.poll() {
-            Ok(Async::Ready(t)) => t.expect("channel closed"),
+            Ok(Async::Ready(Some(t))) => t,
+            Ok(Async::Ready(None)) => return Err(ChannelError), // The channel has been closed.
             Ok(Async::NotReady) => return Ok(Async::NotReady),
             Err(()) => unreachable!(),
         };
