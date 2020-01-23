@@ -333,7 +333,11 @@ impl Future for SpircTask {
                         progress = true;
                         self.handle_frame(frame);
                     }
-                    Async::Ready(None) => panic!("subscription terminated"),
+                    Async::Ready(None) => {
+                        error!("subscription terminated");
+                        self.shutdown = true;
+                        self.commands.close();
+                    },
                     Async::NotReady => (),
                 }
 

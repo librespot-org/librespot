@@ -502,21 +502,20 @@ impl Future for Main {
                 progress = true;
             }
 
-            let mut try_to_reconnect = false;
+            let mut drop_spirc_and_try_to_reconnect = false;
             if let Some(ref mut spirc_task) = self.spirc_task {
                 if let Async::Ready(()) = spirc_task.poll().unwrap() {
                     if self.shutdown {
                         return Ok(Async::Ready(()));
                     } else {
                         warn!("Spirc shut down unexpectedly");
-                        self.spirc_task = None;
-
-                        try_to_reconnect = true;
+                        drop_spirc_and_try_to_reconnect = true;
                     }
                     progress = true;
                 }
             }
-            if try_to_reconnect {
+            if drop_spirc_and_try_to_reconnect {
+                self.spirc_task = None;
                 while (!self.auto_connect_times.is_empty()) && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600) {
                     let _ = self.auto_connect_times.remove(0);
                 }
