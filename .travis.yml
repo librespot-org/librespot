@@ -16,7 +16,7 @@ before_cache:
   - rm -rfv target/debug/deps/librespot-*
   - rm -rfv target/debug/{librespot,liblibrespot}.d
   - rm -rfv target/debug/incremental/{build_script_build,librespot,librespot_core,librespot_connect,librespot_audio,librespot_metadata,librespot_playback,librespot_player,librespot_protocol}-*
-  - cargo clean -p librespot librespot-core librespot-connect librespot-audio librespot-metadata librespot-playback
+  - cargo clean -p librespot -p librespot-core -p librespot-connect -p librespot-audio -p librespot-metadata -p librespot-playback
   
 addons:
   apt:
