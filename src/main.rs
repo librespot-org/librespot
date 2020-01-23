@@ -25,6 +25,7 @@ use std::str::FromStr;
 use tokio_core::reactor::{Core, Handle};
 use tokio_io::IoStream;
 use url::Url;
+use std::time::Instant;
 
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
@@ -382,6 +383,7 @@ struct Main {
 
     shutdown: bool,
     last_credentials: Option<Credentials>,
+    auto_connect_times: Vec<Instant>,
 
     player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
     player_event_program: Option<String>,
@@ -406,6 +408,7 @@ impl Main {
             spirc_task: None,
             shutdown: false,
             last_credentials: None,
+            auto_connect_times: Vec::new(),
             signal: Box::new(tokio_signal::ctrl_c().flatten_stream()),
 
             player_event_channel: None,
@@ -454,6 +457,7 @@ impl Future for Main {
                 if let Some(ref spirc) = self.spirc {
                     spirc.shutdown();
                 }
+                self.auto_connect_times.clear();
                 self.credentials(creds);
 
                 progress = true;
@@ -505,7 +509,16 @@ impl Future for Main {
                     } else {
                         warn!("Spirc shut down unexpectedly");
                         self.spirc_task = None;
+
+                        while (!self.auto_connect_times.is_empty()) && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600) {
+                            let _ = self.auto_connect_times.remove(0);
+                        }
+                        if self.auto_connect_times.len() >= 5 {
+                            error!("Spirc shut down too often. Exiting to avoid too many login attempts.");
+                            return Ok(Async::Ready(()));
+                        }
                         if let Some(credentials) = self.last_credentials.clone() {
+                            self.auto_connect_times.push(Instant::now());
                             self.credentials(credentials);
                             progress = true;
                         }
