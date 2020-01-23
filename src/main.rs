@@ -513,16 +513,17 @@ impl Future for Main {
                         while (!self.auto_connect_times.is_empty()) && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600) {
                             let _ = self.auto_connect_times.remove(0);
                         }
-                        if self.auto_connect_times.len() >= 5 {
-                            error!("Spirc shut down too often. Exiting to avoid too many login attempts.");
-                            return Ok(Async::Ready(()));
-                        }
+
                         if let Some(credentials) = self.last_credentials.clone() {
-                            self.auto_connect_times.push(Instant::now());
-                            self.credentials(credentials);
-                            progress = true;
+                            if self.auto_connect_times.len() >= 5 {
+                                warn!("Spirc shut down too often. Not reconnecting automatically.");
+                            } else {
+                                self.auto_connect_times.push(Instant::now());
+                                self.credentials(credentials);
+                            }
                         }
                     }
+                    progress = true;
                 }
             }
 
