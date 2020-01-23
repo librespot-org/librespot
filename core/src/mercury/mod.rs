@@ -20,7 +20,7 @@ component! {
         sequence: SeqGenerator<u64> = SeqGenerator::new(0),
         pending: HashMap<Vec<u8>, MercuryPending> = HashMap::new(),
         subscriptions: Vec<(String, mpsc::UnboundedSender<MercuryResponse>)> = Vec::new(),
-        is_shutdown: bool = false,
+        invalid: bool = false,
     }
 }
 
@@ -63,7 +63,7 @@ impl MercuryManager {
 
         let seq = self.next_seq();
         self.lock(|inner| {
-            if !inner.is_shutdown {
+            if !inner.invalid {
                 inner.pending.insert(seq.clone(), pending);
             }
         });
@@ -114,7 +114,7 @@ impl MercuryManager {
             let (tx, rx) = mpsc::unbounded();
 
             manager.lock(move |inner| {
-                if !inner.is_shutdown {
+                if !inner.invalid {
                     debug!("subscribed uri={} count={}", uri, response.payload.len());
                     if response.payload.len() > 0 {
                         // Old subscription protocol, watch the provided list of URIs
@@ -232,7 +232,7 @@ impl MercuryManager {
 
     pub(crate) fn shutdown(&self) {
         self.lock(|inner| {
-            inner.is_shutdown = true;
+            inner.invalid = true;
             // destroy the sending halves of the channels to signal everyone who is waiting for something.
             inner.pending.clear();
             inner.subscriptions.clear();

@@ -14,7 +14,7 @@ component! {
         download_rate_estimate: usize = 0,
         download_measurement_start: Option<Instant> = None,
         download_measurement_bytes: usize = 0,
-        is_shutdown: bool = false,
+        invalid: bool = false,
     }
 }
 
@@ -47,7 +47,7 @@ impl ChannelManager {
 
         let seq = self.lock(|inner| {
             let seq = inner.sequence.get();
-            if !inner.is_shutdown {
+            if !inner.invalid {
                 inner.channels.insert(seq, tx);
             }
             seq
@@ -93,7 +93,7 @@ impl ChannelManager {
 
     pub(crate) fn shutdown(&self) {
         self.lock(|inner| {
-            inner.is_shutdown = true;
+            inner.invalid = true;
             // destroy the sending halves of the channels to signal everyone who is waiting for something.
             inner.channels.clear();
         });
