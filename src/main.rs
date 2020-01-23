@@ -502,6 +502,7 @@ impl Future for Main {
                 progress = true;
             }
 
+            let mut try_to_reconnect = false;
             if let Some(ref mut spirc_task) = self.spirc_task {
                 if let Async::Ready(()) = spirc_task.poll().unwrap() {
                     if self.shutdown {
@@ -510,22 +511,26 @@ impl Future for Main {
                         warn!("Spirc shut down unexpectedly");
                         self.spirc_task = None;
 
-                        while (!self.auto_connect_times.is_empty()) && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600) {
-                            let _ = self.auto_connect_times.remove(0);
-                        }
-
-                        if let Some(credentials) = self.last_credentials.clone() {
-                            if self.auto_connect_times.len() >= 5 {
-                                warn!("Spirc shut down too often. Not reconnecting automatically.");
-                            } else {
-                                self.auto_connect_times.push(Instant::now());
-                                self.credentials(credentials);
-                            }
-                        }
+                        try_to_reconnect = true;
                     }
                     progress = true;
                 }
             }
+            if try_to_reconnect {
+                while (!self.auto_connect_times.is_empty()) && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600) {
+                    let _ = self.auto_connect_times.remove(0);
+                }
+
+                if let Some(credentials) = self.last_credentials.clone() {
+                    if self.auto_connect_times.len() >= 5 {
+                        warn!("Spirc shut down too often. Not reconnecting automatically.");
+                    } else {
+                        self.auto_connect_times.push(Instant::now());
+                        self.credentials(credentials);
+                    }
+                }
+            }
+
 
             if let Some(ref mut player_event_channel) = self.player_event_channel {
                 if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
