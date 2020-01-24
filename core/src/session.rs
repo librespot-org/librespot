@@ -1,23 +1,23 @@
 use std::io;
-use std::sync::{Arc, RwLock, Weak};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock, Weak};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::{Async, Future, IntoFuture, Poll, Stream};
 use futures::sync::mpsc;
+use futures::{Async, Future, IntoFuture, Poll, Stream};
 use tokio_core::reactor::{Handle, Remote};
 
-use apresolve::apresolve_or_fallback;
-use audio_key::AudioKeyManager;
-use authentication::Credentials;
-use cache::Cache;
-use channel::ChannelManager;
-use component::Lazy;
-use config::SessionConfig;
-use connection;
-use mercury::MercuryManager;
+use crate::apresolve::apresolve_or_fallback;
+use crate::audio_key::AudioKeyManager;
+use crate::authentication::Credentials;
+use crate::cache::Cache;
+use crate::channel::ChannelManager;
+use crate::component::Lazy;
+use crate::config::SessionConfig;
+use crate::connection;
+use crate::mercury::MercuryManager;
 
 struct SessionData {
     country: String,
@@ -53,8 +53,9 @@ impl Session {
         credentials: Credentials,
         cache: Option<Cache>,
         handle: Handle,
-    ) -> Box<Future<Item = Session, Error = io::Error>> {
-        let access_point = apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
+    ) -> Box<dyn Future<Item = Session, Error = io::Error>> {
+        let access_point =
+            apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
 
         let handle_ = handle.clone();
         let proxy = config.proxy.clone();
@@ -64,8 +65,9 @@ impl Session {
         });
 
         let device_id = config.device_id.clone();
-        let authentication = connection
-            .and_then(move |connection| connection::authenticate(connection, credentials, device_id));
+        let authentication = connection.and_then(move |connection| {
+            connection::authenticate(connection, credentials, device_id)
+        });
 
         let result = authentication.map(move |(transport, reusable_credentials)| {
             info!("Authenticated as \"{}\" !", reusable_credentials.username);
@@ -97,7 +99,7 @@ impl Session {
         config: SessionConfig,
         cache: Option<Cache>,
         username: String,
-    ) -> (Session, Box<Future<Item = (), Error = io::Error>>) {
+    ) -> (Session, Box<dyn Future<Item = (), Error = io::Error>>) {
         let (sink, stream) = transport.split();
 
         let (sender_tx, sender_rx) = mpsc::unbounded();
@@ -133,7 +135,11 @@ impl Session {
             .map(|_| ());
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task = Box::new((receiver_task, sender_task).into_future().map(|((), ())| ()));
+        let task = Box::new(
+            (receiver_task, sender_task)
+                .into_future()
+                .map(|((), ())| ()),
+        );
 
         (session, task)
     }
@@ -197,7 +203,7 @@ impl Session {
 
             0x9 | 0xa => self.channel().dispatch(cmd, data),
             0xd | 0xe => self.audio_key().dispatch(cmd, data),
-            0xb2...0xb6 => self.mercury().dispatch(cmd, data),
+            0xb2..=0xb6 => self.mercury().dispatch(cmd, data),
             _ => (),
         }
     }

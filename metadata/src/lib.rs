@@ -19,7 +19,7 @@ use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId};
 
-pub use protocol::metadata::AudioFile_Format as FileFormat;
+pub use crate::protocol::metadata::AudioFile_Format as FileFormat;
 
 fn countrylist_contains(list: &str, country: &str) -> bool {
     list.chunks(2).any(|cc| cc == country)
@@ -301,7 +301,6 @@ impl Metadata for Playlist {
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
-
         let tracks = msg
             .get_contents()
             .get_items()
@@ -312,9 +311,13 @@ impl Metadata for Playlist {
                 SpotifyId::from_base62(uri_parts[2]).unwrap()
             })
             .collect::<Vec<_>>();
-        
+
         if tracks.len() != msg.get_length() as usize {
-            warn!("Got {} tracks, but the playlist should contain {} tracks.", tracks.len(), msg.get_length());
+            warn!(
+                "Got {} tracks, but the playlist should contain {} tracks.",
+                tracks.len(),
+                msg.get_length()
+            );
         }
 
         Playlist {

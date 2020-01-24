@@ -11,19 +11,19 @@ use std::sync::mpsc::{RecvError, RecvTimeoutError, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
-use config::{Bitrate, PlayerConfig};
+use crate::config::{Bitrate, PlayerConfig};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::SpotifyId;
 
-use audio::{AudioDecrypt, AudioFile, StreamLoaderController};
-use audio::{VorbisDecoder, VorbisPacket};
-use audio::{
+use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
+use crate::audio::{VorbisDecoder, VorbisPacket};
+use crate::audio::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
 };
-use audio_backend::Sink;
-use metadata::{AudioItem, FileFormat};
-use mixer::AudioFilter;
+use crate::audio_backend::Sink;
+use crate::metadata::{AudioItem, FileFormat};
+use crate::mixer::AudioFilter;
 
 pub struct Player {
     commands: Option<std::sync::mpsc::Sender<PlayerCommand>>,
@@ -36,9 +36,9 @@ struct PlayerInternal {
     commands: std::sync::mpsc::Receiver<PlayerCommand>,
 
     state: PlayerState,
-    sink: Box<Sink>,
+    sink: Box<dyn Sink>,
     sink_running: bool,
-    audio_filter: Option<Box<AudioFilter + Send>>,
+    audio_filter: Option<Box<dyn AudioFilter + Send>>,
     event_sender: futures::sync::mpsc::UnboundedSender<PlayerEvent>,
 }
 
@@ -98,8 +98,10 @@ impl NormalisationData {
     }
 
     fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
-        let mut normalisation_factor =
-            f32::powf(10.0, (data.track_gain_db + config.normalisation_pregain) / 20.0);
+        let mut normalisation_factor = f32::powf(
+            10.0,
+            (data.track_gain_db + config.normalisation_pregain) / 20.0,
+        );
 
         if normalisation_factor * data.track_peak > 1.0 {
             warn!("Reducing normalisation factor to prevent clipping. Please add negative pregain to avoid.");
@@ -117,11 +119,11 @@ impl Player {
     pub fn new<F>(
         config: PlayerConfig,
         session: Session,
-        audio_filter: Option<Box<AudioFilter + Send>>,
+        audio_filter: Option<Box<dyn AudioFilter + Send>>,
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
     where
-        F: FnOnce() -> Box<Sink> + Send + 'static,
+        F: FnOnce() -> Box<dyn Sink> + Send + 'static,
     {
         let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
         let (event_sender, event_receiver) = futures::sync::mpsc::unbounded();
@@ -238,7 +240,12 @@ impl PlayerState {
         use self::PlayerState::*;
         match *self {
             Stopped | EndOfTrack { .. } => None,
-            Paused { ref mut decoder, .. } | Playing { ref mut decoder, .. } => Some(decoder),
+            Paused {
+                ref mut decoder, ..
+            }
+            | Playing {
+                ref mut decoder, ..
+            } => Some(decoder),
             Invalid => panic!("invalid state"),
         }
     }
@@ -518,7 +525,10 @@ impl PlayerInternal {
                 if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                     stream_loader_controller.set_stream_mode();
                 }
-                if let PlayerState::Playing { bytes_per_second, .. } = self.state {
+                if let PlayerState::Playing {
+                    bytes_per_second, ..
+                } = self.state
+                {
                     if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                         // Request our read ahead range
                         let request_data_length = max(
@@ -592,7 +602,10 @@ impl PlayerInternal {
                     .iter()
                     .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id));
                 let alternatives = future::join_all(alternatives).wait().unwrap();
-                alternatives.into_iter().find(|alt| alt.available).map(Cow::Owned)
+                alternatives
+                    .into_iter()
+                    .find(|alt| alt.available)
+                    .map(Cow::Owned)
             } else {
                 None
             }
@@ -676,8 +689,12 @@ impl PlayerInternal {
         let play_from_beginning = position == 0;
 
         let key = self.session.audio_key().request(spotify_id, file_id);
-        let encrypted_file =
-            AudioFile::open(&self.session, file_id, bytes_per_second, play_from_beginning);
+        let encrypted_file = AudioFile::open(
+            &self.session,
+            file_id,
+            bytes_per_second,
+            play_from_beginning,
+        );
 
         let encrypted_file = match encrypted_file.wait() {
             Ok(encrypted_file) => encrypted_file,
@@ -708,7 +725,9 @@ impl PlayerInternal {
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
         let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
-            Ok(normalisation_data) => NormalisationData::get_factor(&self.config, normalisation_data),
+            Ok(normalisation_data) => {
+                NormalisationData::get_factor(&self.config, normalisation_data)
+            }
             Err(_) => {
                 warn!("Unable to extract normalisation data, using default value.");
                 1.0 as f32
@@ -787,7 +806,7 @@ impl<T: Read + Seek> Seek for Subfile<T> {
             x => x,
         };
 
-        let newpos = try!(self.stream.seek(pos));
+        let newpos = self.stream.seek(pos)?;
         if newpos > self.offset {
             Ok(newpos - self.offset)
         } else {

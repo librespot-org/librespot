@@ -6,7 +6,10 @@ use std::mem;
 use std::ops::{Mul, Rem, Shr};
 
 pub fn rand_vec<G: Rng>(rng: &mut G, size: usize) -> Vec<u8> {
-    ::std::iter::repeat(()).map(|()| rng.gen()).take(size).collect()
+    ::std::iter::repeat(())
+        .map(|()| rng.gen())
+        .take(size)
+        .collect()
 }
 
 pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {

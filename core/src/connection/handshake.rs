@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use hmac::{Hmac, Mac};
-use sha1::Sha1;
 use futures::{Async, Future, Poll};
+use hmac::{Hmac, Mac};
 use protobuf::{self, Message};
 use rand::thread_rng;
+use sha1::Sha1;
 use std::io::{self, Read};
 use std::marker::PhantomData;
 use tokio_codec::{Decoder, Framed};
@@ -11,10 +11,10 @@ use tokio_io::io::{read_exact, write_all, ReadExact, Window, WriteAll};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use super::codec::APCodec;
-use diffie_hellman::DHLocalKeys;
-use protocol;
-use protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
-use util;
+use crate::diffie_hellman::DHLocalKeys;
+use crate::protocol;
+use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
+use crate::util;
 
 pub struct Handshake<T> {
     keys: DHLocalKeys,
@@ -62,7 +62,8 @@ impl<T: AsyncRead + AsyncWrite> Future for Handshake<T> {
                         .to_owned();
 
                     let shared_secret = self.keys.shared_secret(&remote_key);
-                    let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator);
+                    let (challenge, send_key, recv_key) =
+                        compute_keys(&shared_secret, &accumulator);
                     let codec = APCodec::new(&send_key, &recv_key);
 
                     let write = client_response(connection, challenge);
@@ -92,7 +93,10 @@ fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8
     packet
         .mut_cryptosuites_supported()
         .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);
-    packet.mut_login_crypto_hello().mut_diffie_hellman().set_gc(gc);
+    packet
+        .mut_login_crypto_hello()
+        .mut_diffie_hellman()
+        .set_gc(gc);
     packet
         .mut_login_crypto_hello()
         .mut_diffie_hellman()
@@ -190,15 +194,13 @@ fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<
 
     let mut data = Vec::with_capacity(0x64);
     for i in 1..6 {
-        let mut mac = HmacSha1::new_varkey(&shared_secret)
-            .expect("HMAC can take key of any size");
+        let mut mac = HmacSha1::new_varkey(&shared_secret).expect("HMAC can take key of any size");
         mac.input(packets);
         mac.input(&[i]);
         data.extend_from_slice(&mac.result().code());
     }
 
-    let mut mac = HmacSha1::new_varkey(&data[..0x14])
-        .expect("HMAC can take key of any size");;
+    let mut mac = HmacSha1::new_varkey(&data[..0x14]).expect("HMAC can take key of any size");
     mac.input(packets);
 
     (

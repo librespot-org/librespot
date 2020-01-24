@@ -57,7 +57,9 @@ impl<T: AsyncRead + AsyncWrite> Future for ProxyTunnel<T> {
                     let mut response = httparse::Response::new(&mut headers);
                     let status = match response.parse(&buf) {
                         Ok(status) => status,
-                        Err(err) => return Err(io::Error::new(io::ErrorKind::Other, err.description())),
+                        Err(err) => {
+                            return Err(io::Error::new(io::ErrorKind::Other, err.description()));
+                        }
                     };
 
                     if status.is_complete() {
@@ -102,7 +104,8 @@ fn proxy_connect<T: AsyncWrite>(connection: T, connect_url: &str) -> WriteAll<T,
          \r\n",
         uri.host().expect(&format!("No host in {}", uri)),
         uri.port().expect(&format!("No port in {}", uri))
-    ).into_bytes();
+    )
+    .into_bytes();
 
     write_all(connection, buffer)
 }

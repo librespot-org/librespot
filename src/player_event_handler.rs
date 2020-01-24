@@ -1,8 +1,9 @@
 use librespot::playback::player::PlayerEvent;
-use tokio_process::{Child, CommandExt};
+use log::info;
 use std::collections::HashMap;
 use std::io;
 use std::process::Command;
+use tokio_process::{Child, CommandExt};
 
 fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Child> {
     let mut v: Vec<&str> = program.split_whitespace().collect();

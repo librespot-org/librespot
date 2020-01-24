@@ -14,7 +14,11 @@ pub struct PulseAudioSink {
     desc: CString,
 }
 
-fn call_pulseaudio<T, F, FailCheck>(f: F, fail_check: FailCheck, kind: io::ErrorKind) -> io::Result<T>
+fn call_pulseaudio<T, F, FailCheck>(
+    f: F,
+    fail_check: FailCheck,
+    kind: io::ErrorKind,
+) -> io::Result<T>
 where
     T: Copy,
     F: Fn(*mut libc::c_int) -> T,

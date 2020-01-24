@@ -1,16 +1,13 @@
 use std::io;
 
-use aes_ctr::Aes128Ctr;
-use aes_ctr::stream_cipher::{
-    NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek
-};
 use aes_ctr::stream_cipher::generic_array::GenericArray;
+use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek};
+use aes_ctr::Aes128Ctr;
 
 use librespot_core::audio_key::AudioKey;
 
 const AUDIO_AESIV: [u8; 16] = [
-    0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77,
-    0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93,
+    0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77, 0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93,
 ];
 
 pub struct AudioDecrypt<T: io::Read> {
@@ -30,7 +27,7 @@ impl<T: io::Read> AudioDecrypt<T> {
 
 impl<T: io::Read> io::Read for AudioDecrypt<T> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
-        let len = try!(self.reader.read(output));
+        let len = self.reader.read(output)?;
 
         self.cipher.apply_keystream(&mut output[..len]);
 
@@ -40,7 +37,7 @@ impl<T: io::Read> io::Read for AudioDecrypt<T> {
 
 impl<T: io::Read + io::Seek> io::Seek for AudioDecrypt<T> {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        let newpos = try!(self.reader.seek(pos));
+        let newpos = self.reader.seek(pos)?;
 
         self.cipher.seek(newpos);
 

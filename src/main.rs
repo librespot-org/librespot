@@ -1,20 +1,6 @@
-extern crate env_logger;
-extern crate futures;
-extern crate getopts;
-extern crate librespot;
-#[macro_use]
-extern crate log;
-extern crate hex;
-extern crate rpassword;
-extern crate sha1;
-extern crate tokio_core;
-extern crate tokio_io;
-extern crate tokio_process;
-extern crate tokio_signal;
-extern crate url;
-
 use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
+use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use std::env;
 use std::io::{self, stderr, Write};
@@ -41,7 +27,7 @@ use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{Player, PlayerEvent};
 
 mod player_event_handler;
-use player_event_handler::run_program_on_events;
+use crate::player_event_handler::run_program_on_events;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -87,10 +73,10 @@ fn list_backends() {
 
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<Sink>,
+    backend: fn(Option<String>) -> Box<dyn Sink>,
     device: Option<String>,
 
-    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
 
     cache: Option<Cache>,
     player_config: PlayerConfig,
@@ -199,7 +185,13 @@ fn setup(args: &[String]) -> Setup {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            writeln!(stderr(), "error: {}\n{}", f.to_string(), usage(&args[0], &opts)).unwrap();
+            writeln!(
+                stderr(),
+                "error: {}\n{}",
+                f.to_string(),
+                usage(&args[0], &opts)
+            )
+            .unwrap();
             exit(1);
         }
     };
@@ -233,7 +225,9 @@ fn setup(args: &[String]) -> Setup {
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
     let mixer_config = MixerConfig {
-        card: matches.opt_str("mixer-card").unwrap_or(String::from("default")),
+        card: matches
+            .opt_str("mixer-card")
+            .unwrap_or(String::from("default")),
         mixer: matches.opt_str("mixer-name").unwrap_or(String::from("PCM")),
         index: matches
             .opt_str("mixer-index")
@@ -368,9 +362,9 @@ struct Main {
     player_config: PlayerConfig,
     session_config: SessionConfig,
     connect_config: ConnectConfig,
-    backend: fn(Option<String>) -> Box<Sink>,
+    backend: fn(Option<String>) -> Box<dyn Sink>,
     device: Option<String>,
-    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
     mixer_config: MixerConfig,
     handle: Handle,
 
@@ -379,7 +373,7 @@ struct Main {
 
     spirc: Option<Spirc>,
     spirc_task: Option<SpircTask>,
-    connect: Box<Future<Item = Session, Error = io::Error>>,
+    connect: Box<dyn Future<Item = Session, Error = io::Error>>,
 
     shutdown: bool,
     last_credentials: Option<Credentials>,
@@ -419,7 +413,8 @@ impl Main {
             let config = task.connect_config.clone();
             let device_id = task.session_config.device_id.clone();
 
-            task.discovery = Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
+            task.discovery =
+                Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
         }
 
         if let Some(credentials) = setup.credentials {
@@ -453,7 +448,9 @@ impl Future for Main {
         loop {
             let mut progress = false;
 
-            if let Some(Async::Ready(Some(creds))) = self.discovery.as_mut().map(|d| d.poll().unwrap()) {
+            if let Some(Async::Ready(Some(creds))) =
+                self.discovery.as_mut().map(|d| d.poll().unwrap())
+            {
                 if let Some(ref spirc) = self.spirc {
                     spirc.shutdown();
                 }
