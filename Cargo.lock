@@ -908,6 +908,7 @@ dependencies = [
  "portaudio-rs 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rodio 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sdl2 0.32.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shell-words 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1726,6 +1727,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell-words"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "signal-hook"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2540,6 +2546,7 @@ dependencies = [
 "checksum sha-1 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "23962131a91661d643c98940b20fcaffe62d776a823247be80a48fcb8b6fce68"
 "checksum sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7b4d8bfd0e469f417657573d8451fb33d16cfe0989359b93baf3a1ffc639543d"
 "checksum shannon 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7ea5b41c9427b56caa7b808cb548a04fb50bb5b9e98590b53f28064ff4174561"
+"checksum shell-words 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "39acde55a154c4cd3ae048ac78cc21c25f3a0145e44111b523279113dce0d94a"
 "checksum signal-hook 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "4f61c4d59f3aaa9f61bba6450a9b80ba48362fd7d651689e7a10c453b1f6dc68"
 "checksum signal-hook-registry 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "913661ac8848a61e39684a3c3e7a7a14a4deec7f54b4976d0641e70dda3939b1"
 "checksum slab 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "17b4fcaed89ab08ef143da37bc52adbcc04d4a69014f4c1208d6b51f0c47bc23"
