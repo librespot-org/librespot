@@ -296,7 +296,7 @@ where
                     warn!("Connection to server closed.");
                     session.shutdown();
                     return Ok(Async::Ready(()));
-                },
+                }
                 Ok(Async::NotReady) => return Ok(Async::NotReady),
                 Err(e) => {
                     session.shutdown();

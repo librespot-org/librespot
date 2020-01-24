@@ -636,13 +636,12 @@ impl PlayerInternal {
         spotify_id: SpotifyId,
         position: i64,
     ) -> Option<(Decoder, f32, StreamLoaderController, usize)> {
-
         let audio = match AudioItem::get_audio_item(&self.session, spotify_id).wait() {
             Ok(audio) => audio,
             Err(_) => {
                 error!("Unable to load audio item.");
-                return None
-            },
+                return None;
+            }
         };
 
         info!("Loading <{}> with Spotify URI <{}>", audio.name, audio.uri);

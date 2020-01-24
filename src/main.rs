@@ -8,10 +8,10 @@ use std::mem;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
+use std::time::Instant;
 use tokio_core::reactor::{Core, Handle};
 use tokio_io::IoStream;
 use url::Url;
-use std::time::Instant;
 
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
@@ -513,7 +513,9 @@ impl Future for Main {
             }
             if drop_spirc_and_try_to_reconnect {
                 self.spirc_task = None;
-                while (!self.auto_connect_times.is_empty()) && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600) {
+                while (!self.auto_connect_times.is_empty())
+                    && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600)
+                {
                     let _ = self.auto_connect_times.remove(0);
                 }
 
@@ -526,7 +528,6 @@ impl Future for Main {
                     }
                 }
             }
-
 
             if let Some(ref mut player_event_channel) = self.player_event_channel {
                 if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {

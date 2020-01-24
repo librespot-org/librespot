@@ -337,7 +337,7 @@ impl Future for SpircTask {
                         error!("subscription terminated");
                         self.shutdown = true;
                         self.commands.close();
-                    },
+                    }
                     Async::NotReady => (),
                 }
 
