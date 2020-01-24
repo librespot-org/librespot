@@ -1,13 +1,13 @@
-use base64;
-use sha1::{Sha1, Digest};
-use hmac::{Hmac, Mac};
-use aes_ctr::Aes128Ctr;
-use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::stream_cipher::generic_array::GenericArray;
+use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
+use aes_ctr::Aes128Ctr;
+use base64;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Stream};
+use hmac::{Hmac, Mac};
 use hyper::server::{Http, Request, Response, Service};
 use hyper::{self, Get, Post, StatusCode};
+use sha1::{Digest, Sha1};
 
 #[cfg(feature = "with-dns-sd")]
 use dns_sd::DNSService;
@@ -114,21 +114,18 @@ impl Discovery {
         let base_key = &base_key[..16];
 
         let checksum_key = {
-            let mut h = HmacSha1::new_varkey(base_key)
-                .expect("HMAC can take key of any size");
+            let mut h = HmacSha1::new_varkey(base_key).expect("HMAC can take key of any size");
             h.input(b"checksum");
             h.result().code()
         };
 
         let encryption_key = {
-            let mut h = HmacSha1::new_varkey(&base_key)
-                .expect("HMAC can take key of any size");
+            let mut h = HmacSha1::new_varkey(&base_key).expect("HMAC can take key of any size");
             h.input(b"encryption");
             h.result().code()
         };
 
-        let mut h = HmacSha1::new_varkey(&checksum_key)
-            .expect("HMAC can take key of any size");
+        let mut h = HmacSha1::new_varkey(&checksum_key).expect("HMAC can take key of any size");
         h.input(encrypted);
         if let Err(_) = h.verify(cksum) {
             warn!("Login error for user {:?}: MAC mismatch", username);
@@ -139,7 +136,7 @@ impl Discovery {
             });
 
             let body = result.to_string();
-            return ::futures::finished(Response::new().with_body(body))
+            return ::futures::finished(Response::new().with_body(body));
         }
 
         let decrypted = {
@@ -152,7 +149,8 @@ impl Discovery {
             String::from_utf8(data).unwrap()
         };
 
-        let credentials = Credentials::with_blob(username.to_owned(), &decrypted, &self.0.device_id);
+        let credentials =
+            Credentials::with_blob(username.to_owned(), &decrypted, &self.0.device_id);
 
         self.0.tx.unbounded_send(credentials).unwrap();
 
@@ -175,7 +173,7 @@ impl Service for Discovery {
     type Request = Request;
     type Response = Response;
     type Error = hyper::Error;
-    type Future = Box<Future<Item = Response, Error = hyper::Error>>;
+    type Future = Box<dyn Future<Item = Response, Error = hyper::Error>>;
 
     fn call(&self, request: Request) -> Self::Future {
         let mut params = BTreeMap::new();
@@ -194,17 +192,18 @@ impl Service for Discovery {
             body.fold(Vec::new(), |mut acc, chunk| {
                 acc.extend_from_slice(chunk.as_ref());
                 Ok::<_, hyper::Error>(acc)
-            }).map(move |body| {
-                    params.extend(url::form_urlencoded::parse(&body).into_owned());
-                    params
-                })
-                .and_then(
-                    move |params| match (method, params.get("action").map(AsRef::as_ref)) {
-                        (Get, Some("getInfo")) => this.handle_get_info(&params),
-                        (Post, Some("addUser")) => this.handle_add_user(&params),
-                        _ => this.not_found(),
-                    },
-                ),
+            })
+            .map(move |body| {
+                params.extend(url::form_urlencoded::parse(&body).into_owned());
+                params
+            })
+            .and_then(move |params| {
+                match (method, params.get("action").map(AsRef::as_ref)) {
+                    (Get, Some("getInfo")) => this.handle_get_info(&params),
+                    (Post, Some("addUser")) => this.handle_add_user(&params),
+                    _ => this.not_found(),
+                }
+            }),
         )
     }
 }
@@ -235,7 +234,8 @@ pub fn discovery(
             &format!("0.0.0.0:{}", port).parse().unwrap(),
             &handle,
             move || Ok(discovery.clone()),
-        ).unwrap()
+        )
+        .unwrap()
     };
 
     let s_port = serve.incoming_ref().local_addr().port();
@@ -260,7 +260,8 @@ pub fn discovery(
         None,
         s_port,
         &["VERSION=1.0", "CPath=/"],
-    ).unwrap();
+    )
+    .unwrap();
 
     #[cfg(not(feature = "with-dns-sd"))]
     let responder = libmdns::Responder::spawn(&handle)?;

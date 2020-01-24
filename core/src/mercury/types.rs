@@ -2,7 +2,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use protobuf::Message;
 use std::io::Write;
 
-use protocol;
+use crate::protocol;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
@@ -37,7 +37,8 @@ impl ToString for MercuryMethod {
             MercuryMethod::SUB => "SUB",
             MercuryMethod::UNSUB => "UNSUB",
             MercuryMethod::SEND => "SEND",
-        }.to_owned()
+        }
+        .to_owned()
     }
 }
 

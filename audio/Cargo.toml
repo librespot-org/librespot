@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description="The audio fetching and processing logic for librespot"
 license="MIT"
+edition = "2018"
 
 [dependencies.librespot-core]
 path = "../core"

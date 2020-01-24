@@ -1,14 +1,16 @@
 extern crate protobuf_codegen; // Does the business
 extern crate protobuf_codegen_pure; // Helper function
 
-use std::path::Path;
 use std::fs::{read_to_string, write};
+use std::path::Path;
 
-use protobuf_codegen_pure::Customize;
 use protobuf_codegen_pure::parse_and_typecheck;
+use protobuf_codegen_pure::Customize;
 
 fn main() {
-    let customizations = Customize { ..Default::default() };
+    let customizations = Customize {
+        ..Default::default()
+    };
 
     let lib_str = read_to_string("src/lib.rs").unwrap();
 
@@ -21,10 +23,9 @@ fn main() {
 
         let name;
         if line.starts_with("pub mod ") {
-            name = &line[8..len-1]; // Remove keywords and semi-colon
-        }
-        else {
-            name = &line[4..len-1]; // Remove keywords and semi-colon
+            name = &line[8..len - 1]; // Remove keywords and semi-colon
+        } else {
+            name = &line[4..len - 1]; // Remove keywords and semi-colon
         }
 
         // Build the paths to relevant files.
@@ -44,11 +45,7 @@ fn main() {
         let p = parse_and_typecheck(&["proto"], &[src]).expect("protoc");
         // But generate them with the protobuf-codegen crate directly.
         // Then we can keep the result in-memory.
-        let result = protobuf_codegen::gen(
-            &p.file_descriptors,
-            &p.relative_paths,
-            &customizations,
-        );
+        let result = protobuf_codegen::gen(&p.file_descriptors, &p.relative_paths, &customizations);
         // Protoc result as a byte array.
         let new = &result.first().unwrap().content;
         // Convert to utf8 to compare with existing.

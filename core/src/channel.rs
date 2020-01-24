@@ -5,7 +5,7 @@ use futures::{Async, Poll, Stream};
 use std::collections::HashMap;
 use std::time::Instant;
 
-use util::SeqGenerator;
+use crate::util::SeqGenerator;
 
 component! {
     ChannelManager : ChannelManagerInner {

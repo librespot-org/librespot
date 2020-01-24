@@ -11,7 +11,7 @@ pub struct PortAudioSink<'a>(
     StreamParameters<i16>,
 );
 
-fn output_devices() -> Box<Iterator<Item = (DeviceIndex, DeviceInfo)>> {
+fn output_devices() -> Box<dyn Iterator<Item = (DeviceIndex, DeviceInfo)>> {
     let count = portaudio_rs::device::get_count().unwrap();
     let devices = (0..count)
         .filter_map(|idx| portaudio_rs::device::get_info(idx).map(|info| (idx, info)))
@@ -51,7 +51,8 @@ impl<'a> Open for PortAudioSink<'a> {
             }
             Some(device) => find_output(device),
             None => get_default_output_index(),
-        }.expect("Could not find device");
+        }
+        .expect("Could not find device");
 
         let info = portaudio_rs::device::get_info(device_idx);
         let latency = match info {
@@ -81,8 +82,9 @@ impl<'a> Sink for PortAudioSink<'a> {
                     FRAMES_PER_BUFFER_UNSPECIFIED,
                     StreamFlags::empty(),
                     None,
-                ).unwrap(),
-            );;
+                )
+                .unwrap(),
+            );
         }
 
         self.0.as_mut().unwrap().start().unwrap();

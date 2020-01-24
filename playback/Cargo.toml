@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
 description="The audio playback logic for librespot"
 license="MIT"
+edition = "2018"
 
 [dependencies.librespot-audio]
 path = "../audio"
