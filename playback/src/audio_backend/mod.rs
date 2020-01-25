@@ -46,6 +46,9 @@ use self::sdl::SdlSink;
 mod pipe;
 use self::pipe::StdoutSink;
 
+mod subprocess;
+use self::subprocess::SubprocessSink;
+
 pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
@@ -60,6 +63,7 @@ pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>
     #[cfg(feature = "sdl-backend")]
     ("sdl", mk_sink::<SdlSink>),
     ("pipe", mk_sink::<StdoutSink>),
+    ("subprocess", mk_sink::<SubprocessSink>),
 ];
 
 pub fn find(name: Option<String>) -> Option<fn(Option<String>) -> Box<dyn Sink>> {
