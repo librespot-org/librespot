@@ -484,7 +484,8 @@ impl Future for Main {
                     progress = true;
                 }
                 Ok(Async::NotReady) => (),
-                Err(_) => {
+                Err(error) => {
+                    error!("Could not connect to server: {}", error);
                     self.connect = Box::new(futures::future::empty());
                 }
             }
