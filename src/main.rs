@@ -460,27 +460,33 @@ impl Future for Main {
                 progress = true;
             }
 
-            if let Async::Ready(session) = self.connect.poll().unwrap() {
-                self.connect = Box::new(futures::future::empty());
-                let mixer_config = self.mixer_config.clone();
-                let mixer = (self.mixer)(Some(mixer_config));
-                let player_config = self.player_config.clone();
-                let connect_config = self.connect_config.clone();
+            match self.connect.poll() {
+                Ok(Async::Ready(session)) => {
+                    self.connect = Box::new(futures::future::empty());
+                    let mixer_config = self.mixer_config.clone();
+                    let mixer = (self.mixer)(Some(mixer_config));
+                    let player_config = self.player_config.clone();
+                    let connect_config = self.connect_config.clone();
 
-                let audio_filter = mixer.get_audio_filter();
-                let backend = self.backend;
-                let device = self.device.clone();
-                let (player, event_channel) =
-                    Player::new(player_config, session.clone(), audio_filter, move || {
-                        (backend)(device)
-                    });
+                    let audio_filter = mixer.get_audio_filter();
+                    let backend = self.backend;
+                    let device = self.device.clone();
+                    let (player, event_channel) =
+                        Player::new(player_config, session.clone(), audio_filter, move || {
+                            (backend)(device)
+                        });
 
-                let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
-                self.spirc = Some(spirc);
-                self.spirc_task = Some(spirc_task);
-                self.player_event_channel = Some(event_channel);
+                    let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
+                    self.spirc = Some(spirc);
+                    self.spirc_task = Some(spirc_task);
+                    self.player_event_channel = Some(event_channel);
 
-                progress = true;
+                    progress = true;
+                }
+                Ok(Async::NotReady) => (),
+                Err(_) => {
+                    self.connect = Box::new(futures::future::empty());
+                }
             }
 
             if let Async::Ready(Some(())) = self.signal.poll().unwrap() {

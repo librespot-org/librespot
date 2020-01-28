@@ -28,9 +28,27 @@ pub fn connect(
     let (addr, connect_url) = match *proxy {
         Some(ref url) => {
             info!("Using proxy \"{}\"", url);
-            (url.to_socket_addrs().unwrap().next().unwrap(), Some(addr))
+            match url.to_socket_addrs().and_then(|mut iter| {
+                iter.next().ok_or(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "Can't resolve proxy server address",
+                ))
+            }) {
+                Ok(socket_addr) => (socket_addr, Some(addr)),
+                Err(error) => return Box::new(futures::future::err(error)),
+            }
         }
-        None => (addr.to_socket_addrs().unwrap().next().unwrap(), None),
+        None => {
+            match addr.to_socket_addrs().and_then(|mut iter| {
+                iter.next().ok_or(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "Can't resolve server address",
+                ))
+            }) {
+                Ok(socket_addr) => (socket_addr, None),
+                Err(error) => return Box::new(futures::future::err(error)),
+            }
+        }
     };
 
     let socket = TcpStream::connect(&addr, handle);
