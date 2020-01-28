@@ -673,7 +673,9 @@ impl SpircTask {
         // Removes current track if it is queued
         // Returns the index of the next track
         let current_index = self.state.get_playing_track_index() as usize;
-        if (current_index < self.state.get_track().len()) && self.state.get_track()[current_index].get_queued() {
+        if (current_index < self.state.get_track().len())
+            && self.state.get_track()[current_index].get_queued()
+        {
             self.state.mut_track().remove(current_index);
             current_index
         } else {
@@ -719,15 +721,13 @@ impl SpircTask {
             self.state.set_position_measured_at(now as u64);
 
             self.load_track(continue_playing);
-
-         } else {
+        } else {
             info!("Not playing next track because there are no more tracks left in queue.");
             self.state.set_playing_track_index(0);
             self.state.set_status(PlayStatus::kPlayStatusStop);
             self.player.stop();
             self.mixer.stop();
         }
-
     }
 
     fn handle_prev(&mut self) {
