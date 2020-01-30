@@ -14,6 +14,7 @@ component! {
         download_rate_estimate: usize = 0,
         download_measurement_start: Option<Instant> = None,
         download_measurement_bytes: usize = 0,
+        invalid: bool = false,
     }
 }
 
@@ -46,7 +47,9 @@ impl ChannelManager {
 
         let seq = self.lock(|inner| {
             let seq = inner.sequence.get();
-            inner.channels.insert(seq, tx);
+            if !inner.invalid {
+                inner.channels.insert(seq, tx);
+            }
             seq
         });
 
@@ -87,12 +90,21 @@ impl ChannelManager {
     pub fn get_download_rate_estimate(&self) -> usize {
         return self.lock(|inner| inner.download_rate_estimate);
     }
+
+    pub(crate) fn shutdown(&self) {
+        self.lock(|inner| {
+            inner.invalid = true;
+            // destroy the sending halves of the channels to signal everyone who is waiting for something.
+            inner.channels.clear();
+        });
+    }
 }
 
 impl Channel {
     fn recv_packet(&mut self) -> Poll<Bytes, ChannelError> {
         let (cmd, packet) = match self.receiver.poll() {
-            Ok(Async::Ready(t)) => t.expect("channel closed"),
+            Ok(Async::Ready(Some(t))) => t,
+            Ok(Async::Ready(None)) => return Err(ChannelError), // The channel has been closed.
             Ok(Async::NotReady) => return Ok(Async::NotReady),
             Err(()) => unreachable!(),
         };
