@@ -24,10 +24,20 @@ use librespot_core::volume::Volume;
 
 enum SpircPlayStatus {
     Stopped,
-    LoadingPlay { position_ms: u32 },
-    LoadingPause { position_ms: u32 },
-    Playing { nominal_start_time: i64 },
-    Paused { position_ms: u32 },
+    LoadingPlay {
+        position_ms: u32,
+    },
+    LoadingPause {
+        position_ms: u32,
+    },
+    Playing {
+        nominal_start_time: i64,
+        preloading_of_next_track_triggered: bool,
+    },
+    Paused {
+        position_ms: u32,
+        preloading_of_next_track_triggered: bool,
+    },
 }
 
 pub struct SpircTask {
@@ -548,13 +558,14 @@ impl SpircTask {
                     PlayerEvent::Playing { position_ms, .. } => {
                         let new_nominal_start_time = self.now_ms() - position_ms as i64;
                         match self.play_status {
-                            SpircPlayStatus::Playing { nominal_start_time } => {
-                                if (nominal_start_time - new_nominal_start_time).abs() > 100 {
+                            SpircPlayStatus::Playing {
+                                ref mut nominal_start_time,
+                                ..
+                            } => {
+                                if (*nominal_start_time - new_nominal_start_time).abs() > 100 {
+                                    *nominal_start_time = new_nominal_start_time;
                                     self.update_state_position(position_ms);
                                     self.notify(None);
-                                    self.play_status = SpircPlayStatus::Playing {
-                                        nominal_start_time: new_nominal_start_time,
-                                    };
                                 }
                             }
                             SpircPlayStatus::LoadingPlay { .. }
@@ -564,6 +575,7 @@ impl SpircTask {
                                 self.notify(None);
                                 self.play_status = SpircPlayStatus::Playing {
                                     nominal_start_time: new_nominal_start_time,
+                                    preloading_of_next_track_triggered: false,
                                 };
                             }
                             _ => (),
@@ -577,6 +589,7 @@ impl SpircTask {
                         match self.play_status {
                             SpircPlayStatus::Paused {
                                 ref mut position_ms,
+                                ..
                             } => {
                                 if *position_ms != new_position_ms {
                                     *position_ms = new_position_ms;
@@ -591,6 +604,7 @@ impl SpircTask {
                                 self.notify(None);
                                 self.play_status = SpircPlayStatus::Paused {
                                     position_ms: new_position_ms,
+                                    preloading_of_next_track_triggered: false,
                                 };
                             }
                             _ => (),
@@ -608,15 +622,22 @@ impl SpircTask {
                         }
                     },
                     PlayerEvent::TimeToPreloadNextTrack { .. } => match self.play_status {
-                        SpircPlayStatus::Paused { .. }
-                        | SpircPlayStatus::Playing { .. }
-                        | SpircPlayStatus::LoadingPause { .. }
-                        | SpircPlayStatus::LoadingPlay { .. } => {
+                        SpircPlayStatus::Paused {
+                            ref mut preloading_of_next_track_triggered,
+                            ..
+                        }
+                        | SpircPlayStatus::Playing {
+                            ref mut preloading_of_next_track_triggered,
+                            ..
+                        } => {
+                            *preloading_of_next_track_triggered = true;
                             if let Some(track_id) = self.preview_next_track() {
                                 self.player.preload(track_id);
                             }
                         }
-                        SpircPlayStatus::Stopped => (),
+                        SpircPlayStatus::LoadingPause { .. }
+                        | SpircPlayStatus::LoadingPlay { .. }
+                        | SpircPlayStatus::Stopped => (),
                     },
                     _ => (),
                 }
@@ -745,6 +766,22 @@ impl SpircTask {
             MessageType::kMessageTypeReplace => {
                 self.update_tracks(&frame);
                 self.notify(None);
+
+                if let SpircPlayStatus::Playing {
+                    preloading_of_next_track_triggered,
+                    ..
+                }
+                | SpircPlayStatus::Paused {
+                    preloading_of_next_track_triggered,
+                    ..
+                } = self.play_status
+                {
+                    if preloading_of_next_track_triggered {
+                        if let Some(track_id) = self.preview_next_track() {
+                            self.player.preload(track_id);
+                        }
+                    }
+                }
             }
 
             MessageType::kMessageTypeVolume => {
@@ -768,13 +805,17 @@ impl SpircTask {
 
     fn handle_play(&mut self) {
         match self.play_status {
-            SpircPlayStatus::Paused { position_ms } => {
+            SpircPlayStatus::Paused {
+                position_ms,
+                preloading_of_next_track_triggered,
+            } => {
                 self.ensure_mixer_started();
                 self.player.play();
                 self.state.set_status(PlayStatus::kPlayStatusPlay);
                 self.update_state_position(position_ms);
                 self.play_status = SpircPlayStatus::Playing {
                     nominal_start_time: self.now_ms() as i64 - position_ms as i64,
+                    preloading_of_next_track_triggered,
                 };
             }
             SpircPlayStatus::LoadingPause { position_ms } => {
@@ -800,12 +841,18 @@ impl SpircTask {
 
     fn handle_pause(&mut self) {
         match self.play_status {
-            SpircPlayStatus::Playing { nominal_start_time } => {
+            SpircPlayStatus::Playing {
+                nominal_start_time,
+                preloading_of_next_track_triggered,
+            } => {
                 self.player.pause();
                 self.state.set_status(PlayStatus::kPlayStatusPause);
                 let position_ms = (self.now_ms() - nominal_start_time) as u32;
                 self.update_state_position(position_ms);
-                self.play_status = SpircPlayStatus::Paused { position_ms };
+                self.play_status = SpircPlayStatus::Paused {
+                    position_ms,
+                    preloading_of_next_track_triggered,
+                };
             }
             SpircPlayStatus::LoadingPlay { position_ms } => {
                 self.player.pause();
@@ -829,9 +876,11 @@ impl SpircTask {
             }
             | SpircPlayStatus::Paused {
                 position_ms: ref mut position,
+                ..
             } => *position = position_ms,
             SpircPlayStatus::Playing {
                 ref mut nominal_start_time,
+                ..
             } => *nominal_start_time = now - position_ms as i64,
         };
     }
@@ -851,7 +900,8 @@ impl SpircTask {
     }
 
     fn preview_next_track(&mut self) -> Option<SpotifyId> {
-        None
+        self.get_track_id_to_play_from_playlist(self.state.get_playing_track_index() + 1)
+            .and_then(|(track_id, _)| Some(track_id))
     }
 
     fn handle_next(&mut self) {
@@ -963,10 +1013,10 @@ impl SpircTask {
             SpircPlayStatus::Stopped => 0,
             SpircPlayStatus::LoadingPlay { position_ms }
             | SpircPlayStatus::LoadingPause { position_ms }
-            | SpircPlayStatus::Paused { position_ms } => position_ms,
-            SpircPlayStatus::Playing { nominal_start_time } => {
-                (self.now_ms() - nominal_start_time) as u32
-            }
+            | SpircPlayStatus::Paused { position_ms, .. } => position_ms,
+            SpircPlayStatus::Playing {
+                nominal_start_time, ..
+            } => (self.now_ms() - nominal_start_time) as u32,
         }
     }
 
@@ -1077,53 +1127,123 @@ impl SpircTask {
         })
     }
 
-    fn load_track(&mut self, start_playing: bool, position_ms: u32) {
-        let context_uri = self.state.get_context_uri().to_owned();
-        let mut index = self.state.get_playing_track_index();
-        let start_index = index;
+    fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
         let tracks_len = self.state.get_track().len() as u32;
-        debug!(
-            "Loading context: <{}> index: [{}] of {}",
-            context_uri, index, tracks_len
-        );
+
+        let mut new_playlist_index = index;
+
+        if new_playlist_index >= tracks_len {
+            new_playlist_index = 0;
+        }
+
+        let start_index = new_playlist_index;
+
         // Cycle through all tracks, break if we don't find any playable tracks
-        // TODO: This will panic if no playable tracks are found!
         // tracks in each frame either have a gid or uri (that may or may not be a valid track)
         // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
-        let track = {
-            let mut track_ref = self.state.get_track()[index as usize].clone();
-            let mut track_id = self.get_spotify_id_for_track(&track_ref);
-            while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
-            {
-                warn!(
-                    "Skipping track <{:?}> at position [{}] of {}",
-                    track_ref.get_uri(),
-                    index,
-                    tracks_len
-                );
-                index = if index + 1 < tracks_len { index + 1 } else { 0 };
-                self.state.set_playing_track_index(index);
-                if index == start_index {
-                    warn!("No playable track found in state: {:?}", self.state);
-                    break;
-                }
-                track_ref = self.state.get_track()[index as usize].clone();
-                track_id = self.get_spotify_id_for_track(&track_ref);
+
+        let mut track_ref = self.state.get_track()[index as usize].clone();
+        let mut track_id = self.get_spotify_id_for_track(&track_ref);
+        while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable {
+            warn!(
+                "Skipping track <{:?}> at position [{}] of {}",
+                track_ref.get_uri(),
+                new_playlist_index,
+                tracks_len
+            );
+
+            new_playlist_index += 1;
+            if new_playlist_index >= tracks_len {
+                new_playlist_index = 0;
             }
-            track_id
+
+            if new_playlist_index == start_index {
+                warn!("No playable track found in state: {:?}", self.state);
+                return None;
+            }
+            track_ref = self.state.get_track()[index as usize].clone();
+            track_id = self.get_spotify_id_for_track(&track_ref);
         }
-        .expect("Invalid SpotifyId");
 
-        self.play_request_id = Some(self.player.load(track, start_playing, position_ms));
-
-        self.update_state_position(position_ms);
-        self.state.set_status(PlayStatus::kPlayStatusLoading);
-        if start_playing {
-            self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
-        } else {
-            self.play_status = SpircPlayStatus::LoadingPause { position_ms };
+        match track_id {
+            Ok(track_id) => Some((track_id, new_playlist_index)),
+            Err(_) => None,
         }
     }
+
+    fn load_track(&mut self, start_playing: bool, position_ms: u32) {
+        let index = self.state.get_playing_track_index();
+
+        match self.get_track_id_to_play_from_playlist(index) {
+            Some((track, index)) => {
+                self.state.set_playing_track_index(index);
+
+                self.play_request_id = Some(self.player.load(track, start_playing, position_ms));
+
+                self.update_state_position(position_ms);
+                self.state.set_status(PlayStatus::kPlayStatusLoading);
+                if start_playing {
+                    self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
+                } else {
+                    self.play_status = SpircPlayStatus::LoadingPause { position_ms };
+                }
+            }
+            None => {
+                self.state.set_status(PlayStatus::kPlayStatusStop);
+                self.player.stop();
+                self.ensure_mixer_stopped();
+                self.play_status = SpircPlayStatus::Stopped;
+            }
+        }
+    }
+
+    //    fn load_track(&mut self, start_playing: bool, position_ms: u32) {
+    //        let context_uri = self.state.get_context_uri().to_owned();
+    //        let mut index = self.state.get_playing_track_index();
+    //        let start_index = index;
+    //        let tracks_len = self.state.get_track().len() as u32;
+    //        debug!(
+    //            "Loading context: <{}> index: [{}] of {}",
+    //            context_uri, index, tracks_len
+    //        );
+    //        // Cycle through all tracks, break if we don't find any playable tracks
+    //        // TODO: This will panic if no playable tracks are found!
+    //        // tracks in each frame either have a gid or uri (that may or may not be a valid track)
+    //        // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
+    //        let track = {
+    //            let mut track_ref = self.state.get_track()[index as usize].clone();
+    //            let mut track_id = self.get_spotify_id_for_track(&track_ref);
+    //            while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
+    //            {
+    //                warn!(
+    //                    "Skipping track <{:?}> at position [{}] of {}",
+    //                    track_ref.get_uri(),
+    //                    index,
+    //                    tracks_len
+    //                );
+    //                index = if index + 1 < tracks_len { index + 1 } else { 0 };
+    //                self.state.set_playing_track_index(index);
+    //                if index == start_index {
+    //                    warn!("No playable track found in state: {:?}", self.state);
+    //                    break;
+    //                }
+    //                track_ref = self.state.get_track()[index as usize].clone();
+    //                track_id = self.get_spotify_id_for_track(&track_ref);
+    //            }
+    //            track_id
+    //        }
+    //            .expect("Invalid SpotifyId");
+    //
+    //        self.play_request_id = Some(self.player.load(track, start_playing, position_ms));
+    //
+    //        self.update_state_position(position_ms);
+    //        self.state.set_status(PlayStatus::kPlayStatusLoading);
+    //        if start_playing {
+    //            self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
+    //        } else {
+    //            self.play_status = SpircPlayStatus::LoadingPause { position_ms };
+    //        }
+    //    }
 
     fn hello(&mut self) {
         CommandSender::new(self, MessageType::kMessageTypeHello).send();

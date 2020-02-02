@@ -1270,6 +1270,7 @@ impl PlayerInternal {
             }
 
             PlayerCommand::Preload { track_id } => {
+                debug!("Preloading track");
                 let mut preload_track = true;
 
                 if let PlayerPreload::Loading {
