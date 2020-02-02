@@ -247,10 +247,8 @@ impl Player {
         play_request_id
     }
 
-    pub fn preload(&mut self, track_id: SpotifyId) {
-        self.command(PlayerCommand::Preload {
-            track_id,
-        });
+    pub fn preload(&self, track_id: SpotifyId) {
+        self.command(PlayerCommand::Preload { track_id });
     }
 
     pub fn play(&self) {
@@ -273,6 +271,19 @@ impl Player {
         let (event_sender, event_receiver) = futures::sync::mpsc::unbounded();
         self.command(PlayerCommand::AddEventSender(event_sender));
         event_receiver
+    }
+
+    pub fn get_end_of_track_future(&self) -> Box<dyn Future<Item = (), Error = ()>> {
+        let result = self
+            .get_player_event_channel()
+            .filter(|event| match event {
+                PlayerEvent::EndOfTrack { .. } | PlayerEvent::Stopped { .. } => true,
+                _ => false,
+            })
+            .into_future()
+            .map_err(|_| ())
+            .map(|_| ());
+        Box::new(result)
     }
 
     pub fn emit_volume_set_event(&self, volume: u16) {
@@ -299,7 +310,7 @@ struct PlayerLoadedTrackData {
     stream_loader_controller: StreamLoaderController,
     bytes_per_second: usize,
     duration_ms: u32,
-    stream_position: u64,
+    stream_position_pcm: u64,
 }
 
 enum PlayerPreload {
@@ -332,7 +343,7 @@ enum PlayerState {
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
         duration_ms: u32,
-        stream_position: u64,
+        stream_position_pcm: u64,
         suggested_to_preload_next_track: bool,
     },
     Playing {
@@ -343,7 +354,7 @@ enum PlayerState {
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
         duration_ms: u32,
-        stream_position: u64,
+        stream_position_pcm: u64,
         reported_nominal_start_time: Option<Instant>,
         suggested_to_preload_next_track: bool,
     },
@@ -430,7 +441,7 @@ impl PlayerState {
                 stream_loader_controller,
                 duration_ms,
                 bytes_per_second,
-                stream_position,
+                stream_position_pcm,
                 suggested_to_preload_next_track,
             } => {
                 *self = Playing {
@@ -441,7 +452,7 @@ impl PlayerState {
                     stream_loader_controller,
                     duration_ms,
                     bytes_per_second,
-                    stream_position,
+                    stream_position_pcm,
                     reported_nominal_start_time: None,
                     suggested_to_preload_next_track,
                 };
@@ -461,7 +472,7 @@ impl PlayerState {
                 stream_loader_controller,
                 duration_ms,
                 bytes_per_second,
-                stream_position,
+                stream_position_pcm,
                 reported_nominal_start_time: _,
                 suggested_to_preload_next_track,
             } => {
@@ -473,7 +484,7 @@ impl PlayerState {
                     stream_loader_controller,
                     duration_ms,
                     bytes_per_second,
-                    stream_position,
+                    stream_position_pcm,
                     suggested_to_preload_next_track,
                 };
             }
@@ -526,7 +537,7 @@ impl PlayerTrackLoader {
         }
     }
 
-    fn load_track(&self, spotify_id: SpotifyId, position: u64) -> Option<PlayerLoadedTrackData> {
+    fn load_track(&self, spotify_id: SpotifyId, position_ms: u32) -> Option<PlayerLoadedTrackData> {
         let audio = match AudioItem::get_audio_item(&self.session, spotify_id).wait() {
             Ok(audio) => audio,
             Err(_) => {
@@ -580,7 +591,7 @@ impl PlayerTrackLoader {
         };
 
         let bytes_per_second = self.stream_data_rate(*format);
-        let play_from_beginning = position == 0;
+        let play_from_beginning = position_ms == 0;
 
         let key = self.session.audio_key().request(spotify_id, file_id);
         let encrypted_file = AudioFile::open(
@@ -632,14 +643,14 @@ impl PlayerTrackLoader {
 
         let mut decoder = VorbisDecoder::new(audio_file).unwrap();
 
-        if position != 0 {
-            match decoder.seek(position as i64) {
+        if position_ms != 0 {
+            match decoder.seek(position_ms as i64) {
                 Ok(_) => (),
                 Err(err) => error!("Vorbis error: {:?}", err),
             }
             stream_loader_controller.set_stream_mode();
         }
-        let stream_position = position * 441 / 10;
+        let stream_position_pcm = PlayerInternal::position_ms_to_pcm(position_ms);
         info!("<{}> ({} ms) loaded", audio.name, audio.duration);
         Some(PlayerLoadedTrackData {
             decoder,
@@ -647,7 +658,7 @@ impl PlayerTrackLoader {
             stream_loader_controller,
             bytes_per_second,
             duration_ms,
-            stream_position,
+            stream_position_pcm,
         })
     }
 }
@@ -736,7 +747,7 @@ impl Future for PlayerInternal {
                     play_request_id,
                     ref mut decoder,
                     normalisation_factor,
-                    ref mut stream_position,
+                    ref mut stream_position_pcm,
                     ref mut reported_nominal_start_time,
                     duration_ms,
                     ..
@@ -746,17 +757,18 @@ impl Future for PlayerInternal {
                     let packet = decoder.next_packet().expect("Vorbis error");
 
                     if let Some(ref packet) = packet {
-                        *stream_position = *stream_position + (packet.data().len() / 2) as u64;
-                        let stream_position_seconds = *stream_position / 44100;
-                        if stream_position_seconds != last_printed_stream_position_for_debug {
+                        *stream_position_pcm =
+                            *stream_position_pcm + (packet.data().len() / 2) as u64;
+                        let stream_position_millis = Self::position_pcm_to_ms(*stream_position_pcm);
+
+                        if stream_position_millis / 1000 != last_printed_stream_position_for_debug {
                             trace!(
                                 "Stream position: {} ({} seconds)",
-                                *stream_position,
-                                stream_position_seconds
+                                *stream_position_pcm,
+                                stream_position_millis / 1000
                             );
-                            last_printed_stream_position_for_debug = stream_position_seconds;
+                            last_printed_stream_position_for_debug = stream_position_millis / 1000;
                         }
-                        let stream_position_millis = *stream_position * 10 / 441;
 
                         let notify_about_position = match *reported_nominal_start_time {
                             None => true,
@@ -800,7 +812,7 @@ impl Future for PlayerInternal {
                 track_id,
                 play_request_id,
                 duration_ms,
-                stream_position,
+                stream_position_pcm,
                 ref mut stream_loader_controller,
                 ref mut suggested_to_preload_next_track,
                 ..
@@ -809,13 +821,13 @@ impl Future for PlayerInternal {
                 track_id,
                 play_request_id,
                 duration_ms,
-                stream_position,
+                stream_position_pcm,
                 ref mut stream_loader_controller,
                 ref mut suggested_to_preload_next_track,
                 ..
             } = self.state
             {
-                let stream_position_millis = stream_position * 10 / 441;
+                let stream_position_millis = Self::position_pcm_to_ms(stream_position_pcm);
                 if (!*suggested_to_preload_next_track)
                     && ((duration_ms as i64 - stream_position_millis as i64)
                         < PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS as i64)
@@ -841,6 +853,14 @@ impl Future for PlayerInternal {
 }
 
 impl PlayerInternal {
+    fn position_pcm_to_ms(position_pcm: u64) -> u32 {
+        (position_pcm * 10 / 441) as u32
+    }
+
+    fn position_ms_to_pcm(position_ms: u32) -> u64 {
+        position_ms as u64 * 441 / 10
+    }
+
     fn start_sink(&mut self) {
         match self.sink.start() {
             Ok(()) => self.sink_running = true,
@@ -939,7 +959,7 @@ impl PlayerInternal {
         loaded_track: PlayerLoadedTrackData,
         start_playback: bool,
     ) {
-        let position_ms = (loaded_track.stream_position * 10 / 441) as u32;
+        let position_ms = Self::position_pcm_to_ms(loaded_track.stream_position_pcm);
 
         match self.state {
             PlayerState::Playing {
@@ -984,7 +1004,7 @@ impl PlayerInternal {
                 stream_loader_controller: loaded_track.stream_loader_controller,
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
-                stream_position: loaded_track.stream_position,
+                stream_position_pcm: loaded_track.stream_position_pcm,
                 reported_nominal_start_time: Some(
                     Instant::now() - Duration::from_millis(position_ms as u64),
                 ),
@@ -999,7 +1019,7 @@ impl PlayerInternal {
                 stream_loader_controller: loaded_track.stream_loader_controller,
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
-                stream_position: loaded_track.stream_position,
+                stream_position_pcm: loaded_track.stream_position_pcm,
                 suggested_to_preload_next_track: false,
             };
 
@@ -1102,8 +1122,7 @@ impl PlayerInternal {
 
                     self.preload = PlayerPreload::None;
 
-                    let loader = loader
-                        .or_else(|| Some(self.load_track_threaded(track_id, position_ms as u64)));
+                    let loader = loader.or_else(|| Some(self.load_track(track_id, position_ms)));
                     let loader = loader.unwrap();
 
                     self.state = PlayerState::Loading {
@@ -1130,28 +1149,28 @@ impl PlayerInternal {
                     }
                 }
                 if let PlayerPreload::None = self.preload {
-                    let loader = self.load_track_threaded(track_id, 0);
+                    let loader = self.load_track(track_id, 0);
                     self.preload = PlayerPreload::Loading { track_id, loader }
                 }
             }
 
-            PlayerCommand::Seek(position) => {
+            PlayerCommand::Seek(position_ms) => {
                 if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
                     stream_loader_controller.set_random_access_mode();
                 }
                 if let Some(decoder) = self.state.decoder() {
-                    match decoder.seek(position as i64) {
+                    match decoder.seek(position_ms as i64) {
                         Ok(_) => {
                             if let PlayerState::Playing {
-                                ref mut stream_position,
+                                ref mut stream_position_pcm,
                                 ..
                             }
                             | PlayerState::Paused {
-                                ref mut stream_position,
+                                ref mut stream_position_pcm,
                                 ..
                             } = self.state
                             {
-                                *stream_position = position as u64 * 441 / 10;
+                                *stream_position_pcm = Self::position_ms_to_pcm(position_ms);
                             }
                         }
                         Err(err) => error!("Vorbis error: {:?}", err),
@@ -1176,11 +1195,11 @@ impl PlayerInternal {
                 } = self.state
                 {
                     *reported_nominal_start_time =
-                        Some(Instant::now() - Duration::from_millis(position as u64));
+                        Some(Instant::now() - Duration::from_millis(position_ms as u64));
                     self.send_event(PlayerEvent::Playing {
                         track_id,
                         play_request_id,
-                        position_ms: position,
+                        position_ms: position_ms,
                         duration_ms,
                     });
                 }
@@ -1194,7 +1213,7 @@ impl PlayerInternal {
                     self.send_event(PlayerEvent::Paused {
                         track_id,
                         play_request_id,
-                        position_ms: position,
+                        position_ms: position_ms,
                         duration_ms,
                     });
                 }
@@ -1204,13 +1223,13 @@ impl PlayerInternal {
                 if let PlayerState::Paused {
                     track_id,
                     play_request_id,
-                    stream_position,
+                    stream_position_pcm,
                     ..
                 } = self.state
                 {
                     self.state.paused_to_playing();
 
-                    let position_ms = (stream_position * 10 / 441) as u32;
+                    let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
                     self.send_event(PlayerEvent::Started {
                         track_id,
                         play_request_id,
@@ -1226,7 +1245,7 @@ impl PlayerInternal {
                 if let PlayerState::Playing {
                     track_id,
                     play_request_id,
-                    stream_position,
+                    stream_position_pcm,
                     duration_ms,
                     ..
                 } = self.state
@@ -1234,7 +1253,7 @@ impl PlayerInternal {
                     self.state.playing_to_paused();
 
                     self.stop_sink_if_running();
-                    let position_ms = (stream_position * 10 / 441) as u32;
+                    let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
                     self.send_event(PlayerEvent::Paused {
                         track_id,
                         play_request_id,
@@ -1268,48 +1287,10 @@ impl PlayerInternal {
         }
     }
 
-    //    fn find_available_alternative<'a>(&self, audio: &'a AudioItem) -> Option<Cow<'a, AudioItem>> {
-    //        if audio.available {
-    //            Some(Cow::Borrowed(audio))
-    //        } else {
-    //            if let Some(alternatives) = &audio.alternatives {
-    //                let alternatives = alternatives
-    //                    .iter()
-    //                    .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id));
-    //                let alternatives = future::join_all(alternatives).wait().unwrap();
-    //                alternatives
-    //                    .into_iter()
-    //                    .find(|alt| alt.available)
-    //                    .map(Cow::Owned)
-    //            } else {
-    //                None
-    //            }
-    //        }
-    //    }
-
-    //    fn stream_data_rate(&self, format: FileFormat) -> usize {
-    //        match format {
-    //            FileFormat::OGG_VORBIS_96 => 12 * 1024,
-    //            FileFormat::OGG_VORBIS_160 => 20 * 1024,
-    //            FileFormat::OGG_VORBIS_320 => 40 * 1024,
-    //            FileFormat::MP3_256 => 32 * 1024,
-    //            FileFormat::MP3_320 => 40 * 1024,
-    //            FileFormat::MP3_160 => 20 * 1024,
-    //            FileFormat::MP3_96 => 12 * 1024,
-    //            FileFormat::MP3_160_ENC => 20 * 1024,
-    //            FileFormat::MP4_128_DUAL => 16 * 1024,
-    //            FileFormat::OTHER3 => 40 * 1024, // better some high guess than nothing
-    //            FileFormat::AAC_160 => 20 * 1024,
-    //            FileFormat::AAC_320 => 40 * 1024,
-    //            FileFormat::MP4_128 => 16 * 1024,
-    //            FileFormat::OTHER5 => 40 * 1024, // better some high guess than nothing
-    //        }
-    //    }
-
-    fn load_track_threaded(
+    fn load_track(
         &self,
         spotify_id: SpotifyId,
-        position: u64,
+        position_ms: u32,
     ) -> Box<dyn Future<Item = PlayerLoadedTrackData, Error = ()>> {
         // This method creates a future that returns the loaded stream and associated info.
         // Ideally all work should be done using asynchronous code. However, seek() on the
@@ -1326,7 +1307,7 @@ impl PlayerInternal {
 
         std::thread::spawn(move || {
             loader
-                .load_track(spotify_id, position)
+                .load_track(spotify_id, position_ms)
                 .and_then(move |data| {
                     let _ = result_tx.send(data);
                     Some(())
@@ -1335,130 +1316,6 @@ impl PlayerInternal {
 
         Box::new(result_rx.map_err(|_| ()))
     }
-
-    //    fn load_track(
-    //        &self,
-    //        spotify_id: SpotifyId,
-    //        position: u64,
-    //    ) -> Option<(Decoder, f32, StreamLoaderController, usize, u64)> {
-    //        let audio = match AudioItem::get_audio_item(&self.session, spotify_id).wait() {
-    //            Ok(audio) => audio,
-    //            Err(_) => {
-    //                error!("Unable to load audio item.");
-    //                return None;
-    //            }
-    //        };
-    //
-    //        info!("Loading <{}> with Spotify URI <{}>", audio.name, audio.uri);
-    //
-    //        let audio = match self.find_available_alternative(&audio) {
-    //            Some(audio) => audio,
-    //            None => {
-    //                warn!("<{}> is not available", audio.uri);
-    //                return None;
-    //            }
-    //        };
-    //        // (Most) podcasts seem to support only 96 bit Vorbis, so fall back to it
-    //        let formats = match self.config.bitrate {
-    //            Bitrate::Bitrate96 => [
-    //                FileFormat::OGG_VORBIS_96,
-    //                FileFormat::OGG_VORBIS_160,
-    //                FileFormat::OGG_VORBIS_320,
-    //            ],
-    //            Bitrate::Bitrate160 => [
-    //                FileFormat::OGG_VORBIS_160,
-    //                FileFormat::OGG_VORBIS_96,
-    //                FileFormat::OGG_VORBIS_320,
-    //            ],
-    //            Bitrate::Bitrate320 => [
-    //                FileFormat::OGG_VORBIS_320,
-    //                FileFormat::OGG_VORBIS_160,
-    //                FileFormat::OGG_VORBIS_96,
-    //            ],
-    //        };
-    //        let format = formats
-    //            .iter()
-    //            .find(|format| audio.files.contains_key(format))
-    //            .unwrap();
-    //
-    //        let file_id = match audio.files.get(&format) {
-    //            Some(&file_id) => file_id,
-    //            None => {
-    //                warn!("<{}> in not available in format {:?}", audio.name, format);
-    //                return None;
-    //            }
-    //        };
-    //
-    //        let bytes_per_second = self.stream_data_rate(*format);
-    //        let play_from_beginning = position == 0;
-    //
-    //        let key = self.session.audio_key().request(spotify_id, file_id);
-    //        let encrypted_file = AudioFile::open(
-    //            &self.session,
-    //            file_id,
-    //            bytes_per_second,
-    //            play_from_beginning,
-    //        );
-    //
-    //        let encrypted_file = match encrypted_file.wait() {
-    //            Ok(encrypted_file) => encrypted_file,
-    //            Err(_) => {
-    //                error!("Unable to load encrypted file.");
-    //                return None;
-    //            }
-    //        };
-    //
-    //        let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
-    //
-    //        if play_from_beginning {
-    //            // No need to seek -> we stream from the beginning
-    //            stream_loader_controller.set_stream_mode();
-    //        } else {
-    //            // we need to seek -> we set stream mode after the initial seek.
-    //            stream_loader_controller.set_random_access_mode();
-    //        }
-    //
-    //        let key = match key.wait() {
-    //            Ok(key) => key,
-    //            Err(_) => {
-    //                error!("Unable to load decryption key");
-    //                return None;
-    //            }
-    //        };
-    //
-    //        let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
-    //
-    //        let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
-    //            Ok(normalisation_data) => {
-    //                NormalisationData::get_factor(&self.config, normalisation_data)
-    //            }
-    //            Err(_) => {
-    //                warn!("Unable to extract normalisation data, using default value.");
-    //                1.0 as f32
-    //            }
-    //        };
-    //
-    //        let audio_file = Subfile::new(decrypted_file, 0xa7);
-    //
-    //        let mut decoder = VorbisDecoder::new(audio_file).unwrap();
-    //
-    //        if position != 0 {
-    //            match decoder.seek(position as i64) {
-    //                Ok(_) => (),
-    //                Err(err) => error!("Vorbis error: {:?}", err),
-    //            }
-    //            stream_loader_controller.set_stream_mode();
-    //        }
-    //        let stream_position = position * 441 / 10;
-    //        info!("<{}> loaded", audio.name);
-    //        Some((
-    //            decoder,
-    //            normalisation_factor,
-    //            stream_loader_controller,
-    //            bytes_per_second,
-    //            stream_position,
-    //        ))
-    //    }
 
     fn preload_data_before_playback(&mut self) {
         if let PlayerState::Playing {

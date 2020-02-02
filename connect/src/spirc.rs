@@ -546,14 +546,10 @@ impl SpircTask {
                     PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track(),
                     PlayerEvent::Loading { .. } => (),
                     PlayerEvent::Playing { position_ms, .. } => {
-                        let new_nominal_start_time =
-                            self.now_ms() - position_ms as i64;
+                        let new_nominal_start_time = self.now_ms() - position_ms as i64;
                         match self.play_status {
                             SpircPlayStatus::Playing { nominal_start_time } => {
-                                if (nominal_start_time - new_nominal_start_time)
-                                    .abs()
-                                    > 100
-                                {
+                                if (nominal_start_time - new_nominal_start_time).abs() > 100 {
                                     self.update_state_position(position_ms);
                                     self.notify(None);
                                     self.play_status = SpircPlayStatus::Playing {
@@ -611,14 +607,17 @@ impl SpircTask {
                             self.play_status = SpircPlayStatus::Stopped;
                         }
                     },
-                    PlayerEvent::TimeToPreloadNextTrack {..} => match self.play_status {
-                        SpircPlayStatus::Paused {..}|SpircPlayStatus::Playing {..}| SpircPlayStatus::LoadingPause{..}|SpircPlayStatus::LoadingPlay {..} => {
+                    PlayerEvent::TimeToPreloadNextTrack { .. } => match self.play_status {
+                        SpircPlayStatus::Paused { .. }
+                        | SpircPlayStatus::Playing { .. }
+                        | SpircPlayStatus::LoadingPause { .. }
+                        | SpircPlayStatus::LoadingPlay { .. } => {
                             if let Some(track_id) = self.preview_next_track() {
                                 self.player.preload(track_id);
                             }
                         }
                         SpircPlayStatus::Stopped => (),
-                    }
+                    },
                     _ => (),
                 }
             }

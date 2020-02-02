@@ -7,53 +7,8 @@ use librespot::core::session::Session;
 use librespot::core::spotify_id::SpotifyId;
 use librespot::playback::config::PlayerConfig;
 
-use futures::stream::Stream;
-use futures::{Async, Future, Poll};
 use librespot::playback::audio_backend;
-use librespot::playback::player::{Player, PlayerEvent, PlayerEventChannel};
-
-pub struct SingleTrackPlayer {
-    play_request_id: u64,
-    event_channel: PlayerEventChannel,
-}
-
-impl SingleTrackPlayer {
-    pub fn new(ref mut player: Player, track_id: SpotifyId) -> SingleTrackPlayer {
-        let event_channel = player.get_player_event_channel();
-        let play_request_id = player.load(track_id, true, 0);
-        SingleTrackPlayer {
-            play_request_id,
-            event_channel,
-        }
-    }
-}
-
-impl Future for SingleTrackPlayer {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<(), ()> {
-        loop {
-            match self.event_channel.poll().unwrap() {
-                Async::NotReady => return Ok(Async::NotReady),
-                Async::Ready(None) => return Ok(Async::Ready(())),
-                Async::Ready(Some(event)) => match event {
-                    PlayerEvent::EndOfTrack {
-                        play_request_id, ..
-                    }
-                    | PlayerEvent::Stopped {
-                        play_request_id, ..
-                    } => {
-                        if play_request_id == self.play_request_id {
-                            return Ok(Async::Ready(()));
-                        }
-                    }
-                    _ => (),
-                },
-            }
-        }
-    }
-}
+use librespot::playback::player::Player;
 
 fn main() {
     let mut core = Core::new().unwrap();
@@ -79,12 +34,14 @@ fn main() {
         .run(Session::connect(session_config, credentials, None, handle))
         .unwrap();
 
-    let (player, _) = Player::new(player_config, session.clone(), None, move || {
+    let (mut player, _) = Player::new(player_config, session.clone(), None, move || {
         (backend)(None)
     });
 
+    player.load(track, true, 0);
+
     println!("Playing...");
-    core.run(SingleTrackPlayer::new(player, track)).unwrap();
+    core.run(player.get_end_of_track_future()).unwrap();
 
     println!("Done");
 }
