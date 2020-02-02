@@ -668,7 +668,6 @@ impl Future for PlayerInternal {
     type Error = ();
 
     fn poll(&mut self) -> Poll<(), ()> {
-        let mut last_printed_stream_position_for_debug = 0;
         loop {
             let mut all_futures_completed_or_not_ready = true;
 
@@ -760,15 +759,6 @@ impl Future for PlayerInternal {
                         *stream_position_pcm =
                             *stream_position_pcm + (packet.data().len() / 2) as u64;
                         let stream_position_millis = Self::position_pcm_to_ms(*stream_position_pcm);
-
-                        if stream_position_millis / 1000 != last_printed_stream_position_for_debug {
-                            trace!(
-                                "Stream position: {} ({} seconds)",
-                                *stream_position_pcm,
-                                stream_position_millis / 1000
-                            );
-                            last_printed_stream_position_for_debug = stream_position_millis / 1000;
-                        }
 
                         let notify_about_position = match *reported_nominal_start_time {
                             None => true,
