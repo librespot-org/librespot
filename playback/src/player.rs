@@ -361,6 +361,7 @@ enum PlayerState {
     EndOfTrack {
         track_id: SpotifyId,
         play_request_id: u64,
+        loaded_track: Option<PlayerLoadedTrackData>,
     },
     Invalid,
 }
@@ -419,11 +420,25 @@ impl PlayerState {
             Playing {
                 track_id,
                 play_request_id,
+                decoder,
+                duration_ms,
+                bytes_per_second,
+                normalisation_factor,
+                stream_loader_controller,
+                stream_position_pcm,
                 ..
             } => {
                 *self = EndOfTrack {
                     track_id,
                     play_request_id,
+                    loaded_track: Some(PlayerLoadedTrackData {
+                        decoder,
+                        duration_ms,
+                        bytes_per_second,
+                        normalisation_factor,
+                        stream_loader_controller,
+                        stream_position_pcm,
+                    }),
                 };
             }
             _ => panic!("Called playing_to_end_of_track in non-playing state."),
@@ -884,6 +899,7 @@ impl PlayerInternal {
             | PlayerState::EndOfTrack {
                 track_id,
                 play_request_id,
+                ..
             }
             | PlayerState::Loading {
                 track_id,
@@ -899,6 +915,52 @@ impl PlayerInternal {
             }
             PlayerState::Stopped => (),
             PlayerState::Invalid => panic!("invalid state"),
+        }
+    }
+
+    fn handle_play(&mut self) {
+        if let PlayerState::Paused {
+            track_id,
+            play_request_id,
+            stream_position_pcm,
+            ..
+        } = self.state
+        {
+            self.state.paused_to_playing();
+
+            let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
+            self.send_event(PlayerEvent::Started {
+                track_id,
+                play_request_id,
+                position_ms,
+            });
+            self.start_sink();
+        } else {
+            warn!("Player::play called from invalid state");
+        }
+    }
+
+    fn handle_pause(&mut self) {
+        if let PlayerState::Playing {
+            track_id,
+            play_request_id,
+            stream_position_pcm,
+            duration_ms,
+            ..
+        } = self.state
+        {
+            self.state.playing_to_paused();
+
+            self.stop_sink_if_running();
+            let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
+            self.send_event(PlayerEvent::Paused {
+                track_id,
+                play_request_id,
+                position_ms,
+                duration_ms,
+            });
+        } else {
+            warn!("Player::pause called from invalid state");
         }
     }
 
@@ -929,6 +991,7 @@ impl PlayerInternal {
                 if let PlayerState::EndOfTrack {
                     track_id,
                     play_request_id,
+                    ..
                 } = self.state
                 {
                     self.send_event(PlayerEvent::EndOfTrack {
@@ -1035,6 +1098,7 @@ impl PlayerInternal {
                     self.stop_sink_if_running();
                 }
 
+                // emit the correct player event
                 match self.state {
                     PlayerState::Playing {
                         track_id: old_track_id,
@@ -1064,25 +1128,105 @@ impl PlayerInternal {
                 }
 
                 let mut load_command_processed = false;
-                if let PlayerPreload::Ready {
-                    track_id: loaded_track_id,
+
+                // Check if there's a matching loaded track in the EndOfTrack player state.
+                // This is the case if we're repeating the same track again.
+                if let PlayerState::EndOfTrack {
+                    track_id: previous_track_id,
+                    ref mut loaded_track,
                     ..
-                } = self.preload
+                } = self.state
                 {
-                    if (track_id == loaded_track_id) && (position_ms == 0) {
-                        let mut preload = PlayerPreload::None;
-                        std::mem::swap(&mut preload, &mut self.preload);
-                        if let PlayerPreload::Ready {
-                            track_id,
-                            loaded_track,
-                        } = preload
-                        {
+                    if previous_track_id == track_id {
+                        let loaded_track = mem::replace(&mut *loaded_track, None);
+                        if let Some(mut loaded_track) = loaded_track {
+                            if Self::position_ms_to_pcm(position_ms)
+                                != loaded_track.stream_position_pcm
+                            {
+                                loaded_track
+                                    .stream_loader_controller
+                                    .set_random_access_mode();
+                                let _ = loaded_track.decoder.seek(position_ms as i64); // This may be blocking.
+                                                                                       // But most likely the track is fully
+                                                                                       // loaded already because we played
+                                                                                       // to the end of it.
+                                loaded_track.stream_loader_controller.set_stream_mode();
+                                loaded_track.stream_position_pcm =
+                                    Self::position_ms_to_pcm(position_ms);
+                            }
                             self.start_playback(track_id, play_request_id, loaded_track, play);
                             load_command_processed = true;
                         }
                     }
                 }
 
+                // Check if we are already playing the track. If so, just do a seek and update our info.
+                if let PlayerState::Playing {
+                    track_id: current_track_id,
+                    play_request_id: ref mut current_play_request_id,
+                    ref mut stream_position_pcm,
+                    ref mut decoder,
+                    ref mut stream_loader_controller,
+                    ..
+                }
+                | PlayerState::Paused {
+                    track_id: current_track_id,
+                    play_request_id: ref mut current_play_request_id,
+                    ref mut stream_position_pcm,
+                    ref mut decoder,
+                    ref mut stream_loader_controller,
+                    ..
+                } = self.state
+                {
+                    if current_track_id == track_id {
+                        if Self::position_ms_to_pcm(position_ms) != *stream_position_pcm {
+                            stream_loader_controller.set_random_access_mode();
+                            let _ = decoder.seek(position_ms as i64); // This may be blocking.
+                            stream_loader_controller.set_stream_mode();
+                            *stream_position_pcm = Self::position_ms_to_pcm(position_ms);
+                        }
+                        *current_play_request_id = play_request_id;
+                        if play {
+                            self.handle_play();
+                        } else {
+                            self.handle_pause();
+                        }
+                        load_command_processed = true;
+                    }
+                }
+
+                // Check if the requested track has been preloaded already. If so use the preloaded data.
+                if !load_command_processed {
+                    if let PlayerPreload::Ready {
+                        track_id: loaded_track_id,
+                        ..
+                    } = self.preload
+                    {
+                        if track_id == loaded_track_id {
+                            let preload = std::mem::replace(&mut self.preload, PlayerPreload::None);
+                            if let PlayerPreload::Ready {
+                                track_id,
+                                mut loaded_track,
+                            } = preload
+                            {
+                                if Self::position_ms_to_pcm(position_ms)
+                                    != loaded_track.stream_position_pcm
+                                {
+                                    loaded_track
+                                        .stream_loader_controller
+                                        .set_random_access_mode();
+                                    let _ = loaded_track.decoder.seek(position_ms as i64); // This may be blocking
+                                    loaded_track.stream_loader_controller.set_stream_mode();
+                                }
+                                self.start_playback(track_id, play_request_id, loaded_track, play);
+                                load_command_processed = true;
+                            }
+                        }
+                    }
+                }
+
+                // We need to load the track - either from scratch or by completing a preload.
+                // In any case we go into a Loading state to load the track.
                 if !load_command_processed {
                     self.send_event(PlayerEvent::Loading {
                         track_id,
@@ -1112,8 +1256,9 @@ impl PlayerInternal {
 
                     self.preload = PlayerPreload::None;
 
-                    let loader = loader.or_else(|| Some(self.load_track(track_id, position_ms)));
-                    let loader = loader.unwrap();
+                    let loader = loader
+                        .or_else(|| Some(self.load_track(track_id, position_ms)))
+                        .unwrap();
 
                     self.state = PlayerState::Loading {
                         track_id,
@@ -1125,6 +1270,8 @@ impl PlayerInternal {
             }
 
             PlayerCommand::Preload { track_id } => {
+                let mut preload_track = true;
+
                 if let PlayerPreload::Loading {
                     track_id: currently_loading,
                     ..
@@ -1134,11 +1281,35 @@ impl PlayerInternal {
                     ..
                 } = self.preload
                 {
-                    if currently_loading != track_id {
+                    if currently_loading == track_id {
+                        // we're already loading the requested track.
+                        preload_track = false;
+                    } else {
+                        // we're loading something else - cancel it.
                         self.preload = PlayerPreload::None;
                     }
                 }
-                if let PlayerPreload::None = self.preload {
+
+                if let PlayerState::Playing {
+                    track_id: current_track_id,
+                    ..
+                }
+                | PlayerState::Paused {
+                    track_id: current_track_id,
+                    ..
+                }
+                | PlayerState::EndOfTrack {
+                    track_id: current_track_id,
+                    ..
+                } = self.state
+                {
+                    if current_track_id == track_id {
+                        // we already have the requested track loaded.
+                        preload_track = false;
+                    }
+                }
+
+                if preload_track {
                     let loader = self.load_track(track_id, 0);
                     self.preload = PlayerPreload::Loading { track_id, loader }
                 }
@@ -1210,49 +1381,11 @@ impl PlayerInternal {
             }
 
             PlayerCommand::Play => {
-                if let PlayerState::Paused {
-                    track_id,
-                    play_request_id,
-                    stream_position_pcm,
-                    ..
-                } = self.state
-                {
-                    self.state.paused_to_playing();
-
-                    let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
-                    self.send_event(PlayerEvent::Started {
-                        track_id,
-                        play_request_id,
-                        position_ms,
-                    });
-                    self.start_sink();
-                } else {
-                    warn!("Player::play called from invalid state");
-                }
+                self.handle_play();
             }
 
             PlayerCommand::Pause => {
-                if let PlayerState::Playing {
-                    track_id,
-                    play_request_id,
-                    stream_position_pcm,
-                    duration_ms,
-                    ..
-                } = self.state
-                {
-                    self.state.playing_to_paused();
-
-                    self.stop_sink_if_running();
-                    let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
-                    self.send_event(PlayerEvent::Paused {
-                        track_id,
-                        play_request_id,
-                        position_ms,
-                        duration_ms,
-                    });
-                } else {
-                    warn!("Player::pause called from invalid state");
-                }
+                self.handle_pause();
             }
 
             PlayerCommand::Stop => self.handle_player_stop(),
