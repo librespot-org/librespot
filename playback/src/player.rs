@@ -749,8 +749,8 @@ impl Future for PlayerInternal {
                 }
             }
 
-            if self.state.is_playing() && !self.sink_running {
-                self.start_sink();
+            if self.state.is_playing() {
+                self.ensure_sink_running();
             }
 
             if self.sink_running {
@@ -866,23 +866,24 @@ impl PlayerInternal {
         position_ms as u64 * 441 / 10
     }
 
-    fn start_sink(&mut self) {
-        match self.sink.start() {
-            Ok(()) => self.sink_running = true,
-            Err(err) => error!("Could not start audio: {}", err),
+    fn ensure_sink_running(&mut self) {
+        if !self.sink_running {
+            trace!("== Starting sink ==");
+            match self.sink.start() {
+                Ok(()) => self.sink_running = true,
+                Err(err) => error!("Could not start audio: {}", err),
+            }
         }
     }
 
-    fn stop_sink_if_running(&mut self) {
+    fn ensure_sink_stopped(&mut self) {
         if self.sink_running {
-            self.stop_sink();
+            trace!("== Stopping sink ==");
+            self.sink.stop().unwrap();
+            self.sink_running = false;
         }
     }
 
-    fn stop_sink(&mut self) {
-        self.sink.stop().unwrap();
-        self.sink_running = false;
-    }
 
     fn handle_player_stop(&mut self) {
         match self.state {
@@ -906,7 +907,7 @@ impl PlayerInternal {
                 play_request_id,
                 ..
             } => {
-                self.stop_sink_if_running();
+                self.ensure_sink_stopped();
                 self.send_event(PlayerEvent::Stopped {
                     track_id,
                     play_request_id,
@@ -934,7 +935,7 @@ impl PlayerInternal {
                 play_request_id,
                 position_ms,
             });
-            self.start_sink();
+            self.ensure_sink_running();
         } else {
             warn!("Player::play called from invalid state");
         }
@@ -951,7 +952,7 @@ impl PlayerInternal {
         {
             self.state.playing_to_paused();
 
-            self.stop_sink_if_running();
+            self.ensure_sink_stopped();
             let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
             self.send_event(PlayerEvent::Paused {
                 track_id,
@@ -980,13 +981,12 @@ impl PlayerInternal {
 
                     if let Err(err) = self.sink.write(&packet.data()) {
                         error!("Could not write audio: {}", err);
-                        self.stop_sink();
+                        self.ensure_sink_stopped();
                     }
                 }
             }
 
             None => {
-                self.stop_sink();
                 self.state.playing_to_end_of_track();
                 if let PlayerState::EndOfTrack {
                     track_id,
@@ -1040,7 +1040,7 @@ impl PlayerInternal {
         }
 
         if start_playback {
-            self.start_sink();
+            self.ensure_sink_running();
 
             self.send_event(PlayerEvent::Playing {
                 track_id,
@@ -1094,10 +1094,6 @@ impl PlayerInternal {
                 play,
                 position_ms,
             } => {
-                if self.state.is_playing() {
-                    self.stop_sink_if_running();
-                }
-
                 // emit the correct player event
                 match self.state {
                     PlayerState::Playing {
@@ -1228,6 +1224,9 @@ impl PlayerInternal {
                 // We need to load the track - either from scratch or by completing a preload.
                 // In any case we go into a Loading state to load the track.
                 if !load_command_processed {
+
+                    self.ensure_sink_stopped();
+
                     self.send_event(PlayerEvent::Loading {
                         track_id,
                         play_request_id,

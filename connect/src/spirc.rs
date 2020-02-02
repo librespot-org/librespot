@@ -1142,7 +1142,7 @@ impl SpircTask {
         // tracks in each frame either have a gid or uri (that may or may not be a valid track)
         // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
 
-        let mut track_ref = self.state.get_track()[index as usize].clone();
+        let mut track_ref = self.state.get_track()[new_playlist_index as usize].clone();
         let mut track_id = self.get_spotify_id_for_track(&track_ref);
         while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable {
             warn!(
