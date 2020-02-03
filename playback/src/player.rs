@@ -716,6 +716,7 @@ impl Future for PlayerInternal {
                             play_request_id,
                             loaded_track,
                             start_playback,
+                            false,
                         );
                         if let PlayerState::Loading { .. } = self.state {
                             panic!("The state wasn't changed by start_playback()");
@@ -1010,6 +1011,7 @@ impl PlayerInternal {
         play_request_id: u64,
         loaded_track: PlayerLoadedTrackData,
         start_playback: bool,
+        state_is_invalid_because_the_same_track_is_getting_repeated: bool,
     ) {
         let position_ms = Self::position_pcm_to_ms(loaded_track.stream_position_pcm);
 
@@ -1035,7 +1037,16 @@ impl PlayerInternal {
                 position_ms,
             }),
             PlayerState::Loading { .. } => (),
-            PlayerState::Invalid { .. } => panic!("Player is in an invalid state."),
+            PlayerState::Invalid { .. } => {
+                if state_is_invalid_because_the_same_track_is_getting_repeated {
+                    self.send_event(PlayerEvent::Changed {
+                        old_track_id: track_id,
+                        new_track_id: track_id,
+                    })
+                } else {
+                    panic!("Player is in an invalid state.")
+                }
+            }
         }
 
         if start_playback {
@@ -1149,7 +1160,13 @@ impl PlayerInternal {
                                 loaded_track.stream_position_pcm =
                                     Self::position_ms_to_pcm(position_ms);
                             }
-                            self.start_playback(track_id, play_request_id, loaded_track, play);
+                            self.start_playback(
+                                track_id,
+                                play_request_id,
+                                loaded_track,
+                                play,
+                                false,
+                            );
                             load_command_processed = true;
                         }
                     }
@@ -1158,7 +1175,6 @@ impl PlayerInternal {
                 // Check if we are already playing the track. If so, just do a seek and update our info.
                 if let PlayerState::Playing {
                     track_id: current_track_id,
-                    play_request_id: ref mut current_play_request_id,
                     ref mut stream_position_pcm,
                     ref mut decoder,
                     ref mut stream_loader_controller,
@@ -1166,7 +1182,6 @@ impl PlayerInternal {
                 }
                 | PlayerState::Paused {
                     track_id: current_track_id,
-                    play_request_id: ref mut current_play_request_id,
                     ref mut stream_position_pcm,
                     ref mut decoder,
                     ref mut stream_loader_controller,
@@ -1180,13 +1195,49 @@ impl PlayerInternal {
                             stream_loader_controller.set_stream_mode();
                             *stream_position_pcm = Self::position_ms_to_pcm(position_ms);
                         }
-                        *current_play_request_id = play_request_id;
-                        if play {
-                            self.handle_play();
-                        } else {
-                            self.handle_pause();
+
+                        let old_state = mem::replace(&mut self.state, PlayerState::Invalid);
+
+                        if let PlayerState::Playing {
+                            stream_position_pcm,
+                            decoder,
+                            stream_loader_controller,
+                            bytes_per_second,
+                            duration_ms,
+                            normalisation_factor,
+                            ..
                         }
-                        load_command_processed = true;
+                        | PlayerState::Paused {
+                            stream_position_pcm,
+                            decoder,
+                            stream_loader_controller,
+                            bytes_per_second,
+                            duration_ms,
+                            normalisation_factor,
+                            ..
+                        } = old_state
+                        {
+                            let loaded_track = PlayerLoadedTrackData {
+                                decoder,
+                                normalisation_factor,
+                                stream_loader_controller,
+                                bytes_per_second,
+                                duration_ms,
+                                stream_position_pcm,
+                            };
+
+                            self.start_playback(
+                                track_id,
+                                play_request_id,
+                                loaded_track,
+                                play,
+                                true,
+                            );
+
+                            load_command_processed = true;
+                        } else {
+                            unreachable!();
+                        }
                     }
                 }
 
@@ -1213,7 +1264,13 @@ impl PlayerInternal {
                                     let _ = loaded_track.decoder.seek(position_ms as i64); // This may be blocking
                                     loaded_track.stream_loader_controller.set_stream_mode();
                                 }
-                                self.start_playback(track_id, play_request_id, loaded_track, play);
+                                self.start_playback(
+                                    track_id,
+                                    play_request_id,
+                                    loaded_track,
+                                    play,
+                                    false,
+                                );
                                 load_command_processed = true;
                             }
                         }
