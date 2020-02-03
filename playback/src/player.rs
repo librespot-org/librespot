@@ -884,7 +884,6 @@ impl PlayerInternal {
         }
     }
 
-
     fn handle_player_stop(&mut self) {
         match self.state {
             PlayerState::Playing {
@@ -1224,7 +1223,6 @@ impl PlayerInternal {
                 // We need to load the track - either from scratch or by completing a preload.
                 // In any case we go into a Loading state to load the track.
                 if !load_command_processed {
-
                     self.ensure_sink_stopped();
 
                     self.send_event(PlayerEvent::Loading {
