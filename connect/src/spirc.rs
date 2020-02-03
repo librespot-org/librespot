@@ -1197,54 +1197,6 @@ impl SpircTask {
         }
     }
 
-    //    fn load_track(&mut self, start_playing: bool, position_ms: u32) {
-    //        let context_uri = self.state.get_context_uri().to_owned();
-    //        let mut index = self.state.get_playing_track_index();
-    //        let start_index = index;
-    //        let tracks_len = self.state.get_track().len() as u32;
-    //        debug!(
-    //            "Loading context: <{}> index: [{}] of {}",
-    //            context_uri, index, tracks_len
-    //        );
-    //        // Cycle through all tracks, break if we don't find any playable tracks
-    //        // TODO: This will panic if no playable tracks are found!
-    //        // tracks in each frame either have a gid or uri (that may or may not be a valid track)
-    //        // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
-    //        let track = {
-    //            let mut track_ref = self.state.get_track()[index as usize].clone();
-    //            let mut track_id = self.get_spotify_id_for_track(&track_ref);
-    //            while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
-    //            {
-    //                warn!(
-    //                    "Skipping track <{:?}> at position [{}] of {}",
-    //                    track_ref.get_uri(),
-    //                    index,
-    //                    tracks_len
-    //                );
-    //                index = if index + 1 < tracks_len { index + 1 } else { 0 };
-    //                self.state.set_playing_track_index(index);
-    //                if index == start_index {
-    //                    warn!("No playable track found in state: {:?}", self.state);
-    //                    break;
-    //                }
-    //                track_ref = self.state.get_track()[index as usize].clone();
-    //                track_id = self.get_spotify_id_for_track(&track_ref);
-    //            }
-    //            track_id
-    //        }
-    //            .expect("Invalid SpotifyId");
-    //
-    //        self.play_request_id = Some(self.player.load(track, start_playing, position_ms));
-    //
-    //        self.update_state_position(position_ms);
-    //        self.state.set_status(PlayStatus::kPlayStatusLoading);
-    //        if start_playing {
-    //            self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
-    //        } else {
-    //            self.play_status = SpircPlayStatus::LoadingPause { position_ms };
-    //        }
-    //    }
-
     fn hello(&mut self) {
         CommandSender::new(self, MessageType::kMessageTypeHello).send();
     }
