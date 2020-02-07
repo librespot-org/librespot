@@ -1119,6 +1119,7 @@ impl PlayerInternal {
                         loaded_track.stream_loader_controller.set_stream_mode();
                         loaded_track.stream_position_pcm = Self::position_ms_to_pcm(position_ms);
                     }
+                    self.preload = PlayerPreload::None;
                     self.start_playback(track_id, play_request_id, loaded_track, play);
                     return;
                 }
@@ -1182,6 +1183,7 @@ impl PlayerInternal {
                         stream_position_pcm,
                     };
 
+                    self.preload = PlayerPreload::None;
                     self.start_playback(track_id, play_request_id, loaded_track, play);
 
                     if let PlayerState::Invalid = self.state {
