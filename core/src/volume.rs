@@ -21,7 +21,9 @@ impl Volume {
 
     // write volume to file
     fn save_to_writer<W: Write>(&self, writer: &mut W) {
-        writer.write_all(self.volume.to_string().as_bytes()).unwrap();
+        writer
+            .write_all(self.volume.to_string().as_bytes())
+            .unwrap();
     }
 
     pub(crate) fn save_to_file<P: AsRef<Path>>(&self, path: P) {

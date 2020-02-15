@@ -9,7 +9,11 @@ use rand;
 use rand::seq::SliceRandom;
 use serde_json;
 
-use context::StationContext;
+use crate::context::StationContext;
+use crate::playback::mixer::Mixer;
+use crate::playback::player::Player;
+use crate::protocol;
+use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
 use librespot_core::config::ConnectConfig;
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
@@ -17,14 +21,10 @@ use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
 use librespot_core::util::SeqGenerator;
 use librespot_core::version;
 use librespot_core::volume::Volume;
-use playback::mixer::Mixer;
-use playback::player::Player;
-use protocol;
-use protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
 
 pub struct SpircTask {
     player: Player,
-    mixer: Box<Mixer>,
+    mixer: Box<dyn Mixer>,
     config: SpircTaskConfig,
 
     sequence: SeqGenerator<u32>,
@@ -33,15 +33,15 @@ pub struct SpircTask {
     device: DeviceState,
     state: State,
 
-    subscription: Box<Stream<Item = Frame, Error = MercuryError>>,
-    sender: Box<Sink<SinkItem = Frame, SinkError = MercuryError>>,
+    subscription: Box<dyn Stream<Item = Frame, Error = MercuryError>>,
+    sender: Box<dyn Sink<SinkItem = Frame, SinkError = MercuryError>>,
     commands: mpsc::UnboundedReceiver<SpircCommand>,
-    end_of_track: Box<Future<Item = (), Error = oneshot::Canceled>>,
+    end_of_track: Box<dyn Future<Item = (), Error = oneshot::Canceled>>,
 
     shutdown: bool,
     session: Session,
-    context_fut: Box<Future<Item = serde_json::Value, Error = MercuryError>>,
-    autoplay_fut: Box<Future<Item = String, Error = MercuryError>>,
+    context_fut: Box<dyn Future<Item = serde_json::Value, Error = MercuryError>>,
+    autoplay_fut: Box<dyn Future<Item = String, Error = MercuryError>>,
     context: Option<StationContext>,
 }
 
@@ -221,7 +221,7 @@ impl Spirc {
         config: ConnectConfig,
         session: Session,
         player: Player,
-        mixer: Box<Mixer>,
+        mixer: Box<dyn Mixer>,
     ) -> (Spirc, SpircTask) {
         debug!("new Spirc[{}]", session.session_id());
 
@@ -333,7 +333,11 @@ impl Future for SpircTask {
                         progress = true;
                         self.handle_frame(frame);
                     }
-                    Async::Ready(None) => panic!("subscription terminated"),
+                    Async::Ready(None) => {
+                        error!("subscription terminated");
+                        self.shutdown = true;
+                        self.commands.close();
+                    }
                     Async::NotReady => (),
                 }
 
@@ -526,7 +530,8 @@ impl SpircTask {
 
                 if self.state.get_track().len() > 0 {
                     let now = self.now_ms();
-                    self.state.set_position_ms(frame.get_state().get_position_ms());
+                    self.state
+                        .set_position_ms(frame.get_state().get_position_ms());
                     self.state.set_position_measured_at(now as u64);
 
                     let play = frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
@@ -534,6 +539,8 @@ impl SpircTask {
                 } else {
                     info!("No more tracks left in queue");
                     self.state.set_status(PlayStatus::kPlayStatusStop);
+                    self.player.stop();
+                    self.mixer.stop();
                 }
 
                 self.notify(None);
@@ -670,11 +677,14 @@ impl SpircTask {
         // Removes current track if it is queued
         // Returns the index of the next track
         let current_index = self.state.get_playing_track_index() as usize;
-        if self.state.get_track()[current_index].get_queued() {
+        if (current_index < self.state.get_track().len())
+            && self.state.get_track()[current_index].get_queued()
+        {
             self.state.mut_track().remove(current_index);
-            return current_index;
+            current_index
+        } else {
+            current_index + 1
         }
-        current_index + 1
     }
 
     fn handle_next(&mut self) {
@@ -689,7 +699,8 @@ impl SpircTask {
             tracks_len - new_index < CONTEXT_FETCH_THRESHOLD
         );
         let context_uri = self.state.get_context_uri().to_owned();
-        if (context_uri.starts_with("spotify:station:") || context_uri.starts_with("spotify:dailymix:"))
+        if (context_uri.starts_with("spotify:station:")
+            || context_uri.starts_with("spotify:dailymix:"))
             && ((self.state.get_track().len() as u32) - new_index) < CONTEXT_FETCH_THRESHOLD
         {
             self.context_fut = self.resolve_station(&context_uri);
@@ -706,12 +717,21 @@ impl SpircTask {
             new_index = 0; // Loop around back to start
             continue_playing = self.state.get_repeat();
         }
-        self.state.set_playing_track_index(new_index);
-        self.state.set_position_ms(0);
-        let now = self.now_ms();
-        self.state.set_position_measured_at(now as u64);
 
-        self.load_track(continue_playing);
+        if tracks_len > 0 {
+            self.state.set_playing_track_index(new_index);
+            self.state.set_position_ms(0);
+            let now = self.now_ms();
+            self.state.set_position_measured_at(now as u64);
+
+            self.load_track(continue_playing);
+        } else {
+            info!("Not playing next track because there are no more tracks left in queue.");
+            self.state.set_playing_track_index(0);
+            self.state.set_status(PlayStatus::kPlayStatusStop);
+            self.player.stop();
+            self.mixer.stop();
+        }
     }
 
     fn handle_prev(&mut self) {
@@ -785,28 +805,48 @@ impl SpircTask {
         self.state.get_position_ms() + diff as u32
     }
 
-    fn resolve_station(&self, uri: &str) -> Box<Future<Item = serde_json::Value, Error = MercuryError>> {
+    fn resolve_station(
+        &self,
+        uri: &str,
+    ) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
         let radio_uri = format!("hm://radio-apollo/v3/stations/{}", uri);
 
         self.resolve_uri(&radio_uri)
     }
 
-    fn resolve_autoplay_uri(&self, uri: &str) -> Box<Future<Item = String, Error = MercuryError>> {
+    fn resolve_autoplay_uri(
+        &self,
+        uri: &str,
+    ) -> Box<dyn Future<Item = String, Error = MercuryError>> {
         let query_uri = format!("hm://autoplay-enabled/query?uri={}", uri);
         let request = self.session.mercury().get(query_uri);
         Box::new(request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty autoplay uri").to_vec();
-            let autoplay_uri = String::from_utf8(data).unwrap();
-
-            Ok(autoplay_uri)
+            if response.status_code == 200 {
+                let data = response
+                    .payload
+                    .first()
+                    .expect("Empty autoplay uri")
+                    .to_vec();
+                let autoplay_uri = String::from_utf8(data).unwrap();
+                Ok(autoplay_uri)
+            } else {
+                warn!("No autoplay_uri found");
+                Err(MercuryError)
+            }
         }))
     }
 
-    fn resolve_uri(&self, uri: &str) -> Box<Future<Item = serde_json::Value, Error = MercuryError>> {
+    fn resolve_uri(
+        &self,
+        uri: &str,
+    ) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
         let request = self.session.mercury().get(uri);
 
         Box::new(request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty payload on context uri");
+            let data = response
+                .payload
+                .first()
+                .expect("Empty payload on context uri");
             let response: serde_json::Value = serde_json::from_slice(&data).unwrap();
 
             Ok(response)
@@ -824,7 +864,8 @@ impl SpircTask {
                 track_vec.drain(0..head);
             }
             track_vec.extend_from_slice(&new_tracks);
-            self.state.set_track(protobuf::RepeatedField::from_vec(track_vec));
+            self.state
+                .set_track(protobuf::RepeatedField::from_vec(track_vec));
 
             // Update playing index
             if let Some(new_index) = self
@@ -845,7 +886,9 @@ impl SpircTask {
         let context_uri = frame.get_state().get_context_uri().to_owned();
         let tracks = frame.get_state().get_track();
         debug!("Frame has {:?} tracks", tracks.len());
-        if context_uri.starts_with("spotify:station:") || context_uri.starts_with("spotify:dailymix:") {
+        if context_uri.starts_with("spotify:station:")
+            || context_uri.starts_with("spotify:dailymix:")
+        {
             self.context_fut = self.resolve_station(&context_uri);
         } else if self.config.autoplay {
             info!("Fetching autoplay context uri");
@@ -856,8 +899,16 @@ impl SpircTask {
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.into_iter().cloned().collect());
         self.state.set_context_uri(context_uri);
-        self.state.set_repeat(frame.get_state().get_repeat());
-        self.state.set_shuffle(frame.get_state().get_shuffle());
+        // has_shuffle/repeat seem to always be true in these replace msgs,
+        // but to replicate the behaviour of the Android client we have to
+        // ignore false values.
+        let state = frame.get_state();
+        if state.get_repeat() {
+            self.state.set_repeat(true);
+        }
+        if state.get_shuffle() {
+            self.state.set_shuffle(true);
+        }
     }
 
     // should this be a method of SpotifyId directly?
@@ -885,7 +936,8 @@ impl SpircTask {
         let track = {
             let mut track_ref = self.state.get_track()[index as usize].clone();
             let mut track_id = self.get_spotify_id_for_track(&track_ref);
-            while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable {
+            while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
+            {
                 warn!(
                     "Skipping track <{:?}> at position [{}] of {}",
                     track_ref.get_uri(),

@@ -1,8 +1,8 @@
 use futures::Future;
 use serde_json;
 
-use mercury::MercuryError;
-use session::Session;
+use crate::mercury::MercuryError;
+use crate::session::Session;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -17,7 +17,7 @@ pub fn get_token(
     session: &Session,
     client_id: &str,
     scopes: &str,
-) -> Box<Future<Item = Token, Error = MercuryError>> {
+) -> Box<dyn Future<Item = Token, Error = MercuryError>> {
     let url = format!(
         "hm://keymaster/token/authenticated?client_id={}&scope={}",
         client_id, scopes

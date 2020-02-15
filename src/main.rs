@@ -1,20 +1,6 @@
-extern crate env_logger;
-extern crate futures;
-extern crate getopts;
-extern crate librespot;
-#[macro_use]
-extern crate log;
-extern crate hex;
-extern crate rpassword;
-extern crate sha1;
-extern crate tokio_core;
-extern crate tokio_io;
-extern crate tokio_process;
-extern crate tokio_signal;
-extern crate url;
-
 use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
+use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use std::env;
 use std::io::{self, stderr, Write};
@@ -22,6 +8,7 @@ use std::mem;
 use std::path::PathBuf;
 use std::process::exit;
 use std::str::FromStr;
+use std::time::Instant;
 use tokio_core::reactor::{Core, Handle};
 use tokio_io::IoStream;
 use url::Url;
@@ -40,7 +27,7 @@ use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{Player, PlayerEvent};
 
 mod player_event_handler;
-use player_event_handler::run_program_on_events;
+use crate::player_event_handler::run_program_on_events;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -86,10 +73,10 @@ fn list_backends() {
 
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<Sink>,
+    backend: fn(Option<String>) -> Box<dyn Sink>,
     device: Option<String>,
 
-    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
 
     cache: Option<Cache>,
     player_config: PlayerConfig,
@@ -198,7 +185,13 @@ fn setup(args: &[String]) -> Setup {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            writeln!(stderr(), "error: {}\n{}", f.to_string(), usage(&args[0], &opts)).unwrap();
+            writeln!(
+                stderr(),
+                "error: {}\n{}",
+                f.to_string(),
+                usage(&args[0], &opts)
+            )
+            .unwrap();
             exit(1);
         }
     };
@@ -232,7 +225,9 @@ fn setup(args: &[String]) -> Setup {
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
     let mixer_config = MixerConfig {
-        card: matches.opt_str("mixer-card").unwrap_or(String::from("default")),
+        card: matches
+            .opt_str("mixer-card")
+            .unwrap_or(String::from("default")),
         mixer: matches.opt_str("mixer-name").unwrap_or(String::from("PCM")),
         index: matches
             .opt_str("mixer-index")
@@ -367,9 +362,9 @@ struct Main {
     player_config: PlayerConfig,
     session_config: SessionConfig,
     connect_config: ConnectConfig,
-    backend: fn(Option<String>) -> Box<Sink>,
+    backend: fn(Option<String>) -> Box<dyn Sink>,
     device: Option<String>,
-    mixer: fn(Option<MixerConfig>) -> Box<Mixer>,
+    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
     mixer_config: MixerConfig,
     handle: Handle,
 
@@ -378,9 +373,11 @@ struct Main {
 
     spirc: Option<Spirc>,
     spirc_task: Option<SpircTask>,
-    connect: Box<Future<Item = Session, Error = io::Error>>,
+    connect: Box<dyn Future<Item = Session, Error = io::Error>>,
 
     shutdown: bool,
+    last_credentials: Option<Credentials>,
+    auto_connect_times: Vec<Instant>,
 
     player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
     player_event_program: Option<String>,
@@ -404,6 +401,8 @@ impl Main {
             spirc: None,
             spirc_task: None,
             shutdown: false,
+            last_credentials: None,
+            auto_connect_times: Vec::new(),
             signal: Box::new(tokio_signal::ctrl_c().flatten_stream()),
 
             player_event_channel: None,
@@ -414,7 +413,8 @@ impl Main {
             let config = task.connect_config.clone();
             let device_id = task.session_config.device_id.clone();
 
-            task.discovery = Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
+            task.discovery =
+                Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
         }
 
         if let Some(credentials) = setup.credentials {
@@ -425,6 +425,7 @@ impl Main {
     }
 
     fn credentials(&mut self, credentials: Credentials) {
+        self.last_credentials = Some(credentials.clone());
         let config = self.session_config.clone();
         let handle = self.handle.clone();
 
@@ -447,36 +448,46 @@ impl Future for Main {
         loop {
             let mut progress = false;
 
-            if let Some(Async::Ready(Some(creds))) = self.discovery.as_mut().map(|d| d.poll().unwrap()) {
+            if let Some(Async::Ready(Some(creds))) =
+                self.discovery.as_mut().map(|d| d.poll().unwrap())
+            {
                 if let Some(ref spirc) = self.spirc {
                     spirc.shutdown();
                 }
+                self.auto_connect_times.clear();
                 self.credentials(creds);
 
                 progress = true;
             }
 
-            if let Async::Ready(session) = self.connect.poll().unwrap() {
-                self.connect = Box::new(futures::future::empty());
-                let mixer_config = self.mixer_config.clone();
-                let mixer = (self.mixer)(Some(mixer_config));
-                let player_config = self.player_config.clone();
-                let connect_config = self.connect_config.clone();
+            match self.connect.poll() {
+                Ok(Async::Ready(session)) => {
+                    self.connect = Box::new(futures::future::empty());
+                    let mixer_config = self.mixer_config.clone();
+                    let mixer = (self.mixer)(Some(mixer_config));
+                    let player_config = self.player_config.clone();
+                    let connect_config = self.connect_config.clone();
 
-                let audio_filter = mixer.get_audio_filter();
-                let backend = self.backend;
-                let device = self.device.clone();
-                let (player, event_channel) =
-                    Player::new(player_config, session.clone(), audio_filter, move || {
-                        (backend)(device)
-                    });
+                    let audio_filter = mixer.get_audio_filter();
+                    let backend = self.backend;
+                    let device = self.device.clone();
+                    let (player, event_channel) =
+                        Player::new(player_config, session.clone(), audio_filter, move || {
+                            (backend)(device)
+                        });
 
-                let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
-                self.spirc = Some(spirc);
-                self.spirc_task = Some(spirc_task);
-                self.player_event_channel = Some(event_channel);
+                    let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
+                    self.spirc = Some(spirc);
+                    self.spirc_task = Some(spirc_task);
+                    self.player_event_channel = Some(event_channel);
 
-                progress = true;
+                    progress = true;
+                }
+                Ok(Async::NotReady) => (),
+                Err(error) => {
+                    error!("Could not connect to server: {}", error);
+                    self.connect = Box::new(futures::future::empty());
+                }
             }
 
             if let Async::Ready(Some(())) = self.signal.poll().unwrap() {
@@ -495,12 +506,32 @@ impl Future for Main {
                 progress = true;
             }
 
+            let mut drop_spirc_and_try_to_reconnect = false;
             if let Some(ref mut spirc_task) = self.spirc_task {
                 if let Async::Ready(()) = spirc_task.poll().unwrap() {
                     if self.shutdown {
                         return Ok(Async::Ready(()));
                     } else {
-                        panic!("Spirc shut down unexpectedly");
+                        warn!("Spirc shut down unexpectedly");
+                        drop_spirc_and_try_to_reconnect = true;
+                    }
+                    progress = true;
+                }
+            }
+            if drop_spirc_and_try_to_reconnect {
+                self.spirc_task = None;
+                while (!self.auto_connect_times.is_empty())
+                    && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600)
+                {
+                    let _ = self.auto_connect_times.remove(0);
+                }
+
+                if let Some(credentials) = self.last_credentials.clone() {
+                    if self.auto_connect_times.len() >= 5 {
+                        warn!("Spirc shut down too often. Not reconnecting automatically.");
+                    } else {
+                        self.auto_connect_times.push(Instant::now());
+                        self.credentials(credentials);
                     }
                 }
             }

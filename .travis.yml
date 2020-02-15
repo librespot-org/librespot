@@ -15,7 +15,8 @@ before_cache:
   - rm -rfv target/debug/deps/liblibrespot-*
   - rm -rfv target/debug/deps/librespot-*
   - rm -rfv target/debug/{librespot,liblibrespot}.d
-  - cargo clean -p librespot librespot-core librespot-connect librespot-audio librespot-metadata  librespot-playback
+  - rm -rfv target/debug/incremental/{build_script_build,librespot,librespot_core,librespot_connect,librespot_audio,librespot_metadata,librespot_playback,librespot_player,librespot_protocol}-*
+  - cargo clean -p librespot -p librespot-core -p librespot-connect -p librespot-audio -p librespot-metadata -p librespot-playback
   
 addons:
   apt:
@@ -28,12 +29,14 @@ addons:
       - libsdl2-dev
 
 before_script:
+    - rustup component add rustfmt
     - mkdir -p ~/.cargo
     - echo '[target.armv7-unknown-linux-gnueabihf]' > ~/.cargo/config
     - echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
     - rustup target add armv7-unknown-linux-gnueabihf
 
 script:
+    - cargo fmt --all -- --check
     - cargo build --locked --no-default-features
     - cargo build --locked --examples
     - cargo build --locked --no-default-features --features "with-tremor"

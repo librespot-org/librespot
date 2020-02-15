@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::mem;
 use std::slice;
 
-pub struct StdoutSink(Box<Write>);
+pub struct StdoutSink(Box<dyn Write>);
 
 impl Open for StdoutSink {
     fn open(path: Option<String>) -> StdoutSink {
@@ -28,7 +28,10 @@ impl Sink for StdoutSink {
 
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
         let data: &[u8] = unsafe {
-            slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * mem::size_of::<i16>())
+            slice::from_raw_parts(
+                data.as_ptr() as *const u8,
+                data.len() * mem::size_of::<i16>(),
+            )
         };
 
         self.0.write_all(data)?;

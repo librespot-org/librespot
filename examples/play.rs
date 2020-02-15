@@ -1,6 +1,3 @@
-extern crate librespot;
-extern crate tokio_core;
-
 use std::env;
 use tokio_core::reactor::Core;
 
@@ -37,7 +34,9 @@ fn main() {
         .run(Session::connect(session_config, credentials, None, handle))
         .unwrap();
 
-    let (player, _) = Player::new(player_config, session.clone(), None, move || (backend)(None));
+    let (player, _) = Player::new(player_config, session.clone(), None, move || {
+        (backend)(None)
+    });
 
     println!("Playing...");
     core.run(player.load(track, true, 0)).unwrap();

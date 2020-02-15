@@ -3,6 +3,7 @@ extern crate log;
 
 extern crate byteorder;
 extern crate futures;
+extern crate shell_words;
 
 #[cfg(feature = "alsa-backend")]
 extern crate alsa;

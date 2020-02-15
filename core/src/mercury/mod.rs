@@ -1,13 +1,13 @@
+use crate::protocol;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures::sync::{mpsc, oneshot};
 use futures::{Async, Future, Poll};
 use protobuf;
-use protocol;
 use std::collections::HashMap;
 use std::mem;
 
-use util::SeqGenerator;
+use crate::util::SeqGenerator;
 
 mod types;
 pub use self::types::*;
@@ -20,6 +20,7 @@ component! {
         sequence: SeqGenerator<u64> = SeqGenerator::new(0),
         pending: HashMap<Vec<u8>, MercuryPending> = HashMap::new(),
         subscriptions: Vec<(String, mpsc::UnboundedSender<MercuryResponse>)> = Vec::new(),
+        invalid: bool = false,
     }
 }
 
@@ -61,7 +62,11 @@ impl MercuryManager {
         };
 
         let seq = self.next_seq();
-        self.lock(|inner| inner.pending.insert(seq.clone(), pending));
+        self.lock(|inner| {
+            if !inner.invalid {
+                inner.pending.insert(seq.clone(), pending);
+            }
+        });
 
         let cmd = req.method.command();
         let data = req.encode(&seq);
@@ -95,7 +100,8 @@ impl MercuryManager {
     pub fn subscribe<T: Into<String>>(
         &self,
         uri: T,
-    ) -> Box<Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>> {
+    ) -> Box<dyn Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>>
+    {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
             method: MercuryMethod::SUB,
@@ -109,21 +115,23 @@ impl MercuryManager {
             let (tx, rx) = mpsc::unbounded();
 
             manager.lock(move |inner| {
-                debug!("subscribed uri={} count={}", uri, response.payload.len());
-                if response.payload.len() > 0 {
-                    // Old subscription protocol, watch the provided list of URIs
-                    for sub in response.payload {
-                        let mut sub: protocol::pubsub::Subscription =
-                            protobuf::parse_from_bytes(&sub).unwrap();
-                        let sub_uri = sub.take_uri();
+                if !inner.invalid {
+                    debug!("subscribed uri={} count={}", uri, response.payload.len());
+                    if response.payload.len() > 0 {
+                        // Old subscription protocol, watch the provided list of URIs
+                        for sub in response.payload {
+                            let mut sub: protocol::pubsub::Subscription =
+                                protobuf::parse_from_bytes(&sub).unwrap();
+                            let sub_uri = sub.take_uri();
 
-                        debug!("subscribed sub_uri={}", sub_uri);
+                            debug!("subscribed sub_uri={}", sub_uri);
 
-                        inner.subscriptions.push((sub_uri, tx.clone()));
+                            inner.subscriptions.push((sub_uri, tx.clone()));
+                        }
+                    } else {
+                        // New subscription protocol, watch the requested URI
+                        inner.subscriptions.push((uri, tx));
                     }
-                } else {
-                    // New subscription protocol, watch the requested URI
-                    inner.subscriptions.push((uri, tx));
                 }
             });
 
@@ -221,5 +229,14 @@ impl MercuryManager {
                 let _ = cb.send(Ok(response));
             }
         }
+    }
+
+    pub(crate) fn shutdown(&self) {
+        self.lock(|inner| {
+            inner.invalid = true;
+            // destroy the sending halves of the channels to signal everyone who is waiting for something.
+            inner.pending.clear();
+            inner.subscriptions.clear();
+        });
     }
 }
