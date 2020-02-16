@@ -4676,6 +4676,7 @@ pub enum AuthenticationType {
     AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS = 2,
     AUTHENTICATION_SPOTIFY_TOKEN = 3,
     AUTHENTICATION_FACEBOOK_TOKEN = 4,
+    AUTHENTICATION_UNKNOWN = 7,
 }
 
 impl ::protobuf::ProtobufEnum for AuthenticationType {
@@ -4690,6 +4691,7 @@ impl ::protobuf::ProtobufEnum for AuthenticationType {
             2 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS),
             3 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN),
             4 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_FACEBOOK_TOKEN),
+            7 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_UNKNOWN),
             _ => ::std::option::Option::None
         }
     }
@@ -4701,6 +4703,7 @@ impl ::protobuf::ProtobufEnum for AuthenticationType {
             AuthenticationType::AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS,
             AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN,
             AuthenticationType::AUTHENTICATION_FACEBOOK_TOKEN,
+            AuthenticationType::AUTHENTICATION_UNKNOWN,
         ];
         values
     }
@@ -5150,30 +5153,31 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     potifyB\0\x12(\n\x08facebook\x18\x02\x20\x01(\x0b2\x14.AccountInfoFacebo\
     okB\0:\0\"\x16\n\x12AccountInfoSpotify:\0\"E\n\x13AccountInfoFacebook\
     \x12\x16\n\x0caccess_token\x18\x01\x20\x01(\tB\0\x12\x14\n\nmachine_id\
-    \x18\x02\x20\x01(\tB\0:\0*\xd8\x01\n\x12AuthenticationType\x12\x1c\n\x18\
+    \x18\x02\x20\x01(\tB\0:\0*\xf4\x01\n\x12AuthenticationType\x12\x1c\n\x18\
     AUTHENTICATION_USER_PASS\x10\0\x12-\n)AUTHENTICATION_STORED_SPOTIFY_CRED\
     ENTIALS\x10\x01\x12.\n*AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS\x10\
     \x02\x12\x20\n\x1cAUTHENTICATION_SPOTIFY_TOKEN\x10\x03\x12!\n\x1dAUTHENT\
-    ICATION_FACEBOOK_TOKEN\x10\x04\x1a\0*[\n\x0fAccountCreation\x12\"\n\x1eA\
-    CCOUNT_CREATION_ALWAYS_PROMPT\x10\x01\x12\"\n\x1eACCOUNT_CREATION_ALWAYS\
-    _CREATE\x10\x03\x1a\0*\x9f\x01\n\tCpuFamily\x12\x0f\n\x0bCPU_UNKNOWN\x10\
-    \0\x12\x0b\n\x07CPU_X86\x10\x01\x12\x0e\n\nCPU_X86_64\x10\x02\x12\x0b\n\
-    \x07CPU_PPC\x10\x03\x12\x0e\n\nCPU_PPC_64\x10\x04\x12\x0b\n\x07CPU_ARM\
-    \x10\x05\x12\x0c\n\x08CPU_IA64\x10\x06\x12\n\n\x06CPU_SH\x10\x07\x12\x0c\
-    \n\x08CPU_MIPS\x10\x08\x12\x10\n\x0cCPU_BLACKFIN\x10\t\x1a\0*M\n\x05Bran\
-    d\x12\x13\n\x0fBRAND_UNBRANDED\x10\0\x12\r\n\tBRAND_INQ\x10\x01\x12\r\n\
-    \tBRAND_HTC\x10\x02\x12\x0f\n\x0bBRAND_NOKIA\x10\x03\x1a\0*\xd3\x02\n\
-    \x02Os\x12\x0e\n\nOS_UNKNOWN\x10\0\x12\x0e\n\nOS_WINDOWS\x10\x01\x12\n\n\
-    \x06OS_OSX\x10\x02\x12\r\n\tOS_IPHONE\x10\x03\x12\n\n\x06OS_S60\x10\x04\
-    \x12\x0c\n\x08OS_LINUX\x10\x05\x12\x11\n\rOS_WINDOWS_CE\x10\x06\x12\x0e\
-    \n\nOS_ANDROID\x10\x07\x12\x0b\n\x07OS_PALM\x10\x08\x12\x0e\n\nOS_FREEBS\
-    D\x10\t\x12\x11\n\rOS_BLACKBERRY\x10\n\x12\x0c\n\x08OS_SONOS\x10\x0b\x12\
-    \x0f\n\x0bOS_LOGITECH\x10\x0c\x12\n\n\x06OS_WP7\x10\r\x12\x0c\n\x08OS_ON\
-    KYO\x10\x0e\x12\x0e\n\nOS_PHILIPS\x10\x0f\x12\t\n\x05OS_WD\x10\x10\x12\
-    \x0c\n\x08OS_VOLVO\x10\x11\x12\x0b\n\x07OS_TIVO\x10\x12\x12\x0b\n\x07OS_\
-    AWOX\x10\x13\x12\x0c\n\x08OS_MEEGO\x10\x14\x12\r\n\tOS_QNXNTO\x10\x15\
-    \x12\n\n\x06OS_BCO\x10\x16\x1a\0**\n\x0bAccountType\x12\x0b\n\x07Spotify\
-    \x10\0\x12\x0c\n\x08Facebook\x10\x01\x1a\0B\0b\x06proto2\
+    ICATION_FACEBOOK_TOKEN\x10\x04\x12\x1a\n\x16AUTHENTICATION_UNKNOWN\x10\
+    \x07\x1a\0*[\n\x0fAccountCreation\x12\"\n\x1eACCOUNT_CREATION_ALWAYS_PRO\
+    MPT\x10\x01\x12\"\n\x1eACCOUNT_CREATION_ALWAYS_CREATE\x10\x03\x1a\0*\x9f\
+    \x01\n\tCpuFamily\x12\x0f\n\x0bCPU_UNKNOWN\x10\0\x12\x0b\n\x07CPU_X86\
+    \x10\x01\x12\x0e\n\nCPU_X86_64\x10\x02\x12\x0b\n\x07CPU_PPC\x10\x03\x12\
+    \x0e\n\nCPU_PPC_64\x10\x04\x12\x0b\n\x07CPU_ARM\x10\x05\x12\x0c\n\x08CPU\
+    _IA64\x10\x06\x12\n\n\x06CPU_SH\x10\x07\x12\x0c\n\x08CPU_MIPS\x10\x08\
+    \x12\x10\n\x0cCPU_BLACKFIN\x10\t\x1a\0*M\n\x05Brand\x12\x13\n\x0fBRAND_U\
+    NBRANDED\x10\0\x12\r\n\tBRAND_INQ\x10\x01\x12\r\n\tBRAND_HTC\x10\x02\x12\
+    \x0f\n\x0bBRAND_NOKIA\x10\x03\x1a\0*\xd3\x02\n\x02Os\x12\x0e\n\nOS_UNKNO\
+    WN\x10\0\x12\x0e\n\nOS_WINDOWS\x10\x01\x12\n\n\x06OS_OSX\x10\x02\x12\r\n\
+    \tOS_IPHONE\x10\x03\x12\n\n\x06OS_S60\x10\x04\x12\x0c\n\x08OS_LINUX\x10\
+    \x05\x12\x11\n\rOS_WINDOWS_CE\x10\x06\x12\x0e\n\nOS_ANDROID\x10\x07\x12\
+    \x0b\n\x07OS_PALM\x10\x08\x12\x0e\n\nOS_FREEBSD\x10\t\x12\x11\n\rOS_BLAC\
+    KBERRY\x10\n\x12\x0c\n\x08OS_SONOS\x10\x0b\x12\x0f\n\x0bOS_LOGITECH\x10\
+    \x0c\x12\n\n\x06OS_WP7\x10\r\x12\x0c\n\x08OS_ONKYO\x10\x0e\x12\x0e\n\nOS\
+    _PHILIPS\x10\x0f\x12\t\n\x05OS_WD\x10\x10\x12\x0c\n\x08OS_VOLVO\x10\x11\
+    \x12\x0b\n\x07OS_TIVO\x10\x12\x12\x0b\n\x07OS_AWOX\x10\x13\x12\x0c\n\x08\
+    OS_MEEGO\x10\x14\x12\r\n\tOS_QNXNTO\x10\x15\x12\n\n\x06OS_BCO\x10\x16\
+    \x1a\0**\n\x0bAccountType\x12\x0b\n\x07Spotify\x10\0\x12\x0c\n\x08Facebo\
+    ok\x10\x01\x1a\0B\0b\x06proto2\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
