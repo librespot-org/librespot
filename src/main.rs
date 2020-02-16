@@ -287,7 +287,7 @@ fn setup(args: &[String]) -> Setup {
                 |s| {
                     match Url::parse(&s) {
                         Ok(url) => {
-                            if url.host().is_none() || url.port().is_none() {
+                            if url.host().is_none() || url.port_or_known_default().is_none() {
                                 panic!("Invalid proxy url, only urls on the format \"http://host:port\" are allowed");
                             }
 
