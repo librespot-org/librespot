@@ -38,7 +38,7 @@ pub trait Seq {
 macro_rules! impl_seq {
     ($($ty:ty)*) => { $(
         impl Seq for $ty {
-            fn next(&self) -> Self { *self + 1 }
+            fn next(&self) -> Self { (*self).wrapping_add(1) }
         }
     )* }
 }
