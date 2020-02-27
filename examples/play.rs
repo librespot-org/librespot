@@ -34,12 +34,14 @@ fn main() {
         .run(Session::connect(session_config, credentials, None, handle))
         .unwrap();
 
-    let (player, _) = Player::new(player_config, session.clone(), None, move || {
+    let (mut player, _) = Player::new(player_config, session.clone(), None, move || {
         (backend)(None)
     });
 
+    player.load(track, true, 0);
+
     println!("Playing...");
-    core.run(player.load(track, true, 0)).unwrap();
+    core.run(player.get_end_of_track_future()).unwrap();
 
     println!("Done");
 }

@@ -63,6 +63,7 @@ pub struct AudioItem {
     pub uri: String,
     pub files: LinearMap<FileFormat, FileId>,
     pub name: String,
+    pub duration: i32,
     pub available: bool,
     pub alternatives: Option<Vec<SpotifyId>>,
 }
@@ -100,6 +101,7 @@ impl AudioFiles for Track {
                 uri: format!("spotify:track:{}", id.to_base62()),
                 files: item.files,
                 name: item.name,
+                duration: item.duration,
                 available: item.available,
                 alternatives: Some(item.alternatives),
             })
@@ -118,6 +120,7 @@ impl AudioFiles for Episode {
                 uri: format!("spotify:episode:{}", id.to_base62()),
                 files: item.files,
                 name: item.name,
+                duration: item.duration,
                 available: item.available,
                 alternatives: None,
             })

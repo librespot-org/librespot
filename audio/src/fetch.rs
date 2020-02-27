@@ -144,6 +144,15 @@ impl StreamLoaderController {
         }
     }
 
+    pub fn range_to_end_available(&self) -> bool {
+        if let Some(ref shared) = self.stream_shared {
+            let read_position = shared.read_position.load(atomic::Ordering::Relaxed);
+            self.range_available(Range::new(read_position, self.len() - read_position))
+        } else {
+            true
+        }
+    }
+
     pub fn ping_time_ms(&self) -> usize {
         if let Some(ref shared) = self.stream_shared {
             return shared.ping_time_ms.load(atomic::Ordering::Relaxed);

@@ -14,7 +14,7 @@ fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Chi
         .spawn_async()
 }
 
-pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> io::Result<Child> {
+pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Result<Child>> {
     let mut env_vars = HashMap::new();
     match event {
         PlayerEvent::Changed {
@@ -25,14 +25,15 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> io::Result<Ch
             env_vars.insert("OLD_TRACK_ID", old_track_id.to_base62());
             env_vars.insert("TRACK_ID", new_track_id.to_base62());
         }
-        PlayerEvent::Started { track_id } => {
+        PlayerEvent::Started { track_id, .. } => {
             env_vars.insert("PLAYER_EVENT", "start".to_string());
             env_vars.insert("TRACK_ID", track_id.to_base62());
         }
-        PlayerEvent::Stopped { track_id } => {
+        PlayerEvent::Stopped { track_id, .. } => {
             env_vars.insert("PLAYER_EVENT", "stop".to_string());
             env_vars.insert("TRACK_ID", track_id.to_base62());
         }
+        _ => return None,
     }
-    run_program(onevent, env_vars)
+    Some(run_program(onevent, env_vars))
 }
