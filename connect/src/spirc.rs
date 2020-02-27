@@ -614,7 +614,7 @@ impl SpircTask {
                     PlayerEvent::Stopped { .. } => match self.play_status {
                         SpircPlayStatus::Stopped => (),
                         _ => {
-                            warn!("The player has stopped unexpentedly.");
+                            warn!("The player has stopped unexpectedly.");
                             self.state.set_status(PlayStatus::kPlayStatusStop);
                             self.ensure_mixer_stopped();
                             self.notify(None, true);
