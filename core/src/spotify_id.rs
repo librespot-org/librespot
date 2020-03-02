@@ -106,15 +106,9 @@ impl SpotifyId {
 
     pub fn to_uri(&self) -> String {
         match self.audio_type {
-            SpotifyAudioType::Track => {
-                format!("spotify:track:{}", self.to_base62())
-            }
-            SpotifyAudioType::Podcast => {
-                format!("spotify:episode:{}", self.to_base62())
-            }
-            SpotifyAudioType::NonPlayable => {
-                format!("spotify:unknown:{}", self.to_base62())
-            }
+            SpotifyAudioType::Track => format!("spotify:track:{}", self.to_base62()),
+            SpotifyAudioType::Podcast => format!("spotify:episode:{}", self.to_base62()),
+            SpotifyAudioType::NonPlayable => format!("spotify:unknown:{}", self.to_base62()),
         }
     }
 
