@@ -180,6 +180,11 @@ fn setup(args: &[String]) -> Setup {
             "",
             "autoplay",
             "autoplay similar songs when your music ends.",
+        )
+        .optflag(
+            "",
+            "gapless",
+            "enable gapless playback.",
         );
 
     let matches = match opts.parse(&args[1..]) {
@@ -312,9 +317,9 @@ fn setup(args: &[String]) -> Setup {
             .as_ref()
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or(Bitrate::default());
-
         PlayerConfig {
             bitrate: bitrate,
+            gapless: matches.opt_present("gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
             normalisation_pregain: matches
                 .opt_str("normalisation-pregain")

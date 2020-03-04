@@ -828,7 +828,8 @@ impl Future for PlayerInternal {
                 ..
             } = self.state
             {
-                if (!*suggested_to_preload_next_track)
+                if self.config.gapless
+                    && (!*suggested_to_preload_next_track)
                     && ((duration_ms as i64 - Self::position_pcm_to_ms(stream_position_pcm) as i64)
                         < PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS as i64)
                     && stream_loader_controller.range_to_end_available()
