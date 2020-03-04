@@ -39,7 +39,7 @@ impl Default for PlayerConfig {
             bitrate: Bitrate::default(),
             normalisation: false,
             normalisation_pregain: 0.0,
-            gapless: false,
+            gapless: true,
         }
     }
 }

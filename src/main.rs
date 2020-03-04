@@ -183,8 +183,8 @@ fn setup(args: &[String]) -> Setup {
         )
         .optflag(
             "",
-            "gapless",
-            "enable gapless playback.",
+            "disable-gapless",
+            "disable gapless playback.",
         );
 
     let matches = match opts.parse(&args[1..]) {
@@ -319,7 +319,7 @@ fn setup(args: &[String]) -> Setup {
             .unwrap_or(Bitrate::default());
         PlayerConfig {
             bitrate: bitrate,
-            gapless: matches.opt_present("gapless"),
+            gapless: !matches.opt_present("disable-gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
             normalisation_pregain: matches
                 .opt_str("normalisation-pregain")
