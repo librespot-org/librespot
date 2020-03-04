@@ -5,6 +5,8 @@ use std::error::Error;
 
 use alsa;
 
+const SND_CTL_TLV_DB_GAIN_MUTE: i64 = -9999999;
+
 #[derive(Clone)]
 struct AlsaMixerVolumeParams {
     min: i64,
@@ -29,11 +31,17 @@ impl AlsaMixer {
         f64::from(vol - min) / f64::from(max - min)
     }
 
-    fn init_mixer(mut config: MixerConfig) -> Result<AlsaMixer, Box<Error>> {
+    fn init_mixer(mut config: MixerConfig) -> Result<AlsaMixer, Box<dyn Error>> {
         let mixer = alsa::mixer::Mixer::new(&config.card, false)?;
         let sid = alsa::mixer::SelemId::new(&config.mixer, config.index);
 
-        let selem = mixer.find_selem(&sid).expect("Couldn't find SelemId");
+        let selem = mixer.find_selem(&sid).expect(
+            format!(
+                "Couldn't find simple mixer control for {},{}",
+                &config.mixer, &config.index,
+            )
+            .as_str(),
+        );
         let (min, max) = selem.get_playback_volume_range();
         let (min_db, max_db) = selem.get_playback_db_range();
         let hw_mix = selem
@@ -41,7 +49,7 @@ impl AlsaMixer {
             .is_ok();
 
         info!(
-            "Alsa min: {} ({:?}[dB]) -- max: {} ({:?}[dB]) HW: {:?}",
+            "Alsa Mixer info min: {} ({:?}[dB]) -- max: {} ({:?}[dB]) HW: {:?}",
             min, min_db, max, max_db, hw_mix
         );
 
@@ -53,6 +61,10 @@ impl AlsaMixer {
             config.mapped_volume = false;
         } else if !config.mapped_volume {
             info!("Using Alsa linear volume");
+        }
+
+        if min_db != alsa::mixer::MilliBel(SND_CTL_TLV_DB_GAIN_MUTE) {
+            debug!("Alsa min-db is not SND_CTL_TLV_DB_GAIN_MUTE!!");
         }
 
         Ok(AlsaMixer {
@@ -67,75 +79,85 @@ impl AlsaMixer {
         })
     }
 
-    fn map_volume(&self, set_volume: Option<u16>) -> Result<(u16), Box<Error>> {
+    fn map_volume(&self, set_volume: Option<u16>) -> Result<u16, Box<dyn Error>> {
         let mixer = alsa::mixer::Mixer::new(&self.config.card, false)?;
         let sid = alsa::mixer::SelemId::new(&*self.config.mixer, self.config.index);
 
-        let selem = mixer.find_selem(&sid).expect("Couldn't find SelemId");
+        let selem = mixer.find_selem(&sid).unwrap();
         let cur_vol = selem
             .get_playback_volume(alsa::mixer::SelemChannelId::mono())
             .expect("Couldn't get current volume");
         let cur_vol_db = selem
             .get_playback_vol_db(alsa::mixer::SelemChannelId::mono())
-            .unwrap_or(alsa::mixer::MilliBel(9999));
+            .unwrap_or(alsa::mixer::MilliBel(-SND_CTL_TLV_DB_GAIN_MUTE));
 
-        let new_vol: u16;
-        info!("Current alsa volume: {}[i64] {:?}", cur_vol, cur_vol_db);
+        let mut new_vol: u16 = 0;
+        trace!("Current alsa volume: {}{:?}", cur_vol, cur_vol_db);
 
-        if let Some(vol) = set_volume {
-            if self.config.mapped_volume {
-                info!("Using mapped_volume");
-                //TODO Check if min is not mute!
-                let vol_db = ((self.pvol(vol, 0x0000, 0xFFFF)).log10() * 6000.0).floor() as i64
-                    + self.params.max;
-                selem
-                    .set_playback_volume_all(vol_db)
-                    .expect("Couldn't set alsa dB volume");
-                info!(
-                    "Mapping volume [{:.3}%] {:?} [u16] ->> Alsa [{:.3}%] {:?} [dB]",
-                    self.pvol(vol, 0x0000, 0xFFFF) * 100.0,
-                    vol,
+        match set_volume {
+            Some(vol) => {
+                if self.config.mapped_volume {
+                    // Cubic mapping ala alsamixer
+                    // https://linux.die.net/man/1/alsamixer
+                    // In alsamixer, the volume is mapped to a value that is more natural for a
+                    // human ear. The mapping is designed so that the position in the interval is
+                    // proportional to the volume as a human ear would perceive it, i.e. the
+                    // position is the cubic root of the linear sample multiplication factor. For
+                    // controls with a small range (24 dB or less), the mapping is linear in the dB
+                    // values so that each step has the same size visually. TODO
+                    // TODO: Check if min is not mute!
+                    let vol_db = (self.pvol(vol, 0x0000, 0xFFFF).log10() * 6000.0).floor() as i64
+                        + self.params.max_db.0;
+                    selem
+                        .set_playback_db_all(alsa::mixer::MilliBel(vol_db), alsa::Round::Floor)
+                        .expect("Couldn't set alsa dB volume");
+                    debug!(
+                        "Mapping volume [{:.3}%] {:?} [u16] ->> Alsa [{:.3}%] {:?} [dB] - {} [i64]",
+                        self.pvol(vol, 0x0000, 0xFFFF) * 100.0,
+                        vol,
+                        self.pvol(
+                            vol_db as f64,
+                            self.params.min as f64,
+                            self.params.max as f64
+                        ) * 100.0,
+                        vol_db as f64 / 100.0,
+                        vol_db
+                    );
+                } else {
+                    // Linear mapping
+                    let alsa_volume =
+                        ((vol as f64 / 0xFFFF as f64) * self.params.range) as i64 + self.params.min;
+                    selem
+                        .set_playback_volume_all(alsa_volume)
+                        .expect("Couldn't set alsa raw volume");
+                    debug!(
+                        "Mapping volume [{:.3}%] {:?} [u16] ->> Alsa [{:.3}%] {:?} [i64]",
+                        self.pvol(vol, 0x0000, 0xFFFF) * 100.0,
+                        vol,
+                        self.pvol(
+                            alsa_volume as f64,
+                            self.params.min as f64,
+                            self.params.max as f64
+                        ) * 100.0,
+                        alsa_volume
+                    );
+                };
+            }
+            None => {
+                new_vol = (((cur_vol - self.params.min) as f64 / self.params.range) * 0xFFFF as f64)
+                    as u16;
+                debug!(
+                    "Mapping volume [{:.3}%] {:?} [u16] <<- Alsa [{:.3}%] {:?} [i64]",
+                    self.pvol(new_vol, 0x0000, 0xFFFF),
+                    new_vol,
                     self.pvol(
-                        vol_db as f64,
-                        self.params.min_db.to_db() as f64,
-                        self.params.max_db.to_db() as f64
-                    ) * 100.0,
-                    vol_db as f64 / 100.0,
-                );
-            } else {
-                info!("Using linear vol");
-                let alsa_volume =
-                    ((vol as f64 / 0xFFFF as f64) * self.params.range) as i64 + self.params.min;
-                selem
-                    .set_playback_volume_all(alsa_volume)
-                    .expect("Couldn't set alsa raw volume");
-                info!(
-                    "Mapping volume [{:.3}%] {:?} [u16] ->> Alsa [{:.3}%] {:?} [i64]",
-                    self.pvol(vol, 0x0000, 0xFFFF) * 100.0,
-                    vol,
-                    self.pvol(
-                        alsa_volume as f64,
+                        cur_vol as f64,
                         self.params.min as f64,
                         self.params.max as f64
-                    ) * 100.0,
-                    alsa_volume
+                    ),
+                    cur_vol
                 );
-            };
-            new_vol = vol; // Meh
-        } else {
-            new_vol =
-                (((cur_vol - self.params.min) as f64 / self.params.range) * 0xFFFF as f64) as u16;
-            info!(
-                "Mapping volume [{:.3}%] {:?} [u16] <<- Alsa [{:.3}%] {:?} [i64]",
-                self.pvol(new_vol, 0x0000, 0xFFFF),
-                new_vol,
-                self.pvol(
-                    cur_vol as f64,
-                    self.params.min as f64,
-                    self.params.max as f64
-                ),
-                cur_vol
-            );
+            }
         }
 
         Ok(new_vol)
