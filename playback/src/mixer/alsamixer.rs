@@ -14,6 +14,7 @@ struct AlsaMixerVolumeParams {
     range: f64,
     min_db: alsa::mixer::MilliBel,
     max_db: alsa::mixer::MilliBel,
+    has_switch: bool,
 }
 
 #[derive(Clone)]
@@ -47,7 +48,10 @@ impl AlsaMixer {
         let hw_mix = selem
             .get_playback_vol_db(alsa::mixer::SelemChannelId::mono())
             .is_ok();
-
+        let has_switch = selem.has_playback_switch();
+        if min_db != alsa::mixer::MilliBel(SND_CTL_TLV_DB_GAIN_MUTE) {
+            warn!("Alsa min-db is not SND_CTL_TLV_DB_GAIN_MUTE!!");
+        }
         info!(
             "Alsa Mixer info min: {} ({:?}[dB]) -- max: {} ({:?}[dB]) HW: {:?}",
             min, min_db, max, max_db, hw_mix
@@ -75,6 +79,7 @@ impl AlsaMixer {
                 range: (max - min) as f64,
                 min_db: min_db,
                 max_db: max_db,
+                has_switch: has_switch,
             },
         })
     }
@@ -96,6 +101,22 @@ impl AlsaMixer {
 
         match set_volume {
             Some(vol) => {
+                if self.params.has_switch {
+                    let is_muted = selem
+                        .get_playback_switch(alsa::mixer::SelemChannelId::mono())
+                        .map(|b| b == 0)
+                        .unwrap_or(false);
+                    if vol == 0 {
+                        debug!("Toggling mute::True");
+                        selem.set_playback_switch_all(0).expect("Can't switch mute");
+
+                        return Ok(vol);
+                    } else if is_muted {
+                        debug!("Toggling mute::False");
+                        selem.set_playback_switch_all(1).expect("Can't reset mute");
+                    }
+                }
+
                 if self.config.mapped_volume {
                     // Cubic mapping ala alsamixer
                     // https://linux.die.net/man/1/alsamixer
