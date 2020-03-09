@@ -107,6 +107,8 @@ pub enum PlayerEvent {
     VolumeSet {
         volume: u16,
     },
+    SinkActive,
+    SinkInactive,
 }
 
 impl PlayerEvent {
@@ -134,7 +136,7 @@ impl PlayerEvent {
             | Stopped {
                 play_request_id, ..
             } => Some(*play_request_id),
-            Changed { .. } | VolumeSet { .. } => None,
+            Changed { .. } | VolumeSet { .. } | SinkActive | SinkInactive => None,
         }
     }
 }
@@ -865,7 +867,10 @@ impl PlayerInternal {
         if !self.sink_running {
             trace!("== Starting sink ==");
             match self.sink.start() {
-                Ok(()) => self.sink_running = true,
+                Ok(()) => {
+                    self.sink_running = true;
+                    self.send_event(PlayerEvent::SinkActive);
+                }
                 Err(err) => error!("Could not start audio: {}", err),
             }
         }
@@ -876,6 +881,7 @@ impl PlayerInternal {
             trace!("== Stopping sink ==");
             self.sink.stop().unwrap();
             self.sink_running = false;
+            self.send_event(PlayerEvent::SinkInactive);
         }
     }
 
