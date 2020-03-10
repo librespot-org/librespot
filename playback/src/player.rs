@@ -1103,7 +1103,7 @@ impl PlayerInternal {
         position_ms: u32,
     ) {
         if !self.config.gapless {
-            self.ensure_sink_stopped();
+            self.ensure_sink_stopped(play);
         }
         // emit the correct player event
         match self.state {
