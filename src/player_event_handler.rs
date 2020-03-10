@@ -5,6 +5,9 @@ use std::io;
 use std::process::Command;
 use tokio_process::{Child, CommandExt};
 
+use futures::Future;
+use librespot::playback::player::SinkStatus;
+
 fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Child> {
     let mut v: Vec<&str> = program.split_whitespace().collect();
     info!("Running {:?} with environment variables {:?}", v, env_vars);
@@ -36,4 +39,17 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
         _ => return None,
     }
     Some(run_program(onevent, env_vars))
+}
+
+pub fn emit_sink_event(sink_status: SinkStatus, onevent: &str) {
+    let mut env_vars = HashMap::new();
+    env_vars.insert("PLAYER_EVENT", "sink".to_string());
+    let sink_status = match sink_status {
+        SinkStatus::Running => "running",
+        SinkStatus::TemporarilyClosed => "temporarily_closed",
+        SinkStatus::Closed => "closed",
+    };
+    env_vars.insert("SINK_STATUS", sink_status.to_string());
+
+    let _ = run_program(onevent, env_vars).and_then(|child| child.wait());
 }
