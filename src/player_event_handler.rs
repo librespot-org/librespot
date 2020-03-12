@@ -18,7 +18,7 @@ fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Chi
 fn add_meta_data_to_env_vars(env_vars: &mut HashMap<&str, String>, track_meta_data: TrackMetaData) {
     env_vars.insert("TRACK_ID", track_meta_data.track_id.to_base62());
     env_vars.insert("DURATION_MS", track_meta_data.duration_ms.to_string());
-    env_vars.insert("TITLE", track_meta_data.title);
+    env_vars.insert("TRACK_TITLE", track_meta_data.title);
 }
 
 pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Result<Child>> {
