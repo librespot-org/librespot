@@ -22,7 +22,7 @@ use rand;
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::Arc;
-use tokio_core::reactor::Handle;
+use tokio::runtime::current_thread::Handle;
 use url;
 
 use librespot_core::authentication::Credentials;
@@ -235,11 +235,9 @@ pub fn discovery(
 
     let serve = {
         let http = Http::new();
-        http.serve_addr_handle(
-            &format!("0.0.0.0:{}", port).parse().unwrap(),
-            handle.new_tokio_handle(),
-            move || Ok(discovery.clone()),
-        )
+        http.serve_addr(&format!("0.0.0.0:{}", port).parse().unwrap(), move || {
+            Ok(discovery.clone())
+        })
         .unwrap()
     };
 
@@ -254,13 +252,13 @@ pub fn discovery(
                     hyper::server::conn::AddrStream,
                     futures::Failed<_, hyper::Error>,
                 >| {
-                    handle.spawn(connecting.then(|_| Ok(())));
+                    handle.spawn(connecting.flatten().then(|_| Ok(()))).unwrap();
                     Ok(())
                 },
             )
             .then(|_| Ok(()))
     };
-    handle.spawn(server_future);
+    handle.spawn(server_future).unwrap();
 
     #[cfg(feature = "with-dns-sd")]
     let svc = DNSService::register(
