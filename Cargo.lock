@@ -905,7 +905,7 @@ dependencies = [
  "rand 0.7.3",
  "rpassword",
  "sha-1",
- "tokio-core",
+ "tokio",
  "tokio-io",
  "tokio-process",
  "tokio-signal",
