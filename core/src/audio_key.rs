@@ -1,9 +1,13 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
-use futures::sync::oneshot;
-use futures::{Async, Future, Poll};
 use std::collections::HashMap;
 use std::io::Write;
+
+use futures::{channel::oneshot, Future};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use crate::spotify_id::{FileId, SpotifyId};
 use crate::util::SeqGenerator;
@@ -73,14 +77,13 @@ impl AudioKeyManager {
 
 pub struct AudioKeyFuture<T>(oneshot::Receiver<Result<T, AudioKeyError>>);
 impl<T> Future for AudioKeyFuture<T> {
-    type Item = T;
-    type Error = AudioKeyError;
+    type Output = Result<T, AudioKeyError>;
 
-    fn poll(&mut self) -> Poll<T, AudioKeyError> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         match self.0.poll() {
-            Ok(Async::Ready(Ok(value))) => Ok(Async::Ready(value)),
-            Ok(Async::Ready(Err(err))) => Err(err),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Poll::Ready(Ok(Ok(value))) => Poll::Ready(Ok(value)),
+            Poll::Ready(Ok(Err(err))) => Err(err),
+            Poll::Pending => Poll::Pending,
             Err(oneshot::Canceled) => Err(AudioKeyError),
         }
     }

@@ -2,7 +2,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, Bytes, BytesMut};
 use shannon::Shannon;
 use std::io;
-use tokio_io::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 const HEADER_SIZE: usize = 3;
 const MAC_SIZE: usize = 4;
@@ -35,11 +35,11 @@ impl APCodec {
     }
 }
 
-impl Encoder for APCodec {
-    type Item = (u8, Vec<u8>);
+type APCodecItem = (u8, Vec<u8>);
+impl Encoder<APCodecItem> for APCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, item: (u8, Vec<u8>), buf: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, item: APCodecItem, buf: &mut BytesMut) -> io::Result<()> {
         let (cmd, payload) = item;
         let offset = buf.len();
 

@@ -5,9 +5,24 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::mpsc;
-use futures::{Async, Future, IntoFuture, Poll, Stream};
-use tokio::runtime::{current_thread, current_thread::Handle};
+// use futures::sync::mpsc;
+// use futures::{Async, Future, IntoFuture, Poll, Stream};
+// use tokio::runtime::{current_thread, current_thread::Handle};
+
+// use futures::future::{IntoFuture, Remote};
+use futures::{
+    channel::mpsc,
+    // future::{IntoFuture, Remote},
+    Future,
+    Stream,
+    TryFutureExt,
+};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use tokio::runtime::Handle;
 
 use crate::apresolve::apresolve_or_fallback;
 use crate::audio_key::AudioKeyManager;
@@ -46,49 +61,52 @@ static SESSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
 #[derive(Clone)]
 pub struct Session(Arc<SessionInternal>);
 
+// TODO: Define better errors!
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 impl Session {
-    pub fn connect(
+    pub async fn connect(
         config: SessionConfig,
         credentials: Credentials,
         cache: Option<Cache>,
         handle: Handle,
-    ) -> Box<dyn Future<Item = Session, Error = io::Error>> {
-        let access_point = apresolve_or_fallback::<io::Error>(&config.proxy, &config.ap_port);
-
-        let proxy = config.proxy.clone();
-        let connection = access_point.and_then(move |addr| {
-            info!("Connecting to AP \"{}\"", addr);
-            connection::connect(addr, &proxy)
-        });
-
-        let device_id = config.device_id.clone();
-        let authentication = connection.and_then(move |connection| {
-            connection::authenticate(connection, credentials, device_id)
-        });
-
-        let result = authentication.map(move |(transport, reusable_credentials)| {
-            info!("Authenticated as \"{}\" !", reusable_credentials.username);
-            if let Some(ref cache) = cache {
-                cache.save_credentials(&reusable_credentials);
-            }
-
-            let (session, task) = Session::create(
-                &handle,
-                transport,
-                config,
-                cache,
-                reusable_credentials.username.clone(),
-            );
-
-            current_thread::spawn(task.map_err(|e| {
-                error!("SessionError: {}", e.to_string());
-                std::process::exit(0);
-            }));
-
-            session
-        });
-
-        Box::new(result)
+    ) -> Result<Session> {
+        unimplemented!()
+        // let access_point_addr =
+        //     apresolve_or_fallback::<io::Error>(&config.proxy, &config.ap_port).await?;
+        //
+        // let proxy = config.proxy.clone();
+        // info!("Connecting to AP \"{}\"", access_point_addr);
+        // let connection = connection::connect(access_point_addr, &proxy);
+        //
+        // let device_id = config.device_id.clone();
+        // let authentication = connection.and_then(move |connection| {
+        //     connection::authenticate(connection, credentials, device_id)
+        // });
+        //
+        // let result = authentication.map(move |(transport, reusable_credentials)| {
+        //     info!("Authenticated as \"{}\" !", reusable_credentials.username);
+        //     if let Some(ref cache) = cache {
+        //         cache.save_credentials(&reusable_credentials);
+        //     }
+        //
+        //     let (session, task) = Session::create(
+        //         &handle,
+        //         transport,
+        //         config,
+        //         cache,
+        //         reusable_credentials.username.clone(),
+        //     );
+        //
+        //     tokio::spawn(task.map_err(|e| {
+        //         error!("SessionError: {}", e.to_string());
+        //         std::process::exit(0);
+        //     }));
+        //
+        //     session
+        // });
+        //
+        // result
     }
 
     fn create(
@@ -97,7 +115,7 @@ impl Session {
         config: SessionConfig,
         cache: Option<Cache>,
         username: String,
-    ) -> (Session, Box<dyn Future<Item = (), Error = io::Error>>) {
+    ) -> (Session, Box<dyn Future<Output = Result<()>>>) {
         let (sink, stream) = transport.split();
 
         let (sender_tx, sender_rx) = mpsc::unbounded();
@@ -160,7 +178,7 @@ impl Session {
     // Spawn a future directly
     pub fn spawn<F>(&self, f: F)
     where
-        F: Future<Item = (), Error = ()> + Send + 'static,
+        F: Future<Output = ()> + Send + 'static,
     {
         let handle = self.0.handle.lock().unwrap();
         let spawn_res = handle.spawn(f);
@@ -293,34 +311,35 @@ impl Drop for SessionInternal {
     }
 }
 
+// type SErr = ::std::fmt::Debug;
+
 struct DispatchTask<S>(S, SessionWeak)
 where
-    S: Stream<Item = (u8, Bytes)>;
+    S: Stream<Item = Result<((u8, Bytes), ())>>;
 
 impl<S> Future for DispatchTask<S>
 where
-    S: Stream<Item = (u8, Bytes)>,
-    <S as Stream>::Error: ::std::fmt::Debug,
+    // SErr: ::std::fmt::Debug,
+    S: Stream<Item = Result<((u8, Bytes), ())>>,
 {
-    type Item = ();
-    type Error = S::Error;
+    type Output = Result<((), ())>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         let session = match self.1.try_upgrade() {
             Some(session) => session,
-            None => return Ok(Async::Ready(())),
+            None => return Poll::Ready(()),
         };
 
         loop {
-            let (cmd, data) = match self.0.poll() {
-                Ok(Async::Ready(Some(t))) => t,
-                Ok(Async::Ready(None)) => {
+            let (cmd, data) = match self.unwrap().0.poll() {
+                Poll::Ready(Ok(Some(t))) => t,
+                Poll::Ready(Ok(None)) => {
                     warn!("Connection to server closed.");
                     session.shutdown();
-                    return Ok(Async::Ready(()));
+                    return Ok(Poll::Ready(()));
                 }
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Err(e) => {
+                Poll::Pending => return Poll::Pending,
+                Poll::Ready(Err(e)) => {
                     session.shutdown();
                     return Err(From::from(e));
                 }
@@ -333,7 +352,7 @@ where
 
 impl<S> Drop for DispatchTask<S>
 where
-    S: Stream<Item = (u8, Bytes)>,
+    S: Stream<Item = Result<((u8, Bytes), ())>>,
 {
     fn drop(&mut self) {
         debug!("drop Dispatch");

@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
 
-#[macro_use]
-extern crate error_chain;
+// #[macro_use]
+// extern crate error_chain;
 #[macro_use]
 extern crate futures;
 #[macro_use]
@@ -30,8 +30,8 @@ extern crate serde_json;
 extern crate sha1;
 extern crate shannon;
 extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_io;
+// extern crate tokio_codec;
+// extern crate tokio_io;
 extern crate url;
 extern crate uuid;
 
@@ -45,11 +45,11 @@ pub mod authentication;
 pub mod cache;
 pub mod channel;
 pub mod config;
-mod connection;
+pub mod connection;
 pub mod diffie_hellman;
 pub mod keymaster;
 pub mod mercury;
-mod proxytunnel;
+pub mod proxytunnel;
 pub mod session;
 pub mod spotify_id;
 pub mod util;

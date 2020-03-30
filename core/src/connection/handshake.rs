@@ -1,14 +1,13 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use futures::{Async, Future, Poll};
 use hmac::{Hmac, Mac};
 use protobuf::{self, Message};
 use rand::thread_rng;
 use sha1::Sha1;
 use std::io::{self, Read};
 use std::marker::PhantomData;
-use tokio_codec::{Decoder, Framed};
-use tokio_io::io::{read_exact, write_all, ReadExact, Window, WriteAll};
-use tokio_io::{AsyncRead, AsyncWrite};
+// use tokio_codec::{Decoder, Framed};
+// use tokio_io::io::{read_exact, write_all, ReadExact, Window, WriteAll};
+// use tokio_io::{AsyncRead, AsyncWrite};
 
 use super::codec::APCodec;
 use crate::diffie_hellman::DHLocalKeys;
@@ -16,18 +15,30 @@ use crate::protocol;
 use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
 use crate::util;
 
-pub struct Handshake<T> {
+use futures::{
+    io::{ReadExact, Window, WriteAll},
+    Future,
+};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+
+use tokio_util::codec::{Decoder, Framed};
+
+pub struct Handshake<'a, T> {
     keys: DHLocalKeys,
-    state: HandshakeState<T>,
+    state: HandshakeState<'a, T>,
 }
 
-enum HandshakeState<T> {
-    ClientHello(WriteAll<T, Vec<u8>>),
-    APResponse(RecvPacket<T, APResponseMessage>),
-    ClientResponse(Option<APCodec>, WriteAll<T, Vec<u8>>),
+enum HandshakeState<'a, T> {
+    ClientHello(WriteAll<'a, T>),
+    APResponse(RecvPacket<'a, T, APResponseMessage>),
+    ClientResponse(Option<APCodec>, WriteAll<'a, T>),
 }
 
-pub fn handshake<T: AsyncRead + AsyncWrite>(connection: T) -> Handshake<T> {
+pub fn handshake<'a, T: AsyncRead + AsyncWrite>(connection: T) -> Handshake<'a, T> {
     let local_keys = DHLocalKeys::random(&mut thread_rng());
     let client_hello = client_hello(connection, local_keys.public_key());
 
@@ -37,23 +48,22 @@ pub fn handshake<T: AsyncRead + AsyncWrite>(connection: T) -> Handshake<T> {
     }
 }
 
-impl<T: AsyncRead + AsyncWrite> Future for Handshake<T> {
-    type Item = Framed<T, APCodec>;
-    type Error = io::Error;
+impl<'a, T: AsyncRead + AsyncWrite> Future for Handshake<'a, T> {
+    type Output = Result<Framed<T, APCodec>, io::Error>;
 
-    fn poll(&mut self) -> Poll<Self::Item, io::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         use self::HandshakeState::*;
         loop {
             self.state = match self.state {
                 ClientHello(ref mut write) => {
-                    let (connection, accumulator) = try_ready!(write.poll());
+                    let (connection, accumulator) = ready!(write.poll());
 
                     let read = recv_packet(connection, accumulator);
                     APResponse(read)
                 }
 
                 APResponse(ref mut read) => {
-                    let (connection, message, accumulator) = try_ready!(read.poll());
+                    let (connection, message, accumulator) = ready!(read.poll());
                     let remote_key = message
                         .get_challenge()
                         .get_login_crypto_challenge()
@@ -71,17 +81,17 @@ impl<T: AsyncRead + AsyncWrite> Future for Handshake<T> {
                 }
 
                 ClientResponse(ref mut codec, ref mut write) => {
-                    let (connection, _) = try_ready!(write.poll());
+                    let (connection, _) = ready!(write.poll());
                     let codec = codec.take().unwrap();
                     let framed = codec.framed(connection);
-                    return Ok(Async::Ready(framed));
+                    return Poll::Ready(Ok(framed));
                 }
             }
         }
     }
 }
 
-fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8>> {
+fn client_hello<'a, T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<'a, T> {
     let mut packet = ClientHello::new();
     packet
         .mut_build_info()
@@ -109,10 +119,11 @@ fn client_hello<T: AsyncWrite>(connection: T, gc: Vec<u8>) -> WriteAll<T, Vec<u8
     buffer.write_u32::<BigEndian>(size).unwrap();
     packet.write_to_vec(&mut buffer).unwrap();
 
-    write_all(connection, buffer)
+    // write_all(connection, buffer)
+    connection.write_all(&buffer)
 }
 
-fn client_response<T: AsyncWrite>(connection: T, challenge: Vec<u8>) -> WriteAll<T, Vec<u8>> {
+fn client_response<'a, T: AsyncWrite>(connection: T, challenge: Vec<u8>) -> WriteAll<'a, T> {
     let mut packet = ClientResponsePlaintext::new();
     packet
         .mut_login_crypto_response()
@@ -126,15 +137,16 @@ fn client_response<T: AsyncWrite>(connection: T, challenge: Vec<u8>) -> WriteAll
     buffer.write_u32::<BigEndian>(size).unwrap();
     packet.write_to_vec(&mut buffer).unwrap();
 
-    write_all(connection, buffer)
+    // write_all(connection, buffer)
+    connection.write_all(&buffer)
 }
 
-enum RecvPacket<T, M: Message> {
-    Header(ReadExact<T, Window<Vec<u8>>>, PhantomData<M>),
-    Body(ReadExact<T, Window<Vec<u8>>>, PhantomData<M>),
+enum RecvPacket<'a, T, M: Message> {
+    Header(ReadExact<'a, T>, PhantomData<M>),
+    Body(ReadExact<'a, T>, PhantomData<M>),
 }
 
-fn recv_packet<T: AsyncRead, M>(connection: T, acc: Vec<u8>) -> RecvPacket<T, M>
+fn recv_packet<'a, T: AsyncRead, M>(connection: T, acc: Vec<u8>) -> RecvPacket<'a, T, M>
 where
     T: Read,
     M: Message,
@@ -142,20 +154,19 @@ where
     RecvPacket::Header(read_into_accumulator(connection, 4, acc), PhantomData)
 }
 
-impl<T: AsyncRead, M> Future for RecvPacket<T, M>
+impl<'a, T: AsyncRead, M> Future for RecvPacket<'a, T, M>
 where
     T: Read,
     M: Message,
 {
-    type Item = (T, M, Vec<u8>);
-    type Error = io::Error;
+    type Output = Result<(T, M, Vec<u8>), io::Error>;
 
-    fn poll(&mut self) -> Poll<Self::Item, io::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         use self::RecvPacket::*;
         loop {
             *self = match *self {
                 Header(ref mut read, _) => {
-                    let (connection, header) = try_ready!(read.poll());
+                    let (connection, header) = ready!(read.poll());
                     let size = BigEndian::read_u32(header.as_ref()) as usize;
 
                     let acc = header.into_inner();
@@ -164,29 +175,30 @@ where
                 }
 
                 Body(ref mut read, _) => {
-                    let (connection, data) = try_ready!(read.poll());
+                    let (connection, data) = ready!(read.poll());
                     let message = protobuf::parse_from_bytes(data.as_ref()).unwrap();
 
                     let acc = data.into_inner();
-                    return Ok(Async::Ready((connection, message, acc)));
+                    return Poll::Ready(Ok((connection, message, acc)));
                 }
             }
         }
     }
 }
 
-fn read_into_accumulator<T: AsyncRead>(
+fn read_into_accumulator<'a, T: AsyncRead>(
     connection: T,
     size: usize,
     mut acc: Vec<u8>,
-) -> ReadExact<T, Window<Vec<u8>>> {
+) -> ReadExact<'a, T> {
     let offset = acc.len();
     acc.resize(offset + size, 0);
 
     let mut window = Window::new(acc);
     window.set_start(offset);
 
-    read_exact(connection, window)
+    // read_exact(connection, window)
+    connection.read_exact(window)
 }
 
 fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
