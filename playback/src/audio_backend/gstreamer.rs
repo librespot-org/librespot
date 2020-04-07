@@ -5,8 +5,10 @@ use gst::prelude::*;
 use gst::*;
 use zerocopy::*;
 
+#[allow(dead_code)]
 pub struct GstreamerSink {
-    tx: SyncSender<Vec<u8>>
+    tx: SyncSender<Vec<u8>>,
+    pipeline: gst::Pipeline
 }
 
 impl Open for GstreamerSink {
@@ -75,7 +77,8 @@ impl Open for GstreamerSink {
         pipeline.set_state(gst::State::Playing).expect("Unable to set the pipeline to the `Playing` state");
 
         GstreamerSink {
-            tx: tx
+            tx: tx,
+            pipeline: pipeline
         }
     }
 }
