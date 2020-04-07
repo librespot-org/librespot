@@ -18,11 +18,11 @@ extern crate libpulse_sys;
 extern crate jack;
 
 #[cfg(feature = "gstreamer-backend")]
+extern crate glib;
+#[cfg(feature = "gstreamer-backend")]
 extern crate gstreamer as gst;
 #[cfg(feature = "gstreamer-backend")]
 extern crate gstreamer_app as gst_app;
-#[cfg(feature = "gstreamer-backend")]
-extern crate glib;
 #[cfg(feature = "gstreamer-backend")]
 extern crate zerocopy;
 
