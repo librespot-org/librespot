@@ -180,6 +180,11 @@ fn setup(args: &[String]) -> Setup {
             "",
             "autoplay",
             "autoplay similar songs when your music ends.",
+        )
+        .optflag(
+            "",
+            "disable-gapless",
+            "disable gapless playback.",
         );
 
     let matches = match opts.parse(&args[1..]) {
@@ -287,7 +292,7 @@ fn setup(args: &[String]) -> Setup {
                 |s| {
                     match Url::parse(&s) {
                         Ok(url) => {
-                            if url.host().is_none() || url.port().is_none() {
+                            if url.host().is_none() || url.port_or_known_default().is_none() {
                                 panic!("Invalid proxy url, only urls on the format \"http://host:port\" are allowed");
                             }
 
@@ -312,9 +317,9 @@ fn setup(args: &[String]) -> Setup {
             .as_ref()
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or(Bitrate::default());
-
         PlayerConfig {
             bitrate: bitrate,
+            gapless: !matches.opt_present("disable-gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
             normalisation_pregain: matches
                 .opt_str("normalisation-pregain")
@@ -539,16 +544,18 @@ impl Future for Main {
             if let Some(ref mut player_event_channel) = self.player_event_channel {
                 if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
                     if let Some(ref program) = self.player_event_program {
-                        let child = run_program_on_events(event, program)
-                            .expect("program failed to start")
-                            .map(|status| {
-                                if !status.success() {
-                                    error!("child exited with status {:?}", status.code());
-                                }
-                            })
-                            .map_err(|e| error!("failed to wait on child process: {}", e));
+                        if let Some(child) = run_program_on_events(event, program) {
+                            let child = child
+                                .expect("program failed to start")
+                                .map(|status| {
+                                    if !status.success() {
+                                        error!("child exited with status {:?}", status.code());
+                                    }
+                                })
+                                .map_err(|e| error!("failed to wait on child process: {}", e));
 
-                        self.handle.spawn(child);
+                            self.handle.spawn(child);
+                        }
                     }
                 }
             }
