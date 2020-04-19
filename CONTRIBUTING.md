@@ -31,10 +31,10 @@ Make any changes that you are going to make to the code, but do not commit yet.
 
 Make sure that the code is correctly formatted by running:
 ```bash
-cargo fmt --all
+cargo +stable fmt --all
 ```
 
-This command runs the previously installed ```rustfmt```, a code formatting tool that will automatically correct any formatting that you have used that does not conform with the librespot code style. Once that command has run, you will need to rebuild the project:
+This command runs the previously installed stable version of ```rustfmt```, a code formatting tool that will automatically correct any formatting that you have used that does not conform with the librespot code style. Once that command has run, you will need to rebuild the project:
 
 ```bash
 cargo build
