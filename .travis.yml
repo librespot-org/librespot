@@ -14,7 +14,23 @@ cache:
 # But don't cache the cargo registry
 before_cache:
   - rm -rf /home/travis/.cargo/registry
-  
+
+matrix:
+  # Performance tweak
+  fast_finish: true
+  # Ignore failures in nightly, not ideal, but necessary
+  allow_failures:
+  - rust: nightly
+
+  # Only run the formatting check for stable
+  include:
+  - name: 'Rust: format check'
+    rust: stable
+    install:
+    - rustup component add rustfmt
+    script:
+    - cargo fmt --verbose --all -- --check
+
 addons:
   apt:
     packages:
@@ -26,14 +42,12 @@ addons:
       - libsdl2-dev
 
 before_script:
-    - rustup component add rustfmt
     - mkdir -p ~/.cargo
     - echo '[target.armv7-unknown-linux-gnueabihf]' > ~/.cargo/config
     - echo 'linker = "arm-linux-gnueabihf-gcc"' >> ~/.cargo/config
     - rustup target add armv7-unknown-linux-gnueabihf
 
 script:
-    - cargo fmt --all -- --check
     - cargo build --locked --no-default-features
     - cargo build --locked --examples
     - cargo build --locked --no-default-features --features "with-tremor"
