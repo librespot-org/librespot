@@ -129,7 +129,7 @@ fn setup(args: &[String]) -> Setup {
             "Audio device to use. Use '?' to list options if using portaudio or alsa",
             "DEVICE",
         )
-        .optopt("", "mixer", "Mixer to use (alsa or softmixer)", "MIXER")
+        .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
             "m",
             "mixer-name",
