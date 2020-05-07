@@ -12,6 +12,7 @@ pub struct PulseAudioSink {
     ss: pa_sample_spec,
     name: CString,
     desc: CString,
+    device: Option<CString>,
 }
 
 fn call_pulseaudio<T, F, FailCheck>(
@@ -56,10 +57,6 @@ impl Open for PulseAudioSink {
     fn open(device: Option<String>) -> PulseAudioSink {
         debug!("Using PulseAudio sink");
 
-        if device.is_some() {
-            panic!("pulseaudio sink does not support specifying a device name");
-        }
-
         let ss = pa_sample_spec {
             format: PA_SAMPLE_S16LE,
             channels: 2, // stereo
@@ -74,6 +71,7 @@ impl Open for PulseAudioSink {
             ss: ss,
             name: name,
             desc: description,
+            device: device.and_then(|s| CString::new(s).ok()),
         }
     }
 }
@@ -81,13 +79,17 @@ impl Open for PulseAudioSink {
 impl Sink for PulseAudioSink {
     fn start(&mut self) -> io::Result<()> {
         if self.s == null_mut() {
+            let device = match &self.device {
+                None => null(),
+                Some(device) => device.as_ptr(),
+            };
             self.s = call_pulseaudio(
                 |err| unsafe {
                     pa_simple_new(
                         null(),             // Use the default server.
                         self.name.as_ptr(), // Our application's name.
                         PA_STREAM_PLAYBACK,
-                        null(),             // Use the default device.
+                        device,
                         self.desc.as_ptr(), // desc of our stream.
                         &self.ss,           // Our sample format.
                         null(),             // Use default channel map
