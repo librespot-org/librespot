@@ -378,10 +378,19 @@ impl PlayerState {
         }
     }
 
+    #[allow(dead_code)]
     fn is_stopped(&self) -> bool {
         use self::PlayerState::*;
         match *self {
             Stopped => true,
+            _ => false,
+        }
+    }
+
+    fn is_loading(&self) -> bool {
+        use self::PlayerState::*;
+        match *self {
+            Loading { .. } => true,
             _ => false,
         }
     }
@@ -728,8 +737,14 @@ impl Future for PlayerInternal {
                     }
                     Ok(Async::NotReady) => (),
                     Err(_) => {
-                        self.handle_player_stop();
-                        assert!(self.state.is_stopped());
+                        warn!("Unable to load <{:?}>", track_id);
+                        warn!("Skipping to next track");
+                        trace!("State: {:?}", self.state);
+                        assert!(self.state.is_loading());
+                        self.send_event(PlayerEvent::EndOfTrack {
+                            track_id,
+                            play_request_id,
+                        })
                     }
                 }
             }
@@ -749,6 +764,7 @@ impl Future for PlayerInternal {
                     }
                     Ok(Async::NotReady) => (),
                     Err(_) => {
+                        warn!("Unable to preload {:?}", track_id);
                         self.preload = PlayerPreload::None;
                     }
                 }
@@ -1523,6 +1539,51 @@ impl ::std::fmt::Debug for PlayerCommand {
     }
 }
 
+impl ::std::fmt::Debug for PlayerState {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        use PlayerState::*;
+        match *self {
+            Stopped => f.debug_struct("Stopped").finish(),
+            Loading {
+                track_id,
+                play_request_id,
+                ..
+            } => f
+                .debug_struct("Loading")
+                .field("track_id", &track_id)
+                .field("play_request_id", &play_request_id)
+                .finish(),
+            Paused {
+                track_id,
+                play_request_id,
+                ..
+            } => f
+                .debug_struct("Paused")
+                .field("track_id", &track_id)
+                .field("play_request_id", &play_request_id)
+                .finish(),
+            Playing {
+                track_id,
+                play_request_id,
+                ..
+            } => f
+                .debug_struct("Playing")
+                .field("track_id", &track_id)
+                .field("play_request_id", &play_request_id)
+                .finish(),
+            EndOfTrack {
+                track_id,
+                play_request_id,
+                ..
+            } => f
+                .debug_struct("EndOfTrack")
+                .field("track_id", &track_id)
+                .field("play_request_id", &play_request_id)
+                .finish(),
+            Invalid => f.debug_struct("Invalid").finish(),
+        }
+    }
+}
 struct Subfile<T: Read + Seek> {
     stream: T,
     offset: u64,
