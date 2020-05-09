@@ -917,7 +917,9 @@ impl SpircTask {
         );
         let context_uri = self.state.get_context_uri().to_owned();
         if (context_uri.starts_with("spotify:station:")
-            || context_uri.starts_with("spotify:dailymix:"))
+            || context_uri.starts_with("spotify:dailymix:")
+            // spotify:user:xxx:collection
+            || context_uri.starts_with(&format!("spotify:user:{}:collection",self.session.username())))
             && ((self.state.get_track().len() as u32) - new_index) < CONTEXT_FETCH_THRESHOLD
         {
             self.context_fut = self.resolve_station(&context_uri);
