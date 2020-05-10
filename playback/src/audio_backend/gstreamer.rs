@@ -20,10 +20,10 @@ impl Open for GstreamerSink {
             Some(x) => format!("{}{}", pipeline_str_preamble, x),
             None => format!("{}{}", pipeline_str_preamble, pipeline_str_rest),
         };
-        println!("Pipeline: {}", pipeline_str);
+        info!("Pipeline: {}", pipeline_str);
 
         gst::init().unwrap();
-        let pipelinee = gst::parse_launch(&*pipeline_str).expect("New Pipeline error");
+        let pipelinee = gst::parse_launch(&*pipeline_str).expect("Couldn't launch pipeline; likely a GStreamer issue or an error in the pipeline string you specified in the 'device' argument to librespot.");
         let pipeline = pipelinee
             .dynamic_cast::<gst::Pipeline>()
             .expect("Couldn't cast pipeline element at runtime!");
@@ -36,7 +36,7 @@ impl Open for GstreamerSink {
             .dynamic_cast::<gst_app::AppSrc>()
             .expect("Couldn't cast AppSrc element at runtime!");
         let bufferpool = gst::BufferPool::new();
-        let appsrc_caps = appsrc.get_caps().expect("get appsrc caps failed");
+        let appsrc_caps = appsrc.get_caps().expect("Couldn't get appsrc caps");
         let mut conf = bufferpool.get_config();
         conf.set_params(Some(&appsrc_caps), 8192, 0, 0);
         bufferpool

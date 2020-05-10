@@ -58,6 +58,7 @@ script:
     - cargo build --locked --no-default-features --features "jackaudio-backend"
     - cargo build --locked --no-default-features --features "rodio-backend"
     - cargo build --locked --no-default-features --features "sdl-backend"
+    - cargo build --locked --no-default-features --features "gstreamer-backend"
     - cargo build --locked --no-default-features --target armv7-unknown-linux-gnueabihf
 
 notifications:
