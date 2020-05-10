@@ -621,24 +621,26 @@ impl SpircTask {
                             self.play_status = SpircPlayStatus::Stopped;
                         }
                     },
-                    PlayerEvent::TimeToPreloadNextTrack { .. } => match self.play_status {
-                        SpircPlayStatus::Paused {
-                            ref mut preloading_of_next_track_triggered,
-                            ..
-                        }
-                        | SpircPlayStatus::Playing {
-                            ref mut preloading_of_next_track_triggered,
-                            ..
-                        } => {
-                            *preloading_of_next_track_triggered = true;
-                            if let Some(track_id) = self.preview_next_track() {
-                                self.player.preload(track_id);
+                    PlayerEvent::TimeToPreloadNextTrack { preload_index, .. } => {
+                        match self.play_status {
+                            SpircPlayStatus::Paused {
+                                ref mut preloading_of_next_track_triggered,
+                                ..
                             }
+                            | SpircPlayStatus::Playing {
+                                ref mut preloading_of_next_track_triggered,
+                                ..
+                            } => {
+                                *preloading_of_next_track_triggered = true;
+                                if let Some(track_id) = self.preview_next_track(preload_index) {
+                                    self.player.preload(track_id);
+                                }
+                            }
+                            SpircPlayStatus::LoadingPause { .. }
+                            | SpircPlayStatus::LoadingPlay { .. }
+                            | SpircPlayStatus::Stopped => (),
                         }
-                        SpircPlayStatus::LoadingPause { .. }
-                        | SpircPlayStatus::LoadingPlay { .. }
-                        | SpircPlayStatus::Stopped => (),
-                    },
+                    }
                     _ => (),
                 }
             }
@@ -777,7 +779,8 @@ impl SpircTask {
                 } = self.play_status
                 {
                     if preloading_of_next_track_triggered {
-                        if let Some(track_id) = self.preview_next_track() {
+                        // Get the next track_id in the playlist
+                        if let Some(track_id) = self.preview_next_track(1) {
                             self.player.preload(track_id);
                         }
                     }
@@ -899,9 +902,12 @@ impl SpircTask {
         }
     }
 
-    fn preview_next_track(&mut self) -> Option<SpotifyId> {
-        self.get_track_id_to_play_from_playlist(self.state.get_playing_track_index() + 1)
-            .and_then(|(track_id, _)| Some(track_id))
+    fn preview_next_track(&mut self, preview_index: u32) -> Option<SpotifyId> {
+        trace!("Previewing {:}", preview_index);
+        self.get_track_id_to_play_from_playlist(
+            self.state.get_playing_track_index() + preview_index,
+        )
+        .and_then(|(track_id, _)| Some(track_id))
     }
 
     fn handle_next(&mut self) {
