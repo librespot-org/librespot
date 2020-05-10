@@ -12,6 +12,21 @@ pub fn rand_vec<G: Rng>(rng: &mut G, size: usize) -> Vec<u8> {
         .collect()
 }
 
+pub fn url_encode(inp: &str) -> String {
+    let mut encoded = String::new();
+
+    for c in inp.as_bytes().iter() {
+        match *c as char {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' | ':' | '/' => {
+                encoded.push(*c as char)
+            }
+            c => encoded.push_str(format!("%{:02X}", c as u32).as_str()),
+        };
+    }
+
+    encoded
+}
+
 pub fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
     let mut base = base.clone();
     let mut exp = exp.clone();
