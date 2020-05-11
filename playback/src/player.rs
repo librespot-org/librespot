@@ -66,44 +66,64 @@ enum PlayerCommand {
 
 #[derive(Debug, Clone)]
 pub enum PlayerEvent {
+    // Fired when the player is stopped (e.g. by issuing a "stop" command to the player).
     Stopped {
         play_request_id: u64,
         track_id: SpotifyId,
     },
-    Loading {
-        play_request_id: u64,
-        track_id: SpotifyId,
-        position_ms: u32,
-    },
+    // The player started working on playback of a track while it was in a stopped state.
+    // This is always immediately followed up by a "Loading" or "Playing" event.
     Started {
         play_request_id: u64,
         track_id: SpotifyId,
         position_ms: u32,
     },
+    // Same as started but in the case that the player already had a track loaded.
+    // The player was either playing the loaded track or it was paused.
     Changed {
         old_track_id: SpotifyId,
         new_track_id: SpotifyId,
     },
+    // The player is delayed by loading a track.
+    Loading {
+        play_request_id: u64,
+        track_id: SpotifyId,
+        position_ms: u32,
+    },
+    // The player is playing a track.
+    // This event is issued at the start of playback of whenever the position must be communicated
+    // because it is out of sync. This includes:
+    // start of a track
+    // un-pausing
+    // after a seek
+    // after a buffer-underrun
     Playing {
         play_request_id: u64,
         track_id: SpotifyId,
         position_ms: u32,
         duration_ms: u32,
     },
+    // The player entered a paused state.
     Paused {
         play_request_id: u64,
         track_id: SpotifyId,
         position_ms: u32,
         duration_ms: u32,
     },
+    // The player thinks it's a good idea to issue a preload command for the next track now.
+    // This event is intended for use within spirc.
     TimeToPreloadNextTrack {
         play_request_id: u64,
         track_id: SpotifyId,
     },
+    // The player reached the end of a track.
+    // This event is intended for use within spirc. Spirc will respond by issuing another command
+    // which will trigger another event (e.g. Changed or Stopped)
     EndOfTrack {
         play_request_id: u64,
         track_id: SpotifyId,
     },
+    // The mixer volume was set to a new level.
     VolumeSet {
         volume: u16,
     },
@@ -363,7 +383,7 @@ enum PlayerState {
     EndOfTrack {
         track_id: SpotifyId,
         play_request_id: u64,
-        loaded_track: Option<PlayerLoadedTrackData>,
+        loaded_track: PlayerLoadedTrackData,
     },
     Invalid,
 }
@@ -433,14 +453,14 @@ impl PlayerState {
                 *self = EndOfTrack {
                     track_id,
                     play_request_id,
-                    loaded_track: Some(PlayerLoadedTrackData {
+                    loaded_track: PlayerLoadedTrackData {
                         decoder,
                         duration_ms,
                         bytes_per_second,
                         normalisation_factor,
                         stream_loader_controller,
                         stream_position_pcm,
-                    }),
+                    },
                 };
             }
             _ => panic!("Called playing_to_end_of_track in non-playing state."),
@@ -1104,28 +1124,32 @@ impl PlayerInternal {
         // This is the case if we're repeating the same track again.
         if let PlayerState::EndOfTrack {
             track_id: previous_track_id,
-            ref mut loaded_track,
             ..
         } = self.state
         {
             if previous_track_id == track_id {
-                let loaded_track = mem::replace(&mut *loaded_track, None);
-                if let Some(mut loaded_track) = loaded_track {
-                    if Self::position_ms_to_pcm(position_ms) != loaded_track.stream_position_pcm {
-                        loaded_track
-                            .stream_loader_controller
-                            .set_random_access_mode();
-                        let _ = loaded_track.decoder.seek(position_ms as i64); // This may be blocking.
-                                                                               // But most likely the track is fully
-                                                                               // loaded already because we played
-                                                                               // to the end of it.
-                        loaded_track.stream_loader_controller.set_stream_mode();
-                        loaded_track.stream_position_pcm = Self::position_ms_to_pcm(position_ms);
-                    }
-                    self.preload = PlayerPreload::None;
-                    self.start_playback(track_id, play_request_id, loaded_track, play);
-                    return;
+                let mut loaded_track = match mem::replace(&mut self.state, PlayerState::Invalid) {
+                    PlayerState::EndOfTrack { loaded_track, .. } => loaded_track,
+                    _ => unreachable!(),
+                };
+
+                if Self::position_ms_to_pcm(position_ms) != loaded_track.stream_position_pcm {
+                    loaded_track
+                        .stream_loader_controller
+                        .set_random_access_mode();
+                    let _ = loaded_track.decoder.seek(position_ms as i64); // This may be blocking.
+                                                                           // But most likely the track is fully
+                                                                           // loaded already because we played
+                                                                           // to the end of it.
+                    loaded_track.stream_loader_controller.set_stream_mode();
+                    loaded_track.stream_position_pcm = Self::position_ms_to_pcm(position_ms);
                 }
+                self.preload = PlayerPreload::None;
+                self.start_playback(track_id, play_request_id, loaded_track, play);
+                if let PlayerState::Invalid = self.state {
+                    panic!("start_playback() hasn't set a valid player state.");
+                }
+                return;
             }
         }
 
@@ -1317,7 +1341,7 @@ impl PlayerInternal {
             }
         }
 
-        // schedule the preload if the current track if desired.
+        // schedule the preload of the current track if desired.
         if preload_track {
             let loader = self.load_track(track_id, 0);
             self.preload = PlayerPreload::Loading { track_id, loader }
