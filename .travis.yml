@@ -40,6 +40,8 @@ addons:
       - portaudio19-dev
       - libasound2-dev
       - libsdl2-dev
+      - gstreamer1.0-dev
+      - libgstreamer-plugins-base1.0-dev
 
 before_script:
     - mkdir -p ~/.cargo
