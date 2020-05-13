@@ -1170,9 +1170,9 @@ impl SpircTask {
     }
 
     fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
-        let tracks_len = self.state.get_track().len() as u32;
+        let tracks_len = self.state.get_track().len();
 
-        let mut new_playlist_index = index;
+        let mut new_playlist_index = index as usize;
 
         if new_playlist_index >= tracks_len {
             new_playlist_index = 0;
@@ -1184,7 +1184,7 @@ impl SpircTask {
         // tracks in each frame either have a gid or uri (that may or may not be a valid track)
         // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
 
-        let mut track_ref = self.state.get_track()[new_playlist_index as usize].clone();
+        let mut track_ref = self.state.get_track()[new_playlist_index].clone();
         let mut track_id = self.get_spotify_id_for_track(&track_ref);
         while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable {
             warn!(
@@ -1203,12 +1203,12 @@ impl SpircTask {
                 warn!("No playable track found in state: {:?}", self.state);
                 return None;
             }
-            track_ref = self.state.get_track()[index as usize].clone();
+            track_ref = self.state.get_track()[new_playlist_index].clone();
             track_id = self.get_spotify_id_for_track(&track_ref);
         }
 
         match track_id {
-            Ok(track_id) => Some((track_id, new_playlist_index)),
+            Ok(track_id) => Some((track_id, new_playlist_index as u32)),
             Err(_) => None,
         }
     }
