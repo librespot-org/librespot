@@ -621,26 +621,8 @@ impl SpircTask {
                             self.play_status = SpircPlayStatus::Stopped;
                         }
                     },
-                    PlayerEvent::TimeToPreloadNextTrack { preload_index, .. } => {
-                        match self.play_status {
-                            SpircPlayStatus::Paused {
-                                ref mut preloading_of_next_track_triggered,
-                                ..
-                            }
-                            | SpircPlayStatus::Playing {
-                                ref mut preloading_of_next_track_triggered,
-                                ..
-                            } => {
-                                *preloading_of_next_track_triggered = true;
-                                if let Some(track_id) = self.preview_next_track(preload_index) {
-                                    self.player.preload(track_id);
-                                }
-                            }
-                            SpircPlayStatus::LoadingPause { .. }
-                            | SpircPlayStatus::LoadingPlay { .. }
-                            | SpircPlayStatus::Stopped => (),
-                        }
-                    }
+                    PlayerEvent::TimeToPreloadNextTrack { .. } => self.handle_preload_next_track(),
+                    PlayerEvent::Unavailable { track_id, .. } => self.handle_unavalable(track_id),
                     _ => (),
                 }
             }
@@ -780,7 +762,7 @@ impl SpircTask {
                 {
                     if preloading_of_next_track_triggered {
                         // Get the next track_id in the playlist
-                        if let Some(track_id) = self.preview_next_track(1) {
+                        if let Some(track_id) = self.preview_next_track() {
                             self.player.preload(track_id);
                         }
                     }
@@ -902,12 +884,44 @@ impl SpircTask {
         }
     }
 
-    fn preview_next_track(&mut self, preview_index: u32) -> Option<SpotifyId> {
-        trace!("Previewing {:}", preview_index);
-        self.get_track_id_to_play_from_playlist(
-            self.state.get_playing_track_index() + preview_index,
-        )
-        .and_then(|(track_id, _)| Some(track_id))
+    fn preview_next_track(&mut self) -> Option<SpotifyId> {
+        self.get_track_id_to_play_from_playlist(self.state.get_playing_track_index() + 1)
+            .and_then(|(track_id, _)| Some(track_id))
+    }
+
+    fn handle_preload_next_track(&mut self) {
+        // Requests the player thread to preload the next track
+        match self.play_status {
+            SpircPlayStatus::Paused {
+                ref mut preloading_of_next_track_triggered,
+                ..
+            }
+            | SpircPlayStatus::Playing {
+                ref mut preloading_of_next_track_triggered,
+                ..
+            } => {
+                *preloading_of_next_track_triggered = true;
+                if let Some(track_id) = self.preview_next_track() {
+                    self.player.preload(track_id);
+                }
+            }
+            SpircPlayStatus::LoadingPause { .. }
+            | SpircPlayStatus::LoadingPlay { .. }
+            | SpircPlayStatus::Stopped => (),
+        }
+    }
+
+    fn handle_unavalable(&mut self, track_id: SpotifyId) {
+        let unavalable_index = self.get_track_index_for_spotify_id(
+            &track_id,
+            self.state.get_playing_track_index() as usize,
+        );
+        if let Some(index) = unavalable_index {
+            // TODO: Or mark it as NonPlayable?
+            debug!("Removing unavailable track_ref at {:?}", index);
+            self.state.mut_track().remove(index);
+        }
+        self.handle_preload_next_track();
     }
 
     fn handle_next(&mut self) {
@@ -1139,6 +1153,18 @@ impl SpircTask {
             debug!("Malformed or no gid, attempting to parse URI <{}>", uri);
             SpotifyId::from_uri(uri)
         })
+    }
+
+    fn get_track_index_for_spotify_id(
+        &self,
+        track_id: &SpotifyId,
+        start_index: usize,
+    ) -> Option<usize> {
+        let index = self.state.get_track()[start_index..]
+            .iter()
+            .position(|track_ref| self.get_spotify_id_for_track(track_ref) == Ok(*track_id));
+
+        index
     }
 
     fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {

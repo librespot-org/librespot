@@ -99,7 +99,10 @@ pub enum PlayerEvent {
     TimeToPreloadNextTrack {
         play_request_id: u64,
         track_id: SpotifyId,
-        preload_index: u32,
+    },
+    Unavailable {
+        play_request_id: u64,
+        track_id: SpotifyId,
     },
     EndOfTrack {
         play_request_id: u64,
@@ -115,6 +118,9 @@ impl PlayerEvent {
         use PlayerEvent::*;
         match self {
             Loading {
+                play_request_id, ..
+            }
+            | Unavailable {
                 play_request_id, ..
             }
             | Started {
@@ -321,10 +327,6 @@ enum PlayerPreload {
     Loading {
         track_id: SpotifyId,
         loader: Box<dyn Future<Item = PlayerLoadedTrackData, Error = ()>>,
-        preload_index: u32,
-    },
-    Missing {
-        preload_index: u32,
     },
     Ready {
         track_id: SpotifyId,
@@ -742,9 +744,7 @@ impl Future for PlayerInternal {
                     }
                     Ok(Async::NotReady) => (),
                     Err(_) => {
-                        warn!("Unable to load <{:?}>", track_id);
-                        warn!("Skipping to next track");
-                        trace!("State: {:?}", self.state);
+                        warn!("Unable to load <{:?}>\nSkipping to next track", track_id);
                         assert!(self.state.is_loading());
                         self.send_event(PlayerEvent::EndOfTrack {
                             track_id,
@@ -758,7 +758,6 @@ impl Future for PlayerInternal {
             if let PlayerPreload::Loading {
                 ref mut loader,
                 track_id,
-                preload_index,
             } = self.preload
             {
                 match loader.poll() {
@@ -770,9 +769,9 @@ impl Future for PlayerInternal {
                     }
                     Ok(Async::NotReady) => (),
                     Err(_) => {
-                        warn!("Unable to preload {:?}[{}]", track_id, preload_index,);
-                        // Preemptively fetch next track?
-                        self.preload = PlayerPreload::Missing { preload_index };
+                        debug!("Unable to preload {:?}", track_id);
+                        self.preload = PlayerPreload::None;
+                        // Let Spirc know that the track was unavailable.
                         if let PlayerState::Playing {
                             play_request_id, ..
                         }
@@ -780,14 +779,9 @@ impl Future for PlayerInternal {
                             play_request_id, ..
                         } = self.state
                         {
-                            debug!(
-                                "Requesting track_id for preload_index: {}",
-                                preload_index + 1
-                            );
-                            self.send_event(PlayerEvent::TimeToPreloadNextTrack {
+                            self.send_event(PlayerEvent::Unavailable {
                                 track_id,
                                 play_request_id,
-                                preload_index: preload_index + 1,
                             });
                         }
                     }
@@ -877,7 +871,6 @@ impl Future for PlayerInternal {
                     self.send_event(PlayerEvent::TimeToPreloadNextTrack {
                         track_id,
                         play_request_id,
-                        preload_index: 1,
                     });
                 }
             }
@@ -1319,12 +1312,6 @@ impl PlayerInternal {
     fn handle_command_preload(&mut self, track_id: SpotifyId) {
         debug!("Preloading track");
         let mut preload_track = true;
-        let preload_index = match self.preload {
-            PlayerPreload::Loading { preload_index, .. } => preload_index,
-            // The last preload was missing, so increment it
-            PlayerPreload::Missing { preload_index, .. } => preload_index + 1,
-            _ => 1,
-        };
         // check whether the track is already loaded somewhere or being loaded.
         if let PlayerPreload::Loading {
             track_id: currently_loading,
@@ -1366,11 +1353,7 @@ impl PlayerInternal {
         // schedule the preload if the current track if desired.
         if preload_track {
             let loader = self.load_track(track_id, 0);
-            self.preload = PlayerPreload::Loading {
-                track_id,
-                loader,
-                preload_index,
-            }
+            self.preload = PlayerPreload::Loading { track_id, loader }
         }
     }
 
