@@ -454,8 +454,8 @@ impl SpircTask {
             Ok(dur) => dur,
             Err(err) => err.duration(),
         };
-        ((dur.as_secs() as i64 + self.session.time_delta()) * 1000
-            + (dur.subsec_nanos() / 1000_000) as i64)
+        (dur.as_secs() as i64 + self.session.time_delta()) * 1000
+            + (dur.subsec_nanos() / 1000_000) as i64
     }
 
     fn ensure_mixer_started(&mut self) {
@@ -622,7 +622,7 @@ impl SpircTask {
                         }
                     },
                     PlayerEvent::TimeToPreloadNextTrack { .. } => self.handle_preload_next_track(),
-                    PlayerEvent::Unavailable { track_id, .. } => self.handle_unavalable(track_id),
+                    PlayerEvent::Unavailable { track_id, .. } => self.handle_unavailable(track_id),
                     _ => (),
                 }
             }
@@ -910,16 +910,28 @@ impl SpircTask {
             | SpircPlayStatus::Stopped => (),
         }
     }
-
-    fn handle_unavalable(&mut self, track_id: SpotifyId) {
-        let unavalable_index = self.get_track_index_for_spotify_id(
+    // Mark unavailable tracks so we can skip them later
+    fn handle_unavailable(&mut self, track_id: SpotifyId) {
+        let unavailables = self.get_track_index_for_spotify_id(
             &track_id,
             self.state.get_playing_track_index() as usize,
         );
-        if let Some(index) = unavalable_index {
-            // TODO: Or mark it as NonPlayable?
-            debug!("Removing unavailable track_ref at {:?}", index);
-            self.state.mut_track().remove(index);
+
+        for &index in unavailables.iter() {
+            debug_assert_eq!(self.state.get_track()[index].get_gid(), track_id.to_raw());
+            let mut unplayable_track_ref = TrackRef::new();
+            unplayable_track_ref.set_gid(self.state.get_track()[index].get_gid().to_vec());
+            // Misuse context field to flag the track
+            unplayable_track_ref.set_context(String::from("NonPlayable"));
+            std::mem::swap(
+                &mut self.state.mut_track()[index],
+                &mut unplayable_track_ref,
+            );
+            debug!(
+                "Marked <{:?}> at {:?} as NonPlayable",
+                self.state.get_track()[index],
+                index,
+            );
         }
         self.handle_preload_next_track();
     }
@@ -1157,16 +1169,26 @@ impl SpircTask {
         })
     }
 
+    // Helper to find corresponding index(s) for track_id
     fn get_track_index_for_spotify_id(
         &self,
         track_id: &SpotifyId,
         start_index: usize,
-    ) -> Option<usize> {
-        let index = self.state.get_track()[start_index..]
+    ) -> Vec<usize> {
+        let index: Vec<usize> = self.state.get_track()[start_index..]
             .iter()
-            .position(|track_ref| self.get_spotify_id_for_track(track_ref) == Ok(*track_id));
-
+            .enumerate()
+            .filter(|&(_, track_ref)| track_ref.get_gid() == track_id.to_raw())
+            .map(|(idx, _)| start_index + idx)
+            .collect();
+        // Sanity check
+        debug_assert!(!index.is_empty());
         index
+    }
+
+    // Broken out here so we can refactor this later when we move to SpotifyObjectID or similar
+    fn track_ref_is_unavailable(&self, track_ref: &TrackRef) -> bool {
+        track_ref.get_context() == "NonPlayable"
     }
 
     fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
@@ -1186,7 +1208,10 @@ impl SpircTask {
 
         let mut track_ref = self.state.get_track()[new_playlist_index].clone();
         let mut track_id = self.get_spotify_id_for_track(&track_ref);
-        while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable {
+        while self.track_ref_is_unavailable(&track_ref)
+            || track_id.is_err()
+            || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
+        {
             warn!(
                 "Skipping track <{:?}> at position [{}] of {}",
                 track_ref.get_uri(),
