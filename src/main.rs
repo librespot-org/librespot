@@ -51,9 +51,9 @@ fn setup_logging(verbose: bool) {
         }
         Err(_) => {
             if verbose {
-                builder.parse_filters("mdns=info,librespot=trace");
+                builder.parse_filters("libmdns=info,librespot=trace");
             } else {
-                builder.parse_filters("mdns=info,librespot=info");
+                builder.parse_filters("libmdns=info,librespot=info");
             }
             builder.init();
         }
@@ -129,7 +129,7 @@ fn setup(args: &[String]) -> Setup {
             "Audio device to use. Use '?' to list options if using portaudio or alsa",
             "DEVICE",
         )
-        .optopt("", "mixer", "Mixer to use (alsa or softmixer)", "MIXER")
+        .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
             "m",
             "mixer-name",
@@ -543,6 +543,7 @@ impl Future for Main {
 
             if let Some(ref mut player_event_channel) = self.player_event_channel {
                 if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
+                    progress = true;
                     if let Some(ref program) = self.player_event_program {
                         if let Some(child) = run_program_on_events(event, program) {
                             let child = child
