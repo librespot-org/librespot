@@ -1191,10 +1191,11 @@ impl SpircTask {
                 self.play_request_id = Some(self.player.load(track, start_playing, position_ms));
 
                 self.update_state_position(position_ms);
-                self.state.set_status(PlayStatus::kPlayStatusLoading);
                 if start_playing {
+                    self.state.set_status(PlayStatus::kPlayStatusPlay);
                     self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
                 } else {
+                    self.state.set_status(PlayStatus::kPlayStatusPause);
                     self.play_status = SpircPlayStatus::LoadingPause { position_ms };
                 }
             }
