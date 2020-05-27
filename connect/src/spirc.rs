@@ -910,13 +910,17 @@ impl SpircTask {
             | SpircPlayStatus::Stopped => (),
         }
     }
+
     // Mark unavailable tracks so we can skip them later
     fn handle_unavailable(&mut self, track_id: SpotifyId) {
-        let unavailables = self.get_track_index_for_spotify_id(
-            &track_id,
-            self.state.get_playing_track_index() as usize,
-        );
-
+        let playing_index = self.state.get_playing_track_index() as usize;
+        let search_from = if playing_index == self.state.get_track().len() - 1 {
+            trace!("Cycling back to 0 instead of {:?}", playing_index);
+            0
+        } else {
+            playing_index
+        };
+        let unavailables = self.get_track_index_for_spotify_id(&track_id, search_from);
         for &index in unavailables.iter() {
             debug_assert_eq!(self.state.get_track()[index].get_gid(), track_id.to_raw());
             let mut unplayable_track_ref = TrackRef::new();
