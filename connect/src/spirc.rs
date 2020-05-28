@@ -913,20 +913,7 @@ impl SpircTask {
 
     // Mark unavailable tracks so we can skip them later
     fn handle_unavailable(&mut self, track_id: SpotifyId) {
-        let playing_index = self.state.get_playing_track_index() as usize;
-        let mut unavailables = self.get_track_index_for_spotify_id(&track_id, playing_index);
-        if unavailables.is_empty() {
-            trace!(
-                "Couldn't find unavailables searching from {:?} -- {:?}, cycling through entire playlist",
-                playing_index,
-                self.state.get_track().len()
-            );
-            // We could just do this everytime, but for most cases it's needless overhead.
-            // we are still repeating the serach for (playing_index..) in this case
-            unavailables = self.get_track_index_for_spotify_id(&track_id, 0);
-        }
-        // Sanity check
-        debug_assert!(!unavailables.is_empty());
+        let unavailables = self.get_track_index_for_spotify_id(&track_id, 0);
         for &index in unavailables.iter() {
             debug_assert_eq!(self.state.get_track()[index].get_gid(), track_id.to_raw());
             let mut unplayable_track_ref = TrackRef::new();
@@ -1191,6 +1178,8 @@ impl SpircTask {
             .filter(|&(_, track_ref)| track_ref.get_gid() == track_id.to_raw())
             .map(|(idx, _)| start_index + idx)
             .collect();
+        // Sanity check
+        debug_assert!(!index.is_empty());
         index
     }
 
@@ -1222,9 +1211,7 @@ impl SpircTask {
         {
             warn!(
                 "Skipping track <{:?}> at position [{}] of {}",
-                track_ref.get_uri(),
-                new_playlist_index,
-                tracks_len
+                track_ref, new_playlist_index, tracks_len
             );
 
             new_playlist_index += 1;
