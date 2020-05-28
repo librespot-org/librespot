@@ -917,7 +917,9 @@ impl SpircTask {
         );
         let context_uri = self.state.get_context_uri().to_owned();
         if (context_uri.starts_with("spotify:station:")
-            || context_uri.starts_with("spotify:dailymix:"))
+            || context_uri.starts_with("spotify:dailymix:")
+            // spotify:user:xxx:collection
+            || context_uri.starts_with(&format!("spotify:user:{}:collection",self.session.username())))
             && ((self.state.get_track().len() as u32) - new_index) < CONTEXT_FETCH_THRESHOLD
         {
             self.context_fut = self.resolve_station(&context_uri);
@@ -1189,10 +1191,11 @@ impl SpircTask {
                 self.play_request_id = Some(self.player.load(track, start_playing, position_ms));
 
                 self.update_state_position(position_ms);
-                self.state.set_status(PlayStatus::kPlayStatusLoading);
                 if start_playing {
+                    self.state.set_status(PlayStatus::kPlayStatusPlay);
                     self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
                 } else {
+                    self.state.set_status(PlayStatus::kPlayStatusPause);
                     self.play_status = SpircPlayStatus::LoadingPause { position_ms };
                 }
             }
