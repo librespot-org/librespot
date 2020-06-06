@@ -1,48 +1,39 @@
 mod codec;
 mod handshake;
 
-pub use self::codec::APCodec;
-pub use self::handshake::handshake;
-use tokio::net::TcpStream;
+pub use self::{codec::APCodec, handshake::handshake};
+use crate::{authentication::Credentials, version};
 
-use futures::{AsyncRead, AsyncWrite, Future, Sink, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, StreamExt};
 use protobuf::{self, Message};
-use std::io;
-use std::net::ToSocketAddrs;
+use std::{io, net::ToSocketAddrs};
+use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
-// use futures::compat::{AsyncWrite01CompatExt, AsyncRead01CompatExt};
-// use tokio_util::compat::{self, Tokio02AsyncReadCompatExt, Tokio02AsyncWriteCompatExt};
-// use tokio_codec::Framed;
-// use tokio_core::net::TcpStream;
-// use tokio_core::reactor::Handle;
 use url::Url;
 
-use crate::authentication::Credentials;
-use crate::version;
-
-use crate::proxytunnel;
+// use crate::proxytunnel;
 
 pub type Transport = Framed<TcpStream, APCodec>;
 
 pub async fn connect(addr: String, proxy: &Option<Url>) -> Result<Transport, io::Error> {
     let (addr, connect_url): (_, Option<String>) = match *proxy {
         Some(ref url) => {
-            unimplemented!()
-            // info!("Using proxy \"{}\"", url);
-            //
-            // let mut iter = url.to_socket_addrs()?;
-            // let socket_addr = iter.next().ok_or(io::Error::new(
-            //     io::ErrorKind::NotFound,
-            //     "Can't resolve proxy server address",
-            // ))?;
-            // (socket_addr, Some(addr))
+            info!("Using proxy \"{}\"", url);
+
+            let mut iter = url.to_socket_addrs()?;
+            let socket_addr = iter.next().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "Can't resolve proxy server address",
+                )
+            })?;
+            (socket_addr, Some(addr))
         }
         None => {
             let mut iter = addr.to_socket_addrs()?;
-            let socket_addr = iter.next().ok_or(io::Error::new(
-                io::ErrorKind::NotFound,
-                "Can't resolve server address",
-            ))?;
+            let socket_addr = iter.next().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::NotFound, "Can't resolve server address")
+            })?;
             (socket_addr, None)
         }
     };
@@ -54,8 +45,7 @@ pub async fn connect(addr: String, proxy: &Option<Url>) -> Result<Transport, io:
     // let connection = handshake(connection).await?;
     // Ok(connection)
     } else {
-        let connection = handshake(connection).await?;
-        Ok(connection)
+        handshake(connection).await
     }
 }
 
@@ -64,8 +54,10 @@ pub async fn authenticate(
     credentials: Credentials,
     device_id: String,
 ) -> Result<(Transport, Credentials), io::Error> {
-    use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
-    use crate::protocol::keyexchange::APLoginFailed;
+    use crate::protocol::{
+        authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os},
+        keyexchange::APLoginFailed,
+    };
 
     let mut packet = ClientResponseEncrypted::new();
     packet
@@ -94,13 +86,11 @@ pub async fn authenticate(
     let cmd: u8 = 0xab;
     let data = packet.write_to_bytes().unwrap();
 
-    transport.send((cmd, data)).await;
+    transport.send((cmd, data)).await?;
 
     let packet = transport.next().await;
-    // let (packet, transport) = transport
-    //     .into_future()
-    //     .map_err(|(err, _stream)| err)
-    //     .await?;
+
+    // TODO: Don't panic?
     match packet {
         Some(Ok((0xac, data))) => {
             let welcome_data: APWelcome = protobuf::parse_from_bytes(data.as_ref()).unwrap();
