@@ -1077,7 +1077,7 @@ dependencies = [
  "rand 0.7.3",
  "rpassword",
  "sha-1",
- "tokio 0.1.22",
+ "tokio 0.2.21",
  "tokio-io",
  "tokio-process",
  "tokio-signal",
@@ -1138,7 +1138,7 @@ dependencies = [
  "aes",
  "base64 0.10.1",
  "byteorder",
- "bytes 0.4.12",
+ "bytes 0.5.4",
  "error-chain",
  "futures 0.3.5",
  "hmac",
@@ -1159,6 +1159,7 @@ dependencies = [
  "serde_json",
  "sha-1",
  "shannon",
+ "thiserror",
  "tokio 0.2.21",
  "tokio-util",
  "url",
@@ -2211,6 +2212,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb6bfa289a4d7c5766392812c0a1f4c1ba45afa1ad47803c11e1f407d846d75f"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b13f926965ad00595dd129fa12823b04bbf866e9085ab0a5f2b05b850fbfc344"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "893582086c2f98cde18f906265a65b5030a074b1046c674ae898be6519a7f479"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
