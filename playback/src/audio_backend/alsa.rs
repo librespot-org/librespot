@@ -107,7 +107,14 @@ impl Sink for AlsaSink {
 
     fn stop(&mut self) -> io::Result<()> {
         {
-            let pcm = self.pcm.as_ref().unwrap();
+            let pcm = self.pcm.as_mut().unwrap();
+            // Write any leftover data in the period buffer
+            // before draining the actual buffer
+            let io = pcm.io_i16().unwrap();
+            match io.writei(&self.buffer[..self.buffered_data]) {
+                Ok(_) => (),
+                Err(err) => pcm.try_recover(err, false).unwrap(),
+            }
             pcm.drain().unwrap();
         }
         self.pcm = None;
