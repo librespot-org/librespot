@@ -111,6 +111,7 @@ impl Sink for AlsaSink {
             pcm.drain().unwrap();
         }
         self.pcm = None;
+        self.buffered_data = 0;
         Ok(())
     }
 
