@@ -41,7 +41,8 @@ fn open_device(dev_name: &str) -> Result<(PCM), Box<Error>> {
         hwp.set_format(Format::s16())?;
         hwp.set_rate(44100, ValueOr::Nearest)?;
         hwp.set_channels(2)?;
-        hwp.set_buffer_size_near(22050)?; // ~ 0.5s latency
+        hwp.set_period_size_near(5512, ValueOr::Nearest)?; // Period of roughly 125ms
+        hwp.set_buffer_size_near(22048)?; // ~ 0.5s latency
         pcm.hw_params(&hwp)?;
 
         let swp = pcm.sw_params_current()?;
