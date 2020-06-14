@@ -1,12 +1,21 @@
 use super::{Open, Sink};
 use alsa::device_name::HintIter;
-use alsa::pcm::{Access, Format, HwParams, PCM};
+use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, Error, ValueOr};
+use std::cmp::min;
 use std::ffi::CString;
 use std::io;
 use std::process::exit;
 
-pub struct AlsaSink(Option<PCM>, String);
+const PERIOD_SIZE: usize = 5512; // Period of roughly 125ms
+const BUFFERED_PERIODS: usize = 4; // ~ 0.5s latency
+
+pub struct AlsaSink {
+    pcm: Option<PCM>,
+    device: String,
+    buffer: [i16; PERIOD_SIZE as usize],
+    buffered_data: usize,
+}
 
 fn list_outputs() {
     for t in &["pcm", "ctl", "hwdep"] {
@@ -41,8 +50,8 @@ fn open_device(dev_name: &str) -> Result<(PCM), Box<Error>> {
         hwp.set_format(Format::s16())?;
         hwp.set_rate(44100, ValueOr::Nearest)?;
         hwp.set_channels(2)?;
-        hwp.set_period_size_near(5512, ValueOr::Nearest)?; // Period of roughly 125ms
-        hwp.set_buffer_size_near(22048)?; // ~ 0.5s latency
+        hwp.set_period_size_near(PERIOD_SIZE as Frames, ValueOr::Nearest)?;
+        hwp.set_buffer_size_near((PERIOD_SIZE * BUFFERED_PERIODS) as Frames)?;
         pcm.hw_params(&hwp)?;
 
         let swp = pcm.sw_params_current()?;
@@ -68,16 +77,21 @@ impl Open for AlsaSink {
         }
         .to_string();
 
-        AlsaSink(None, name)
+        AlsaSink {
+            pcm: None,
+            device: name,
+            buffer: [0; PERIOD_SIZE],
+            buffered_data: 0,
+        }
     }
 }
 
 impl Sink for AlsaSink {
     fn start(&mut self) -> io::Result<()> {
-        if self.0.is_none() {
-            let pcm = open_device(&self.1);
+        if self.pcm.is_none() {
+            let pcm = open_device(&self.device);
             match pcm {
-                Ok(p) => self.0 = Some(p),
+                Ok(p) => self.pcm = Some(p),
                 Err(e) => {
                     error!("Alsa error PCM open {}", e);
                     return Err(io::Error::new(
@@ -93,20 +107,34 @@ impl Sink for AlsaSink {
 
     fn stop(&mut self) -> io::Result<()> {
         {
-            let pcm = self.0.as_ref().unwrap();
+            let pcm = self.pcm.as_ref().unwrap();
             pcm.drain().unwrap();
         }
-        self.0 = None;
+        self.pcm = None;
         Ok(())
     }
 
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        let pcm = self.0.as_mut().unwrap();
-        let io = pcm.io_i16().unwrap();
-
-        match io.writei(&data) {
-            Ok(_) => (),
-            Err(err) => pcm.try_recover(err, false).unwrap(),
+        let mut processed_data = 0;
+        while processed_data < data.len() {
+            let data_to_buffer = min(
+                PERIOD_SIZE - self.buffered_data,
+                data.len() - processed_data,
+            );
+            let buffer_slice =
+                &mut self.buffer[self.buffered_data..self.buffered_data + data_to_buffer];
+            buffer_slice.copy_from_slice(&data[processed_data..processed_data + data_to_buffer]);
+            self.buffered_data += data_to_buffer;
+            processed_data += data_to_buffer;
+            if self.buffered_data == PERIOD_SIZE {
+                self.buffered_data = 0;
+                let pcm = self.pcm.as_mut().unwrap();
+                let io = pcm.io_i16().unwrap();
+                match io.writei(&self.buffer) {
+                    Ok(_) => (),
+                    Err(err) => pcm.try_recover(err, false).unwrap(),
+                }
+            }
         }
 
         Ok(())
