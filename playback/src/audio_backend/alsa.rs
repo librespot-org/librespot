@@ -35,7 +35,7 @@ fn list_outputs() {
 
 fn open_device(dev_name: &str) -> Result<(PCM, Frames), Box<Error>> {
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
-    let period_size = PREFERED_PERIOD_SIZE;
+    let mut period_size = PREFERED_PERIOD_SIZE;
     // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8
     // latency = period_size * periods / (rate * bytes_per_frame)
     // For 16 Bit stereo data, one frame has a length of four bytes.
@@ -50,7 +50,7 @@ fn open_device(dev_name: &str) -> Result<(PCM, Frames), Box<Error>> {
         hwp.set_format(Format::s16())?;
         hwp.set_rate(44100, ValueOr::Nearest)?;
         hwp.set_channels(2)?;
-        let period_size = hwp.set_period_size_near(period_size, ValueOr::Greater)?;
+        period_size = hwp.set_period_size_near(period_size, ValueOr::Greater)?;
         hwp.set_buffer_size_near(period_size * BUFFERED_PERIODS)?;
         pcm.hw_params(&hwp)?;
 
