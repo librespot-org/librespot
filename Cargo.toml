@@ -76,9 +76,9 @@ default = ["librespot-playback/rodio-backend"]
 [package.metadata.deb]
 maintainer = "librespot-org"
 copyright = "2018 Paul Liétar"
-license_file = ["LICENSE", "4"]
+license-file = ["LICENSE", "4"]
 depends = "$auto"
-extended_description = """\
+extended-description = """\
 librespot is an open source client library for Spotify. It enables applications \
 to use Spotify's service, without using the official but closed-source \
 libspotify. Additionally, it will provide extra features which are not \
