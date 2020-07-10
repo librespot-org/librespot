@@ -790,7 +790,11 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeNotify => {
-                if self.device.get_is_active() && frame.get_device_state().get_is_active() && self.device.get_became_active_at() <= frame.get_device_state().get_became_active_at() {
+                if self.device.get_is_active()
+                    && frame.get_device_state().get_is_active()
+                    && self.device.get_became_active_at()
+                        <= frame.get_device_state().get_became_active_at()
+                {
                     self.device.set_is_active(false);
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
