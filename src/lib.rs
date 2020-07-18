@@ -1,5 +1,4 @@
 #![crate_name = "librespot"]
-#![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
 
 pub extern crate librespot_audio as audio;
 pub extern crate librespot_connect as connect;

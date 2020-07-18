@@ -8,7 +8,7 @@ pub struct RodioSink {
     rodio_sink: rodio::Sink,
 }
 
-fn list_formats(ref device: &rodio::Device) {
+fn list_formats(device: &rodio::Device) {
     let default_fmt = match device.default_output_format() {
         Ok(fmt) => cpal::SupportedFormat::from(fmt),
         Err(e) => {
@@ -60,10 +60,8 @@ impl Open for RodioSink {
         debug!("Using rodio sink");
 
         let mut rodio_device = rodio::default_output_device().expect("no output device available");
-        if device.is_some() {
-            let device_name = device.unwrap();
-
-            if device_name == "?".to_string() {
+        if let Some(device_name) = device {
+            if device_name == "?" {
                 list_outputs();
                 exit(0)
             }

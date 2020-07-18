@@ -8,6 +8,7 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 pub struct JackSink {
     send: SyncSender<i16>,
+    #[allow(dead_code)]
     active_client: AsyncClient<(), JackData>,
 }
 
@@ -44,7 +45,7 @@ impl Open for JackSink {
     fn open(client_name: Option<String>) -> JackSink {
         info!("Using jack sink!");
 
-        let client_name = client_name.unwrap_or("librespot".to_string());
+        let client_name = client_name.unwrap_or_else(|| "librespot".to_string());
         let (client, _status) =
             Client::new(&client_name[..], client_options::NO_START_SERVER).unwrap();
         let ch_r = client
@@ -64,7 +65,7 @@ impl Open for JackSink {
 
         JackSink {
             send: tx,
-            active_client: active_client,
+            active_client,
         }
     }
 }

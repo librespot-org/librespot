@@ -1,9 +1,7 @@
-use std::error::Error;
 use std::io;
 use std::str::FromStr;
 
 use futures::{Async, Future, Poll};
-use httparse;
 use hyper::Uri;
 use tokio_io::io::{read, write_all, Read, Window, WriteAll};
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -58,7 +56,7 @@ impl<T: AsyncRead + AsyncWrite> Future for ProxyTunnel<T> {
                     let status = match response.parse(&buf) {
                         Ok(status) => status,
                         Err(err) => {
-                            return Err(io::Error::new(io::ErrorKind::Other, err.description()));
+                            return Err(io::Error::new(io::ErrorKind::Other, err.to_string()));
                         }
                     };
 
@@ -102,8 +100,8 @@ fn proxy_connect<T: AsyncWrite>(connection: T, connect_url: &str) -> WriteAll<T,
     let buffer = format!(
         "CONNECT {0}:{1} HTTP/1.1\r\n\
          \r\n",
-        uri.host().expect(&format!("No host in {}", uri)),
-        uri.port().expect(&format!("No port in {}", uri))
+        uri.host().unwrap_or_else(|| panic!("No host in {}", uri)),
+        uri.port().unwrap_or_else(|| panic!("No port in {}", uri))
     )
     .into_bytes();
 

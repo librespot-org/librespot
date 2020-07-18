@@ -13,8 +13,8 @@ impl MercurySender {
     // TODO: pub(super) when stable
     pub(crate) fn new(mercury: MercuryManager, uri: String) -> MercurySender {
         MercurySender {
-            mercury: mercury,
-            uri: uri,
+            mercury,
+            uri,
             pending: VecDeque::new(),
         }
     }

@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
-
 #[macro_use]
 extern crate error_chain;
 #[macro_use]

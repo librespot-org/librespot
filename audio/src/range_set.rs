@@ -10,20 +10,20 @@ pub struct Range {
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        return write!(f, "[{}, {}]", self.start, self.start + self.length - 1);
+        write!(f, "[{}, {}]", self.start, self.start + self.length - 1)
     }
 }
 
 impl Range {
     pub fn new(start: usize, length: usize) -> Range {
-        return Range {
-            start: start,
-            length: length,
-        };
+        Range {
+            start,
+            length,
+        }
     }
 
     pub fn end(&self) -> usize {
-        return self.start + self.length;
+        self.start + self.length
     }
 }
 
@@ -50,7 +50,7 @@ impl RangeSet {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.ranges.is_empty();
+        self.ranges.is_empty()
     }
 
     pub fn len(&self) -> usize {
@@ -58,15 +58,15 @@ impl RangeSet {
         for range in self.ranges.iter() {
             result += range.length;
         }
-        return result;
+        result
     }
 
     pub fn get_range(&self, index: usize) -> Range {
-        return self.ranges[index].clone();
+        self.ranges[index]
     }
 
     pub fn iter(&self) -> Iter<Range> {
-        return self.ranges.iter();
+        self.ranges.iter()
     }
 
     pub fn contains(&self, value: usize) -> bool {
@@ -77,7 +77,7 @@ impl RangeSet {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     pub fn contained_length_from_value(&self, value: usize) -> usize {
@@ -88,7 +88,7 @@ impl RangeSet {
                 return range.end() - value;
             }
         }
-        return 0;
+        0
     }
 
     #[allow(dead_code)]
@@ -98,12 +98,12 @@ impl RangeSet {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     pub fn add_range(&mut self, range: &Range) {
-        if range.length <= 0 {
-            // the interval is empty or invalid -> nothing to do.
+        if range.length == 0 {
+            // the interval is empty -> nothing to do.
             return;
         }
 
@@ -111,7 +111,7 @@ impl RangeSet {
             // the new range is clear of any ranges we already iterated over.
             if range.end() < self.ranges[index].start {
                 // the new range starts after anything we already passed and ends before the next range starts (they don't touch) -> insert it.
-                self.ranges.insert(index, range.clone());
+                self.ranges.insert(index, *range);
                 return;
             } else if range.start <= self.ranges[index].end()
                 && self.ranges[index].start <= range.end()
@@ -119,7 +119,7 @@ impl RangeSet {
                 // the new range overlaps (or touches) the first range. They are to be merged.
                 // In addition we might have to merge further ranges in as well.
 
-                let mut new_range = range.clone();
+                let mut new_range = *range;
 
                 while index < self.ranges.len() && self.ranges[index].start <= new_range.end() {
                     let new_end = max(new_range.end(), self.ranges[index].end());
@@ -134,7 +134,7 @@ impl RangeSet {
         }
 
         // the new range is after everything else -> just add it
-        self.ranges.push(range.clone());
+        self.ranges.push(*range);
     }
 
     #[allow(dead_code)]
@@ -148,11 +148,11 @@ impl RangeSet {
     pub fn union(&self, other: &RangeSet) -> RangeSet {
         let mut result = self.clone();
         result.add_range_set(other);
-        return result;
+        result
     }
 
     pub fn subtract_range(&mut self, range: &Range) {
-        if range.length <= 0 {
+        if range.length == 0 {
             return;
         }
 
@@ -208,7 +208,7 @@ impl RangeSet {
     pub fn minus(&self, other: &RangeSet) -> RangeSet {
         let mut result = self.clone();
         result.subtract_range_set(other);
-        return result;
+        result
     }
 
     pub fn intersection(&self, other: &RangeSet) -> RangeSet {
@@ -244,6 +244,6 @@ impl RangeSet {
             }
         }
 
-        return result;
+        result
     }
 }

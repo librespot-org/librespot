@@ -1,5 +1,4 @@
 use futures::Future;
-use serde_json;
 
 use crate::mercury::MercuryError;
 use crate::session::Session;

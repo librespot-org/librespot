@@ -80,7 +80,7 @@ impl Session {
                 transport,
                 config,
                 cache,
-                reusable_credentials.username.clone(),
+                reusable_credentials.username,
             );
 
             handle.spawn(task.map_err(|e| {
@@ -108,7 +108,7 @@ impl Session {
         debug!("new Session[{}]", session_id);
 
         let session = Session(Arc::new(SessionInternal {
-            config: config,
+            config,
             data: RwLock::new(SessionData {
                 country: String::new(),
                 canonical_username: username,
@@ -126,7 +126,7 @@ impl Session {
 
             handle: handle.remote().clone(),
 
-            session_id: session_id,
+            session_id,
         }));
 
         let sender_task = sender_rx
@@ -178,7 +178,7 @@ impl Session {
         );
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
+    #[allow(clippy::match_same_arms)]
     fn dispatch(&self, cmd: u8, data: Bytes) {
         match cmd {
             0x4 => {
@@ -300,7 +300,7 @@ where
                 Ok(Async::NotReady) => return Ok(Async::NotReady),
                 Err(e) => {
                     session.shutdown();
-                    return Err(From::from(e));
+                    return Err(e);
                 }
             };
 

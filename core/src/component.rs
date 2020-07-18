@@ -43,7 +43,7 @@ pub(crate) struct Lazy<T>(Mutex<bool>, UnsafeCell<Option<T>>);
 unsafe impl<T: Sync> Sync for Lazy<T> {}
 unsafe impl<T: Send> Send for Lazy<T> {}
 
-#[cfg_attr(feature = "cargo-clippy", allow(mutex_atomic))]
+#[allow(clippy::mutex_atomic)]
 impl<T> Lazy<T> {
     pub(crate) fn new() -> Lazy<T> {
         Lazy(Mutex::new(false), UnsafeCell::new(None))

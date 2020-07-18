@@ -62,8 +62,8 @@ impl AudioKeyManager {
 
     fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) {
         let mut data: Vec<u8> = Vec::new();
-        data.write(&file.0).unwrap();
-        data.write(&track.to_raw()).unwrap();
+        data.write_all(&file.0).unwrap();
+        data.write_all(&track.to_raw()).unwrap();
         data.write_u32::<BigEndian>(seq).unwrap();
         data.write_u16::<BigEndian>(0x0000).unwrap();
 

@@ -1,5 +1,4 @@
 use super::{Open, Sink};
-use libc;
 use libpulse_sys::*;
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -38,7 +37,7 @@ where
 
 impl PulseAudioSink {
     fn free_connection(&mut self) {
-        if self.s != null_mut() {
+        if !self.s.is_null() {
             unsafe {
                 pa_simple_free(self.s);
             }
@@ -64,13 +63,13 @@ impl Open for PulseAudioSink {
         };
 
         let name = CString::new("librespot").unwrap();
-        let description = CString::new("Spotify endpoint").unwrap();
+        let desc = CString::new("Spotify endpoint").unwrap();
 
         PulseAudioSink {
             s: null_mut(),
-            ss: ss,
-            name: name,
-            desc: description,
+            ss,
+            name,
+            desc,
             device: device.and_then(|s| CString::new(s).ok()),
         }
     }
@@ -78,7 +77,7 @@ impl Open for PulseAudioSink {
 
 impl Sink for PulseAudioSink {
     fn start(&mut self) -> io::Result<()> {
-        if self.s == null_mut() {
+        if self.s.is_null() {
             let device = match &self.device {
                 None => null(),
                 Some(device) => device.as_ptr(),
@@ -97,7 +96,7 @@ impl Sink for PulseAudioSink {
                         err,
                     )
                 },
-                |ptr| ptr == null_mut(),
+                |ptr| ptr.is_null(),
                 io::ErrorKind::ConnectionRefused,
             )?;
         }
@@ -110,7 +109,7 @@ impl Sink for PulseAudioSink {
     }
 
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        if self.s == null_mut() {
+        if self.s.is_null() {
             Err(io::Error::new(
                 io::ErrorKind::NotConnected,
                 "Not connected to pulseaudio",

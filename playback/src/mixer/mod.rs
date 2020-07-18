@@ -44,7 +44,9 @@ fn mk_sink<M: Mixer + 'static>(device: Option<MixerConfig>) -> Box<dyn Mixer> {
     Box::new(M::open(device))
 }
 
-pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<fn(Option<MixerConfig>) -> Box<dyn Mixer>> {
+pub type MixerCtor = fn(Option<MixerConfig>) -> Box<dyn Mixer>;
+
+pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<MixerCtor> {
     match name.as_ref().map(AsRef::as_ref) {
         None | Some("softvol") => Some(mk_sink::<SoftMixer>),
         #[cfg(feature = "alsa-backend")]

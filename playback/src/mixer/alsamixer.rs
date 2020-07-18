@@ -2,24 +2,21 @@ use super::AudioFilter;
 use super::{Mixer, MixerConfig};
 use std::error::Error;
 
-use alsa;
-
 #[derive(Clone)]
 pub struct AlsaMixer {
     config: MixerConfig,
 }
 
 impl AlsaMixer {
-    fn map_volume(&self, set_volume: Option<u16>) -> Result<(u16), Box<dyn Error>> {
+    fn map_volume(&self, set_volume: Option<u16>) -> Result<u16, Box<dyn Error>> {
         let mixer = alsa::mixer::Mixer::new(&self.config.card, false)?;
         let sid = alsa::mixer::SelemId::new(&*self.config.mixer, self.config.index);
 
-        let selem = mixer.find_selem(&sid).expect(
-            format!(
+        let selem = mixer.find_selem(&sid).unwrap_or_else(||
+            panic!(
                 "Couldn't find simple mixer control for {}",
                 self.config.mixer
             )
-            .as_str(),
         );
         let (min, max) = selem.get_playback_volume_range();
         let range = (max - min) as f64;
@@ -52,7 +49,7 @@ impl Mixer for AlsaMixer {
             "Setting up new mixer: card:{} mixer:{} index:{}",
             config.card, config.mixer, config.index
         );
-        AlsaMixer { config: config }
+        AlsaMixer { config }
     }
 
     fn start(&self) {}

@@ -29,7 +29,7 @@ pub fn connect(
         Some(ref url) => {
             info!("Using proxy \"{}\"", url);
             match url.to_socket_addrs().and_then(|mut iter| {
-                iter.next().ok_or(io::Error::new(
+                iter.next().ok_or_else(|| io::Error::new(
                     io::ErrorKind::NotFound,
                     "Can't resolve proxy server address",
                 ))
@@ -40,7 +40,7 @@ pub fn connect(
         }
         None => {
             match addr.to_socket_addrs().and_then(|mut iter| {
-                iter.next().ok_or(io::Error::new(
+                iter.next().ok_or_else(|| io::Error::new(
                     io::ErrorKind::NotFound,
                     "Can't resolve server address",
                 ))

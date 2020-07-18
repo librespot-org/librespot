@@ -14,7 +14,7 @@ impl Open for SubprocessSink {
     fn open(shell_command: Option<String>) -> SubprocessSink {
         if let Some(shell_command) = shell_command {
             SubprocessSink {
-                shell_command: shell_command,
+                shell_command,
                 child: None,
             }
         } else {

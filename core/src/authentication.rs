@@ -1,11 +1,8 @@
 use aes::Aes192;
-use base64;
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use protobuf::ProtobufEnum;
-use serde;
-use serde_json;
 use sha1::{Digest, Sha1};
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -31,7 +28,7 @@ pub struct Credentials {
 impl Credentials {
     pub fn with_password(username: String, password: String) -> Credentials {
         Credentials {
-            username: username,
+            username,
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
             auth_data: password.into_bytes(),
         }
@@ -107,9 +104,9 @@ impl Credentials {
         let auth_data = read_bytes(&mut cursor).unwrap();
 
         Credentials {
-            username: username,
-            auth_type: auth_type,
-            auth_data: auth_data,
+            username,
+            auth_type,
+            auth_data,
         }
     }
 

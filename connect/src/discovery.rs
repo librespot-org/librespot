@@ -1,7 +1,6 @@
 use aes_ctr::stream_cipher::generic_array::GenericArray;
 use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes128Ctr;
-use base64;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Stream};
 use hmac::{Hmac, Mac};
@@ -12,16 +11,11 @@ use sha1::{Digest, Sha1};
 #[cfg(feature = "with-dns-sd")]
 use dns_sd::DNSService;
 
-#[cfg(not(feature = "with-dns-sd"))]
-use libmdns;
-
 use num_bigint::BigUint;
-use rand;
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::Arc;
 use tokio_core::reactor::Handle;
-use url;
 
 use librespot_core::authentication::Credentials;
 use librespot_core::config::ConnectConfig;
@@ -52,11 +46,11 @@ impl Discovery {
         let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
 
         let discovery = Discovery(Arc::new(DiscoveryInner {
-            config: config,
-            device_id: device_id,
-            private_key: private_key,
-            public_key: public_key,
-            tx: tx,
+            config,
+            device_id,
+            private_key,
+            public_key,
+            tx,
         }));
 
         (discovery, rx)
@@ -127,7 +121,7 @@ impl Discovery {
 
         let mut h = HmacSha1::new_varkey(&checksum_key).expect("HMAC can take key of any size");
         h.input(encrypted);
-        if let Err(_) = h.verify(cksum) {
+        if h.verify(cksum).is_err() {
             warn!("Login error for user {:?}: MAC mismatch", username);
             let result = json!({
                 "status": 102,

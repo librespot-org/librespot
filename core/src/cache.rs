@@ -32,7 +32,7 @@ impl Cache {
 
         Cache {
             root: location,
-            use_audio_cache: use_audio_cache,
+            use_audio_cache,
         }
     }
 }

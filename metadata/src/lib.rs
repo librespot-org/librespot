@@ -97,7 +97,7 @@ impl AudioFiles for Track {
     ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
         Box::new(Self::get(session, id).and_then(move |item| {
             Ok(AudioItem {
-                id: id,
+                id,
                 uri: format!("spotify:track:{}", id.to_base62()),
                 files: item.files,
                 name: item.name,
@@ -116,7 +116,7 @@ impl AudioFiles for Episode {
     ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
         Box::new(Self::get(session, id).and_then(move |item| {
             Ok(AudioItem {
-                id: id,
+                id,
                 uri: format!("spotify:episode:{}", id.to_base62()),
                 files: item.files,
                 name: item.name,
@@ -239,8 +239,8 @@ impl Metadata for Track {
             name: msg.get_name().to_owned(),
             duration: msg.get_duration(),
             album: SpotifyId::from_raw(msg.get_album().get_gid()).unwrap(),
-            artists: artists,
-            files: files,
+            artists,
+            files,
             alternatives: msg
                 .get_alternative()
                 .iter()
@@ -289,9 +289,9 @@ impl Metadata for Album {
         Album {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
-            artists: artists,
-            tracks: tracks,
-            covers: covers,
+            artists,
+            tracks,
+            covers,
         }
     }
 }
@@ -309,7 +309,7 @@ impl Metadata for Playlist {
             .get_items()
             .iter()
             .map(|item| {
-                let uri_split = item.get_uri().split(":");
+                let uri_split = item.get_uri().split(':');
                 let uri_parts: Vec<&str> = uri_split.collect();
                 SpotifyId::from_base62(uri_parts[2]).unwrap()
             })
@@ -326,7 +326,7 @@ impl Metadata for Playlist {
         Playlist {
             revision: msg.get_revision().to_vec(),
             name: msg.get_attributes().get_name().to_owned(),
-            tracks: tracks,
+            tracks,
             user: msg.get_owner_username().to_string(),
         }
     }
@@ -359,7 +359,7 @@ impl Metadata for Artist {
         Artist {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
-            top_tracks: top_tracks,
+            top_tracks,
         }
     }
 }
@@ -405,8 +405,8 @@ impl Metadata for Episode {
             duration: msg.get_duration().to_owned(),
             language: msg.get_language().to_owned(),
             show: SpotifyId::from_raw(msg.get_show().get_gid()).unwrap(),
-            covers: covers,
-            files: files,
+            covers,
+            files,
             available: parse_restrictions(msg.get_restriction(), &country, "premium"),
             explicit: msg.get_explicit().to_owned(),
         }
@@ -444,8 +444,8 @@ impl Metadata for Show {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             publisher: msg.get_publisher().to_owned(),
-            episodes: episodes,
-            covers: covers,
+            episodes,
+            covers,
         }
     }
 }

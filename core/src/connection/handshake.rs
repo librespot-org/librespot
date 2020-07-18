@@ -21,6 +21,7 @@ pub struct Handshake<T> {
     state: HandshakeState<T>,
 }
 
+#[allow(clippy::large_enum_variant)]
 enum HandshakeState<T> {
     ClientHello(WriteAll<T, Vec<u8>>),
     APResponse(RecvPacket<T, APResponseMessage>),

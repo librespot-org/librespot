@@ -25,7 +25,7 @@ fn list_outputs() {
     }
 }
 
-fn open_device(dev_name: &str) -> Result<(PCM), Box<Error>> {
+fn open_device(dev_name: &str) -> Result<PCM, Box<Error>> {
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
     // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8
     // latency = period_size * periods / (rate * bytes_per_frame)

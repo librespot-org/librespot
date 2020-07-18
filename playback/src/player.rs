@@ -1,7 +1,5 @@
 use byteorder::{LittleEndian, ReadBytesExt};
-use futures;
 use futures::{future, Async, Future, Poll, Stream};
-use std;
 use std::borrow::Cow;
 use std::cmp::max;
 use std::io::{Read, Result, Seek, SeekFrom};
@@ -181,10 +179,10 @@ impl NormalisationData {
         let album_peak = file.read_f32::<LittleEndian>().unwrap();
 
         let r = NormalisationData {
-            track_gain_db: track_gain_db,
-            track_peak: track_peak,
-            album_gain_db: album_gain_db,
-            album_peak: album_peak,
+            track_gain_db,
+            track_peak,
+            album_gain_db,
+            album_peak,
         };
 
         Ok(r)
@@ -225,15 +223,15 @@ impl Player {
             debug!("new Player[{}]", session.session_id());
 
             let internal = PlayerInternal {
-                session: session,
-                config: config,
+                session,
+                config,
                 commands: cmd_rx,
 
                 state: PlayerState::Stopped,
                 preload: PlayerPreload::None,
                 sink: sink_builder(),
                 sink_running: false,
-                audio_filter: audio_filter,
+                audio_filter,
                 event_senders: [event_sender].to_vec(),
             };
 
@@ -539,19 +537,17 @@ impl PlayerTrackLoader {
     fn find_available_alternative<'a>(&self, audio: &'a AudioItem) -> Option<Cow<'a, AudioItem>> {
         if audio.available {
             Some(Cow::Borrowed(audio))
+        } else if let Some(alternatives) = &audio.alternatives {
+            let alternatives = alternatives
+                .iter()
+                .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id));
+            let alternatives = future::join_all(alternatives).wait().unwrap();
+            alternatives
+                .into_iter()
+                .find(|alt| alt.available)
+                .map(Cow::Owned)
         } else {
-            if let Some(alternatives) = &audio.alternatives {
-                let alternatives = alternatives
-                    .iter()
-                    .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id));
-                let alternatives = future::join_all(alternatives).wait().unwrap();
-                alternatives
-                    .into_iter()
-                    .find(|alt| alt.available)
-                    .map(Cow::Owned)
-            } else {
-                None
-            }
+            None
         }
     }
 
@@ -791,8 +787,7 @@ impl Future for PlayerInternal {
                     let packet = decoder.next_packet().expect("Vorbis error");
 
                     if let Some(ref packet) = packet {
-                        *stream_position_pcm =
-                            *stream_position_pcm + (packet.data().len() / 2) as u64;
+                        *stream_position_pcm += (packet.data().len() / 2) as u64;
                         let stream_position_millis = Self::position_pcm_to_ms(*stream_position_pcm);
 
                         let notify_about_position = match *reported_nominal_start_time {
@@ -802,11 +797,7 @@ impl Future for PlayerInternal {
                                 let lag = (Instant::now() - reported_nominal_start_time).as_millis()
                                     as i64
                                     - stream_position_millis as i64;
-                                if lag > 1000 {
-                                    true
-                                } else {
-                                    false
-                                }
+                                lag > 1000
                             }
                         };
                         if notify_about_position {
@@ -984,11 +975,12 @@ impl PlayerInternal {
     fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalisation_factor: f32) {
         match packet {
             Some(mut packet) => {
-                if packet.data().len() > 0 {
+                if !packet.data().is_empty() {
                     if let Some(ref editor) = self.audio_filter {
                         editor.modify_stream(&mut packet.data_mut())
                     };
 
+                    #[allow(clippy::float_cmp)]
                     if self.config.normalisation && normalisation_factor != 1.0 {
                         for x in packet.data_mut().iter_mut() {
                             *x = (*x as f32 * normalisation_factor) as i16;
@@ -1041,8 +1033,8 @@ impl PlayerInternal {
             });
 
             self.state = PlayerState::Playing {
-                track_id: track_id,
-                play_request_id: play_request_id,
+                track_id,
+                play_request_id,
                 decoder: loaded_track.decoder,
                 normalisation_factor: loaded_track.normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
@@ -1058,8 +1050,8 @@ impl PlayerInternal {
             self.ensure_sink_stopped();
 
             self.state = PlayerState::Paused {
-                track_id: track_id,
-                play_request_id: play_request_id,
+                track_id,
+                play_request_id,
                 decoder: loaded_track.decoder,
                 normalisation_factor: loaded_track.normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
@@ -1106,7 +1098,7 @@ impl PlayerInternal {
                 track_id: old_track_id,
                 ..
             } => self.send_event(PlayerEvent::Changed {
-                old_track_id: old_track_id,
+                old_track_id,
                 new_track_id: track_id,
             }),
             PlayerState::Stopped => self.send_event(PlayerEvent::Started {
@@ -1556,8 +1548,8 @@ impl<T: Read + Seek> Subfile<T> {
     pub fn new(mut stream: T, offset: u64) -> Subfile<T> {
         stream.seek(SeekFrom::Start(offset)).unwrap();
         Subfile {
-            stream: stream,
-            offset: offset,
+            stream,
+            offset,
         }
     }
 }

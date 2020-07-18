@@ -71,10 +71,6 @@ impl fmt::Display for VorbisError {
 }
 
 impl error::Error for VorbisError {
-    fn description(&self) -> &str {
-        error::Error::description(&self.0)
-    }
-
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         error::Error::source(&self.0)
     }

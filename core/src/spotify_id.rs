@@ -1,4 +1,3 @@
-use std;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -17,12 +16,12 @@ pub struct SpotifyId {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SpotifyIdError;
 
-const BASE62_DIGITS: &'static [u8] =
+const BASE62_DIGITS: &[u8] =
     b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const BASE16_DIGITS: &'static [u8] = b"0123456789abcdef";
+const BASE16_DIGITS: &[u8] = b"0123456789abcdef";
 
 impl SpotifyId {
-    fn as_track(n: u128) -> SpotifyId {
+    fn track(n: u128) -> SpotifyId {
         SpotifyId {
             id: n.to_owned(),
             audio_type: SpotifyAudioType::Track,
@@ -38,11 +37,11 @@ impl SpotifyId {
                 None => return Err(SpotifyIdError),
                 Some(x) => x as u128,
             };
-            n = n * 16;
-            n = n + d;
+            n *= 16;
+            n += d;
         }
 
-        Ok(SpotifyId::as_track(n))
+        Ok(SpotifyId::track(n))
     }
 
     pub fn from_base62(id: &str) -> Result<SpotifyId, SpotifyIdError> {
@@ -54,10 +53,10 @@ impl SpotifyId {
                 None => return Err(SpotifyIdError),
                 Some(x) => x as u128,
             };
-            n = n * 62;
-            n = n + d;
+            n *= 62;
+            n += d;
         }
-        Ok(SpotifyId::as_track(n))
+        Ok(SpotifyId::track(n))
     }
 
     pub fn from_raw(data: &[u8]) -> Result<SpotifyId, SpotifyIdError> {
@@ -68,11 +67,11 @@ impl SpotifyId {
         let mut arr: [u8; 16] = Default::default();
         arr.copy_from_slice(&data[0..16]);
 
-        Ok(SpotifyId::as_track(u128::from_be_bytes(arr)))
+        Ok(SpotifyId::track(u128::from_be_bytes(arr)))
     }
 
     pub fn from_uri(uri: &str) -> Result<SpotifyId, SpotifyIdError> {
-        let parts = uri.split(":").collect::<Vec<&str>>();
+        let parts = uri.split(':').collect::<Vec<&str>>();
         let gid = parts.last().unwrap();
         if uri.contains(":episode:") {
             let mut spotify_id = SpotifyId::from_base62(gid).unwrap();

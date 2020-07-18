@@ -88,7 +88,7 @@ impl ChannelManager {
     }
 
     pub fn get_download_rate_estimate(&self) -> usize {
-        return self.lock(|inner| inner.download_rate_estimate);
+        self.lock(|inner| inner.download_rate_estimate)
     }
 
     pub(crate) fn shutdown(&self) {
@@ -137,7 +137,7 @@ impl Stream for Channel {
             match self.state.clone() {
                 ChannelState::Closed => panic!("Polling already terminated channel"),
                 ChannelState::Header(mut data) => {
-                    if data.len() == 0 {
+                    if data.is_empty() {
                         data = try_ready!(self.recv_packet());
                     }
 
@@ -158,7 +158,7 @@ impl Stream for Channel {
 
                 ChannelState::Data => {
                     let data = try_ready!(self.recv_packet());
-                    if data.len() == 0 {
+                    if data.is_empty() {
                         self.receiver.close();
                         self.state = ChannelState::Closed;
                         return Ok(Async::Ready(None));
