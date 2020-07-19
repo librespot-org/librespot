@@ -431,20 +431,16 @@ impl AudioFile {
 
     pub fn get_stream_loader_controller(&self) -> StreamLoaderController {
         match self {
-            AudioFile::Streaming(ref stream) => {
-                StreamLoaderController {
-                    channel_tx: Some(stream.stream_loader_command_tx.clone()),
-                    stream_shared: Some(stream.shared.clone()),
-                    file_size: stream.shared.file_size,
-                }
-            }
-            AudioFile::Cached(ref file) => {
-                StreamLoaderController {
-                    channel_tx: None,
-                    stream_shared: None,
-                    file_size: file.metadata().unwrap().len() as usize,
-                }
-            }
+            AudioFile::Streaming(ref stream) => StreamLoaderController {
+                channel_tx: Some(stream.stream_loader_command_tx.clone()),
+                stream_shared: Some(stream.shared.clone()),
+                file_size: stream.shared.file_size,
+            },
+            AudioFile::Cached(ref file) => StreamLoaderController {
+                channel_tx: None,
+                stream_shared: None,
+                file_size: file.metadata().unwrap().len() as usize,
+            },
         }
     }
 }

@@ -192,11 +192,7 @@ fn setup(args: &[String]) -> Setup {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            eprintln!(
-                "error: {}\n{}",
-                f.to_string(),
-                usage(&args[0], &opts)
-            );
+            eprintln!("error: {}\n{}", f.to_string(), usage(&args[0], &opts));
             exit(1);
         }
     };
@@ -233,7 +229,9 @@ fn setup(args: &[String]) -> Setup {
         card: matches
             .opt_str("mixer-card")
             .unwrap_or_else(|| String::from("default")),
-        mixer: matches.opt_str("mixer-name").unwrap_or_else(|| String::from("PCM")),
+        mixer: matches
+            .opt_str("mixer-name")
+            .unwrap_or_else(|| String::from("PCM")),
         index: matches
             .opt_str("mixer-index")
             .map(|index| index.parse::<u32>().unwrap())

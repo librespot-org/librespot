@@ -452,8 +452,7 @@ impl SpircTask {
             Ok(dur) => dur,
             Err(err) => err.duration(),
         };
-        (dur.as_secs() as i64 + self.session.time_delta()) * 1000
-            + dur.subsec_millis() as i64
+        (dur.as_secs() as i64 + self.session.time_delta()) * 1000 + dur.subsec_millis() as i64
     }
 
     fn ensure_mixer_started(&mut self) {
@@ -1260,10 +1259,7 @@ impl<'a> CommandSender<'a> {
         frame.set_typ(cmd);
         frame.set_device_state(spirc.device.clone());
         frame.set_state_update_id(spirc.now_ms());
-        CommandSender {
-            spirc,
-            frame,
-        }
+        CommandSender { spirc, frame }
     }
 
     fn recipient(mut self, recipient: &'a str) -> CommandSender<'_> {

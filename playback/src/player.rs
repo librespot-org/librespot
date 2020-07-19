@@ -1547,10 +1547,7 @@ struct Subfile<T: Read + Seek> {
 impl<T: Read + Seek> Subfile<T> {
     pub fn new(mut stream: T, offset: u64) -> Subfile<T> {
         stream.seek(SeekFrom::Start(offset)).unwrap();
-        Subfile {
-            stream,
-            offset,
-        }
+        Subfile { stream, offset }
     }
 }
 

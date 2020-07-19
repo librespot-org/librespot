@@ -62,9 +62,9 @@ fn apresolve(
     let ap = data.and_then(move |data| {
         let mut aps = data.ap_list.iter().filter(|ap| {
             if let Some(p) = p {
-                Uri::from_str(ap).ok().map_or(false, |uri| {
-                    uri.port().map_or(false, |port| port == p)
-                })
+                Uri::from_str(ap)
+                    .ok()
+                    .map_or(false, |uri| uri.port().map_or(false, |port| port == p))
             } else if use_proxy {
                 // It is unlikely that the proxy will accept CONNECT on anything other than 443.
                 Uri::from_str(ap)

@@ -29,10 +29,12 @@ pub fn connect(
         Some(ref url) => {
             info!("Using proxy \"{}\"", url);
             match url.to_socket_addrs().and_then(|mut iter| {
-                iter.next().ok_or_else(|| io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Can't resolve proxy server address",
-                ))
+                iter.next().ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::NotFound,
+                        "Can't resolve proxy server address",
+                    )
+                })
             }) {
                 Ok(socket_addr) => (socket_addr, Some(addr)),
                 Err(error) => return Box::new(futures::future::err(error)),
@@ -40,10 +42,9 @@ pub fn connect(
         }
         None => {
             match addr.to_socket_addrs().and_then(|mut iter| {
-                iter.next().ok_or_else(|| io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Can't resolve server address",
-                ))
+                iter.next().ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::NotFound, "Can't resolve server address")
+                })
             }) {
                 Ok(socket_addr) => (socket_addr, None),
                 Err(error) => return Box::new(futures::future::err(error)),

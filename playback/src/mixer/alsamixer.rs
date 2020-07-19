@@ -12,12 +12,12 @@ impl AlsaMixer {
         let mixer = alsa::mixer::Mixer::new(&self.config.card, false)?;
         let sid = alsa::mixer::SelemId::new(&*self.config.mixer, self.config.index);
 
-        let selem = mixer.find_selem(&sid).unwrap_or_else(||
+        let selem = mixer.find_selem(&sid).unwrap_or_else(|| {
             panic!(
                 "Couldn't find simple mixer control for {}",
                 self.config.mixer
             )
-        );
+        });
         let (min, max) = selem.get_playback_volume_range();
         let range = (max - min) as f64;
 

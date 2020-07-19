@@ -15,10 +15,7 @@ impl fmt::Display for Range {
 
 impl Range {
     pub fn new(start: usize, length: usize) -> Range {
-        Range {
-            start,
-            length,
-        }
+        Range { start, length }
     }
 
     pub fn end(&self) -> usize {
@@ -64,7 +61,7 @@ impl RangeSet {
         self.ranges[index]
     }
 
-    pub fn iter(&self) -> impl Iterator<Item=&Range> {
+    pub fn iter(&self) -> impl Iterator<Item = &Range> {
         self.ranges.iter()
     }
 
