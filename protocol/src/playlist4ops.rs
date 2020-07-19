@@ -26,7 +26,7 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 /// of protobuf runtime.
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_8_1;
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct Add {
     // message fields
     fromIndex: ::std::option::Option<i32>,
@@ -52,7 +52,6 @@ impl Add {
 
     // optional int32 fromIndex = 1;
 
-
     pub fn get_fromIndex(&self) -> i32 {
         self.fromIndex.unwrap_or(0)
     }
@@ -70,7 +69,6 @@ impl Add {
     }
 
     // repeated .Item items = 2;
-
 
     pub fn get_items(&self) -> &[super::playlist4content::Item] {
         &self.items
@@ -96,9 +94,10 @@ impl Add {
 
     // optional .ListChecksum list_checksum = 3;
 
-
     pub fn get_list_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.list_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.list_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_list_checksum(&mut self) {
         self.list_checksum.clear();
@@ -124,11 +123,12 @@ impl Add {
 
     // Take field
     pub fn take_list_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.list_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.list_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 
     // optional bool addLast = 4;
-
 
     pub fn get_addLast(&self) -> bool {
         self.addLast.unwrap_or(false)
@@ -147,7 +147,6 @@ impl Add {
     }
 
     // optional bool addFirst = 5;
-
 
     pub fn get_addFirst(&self) -> bool {
         self.addFirst.unwrap_or(false)
@@ -172,49 +171,67 @@ impl ::protobuf::Message for Add {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.list_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.fromIndex = ::std::option::Option::Some(tmp);
-                },
+                }
                 2 => {
                     ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.items)?;
-                },
+                }
                 3 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.list_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.list_checksum,
+                    )?;
+                }
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.addLast = ::std::option::Option::Some(tmp);
-                },
+                }
                 5 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.addFirst = ::std::option::Option::Some(tmp);
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -230,7 +247,7 @@ impl ::protobuf::Message for Add {
         for value in &self.items {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
+        }
         if let Some(ref v) = self.list_checksum.as_ref() {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
@@ -246,7 +263,10 @@ impl ::protobuf::Message for Add {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.fromIndex {
             os.write_int32(1, v)?;
         }
@@ -254,7 +274,7 @@ impl ::protobuf::Message for Add {
             os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
+        }
         if let Some(ref v) = self.list_checksum.as_ref() {
             os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -301,42 +321,58 @@ impl ::protobuf::Message for Add {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "fromIndex",
-                    |m: &Add| { &m.fromIndex },
-                    |m: &mut Add| { &mut m.fromIndex },
+                    |m: &Add| &m.fromIndex,
+                    |m: &mut Add| &mut m.fromIndex,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4content::Item>>(
-                    "items",
-                    |m: &Add| { &m.items },
-                    |m: &mut Add| { &mut m.items },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "list_checksum",
-                    |m: &Add| { &m.list_checksum },
-                    |m: &mut Add| { &mut m.list_checksum },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_repeated_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4content::Item>,
+                    >("items", |m: &Add| &m.items, |m: &mut Add| &mut m.items),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "list_checksum",
+                        |m: &Add| &m.list_checksum,
+                        |m: &mut Add| &mut m.list_checksum,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "addLast",
-                    |m: &Add| { &m.addLast },
-                    |m: &mut Add| { &mut m.addLast },
+                    |m: &Add| &m.addLast,
+                    |m: &mut Add| &mut m.addLast,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "addFirst",
-                    |m: &Add| { &m.addFirst },
-                    |m: &mut Add| { &mut m.addFirst },
+                    |m: &Add| &m.addFirst,
+                    |m: &mut Add| &mut m.addFirst,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Add>(
                     "Add",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -347,9 +383,7 @@ impl ::protobuf::Message for Add {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const Add,
         };
-        unsafe {
-            instance.get(Add::new)
-        }
+        unsafe { instance.get(Add::new) }
     }
 }
 
@@ -376,7 +410,7 @@ impl ::protobuf::reflect::ProtobufValue for Add {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct Rem {
     // message fields
     fromIndex: ::std::option::Option<i32>,
@@ -404,7 +438,6 @@ impl Rem {
 
     // optional int32 fromIndex = 1;
 
-
     pub fn get_fromIndex(&self) -> i32 {
         self.fromIndex.unwrap_or(0)
     }
@@ -423,7 +456,6 @@ impl Rem {
 
     // optional int32 length = 2;
 
-
     pub fn get_length(&self) -> i32 {
         self.length.unwrap_or(0)
     }
@@ -441,7 +473,6 @@ impl Rem {
     }
 
     // repeated .Item items = 3;
-
 
     pub fn get_items(&self) -> &[super::playlist4content::Item] {
         &self.items
@@ -467,9 +498,10 @@ impl Rem {
 
     // optional .ListChecksum list_checksum = 4;
 
-
     pub fn get_list_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.list_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.list_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_list_checksum(&mut self) {
         self.list_checksum.clear();
@@ -495,14 +527,17 @@ impl Rem {
 
     // Take field
     pub fn take_list_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.list_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.list_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 
     // optional .ListChecksum items_checksum = 5;
 
-
     pub fn get_items_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.items_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.items_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_items_checksum(&mut self) {
         self.items_checksum.clear();
@@ -528,14 +563,17 @@ impl Rem {
 
     // Take field
     pub fn take_items_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.items_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.items_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 
     // optional .ListChecksum uris_checksum = 6;
 
-
     pub fn get_uris_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.uris_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.uris_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_uris_checksum(&mut self) {
         self.uris_checksum.clear();
@@ -561,11 +599,12 @@ impl Rem {
 
     // Take field
     pub fn take_uris_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.uris_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.uris_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 
     // optional bool itemsAsKey = 7;
-
 
     pub fn get_itemsAsKey(&self) -> bool {
         self.itemsAsKey.unwrap_or(false)
@@ -590,65 +629,91 @@ impl ::protobuf::Message for Rem {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.list_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.items_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.uris_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.fromIndex = ::std::option::Option::Some(tmp);
-                },
+                }
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.length = ::std::option::Option::Some(tmp);
-                },
+                }
                 3 => {
                     ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.items)?;
-                },
+                }
                 4 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.list_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.list_checksum,
+                    )?;
+                }
                 5 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.items_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.items_checksum,
+                    )?;
+                }
                 6 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.uris_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.uris_checksum,
+                    )?;
+                }
                 7 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.itemsAsKey = ::std::option::Option::Some(tmp);
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -667,7 +732,7 @@ impl ::protobuf::Message for Rem {
         for value in &self.items {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
+        }
         if let Some(ref v) = self.list_checksum.as_ref() {
             let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
@@ -688,7 +753,10 @@ impl ::protobuf::Message for Rem {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.fromIndex {
             os.write_int32(1, v)?;
         }
@@ -699,7 +767,7 @@ impl ::protobuf::Message for Rem {
             os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
+        }
         if let Some(ref v) = self.list_checksum.as_ref() {
             os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -753,52 +821,76 @@ impl ::protobuf::Message for Rem {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "fromIndex",
-                    |m: &Rem| { &m.fromIndex },
-                    |m: &mut Rem| { &mut m.fromIndex },
+                    |m: &Rem| &m.fromIndex,
+                    |m: &mut Rem| &mut m.fromIndex,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
-                    "length",
-                    |m: &Rem| { &m.length },
-                    |m: &mut Rem| { &mut m.length },
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
+                    "length", |m: &Rem| &m.length, |m: &mut Rem| &mut m.length
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4content::Item>>(
-                    "items",
-                    |m: &Rem| { &m.items },
-                    |m: &mut Rem| { &mut m.items },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "list_checksum",
-                    |m: &Rem| { &m.list_checksum },
-                    |m: &mut Rem| { &mut m.list_checksum },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "items_checksum",
-                    |m: &Rem| { &m.items_checksum },
-                    |m: &mut Rem| { &mut m.items_checksum },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "uris_checksum",
-                    |m: &Rem| { &m.uris_checksum },
-                    |m: &mut Rem| { &mut m.uris_checksum },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_repeated_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4content::Item>,
+                    >("items", |m: &Rem| &m.items, |m: &mut Rem| &mut m.items),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "list_checksum",
+                        |m: &Rem| &m.list_checksum,
+                        |m: &mut Rem| &mut m.list_checksum,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "items_checksum",
+                        |m: &Rem| &m.items_checksum,
+                        |m: &mut Rem| &mut m.items_checksum,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "uris_checksum",
+                        |m: &Rem| &m.uris_checksum,
+                        |m: &mut Rem| &mut m.uris_checksum,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "itemsAsKey",
-                    |m: &Rem| { &m.itemsAsKey },
-                    |m: &mut Rem| { &mut m.itemsAsKey },
+                    |m: &Rem| &m.itemsAsKey,
+                    |m: &mut Rem| &mut m.itemsAsKey,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Rem>(
                     "Rem",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -809,9 +901,7 @@ impl ::protobuf::Message for Rem {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const Rem,
         };
-        unsafe {
-            instance.get(Rem::new)
-        }
+        unsafe { instance.get(Rem::new) }
     }
 }
 
@@ -840,7 +930,7 @@ impl ::protobuf::reflect::ProtobufValue for Rem {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct Mov {
     // message fields
     fromIndex: ::std::option::Option<i32>,
@@ -867,7 +957,6 @@ impl Mov {
 
     // optional int32 fromIndex = 1;
 
-
     pub fn get_fromIndex(&self) -> i32 {
         self.fromIndex.unwrap_or(0)
     }
@@ -885,7 +974,6 @@ impl Mov {
     }
 
     // optional int32 length = 2;
-
 
     pub fn get_length(&self) -> i32 {
         self.length.unwrap_or(0)
@@ -905,7 +993,6 @@ impl Mov {
 
     // optional int32 toIndex = 3;
 
-
     pub fn get_toIndex(&self) -> i32 {
         self.toIndex.unwrap_or(0)
     }
@@ -924,9 +1011,10 @@ impl Mov {
 
     // optional .ListChecksum list_checksum = 4;
 
-
     pub fn get_list_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.list_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.list_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_list_checksum(&mut self) {
         self.list_checksum.clear();
@@ -952,14 +1040,17 @@ impl Mov {
 
     // Take field
     pub fn take_list_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.list_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.list_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 
     // optional .ListChecksum items_checksum = 5;
 
-
     pub fn get_items_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.items_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.items_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_items_checksum(&mut self) {
         self.items_checksum.clear();
@@ -985,14 +1076,17 @@ impl Mov {
 
     // Take field
     pub fn take_items_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.items_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.items_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 
     // optional .ListChecksum uris_checksum = 6;
 
-
     pub fn get_uris_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.uris_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.uris_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_uris_checksum(&mut self) {
         self.uris_checksum.clear();
@@ -1018,7 +1112,9 @@ impl Mov {
 
     // Take field
     pub fn take_uris_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.uris_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.uris_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 }
 
@@ -1028,57 +1124,83 @@ impl ::protobuf::Message for Mov {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.items_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.uris_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.fromIndex = ::std::option::Option::Some(tmp);
-                },
+                }
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.length = ::std::option::Option::Some(tmp);
-                },
+                }
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.toIndex = ::std::option::Option::Some(tmp);
-                },
+                }
                 4 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.list_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.list_checksum,
+                    )?;
+                }
                 5 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.items_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.items_checksum,
+                    )?;
+                }
                 6 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.uris_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.uris_checksum,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1114,7 +1236,10 @@ impl ::protobuf::Message for Mov {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.fromIndex {
             os.write_int32(1, v)?;
         }
@@ -1174,47 +1299,70 @@ impl ::protobuf::Message for Mov {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "fromIndex",
-                    |m: &Mov| { &m.fromIndex },
-                    |m: &mut Mov| { &mut m.fromIndex },
+                    |m: &Mov| &m.fromIndex,
+                    |m: &mut Mov| &mut m.fromIndex,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
-                    "length",
-                    |m: &Mov| { &m.length },
-                    |m: &mut Mov| { &mut m.length },
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
+                    "length", |m: &Mov| &m.length, |m: &mut Mov| &mut m.length
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "toIndex",
-                    |m: &Mov| { &m.toIndex },
-                    |m: &mut Mov| { &mut m.toIndex },
+                    |m: &Mov| &m.toIndex,
+                    |m: &mut Mov| &mut m.toIndex,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "list_checksum",
-                    |m: &Mov| { &m.list_checksum },
-                    |m: &mut Mov| { &mut m.list_checksum },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "items_checksum",
-                    |m: &Mov| { &m.items_checksum },
-                    |m: &mut Mov| { &mut m.items_checksum },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "uris_checksum",
-                    |m: &Mov| { &m.uris_checksum },
-                    |m: &mut Mov| { &mut m.uris_checksum },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "list_checksum",
+                        |m: &Mov| &m.list_checksum,
+                        |m: &mut Mov| &mut m.list_checksum,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "items_checksum",
+                        |m: &Mov| &m.items_checksum,
+                        |m: &mut Mov| &mut m.items_checksum,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "uris_checksum",
+                        |m: &Mov| &m.uris_checksum,
+                        |m: &mut Mov| &mut m.uris_checksum,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<Mov>(
                     "Mov",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -1225,9 +1373,7 @@ impl ::protobuf::Message for Mov {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const Mov,
         };
-        unsafe {
-            instance.get(Mov::new)
-        }
+        unsafe { instance.get(Mov::new) }
     }
 }
 
@@ -1255,7 +1401,7 @@ impl ::protobuf::reflect::ProtobufValue for Mov {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ItemAttributesPartialState {
     // message fields
     values: ::protobuf::SingularPtrField<super::playlist4meta::ItemAttributes>,
@@ -1278,9 +1424,10 @@ impl ItemAttributesPartialState {
 
     // optional .ItemAttributes values = 1;
 
-
     pub fn get_values(&self) -> &super::playlist4meta::ItemAttributes {
-        self.values.as_ref().unwrap_or_else(|| super::playlist4meta::ItemAttributes::default_instance())
+        self.values
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ItemAttributes::default_instance())
     }
     pub fn clear_values(&mut self) {
         self.values.clear();
@@ -1306,11 +1453,12 @@ impl ItemAttributesPartialState {
 
     // Take field
     pub fn take_values(&mut self) -> super::playlist4meta::ItemAttributes {
-        self.values.take().unwrap_or_else(|| super::playlist4meta::ItemAttributes::new())
+        self.values
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ItemAttributes::new())
     }
 
     // repeated .ItemAttributesPartialState.ItemAttributeKind no_value = 2;
-
 
     pub fn get_no_value(&self) -> &[ItemAttributesPartialState_ItemAttributeKind] {
         &self.no_value
@@ -1320,17 +1468,24 @@ impl ItemAttributesPartialState {
     }
 
     // Param is passed by value, moved
-    pub fn set_no_value(&mut self, v: ::std::vec::Vec<ItemAttributesPartialState_ItemAttributeKind>) {
+    pub fn set_no_value(
+        &mut self,
+        v: ::std::vec::Vec<ItemAttributesPartialState_ItemAttributeKind>,
+    ) {
         self.no_value = v;
     }
 
     // Mutable pointer to the field.
-    pub fn mut_no_value(&mut self) -> &mut ::std::vec::Vec<ItemAttributesPartialState_ItemAttributeKind> {
+    pub fn mut_no_value(
+        &mut self,
+    ) -> &mut ::std::vec::Vec<ItemAttributesPartialState_ItemAttributeKind> {
         &mut self.no_value
     }
 
     // Take field
-    pub fn take_no_value(&mut self) -> ::std::vec::Vec<ItemAttributesPartialState_ItemAttributeKind> {
+    pub fn take_no_value(
+        &mut self,
+    ) -> ::std::vec::Vec<ItemAttributesPartialState_ItemAttributeKind> {
         ::std::mem::replace(&mut self.no_value, ::std::vec::Vec::new())
     }
 }
@@ -1341,23 +1496,35 @@ impl ::protobuf::Message for ItemAttributesPartialState {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.values)?;
-                },
-                2 => {
-                    ::protobuf::rt::read_repeated_enum_with_unknown_fields_into(wire_type, is, &mut self.no_value, 2, &mut self.unknown_fields)?
-                },
+                }
+                2 => ::protobuf::rt::read_repeated_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.no_value,
+                    2,
+                    &mut self.unknown_fields,
+                )?,
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1373,13 +1540,16 @@ impl ::protobuf::Message for ItemAttributesPartialState {
         }
         for value in &self.no_value {
             my_size += ::protobuf::rt::enum_size(2, *value);
-        };
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.values.as_ref() {
             os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -1387,7 +1557,7 @@ impl ::protobuf::Message for ItemAttributesPartialState {
         }
         for v in &self.no_value {
             os.write_enum(2, v.value())?;
-        };
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -1423,40 +1593,52 @@ impl ::protobuf::Message for ItemAttributesPartialState {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ItemAttributes>>(
-                    "values",
-                    |m: &ItemAttributesPartialState| { &m.values },
-                    |m: &mut ItemAttributesPartialState| { &mut m.values },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_vec_accessor::<_, ::protobuf::types::ProtobufTypeEnum<ItemAttributesPartialState_ItemAttributeKind>>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<
+                            super::playlist4meta::ItemAttributes,
+                        >,
+                    >(
+                        "values",
+                        |m: &ItemAttributesPartialState| &m.values,
+                        |m: &mut ItemAttributesPartialState| &mut m.values,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_vec_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<
+                        ItemAttributesPartialState_ItemAttributeKind,
+                    >,
+                >(
                     "no_value",
-                    |m: &ItemAttributesPartialState| { &m.no_value },
-                    |m: &mut ItemAttributesPartialState| { &mut m.no_value },
+                    |m: &ItemAttributesPartialState| &m.no_value,
+                    |m: &mut ItemAttributesPartialState| &mut m.no_value,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ItemAttributesPartialState>(
                     "ItemAttributesPartialState",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static ItemAttributesPartialState {
-        static mut instance: ::protobuf::lazy::Lazy<ItemAttributesPartialState> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ItemAttributesPartialState,
-        };
-        unsafe {
-            instance.get(ItemAttributesPartialState::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<ItemAttributesPartialState> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ItemAttributesPartialState,
+            };
+        unsafe { instance.get(ItemAttributesPartialState::new) }
     }
 }
 
@@ -1480,7 +1662,7 @@ impl ::protobuf::reflect::ProtobufValue for ItemAttributesPartialState {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum ItemAttributesPartialState_ItemAttributeKind {
     ITEM_UNKNOWN = 0,
     ITEM_ADDED_BY = 1,
@@ -1502,18 +1684,40 @@ impl ::protobuf::ProtobufEnum for ItemAttributesPartialState_ItemAttributeKind {
 
     fn from_i32(value: i32) -> ::std::option::Option<ItemAttributesPartialState_ItemAttributeKind> {
         match value {
-            0 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_UNKNOWN),
-            1 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_ADDED_BY),
-            2 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_TIMESTAMP),
-            3 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_MESSAGE),
-            4 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_SEEN),
-            5 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_DOWNLOAD_COUNT),
-            6 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_DOWNLOAD_FORMAT),
-            7 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_SEVENDIGITAL_ID),
-            8 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_SEVENDIGITAL_LEFT),
-            9 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_SEEN_AT),
-            10 => ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_PUBLIC),
-            _ => ::std::option::Option::None
+            0 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_UNKNOWN,
+            ),
+            1 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_ADDED_BY,
+            ),
+            2 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_TIMESTAMP,
+            ),
+            3 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_MESSAGE,
+            ),
+            4 => {
+                ::std::option::Option::Some(ItemAttributesPartialState_ItemAttributeKind::ITEM_SEEN)
+            }
+            5 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_DOWNLOAD_COUNT,
+            ),
+            6 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_DOWNLOAD_FORMAT,
+            ),
+            7 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_SEVENDIGITAL_ID,
+            ),
+            8 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_SEVENDIGITAL_LEFT,
+            ),
+            9 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_SEEN_AT,
+            ),
+            10 => ::std::option::Option::Some(
+                ItemAttributesPartialState_ItemAttributeKind::ITEM_PUBLIC,
+            ),
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -1535,20 +1739,23 @@ impl ::protobuf::ProtobufEnum for ItemAttributesPartialState_ItemAttributeKind {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("ItemAttributesPartialState_ItemAttributeKind", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new(
+                    "ItemAttributesPartialState_ItemAttributeKind",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for ItemAttributesPartialState_ItemAttributeKind {
-}
+impl ::std::marker::Copy for ItemAttributesPartialState_ItemAttributeKind {}
 
 impl ::std::default::Default for ItemAttributesPartialState_ItemAttributeKind {
     fn default() -> Self {
@@ -1562,7 +1769,7 @@ impl ::protobuf::reflect::ProtobufValue for ItemAttributesPartialState_ItemAttri
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ListAttributesPartialState {
     // message fields
     values: ::protobuf::SingularPtrField<super::playlist4meta::ListAttributes>,
@@ -1585,9 +1792,10 @@ impl ListAttributesPartialState {
 
     // optional .ListAttributes values = 1;
 
-
     pub fn get_values(&self) -> &super::playlist4meta::ListAttributes {
-        self.values.as_ref().unwrap_or_else(|| super::playlist4meta::ListAttributes::default_instance())
+        self.values
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListAttributes::default_instance())
     }
     pub fn clear_values(&mut self) {
         self.values.clear();
@@ -1613,11 +1821,12 @@ impl ListAttributesPartialState {
 
     // Take field
     pub fn take_values(&mut self) -> super::playlist4meta::ListAttributes {
-        self.values.take().unwrap_or_else(|| super::playlist4meta::ListAttributes::new())
+        self.values
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListAttributes::new())
     }
 
     // repeated .ListAttributesPartialState.ListAttributeKind no_value = 2;
-
 
     pub fn get_no_value(&self) -> &[ListAttributesPartialState_ListAttributeKind] {
         &self.no_value
@@ -1627,17 +1836,24 @@ impl ListAttributesPartialState {
     }
 
     // Param is passed by value, moved
-    pub fn set_no_value(&mut self, v: ::std::vec::Vec<ListAttributesPartialState_ListAttributeKind>) {
+    pub fn set_no_value(
+        &mut self,
+        v: ::std::vec::Vec<ListAttributesPartialState_ListAttributeKind>,
+    ) {
         self.no_value = v;
     }
 
     // Mutable pointer to the field.
-    pub fn mut_no_value(&mut self) -> &mut ::std::vec::Vec<ListAttributesPartialState_ListAttributeKind> {
+    pub fn mut_no_value(
+        &mut self,
+    ) -> &mut ::std::vec::Vec<ListAttributesPartialState_ListAttributeKind> {
         &mut self.no_value
     }
 
     // Take field
-    pub fn take_no_value(&mut self) -> ::std::vec::Vec<ListAttributesPartialState_ListAttributeKind> {
+    pub fn take_no_value(
+        &mut self,
+    ) -> ::std::vec::Vec<ListAttributesPartialState_ListAttributeKind> {
         ::std::mem::replace(&mut self.no_value, ::std::vec::Vec::new())
     }
 }
@@ -1648,23 +1864,35 @@ impl ::protobuf::Message for ListAttributesPartialState {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.values)?;
-                },
-                2 => {
-                    ::protobuf::rt::read_repeated_enum_with_unknown_fields_into(wire_type, is, &mut self.no_value, 2, &mut self.unknown_fields)?
-                },
+                }
+                2 => ::protobuf::rt::read_repeated_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.no_value,
+                    2,
+                    &mut self.unknown_fields,
+                )?,
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1680,13 +1908,16 @@ impl ::protobuf::Message for ListAttributesPartialState {
         }
         for value in &self.no_value {
             my_size += ::protobuf::rt::enum_size(2, *value);
-        };
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.values.as_ref() {
             os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -1694,7 +1925,7 @@ impl ::protobuf::Message for ListAttributesPartialState {
         }
         for v in &self.no_value {
             os.write_enum(2, v.value())?;
-        };
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -1730,40 +1961,52 @@ impl ::protobuf::Message for ListAttributesPartialState {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListAttributes>>(
-                    "values",
-                    |m: &ListAttributesPartialState| { &m.values },
-                    |m: &mut ListAttributesPartialState| { &mut m.values },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_vec_accessor::<_, ::protobuf::types::ProtobufTypeEnum<ListAttributesPartialState_ListAttributeKind>>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<
+                            super::playlist4meta::ListAttributes,
+                        >,
+                    >(
+                        "values",
+                        |m: &ListAttributesPartialState| &m.values,
+                        |m: &mut ListAttributesPartialState| &mut m.values,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_vec_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<
+                        ListAttributesPartialState_ListAttributeKind,
+                    >,
+                >(
                     "no_value",
-                    |m: &ListAttributesPartialState| { &m.no_value },
-                    |m: &mut ListAttributesPartialState| { &mut m.no_value },
+                    |m: &ListAttributesPartialState| &m.no_value,
+                    |m: &mut ListAttributesPartialState| &mut m.no_value,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ListAttributesPartialState>(
                     "ListAttributesPartialState",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static ListAttributesPartialState {
-        static mut instance: ::protobuf::lazy::Lazy<ListAttributesPartialState> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ListAttributesPartialState,
-        };
-        unsafe {
-            instance.get(ListAttributesPartialState::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<ListAttributesPartialState> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ListAttributesPartialState,
+            };
+        unsafe { instance.get(ListAttributesPartialState::new) }
     }
 }
 
@@ -1787,7 +2030,7 @@ impl ::protobuf::reflect::ProtobufValue for ListAttributesPartialState {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum ListAttributesPartialState_ListAttributeKind {
     LIST_UNKNOWN = 0,
     LIST_NAME = 1,
@@ -1806,15 +2049,31 @@ impl ::protobuf::ProtobufEnum for ListAttributesPartialState_ListAttributeKind {
 
     fn from_i32(value: i32) -> ::std::option::Option<ListAttributesPartialState_ListAttributeKind> {
         match value {
-            0 => ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_UNKNOWN),
-            1 => ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_NAME),
-            2 => ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_DESCRIPTION),
-            3 => ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_PICTURE),
-            4 => ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_COLLABORATIVE),
-            5 => ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_PL3_VERSION),
-            6 => ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_DELETED_BY_OWNER),
-            7 => ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_RESTRICTED_COLLABORATIVE),
-            _ => ::std::option::Option::None
+            0 => ::std::option::Option::Some(
+                ListAttributesPartialState_ListAttributeKind::LIST_UNKNOWN,
+            ),
+            1 => {
+                ::std::option::Option::Some(ListAttributesPartialState_ListAttributeKind::LIST_NAME)
+            }
+            2 => ::std::option::Option::Some(
+                ListAttributesPartialState_ListAttributeKind::LIST_DESCRIPTION,
+            ),
+            3 => ::std::option::Option::Some(
+                ListAttributesPartialState_ListAttributeKind::LIST_PICTURE,
+            ),
+            4 => ::std::option::Option::Some(
+                ListAttributesPartialState_ListAttributeKind::LIST_COLLABORATIVE,
+            ),
+            5 => ::std::option::Option::Some(
+                ListAttributesPartialState_ListAttributeKind::LIST_PL3_VERSION,
+            ),
+            6 => ::std::option::Option::Some(
+                ListAttributesPartialState_ListAttributeKind::LIST_DELETED_BY_OWNER,
+            ),
+            7 => ::std::option::Option::Some(
+                ListAttributesPartialState_ListAttributeKind::LIST_RESTRICTED_COLLABORATIVE,
+            ),
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -1833,20 +2092,23 @@ impl ::protobuf::ProtobufEnum for ListAttributesPartialState_ListAttributeKind {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("ListAttributesPartialState_ListAttributeKind", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new(
+                    "ListAttributesPartialState_ListAttributeKind",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for ListAttributesPartialState_ListAttributeKind {
-}
+impl ::std::marker::Copy for ListAttributesPartialState_ListAttributeKind {}
 
 impl ::std::default::Default for ListAttributesPartialState_ListAttributeKind {
     fn default() -> Self {
@@ -1860,7 +2122,7 @@ impl ::protobuf::reflect::ProtobufValue for ListAttributesPartialState_ListAttri
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct UpdateItemAttributes {
     // message fields
     index: ::std::option::Option<i32>,
@@ -1886,7 +2148,6 @@ impl UpdateItemAttributes {
 
     // optional int32 index = 1;
 
-
     pub fn get_index(&self) -> i32 {
         self.index.unwrap_or(0)
     }
@@ -1905,9 +2166,10 @@ impl UpdateItemAttributes {
 
     // optional .ItemAttributesPartialState new_attributes = 2;
 
-
     pub fn get_new_attributes(&self) -> &ItemAttributesPartialState {
-        self.new_attributes.as_ref().unwrap_or_else(|| ItemAttributesPartialState::default_instance())
+        self.new_attributes
+            .as_ref()
+            .unwrap_or_else(|| ItemAttributesPartialState::default_instance())
     }
     pub fn clear_new_attributes(&mut self) {
         self.new_attributes.clear();
@@ -1933,14 +2195,17 @@ impl UpdateItemAttributes {
 
     // Take field
     pub fn take_new_attributes(&mut self) -> ItemAttributesPartialState {
-        self.new_attributes.take().unwrap_or_else(|| ItemAttributesPartialState::new())
+        self.new_attributes
+            .take()
+            .unwrap_or_else(|| ItemAttributesPartialState::new())
     }
 
     // optional .ItemAttributesPartialState old_attributes = 3;
 
-
     pub fn get_old_attributes(&self) -> &ItemAttributesPartialState {
-        self.old_attributes.as_ref().unwrap_or_else(|| ItemAttributesPartialState::default_instance())
+        self.old_attributes
+            .as_ref()
+            .unwrap_or_else(|| ItemAttributesPartialState::default_instance())
     }
     pub fn clear_old_attributes(&mut self) {
         self.old_attributes.clear();
@@ -1966,14 +2231,17 @@ impl UpdateItemAttributes {
 
     // Take field
     pub fn take_old_attributes(&mut self) -> ItemAttributesPartialState {
-        self.old_attributes.take().unwrap_or_else(|| ItemAttributesPartialState::new())
+        self.old_attributes
+            .take()
+            .unwrap_or_else(|| ItemAttributesPartialState::new())
     }
 
     // optional .ListChecksum list_checksum = 4;
 
-
     pub fn get_list_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.list_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.list_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_list_checksum(&mut self) {
         self.list_checksum.clear();
@@ -1999,14 +2267,17 @@ impl UpdateItemAttributes {
 
     // Take field
     pub fn take_list_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.list_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.list_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 
     // optional .ListChecksum old_attributes_checksum = 5;
 
-
     pub fn get_old_attributes_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.old_attributes_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.old_attributes_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_old_attributes_checksum(&mut self) {
         self.old_attributes_checksum.clear();
@@ -2032,7 +2303,9 @@ impl UpdateItemAttributes {
 
     // Take field
     pub fn take_old_attributes_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.old_attributes_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.old_attributes_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 }
 
@@ -2042,51 +2315,77 @@ impl ::protobuf::Message for UpdateItemAttributes {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.old_attributes {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.list_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.old_attributes_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.index = ::std::option::Option::Some(tmp);
-                },
+                }
                 2 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.new_attributes)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.new_attributes,
+                    )?;
+                }
                 3 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.old_attributes)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.old_attributes,
+                    )?;
+                }
                 4 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.list_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.list_checksum,
+                    )?;
+                }
                 5 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.old_attributes_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.old_attributes_checksum,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -2120,7 +2419,10 @@ impl ::protobuf::Message for UpdateItemAttributes {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.index {
             os.write_int32(1, v)?;
         }
@@ -2179,55 +2481,78 @@ impl ::protobuf::Message for UpdateItemAttributes {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "index",
-                    |m: &UpdateItemAttributes| { &m.index },
-                    |m: &mut UpdateItemAttributes| { &mut m.index },
+                    |m: &UpdateItemAttributes| &m.index,
+                    |m: &mut UpdateItemAttributes| &mut m.index,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ItemAttributesPartialState>>(
-                    "new_attributes",
-                    |m: &UpdateItemAttributes| { &m.new_attributes },
-                    |m: &mut UpdateItemAttributes| { &mut m.new_attributes },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ItemAttributesPartialState>>(
-                    "old_attributes",
-                    |m: &UpdateItemAttributes| { &m.old_attributes },
-                    |m: &mut UpdateItemAttributes| { &mut m.old_attributes },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "list_checksum",
-                    |m: &UpdateItemAttributes| { &m.list_checksum },
-                    |m: &mut UpdateItemAttributes| { &mut m.list_checksum },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "old_attributes_checksum",
-                    |m: &UpdateItemAttributes| { &m.old_attributes_checksum },
-                    |m: &mut UpdateItemAttributes| { &mut m.old_attributes_checksum },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<ItemAttributesPartialState>,
+                    >(
+                        "new_attributes",
+                        |m: &UpdateItemAttributes| &m.new_attributes,
+                        |m: &mut UpdateItemAttributes| &mut m.new_attributes,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<ItemAttributesPartialState>,
+                    >(
+                        "old_attributes",
+                        |m: &UpdateItemAttributes| &m.old_attributes,
+                        |m: &mut UpdateItemAttributes| &mut m.old_attributes,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "list_checksum",
+                        |m: &UpdateItemAttributes| &m.list_checksum,
+                        |m: &mut UpdateItemAttributes| &mut m.list_checksum,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "old_attributes_checksum",
+                        |m: &UpdateItemAttributes| &m.old_attributes_checksum,
+                        |m: &mut UpdateItemAttributes| &mut m.old_attributes_checksum,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<UpdateItemAttributes>(
                     "UpdateItemAttributes",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static UpdateItemAttributes {
-        static mut instance: ::protobuf::lazy::Lazy<UpdateItemAttributes> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const UpdateItemAttributes,
-        };
-        unsafe {
-            instance.get(UpdateItemAttributes::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<UpdateItemAttributes> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const UpdateItemAttributes,
+            };
+        unsafe { instance.get(UpdateItemAttributes::new) }
     }
 }
 
@@ -2254,7 +2579,7 @@ impl ::protobuf::reflect::ProtobufValue for UpdateItemAttributes {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct UpdateListAttributes {
     // message fields
     new_attributes: ::protobuf::SingularPtrField<ListAttributesPartialState>,
@@ -2279,9 +2604,10 @@ impl UpdateListAttributes {
 
     // optional .ListAttributesPartialState new_attributes = 1;
 
-
     pub fn get_new_attributes(&self) -> &ListAttributesPartialState {
-        self.new_attributes.as_ref().unwrap_or_else(|| ListAttributesPartialState::default_instance())
+        self.new_attributes
+            .as_ref()
+            .unwrap_or_else(|| ListAttributesPartialState::default_instance())
     }
     pub fn clear_new_attributes(&mut self) {
         self.new_attributes.clear();
@@ -2307,14 +2633,17 @@ impl UpdateListAttributes {
 
     // Take field
     pub fn take_new_attributes(&mut self) -> ListAttributesPartialState {
-        self.new_attributes.take().unwrap_or_else(|| ListAttributesPartialState::new())
+        self.new_attributes
+            .take()
+            .unwrap_or_else(|| ListAttributesPartialState::new())
     }
 
     // optional .ListAttributesPartialState old_attributes = 2;
 
-
     pub fn get_old_attributes(&self) -> &ListAttributesPartialState {
-        self.old_attributes.as_ref().unwrap_or_else(|| ListAttributesPartialState::default_instance())
+        self.old_attributes
+            .as_ref()
+            .unwrap_or_else(|| ListAttributesPartialState::default_instance())
     }
     pub fn clear_old_attributes(&mut self) {
         self.old_attributes.clear();
@@ -2340,14 +2669,17 @@ impl UpdateListAttributes {
 
     // Take field
     pub fn take_old_attributes(&mut self) -> ListAttributesPartialState {
-        self.old_attributes.take().unwrap_or_else(|| ListAttributesPartialState::new())
+        self.old_attributes
+            .take()
+            .unwrap_or_else(|| ListAttributesPartialState::new())
     }
 
     // optional .ListChecksum list_checksum = 3;
 
-
     pub fn get_list_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.list_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.list_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_list_checksum(&mut self) {
         self.list_checksum.clear();
@@ -2373,14 +2705,17 @@ impl UpdateListAttributes {
 
     // Take field
     pub fn take_list_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.list_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.list_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 
     // optional .ListChecksum old_attributes_checksum = 4;
 
-
     pub fn get_old_attributes_checksum(&self) -> &super::playlist4meta::ListChecksum {
-        self.old_attributes_checksum.as_ref().unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
+        self.old_attributes_checksum
+            .as_ref()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::default_instance())
     }
     pub fn clear_old_attributes_checksum(&mut self) {
         self.old_attributes_checksum.clear();
@@ -2406,7 +2741,9 @@ impl UpdateListAttributes {
 
     // Take field
     pub fn take_old_attributes_checksum(&mut self) -> super::playlist4meta::ListChecksum {
-        self.old_attributes_checksum.take().unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
+        self.old_attributes_checksum
+            .take()
+            .unwrap_or_else(|| super::playlist4meta::ListChecksum::new())
     }
 }
 
@@ -2416,44 +2753,68 @@ impl ::protobuf::Message for UpdateListAttributes {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.old_attributes {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.list_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.old_attributes_checksum {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.new_attributes)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.new_attributes,
+                    )?;
+                }
                 2 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.old_attributes)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.old_attributes,
+                    )?;
+                }
                 3 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.list_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.list_checksum,
+                    )?;
+                }
                 4 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.old_attributes_checksum)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.old_attributes_checksum,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -2484,7 +2845,10 @@ impl ::protobuf::Message for UpdateListAttributes {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.new_attributes.as_ref() {
             os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -2540,50 +2904,70 @@ impl ::protobuf::Message for UpdateListAttributes {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ListAttributesPartialState>>(
-                    "new_attributes",
-                    |m: &UpdateListAttributes| { &m.new_attributes },
-                    |m: &mut UpdateListAttributes| { &mut m.new_attributes },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ListAttributesPartialState>>(
-                    "old_attributes",
-                    |m: &UpdateListAttributes| { &m.old_attributes },
-                    |m: &mut UpdateListAttributes| { &mut m.old_attributes },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "list_checksum",
-                    |m: &UpdateListAttributes| { &m.list_checksum },
-                    |m: &mut UpdateListAttributes| { &mut m.list_checksum },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>>(
-                    "old_attributes_checksum",
-                    |m: &UpdateListAttributes| { &m.old_attributes_checksum },
-                    |m: &mut UpdateListAttributes| { &mut m.old_attributes_checksum },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<ListAttributesPartialState>,
+                    >(
+                        "new_attributes",
+                        |m: &UpdateListAttributes| &m.new_attributes,
+                        |m: &mut UpdateListAttributes| &mut m.new_attributes,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<ListAttributesPartialState>,
+                    >(
+                        "old_attributes",
+                        |m: &UpdateListAttributes| &m.old_attributes,
+                        |m: &mut UpdateListAttributes| &mut m.old_attributes,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "list_checksum",
+                        |m: &UpdateListAttributes| &m.list_checksum,
+                        |m: &mut UpdateListAttributes| &mut m.list_checksum,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<super::playlist4meta::ListChecksum>,
+                    >(
+                        "old_attributes_checksum",
+                        |m: &UpdateListAttributes| &m.old_attributes_checksum,
+                        |m: &mut UpdateListAttributes| &mut m.old_attributes_checksum,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<UpdateListAttributes>(
                     "UpdateListAttributes",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static UpdateListAttributes {
-        static mut instance: ::protobuf::lazy::Lazy<UpdateListAttributes> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const UpdateListAttributes,
-        };
-        unsafe {
-            instance.get(UpdateListAttributes::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<UpdateListAttributes> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const UpdateListAttributes,
+            };
+        unsafe { instance.get(UpdateListAttributes::new) }
     }
 }
 
@@ -2609,7 +2993,7 @@ impl ::protobuf::reflect::ProtobufValue for UpdateListAttributes {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct Op {
     // message fields
     kind: ::std::option::Option<Op_Kind>,
@@ -2636,7 +3020,6 @@ impl Op {
 
     // optional .Op.Kind kind = 1;
 
-
     pub fn get_kind(&self) -> Op_Kind {
         self.kind.unwrap_or(Op_Kind::KIND_UNKNOWN)
     }
@@ -2654,7 +3037,6 @@ impl Op {
     }
 
     // optional .Add add = 2;
-
 
     pub fn get_add(&self) -> &Add {
         self.add.as_ref().unwrap_or_else(|| Add::default_instance())
@@ -2688,7 +3070,6 @@ impl Op {
 
     // optional .Rem rem = 3;
 
-
     pub fn get_rem(&self) -> &Rem {
         self.rem.as_ref().unwrap_or_else(|| Rem::default_instance())
     }
@@ -2720,7 +3101,6 @@ impl Op {
     }
 
     // optional .Mov mov = 4;
-
 
     pub fn get_mov(&self) -> &Mov {
         self.mov.as_ref().unwrap_or_else(|| Mov::default_instance())
@@ -2754,9 +3134,10 @@ impl Op {
 
     // optional .UpdateItemAttributes update_item_attributes = 5;
 
-
     pub fn get_update_item_attributes(&self) -> &UpdateItemAttributes {
-        self.update_item_attributes.as_ref().unwrap_or_else(|| UpdateItemAttributes::default_instance())
+        self.update_item_attributes
+            .as_ref()
+            .unwrap_or_else(|| UpdateItemAttributes::default_instance())
     }
     pub fn clear_update_item_attributes(&mut self) {
         self.update_item_attributes.clear();
@@ -2782,14 +3163,17 @@ impl Op {
 
     // Take field
     pub fn take_update_item_attributes(&mut self) -> UpdateItemAttributes {
-        self.update_item_attributes.take().unwrap_or_else(|| UpdateItemAttributes::new())
+        self.update_item_attributes
+            .take()
+            .unwrap_or_else(|| UpdateItemAttributes::new())
     }
 
     // optional .UpdateListAttributes update_list_attributes = 6;
 
-
     pub fn get_update_list_attributes(&self) -> &UpdateListAttributes {
-        self.update_list_attributes.as_ref().unwrap_or_else(|| UpdateListAttributes::default_instance())
+        self.update_list_attributes
+            .as_ref()
+            .unwrap_or_else(|| UpdateListAttributes::default_instance())
     }
     pub fn clear_update_list_attributes(&mut self) {
         self.update_list_attributes.clear();
@@ -2815,7 +3199,9 @@ impl Op {
 
     // Take field
     pub fn take_update_list_attributes(&mut self) -> UpdateListAttributes {
-        self.update_list_attributes.take().unwrap_or_else(|| UpdateListAttributes::new())
+        self.update_list_attributes
+            .take()
+            .unwrap_or_else(|| UpdateListAttributes::new())
     }
 }
 
@@ -2825,55 +3211,75 @@ impl ::protobuf::Message for Op {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.rem {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.mov {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.update_item_attributes {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.update_list_attributes {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.kind, 1, &mut self.unknown_fields)?
-                },
+                1 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.kind,
+                    1,
+                    &mut self.unknown_fields,
+                )?,
                 2 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.add)?;
-                },
+                }
                 3 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.rem)?;
-                },
+                }
                 4 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.mov)?;
-                },
+                }
                 5 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.update_item_attributes)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.update_item_attributes,
+                    )?;
+                }
                 6 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.update_list_attributes)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.update_list_attributes,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -2911,7 +3317,10 @@ impl ::protobuf::Message for Op {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.kind {
             os.write_enum(1, v.value())?;
         }
@@ -2975,47 +3384,62 @@ impl ::protobuf::Message for Op {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Op_Kind>>(
-                    "kind",
-                    |m: &Op| { &m.kind },
-                    |m: &mut Op| { &mut m.kind },
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<Op_Kind>,
+                >(
+                    "kind", |m: &Op| &m.kind, |m: &mut Op| &mut m.kind
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Add>>(
-                    "add",
-                    |m: &Op| { &m.add },
-                    |m: &mut Op| { &mut m.add },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Rem>>(
-                    "rem",
-                    |m: &Op| { &m.rem },
-                    |m: &mut Op| { &mut m.rem },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Mov>>(
-                    "mov",
-                    |m: &Op| { &m.mov },
-                    |m: &mut Op| { &mut m.mov },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<UpdateItemAttributes>>(
-                    "update_item_attributes",
-                    |m: &Op| { &m.update_item_attributes },
-                    |m: &mut Op| { &mut m.update_item_attributes },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<UpdateListAttributes>>(
-                    "update_list_attributes",
-                    |m: &Op| { &m.update_list_attributes },
-                    |m: &mut Op| { &mut m.update_list_attributes },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<Add>,
+                    >("add", |m: &Op| &m.add, |m: &mut Op| &mut m.add),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<Rem>,
+                    >("rem", |m: &Op| &m.rem, |m: &mut Op| &mut m.rem),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<Mov>,
+                    >("mov", |m: &Op| &m.mov, |m: &mut Op| &mut m.mov),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<UpdateItemAttributes>,
+                    >(
+                        "update_item_attributes",
+                        |m: &Op| &m.update_item_attributes,
+                        |m: &mut Op| &mut m.update_item_attributes,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<UpdateListAttributes>,
+                    >(
+                        "update_list_attributes",
+                        |m: &Op| &m.update_list_attributes,
+                        |m: &mut Op| &mut m.update_list_attributes,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<Op>(
                     "Op",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -3026,9 +3450,7 @@ impl ::protobuf::Message for Op {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const Op,
         };
-        unsafe {
-            instance.get(Op::new)
-        }
+        unsafe { instance.get(Op::new) }
     }
 }
 
@@ -3056,7 +3478,7 @@ impl ::protobuf::reflect::ProtobufValue for Op {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum Op_Kind {
     KIND_UNKNOWN = 0,
     ADD = 2,
@@ -3079,7 +3501,7 @@ impl ::protobuf::ProtobufEnum for Op_Kind {
             4 => ::std::option::Option::Some(Op_Kind::MOV),
             5 => ::std::option::Option::Some(Op_Kind::UPDATE_ITEM_ATTRIBUTES),
             6 => ::std::option::Option::Some(Op_Kind::UPDATE_LIST_ATTRIBUTES),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -3096,10 +3518,11 @@ impl ::protobuf::ProtobufEnum for Op_Kind {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 ::protobuf::reflect::EnumDescriptor::new("Op_Kind", file_descriptor_proto())
@@ -3108,8 +3531,7 @@ impl ::protobuf::ProtobufEnum for Op_Kind {
     }
 }
 
-impl ::std::marker::Copy for Op_Kind {
-}
+impl ::std::marker::Copy for Op_Kind {}
 
 impl ::std::default::Default for Op_Kind {
     fn default() -> Self {
@@ -3123,7 +3545,7 @@ impl ::protobuf::reflect::ProtobufValue for Op_Kind {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct OpList {
     // message fields
     ops: ::protobuf::RepeatedField<Op>,
@@ -3144,7 +3566,6 @@ impl OpList {
     }
 
     // repeated .Op ops = 1;
-
 
     pub fn get_ops(&self) -> &[Op] {
         &self.ops
@@ -3175,20 +3596,28 @@ impl ::protobuf::Message for OpList {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.ops)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -3201,18 +3630,21 @@ impl ::protobuf::Message for OpList {
         for value in &self.ops {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         for v in &self.ops {
             os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -3248,22 +3680,24 @@ impl ::protobuf::Message for OpList {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<Op>>(
-                    "ops",
-                    |m: &OpList| { &m.ops },
-                    |m: &mut OpList| { &mut m.ops },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_repeated_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<Op>,
+                    >("ops", |m: &OpList| &m.ops, |m: &mut OpList| &mut m.ops),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<OpList>(
                     "OpList",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -3274,9 +3708,7 @@ impl ::protobuf::Message for OpList {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const OpList,
         };
-        unsafe {
-            instance.get(OpList::new)
-        }
+        unsafe { instance.get(OpList::new) }
     }
 }
 
@@ -3353,7 +3785,9 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x18\x01\x20\x03(\x0b2\x03.OpB\0:\0B\0b\x06proto2\
 ";
 
-static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
+static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<
+    ::protobuf::descriptor::FileDescriptorProto,
+> = ::protobuf::lazy::Lazy {
     lock: ::protobuf::lazy::ONCE_INIT,
     ptr: 0 as *const ::protobuf::descriptor::FileDescriptorProto,
 };
@@ -3363,9 +3797,5 @@ fn parse_descriptor_proto() -> ::protobuf::descriptor::FileDescriptorProto {
 }
 
 pub fn file_descriptor_proto() -> &'static ::protobuf::descriptor::FileDescriptorProto {
-    unsafe {
-        file_descriptor_proto_lazy.get(|| {
-            parse_descriptor_proto()
-        })
-    }
+    unsafe { file_descriptor_proto_lazy.get(|| parse_descriptor_proto()) }
 }

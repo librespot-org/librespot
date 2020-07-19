@@ -26,7 +26,7 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 /// of protobuf runtime.
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_8_1;
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ClientResponseEncrypted {
     // message fields
     login_credentials: ::protobuf::SingularPtrField<LoginCredentials>,
@@ -56,9 +56,10 @@ impl ClientResponseEncrypted {
 
     // required .LoginCredentials login_credentials = 10;
 
-
     pub fn get_login_credentials(&self) -> &LoginCredentials {
-        self.login_credentials.as_ref().unwrap_or_else(|| LoginCredentials::default_instance())
+        self.login_credentials
+            .as_ref()
+            .unwrap_or_else(|| LoginCredentials::default_instance())
     }
     pub fn clear_login_credentials(&mut self) {
         self.login_credentials.clear();
@@ -84,14 +85,16 @@ impl ClientResponseEncrypted {
 
     // Take field
     pub fn take_login_credentials(&mut self) -> LoginCredentials {
-        self.login_credentials.take().unwrap_or_else(|| LoginCredentials::new())
+        self.login_credentials
+            .take()
+            .unwrap_or_else(|| LoginCredentials::new())
     }
 
     // optional .AccountCreation account_creation = 20;
 
-
     pub fn get_account_creation(&self) -> AccountCreation {
-        self.account_creation.unwrap_or(AccountCreation::ACCOUNT_CREATION_ALWAYS_PROMPT)
+        self.account_creation
+            .unwrap_or(AccountCreation::ACCOUNT_CREATION_ALWAYS_PROMPT)
     }
     pub fn clear_account_creation(&mut self) {
         self.account_creation = ::std::option::Option::None;
@@ -108,9 +111,10 @@ impl ClientResponseEncrypted {
 
     // optional .FingerprintResponseUnion fingerprint_response = 30;
 
-
     pub fn get_fingerprint_response(&self) -> &FingerprintResponseUnion {
-        self.fingerprint_response.as_ref().unwrap_or_else(|| FingerprintResponseUnion::default_instance())
+        self.fingerprint_response
+            .as_ref()
+            .unwrap_or_else(|| FingerprintResponseUnion::default_instance())
     }
     pub fn clear_fingerprint_response(&mut self) {
         self.fingerprint_response.clear();
@@ -136,14 +140,17 @@ impl ClientResponseEncrypted {
 
     // Take field
     pub fn take_fingerprint_response(&mut self) -> FingerprintResponseUnion {
-        self.fingerprint_response.take().unwrap_or_else(|| FingerprintResponseUnion::new())
+        self.fingerprint_response
+            .take()
+            .unwrap_or_else(|| FingerprintResponseUnion::new())
     }
 
     // optional .PeerTicketUnion peer_ticket = 40;
 
-
     pub fn get_peer_ticket(&self) -> &PeerTicketUnion {
-        self.peer_ticket.as_ref().unwrap_or_else(|| PeerTicketUnion::default_instance())
+        self.peer_ticket
+            .as_ref()
+            .unwrap_or_else(|| PeerTicketUnion::default_instance())
     }
     pub fn clear_peer_ticket(&mut self) {
         self.peer_ticket.clear();
@@ -169,14 +176,17 @@ impl ClientResponseEncrypted {
 
     // Take field
     pub fn take_peer_ticket(&mut self) -> PeerTicketUnion {
-        self.peer_ticket.take().unwrap_or_else(|| PeerTicketUnion::new())
+        self.peer_ticket
+            .take()
+            .unwrap_or_else(|| PeerTicketUnion::new())
     }
 
     // required .SystemInfo system_info = 50;
 
-
     pub fn get_system_info(&self) -> &SystemInfo {
-        self.system_info.as_ref().unwrap_or_else(|| SystemInfo::default_instance())
+        self.system_info
+            .as_ref()
+            .unwrap_or_else(|| SystemInfo::default_instance())
     }
     pub fn clear_system_info(&mut self) {
         self.system_info.clear();
@@ -206,7 +216,6 @@ impl ClientResponseEncrypted {
     }
 
     // optional string platform_model = 60;
-
 
     pub fn get_platform_model(&self) -> &str {
         match self.platform_model.as_ref() {
@@ -238,11 +247,12 @@ impl ClientResponseEncrypted {
 
     // Take field
     pub fn take_platform_model(&mut self) -> ::std::string::String {
-        self.platform_model.take().unwrap_or_else(|| ::std::string::String::new())
+        self.platform_model
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional string version_string = 70;
-
 
     pub fn get_version_string(&self) -> &str {
         match self.version_string.as_ref() {
@@ -274,14 +284,17 @@ impl ClientResponseEncrypted {
 
     // Take field
     pub fn take_version_string(&mut self) -> ::std::string::String {
-        self.version_string.take().unwrap_or_else(|| ::std::string::String::new())
+        self.version_string
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional .LibspotifyAppKey appkey = 80;
 
-
     pub fn get_appkey(&self) -> &LibspotifyAppKey {
-        self.appkey.as_ref().unwrap_or_else(|| LibspotifyAppKey::default_instance())
+        self.appkey
+            .as_ref()
+            .unwrap_or_else(|| LibspotifyAppKey::default_instance())
     }
     pub fn clear_appkey(&mut self) {
         self.appkey.clear();
@@ -307,14 +320,17 @@ impl ClientResponseEncrypted {
 
     // Take field
     pub fn take_appkey(&mut self) -> LibspotifyAppKey {
-        self.appkey.take().unwrap_or_else(|| LibspotifyAppKey::new())
+        self.appkey
+            .take()
+            .unwrap_or_else(|| LibspotifyAppKey::new())
     }
 
     // optional .ClientInfo client_info = 90;
 
-
     pub fn get_client_info(&self) -> &ClientInfo {
-        self.client_info.as_ref().unwrap_or_else(|| ClientInfo::default_instance())
+        self.client_info
+            .as_ref()
+            .unwrap_or_else(|| ClientInfo::default_instance())
     }
     pub fn clear_client_info(&mut self) {
         self.client_info.clear();
@@ -356,69 +372,109 @@ impl ::protobuf::Message for ClientResponseEncrypted {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.fingerprint_response {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.peer_ticket {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.system_info {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.appkey {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.client_info {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.login_credentials)?;
-                },
-                20 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.account_creation, 20, &mut self.unknown_fields)?
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.login_credentials,
+                    )?;
+                }
+                20 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.account_creation,
+                    20,
+                    &mut self.unknown_fields,
+                )?,
                 30 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fingerprint_response)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.fingerprint_response,
+                    )?;
+                }
                 40 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.peer_ticket)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.peer_ticket,
+                    )?;
+                }
                 50 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.system_info)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.system_info,
+                    )?;
+                }
                 60 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.platform_model)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.platform_model,
+                    )?;
+                }
                 70 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.version_string)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.version_string,
+                    )?;
+                }
                 80 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.appkey)?;
-                },
+                }
                 90 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.client_info)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.client_info,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -466,7 +522,10 @@ impl ::protobuf::Message for ClientResponseEncrypted {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.login_credentials.as_ref() {
             os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -541,75 +600,118 @@ impl ::protobuf::Message for ClientResponseEncrypted {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<LoginCredentials>>(
-                    "login_credentials",
-                    |m: &ClientResponseEncrypted| { &m.login_credentials },
-                    |m: &mut ClientResponseEncrypted| { &mut m.login_credentials },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AccountCreation>>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<LoginCredentials>,
+                    >(
+                        "login_credentials",
+                        |m: &ClientResponseEncrypted| &m.login_credentials,
+                        |m: &mut ClientResponseEncrypted| &mut m.login_credentials,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<AccountCreation>,
+                >(
                     "account_creation",
-                    |m: &ClientResponseEncrypted| { &m.account_creation },
-                    |m: &mut ClientResponseEncrypted| { &mut m.account_creation },
+                    |m: &ClientResponseEncrypted| &m.account_creation,
+                    |m: &mut ClientResponseEncrypted| &mut m.account_creation,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FingerprintResponseUnion>>(
-                    "fingerprint_response",
-                    |m: &ClientResponseEncrypted| { &m.fingerprint_response },
-                    |m: &mut ClientResponseEncrypted| { &mut m.fingerprint_response },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<PeerTicketUnion>>(
-                    "peer_ticket",
-                    |m: &ClientResponseEncrypted| { &m.peer_ticket },
-                    |m: &mut ClientResponseEncrypted| { &mut m.peer_ticket },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<SystemInfo>>(
-                    "system_info",
-                    |m: &ClientResponseEncrypted| { &m.system_info },
-                    |m: &mut ClientResponseEncrypted| { &mut m.system_info },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "platform_model",
-                    |m: &ClientResponseEncrypted| { &m.platform_model },
-                    |m: &mut ClientResponseEncrypted| { &mut m.platform_model },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "version_string",
-                    |m: &ClientResponseEncrypted| { &m.version_string },
-                    |m: &mut ClientResponseEncrypted| { &mut m.version_string },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<LibspotifyAppKey>>(
-                    "appkey",
-                    |m: &ClientResponseEncrypted| { &m.appkey },
-                    |m: &mut ClientResponseEncrypted| { &mut m.appkey },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ClientInfo>>(
-                    "client_info",
-                    |m: &ClientResponseEncrypted| { &m.client_info },
-                    |m: &mut ClientResponseEncrypted| { &mut m.client_info },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<FingerprintResponseUnion>,
+                    >(
+                        "fingerprint_response",
+                        |m: &ClientResponseEncrypted| &m.fingerprint_response,
+                        |m: &mut ClientResponseEncrypted| &mut m.fingerprint_response,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<PeerTicketUnion>,
+                    >(
+                        "peer_ticket",
+                        |m: &ClientResponseEncrypted| &m.peer_ticket,
+                        |m: &mut ClientResponseEncrypted| &mut m.peer_ticket,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<SystemInfo>,
+                    >(
+                        "system_info",
+                        |m: &ClientResponseEncrypted| &m.system_info,
+                        |m: &mut ClientResponseEncrypted| &mut m.system_info,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "platform_model",
+                        |m: &ClientResponseEncrypted| &m.platform_model,
+                        |m: &mut ClientResponseEncrypted| &mut m.platform_model,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "version_string",
+                        |m: &ClientResponseEncrypted| &m.version_string,
+                        |m: &mut ClientResponseEncrypted| &mut m.version_string,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<LibspotifyAppKey>,
+                    >(
+                        "appkey",
+                        |m: &ClientResponseEncrypted| &m.appkey,
+                        |m: &mut ClientResponseEncrypted| &mut m.appkey,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<ClientInfo>,
+                    >(
+                        "client_info",
+                        |m: &ClientResponseEncrypted| &m.client_info,
+                        |m: &mut ClientResponseEncrypted| &mut m.client_info,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<ClientResponseEncrypted>(
                     "ClientResponseEncrypted",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static ClientResponseEncrypted {
-        static mut instance: ::protobuf::lazy::Lazy<ClientResponseEncrypted> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ClientResponseEncrypted,
-        };
-        unsafe {
-            instance.get(ClientResponseEncrypted::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<ClientResponseEncrypted> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ClientResponseEncrypted,
+            };
+        unsafe { instance.get(ClientResponseEncrypted::new) }
     }
 }
 
@@ -640,7 +742,7 @@ impl ::protobuf::reflect::ProtobufValue for ClientResponseEncrypted {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct LoginCredentials {
     // message fields
     username: ::protobuf::SingularField<::std::string::String>,
@@ -663,7 +765,6 @@ impl LoginCredentials {
     }
 
     // optional string username = 10;
-
 
     pub fn get_username(&self) -> &str {
         match self.username.as_ref() {
@@ -695,14 +796,16 @@ impl LoginCredentials {
 
     // Take field
     pub fn take_username(&mut self) -> ::std::string::String {
-        self.username.take().unwrap_or_else(|| ::std::string::String::new())
+        self.username
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // required .AuthenticationType typ = 20;
 
-
     pub fn get_typ(&self) -> AuthenticationType {
-        self.typ.unwrap_or(AuthenticationType::AUTHENTICATION_USER_PASS)
+        self.typ
+            .unwrap_or(AuthenticationType::AUTHENTICATION_USER_PASS)
     }
     pub fn clear_typ(&mut self) {
         self.typ = ::std::option::Option::None;
@@ -718,7 +821,6 @@ impl LoginCredentials {
     }
 
     // optional bytes auth_data = 30;
-
 
     pub fn get_auth_data(&self) -> &[u8] {
         match self.auth_data.as_ref() {
@@ -750,7 +852,9 @@ impl LoginCredentials {
 
     // Take field
     pub fn take_auth_data(&mut self) -> ::std::vec::Vec<u8> {
-        self.auth_data.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.auth_data
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 }
 
@@ -762,22 +866,34 @@ impl ::protobuf::Message for LoginCredentials {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.username)?;
-                },
-                20 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.typ, 20, &mut self.unknown_fields)?
-                },
+                }
+                20 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.typ,
+                    20,
+                    &mut self.unknown_fields,
+                )?,
                 30 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.auth_data)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -801,7 +917,10 @@ impl ::protobuf::Message for LoginCredentials {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.username.as_ref() {
             os.write_string(10, &v)?;
         }
@@ -846,32 +965,46 @@ impl ::protobuf::Message for LoginCredentials {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "username",
-                    |m: &LoginCredentials| { &m.username },
-                    |m: &mut LoginCredentials| { &mut m.username },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AuthenticationType>>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "username",
+                        |m: &LoginCredentials| &m.username,
+                        |m: &mut LoginCredentials| &mut m.username,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<AuthenticationType>,
+                >(
                     "typ",
-                    |m: &LoginCredentials| { &m.typ },
-                    |m: &mut LoginCredentials| { &mut m.typ },
+                    |m: &LoginCredentials| &m.typ,
+                    |m: &mut LoginCredentials| &mut m.typ,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "auth_data",
-                    |m: &LoginCredentials| { &m.auth_data },
-                    |m: &mut LoginCredentials| { &mut m.auth_data },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "auth_data",
+                        |m: &LoginCredentials| &m.auth_data,
+                        |m: &mut LoginCredentials| &mut m.auth_data,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<LoginCredentials>(
                     "LoginCredentials",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -882,9 +1015,7 @@ impl ::protobuf::Message for LoginCredentials {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const LoginCredentials,
         };
-        unsafe {
-            instance.get(LoginCredentials::new)
-        }
+        unsafe { instance.get(LoginCredentials::new) }
     }
 }
 
@@ -909,7 +1040,7 @@ impl ::protobuf::reflect::ProtobufValue for LoginCredentials {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct FingerprintResponseUnion {
     // message fields
     grain: ::protobuf::SingularPtrField<FingerprintGrainResponse>,
@@ -932,9 +1063,10 @@ impl FingerprintResponseUnion {
 
     // optional .FingerprintGrainResponse grain = 10;
 
-
     pub fn get_grain(&self) -> &FingerprintGrainResponse {
-        self.grain.as_ref().unwrap_or_else(|| FingerprintGrainResponse::default_instance())
+        self.grain
+            .as_ref()
+            .unwrap_or_else(|| FingerprintGrainResponse::default_instance())
     }
     pub fn clear_grain(&mut self) {
         self.grain.clear();
@@ -960,14 +1092,17 @@ impl FingerprintResponseUnion {
 
     // Take field
     pub fn take_grain(&mut self) -> FingerprintGrainResponse {
-        self.grain.take().unwrap_or_else(|| FingerprintGrainResponse::new())
+        self.grain
+            .take()
+            .unwrap_or_else(|| FingerprintGrainResponse::new())
     }
 
     // optional .FingerprintHmacRipemdResponse hmac_ripemd = 20;
 
-
     pub fn get_hmac_ripemd(&self) -> &FingerprintHmacRipemdResponse {
-        self.hmac_ripemd.as_ref().unwrap_or_else(|| FingerprintHmacRipemdResponse::default_instance())
+        self.hmac_ripemd
+            .as_ref()
+            .unwrap_or_else(|| FingerprintHmacRipemdResponse::default_instance())
     }
     pub fn clear_hmac_ripemd(&mut self) {
         self.hmac_ripemd.clear();
@@ -993,7 +1128,9 @@ impl FingerprintResponseUnion {
 
     // Take field
     pub fn take_hmac_ripemd(&mut self) -> FingerprintHmacRipemdResponse {
-        self.hmac_ripemd.take().unwrap_or_else(|| FingerprintHmacRipemdResponse::new())
+        self.hmac_ripemd
+            .take()
+            .unwrap_or_else(|| FingerprintHmacRipemdResponse::new())
     }
 }
 
@@ -1003,28 +1140,40 @@ impl ::protobuf::Message for FingerprintResponseUnion {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.hmac_ripemd {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.grain)?;
-                },
+                }
                 20 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.hmac_ripemd)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.hmac_ripemd,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1047,7 +1196,10 @@ impl ::protobuf::Message for FingerprintResponseUnion {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.grain.as_ref() {
             os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -1093,40 +1245,50 @@ impl ::protobuf::Message for FingerprintResponseUnion {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FingerprintGrainResponse>>(
-                    "grain",
-                    |m: &FingerprintResponseUnion| { &m.grain },
-                    |m: &mut FingerprintResponseUnion| { &mut m.grain },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<FingerprintHmacRipemdResponse>>(
-                    "hmac_ripemd",
-                    |m: &FingerprintResponseUnion| { &m.hmac_ripemd },
-                    |m: &mut FingerprintResponseUnion| { &mut m.hmac_ripemd },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<FingerprintGrainResponse>,
+                    >(
+                        "grain",
+                        |m: &FingerprintResponseUnion| &m.grain,
+                        |m: &mut FingerprintResponseUnion| &mut m.grain,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<FingerprintHmacRipemdResponse>,
+                    >(
+                        "hmac_ripemd",
+                        |m: &FingerprintResponseUnion| &m.hmac_ripemd,
+                        |m: &mut FingerprintResponseUnion| &mut m.hmac_ripemd,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<FingerprintResponseUnion>(
                     "FingerprintResponseUnion",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static FingerprintResponseUnion {
-        static mut instance: ::protobuf::lazy::Lazy<FingerprintResponseUnion> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const FingerprintResponseUnion,
-        };
-        unsafe {
-            instance.get(FingerprintResponseUnion::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<FingerprintResponseUnion> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const FingerprintResponseUnion,
+            };
+        unsafe { instance.get(FingerprintResponseUnion::new) }
     }
 }
 
@@ -1150,7 +1312,7 @@ impl ::protobuf::reflect::ProtobufValue for FingerprintResponseUnion {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct FingerprintGrainResponse {
     // message fields
     encrypted_key: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -1171,7 +1333,6 @@ impl FingerprintGrainResponse {
     }
 
     // required bytes encrypted_key = 10;
-
 
     pub fn get_encrypted_key(&self) -> &[u8] {
         match self.encrypted_key.as_ref() {
@@ -1203,7 +1364,9 @@ impl FingerprintGrainResponse {
 
     // Take field
     pub fn take_encrypted_key(&mut self) -> ::std::vec::Vec<u8> {
-        self.encrypted_key.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.encrypted_key
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 }
 
@@ -1215,16 +1378,28 @@ impl ::protobuf::Message for FingerprintGrainResponse {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.encrypted_key)?;
-                },
+                    ::protobuf::rt::read_singular_bytes_into(
+                        wire_type,
+                        is,
+                        &mut self.encrypted_key,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1242,7 +1417,10 @@ impl ::protobuf::Message for FingerprintGrainResponse {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.encrypted_key.as_ref() {
             os.write_bytes(10, &v)?;
         }
@@ -1281,35 +1459,40 @@ impl ::protobuf::Message for FingerprintGrainResponse {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "encrypted_key",
-                    |m: &FingerprintGrainResponse| { &m.encrypted_key },
-                    |m: &mut FingerprintGrainResponse| { &mut m.encrypted_key },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "encrypted_key",
+                        |m: &FingerprintGrainResponse| &m.encrypted_key,
+                        |m: &mut FingerprintGrainResponse| &mut m.encrypted_key,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<FingerprintGrainResponse>(
                     "FingerprintGrainResponse",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static FingerprintGrainResponse {
-        static mut instance: ::protobuf::lazy::Lazy<FingerprintGrainResponse> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const FingerprintGrainResponse,
-        };
-        unsafe {
-            instance.get(FingerprintGrainResponse::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<FingerprintGrainResponse> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const FingerprintGrainResponse,
+            };
+        unsafe { instance.get(FingerprintGrainResponse::new) }
     }
 }
 
@@ -1332,7 +1515,7 @@ impl ::protobuf::reflect::ProtobufValue for FingerprintGrainResponse {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct FingerprintHmacRipemdResponse {
     // message fields
     hmac: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -1353,7 +1536,6 @@ impl FingerprintHmacRipemdResponse {
     }
 
     // required bytes hmac = 10;
-
 
     pub fn get_hmac(&self) -> &[u8] {
         match self.hmac.as_ref() {
@@ -1397,16 +1579,24 @@ impl ::protobuf::Message for FingerprintHmacRipemdResponse {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.hmac)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1424,7 +1614,10 @@ impl ::protobuf::Message for FingerprintHmacRipemdResponse {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.hmac.as_ref() {
             os.write_bytes(10, &v)?;
         }
@@ -1463,35 +1656,40 @@ impl ::protobuf::Message for FingerprintHmacRipemdResponse {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "hmac",
-                    |m: &FingerprintHmacRipemdResponse| { &m.hmac },
-                    |m: &mut FingerprintHmacRipemdResponse| { &mut m.hmac },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "hmac",
+                        |m: &FingerprintHmacRipemdResponse| &m.hmac,
+                        |m: &mut FingerprintHmacRipemdResponse| &mut m.hmac,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<FingerprintHmacRipemdResponse>(
                     "FingerprintHmacRipemdResponse",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static FingerprintHmacRipemdResponse {
-        static mut instance: ::protobuf::lazy::Lazy<FingerprintHmacRipemdResponse> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const FingerprintHmacRipemdResponse,
-        };
-        unsafe {
-            instance.get(FingerprintHmacRipemdResponse::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<FingerprintHmacRipemdResponse> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const FingerprintHmacRipemdResponse,
+            };
+        unsafe { instance.get(FingerprintHmacRipemdResponse::new) }
     }
 }
 
@@ -1514,7 +1712,7 @@ impl ::protobuf::reflect::ProtobufValue for FingerprintHmacRipemdResponse {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct PeerTicketUnion {
     // message fields
     public_key: ::protobuf::SingularPtrField<PeerTicketPublicKey>,
@@ -1537,9 +1735,10 @@ impl PeerTicketUnion {
 
     // optional .PeerTicketPublicKey public_key = 10;
 
-
     pub fn get_public_key(&self) -> &PeerTicketPublicKey {
-        self.public_key.as_ref().unwrap_or_else(|| PeerTicketPublicKey::default_instance())
+        self.public_key
+            .as_ref()
+            .unwrap_or_else(|| PeerTicketPublicKey::default_instance())
     }
     pub fn clear_public_key(&mut self) {
         self.public_key.clear();
@@ -1565,14 +1764,17 @@ impl PeerTicketUnion {
 
     // Take field
     pub fn take_public_key(&mut self) -> PeerTicketPublicKey {
-        self.public_key.take().unwrap_or_else(|| PeerTicketPublicKey::new())
+        self.public_key
+            .take()
+            .unwrap_or_else(|| PeerTicketPublicKey::new())
     }
 
     // optional .PeerTicketOld old_ticket = 20;
 
-
     pub fn get_old_ticket(&self) -> &PeerTicketOld {
-        self.old_ticket.as_ref().unwrap_or_else(|| PeerTicketOld::default_instance())
+        self.old_ticket
+            .as_ref()
+            .unwrap_or_else(|| PeerTicketOld::default_instance())
     }
     pub fn clear_old_ticket(&mut self) {
         self.old_ticket.clear();
@@ -1598,7 +1800,9 @@ impl PeerTicketUnion {
 
     // Take field
     pub fn take_old_ticket(&mut self) -> PeerTicketOld {
-        self.old_ticket.take().unwrap_or_else(|| PeerTicketOld::new())
+        self.old_ticket
+            .take()
+            .unwrap_or_else(|| PeerTicketOld::new())
     }
 }
 
@@ -1608,28 +1812,44 @@ impl ::protobuf::Message for PeerTicketUnion {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.old_ticket {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.public_key)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.public_key,
+                    )?;
+                }
                 20 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.old_ticket)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.old_ticket,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1652,7 +1872,10 @@ impl ::protobuf::Message for PeerTicketUnion {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.public_key.as_ref() {
             os.write_tag(10, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -1698,27 +1921,38 @@ impl ::protobuf::Message for PeerTicketUnion {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<PeerTicketPublicKey>>(
-                    "public_key",
-                    |m: &PeerTicketUnion| { &m.public_key },
-                    |m: &mut PeerTicketUnion| { &mut m.public_key },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<PeerTicketOld>>(
-                    "old_ticket",
-                    |m: &PeerTicketUnion| { &m.old_ticket },
-                    |m: &mut PeerTicketUnion| { &mut m.old_ticket },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<PeerTicketPublicKey>,
+                    >(
+                        "public_key",
+                        |m: &PeerTicketUnion| &m.public_key,
+                        |m: &mut PeerTicketUnion| &mut m.public_key,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<PeerTicketOld>,
+                    >(
+                        "old_ticket",
+                        |m: &PeerTicketUnion| &m.old_ticket,
+                        |m: &mut PeerTicketUnion| &mut m.old_ticket,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<PeerTicketUnion>(
                     "PeerTicketUnion",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -1729,9 +1963,7 @@ impl ::protobuf::Message for PeerTicketUnion {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const PeerTicketUnion,
         };
-        unsafe {
-            instance.get(PeerTicketUnion::new)
-        }
+        unsafe { instance.get(PeerTicketUnion::new) }
     }
 }
 
@@ -1755,7 +1987,7 @@ impl ::protobuf::reflect::ProtobufValue for PeerTicketUnion {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct PeerTicketPublicKey {
     // message fields
     public_key: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -1776,7 +2008,6 @@ impl PeerTicketPublicKey {
     }
 
     // required bytes public_key = 10;
-
 
     pub fn get_public_key(&self) -> &[u8] {
         match self.public_key.as_ref() {
@@ -1808,7 +2039,9 @@ impl PeerTicketPublicKey {
 
     // Take field
     pub fn take_public_key(&mut self) -> ::std::vec::Vec<u8> {
-        self.public_key.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.public_key
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 }
 
@@ -1820,16 +2053,24 @@ impl ::protobuf::Message for PeerTicketPublicKey {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.public_key)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1847,7 +2088,10 @@ impl ::protobuf::Message for PeerTicketPublicKey {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.public_key.as_ref() {
             os.write_bytes(10, &v)?;
         }
@@ -1886,22 +2130,28 @@ impl ::protobuf::Message for PeerTicketPublicKey {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "public_key",
-                    |m: &PeerTicketPublicKey| { &m.public_key },
-                    |m: &mut PeerTicketPublicKey| { &mut m.public_key },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "public_key",
+                        |m: &PeerTicketPublicKey| &m.public_key,
+                        |m: &mut PeerTicketPublicKey| &mut m.public_key,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<PeerTicketPublicKey>(
                     "PeerTicketPublicKey",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -1912,9 +2162,7 @@ impl ::protobuf::Message for PeerTicketPublicKey {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const PeerTicketPublicKey,
         };
-        unsafe {
-            instance.get(PeerTicketPublicKey::new)
-        }
+        unsafe { instance.get(PeerTicketPublicKey::new) }
     }
 }
 
@@ -1937,7 +2185,7 @@ impl ::protobuf::reflect::ProtobufValue for PeerTicketPublicKey {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct PeerTicketOld {
     // message fields
     peer_ticket: ::protobuf::SingularField<::std::vec::Vec<u8>>,
@@ -1959,7 +2207,6 @@ impl PeerTicketOld {
     }
 
     // required bytes peer_ticket = 10;
-
 
     pub fn get_peer_ticket(&self) -> &[u8] {
         match self.peer_ticket.as_ref() {
@@ -1991,11 +2238,12 @@ impl PeerTicketOld {
 
     // Take field
     pub fn take_peer_ticket(&mut self) -> ::std::vec::Vec<u8> {
-        self.peer_ticket.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.peer_ticket
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 
     // required bytes peer_ticket_signature = 20;
-
 
     pub fn get_peer_ticket_signature(&self) -> &[u8] {
         match self.peer_ticket_signature.as_ref() {
@@ -2027,7 +2275,9 @@ impl PeerTicketOld {
 
     // Take field
     pub fn take_peer_ticket_signature(&mut self) -> ::std::vec::Vec<u8> {
-        self.peer_ticket_signature.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.peer_ticket_signature
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 }
 
@@ -2042,19 +2292,31 @@ impl ::protobuf::Message for PeerTicketOld {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.peer_ticket)?;
-                },
+                }
                 20 => {
-                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.peer_ticket_signature)?;
-                },
+                    ::protobuf::rt::read_singular_bytes_into(
+                        wire_type,
+                        is,
+                        &mut self.peer_ticket_signature,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -2075,7 +2337,10 @@ impl ::protobuf::Message for PeerTicketOld {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.peer_ticket.as_ref() {
             os.write_bytes(10, &v)?;
         }
@@ -2117,27 +2382,38 @@ impl ::protobuf::Message for PeerTicketOld {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "peer_ticket",
-                    |m: &PeerTicketOld| { &m.peer_ticket },
-                    |m: &mut PeerTicketOld| { &mut m.peer_ticket },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "peer_ticket_signature",
-                    |m: &PeerTicketOld| { &m.peer_ticket_signature },
-                    |m: &mut PeerTicketOld| { &mut m.peer_ticket_signature },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "peer_ticket",
+                        |m: &PeerTicketOld| &m.peer_ticket,
+                        |m: &mut PeerTicketOld| &mut m.peer_ticket,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "peer_ticket_signature",
+                        |m: &PeerTicketOld| &m.peer_ticket_signature,
+                        |m: &mut PeerTicketOld| &mut m.peer_ticket_signature,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<PeerTicketOld>(
                     "PeerTicketOld",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -2148,9 +2424,7 @@ impl ::protobuf::Message for PeerTicketOld {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const PeerTicketOld,
         };
-        unsafe {
-            instance.get(PeerTicketOld::new)
-        }
+        unsafe { instance.get(PeerTicketOld::new) }
     }
 }
 
@@ -2174,7 +2448,7 @@ impl ::protobuf::reflect::ProtobufValue for PeerTicketOld {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct SystemInfo {
     // message fields
     cpu_family: ::std::option::Option<CpuFamily>,
@@ -2205,7 +2479,6 @@ impl SystemInfo {
 
     // required .CpuFamily cpu_family = 10;
 
-
     pub fn get_cpu_family(&self) -> CpuFamily {
         self.cpu_family.unwrap_or(CpuFamily::CPU_UNKNOWN)
     }
@@ -2223,7 +2496,6 @@ impl SystemInfo {
     }
 
     // optional uint32 cpu_subtype = 20;
-
 
     pub fn get_cpu_subtype(&self) -> u32 {
         self.cpu_subtype.unwrap_or(0)
@@ -2243,7 +2515,6 @@ impl SystemInfo {
 
     // optional uint32 cpu_ext = 30;
 
-
     pub fn get_cpu_ext(&self) -> u32 {
         self.cpu_ext.unwrap_or(0)
     }
@@ -2261,7 +2532,6 @@ impl SystemInfo {
     }
 
     // optional .Brand brand = 40;
-
 
     pub fn get_brand(&self) -> Brand {
         self.brand.unwrap_or(Brand::BRAND_UNBRANDED)
@@ -2281,7 +2551,6 @@ impl SystemInfo {
 
     // optional uint32 brand_flags = 50;
 
-
     pub fn get_brand_flags(&self) -> u32 {
         self.brand_flags.unwrap_or(0)
     }
@@ -2299,7 +2568,6 @@ impl SystemInfo {
     }
 
     // required .Os os = 60;
-
 
     pub fn get_os(&self) -> Os {
         self.os.unwrap_or(Os::OS_UNKNOWN)
@@ -2319,7 +2587,6 @@ impl SystemInfo {
 
     // optional uint32 os_version = 70;
 
-
     pub fn get_os_version(&self) -> u32 {
         self.os_version.unwrap_or(0)
     }
@@ -2338,7 +2605,6 @@ impl SystemInfo {
 
     // optional uint32 os_ext = 80;
 
-
     pub fn get_os_ext(&self) -> u32 {
         self.os_ext.unwrap_or(0)
     }
@@ -2356,7 +2622,6 @@ impl SystemInfo {
     }
 
     // optional string system_information_string = 90;
-
 
     pub fn get_system_information_string(&self) -> &str {
         match self.system_information_string.as_ref() {
@@ -2388,11 +2653,12 @@ impl SystemInfo {
 
     // Take field
     pub fn take_system_information_string(&mut self) -> ::std::string::String {
-        self.system_information_string.take().unwrap_or_else(|| ::std::string::String::new())
+        self.system_information_string
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional string device_id = 100;
-
 
     pub fn get_device_id(&self) -> &str {
         match self.device_id.as_ref() {
@@ -2424,7 +2690,9 @@ impl SystemInfo {
 
     // Take field
     pub fn take_device_id(&mut self) -> ::std::string::String {
-        self.device_id.take().unwrap_or_else(|| ::std::string::String::new())
+        self.device_id
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 }
 
@@ -2439,63 +2707,97 @@ impl ::protobuf::Message for SystemInfo {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                10 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.cpu_family, 10, &mut self.unknown_fields)?
-                },
+                10 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.cpu_family,
+                    10,
+                    &mut self.unknown_fields,
+                )?,
                 20 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_uint32()?;
                     self.cpu_subtype = ::std::option::Option::Some(tmp);
-                },
+                }
                 30 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_uint32()?;
                     self.cpu_ext = ::std::option::Option::Some(tmp);
-                },
-                40 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.brand, 40, &mut self.unknown_fields)?
-                },
+                }
+                40 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.brand,
+                    40,
+                    &mut self.unknown_fields,
+                )?,
                 50 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_uint32()?;
                     self.brand_flags = ::std::option::Option::Some(tmp);
-                },
-                60 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.os, 60, &mut self.unknown_fields)?
-                },
+                }
+                60 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.os,
+                    60,
+                    &mut self.unknown_fields,
+                )?,
                 70 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_uint32()?;
                     self.os_version = ::std::option::Option::Some(tmp);
-                },
+                }
                 80 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_uint32()?;
                     self.os_ext = ::std::option::Option::Some(tmp);
-                },
+                }
                 90 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.system_information_string)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.system_information_string,
+                    )?;
+                }
                 100 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.device_id)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -2540,7 +2842,10 @@ impl ::protobuf::Message for SystemInfo {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.cpu_family {
             os.write_enum(10, v.value())?;
         }
@@ -2606,67 +2911,102 @@ impl ::protobuf::Message for SystemInfo {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<CpuFamily>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<CpuFamily>,
+                >(
                     "cpu_family",
-                    |m: &SystemInfo| { &m.cpu_family },
-                    |m: &mut SystemInfo| { &mut m.cpu_family },
+                    |m: &SystemInfo| &m.cpu_family,
+                    |m: &mut SystemInfo| &mut m.cpu_family,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeUint32,
+                >(
                     "cpu_subtype",
-                    |m: &SystemInfo| { &m.cpu_subtype },
-                    |m: &mut SystemInfo| { &mut m.cpu_subtype },
+                    |m: &SystemInfo| &m.cpu_subtype,
+                    |m: &mut SystemInfo| &mut m.cpu_subtype,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeUint32,
+                >(
                     "cpu_ext",
-                    |m: &SystemInfo| { &m.cpu_ext },
-                    |m: &mut SystemInfo| { &mut m.cpu_ext },
+                    |m: &SystemInfo| &m.cpu_ext,
+                    |m: &mut SystemInfo| &mut m.cpu_ext,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Brand>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<Brand>,
+                >(
                     "brand",
-                    |m: &SystemInfo| { &m.brand },
-                    |m: &mut SystemInfo| { &mut m.brand },
+                    |m: &SystemInfo| &m.brand,
+                    |m: &mut SystemInfo| &mut m.brand,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeUint32,
+                >(
                     "brand_flags",
-                    |m: &SystemInfo| { &m.brand_flags },
-                    |m: &mut SystemInfo| { &mut m.brand_flags },
+                    |m: &SystemInfo| &m.brand_flags,
+                    |m: &mut SystemInfo| &mut m.brand_flags,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<Os>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<Os>,
+                >(
                     "os",
-                    |m: &SystemInfo| { &m.os },
-                    |m: &mut SystemInfo| { &mut m.os },
+                    |m: &SystemInfo| &m.os,
+                    |m: &mut SystemInfo| &mut m.os,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeUint32,
+                >(
                     "os_version",
-                    |m: &SystemInfo| { &m.os_version },
-                    |m: &mut SystemInfo| { &mut m.os_version },
+                    |m: &SystemInfo| &m.os_version,
+                    |m: &mut SystemInfo| &mut m.os_version,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeUint32,
+                >(
                     "os_ext",
-                    |m: &SystemInfo| { &m.os_ext },
-                    |m: &mut SystemInfo| { &mut m.os_ext },
+                    |m: &SystemInfo| &m.os_ext,
+                    |m: &mut SystemInfo| &mut m.os_ext,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "system_information_string",
-                    |m: &SystemInfo| { &m.system_information_string },
-                    |m: &mut SystemInfo| { &mut m.system_information_string },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "device_id",
-                    |m: &SystemInfo| { &m.device_id },
-                    |m: &mut SystemInfo| { &mut m.device_id },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "system_information_string",
+                        |m: &SystemInfo| &m.system_information_string,
+                        |m: &mut SystemInfo| &mut m.system_information_string,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "device_id",
+                        |m: &SystemInfo| &m.device_id,
+                        |m: &mut SystemInfo| &mut m.device_id,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<SystemInfo>(
                     "SystemInfo",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -2677,9 +3017,7 @@ impl ::protobuf::Message for SystemInfo {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const SystemInfo,
         };
-        unsafe {
-            instance.get(SystemInfo::new)
-        }
+        unsafe { instance.get(SystemInfo::new) }
     }
 }
 
@@ -2711,7 +3049,7 @@ impl ::protobuf::reflect::ProtobufValue for SystemInfo {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct LibspotifyAppKey {
     // message fields
     version: ::std::option::Option<u32>,
@@ -2737,7 +3075,6 @@ impl LibspotifyAppKey {
 
     // required uint32 version = 1;
 
-
     pub fn get_version(&self) -> u32 {
         self.version.unwrap_or(0)
     }
@@ -2755,7 +3092,6 @@ impl LibspotifyAppKey {
     }
 
     // required bytes devkey = 2;
-
 
     pub fn get_devkey(&self) -> &[u8] {
         match self.devkey.as_ref() {
@@ -2792,7 +3128,6 @@ impl LibspotifyAppKey {
 
     // required bytes signature = 3;
 
-
     pub fn get_signature(&self) -> &[u8] {
         match self.signature.as_ref() {
             Some(v) => &v,
@@ -2823,11 +3158,12 @@ impl LibspotifyAppKey {
 
     // Take field
     pub fn take_signature(&mut self) -> ::std::vec::Vec<u8> {
-        self.signature.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.signature
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 
     // required string useragent = 4;
-
 
     pub fn get_useragent(&self) -> &str {
         match self.useragent.as_ref() {
@@ -2859,11 +3195,12 @@ impl LibspotifyAppKey {
 
     // Take field
     pub fn take_useragent(&mut self) -> ::std::string::String {
-        self.useragent.take().unwrap_or_else(|| ::std::string::String::new())
+        self.useragent
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // required bytes callback_hash = 5;
-
 
     pub fn get_callback_hash(&self) -> &[u8] {
         match self.callback_hash.as_ref() {
@@ -2895,7 +3232,9 @@ impl LibspotifyAppKey {
 
     // Take field
     pub fn take_callback_hash(&mut self) -> ::std::vec::Vec<u8> {
-        self.callback_hash.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.callback_hash
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 }
 
@@ -2919,32 +3258,46 @@ impl ::protobuf::Message for LibspotifyAppKey {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_uint32()?;
                     self.version = ::std::option::Option::Some(tmp);
-                },
+                }
                 2 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.devkey)?;
-                },
+                }
                 3 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.signature)?;
-                },
+                }
                 4 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.useragent)?;
-                },
+                }
                 5 => {
-                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.callback_hash)?;
-                },
+                    ::protobuf::rt::read_singular_bytes_into(
+                        wire_type,
+                        is,
+                        &mut self.callback_hash,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -2974,7 +3327,10 @@ impl ::protobuf::Message for LibspotifyAppKey {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.version {
             os.write_uint32(1, v)?;
         }
@@ -3025,42 +3381,66 @@ impl ::protobuf::Message for LibspotifyAppKey {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeUint32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeUint32,
+                >(
                     "version",
-                    |m: &LibspotifyAppKey| { &m.version },
-                    |m: &mut LibspotifyAppKey| { &mut m.version },
+                    |m: &LibspotifyAppKey| &m.version,
+                    |m: &mut LibspotifyAppKey| &mut m.version,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "devkey",
-                    |m: &LibspotifyAppKey| { &m.devkey },
-                    |m: &mut LibspotifyAppKey| { &mut m.devkey },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "signature",
-                    |m: &LibspotifyAppKey| { &m.signature },
-                    |m: &mut LibspotifyAppKey| { &mut m.signature },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "useragent",
-                    |m: &LibspotifyAppKey| { &m.useragent },
-                    |m: &mut LibspotifyAppKey| { &mut m.useragent },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "callback_hash",
-                    |m: &LibspotifyAppKey| { &m.callback_hash },
-                    |m: &mut LibspotifyAppKey| { &mut m.callback_hash },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "devkey",
+                        |m: &LibspotifyAppKey| &m.devkey,
+                        |m: &mut LibspotifyAppKey| &mut m.devkey,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "signature",
+                        |m: &LibspotifyAppKey| &m.signature,
+                        |m: &mut LibspotifyAppKey| &mut m.signature,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "useragent",
+                        |m: &LibspotifyAppKey| &m.useragent,
+                        |m: &mut LibspotifyAppKey| &mut m.useragent,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "callback_hash",
+                        |m: &LibspotifyAppKey| &m.callback_hash,
+                        |m: &mut LibspotifyAppKey| &mut m.callback_hash,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<LibspotifyAppKey>(
                     "LibspotifyAppKey",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -3071,9 +3451,7 @@ impl ::protobuf::Message for LibspotifyAppKey {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const LibspotifyAppKey,
         };
-        unsafe {
-            instance.get(LibspotifyAppKey::new)
-        }
+        unsafe { instance.get(LibspotifyAppKey::new) }
     }
 }
 
@@ -3100,7 +3478,7 @@ impl ::protobuf::reflect::ProtobufValue for LibspotifyAppKey {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ClientInfo {
     // message fields
     limited: ::std::option::Option<bool>,
@@ -3124,7 +3502,6 @@ impl ClientInfo {
 
     // optional bool limited = 1;
 
-
     pub fn get_limited(&self) -> bool {
         self.limited.unwrap_or(false)
     }
@@ -3143,9 +3520,10 @@ impl ClientInfo {
 
     // optional .ClientInfoFacebook fb = 2;
 
-
     pub fn get_fb(&self) -> &ClientInfoFacebook {
-        self.fb.as_ref().unwrap_or_else(|| ClientInfoFacebook::default_instance())
+        self.fb
+            .as_ref()
+            .unwrap_or_else(|| ClientInfoFacebook::default_instance())
     }
     pub fn clear_fb(&mut self) {
         self.fb.clear();
@@ -3175,7 +3553,6 @@ impl ClientInfo {
     }
 
     // optional string language = 3;
-
 
     pub fn get_language(&self) -> &str {
         match self.language.as_ref() {
@@ -3207,7 +3584,9 @@ impl ClientInfo {
 
     // Take field
     pub fn take_language(&mut self) -> ::std::string::String {
-        self.language.take().unwrap_or_else(|| ::std::string::String::new())
+        self.language
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 }
 
@@ -3217,30 +3596,40 @@ impl ::protobuf::Message for ClientInfo {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.limited = ::std::option::Option::Some(tmp);
-                },
+                }
                 2 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fb)?;
-                },
+                }
                 3 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.language)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -3265,7 +3654,10 @@ impl ::protobuf::Message for ClientInfo {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.limited {
             os.write_bool(1, v)?;
         }
@@ -3312,32 +3704,44 @@ impl ::protobuf::Message for ClientInfo {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "limited",
-                    |m: &ClientInfo| { &m.limited },
-                    |m: &mut ClientInfo| { &mut m.limited },
+                    |m: &ClientInfo| &m.limited,
+                    |m: &mut ClientInfo| &mut m.limited,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<ClientInfoFacebook>>(
-                    "fb",
-                    |m: &ClientInfo| { &m.fb },
-                    |m: &mut ClientInfo| { &mut m.fb },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "language",
-                    |m: &ClientInfo| { &m.language },
-                    |m: &mut ClientInfo| { &mut m.language },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<ClientInfoFacebook>,
+                    >(
+                        "fb", |m: &ClientInfo| &m.fb, |m: &mut ClientInfo| &mut m.fb
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "language",
+                        |m: &ClientInfo| &m.language,
+                        |m: &mut ClientInfo| &mut m.language,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<ClientInfo>(
                     "ClientInfo",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -3348,9 +3752,7 @@ impl ::protobuf::Message for ClientInfo {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const ClientInfo,
         };
-        unsafe {
-            instance.get(ClientInfo::new)
-        }
+        unsafe { instance.get(ClientInfo::new) }
     }
 }
 
@@ -3375,7 +3777,7 @@ impl ::protobuf::reflect::ProtobufValue for ClientInfo {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ClientInfoFacebook {
     // message fields
     machine_id: ::protobuf::SingularField<::std::string::String>,
@@ -3396,7 +3798,6 @@ impl ClientInfoFacebook {
     }
 
     // optional string machine_id = 1;
-
 
     pub fn get_machine_id(&self) -> &str {
         match self.machine_id.as_ref() {
@@ -3428,7 +3829,9 @@ impl ClientInfoFacebook {
 
     // Take field
     pub fn take_machine_id(&mut self) -> ::std::string::String {
-        self.machine_id.take().unwrap_or_else(|| ::std::string::String::new())
+        self.machine_id
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 }
 
@@ -3437,16 +3840,24 @@ impl ::protobuf::Message for ClientInfoFacebook {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.machine_id)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -3464,7 +3875,10 @@ impl ::protobuf::Message for ClientInfoFacebook {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.machine_id.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -3503,22 +3917,28 @@ impl ::protobuf::Message for ClientInfoFacebook {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "machine_id",
-                    |m: &ClientInfoFacebook| { &m.machine_id },
-                    |m: &mut ClientInfoFacebook| { &mut m.machine_id },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "machine_id",
+                        |m: &ClientInfoFacebook| &m.machine_id,
+                        |m: &mut ClientInfoFacebook| &mut m.machine_id,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<ClientInfoFacebook>(
                     "ClientInfoFacebook",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -3529,9 +3949,7 @@ impl ::protobuf::Message for ClientInfoFacebook {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const ClientInfoFacebook,
         };
-        unsafe {
-            instance.get(ClientInfoFacebook::new)
-        }
+        unsafe { instance.get(ClientInfoFacebook::new) }
     }
 }
 
@@ -3554,7 +3972,7 @@ impl ::protobuf::reflect::ProtobufValue for ClientInfoFacebook {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct APWelcome {
     // message fields
     canonical_username: ::protobuf::SingularField<::std::string::String>,
@@ -3582,7 +4000,6 @@ impl APWelcome {
     }
 
     // required string canonical_username = 10;
-
 
     pub fn get_canonical_username(&self) -> &str {
         match self.canonical_username.as_ref() {
@@ -3614,11 +4031,12 @@ impl APWelcome {
 
     // Take field
     pub fn take_canonical_username(&mut self) -> ::std::string::String {
-        self.canonical_username.take().unwrap_or_else(|| ::std::string::String::new())
+        self.canonical_username
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // required .AccountType account_type_logged_in = 20;
-
 
     pub fn get_account_type_logged_in(&self) -> AccountType {
         self.account_type_logged_in.unwrap_or(AccountType::Spotify)
@@ -3638,9 +4056,9 @@ impl APWelcome {
 
     // required .AccountType credentials_type_logged_in = 25;
 
-
     pub fn get_credentials_type_logged_in(&self) -> AccountType {
-        self.credentials_type_logged_in.unwrap_or(AccountType::Spotify)
+        self.credentials_type_logged_in
+            .unwrap_or(AccountType::Spotify)
     }
     pub fn clear_credentials_type_logged_in(&mut self) {
         self.credentials_type_logged_in = ::std::option::Option::None;
@@ -3657,9 +4075,9 @@ impl APWelcome {
 
     // required .AuthenticationType reusable_auth_credentials_type = 30;
 
-
     pub fn get_reusable_auth_credentials_type(&self) -> AuthenticationType {
-        self.reusable_auth_credentials_type.unwrap_or(AuthenticationType::AUTHENTICATION_USER_PASS)
+        self.reusable_auth_credentials_type
+            .unwrap_or(AuthenticationType::AUTHENTICATION_USER_PASS)
     }
     pub fn clear_reusable_auth_credentials_type(&mut self) {
         self.reusable_auth_credentials_type = ::std::option::Option::None;
@@ -3675,7 +4093,6 @@ impl APWelcome {
     }
 
     // required bytes reusable_auth_credentials = 40;
-
 
     pub fn get_reusable_auth_credentials(&self) -> &[u8] {
         match self.reusable_auth_credentials.as_ref() {
@@ -3707,11 +4124,12 @@ impl APWelcome {
 
     // Take field
     pub fn take_reusable_auth_credentials(&mut self) -> ::std::vec::Vec<u8> {
-        self.reusable_auth_credentials.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.reusable_auth_credentials
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 
     // optional bytes lfs_secret = 50;
-
 
     pub fn get_lfs_secret(&self) -> &[u8] {
         match self.lfs_secret.as_ref() {
@@ -3743,14 +4161,17 @@ impl APWelcome {
 
     // Take field
     pub fn take_lfs_secret(&mut self) -> ::std::vec::Vec<u8> {
-        self.lfs_secret.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.lfs_secret
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 
     // optional .AccountInfo account_info = 60;
 
-
     pub fn get_account_info(&self) -> &AccountInfo {
-        self.account_info.as_ref().unwrap_or_else(|| AccountInfo::default_instance())
+        self.account_info
+            .as_ref()
+            .unwrap_or_else(|| AccountInfo::default_instance())
     }
     pub fn clear_account_info(&mut self) {
         self.account_info.clear();
@@ -3776,14 +4197,17 @@ impl APWelcome {
 
     // Take field
     pub fn take_account_info(&mut self) -> AccountInfo {
-        self.account_info.take().unwrap_or_else(|| AccountInfo::new())
+        self.account_info
+            .take()
+            .unwrap_or_else(|| AccountInfo::new())
     }
 
     // optional .AccountInfoFacebook fb = 70;
 
-
     pub fn get_fb(&self) -> &AccountInfoFacebook {
-        self.fb.as_ref().unwrap_or_else(|| AccountInfoFacebook::default_instance())
+        self.fb
+            .as_ref()
+            .unwrap_or_else(|| AccountInfoFacebook::default_instance())
     }
     pub fn clear_fb(&mut self) {
         self.fb.clear();
@@ -3834,46 +4258,78 @@ impl ::protobuf::Message for APWelcome {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.fb {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 10 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.canonical_username)?;
-                },
-                20 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.account_type_logged_in, 20, &mut self.unknown_fields)?
-                },
-                25 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.credentials_type_logged_in, 25, &mut self.unknown_fields)?
-                },
-                30 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.reusable_auth_credentials_type, 30, &mut self.unknown_fields)?
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.canonical_username,
+                    )?;
+                }
+                20 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.account_type_logged_in,
+                    20,
+                    &mut self.unknown_fields,
+                )?,
+                25 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.credentials_type_logged_in,
+                    25,
+                    &mut self.unknown_fields,
+                )?,
+                30 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.reusable_auth_credentials_type,
+                    30,
+                    &mut self.unknown_fields,
+                )?,
                 40 => {
-                    ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.reusable_auth_credentials)?;
-                },
+                    ::protobuf::rt::read_singular_bytes_into(
+                        wire_type,
+                        is,
+                        &mut self.reusable_auth_credentials,
+                    )?;
+                }
                 50 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.lfs_secret)?;
-                },
+                }
                 60 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.account_info)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.account_info,
+                    )?;
+                }
                 70 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.fb)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -3914,7 +4370,10 @@ impl ::protobuf::Message for APWelcome {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.canonical_username.as_ref() {
             os.write_string(10, &v)?;
         }
@@ -3978,57 +4437,90 @@ impl ::protobuf::Message for APWelcome {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "canonical_username",
-                    |m: &APWelcome| { &m.canonical_username },
-                    |m: &mut APWelcome| { &mut m.canonical_username },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AccountType>>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "canonical_username",
+                        |m: &APWelcome| &m.canonical_username,
+                        |m: &mut APWelcome| &mut m.canonical_username,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<AccountType>,
+                >(
                     "account_type_logged_in",
-                    |m: &APWelcome| { &m.account_type_logged_in },
-                    |m: &mut APWelcome| { &mut m.account_type_logged_in },
+                    |m: &APWelcome| &m.account_type_logged_in,
+                    |m: &mut APWelcome| &mut m.account_type_logged_in,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AccountType>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<AccountType>,
+                >(
                     "credentials_type_logged_in",
-                    |m: &APWelcome| { &m.credentials_type_logged_in },
-                    |m: &mut APWelcome| { &mut m.credentials_type_logged_in },
+                    |m: &APWelcome| &m.credentials_type_logged_in,
+                    |m: &mut APWelcome| &mut m.credentials_type_logged_in,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<AuthenticationType>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<AuthenticationType>,
+                >(
                     "reusable_auth_credentials_type",
-                    |m: &APWelcome| { &m.reusable_auth_credentials_type },
-                    |m: &mut APWelcome| { &mut m.reusable_auth_credentials_type },
+                    |m: &APWelcome| &m.reusable_auth_credentials_type,
+                    |m: &mut APWelcome| &mut m.reusable_auth_credentials_type,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "reusable_auth_credentials",
-                    |m: &APWelcome| { &m.reusable_auth_credentials },
-                    |m: &mut APWelcome| { &mut m.reusable_auth_credentials },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "lfs_secret",
-                    |m: &APWelcome| { &m.lfs_secret },
-                    |m: &mut APWelcome| { &mut m.lfs_secret },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AccountInfo>>(
-                    "account_info",
-                    |m: &APWelcome| { &m.account_info },
-                    |m: &mut APWelcome| { &mut m.account_info },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AccountInfoFacebook>>(
-                    "fb",
-                    |m: &APWelcome| { &m.fb },
-                    |m: &mut APWelcome| { &mut m.fb },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "reusable_auth_credentials",
+                        |m: &APWelcome| &m.reusable_auth_credentials,
+                        |m: &mut APWelcome| &mut m.reusable_auth_credentials,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "lfs_secret",
+                        |m: &APWelcome| &m.lfs_secret,
+                        |m: &mut APWelcome| &mut m.lfs_secret,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<AccountInfo>,
+                    >(
+                        "account_info",
+                        |m: &APWelcome| &m.account_info,
+                        |m: &mut APWelcome| &mut m.account_info,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<AccountInfoFacebook>,
+                    >(
+                        "fb", |m: &APWelcome| &m.fb, |m: &mut APWelcome| &mut m.fb
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<APWelcome>(
                     "APWelcome",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -4039,9 +4531,7 @@ impl ::protobuf::Message for APWelcome {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const APWelcome,
         };
-        unsafe {
-            instance.get(APWelcome::new)
-        }
+        unsafe { instance.get(APWelcome::new) }
     }
 }
 
@@ -4071,7 +4561,7 @@ impl ::protobuf::reflect::ProtobufValue for APWelcome {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct AccountInfo {
     // message fields
     spotify: ::protobuf::SingularPtrField<AccountInfoSpotify>,
@@ -4094,9 +4584,10 @@ impl AccountInfo {
 
     // optional .AccountInfoSpotify spotify = 1;
 
-
     pub fn get_spotify(&self) -> &AccountInfoSpotify {
-        self.spotify.as_ref().unwrap_or_else(|| AccountInfoSpotify::default_instance())
+        self.spotify
+            .as_ref()
+            .unwrap_or_else(|| AccountInfoSpotify::default_instance())
     }
     pub fn clear_spotify(&mut self) {
         self.spotify.clear();
@@ -4122,14 +4613,17 @@ impl AccountInfo {
 
     // Take field
     pub fn take_spotify(&mut self) -> AccountInfoSpotify {
-        self.spotify.take().unwrap_or_else(|| AccountInfoSpotify::new())
+        self.spotify
+            .take()
+            .unwrap_or_else(|| AccountInfoSpotify::new())
     }
 
     // optional .AccountInfoFacebook facebook = 2;
 
-
     pub fn get_facebook(&self) -> &AccountInfoFacebook {
-        self.facebook.as_ref().unwrap_or_else(|| AccountInfoFacebook::default_instance())
+        self.facebook
+            .as_ref()
+            .unwrap_or_else(|| AccountInfoFacebook::default_instance())
     }
     pub fn clear_facebook(&mut self) {
         self.facebook.clear();
@@ -4155,7 +4649,9 @@ impl AccountInfo {
 
     // Take field
     pub fn take_facebook(&mut self) -> AccountInfoFacebook {
-        self.facebook.take().unwrap_or_else(|| AccountInfoFacebook::new())
+        self.facebook
+            .take()
+            .unwrap_or_else(|| AccountInfoFacebook::new())
     }
 }
 
@@ -4165,28 +4661,36 @@ impl ::protobuf::Message for AccountInfo {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         for v in &self.facebook {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.spotify)?;
-                },
+                }
                 2 => {
                     ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.facebook)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -4209,7 +4713,10 @@ impl ::protobuf::Message for AccountInfo {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.spotify.as_ref() {
             os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
@@ -4255,27 +4762,38 @@ impl ::protobuf::Message for AccountInfo {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AccountInfoSpotify>>(
-                    "spotify",
-                    |m: &AccountInfo| { &m.spotify },
-                    |m: &mut AccountInfo| { &mut m.spotify },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<AccountInfoFacebook>>(
-                    "facebook",
-                    |m: &AccountInfo| { &m.facebook },
-                    |m: &mut AccountInfo| { &mut m.facebook },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<AccountInfoSpotify>,
+                    >(
+                        "spotify",
+                        |m: &AccountInfo| &m.spotify,
+                        |m: &mut AccountInfo| &mut m.spotify,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<AccountInfoFacebook>,
+                    >(
+                        "facebook",
+                        |m: &AccountInfo| &m.facebook,
+                        |m: &mut AccountInfo| &mut m.facebook,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<AccountInfo>(
                     "AccountInfo",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -4286,9 +4804,7 @@ impl ::protobuf::Message for AccountInfo {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const AccountInfo,
         };
-        unsafe {
-            instance.get(AccountInfo::new)
-        }
+        unsafe { instance.get(AccountInfo::new) }
     }
 }
 
@@ -4312,7 +4828,7 @@ impl ::protobuf::reflect::ProtobufValue for AccountInfo {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct AccountInfoSpotify {
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -4336,13 +4852,21 @@ impl ::protobuf::Message for AccountInfoSpotify {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -4357,7 +4881,10 @@ impl ::protobuf::Message for AccountInfoSpotify {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -4393,17 +4920,18 @@ impl ::protobuf::Message for AccountInfoSpotify {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let fields = ::std::vec::Vec::new();
                 ::protobuf::reflect::MessageDescriptor::new::<AccountInfoSpotify>(
                     "AccountInfoSpotify",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -4414,9 +4942,7 @@ impl ::protobuf::Message for AccountInfoSpotify {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const AccountInfoSpotify,
         };
-        unsafe {
-            instance.get(AccountInfoSpotify::new)
-        }
+        unsafe { instance.get(AccountInfoSpotify::new) }
     }
 }
 
@@ -4438,7 +4964,7 @@ impl ::protobuf::reflect::ProtobufValue for AccountInfoSpotify {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct AccountInfoFacebook {
     // message fields
     access_token: ::protobuf::SingularField<::std::string::String>,
@@ -4460,7 +4986,6 @@ impl AccountInfoFacebook {
     }
 
     // optional string access_token = 1;
-
 
     pub fn get_access_token(&self) -> &str {
         match self.access_token.as_ref() {
@@ -4492,11 +5017,12 @@ impl AccountInfoFacebook {
 
     // Take field
     pub fn take_access_token(&mut self) -> ::std::string::String {
-        self.access_token.take().unwrap_or_else(|| ::std::string::String::new())
+        self.access_token
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional string machine_id = 2;
-
 
     pub fn get_machine_id(&self) -> &str {
         match self.machine_id.as_ref() {
@@ -4528,7 +5054,9 @@ impl AccountInfoFacebook {
 
     // Take field
     pub fn take_machine_id(&mut self) -> ::std::string::String {
-        self.machine_id.take().unwrap_or_else(|| ::std::string::String::new())
+        self.machine_id
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 }
 
@@ -4537,19 +5065,31 @@ impl ::protobuf::Message for AccountInfoFacebook {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.access_token)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.access_token,
+                    )?;
+                }
                 2 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.machine_id)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -4570,7 +5110,10 @@ impl ::protobuf::Message for AccountInfoFacebook {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.access_token.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -4612,27 +5155,38 @@ impl ::protobuf::Message for AccountInfoFacebook {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "access_token",
-                    |m: &AccountInfoFacebook| { &m.access_token },
-                    |m: &mut AccountInfoFacebook| { &mut m.access_token },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "machine_id",
-                    |m: &AccountInfoFacebook| { &m.machine_id },
-                    |m: &mut AccountInfoFacebook| { &mut m.machine_id },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "access_token",
+                        |m: &AccountInfoFacebook| &m.access_token,
+                        |m: &mut AccountInfoFacebook| &mut m.access_token,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "machine_id",
+                        |m: &AccountInfoFacebook| &m.machine_id,
+                        |m: &mut AccountInfoFacebook| &mut m.machine_id,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<AccountInfoFacebook>(
                     "AccountInfoFacebook",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -4643,9 +5197,7 @@ impl ::protobuf::Message for AccountInfoFacebook {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const AccountInfoFacebook,
         };
-        unsafe {
-            instance.get(AccountInfoFacebook::new)
-        }
+        unsafe { instance.get(AccountInfoFacebook::new) }
     }
 }
 
@@ -4669,7 +5221,7 @@ impl ::protobuf::reflect::ProtobufValue for AccountInfoFacebook {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum AuthenticationType {
     AUTHENTICATION_USER_PASS = 0,
     AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS = 1,
@@ -4686,11 +5238,15 @@ impl ::protobuf::ProtobufEnum for AuthenticationType {
     fn from_i32(value: i32) -> ::std::option::Option<AuthenticationType> {
         match value {
             0 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_USER_PASS),
-            1 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS),
-            2 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS),
+            1 => ::std::option::Option::Some(
+                AuthenticationType::AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS,
+            ),
+            2 => ::std::option::Option::Some(
+                AuthenticationType::AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS,
+            ),
             3 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN),
             4 => ::std::option::Option::Some(AuthenticationType::AUTHENTICATION_FACEBOOK_TOKEN),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -4706,20 +5262,23 @@ impl ::protobuf::ProtobufEnum for AuthenticationType {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("AuthenticationType", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new(
+                    "AuthenticationType",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for AuthenticationType {
-}
+impl ::std::marker::Copy for AuthenticationType {}
 
 impl ::std::default::Default for AuthenticationType {
     fn default() -> Self {
@@ -4733,7 +5292,7 @@ impl ::protobuf::reflect::ProtobufValue for AuthenticationType {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum AccountCreation {
     ACCOUNT_CREATION_ALWAYS_PROMPT = 1,
     ACCOUNT_CREATION_ALWAYS_CREATE = 3,
@@ -4748,7 +5307,7 @@ impl ::protobuf::ProtobufEnum for AccountCreation {
         match value {
             1 => ::std::option::Option::Some(AccountCreation::ACCOUNT_CREATION_ALWAYS_PROMPT),
             3 => ::std::option::Option::Some(AccountCreation::ACCOUNT_CREATION_ALWAYS_CREATE),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -4761,10 +5320,11 @@ impl ::protobuf::ProtobufEnum for AccountCreation {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 ::protobuf::reflect::EnumDescriptor::new("AccountCreation", file_descriptor_proto())
@@ -4773,8 +5333,7 @@ impl ::protobuf::ProtobufEnum for AccountCreation {
     }
 }
 
-impl ::std::marker::Copy for AccountCreation {
-}
+impl ::std::marker::Copy for AccountCreation {}
 
 // Note, `Default` is implemented although default value is not 0
 impl ::std::default::Default for AccountCreation {
@@ -4789,7 +5348,7 @@ impl ::protobuf::reflect::ProtobufValue for AccountCreation {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum CpuFamily {
     CPU_UNKNOWN = 0,
     CPU_X86 = 1,
@@ -4820,7 +5379,7 @@ impl ::protobuf::ProtobufEnum for CpuFamily {
             7 => ::std::option::Option::Some(CpuFamily::CPU_SH),
             8 => ::std::option::Option::Some(CpuFamily::CPU_MIPS),
             9 => ::std::option::Option::Some(CpuFamily::CPU_BLACKFIN),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -4841,10 +5400,11 @@ impl ::protobuf::ProtobufEnum for CpuFamily {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 ::protobuf::reflect::EnumDescriptor::new("CpuFamily", file_descriptor_proto())
@@ -4853,8 +5413,7 @@ impl ::protobuf::ProtobufEnum for CpuFamily {
     }
 }
 
-impl ::std::marker::Copy for CpuFamily {
-}
+impl ::std::marker::Copy for CpuFamily {}
 
 impl ::std::default::Default for CpuFamily {
     fn default() -> Self {
@@ -4868,7 +5427,7 @@ impl ::protobuf::reflect::ProtobufValue for CpuFamily {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum Brand {
     BRAND_UNBRANDED = 0,
     BRAND_INQ = 1,
@@ -4887,7 +5446,7 @@ impl ::protobuf::ProtobufEnum for Brand {
             1 => ::std::option::Option::Some(Brand::BRAND_INQ),
             2 => ::std::option::Option::Some(Brand::BRAND_HTC),
             3 => ::std::option::Option::Some(Brand::BRAND_NOKIA),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -4902,20 +5461,19 @@ impl ::protobuf::ProtobufEnum for Brand {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
-            descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("Brand", file_descriptor_proto())
-            })
+            descriptor
+                .get(|| ::protobuf::reflect::EnumDescriptor::new("Brand", file_descriptor_proto()))
         }
     }
 }
 
-impl ::std::marker::Copy for Brand {
-}
+impl ::std::marker::Copy for Brand {}
 
 impl ::std::default::Default for Brand {
     fn default() -> Self {
@@ -4929,7 +5487,7 @@ impl ::protobuf::reflect::ProtobufValue for Brand {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum Os {
     OS_UNKNOWN = 0,
     OS_WINDOWS = 1,
@@ -4986,7 +5544,7 @@ impl ::protobuf::ProtobufEnum for Os {
             20 => ::std::option::Option::Some(Os::OS_MEEGO),
             21 => ::std::option::Option::Some(Os::OS_QNXNTO),
             22 => ::std::option::Option::Some(Os::OS_BCO),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -5020,20 +5578,19 @@ impl ::protobuf::ProtobufEnum for Os {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
-            descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("Os", file_descriptor_proto())
-            })
+            descriptor
+                .get(|| ::protobuf::reflect::EnumDescriptor::new("Os", file_descriptor_proto()))
         }
     }
 }
 
-impl ::std::marker::Copy for Os {
-}
+impl ::std::marker::Copy for Os {}
 
 impl ::std::default::Default for Os {
     fn default() -> Self {
@@ -5047,7 +5604,7 @@ impl ::protobuf::reflect::ProtobufValue for Os {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum AccountType {
     Spotify = 0,
     Facebook = 1,
@@ -5062,23 +5619,21 @@ impl ::protobuf::ProtobufEnum for AccountType {
         match value {
             0 => ::std::option::Option::Some(AccountType::Spotify),
             1 => ::std::option::Option::Some(AccountType::Facebook),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
     fn values() -> &'static [Self] {
-        static values: &'static [AccountType] = &[
-            AccountType::Spotify,
-            AccountType::Facebook,
-        ];
+        static values: &'static [AccountType] = &[AccountType::Spotify, AccountType::Facebook];
         values
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 ::protobuf::reflect::EnumDescriptor::new("AccountType", file_descriptor_proto())
@@ -5087,8 +5642,7 @@ impl ::protobuf::ProtobufEnum for AccountType {
     }
 }
 
-impl ::std::marker::Copy for AccountType {
-}
+impl ::std::marker::Copy for AccountType {}
 
 impl ::std::default::Default for AccountType {
     fn default() -> Self {
@@ -5176,7 +5730,9 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x10\0\x12\x0c\n\x08Facebook\x10\x01\x1a\0B\0b\x06proto2\
 ";
 
-static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
+static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<
+    ::protobuf::descriptor::FileDescriptorProto,
+> = ::protobuf::lazy::Lazy {
     lock: ::protobuf::lazy::ONCE_INIT,
     ptr: 0 as *const ::protobuf::descriptor::FileDescriptorProto,
 };
@@ -5186,9 +5742,5 @@ fn parse_descriptor_proto() -> ::protobuf::descriptor::FileDescriptorProto {
 }
 
 pub fn file_descriptor_proto() -> &'static ::protobuf::descriptor::FileDescriptorProto {
-    unsafe {
-        file_descriptor_proto_lazy.get(|| {
-            parse_descriptor_proto()
-        })
-    }
+    unsafe { file_descriptor_proto_lazy.get(|| parse_descriptor_proto()) }
 }

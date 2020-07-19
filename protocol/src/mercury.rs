@@ -26,7 +26,7 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 /// of protobuf runtime.
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_8_1;
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct MercuryMultiGetRequest {
     // message fields
     request: ::protobuf::RepeatedField<MercuryRequest>,
@@ -47,7 +47,6 @@ impl MercuryMultiGetRequest {
     }
 
     // repeated .MercuryRequest request = 1;
-
 
     pub fn get_request(&self) -> &[MercuryRequest] {
         &self.request
@@ -78,20 +77,28 @@ impl ::protobuf::Message for MercuryMultiGetRequest {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.request)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -104,18 +111,21 @@ impl ::protobuf::Message for MercuryMultiGetRequest {
         for value in &self.request {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         for v in &self.request {
             os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -151,35 +161,40 @@ impl ::protobuf::Message for MercuryMultiGetRequest {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<MercuryRequest>>(
-                    "request",
-                    |m: &MercuryMultiGetRequest| { &m.request },
-                    |m: &mut MercuryMultiGetRequest| { &mut m.request },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_repeated_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<MercuryRequest>,
+                    >(
+                        "request",
+                        |m: &MercuryMultiGetRequest| &m.request,
+                        |m: &mut MercuryMultiGetRequest| &mut m.request,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<MercuryMultiGetRequest>(
                     "MercuryMultiGetRequest",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static MercuryMultiGetRequest {
-        static mut instance: ::protobuf::lazy::Lazy<MercuryMultiGetRequest> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const MercuryMultiGetRequest,
-        };
-        unsafe {
-            instance.get(MercuryMultiGetRequest::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<MercuryMultiGetRequest> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const MercuryMultiGetRequest,
+            };
+        unsafe { instance.get(MercuryMultiGetRequest::new) }
     }
 }
 
@@ -202,7 +217,7 @@ impl ::protobuf::reflect::ProtobufValue for MercuryMultiGetRequest {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct MercuryMultiGetReply {
     // message fields
     reply: ::protobuf::RepeatedField<MercuryReply>,
@@ -223,7 +238,6 @@ impl MercuryMultiGetReply {
     }
 
     // repeated .MercuryReply reply = 1;
-
 
     pub fn get_reply(&self) -> &[MercuryReply] {
         &self.reply
@@ -254,20 +268,28 @@ impl ::protobuf::Message for MercuryMultiGetReply {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.reply)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -280,18 +302,21 @@ impl ::protobuf::Message for MercuryMultiGetReply {
         for value in &self.reply {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         for v in &self.reply {
             os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -327,35 +352,40 @@ impl ::protobuf::Message for MercuryMultiGetReply {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<MercuryReply>>(
-                    "reply",
-                    |m: &MercuryMultiGetReply| { &m.reply },
-                    |m: &mut MercuryMultiGetReply| { &mut m.reply },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_repeated_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<MercuryReply>,
+                    >(
+                        "reply",
+                        |m: &MercuryMultiGetReply| &m.reply,
+                        |m: &mut MercuryMultiGetReply| &mut m.reply,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<MercuryMultiGetReply>(
                     "MercuryMultiGetReply",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static MercuryMultiGetReply {
-        static mut instance: ::protobuf::lazy::Lazy<MercuryMultiGetReply> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const MercuryMultiGetReply,
-        };
-        unsafe {
-            instance.get(MercuryMultiGetReply::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<MercuryMultiGetReply> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const MercuryMultiGetReply,
+            };
+        unsafe { instance.get(MercuryMultiGetReply::new) }
     }
 }
 
@@ -378,7 +408,7 @@ impl ::protobuf::reflect::ProtobufValue for MercuryMultiGetReply {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct MercuryRequest {
     // message fields
     uri: ::protobuf::SingularField<::std::string::String>,
@@ -402,7 +432,6 @@ impl MercuryRequest {
     }
 
     // optional string uri = 1;
-
 
     pub fn get_uri(&self) -> &str {
         match self.uri.as_ref() {
@@ -434,11 +463,12 @@ impl MercuryRequest {
 
     // Take field
     pub fn take_uri(&mut self) -> ::std::string::String {
-        self.uri.take().unwrap_or_else(|| ::std::string::String::new())
+        self.uri
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional string content_type = 2;
-
 
     pub fn get_content_type(&self) -> &str {
         match self.content_type.as_ref() {
@@ -470,11 +500,12 @@ impl MercuryRequest {
 
     // Take field
     pub fn take_content_type(&mut self) -> ::std::string::String {
-        self.content_type.take().unwrap_or_else(|| ::std::string::String::new())
+        self.content_type
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional bytes body = 3;
-
 
     pub fn get_body(&self) -> &[u8] {
         match self.body.as_ref() {
@@ -510,7 +541,6 @@ impl MercuryRequest {
     }
 
     // optional bytes etag = 4;
-
 
     pub fn get_etag(&self) -> &[u8] {
         match self.etag.as_ref() {
@@ -551,25 +581,37 @@ impl ::protobuf::Message for MercuryRequest {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.uri)?;
-                },
+                }
                 2 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.content_type)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.content_type,
+                    )?;
+                }
                 3 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.body)?;
-                },
+                }
                 4 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.etag)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -596,7 +638,10 @@ impl ::protobuf::Message for MercuryRequest {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.uri.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -644,37 +689,58 @@ impl ::protobuf::Message for MercuryRequest {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "uri",
-                    |m: &MercuryRequest| { &m.uri },
-                    |m: &mut MercuryRequest| { &mut m.uri },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "content_type",
-                    |m: &MercuryRequest| { &m.content_type },
-                    |m: &mut MercuryRequest| { &mut m.content_type },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "body",
-                    |m: &MercuryRequest| { &m.body },
-                    |m: &mut MercuryRequest| { &mut m.body },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "etag",
-                    |m: &MercuryRequest| { &m.etag },
-                    |m: &mut MercuryRequest| { &mut m.etag },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "uri",
+                        |m: &MercuryRequest| &m.uri,
+                        |m: &mut MercuryRequest| &mut m.uri,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "content_type",
+                        |m: &MercuryRequest| &m.content_type,
+                        |m: &mut MercuryRequest| &mut m.content_type,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "body",
+                        |m: &MercuryRequest| &m.body,
+                        |m: &mut MercuryRequest| &mut m.body,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "etag",
+                        |m: &MercuryRequest| &m.etag,
+                        |m: &mut MercuryRequest| &mut m.etag,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<MercuryRequest>(
                     "MercuryRequest",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -685,9 +751,7 @@ impl ::protobuf::Message for MercuryRequest {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const MercuryRequest,
         };
-        unsafe {
-            instance.get(MercuryRequest::new)
-        }
+        unsafe { instance.get(MercuryRequest::new) }
     }
 }
 
@@ -713,7 +777,7 @@ impl ::protobuf::reflect::ProtobufValue for MercuryRequest {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct MercuryReply {
     // message fields
     status_code: ::std::option::Option<i32>,
@@ -741,7 +805,6 @@ impl MercuryReply {
 
     // optional sint32 status_code = 1;
 
-
     pub fn get_status_code(&self) -> i32 {
         self.status_code.unwrap_or(0)
     }
@@ -759,7 +822,6 @@ impl MercuryReply {
     }
 
     // optional string status_message = 2;
-
 
     pub fn get_status_message(&self) -> &str {
         match self.status_message.as_ref() {
@@ -791,14 +853,16 @@ impl MercuryReply {
 
     // Take field
     pub fn take_status_message(&mut self) -> ::std::string::String {
-        self.status_message.take().unwrap_or_else(|| ::std::string::String::new())
+        self.status_message
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional .MercuryReply.CachePolicy cache_policy = 3;
 
-
     pub fn get_cache_policy(&self) -> MercuryReply_CachePolicy {
-        self.cache_policy.unwrap_or(MercuryReply_CachePolicy::CACHE_NO)
+        self.cache_policy
+            .unwrap_or(MercuryReply_CachePolicy::CACHE_NO)
     }
     pub fn clear_cache_policy(&mut self) {
         self.cache_policy = ::std::option::Option::None;
@@ -814,7 +878,6 @@ impl MercuryReply {
     }
 
     // optional sint32 ttl = 4;
-
 
     pub fn get_ttl(&self) -> i32 {
         self.ttl.unwrap_or(0)
@@ -833,7 +896,6 @@ impl MercuryReply {
     }
 
     // optional bytes etag = 5;
-
 
     pub fn get_etag(&self) -> &[u8] {
         match self.etag.as_ref() {
@@ -870,7 +932,6 @@ impl MercuryReply {
 
     // optional string content_type = 6;
 
-
     pub fn get_content_type(&self) -> &str {
         match self.content_type.as_ref() {
             Some(v) => &v,
@@ -901,11 +962,12 @@ impl MercuryReply {
 
     // Take field
     pub fn take_content_type(&mut self) -> ::std::string::String {
-        self.content_type.take().unwrap_or_else(|| ::std::string::String::new())
+        self.content_type
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional bytes body = 7;
-
 
     pub fn get_body(&self) -> &[u8] {
         match self.body.as_ref() {
@@ -946,42 +1008,66 @@ impl ::protobuf::Message for MercuryReply {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_sint32()?;
                     self.status_code = ::std::option::Option::Some(tmp);
-                },
+                }
                 2 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.status_message)?;
-                },
-                3 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.cache_policy, 3, &mut self.unknown_fields)?
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.status_message,
+                    )?;
+                }
+                3 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.cache_policy,
+                    3,
+                    &mut self.unknown_fields,
+                )?,
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_sint32()?;
                     self.ttl = ::std::option::Option::Some(tmp);
-                },
+                }
                 5 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.etag)?;
-                },
+                }
                 6 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.content_type)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.content_type,
+                    )?;
+                }
                 7 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.body)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1017,7 +1103,10 @@ impl ::protobuf::Message for MercuryReply {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.status_code {
             os.write_sint32(1, v)?;
         }
@@ -1074,52 +1163,82 @@ impl ::protobuf::Message for MercuryReply {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeSint32,
+                >(
                     "status_code",
-                    |m: &MercuryReply| { &m.status_code },
-                    |m: &mut MercuryReply| { &mut m.status_code },
+                    |m: &MercuryReply| &m.status_code,
+                    |m: &mut MercuryReply| &mut m.status_code,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "status_message",
-                    |m: &MercuryReply| { &m.status_message },
-                    |m: &mut MercuryReply| { &mut m.status_message },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<MercuryReply_CachePolicy>>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "status_message",
+                        |m: &MercuryReply| &m.status_message,
+                        |m: &mut MercuryReply| &mut m.status_message,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<MercuryReply_CachePolicy>,
+                >(
                     "cache_policy",
-                    |m: &MercuryReply| { &m.cache_policy },
-                    |m: &mut MercuryReply| { &mut m.cache_policy },
+                    |m: &MercuryReply| &m.cache_policy,
+                    |m: &mut MercuryReply| &mut m.cache_policy,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeSint32,
+                >(
                     "ttl",
-                    |m: &MercuryReply| { &m.ttl },
-                    |m: &mut MercuryReply| { &mut m.ttl },
+                    |m: &MercuryReply| &m.ttl,
+                    |m: &mut MercuryReply| &mut m.ttl,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "etag",
-                    |m: &MercuryReply| { &m.etag },
-                    |m: &mut MercuryReply| { &mut m.etag },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "content_type",
-                    |m: &MercuryReply| { &m.content_type },
-                    |m: &mut MercuryReply| { &mut m.content_type },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "body",
-                    |m: &MercuryReply| { &m.body },
-                    |m: &mut MercuryReply| { &mut m.body },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "etag",
+                        |m: &MercuryReply| &m.etag,
+                        |m: &mut MercuryReply| &mut m.etag,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "content_type",
+                        |m: &MercuryReply| &m.content_type,
+                        |m: &mut MercuryReply| &mut m.content_type,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "body",
+                        |m: &MercuryReply| &m.body,
+                        |m: &mut MercuryReply| &mut m.body,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<MercuryReply>(
                     "MercuryReply",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -1130,9 +1249,7 @@ impl ::protobuf::Message for MercuryReply {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const MercuryReply,
         };
-        unsafe {
-            instance.get(MercuryReply::new)
-        }
+        unsafe { instance.get(MercuryReply::new) }
     }
 }
 
@@ -1161,7 +1278,7 @@ impl ::protobuf::reflect::ProtobufValue for MercuryReply {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum MercuryReply_CachePolicy {
     CACHE_NO = 1,
     CACHE_PRIVATE = 2,
@@ -1178,7 +1295,7 @@ impl ::protobuf::ProtobufEnum for MercuryReply_CachePolicy {
             1 => ::std::option::Option::Some(MercuryReply_CachePolicy::CACHE_NO),
             2 => ::std::option::Option::Some(MercuryReply_CachePolicy::CACHE_PRIVATE),
             3 => ::std::option::Option::Some(MercuryReply_CachePolicy::CACHE_PUBLIC),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -1192,20 +1309,23 @@ impl ::protobuf::ProtobufEnum for MercuryReply_CachePolicy {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("MercuryReply_CachePolicy", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new(
+                    "MercuryReply_CachePolicy",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for MercuryReply_CachePolicy {
-}
+impl ::std::marker::Copy for MercuryReply_CachePolicy {}
 
 // Note, `Default` is implemented although default value is not 0
 impl ::std::default::Default for MercuryReply_CachePolicy {
@@ -1220,7 +1340,7 @@ impl ::protobuf::reflect::ProtobufValue for MercuryReply_CachePolicy {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct Header {
     // message fields
     uri: ::protobuf::SingularField<::std::string::String>,
@@ -1245,7 +1365,6 @@ impl Header {
     }
 
     // optional string uri = 1;
-
 
     pub fn get_uri(&self) -> &str {
         match self.uri.as_ref() {
@@ -1277,11 +1396,12 @@ impl Header {
 
     // Take field
     pub fn take_uri(&mut self) -> ::std::string::String {
-        self.uri.take().unwrap_or_else(|| ::std::string::String::new())
+        self.uri
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional string content_type = 2;
-
 
     pub fn get_content_type(&self) -> &str {
         match self.content_type.as_ref() {
@@ -1313,11 +1433,12 @@ impl Header {
 
     // Take field
     pub fn take_content_type(&mut self) -> ::std::string::String {
-        self.content_type.take().unwrap_or_else(|| ::std::string::String::new())
+        self.content_type
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional string method = 3;
-
 
     pub fn get_method(&self) -> &str {
         match self.method.as_ref() {
@@ -1349,11 +1470,12 @@ impl Header {
 
     // Take field
     pub fn take_method(&mut self) -> ::std::string::String {
-        self.method.take().unwrap_or_else(|| ::std::string::String::new())
+        self.method
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional sint32 status_code = 4;
-
 
     pub fn get_status_code(&self) -> i32 {
         self.status_code.unwrap_or(0)
@@ -1372,7 +1494,6 @@ impl Header {
     }
 
     // repeated .UserField user_fields = 6;
-
 
     pub fn get_user_fields(&self) -> &[UserField] {
         &self.user_fields
@@ -1403,36 +1524,54 @@ impl ::protobuf::Message for Header {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.uri)?;
-                },
+                }
                 2 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.content_type)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.content_type,
+                    )?;
+                }
                 3 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.method)?;
-                },
+                }
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_sint32()?;
                     self.status_code = ::std::option::Option::Some(tmp);
-                },
+                }
                 6 => {
-                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.user_fields)?;
-                },
+                    ::protobuf::rt::read_repeated_message_into(
+                        wire_type,
+                        is,
+                        &mut self.user_fields,
+                    )?;
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1457,13 +1596,16 @@ impl ::protobuf::Message for Header {
         for value in &self.user_fields {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.uri.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -1480,7 +1622,7 @@ impl ::protobuf::Message for Header {
             os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -1516,42 +1658,62 @@ impl ::protobuf::Message for Header {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "uri",
-                    |m: &Header| { &m.uri },
-                    |m: &mut Header| { &mut m.uri },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "content_type",
-                    |m: &Header| { &m.content_type },
-                    |m: &mut Header| { &mut m.content_type },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "method",
-                    |m: &Header| { &m.method },
-                    |m: &mut Header| { &mut m.method },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeSint32>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >("uri", |m: &Header| &m.uri, |m: &mut Header| &mut m.uri),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "content_type",
+                        |m: &Header| &m.content_type,
+                        |m: &mut Header| &mut m.content_type,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "method",
+                        |m: &Header| &m.method,
+                        |m: &mut Header| &mut m.method,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeSint32,
+                >(
                     "status_code",
-                    |m: &Header| { &m.status_code },
-                    |m: &mut Header| { &mut m.status_code },
+                    |m: &Header| &m.status_code,
+                    |m: &mut Header| &mut m.status_code,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<UserField>>(
-                    "user_fields",
-                    |m: &Header| { &m.user_fields },
-                    |m: &mut Header| { &mut m.user_fields },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_repeated_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<UserField>,
+                    >(
+                        "user_fields",
+                        |m: &Header| &m.user_fields,
+                        |m: &mut Header| &mut m.user_fields,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<Header>(
                     "Header",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -1562,9 +1724,7 @@ impl ::protobuf::Message for Header {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const Header,
         };
-        unsafe {
-            instance.get(Header::new)
-        }
+        unsafe { instance.get(Header::new) }
     }
 }
 
@@ -1591,7 +1751,7 @@ impl ::protobuf::reflect::ProtobufValue for Header {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct UserField {
     // message fields
     key: ::protobuf::SingularField<::std::string::String>,
@@ -1613,7 +1773,6 @@ impl UserField {
     }
 
     // optional string key = 1;
-
 
     pub fn get_key(&self) -> &str {
         match self.key.as_ref() {
@@ -1645,11 +1804,12 @@ impl UserField {
 
     // Take field
     pub fn take_key(&mut self) -> ::std::string::String {
-        self.key.take().unwrap_or_else(|| ::std::string::String::new())
+        self.key
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional bytes value = 2;
-
 
     pub fn get_value(&self) -> &[u8] {
         match self.value.as_ref() {
@@ -1690,19 +1850,27 @@ impl ::protobuf::Message for UserField {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.key)?;
-                },
+                }
                 2 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.value)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1723,7 +1891,10 @@ impl ::protobuf::Message for UserField {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.key.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -1765,27 +1936,38 @@ impl ::protobuf::Message for UserField {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "key",
-                    |m: &UserField| { &m.key },
-                    |m: &mut UserField| { &mut m.key },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "value",
-                    |m: &UserField| { &m.value },
-                    |m: &mut UserField| { &mut m.value },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "key",
+                        |m: &UserField| &m.key,
+                        |m: &mut UserField| &mut m.key,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "value",
+                        |m: &UserField| &m.value,
+                        |m: &mut UserField| &mut m.value,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new::<UserField>(
                     "UserField",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -1796,9 +1978,7 @@ impl ::protobuf::Message for UserField {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const UserField,
         };
-        unsafe {
-            instance.get(UserField::new)
-        }
+        unsafe { instance.get(UserField::new) }
     }
 }
 
@@ -1843,7 +2023,9 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x12\x0f\n\x05value\x18\x02\x20\x01(\x0cB\0:\0B\0b\x06proto2\
 ";
 
-static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
+static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<
+    ::protobuf::descriptor::FileDescriptorProto,
+> = ::protobuf::lazy::Lazy {
     lock: ::protobuf::lazy::ONCE_INIT,
     ptr: 0 as *const ::protobuf::descriptor::FileDescriptorProto,
 };
@@ -1853,9 +2035,5 @@ fn parse_descriptor_proto() -> ::protobuf::descriptor::FileDescriptorProto {
 }
 
 pub fn file_descriptor_proto() -> &'static ::protobuf::descriptor::FileDescriptorProto {
-    unsafe {
-        file_descriptor_proto_lazy.get(|| {
-            parse_descriptor_proto()
-        })
-    }
+    unsafe { file_descriptor_proto_lazy.get(|| parse_descriptor_proto()) }
 }

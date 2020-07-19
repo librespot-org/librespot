@@ -26,7 +26,7 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 /// of protobuf runtime.
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_8_1;
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ClientIssue {
     // message fields
     level: ::std::option::Option<ClientIssue_Level>,
@@ -50,7 +50,6 @@ impl ClientIssue {
 
     // optional .ClientIssue.Level level = 1;
 
-
     pub fn get_level(&self) -> ClientIssue_Level {
         self.level.unwrap_or(ClientIssue_Level::LEVEL_UNKNOWN)
     }
@@ -69,7 +68,6 @@ impl ClientIssue {
 
     // optional .ClientIssue.Code code = 2;
 
-
     pub fn get_code(&self) -> ClientIssue_Code {
         self.code.unwrap_or(ClientIssue_Code::CODE_UNKNOWN)
     }
@@ -87,7 +85,6 @@ impl ClientIssue {
     }
 
     // optional int32 repeatCount = 3;
-
 
     pub fn get_repeatCount(&self) -> i32 {
         self.repeatCount.unwrap_or(0)
@@ -111,26 +108,44 @@ impl ::protobuf::Message for ClientIssue {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.level, 1, &mut self.unknown_fields)?
-                },
-                2 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.code, 2, &mut self.unknown_fields)?
-                },
+                1 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.level,
+                    1,
+                    &mut self.unknown_fields,
+                )?,
+                2 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.code,
+                    2,
+                    &mut self.unknown_fields,
+                )?,
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.repeatCount = ::std::option::Option::Some(tmp);
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -154,7 +169,10 @@ impl ::protobuf::Message for ClientIssue {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.level {
             os.write_enum(1, v.value())?;
         }
@@ -199,32 +217,42 @@ impl ::protobuf::Message for ClientIssue {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<ClientIssue_Level>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<ClientIssue_Level>,
+                >(
                     "level",
-                    |m: &ClientIssue| { &m.level },
-                    |m: &mut ClientIssue| { &mut m.level },
+                    |m: &ClientIssue| &m.level,
+                    |m: &mut ClientIssue| &mut m.level,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<ClientIssue_Code>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<ClientIssue_Code>,
+                >(
                     "code",
-                    |m: &ClientIssue| { &m.code },
-                    |m: &mut ClientIssue| { &mut m.code },
+                    |m: &ClientIssue| &m.code,
+                    |m: &mut ClientIssue| &mut m.code,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "repeatCount",
-                    |m: &ClientIssue| { &m.repeatCount },
-                    |m: &mut ClientIssue| { &mut m.repeatCount },
+                    |m: &ClientIssue| &m.repeatCount,
+                    |m: &mut ClientIssue| &mut m.repeatCount,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ClientIssue>(
                     "ClientIssue",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -235,9 +263,7 @@ impl ::protobuf::Message for ClientIssue {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const ClientIssue,
         };
-        unsafe {
-            instance.get(ClientIssue::new)
-        }
+        unsafe { instance.get(ClientIssue::new) }
     }
 }
 
@@ -262,7 +288,7 @@ impl ::protobuf::reflect::ProtobufValue for ClientIssue {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum ClientIssue_Level {
     LEVEL_UNKNOWN = 0,
     LEVEL_DEBUG = 1,
@@ -285,7 +311,7 @@ impl ::protobuf::ProtobufEnum for ClientIssue_Level {
             3 => ::std::option::Option::Some(ClientIssue_Level::LEVEL_NOTICE),
             4 => ::std::option::Option::Some(ClientIssue_Level::LEVEL_WARNING),
             5 => ::std::option::Option::Some(ClientIssue_Level::LEVEL_ERROR),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -302,20 +328,23 @@ impl ::protobuf::ProtobufEnum for ClientIssue_Level {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("ClientIssue_Level", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new(
+                    "ClientIssue_Level",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for ClientIssue_Level {
-}
+impl ::std::marker::Copy for ClientIssue_Level {}
 
 impl ::std::default::Default for ClientIssue_Level {
     fn default() -> Self {
@@ -329,7 +358,7 @@ impl ::protobuf::reflect::ProtobufValue for ClientIssue_Level {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum ClientIssue_Code {
     CODE_UNKNOWN = 0,
     CODE_INDEX_OUT_OF_BOUNDS = 1,
@@ -352,7 +381,7 @@ impl ::protobuf::ProtobufEnum for ClientIssue_Code {
             3 => ::std::option::Option::Some(ClientIssue_Code::CODE_CACHED_CHANGE),
             4 => ::std::option::Option::Some(ClientIssue_Code::CODE_OFFLINE_CHANGE),
             5 => ::std::option::Option::Some(ClientIssue_Code::CODE_CONCURRENT_CHANGE),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -369,20 +398,23 @@ impl ::protobuf::ProtobufEnum for ClientIssue_Code {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("ClientIssue_Code", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new(
+                    "ClientIssue_Code",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for ClientIssue_Code {
-}
+impl ::std::marker::Copy for ClientIssue_Code {}
 
 impl ::std::default::Default for ClientIssue_Code {
     fn default() -> Self {
@@ -396,7 +428,7 @@ impl ::protobuf::reflect::ProtobufValue for ClientIssue_Code {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ClientResolveAction {
     // message fields
     code: ::std::option::Option<ClientResolveAction_Code>,
@@ -419,7 +451,6 @@ impl ClientResolveAction {
 
     // optional .ClientResolveAction.Code code = 1;
 
-
     pub fn get_code(&self) -> ClientResolveAction_Code {
         self.code.unwrap_or(ClientResolveAction_Code::CODE_UNKNOWN)
     }
@@ -438,9 +469,9 @@ impl ClientResolveAction {
 
     // optional .ClientResolveAction.Initiator initiator = 2;
 
-
     pub fn get_initiator(&self) -> ClientResolveAction_Initiator {
-        self.initiator.unwrap_or(ClientResolveAction_Initiator::INITIATOR_UNKNOWN)
+        self.initiator
+            .unwrap_or(ClientResolveAction_Initiator::INITIATOR_UNKNOWN)
     }
     pub fn clear_initiator(&mut self) {
         self.initiator = ::std::option::Option::None;
@@ -461,19 +492,35 @@ impl ::protobuf::Message for ClientResolveAction {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.code, 1, &mut self.unknown_fields)?
-                },
-                2 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.initiator, 2, &mut self.unknown_fields)?
-                },
+                1 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.code,
+                    1,
+                    &mut self.unknown_fields,
+                )?,
+                2 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.initiator,
+                    2,
+                    &mut self.unknown_fields,
+                )?,
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -494,7 +541,10 @@ impl ::protobuf::Message for ClientResolveAction {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.code {
             os.write_enum(1, v.value())?;
         }
@@ -536,27 +586,34 @@ impl ::protobuf::Message for ClientResolveAction {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<ClientResolveAction_Code>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<ClientResolveAction_Code>,
+                >(
                     "code",
-                    |m: &ClientResolveAction| { &m.code },
-                    |m: &mut ClientResolveAction| { &mut m.code },
+                    |m: &ClientResolveAction| &m.code,
+                    |m: &mut ClientResolveAction| &mut m.code,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<ClientResolveAction_Initiator>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<ClientResolveAction_Initiator>,
+                >(
                     "initiator",
-                    |m: &ClientResolveAction| { &m.initiator },
-                    |m: &mut ClientResolveAction| { &mut m.initiator },
+                    |m: &ClientResolveAction| &m.initiator,
+                    |m: &mut ClientResolveAction| &mut m.initiator,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<ClientResolveAction>(
                     "ClientResolveAction",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -567,9 +624,7 @@ impl ::protobuf::Message for ClientResolveAction {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const ClientResolveAction,
         };
-        unsafe {
-            instance.get(ClientResolveAction::new)
-        }
+        unsafe { instance.get(ClientResolveAction::new) }
     }
 }
 
@@ -593,7 +648,7 @@ impl ::protobuf::reflect::ProtobufValue for ClientResolveAction {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum ClientResolveAction_Code {
     CODE_UNKNOWN = 0,
     CODE_NO_ACTION = 1,
@@ -618,7 +673,7 @@ impl ::protobuf::ProtobufEnum for ClientResolveAction_Code {
             4 => ::std::option::Option::Some(ClientResolveAction_Code::CODE_DISCARD_LOCAL_CHANGES),
             5 => ::std::option::Option::Some(ClientResolveAction_Code::CODE_SEND_DUMP),
             6 => ::std::option::Option::Some(ClientResolveAction_Code::CODE_DISPLAY_ERROR_MESSAGE),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -636,20 +691,23 @@ impl ::protobuf::ProtobufEnum for ClientResolveAction_Code {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("ClientResolveAction_Code", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new(
+                    "ClientResolveAction_Code",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for ClientResolveAction_Code {
-}
+impl ::std::marker::Copy for ClientResolveAction_Code {}
 
 impl ::std::default::Default for ClientResolveAction_Code {
     fn default() -> Self {
@@ -663,7 +721,7 @@ impl ::protobuf::reflect::ProtobufValue for ClientResolveAction_Code {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum ClientResolveAction_Initiator {
     INITIATOR_UNKNOWN = 0,
     INITIATOR_SERVER = 1,
@@ -680,7 +738,7 @@ impl ::protobuf::ProtobufEnum for ClientResolveAction_Initiator {
             0 => ::std::option::Option::Some(ClientResolveAction_Initiator::INITIATOR_UNKNOWN),
             1 => ::std::option::Option::Some(ClientResolveAction_Initiator::INITIATOR_SERVER),
             2 => ::std::option::Option::Some(ClientResolveAction_Initiator::INITIATOR_CLIENT),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -694,20 +752,23 @@ impl ::protobuf::ProtobufEnum for ClientResolveAction_Initiator {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("ClientResolveAction_Initiator", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new(
+                    "ClientResolveAction_Initiator",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for ClientResolveAction_Initiator {
-}
+impl ::std::marker::Copy for ClientResolveAction_Initiator {}
 
 impl ::std::default::Default for ClientResolveAction_Initiator {
     fn default() -> Self {
@@ -743,7 +804,9 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x10\x01\x12\x14\n\x10INITIATOR_CLIENT\x10\x02\x1a\0:\0B\0b\x06proto2\
 ";
 
-static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
+static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<
+    ::protobuf::descriptor::FileDescriptorProto,
+> = ::protobuf::lazy::Lazy {
     lock: ::protobuf::lazy::ONCE_INIT,
     ptr: 0 as *const ::protobuf::descriptor::FileDescriptorProto,
 };
@@ -753,9 +816,5 @@ fn parse_descriptor_proto() -> ::protobuf::descriptor::FileDescriptorProto {
 }
 
 pub fn file_descriptor_proto() -> &'static ::protobuf::descriptor::FileDescriptorProto {
-    unsafe {
-        file_descriptor_proto_lazy.get(|| {
-            parse_descriptor_proto()
-        })
-    }
+    unsafe { file_descriptor_proto_lazy.get(|| parse_descriptor_proto()) }
 }

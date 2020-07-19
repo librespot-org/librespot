@@ -26,7 +26,7 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 /// of protobuf runtime.
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_8_1;
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct Subscription {
     // message fields
     uri: ::protobuf::SingularField<::std::string::String>,
@@ -49,7 +49,6 @@ impl Subscription {
     }
 
     // optional string uri = 1;
-
 
     pub fn get_uri(&self) -> &str {
         match self.uri.as_ref() {
@@ -81,11 +80,12 @@ impl Subscription {
 
     // Take field
     pub fn take_uri(&mut self) -> ::std::string::String {
-        self.uri.take().unwrap_or_else(|| ::std::string::String::new())
+        self.uri
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional int32 expiry = 2;
-
 
     pub fn get_expiry(&self) -> i32 {
         self.expiry.unwrap_or(0)
@@ -104,7 +104,6 @@ impl Subscription {
     }
 
     // optional int32 status_code = 3;
-
 
     pub fn get_status_code(&self) -> i32 {
         self.status_code.unwrap_or(0)
@@ -128,30 +127,42 @@ impl ::protobuf::Message for Subscription {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.uri)?;
-                },
+                }
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.expiry = ::std::option::Option::Some(tmp);
-                },
+                }
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.status_code = ::std::option::Option::Some(tmp);
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -175,7 +186,10 @@ impl ::protobuf::Message for Subscription {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.uri.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -220,32 +234,44 @@ impl ::protobuf::Message for Subscription {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy {
+                lock: ::protobuf::lazy::ONCE_INIT,
+                ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+            };
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "uri",
-                    |m: &Subscription| { &m.uri },
-                    |m: &mut Subscription| { &mut m.uri },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "uri",
+                        |m: &Subscription| &m.uri,
+                        |m: &mut Subscription| &mut m.uri,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "expiry",
-                    |m: &Subscription| { &m.expiry },
-                    |m: &mut Subscription| { &mut m.expiry },
+                    |m: &Subscription| &m.expiry,
+                    |m: &mut Subscription| &mut m.expiry,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "status_code",
-                    |m: &Subscription| { &m.status_code },
-                    |m: &mut Subscription| { &mut m.status_code },
+                    |m: &Subscription| &m.status_code,
+                    |m: &mut Subscription| &mut m.status_code,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Subscription>(
                     "Subscription",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -256,9 +282,7 @@ impl ::protobuf::Message for Subscription {
             lock: ::protobuf::lazy::ONCE_INIT,
             ptr: 0 as *const Subscription,
         };
-        unsafe {
-            instance.get(Subscription::new)
-        }
+        unsafe { instance.get(Subscription::new) }
     }
 }
 
@@ -289,7 +313,9 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     us_code\x18\x03\x20\x01(\x05B\0:\0B\0b\x06proto2\
 ";
 
-static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
+static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<
+    ::protobuf::descriptor::FileDescriptorProto,
+> = ::protobuf::lazy::Lazy {
     lock: ::protobuf::lazy::ONCE_INIT,
     ptr: 0 as *const ::protobuf::descriptor::FileDescriptorProto,
 };
@@ -299,9 +325,5 @@ fn parse_descriptor_proto() -> ::protobuf::descriptor::FileDescriptorProto {
 }
 
 pub fn file_descriptor_proto() -> &'static ::protobuf::descriptor::FileDescriptorProto {
-    unsafe {
-        file_descriptor_proto_lazy.get(|| {
-            parse_descriptor_proto()
-        })
-    }
+    unsafe { file_descriptor_proto_lazy.get(|| parse_descriptor_proto()) }
 }
