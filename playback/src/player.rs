@@ -972,6 +972,7 @@ impl PlayerInternal {
         }
     }
 
+    #[allow(clippy::float_cmp)]
     fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalisation_factor: f32) {
         match packet {
             Some(mut packet) => {
@@ -980,7 +981,6 @@ impl PlayerInternal {
                         editor.modify_stream(&mut packet.data_mut())
                     };
 
-                    #[allow(clippy::float_cmp)]
                     if self.config.normalisation && normalisation_factor != 1.0 {
                         for x in packet.data_mut().iter_mut() {
                             *x = (*x as f32 * normalisation_factor) as i16;
@@ -1465,12 +1465,9 @@ impl PlayerInternal {
         let (result_tx, result_rx) = futures::sync::oneshot::channel();
 
         std::thread::spawn(move || {
-            loader
-                .load_track(spotify_id, position_ms)
-                .and_then(move |data| {
-                    let _ = result_tx.send(data);
-                    Some(())
-                });
+            if let Some(data) = loader.load_track(spotify_id, position_ms) {
+                let _ = result_tx.send(data);
+            };
         });
 
         Box::new(result_rx.map_err(|_| ()))
