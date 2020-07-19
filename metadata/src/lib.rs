@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate log;
 
-extern crate librespot_protocol as protocol;
+use librespot_protocol as protocol;
 
 pub mod cover;
 

@@ -1,9 +1,9 @@
 #![crate_name = "librespot"]
 #![deny(rust_2018_idioms)]
 
-pub extern crate librespot_audio as audio;
-pub extern crate librespot_connect as connect;
-pub extern crate librespot_core as core;
-pub extern crate librespot_metadata as metadata;
-pub extern crate librespot_playback as playback;
-pub extern crate librespot_protocol as protocol;
+pub use librespot_audio as audio;
+pub use librespot_connect as connect;
+pub use librespot_core as core;
+pub use librespot_metadata as metadata;
+pub use librespot_playback as playback;
+pub use librespot_protocol as protocol;

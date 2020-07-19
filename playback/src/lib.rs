@@ -3,8 +3,8 @@
 #[macro_use]
 extern crate log;
 
-extern crate librespot_audio as audio;
-extern crate librespot_metadata as metadata;
+use librespot_audio as audio;
+use librespot_metadata as metadata;
 
 pub mod audio_backend;
 pub mod config;

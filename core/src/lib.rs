@@ -11,7 +11,7 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
-extern crate librespot_protocol as protocol;
+use librespot_protocol as protocol;
 
 #[macro_use]
 mod component;

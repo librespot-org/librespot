@@ -7,8 +7,8 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 
-extern crate librespot_playback as playback;
-extern crate librespot_protocol as protocol;
+use librespot_playback as playback;
+use librespot_protocol as protocol;
 
 pub mod context;
 pub mod discovery;

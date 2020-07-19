@@ -1,5 +1,5 @@
 #[cfg(feature = "with-tremor")]
-extern crate librespot_tremor as vorbis;
+use librespot_tremor as vorbis;
 
 use std::error;
 use std::fmt;
