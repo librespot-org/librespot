@@ -1,6 +1,3 @@
-extern crate rand;
-extern crate vergen;
-
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use vergen::{generate_cargo_keys, ConstantsFlags};

@@ -1,6 +1,4 @@
 use super::{Open, Sink};
-extern crate cpal;
-extern crate rodio;
 use std::process::exit;
 use std::{io, thread, time};
 

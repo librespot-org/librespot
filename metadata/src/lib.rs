@@ -1,12 +1,8 @@
+#![deny(rust_2018_idioms)]
+
 #[macro_use]
 extern crate log;
 
-extern crate byteorder;
-extern crate futures;
-extern crate linear_map;
-extern crate protobuf;
-
-extern crate librespot_core;
 extern crate librespot_protocol as protocol;
 
 pub mod cover;
@@ -453,11 +449,11 @@ impl Metadata for Show {
 struct StrChunks<'s>(&'s str, usize);
 
 trait StrChunksExt {
-    fn chunks(&self, size: usize) -> StrChunks;
+    fn chunks(&self, size: usize) -> StrChunks<'_>;
 }
 
 impl StrChunksExt for str {
-    fn chunks(&self, size: usize) -> StrChunks {
+    fn chunks(&self, size: usize) -> StrChunks<'_> {
         StrChunks(self, size)
     }
 }

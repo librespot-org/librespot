@@ -1,4 +1,5 @@
 #![crate_name = "librespot"]
+#![deny(rust_2018_idioms)]
 
 pub extern crate librespot_audio as audio;
 pub extern crate librespot_connect as connect;

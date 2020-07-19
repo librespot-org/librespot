@@ -1511,7 +1511,7 @@ impl Drop for PlayerInternal {
 }
 
 impl ::std::fmt::Debug for PlayerCommand {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         match *self {
             PlayerCommand::Load {
                 track_id,

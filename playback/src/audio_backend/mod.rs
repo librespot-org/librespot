@@ -55,7 +55,7 @@ pub const BACKENDS: &[(&str, BackendCtor)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
-    ("portaudio", mk_sink::<PortAudioSink>),
+    ("portaudio", mk_sink::<PortAudioSink<'_>>),
     #[cfg(feature = "pulseaudio-backend")]
     ("pulseaudio", mk_sink::<PulseAudioSink>),
     #[cfg(feature = "jackaudio-backend")]

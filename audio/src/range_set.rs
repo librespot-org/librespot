@@ -1,6 +1,5 @@
 use std::cmp::{max, min};
 use std::fmt;
-use std::slice::Iter;
 
 #[derive(Copy, Clone)]
 pub struct Range {
@@ -65,7 +64,7 @@ impl RangeSet {
         self.ranges[index]
     }
 
-    pub fn iter(&self) -> Iter<Range> {
+    pub fn iter(&self) -> impl Iterator<Item=&Range> {
         self.ranges.iter()
     }
 

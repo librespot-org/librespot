@@ -122,13 +122,13 @@ impl FileId {
 }
 
 impl fmt::Debug for FileId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("FileId").field(&self.to_base16()).finish()
     }
 }
 
 impl fmt::Display for FileId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_base16())
     }
 }

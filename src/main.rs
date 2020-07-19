@@ -1,3 +1,5 @@
+#![deny(rust_2018_idioms)]
+
 use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
 use log::{error, info, trace, warn};
