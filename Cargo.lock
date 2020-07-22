@@ -787,7 +787,7 @@ dependencies = [
  "num-bigint 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "vorbis 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vorbis 0.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2115,38 +2115,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "vorbis"
-version = "0.1.0"
+version = "0.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.73 (registry+https://github.com/rust-lang/crates.io-index)",
  "ogg-sys 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)",
- "vorbis-encoder 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "vorbis-sys 0.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vorbis-sys 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vorbisfile-sys 0.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "vorbis-encoder"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "gcc 0.3.55 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.73 (registry+https://github.com/rust-lang/crates.io-index)",
- "ogg-sys 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "pkg-config 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
- "vorbis-sys 0.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "vorbis-sys"
-version = "0.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "gcc 0.3.55 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.73 (registry+https://github.com/rust-lang/crates.io-index)",
- "ogg-sys 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "pkg-config 0.3.18 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2459,9 +2434,7 @@ dependencies = [
 "checksum vergen 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4ce50d8996df1f85af15f2cd8d33daae6e479575123ef4314a51a70a230739cb"
 "checksum version_check 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)" = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
-"checksum vorbis 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "760993e54524128b88d4d7aff09c773c2f16a9f18db3c8ae1ccca5afd1287656"
-"checksum vorbis-encoder 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "3fb66bcdde056dd230991bb86669a1269778fe8ad1f6cee403428ac7985391bc"
-"checksum vorbis-sys 0.0.8 (registry+https://github.com/rust-lang/crates.io-index)" = "729e1f15395850b4e6d19ca0cd1d42ef44707503a53b69d40ff49182b3c5589d"
+"checksum vorbis 0.0.14 (registry+https://github.com/rust-lang/crates.io-index)" = "5e8a194457075360557b82dac78f7ca2d65bbb6679bccfabae5f7c8c706cc776"
 "checksum vorbis-sys 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3a0a8d7034313748da1d84b0adfa501f83f9ec83250f37fbacfa92a3580327c4"
 "checksum vorbisfile-sys 0.0.8 (registry+https://github.com/rust-lang/crates.io-index)" = "4f4306d7e1ac4699b55e20de9483750b90c250913188efd7484db6bfbe9042d1"
 "checksum want 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a05d9d966753fa4b5c8db73fcab5eed4549cfe0e1e4e66911e5564a0085c35d1"
