@@ -29,20 +29,21 @@ fn main() {
         }
 
         // Build the paths to relevant files.
-        let src = &format!("proto/{}.proto", name);
-        let dest = &format!("src/{}.rs", name);
-
+        let src_fname = &format!("proto/{}.proto", name);
+        let dest_fname = &format!("src/{}.rs", name);
+        let src = Path::new(src_fname);
+        let dest = Path::new(dest_fname);
         // Get the contents of the existing generated file.
         let mut existing = "".to_string();
-        if Path::new(dest).exists() {
+        if dest.exists() {
             // Removing CRLF line endings if present.
             existing = read_to_string(dest).unwrap().replace("\r\n", "\n");
         }
 
-        println!("Regenerating {} from {}", dest, src);
+        println!("Regenerating {} from {}", dest.display(), src.display());
 
         // Parse the proto files as the protobuf-codegen-pure crate does.
-        let p = parse_and_typecheck(&["proto"], &[src]).expect("protoc");
+        let p = parse_and_typecheck(&[&Path::new("proto")], &[src]).expect("protoc");
         // But generate them with the protobuf-codegen crate directly.
         // Then we can keep the result in-memory.
         let result = protobuf_codegen::gen(&p.file_descriptors, &p.relative_paths, &customizations);
