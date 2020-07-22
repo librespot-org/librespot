@@ -1,6 +1,6 @@
 [package]
 name = "librespot-audio"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description="The audio fetching and processing logic for librespot"
 license="MIT"
@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.1.1"
+version = "0.1.2"
 
 [dependencies]
 bit-set = "0.5"
