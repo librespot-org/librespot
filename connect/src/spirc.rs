@@ -14,10 +14,12 @@ use crate::playback::mixer::Mixer;
 use crate::playback::player::{Player, PlayerEvent, PlayerEventChannel};
 use crate::protocol;
 use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
+
 use librespot_core::config::ConnectConfig;
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
+use librespot_core::util::url_encode;
 use librespot_core::util::SeqGenerator;
 use librespot_core::version;
 use librespot_core::volume::Volume;
@@ -249,7 +251,8 @@ impl Spirc {
         let ident = session.device_id().to_owned();
 
         // Uri updated in response to issue #288
-        let uri = format!("hm://remote/user/{}/", session.username());
+        debug!("canonical_username: {}", url_encode(&session.username()));
+        let uri = format!("hm://remote/user/{}/", url_encode(&session.username()));
 
         let subscription = session.mercury().subscribe(&uri as &str);
         let subscription = subscription
@@ -923,7 +926,7 @@ impl SpircTask {
         if (context_uri.starts_with("spotify:station:")
             || context_uri.starts_with("spotify:dailymix:")
             // spotify:user:xxx:collection
-            || context_uri.starts_with(&format!("spotify:user:{}:collection",self.session.username())))
+            || context_uri.starts_with(&format!("spotify:user:{}:collection",url_encode(&self.session.username()))))
             && ((self.state.get_track().len() as u32) - new_index) < CONTEXT_FETCH_THRESHOLD
         {
             self.context_fut = self.resolve_station(&context_uri);
