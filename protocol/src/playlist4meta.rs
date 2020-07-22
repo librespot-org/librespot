@@ -26,7 +26,7 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 /// of protobuf runtime.
 // const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_14_0;
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ListChecksum {
     // message fields
     version: ::std::option::Option<i32>,
@@ -49,7 +49,6 @@ impl ListChecksum {
 
     // optional int32 version = 1;
 
-
     pub fn get_version(&self) -> i32 {
         self.version.unwrap_or(0)
     }
@@ -67,7 +66,6 @@ impl ListChecksum {
     }
 
     // optional bytes sha1 = 4;
-
 
     pub fn get_sha1(&self) -> &[u8] {
         match self.sha1.as_ref() {
@@ -108,23 +106,33 @@ impl ::protobuf::Message for ListChecksum {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int32()?;
                     self.version = ::std::option::Option::Some(tmp);
-                },
+                }
                 4 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.sha1)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -145,7 +153,10 @@ impl ::protobuf::Message for ListChecksum {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.version {
             os.write_int32(1, v)?;
         }
@@ -187,24 +198,33 @@ impl ::protobuf::Message for ListChecksum {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy::INIT;
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt32>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt32,
+                >(
                     "version",
-                    |m: &ListChecksum| { &m.version },
-                    |m: &mut ListChecksum| { &mut m.version },
+                    |m: &ListChecksum| &m.version,
+                    |m: &mut ListChecksum| &mut m.version,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "sha1",
-                    |m: &ListChecksum| { &m.sha1 },
-                    |m: &mut ListChecksum| { &mut m.sha1 },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "sha1",
+                        |m: &ListChecksum| &m.sha1,
+                        |m: &mut ListChecksum| &mut m.sha1,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<ListChecksum>(
                     "ListChecksum",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -212,9 +232,7 @@ impl ::protobuf::Message for ListChecksum {
 
     fn default_instance() -> &'static ListChecksum {
         static mut instance: ::protobuf::lazy::Lazy<ListChecksum> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            instance.get(ListChecksum::new)
-        }
+        unsafe { instance.get(ListChecksum::new) }
     }
 }
 
@@ -238,7 +256,7 @@ impl ::protobuf::reflect::ProtobufValue for ListChecksum {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct DownloadFormat {
     // message fields
     codec: ::std::option::Option<DownloadFormat_Codec>,
@@ -259,7 +277,6 @@ impl DownloadFormat {
     }
 
     // optional .DownloadFormat.Codec codec = 1;
-
 
     pub fn get_codec(&self) -> DownloadFormat_Codec {
         self.codec.unwrap_or(DownloadFormat_Codec::CODEC_UNKNOWN)
@@ -283,16 +300,28 @@ impl ::protobuf::Message for DownloadFormat {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(wire_type, is, &mut self.codec, 1, &mut self.unknown_fields)?
-                },
+                1 => ::protobuf::rt::read_proto2_enum_with_unknown_fields_into(
+                    wire_type,
+                    is,
+                    &mut self.codec,
+                    1,
+                    &mut self.unknown_fields,
+                )?,
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -310,7 +339,10 @@ impl ::protobuf::Message for DownloadFormat {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(v) = self.codec {
             os.write_enum(1, v.value())?;
         }
@@ -349,19 +381,23 @@ impl ::protobuf::Message for DownloadFormat {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy::INIT;
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeEnum<DownloadFormat_Codec>>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeEnum<DownloadFormat_Codec>,
+                >(
                     "codec",
-                    |m: &DownloadFormat| { &m.codec },
-                    |m: &mut DownloadFormat| { &mut m.codec },
+                    |m: &DownloadFormat| &m.codec,
+                    |m: &mut DownloadFormat| &mut m.codec,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<DownloadFormat>(
                     "DownloadFormat",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -369,9 +405,7 @@ impl ::protobuf::Message for DownloadFormat {
 
     fn default_instance() -> &'static DownloadFormat {
         static mut instance: ::protobuf::lazy::Lazy<DownloadFormat> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            instance.get(DownloadFormat::new)
-        }
+        unsafe { instance.get(DownloadFormat::new) }
     }
 }
 
@@ -394,7 +428,7 @@ impl ::protobuf::reflect::ProtobufValue for DownloadFormat {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum DownloadFormat_Codec {
     CODEC_UNKNOWN = 0,
     OGG_VORBIS = 1,
@@ -413,7 +447,7 @@ impl ::protobuf::ProtobufEnum for DownloadFormat_Codec {
             1 => ::std::option::Option::Some(DownloadFormat_Codec::OGG_VORBIS),
             2 => ::std::option::Option::Some(DownloadFormat_Codec::FLAC),
             3 => ::std::option::Option::Some(DownloadFormat_Codec::MPEG_1_LAYER_3),
-            _ => ::std::option::Option::None
+            _ => ::std::option::Option::None,
         }
     }
 
@@ -428,17 +462,20 @@ impl ::protobuf::ProtobufEnum for DownloadFormat_Codec {
     }
 
     fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> =
+            ::protobuf::lazy::Lazy::INIT;
         unsafe {
             descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new_pb_name::<DownloadFormat_Codec>("DownloadFormat.Codec", file_descriptor_proto())
+                ::protobuf::reflect::EnumDescriptor::new_pb_name::<DownloadFormat_Codec>(
+                    "DownloadFormat.Codec",
+                    file_descriptor_proto(),
+                )
             })
         }
     }
 }
 
-impl ::std::marker::Copy for DownloadFormat_Codec {
-}
+impl ::std::marker::Copy for DownloadFormat_Codec {}
 
 impl ::std::default::Default for DownloadFormat_Codec {
     fn default() -> Self {
@@ -452,7 +489,7 @@ impl ::protobuf::reflect::ProtobufValue for DownloadFormat_Codec {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ListAttributes {
     // message fields
     name: ::protobuf::SingularField<::std::string::String>,
@@ -482,7 +519,6 @@ impl ListAttributes {
     }
 
     // optional string name = 1;
-
 
     pub fn get_name(&self) -> &str {
         match self.name.as_ref() {
@@ -514,11 +550,12 @@ impl ListAttributes {
 
     // Take field
     pub fn take_name(&mut self) -> ::std::string::String {
-        self.name.take().unwrap_or_else(|| ::std::string::String::new())
+        self.name
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional string description = 2;
-
 
     pub fn get_description(&self) -> &str {
         match self.description.as_ref() {
@@ -550,11 +587,12 @@ impl ListAttributes {
 
     // Take field
     pub fn take_description(&mut self) -> ::std::string::String {
-        self.description.take().unwrap_or_else(|| ::std::string::String::new())
+        self.description
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional bytes picture = 3;
-
 
     pub fn get_picture(&self) -> &[u8] {
         match self.picture.as_ref() {
@@ -586,11 +624,12 @@ impl ListAttributes {
 
     // Take field
     pub fn take_picture(&mut self) -> ::std::vec::Vec<u8> {
-        self.picture.take().unwrap_or_else(|| ::std::vec::Vec::new())
+        self.picture
+            .take()
+            .unwrap_or_else(|| ::std::vec::Vec::new())
     }
 
     // optional bool collaborative = 4;
-
 
     pub fn get_collaborative(&self) -> bool {
         self.collaborative.unwrap_or(false)
@@ -609,7 +648,6 @@ impl ListAttributes {
     }
 
     // optional string pl3_version = 5;
-
 
     pub fn get_pl3_version(&self) -> &str {
         match self.pl3_version.as_ref() {
@@ -641,11 +679,12 @@ impl ListAttributes {
 
     // Take field
     pub fn take_pl3_version(&mut self) -> ::std::string::String {
-        self.pl3_version.take().unwrap_or_else(|| ::std::string::String::new())
+        self.pl3_version
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional bool deleted_by_owner = 6;
-
 
     pub fn get_deleted_by_owner(&self) -> bool {
         self.deleted_by_owner.unwrap_or(false)
@@ -665,7 +704,6 @@ impl ListAttributes {
 
     // optional bool restricted_collaborative = 7;
 
-
     pub fn get_restricted_collaborative(&self) -> bool {
         self.restricted_collaborative.unwrap_or(false)
     }
@@ -683,7 +721,6 @@ impl ListAttributes {
     }
 
     // optional int64 deprecated_client_id = 8;
-
 
     pub fn get_deprecated_client_id(&self) -> i64 {
         self.deprecated_client_id.unwrap_or(0)
@@ -703,7 +740,6 @@ impl ListAttributes {
 
     // optional bool public_starred = 9;
 
-
     pub fn get_public_starred(&self) -> bool {
         self.public_starred.unwrap_or(false)
     }
@@ -721,7 +757,6 @@ impl ListAttributes {
     }
 
     // optional string client_id = 10;
-
 
     pub fn get_client_id(&self) -> &str {
         match self.client_id.as_ref() {
@@ -753,7 +788,9 @@ impl ListAttributes {
 
     // Take field
     pub fn take_client_id(&mut self) -> ::std::string::String {
-        self.client_id.take().unwrap_or_else(|| ::std::string::String::new())
+        self.client_id
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 }
 
@@ -762,63 +799,89 @@ impl ::protobuf::Message for ListAttributes {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.name)?;
-                },
+                }
                 2 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.description)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.description,
+                    )?;
+                }
                 3 => {
                     ::protobuf::rt::read_singular_bytes_into(wire_type, is, &mut self.picture)?;
-                },
+                }
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.collaborative = ::std::option::Option::Some(tmp);
-                },
+                }
                 5 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.pl3_version)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.pl3_version,
+                    )?;
+                }
                 6 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.deleted_by_owner = ::std::option::Option::Some(tmp);
-                },
+                }
                 7 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.restricted_collaborative = ::std::option::Option::Some(tmp);
-                },
+                }
                 8 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int64()?;
                     self.deprecated_client_id = ::std::option::Option::Some(tmp);
-                },
+                }
                 9 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.public_starred = ::std::option::Option::Some(tmp);
-                },
+                }
                 10 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.client_id)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -863,7 +926,10 @@ impl ::protobuf::Message for ListAttributes {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.name.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -929,64 +995,105 @@ impl ::protobuf::Message for ListAttributes {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy::INIT;
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "name",
-                    |m: &ListAttributes| { &m.name },
-                    |m: &mut ListAttributes| { &mut m.name },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "description",
-                    |m: &ListAttributes| { &m.description },
-                    |m: &mut ListAttributes| { &mut m.description },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeBytes>(
-                    "picture",
-                    |m: &ListAttributes| { &m.picture },
-                    |m: &mut ListAttributes| { &mut m.picture },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "name",
+                        |m: &ListAttributes| &m.name,
+                        |m: &mut ListAttributes| &mut m.name,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "description",
+                        |m: &ListAttributes| &m.description,
+                        |m: &mut ListAttributes| &mut m.description,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeBytes,
+                    >(
+                        "picture",
+                        |m: &ListAttributes| &m.picture,
+                        |m: &mut ListAttributes| &mut m.picture,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "collaborative",
-                    |m: &ListAttributes| { &m.collaborative },
-                    |m: &mut ListAttributes| { &mut m.collaborative },
+                    |m: &ListAttributes| &m.collaborative,
+                    |m: &mut ListAttributes| &mut m.collaborative,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "pl3_version",
-                    |m: &ListAttributes| { &m.pl3_version },
-                    |m: &mut ListAttributes| { &mut m.pl3_version },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "pl3_version",
+                        |m: &ListAttributes| &m.pl3_version,
+                        |m: &mut ListAttributes| &mut m.pl3_version,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "deleted_by_owner",
-                    |m: &ListAttributes| { &m.deleted_by_owner },
-                    |m: &mut ListAttributes| { &mut m.deleted_by_owner },
+                    |m: &ListAttributes| &m.deleted_by_owner,
+                    |m: &mut ListAttributes| &mut m.deleted_by_owner,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "restricted_collaborative",
-                    |m: &ListAttributes| { &m.restricted_collaborative },
-                    |m: &mut ListAttributes| { &mut m.restricted_collaborative },
+                    |m: &ListAttributes| &m.restricted_collaborative,
+                    |m: &mut ListAttributes| &mut m.restricted_collaborative,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt64,
+                >(
                     "deprecated_client_id",
-                    |m: &ListAttributes| { &m.deprecated_client_id },
-                    |m: &mut ListAttributes| { &mut m.deprecated_client_id },
+                    |m: &ListAttributes| &m.deprecated_client_id,
+                    |m: &mut ListAttributes| &mut m.deprecated_client_id,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "public_starred",
-                    |m: &ListAttributes| { &m.public_starred },
-                    |m: &mut ListAttributes| { &mut m.public_starred },
+                    |m: &ListAttributes| &m.public_starred,
+                    |m: &mut ListAttributes| &mut m.public_starred,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "client_id",
-                    |m: &ListAttributes| { &m.client_id },
-                    |m: &mut ListAttributes| { &mut m.client_id },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "client_id",
+                        |m: &ListAttributes| &m.client_id,
+                        |m: &mut ListAttributes| &mut m.client_id,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<ListAttributes>(
                     "ListAttributes",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -994,9 +1101,7 @@ impl ::protobuf::Message for ListAttributes {
 
     fn default_instance() -> &'static ListAttributes {
         static mut instance: ::protobuf::lazy::Lazy<ListAttributes> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            instance.get(ListAttributes::new)
-        }
+        unsafe { instance.get(ListAttributes::new) }
     }
 }
 
@@ -1028,7 +1133,7 @@ impl ::protobuf::reflect::ProtobufValue for ListAttributes {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct ItemAttributes {
     // message fields
     added_by: ::protobuf::SingularField<::std::string::String>,
@@ -1058,7 +1163,6 @@ impl ItemAttributes {
     }
 
     // optional string added_by = 1;
-
 
     pub fn get_added_by(&self) -> &str {
         match self.added_by.as_ref() {
@@ -1090,11 +1194,12 @@ impl ItemAttributes {
 
     // Take field
     pub fn take_added_by(&mut self) -> ::std::string::String {
-        self.added_by.take().unwrap_or_else(|| ::std::string::String::new())
+        self.added_by
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional int64 timestamp = 2;
-
 
     pub fn get_timestamp(&self) -> i64 {
         self.timestamp.unwrap_or(0)
@@ -1113,7 +1218,6 @@ impl ItemAttributes {
     }
 
     // optional string message = 3;
-
 
     pub fn get_message(&self) -> &str {
         match self.message.as_ref() {
@@ -1145,11 +1249,12 @@ impl ItemAttributes {
 
     // Take field
     pub fn take_message(&mut self) -> ::std::string::String {
-        self.message.take().unwrap_or_else(|| ::std::string::String::new())
+        self.message
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional bool seen = 4;
-
 
     pub fn get_seen(&self) -> bool {
         self.seen.unwrap_or(false)
@@ -1169,7 +1274,6 @@ impl ItemAttributes {
 
     // optional int64 download_count = 5;
 
-
     pub fn get_download_count(&self) -> i64 {
         self.download_count.unwrap_or(0)
     }
@@ -1188,9 +1292,10 @@ impl ItemAttributes {
 
     // optional .DownloadFormat download_format = 6;
 
-
     pub fn get_download_format(&self) -> &DownloadFormat {
-        self.download_format.as_ref().unwrap_or_else(|| DownloadFormat::default_instance())
+        self.download_format
+            .as_ref()
+            .unwrap_or_else(|| DownloadFormat::default_instance())
     }
     pub fn clear_download_format(&mut self) {
         self.download_format.clear();
@@ -1216,11 +1321,12 @@ impl ItemAttributes {
 
     // Take field
     pub fn take_download_format(&mut self) -> DownloadFormat {
-        self.download_format.take().unwrap_or_else(|| DownloadFormat::new())
+        self.download_format
+            .take()
+            .unwrap_or_else(|| DownloadFormat::new())
     }
 
     // optional string sevendigital_id = 7;
-
 
     pub fn get_sevendigital_id(&self) -> &str {
         match self.sevendigital_id.as_ref() {
@@ -1252,11 +1358,12 @@ impl ItemAttributes {
 
     // Take field
     pub fn take_sevendigital_id(&mut self) -> ::std::string::String {
-        self.sevendigital_id.take().unwrap_or_else(|| ::std::string::String::new())
+        self.sevendigital_id
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional int64 sevendigital_left = 8;
-
 
     pub fn get_sevendigital_left(&self) -> i64 {
         self.sevendigital_left.unwrap_or(0)
@@ -1276,7 +1383,6 @@ impl ItemAttributes {
 
     // optional int64 seen_at = 9;
 
-
     pub fn get_seen_at(&self) -> i64 {
         self.seen_at.unwrap_or(0)
     }
@@ -1294,7 +1400,6 @@ impl ItemAttributes {
     }
 
     // optional bool public = 10;
-
 
     pub fn get_public(&self) -> bool {
         self.public.unwrap_or(false)
@@ -1319,71 +1424,99 @@ impl ::protobuf::Message for ItemAttributes {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.added_by)?;
-                },
+                }
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int64()?;
                     self.timestamp = ::std::option::Option::Some(tmp);
-                },
+                }
                 3 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.message)?;
-                },
+                }
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.seen = ::std::option::Option::Some(tmp);
-                },
+                }
                 5 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int64()?;
                     self.download_count = ::std::option::Option::Some(tmp);
-                },
+                }
                 6 => {
-                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.download_format)?;
-                },
+                    ::protobuf::rt::read_singular_message_into(
+                        wire_type,
+                        is,
+                        &mut self.download_format,
+                    )?;
+                }
                 7 => {
-                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.sevendigital_id)?;
-                },
+                    ::protobuf::rt::read_singular_string_into(
+                        wire_type,
+                        is,
+                        &mut self.sevendigital_id,
+                    )?;
+                }
                 8 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int64()?;
                     self.sevendigital_left = ::std::option::Option::Some(tmp);
-                },
+                }
                 9 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_int64()?;
                     self.seen_at = ::std::option::Option::Some(tmp);
-                },
+                }
                 10 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
+                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(
+                            wire_type,
+                        ));
                     }
                     let tmp = is.read_bool()?;
                     self.public = ::std::option::Option::Some(tmp);
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1429,7 +1562,10 @@ impl ::protobuf::Message for ItemAttributes {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.added_by.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -1497,64 +1633,103 @@ impl ::protobuf::Message for ItemAttributes {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy::INIT;
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "added_by",
-                    |m: &ItemAttributes| { &m.added_by },
-                    |m: &mut ItemAttributes| { &mut m.added_by },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "added_by",
+                        |m: &ItemAttributes| &m.added_by,
+                        |m: &mut ItemAttributes| &mut m.added_by,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt64,
+                >(
                     "timestamp",
-                    |m: &ItemAttributes| { &m.timestamp },
-                    |m: &mut ItemAttributes| { &mut m.timestamp },
+                    |m: &ItemAttributes| &m.timestamp,
+                    |m: &mut ItemAttributes| &mut m.timestamp,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "message",
-                    |m: &ItemAttributes| { &m.message },
-                    |m: &mut ItemAttributes| { &mut m.message },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "message",
+                        |m: &ItemAttributes| &m.message,
+                        |m: &mut ItemAttributes| &mut m.message,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "seen",
-                    |m: &ItemAttributes| { &m.seen },
-                    |m: &mut ItemAttributes| { &mut m.seen },
+                    |m: &ItemAttributes| &m.seen,
+                    |m: &mut ItemAttributes| &mut m.seen,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt64,
+                >(
                     "download_count",
-                    |m: &ItemAttributes| { &m.download_count },
-                    |m: &mut ItemAttributes| { &mut m.download_count },
+                    |m: &ItemAttributes| &m.download_count,
+                    |m: &mut ItemAttributes| &mut m.download_count,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<DownloadFormat>>(
-                    "download_format",
-                    |m: &ItemAttributes| { &m.download_format },
-                    |m: &mut ItemAttributes| { &mut m.download_format },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "sevendigital_id",
-                    |m: &ItemAttributes| { &m.sevendigital_id },
-                    |m: &mut ItemAttributes| { &mut m.sevendigital_id },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<DownloadFormat>,
+                    >(
+                        "download_format",
+                        |m: &ItemAttributes| &m.download_format,
+                        |m: &mut ItemAttributes| &mut m.download_format,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "sevendigital_id",
+                        |m: &ItemAttributes| &m.sevendigital_id,
+                        |m: &mut ItemAttributes| &mut m.sevendigital_id,
+                    ),
+                );
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt64,
+                >(
                     "sevendigital_left",
-                    |m: &ItemAttributes| { &m.sevendigital_left },
-                    |m: &mut ItemAttributes| { &mut m.sevendigital_left },
+                    |m: &ItemAttributes| &m.sevendigital_left,
+                    |m: &mut ItemAttributes| &mut m.sevendigital_left,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeInt64>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeInt64,
+                >(
                     "seen_at",
-                    |m: &ItemAttributes| { &m.seen_at },
-                    |m: &mut ItemAttributes| { &mut m.seen_at },
+                    |m: &ItemAttributes| &m.seen_at,
+                    |m: &mut ItemAttributes| &mut m.seen_at,
                 ));
-                fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
+                fields.push(::protobuf::reflect::accessor::make_option_accessor::<
+                    _,
+                    ::protobuf::types::ProtobufTypeBool,
+                >(
                     "public",
-                    |m: &ItemAttributes| { &m.public },
-                    |m: &mut ItemAttributes| { &mut m.public },
+                    |m: &ItemAttributes| &m.public,
+                    |m: &mut ItemAttributes| &mut m.public,
                 ));
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<ItemAttributes>(
                     "ItemAttributes",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -1562,9 +1737,7 @@ impl ::protobuf::Message for ItemAttributes {
 
     fn default_instance() -> &'static ItemAttributes {
         static mut instance: ::protobuf::lazy::Lazy<ItemAttributes> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            instance.get(ItemAttributes::new)
-        }
+        unsafe { instance.get(ItemAttributes::new) }
     }
 }
 
@@ -1596,7 +1769,7 @@ impl ::protobuf::reflect::ProtobufValue for ItemAttributes {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct StringAttribute {
     // message fields
     key: ::protobuf::SingularField<::std::string::String>,
@@ -1618,7 +1791,6 @@ impl StringAttribute {
     }
 
     // optional string key = 1;
-
 
     pub fn get_key(&self) -> &str {
         match self.key.as_ref() {
@@ -1650,11 +1822,12 @@ impl StringAttribute {
 
     // Take field
     pub fn take_key(&mut self) -> ::std::string::String {
-        self.key.take().unwrap_or_else(|| ::std::string::String::new())
+        self.key
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 
     // optional string value = 2;
-
 
     pub fn get_value(&self) -> &str {
         match self.value.as_ref() {
@@ -1686,7 +1859,9 @@ impl StringAttribute {
 
     // Take field
     pub fn take_value(&mut self) -> ::std::string::String {
-        self.value.take().unwrap_or_else(|| ::std::string::String::new())
+        self.value
+            .take()
+            .unwrap_or_else(|| ::std::string::String::new())
     }
 }
 
@@ -1695,19 +1870,27 @@ impl ::protobuf::Message for StringAttribute {
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.key)?;
-                },
+                }
                 2 => {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.value)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1728,7 +1911,10 @@ impl ::protobuf::Message for StringAttribute {
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         if let Some(ref v) = self.key.as_ref() {
             os.write_string(1, &v)?;
         }
@@ -1770,24 +1956,35 @@ impl ::protobuf::Message for StringAttribute {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy::INIT;
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "key",
-                    |m: &StringAttribute| { &m.key },
-                    |m: &mut StringAttribute| { &mut m.key },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "value",
-                    |m: &StringAttribute| { &m.value },
-                    |m: &mut StringAttribute| { &mut m.value },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "key",
+                        |m: &StringAttribute| &m.key,
+                        |m: &mut StringAttribute| &mut m.key,
+                    ),
+                );
+                fields.push(
+                    ::protobuf::reflect::accessor::make_singular_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeString,
+                    >(
+                        "value",
+                        |m: &StringAttribute| &m.value,
+                        |m: &mut StringAttribute| &mut m.value,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<StringAttribute>(
                     "StringAttribute",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
@@ -1795,9 +1992,7 @@ impl ::protobuf::Message for StringAttribute {
 
     fn default_instance() -> &'static StringAttribute {
         static mut instance: ::protobuf::lazy::Lazy<StringAttribute> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            instance.get(StringAttribute::new)
-        }
+        unsafe { instance.get(StringAttribute::new) }
     }
 }
 
@@ -1821,7 +2016,7 @@ impl ::protobuf::reflect::ProtobufValue for StringAttribute {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
+#[derive(PartialEq, Clone, Default)]
 pub struct StringAttributes {
     // message fields
     attribute: ::protobuf::RepeatedField<StringAttribute>,
@@ -1842,7 +2037,6 @@ impl StringAttributes {
     }
 
     // repeated .StringAttribute attribute = 1;
-
 
     pub fn get_attribute(&self) -> &[StringAttribute] {
         &self.attribute
@@ -1873,20 +2067,28 @@ impl ::protobuf::Message for StringAttributes {
             if !v.is_initialized() {
                 return false;
             }
-        };
+        }
         true
     }
 
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn merge_from(
+        &mut self,
+        is: &mut ::protobuf::CodedInputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
                     ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.attribute)?;
-                },
+                }
                 _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
+                    ::protobuf::rt::read_unknown_or_skip_group(
+                        field_number,
+                        wire_type,
+                        is,
+                        self.mut_unknown_fields(),
+                    )?;
+                }
             };
         }
         ::std::result::Result::Ok(())
@@ -1899,18 +2101,21 @@ impl ::protobuf::Message for StringAttributes {
         for value in &self.attribute {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+    fn write_to_with_cached_sizes(
+        &self,
+        os: &mut ::protobuf::CodedOutputStream<'_>,
+    ) -> ::protobuf::ProtobufResult<()> {
         for v in &self.attribute {
             os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -1946,29 +2151,34 @@ impl ::protobuf::Message for StringAttributes {
     }
 
     fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy::INIT;
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> =
+            ::protobuf::lazy::Lazy::INIT;
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<StringAttribute>>(
-                    "attribute",
-                    |m: &StringAttributes| { &m.attribute },
-                    |m: &mut StringAttributes| { &mut m.attribute },
-                ));
+                fields.push(
+                    ::protobuf::reflect::accessor::make_repeated_field_accessor::<
+                        _,
+                        ::protobuf::types::ProtobufTypeMessage<StringAttribute>,
+                    >(
+                        "attribute",
+                        |m: &StringAttributes| &m.attribute,
+                        |m: &mut StringAttributes| &mut m.attribute,
+                    ),
+                );
                 ::protobuf::reflect::MessageDescriptor::new_pb_name::<StringAttributes>(
                     "StringAttributes",
                     fields,
-                    file_descriptor_proto()
+                    file_descriptor_proto(),
                 )
             })
         }
     }
 
     fn default_instance() -> &'static StringAttributes {
-        static mut instance: ::protobuf::lazy::Lazy<StringAttributes> = ::protobuf::lazy::Lazy::INIT;
-        unsafe {
-            instance.get(StringAttributes::new)
-        }
+        static mut instance: ::protobuf::lazy::Lazy<StringAttributes> =
+            ::protobuf::lazy::Lazy::INIT;
+        unsafe { instance.get(StringAttributes::new) }
     }
 }
 
@@ -2017,16 +2227,14 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     tribute\x18\x01\x20\x03(\x0b2\x10.StringAttributeB\0:\0B\0b\x06proto2\
 ";
 
-static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy::INIT;
+static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<
+    ::protobuf::descriptor::FileDescriptorProto,
+> = ::protobuf::lazy::Lazy::INIT;
 
 fn parse_descriptor_proto() -> ::protobuf::descriptor::FileDescriptorProto {
     ::protobuf::parse_from_bytes(file_descriptor_proto_data).unwrap()
 }
 
 pub fn file_descriptor_proto() -> &'static ::protobuf::descriptor::FileDescriptorProto {
-    unsafe {
-        file_descriptor_proto_lazy.get(|| {
-            parse_descriptor_proto()
-        })
-    }
+    unsafe { file_descriptor_proto_lazy.get(|| parse_descriptor_proto()) }
 }
