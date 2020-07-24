@@ -11,7 +11,8 @@ use crate::volume::Volume;
 
 #[derive(Clone)]
 pub struct Cache {
-    root: PathBuf,
+    audio_root: PathBuf,
+    system_root: PathBuf,
     use_audio_cache: bool,
 }
 
@@ -26,12 +27,14 @@ fn mkdir_existing(path: &Path) -> io::Result<()> {
 }
 
 impl Cache {
-    pub fn new(location: PathBuf, use_audio_cache: bool) -> Cache {
-        mkdir_existing(&location).unwrap();
-        mkdir_existing(&location.join("files")).unwrap();
+    pub fn new(audio_location: PathBuf, system_location: PathBuf, use_audio_cache: bool) -> Cache {
+        mkdir_existing(&audio_location).unwrap();
+        mkdir_existing(&audio_location.join("files")).unwrap();
+        mkdir_existing(&system_location).unwrap();
 
         Cache {
-            root: location,
+            audio_root: audio_location,
+            system_root: system_location,
             use_audio_cache: use_audio_cache,
         }
     }
@@ -39,7 +42,7 @@ impl Cache {
 
 impl Cache {
     fn credentials_path(&self) -> PathBuf {
-        self.root.join("credentials.json")
+        self.system_root.join("credentials.json")
     }
 
     pub fn credentials(&self) -> Option<Credentials> {
@@ -53,10 +56,10 @@ impl Cache {
     }
 }
 
-// cache volume to root/volume
+// cache volume to system_root/volume
 impl Cache {
     fn volume_path(&self) -> PathBuf {
-        self.root.join("volume")
+        self.system_root.join("volume")
     }
 
     pub fn volume(&self) -> Option<u16> {
@@ -73,7 +76,7 @@ impl Cache {
 impl Cache {
     fn file_path(&self, file: FileId) -> PathBuf {
         let name = file.to_base16();
-        self.root.join("files").join(&name[0..2]).join(&name[2..])
+        self.audio_root.join("files").join(&name[0..2]).join(&name[2..])
     }
 
     pub fn file(&self, file: FileId) -> Option<File> {
