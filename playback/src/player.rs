@@ -123,6 +123,11 @@ pub enum PlayerEvent {
         play_request_id: u64,
         track_id: SpotifyId,
     },
+    // The player was unable to load the requested track.
+    Unavailable {
+        play_request_id: u64,
+        track_id: SpotifyId,
+    },
     // The mixer volume was set to a new level.
     VolumeSet {
         volume: u16,
@@ -134,6 +139,9 @@ impl PlayerEvent {
         use PlayerEvent::*;
         match self {
             Loading {
+                play_request_id, ..
+            }
+            | Unavailable {
                 play_request_id, ..
             }
             | Started {
@@ -398,10 +406,19 @@ impl PlayerState {
         }
     }
 
+    #[allow(dead_code)]
     fn is_stopped(&self) -> bool {
         use self::PlayerState::*;
         match *self {
             Stopped => true,
+            _ => false,
+        }
+    }
+
+    fn is_loading(&self) -> bool {
+        use self::PlayerState::*;
+        match *self {
+            Loading { .. } => true,
             _ => false,
         }
     }
@@ -748,8 +765,12 @@ impl Future for PlayerInternal {
                     }
                     Ok(Async::NotReady) => (),
                     Err(_) => {
-                        self.handle_player_stop();
-                        assert!(self.state.is_stopped());
+                        warn!("Unable to load <{:?}>\nSkipping to next track", track_id);
+                        assert!(self.state.is_loading());
+                        self.send_event(PlayerEvent::EndOfTrack {
+                            track_id,
+                            play_request_id,
+                        })
                     }
                 }
             }
@@ -769,7 +790,21 @@ impl Future for PlayerInternal {
                     }
                     Ok(Async::NotReady) => (),
                     Err(_) => {
+                        debug!("Unable to preload {:?}", track_id);
                         self.preload = PlayerPreload::None;
+                        // Let Spirc know that the track was unavailable.
+                        if let PlayerState::Playing {
+                            play_request_id, ..
+                        }
+                        | PlayerState::Paused {
+                            play_request_id, ..
+                        } = self.state
+                        {
+                            self.send_event(PlayerEvent::Unavailable {
+                                track_id,
+                                play_request_id,
+                            });
+                        }
                     }
                 }
             }
@@ -1302,7 +1337,6 @@ impl PlayerInternal {
     fn handle_command_preload(&mut self, track_id: SpotifyId) {
         debug!("Preloading track");
         let mut preload_track = true;
-
         // check whether the track is already loaded somewhere or being loaded.
         if let PlayerPreload::Loading {
             track_id: currently_loading,
@@ -1547,6 +1581,51 @@ impl ::std::fmt::Debug for PlayerCommand {
     }
 }
 
+impl ::std::fmt::Debug for PlayerState {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        use PlayerState::*;
+        match *self {
+            Stopped => f.debug_struct("Stopped").finish(),
+            Loading {
+                track_id,
+                play_request_id,
+                ..
+            } => f
+                .debug_struct("Loading")
+                .field("track_id", &track_id)
+                .field("play_request_id", &play_request_id)
+                .finish(),
+            Paused {
+                track_id,
+                play_request_id,
+                ..
+            } => f
+                .debug_struct("Paused")
+                .field("track_id", &track_id)
+                .field("play_request_id", &play_request_id)
+                .finish(),
+            Playing {
+                track_id,
+                play_request_id,
+                ..
+            } => f
+                .debug_struct("Playing")
+                .field("track_id", &track_id)
+                .field("play_request_id", &play_request_id)
+                .finish(),
+            EndOfTrack {
+                track_id,
+                play_request_id,
+                ..
+            } => f
+                .debug_struct("EndOfTrack")
+                .field("track_id", &track_id)
+                .field("play_request_id", &play_request_id)
+                .finish(),
+            Invalid => f.debug_struct("Invalid").finish(),
+        }
+    }
+}
 struct Subfile<T: Read + Seek> {
     stream: T,
     offset: u64,
