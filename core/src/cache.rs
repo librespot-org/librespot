@@ -86,8 +86,13 @@ impl Cache {
 
             mkdir_existing(path.parent().unwrap()).unwrap();
 
-            let mut cache_file = File::create(path).unwrap();
-            ::std::io::copy(contents, &mut cache_file).unwrap();
+            let mut cache_file = File::create(path)
+            match cache_file {
+                Ok(file) => ::std::io::copy(contents, &mut file).unwrap(),
+                Err(error) => {
+                    self.use_audio_cache = false
+                },
+            };
         }
     }
 }
