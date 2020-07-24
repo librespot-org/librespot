@@ -454,8 +454,8 @@ impl SpircTask {
             Ok(dur) => dur,
             Err(err) => err.duration(),
         };
-        ((dur.as_secs() as i64 + self.session.time_delta()) * 1000
-            + (dur.subsec_nanos() / 1000_000) as i64)
+        (dur.as_secs() as i64 + self.session.time_delta()) * 1000
+            + (dur.subsec_nanos() / 1000_000) as i64
     }
 
     fn ensure_mixer_started(&mut self) {
