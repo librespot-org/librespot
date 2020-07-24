@@ -33,6 +33,15 @@ pub struct Player {
     play_request_id_generator: SeqGenerator<u64>,
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum SinkStatus {
+    Running,
+    Closed,
+    TemporarilyClosed,
+}
+
+pub type SinkEventCallback = Box<dyn Fn(SinkStatus) + Send>;
+
 struct PlayerInternal {
     session: Session,
     config: PlayerConfig,
@@ -41,7 +50,8 @@ struct PlayerInternal {
     state: PlayerState,
     preload: PlayerPreload,
     sink: Box<dyn Sink>,
-    sink_running: bool,
+    sink_status: SinkStatus,
+    sink_event_callback: Option<SinkEventCallback>,
     audio_filter: Option<Box<dyn AudioFilter + Send>>,
     event_senders: Vec<futures::sync::mpsc::UnboundedSender<PlayerEvent>>,
 }
@@ -61,6 +71,7 @@ enum PlayerCommand {
     Stop,
     Seek(u32),
     AddEventSender(futures::sync::mpsc::UnboundedSender<PlayerEvent>),
+    SetSinkEventCallback(Option<SinkEventCallback>),
     EmitVolumeSetEvent(u16),
 }
 
@@ -240,7 +251,8 @@ impl Player {
                 state: PlayerState::Stopped,
                 preload: PlayerPreload::None,
                 sink: sink_builder(),
-                sink_running: false,
+                sink_status: SinkStatus::Closed,
+                sink_event_callback: None,
                 audio_filter: audio_filter,
                 event_senders: [event_sender].to_vec(),
             };
@@ -314,6 +326,10 @@ impl Player {
             .map_err(|_| ())
             .map(|_| ());
         Box::new(result)
+    }
+
+    pub fn set_sink_event_callback(&self, callback: Option<SinkEventCallback>) {
+        self.command(PlayerCommand::SetSinkEventCallback(callback));
     }
 
     pub fn emit_volume_set_event(&self, volume: u16) {
@@ -917,20 +933,41 @@ impl PlayerInternal {
     }
 
     fn ensure_sink_running(&mut self) {
-        if !self.sink_running {
+        if self.sink_status != SinkStatus::Running {
             trace!("== Starting sink ==");
+            if let Some(callback) = &mut self.sink_event_callback {
+                callback(SinkStatus::Running);
+            }
             match self.sink.start() {
-                Ok(()) => self.sink_running = true,
+                Ok(()) => self.sink_status = SinkStatus::Running,
                 Err(err) => error!("Could not start audio: {}", err),
             }
         }
     }
 
-    fn ensure_sink_stopped(&mut self) {
-        if self.sink_running {
-            trace!("== Stopping sink ==");
-            self.sink.stop().unwrap();
-            self.sink_running = false;
+    fn ensure_sink_stopped(&mut self, temporarily: bool) {
+        match self.sink_status {
+            SinkStatus::Running => {
+                trace!("== Stopping sink ==");
+                self.sink.stop().unwrap();
+                self.sink_status = if temporarily {
+                    SinkStatus::TemporarilyClosed
+                } else {
+                    SinkStatus::Closed
+                };
+                if let Some(callback) = &mut self.sink_event_callback {
+                    callback(self.sink_status);
+                }
+            }
+            SinkStatus::TemporarilyClosed => {
+                if !temporarily {
+                    self.sink_status = SinkStatus::Closed;
+                    if let Some(callback) = &mut self.sink_event_callback {
+                        callback(SinkStatus::Closed);
+                    }
+                }
+            }
+            SinkStatus::Closed => (),
         }
     }
 
@@ -956,7 +993,7 @@ impl PlayerInternal {
                 play_request_id,
                 ..
             } => {
-                self.ensure_sink_stopped();
+                self.ensure_sink_stopped(false);
                 self.send_event(PlayerEvent::Stopped {
                     track_id,
                     play_request_id,
@@ -1003,7 +1040,7 @@ impl PlayerInternal {
         {
             self.state.playing_to_paused();
 
-            self.ensure_sink_stopped();
+            self.ensure_sink_stopped(false);
             let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
             self.send_event(PlayerEvent::Paused {
                 track_id,
@@ -1032,7 +1069,7 @@ impl PlayerInternal {
 
                     if let Err(err) = self.sink.write(&packet.data()) {
                         error!("Could not write audio: {}", err);
-                        self.ensure_sink_stopped();
+                        self.ensure_sink_stopped(false);
                     }
                 }
             }
@@ -1090,7 +1127,7 @@ impl PlayerInternal {
                 suggested_to_preload_next_track: false,
             };
         } else {
-            self.ensure_sink_stopped();
+            self.ensure_sink_stopped(false);
 
             self.state = PlayerState::Paused {
                 track_id: track_id,
@@ -1121,7 +1158,7 @@ impl PlayerInternal {
         position_ms: u32,
     ) {
         if !self.config.gapless {
-            self.ensure_sink_stopped();
+            self.ensure_sink_stopped(play);
         }
         // emit the correct player event
         match self.state {
@@ -1289,7 +1326,7 @@ impl PlayerInternal {
 
         // We need to load the track - either from scratch or by completing a preload.
         // In any case we go into a Loading state to load the track.
-        self.ensure_sink_stopped();
+        self.ensure_sink_stopped(play);
 
         self.send_event(PlayerEvent::Loading {
             track_id,
@@ -1470,6 +1507,8 @@ impl PlayerInternal {
 
             PlayerCommand::AddEventSender(sender) => self.event_senders.push(sender),
 
+            PlayerCommand::SetSinkEventCallback(callback) => self.sink_event_callback = callback,
+
             PlayerCommand::EmitVolumeSetEvent(volume) => {
                 self.send_event(PlayerEvent::VolumeSet { volume })
             }
@@ -1574,6 +1613,9 @@ impl ::std::fmt::Debug for PlayerCommand {
             PlayerCommand::Stop => f.debug_tuple("Stop").finish(),
             PlayerCommand::Seek(position) => f.debug_tuple("Seek").field(&position).finish(),
             PlayerCommand::AddEventSender(_) => f.debug_tuple("AddEventSender").finish(),
+            PlayerCommand::SetSinkEventCallback(_) => {
+                f.debug_tuple("SetSinkEventCallback").finish()
+            }
             PlayerCommand::EmitVolumeSetEvent(volume) => {
                 f.debug_tuple("VolumeSet").field(&volume).finish()
             }
