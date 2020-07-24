@@ -43,10 +43,11 @@ function get_crate_name {
 function remoteWait() {
   IFS=:
   secs=${1}
+  crate_name=${2}
   while [ $secs -gt 0 ]
   do
     sleep 1 &
-    printf "\rSleeping to allow packages to propagate on crates.io servers. Continuing in %2d second(s)." ${secs}
+    printf "\rSleeping to allow %s to propagate on crates.io servers. Continuing in %2d second(s)." ${crate_name} ${secs}
     secs=$(( $secs - 1 ))
     wait
   done
@@ -75,7 +76,7 @@ function publishCrates {
       cargo publish
     fi
     echo "Successfully published $crate_name to crates.io"
-    remoteWait 30
+    remoteWait 30 crate_name
   done
 }
 
