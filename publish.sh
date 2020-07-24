@@ -24,6 +24,10 @@ function updateVersion {
     crate_path=${crate_path//\/\///}
     sed -i '' "s/^version.*/version = \"$1\"/g" "$crate_path"
     echo "Path is $crate_path"
+    if [ "$CRATE" = "librespot" ]
+    then
+      cargo update
+    fi
   done
 }
 
@@ -34,6 +38,19 @@ function commitAndTag {
 
 function get_crate_name {
   awk -v FS="name = " 'NF>1{print $2; exit}' Cargo.toml
+}
+
+function remoteWait() {
+  IFS=:
+  secs=${1}
+  while [ $secs -gt 0 ]
+  do
+    sleep 1 &
+    printf "\rSleeping to allow packages to propagate on crates.io servers. Continuing in %2d second(s)." ${secs}
+    secs=$(( $secs - 1 ))
+    wait
+  done
+  echo
 }
 
 function publishCrates {
@@ -58,7 +75,7 @@ function publishCrates {
       cargo publish
     fi
     echo "Successfully published $crate_name to crates.io"
-    # Should sleep here for 30 seconds to allow Crates.io time to push updated package to edge servers.
+    remoteWait 30
   done
 }
 

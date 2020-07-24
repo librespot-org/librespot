@@ -1,8 +1,10 @@
 extern crate protobuf_codegen; // Does the business
 extern crate protobuf_codegen_pure; // Helper function
 
+use std::env;
 use std::fs::{read_to_string, write};
 use std::path::Path;
+use std::path::PathBuf;
 
 use protobuf_codegen_pure::parse_and_typecheck;
 use protobuf_codegen_pure::Customize;
@@ -28,9 +30,12 @@ fn main() {
             name = &line[4..len - 1]; // Remove keywords and semi-colon
         }
 
+        //let out_dir = env::var("OUT_DIR").is_err();
+        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+
         // Build the paths to relevant files.
         let src_fname = &format!("proto/{}.proto", name);
-        let dest_fname = &format!("src/{}.rs", name);
+        let dest_fname = &out_dir.join(format!("{}.rs", name));
         let src = Path::new(src_fname);
         let dest = Path::new(dest_fname);
         // Get the contents of the existing generated file.
