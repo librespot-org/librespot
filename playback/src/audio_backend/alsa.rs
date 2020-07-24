@@ -1,12 +1,20 @@
 use super::{Open, Sink};
 use alsa::device_name::HintIter;
-use alsa::pcm::{Access, Format, HwParams, PCM};
+use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, Error, ValueOr};
+use std::cmp::min;
 use std::ffi::CString;
 use std::io;
 use std::process::exit;
 
-pub struct AlsaSink(Option<PCM>, String);
+const PREFERED_PERIOD_SIZE: Frames = 5512; // Period of roughly 125ms
+const BUFFERED_PERIODS: Frames = 4;
+
+pub struct AlsaSink {
+    pcm: Option<PCM>,
+    device: String,
+    buffer: Vec<i16>,
+}
 
 fn list_outputs() {
     for t in &["pcm", "ctl", "hwdep"] {
@@ -25,8 +33,9 @@ fn list_outputs() {
     }
 }
 
-fn open_device(dev_name: &str) -> Result<(PCM), Box<Error>> {
+fn open_device(dev_name: &str) -> Result<(PCM, Frames), Box<Error>> {
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
+    let mut period_size = PREFERED_PERIOD_SIZE;
     // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8
     // latency = period_size * periods / (rate * bytes_per_frame)
     // For 16 Bit stereo data, one frame has a length of four bytes.
@@ -41,7 +50,8 @@ fn open_device(dev_name: &str) -> Result<(PCM), Box<Error>> {
         hwp.set_format(Format::s16())?;
         hwp.set_rate(44100, ValueOr::Nearest)?;
         hwp.set_channels(2)?;
-        hwp.set_buffer_size_near(22050)?; // ~ 0.5s latency
+        period_size = hwp.set_period_size_near(period_size, ValueOr::Greater)?;
+        hwp.set_buffer_size_near(period_size * BUFFERED_PERIODS)?;
         pcm.hw_params(&hwp)?;
 
         let swp = pcm.sw_params_current()?;
@@ -49,7 +59,7 @@ fn open_device(dev_name: &str) -> Result<(PCM), Box<Error>> {
         pcm.sw_params(&swp)?;
     }
 
-    Ok(pcm)
+    Ok((pcm, period_size))
 }
 
 impl Open for AlsaSink {
@@ -67,16 +77,24 @@ impl Open for AlsaSink {
         }
         .to_string();
 
-        AlsaSink(None, name)
+        AlsaSink {
+            pcm: None,
+            device: name,
+            buffer: vec![],
+        }
     }
 }
 
 impl Sink for AlsaSink {
     fn start(&mut self) -> io::Result<()> {
-        if self.0.is_none() {
-            let pcm = open_device(&self.1);
+        if self.pcm.is_none() {
+            let pcm = open_device(&self.device);
             match pcm {
-                Ok(p) => self.0 = Some(p),
+                Ok((p, period_size)) => {
+                    self.pcm = Some(p);
+                    // Create a buffer for all samples for a full period
+                    self.buffer = Vec::with_capacity((period_size * 2) as usize);
+                }
                 Err(e) => {
                     error!("Alsa error PCM open {}", e);
                     return Err(io::Error::new(
@@ -92,20 +110,39 @@ impl Sink for AlsaSink {
 
     fn stop(&mut self) -> io::Result<()> {
         {
-            let pcm = self.0.as_ref().unwrap();
+            let pcm = self.pcm.as_mut().unwrap();
+            // Write any leftover data in the period buffer
+            // before draining the actual buffer
+            let io = pcm.io_i16().unwrap();
+            match io.writei(&self.buffer[..]) {
+                Ok(_) => (),
+                Err(err) => pcm.try_recover(err, false).unwrap(),
+            }
             pcm.drain().unwrap();
         }
-        self.0 = None;
+        self.pcm = None;
         Ok(())
     }
 
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        let pcm = self.0.as_mut().unwrap();
-        let io = pcm.io_i16().unwrap();
-
-        match io.writei(&data) {
-            Ok(_) => (),
-            Err(err) => pcm.try_recover(err, false).unwrap(),
+        let mut processed_data = 0;
+        while processed_data < data.len() {
+            let data_to_buffer = min(
+                self.buffer.capacity() - self.buffer.len(),
+                data.len() - processed_data,
+            );
+            self.buffer
+                .extend_from_slice(&data[processed_data..processed_data + data_to_buffer]);
+            processed_data += data_to_buffer;
+            if self.buffer.len() == self.buffer.capacity() {
+                let pcm = self.pcm.as_mut().unwrap();
+                let io = pcm.io_i16().unwrap();
+                match io.writei(&self.buffer) {
+                    Ok(_) => (),
+                    Err(err) => pcm.try_recover(err, false).unwrap(),
+                }
+                self.buffer.clear();
+            }
         }
 
         Ok(())
