@@ -1,64 +1,69 @@
-extern crate protobuf_codegen; // Does the business
-extern crate protobuf_codegen_pure; // Helper function
+extern crate glob;
 
-use std::env;
-use std::fs::{read_to_string, write};
-use std::path::Path;
-use std::path::PathBuf;
+use std::{
+    env, fs,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
-use protobuf_codegen_pure::parse_and_typecheck;
-use protobuf_codegen_pure::Customize;
+fn out_dir() -> PathBuf {
+    Path::new(&env::var("OUT_DIR").expect("env")).to_path_buf()
+}
+
+fn cleanup() {
+    let _ = fs::remove_dir_all(&out_dir());
+}
+
+fn compile() {
+    let proto_dir = Path::new(&env::var("CARGO_MANIFEST_DIR").expect("env")).join("proto");
+
+    let files = &[
+        proto_dir.join("authentication.proto"),
+        proto_dir.join("keyexchange.proto"),
+        proto_dir.join("mercury.proto"),
+        proto_dir.join("metadata.proto"),
+        proto_dir.join("playlist4changes.proto"),
+        proto_dir.join("playlist4content.proto"),
+        proto_dir.join("playlist4issues.proto"),
+        proto_dir.join("playlist4meta.proto"),
+        proto_dir.join("playlist4ops.proto"),
+        proto_dir.join("pubsub.proto"),
+        proto_dir.join("spirc.proto"),
+    ];
+
+    let slices = files.iter().map(Deref::deref).collect::<Vec<_>>();
+
+    let out_dir = out_dir();
+    fs::create_dir(&out_dir).expect("create_dir");
+
+    protobuf_codegen_pure::Codegen::new()
+        .out_dir(&out_dir)
+        .inputs(&slices)
+        .include(&proto_dir)
+        .run()
+        .expect("Codegen failed.");
+}
+
+fn generate_mod_rs() {
+    let out_dir = out_dir();
+
+    let mods = glob::glob(&out_dir.join("*.rs").to_string_lossy())
+        .expect("glob")
+        .filter_map(|p| {
+            p.ok()
+                .map(|p| format!("pub mod {};", p.file_stem().unwrap().to_string_lossy()))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let mod_rs = out_dir.join("mod.rs");
+    fs::write(&mod_rs, format!("// @generated\n{}\n", mods)).expect("write");
+
+    println!("cargo:rustc-env=PROTO_MOD_RS={}", mod_rs.to_string_lossy());
+}
 
 fn main() {
-    let customizations = Customize {
-        ..Default::default()
-    };
-
-    let lib_str = read_to_string("src/lib.rs").unwrap();
-
-    // Iterate over the desired module names.
-    for line in lib_str.lines() {
-        if !line.starts_with("pub mod ") && !line.starts_with("mod ") {
-            continue;
-        }
-        let len = line.len();
-
-        let name;
-        if line.starts_with("pub mod ") {
-            name = &line[8..len - 1]; // Remove keywords and semi-colon
-        } else {
-            name = &line[4..len - 1]; // Remove keywords and semi-colon
-        }
-
-        //let out_dir = env::var("OUT_DIR").is_err();
-        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-
-        // Build the paths to relevant files.
-        let src_fname = &format!("proto/{}.proto", name);
-        let dest_fname = &out_dir.join(format!("{}.rs", name));
-        let src = Path::new(src_fname);
-        let dest = Path::new(dest_fname);
-        // Get the contents of the existing generated file.
-        let mut existing = "".to_string();
-        if dest.exists() {
-            // Removing CRLF line endings if present.
-            existing = read_to_string(dest).unwrap().replace("\r\n", "\n");
-        }
-
-        println!("Regenerating {} from {}", dest.display(), src.display());
-
-        // Parse the proto files as the protobuf-codegen-pure crate does.
-        let p = parse_and_typecheck(&[&Path::new("proto")], &[src]).expect("protoc");
-        // But generate them with the protobuf-codegen crate directly.
-        // Then we can keep the result in-memory.
-        let result = protobuf_codegen::gen(&p.file_descriptors, &p.relative_paths, &customizations);
-        // Protoc result as a byte array.
-        let new = &result.first().unwrap().content;
-        // Convert to utf8 to compare with existing.
-        let new = std::str::from_utf8(&new).unwrap();
-        // Save newly generated file if changed.
-        if new != existing {
-            write(dest, &new).unwrap();
-        }
-    }
+    cleanup();
+    compile();
+    generate_mod_rs();
 }

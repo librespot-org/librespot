@@ -8,8 +8,9 @@ license="MIT"
 edition = "2018"
 
 [dependencies]
-protobuf = "~2.14.0"
+protobuf = "~2.16.2"
 
 [build-dependencies]
-protobuf-codegen-pure = "~2.14.0"
-protobuf-codegen = "~2.14.0"
+protobuf-codegen-pure = "~2.16.2"
+protobuf-codegen = "~2.16.2"
+glob = "0.3.0"
