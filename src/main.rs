@@ -249,7 +249,7 @@ fn setup(args: &[String]) -> Setup {
 
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
 
-    let cache_directory = matches.opt_str("c").unwrap_or(String::from(""))
+    let cache_directory = matches.opt_str("c").unwrap_or(String::from(""));
     let system_cache_directory = matches.opt_str("system-cache").unwrap_or(String::from(cache_directory))
     let cache = Cache::new(
         PathBuf::from(cache_directory),
