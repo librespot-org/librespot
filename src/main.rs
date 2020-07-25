@@ -15,7 +15,7 @@ use url::Url;
 
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
-use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig};
+use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
 use librespot::core::session::Session;
 use librespot::core::version;
 
@@ -173,10 +173,11 @@ fn setup(args: &[String]) -> Setup {
             "Pregain (dB) applied by volume normalisation",
             "PREGAIN",
         )
-        .optflag(
+        .optopt(
             "",
-            "linear-volume",
-            "increase volume linear instead of logarithmic.",
+            "volume-ctrl",
+            "Volume control type - [linear, log, fixed]. Default is logarithmic",
+            "VOLUME_CTRL"
         )
         .optflag(
             "",
@@ -337,11 +338,17 @@ fn setup(args: &[String]) -> Setup {
             .map(|device_type| DeviceType::from_str(device_type).expect("Invalid device type"))
             .unwrap_or(DeviceType::default());
 
+        let volume_ctrl = matches
+            .opt_str("volume-ctrl")
+            .as_ref()
+            .map(|volume_ctrl| VolumeCtrl::from_str(volume_ctrl).expect("Invalid volume ctrl type"))
+            .unwrap_or(VolumeCtrl::default());
+
         ConnectConfig {
             name: name,
             device_type: device_type,
             volume: initial_volume,
-            linear_volume: matches.opt_present("linear-volume"),
+            volume_ctrl: volume_ctrl,
             autoplay: matches.opt_present("autoplay"),
         }
     };
