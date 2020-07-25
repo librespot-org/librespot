@@ -1,6 +1,6 @@
 [package]
 name = "librespot"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
@@ -22,22 +22,22 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
-version = "0.1.1"
+version = "0.1.2"
 [dependencies.librespot-connect]
 path = "connect"
-version = "0.1.1"
+version = "0.1.2"
 [dependencies.librespot-core]
 path = "core"
-version = "0.1.1"
+version = "0.1.2"
 [dependencies.librespot-metadata]
 path = "metadata"
-version = "0.1.1"
+version = "0.1.2"
 [dependencies.librespot-playback]
 path = "playback"
-version = "0.1.1"
+version = "0.1.2"
 [dependencies.librespot-protocol]
 path = "protocol"
-version = "0.1.1"
+version = "0.1.2"
 
 [dependencies]
 base64 = "0.10"
@@ -47,7 +47,7 @@ getopts = "0.2"
 hyper = "0.11"
 log = "0.4"
 num-bigint = "0.2"
-protobuf = "2.8.1"
+protobuf = "~2.14.0"
 rand = "0.7"
 rpassword = "3.0"
 tokio-core = "0.1"
@@ -77,9 +77,9 @@ default = ["librespot-playback/rodio-backend"]
 [package.metadata.deb]
 maintainer = "librespot-org"
 copyright = "2018 Paul Liétar"
-license_file = ["LICENSE", "4"]
+license-file = ["LICENSE", "4"]
 depends = "$auto"
-extended_description = """\
+extended-description = """\
 librespot is an open source client library for Spotify. It enables applications \
 to use Spotify's service, without using the official but closed-source \
 libspotify. Additionally, it will provide extra features which are not \

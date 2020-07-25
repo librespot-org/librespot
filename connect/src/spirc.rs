@@ -14,10 +14,12 @@ use crate::playback::mixer::Mixer;
 use crate::playback::player::{Player, PlayerEvent, PlayerEventChannel};
 use crate::protocol;
 use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
+
 use librespot_core::config::ConnectConfig;
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
+use librespot_core::util::url_encode;
 use librespot_core::util::SeqGenerator;
 use librespot_core::version;
 use librespot_core::volume::Volume;
@@ -249,7 +251,8 @@ impl Spirc {
         let ident = session.device_id().to_owned();
 
         // Uri updated in response to issue #288
-        let uri = format!("hm://remote/user/{}/", session.username());
+        debug!("canonical_username: {}", url_encode(&session.username()));
+        let uri = format!("hm://remote/user/{}/", url_encode(&session.username()));
 
         let subscription = session.mercury().subscribe(&uri as &str);
         let subscription = subscription
@@ -454,8 +457,8 @@ impl SpircTask {
             Ok(dur) => dur,
             Err(err) => err.duration(),
         };
-        ((dur.as_secs() as i64 + self.session.time_delta()) * 1000
-            + (dur.subsec_nanos() / 1000_000) as i64)
+        (dur.as_secs() as i64 + self.session.time_delta()) * 1000
+            + (dur.subsec_nanos() / 1000_000) as i64
     }
 
     fn ensure_mixer_started(&mut self) {
@@ -621,24 +624,8 @@ impl SpircTask {
                             self.play_status = SpircPlayStatus::Stopped;
                         }
                     },
-                    PlayerEvent::TimeToPreloadNextTrack { .. } => match self.play_status {
-                        SpircPlayStatus::Paused {
-                            ref mut preloading_of_next_track_triggered,
-                            ..
-                        }
-                        | SpircPlayStatus::Playing {
-                            ref mut preloading_of_next_track_triggered,
-                            ..
-                        } => {
-                            *preloading_of_next_track_triggered = true;
-                            if let Some(track_id) = self.preview_next_track() {
-                                self.player.preload(track_id);
-                            }
-                        }
-                        SpircPlayStatus::LoadingPause { .. }
-                        | SpircPlayStatus::LoadingPlay { .. }
-                        | SpircPlayStatus::Stopped => (),
-                    },
+                    PlayerEvent::TimeToPreloadNextTrack { .. } => self.handle_preload_next_track(),
+                    PlayerEvent::Unavailable { track_id, .. } => self.handle_unavailable(track_id),
                     _ => (),
                 }
             }
@@ -777,6 +764,7 @@ impl SpircTask {
                 } = self.play_status
                 {
                     if preloading_of_next_track_triggered {
+                        // Get the next track_id in the playlist
                         if let Some(track_id) = self.preview_next_track() {
                             self.player.preload(track_id);
                         }
@@ -790,7 +778,11 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeNotify => {
-                if self.device.get_is_active() && frame.get_device_state().get_is_active() {
+                if self.device.get_is_active()
+                    && frame.get_device_state().get_is_active()
+                    && self.device.get_became_active_at()
+                        <= frame.get_device_state().get_became_active_at()
+                {
                     self.device.set_is_active(false);
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
@@ -904,6 +896,50 @@ impl SpircTask {
             .and_then(|(track_id, _)| Some(track_id))
     }
 
+    fn handle_preload_next_track(&mut self) {
+        // Requests the player thread to preload the next track
+        match self.play_status {
+            SpircPlayStatus::Paused {
+                ref mut preloading_of_next_track_triggered,
+                ..
+            }
+            | SpircPlayStatus::Playing {
+                ref mut preloading_of_next_track_triggered,
+                ..
+            } => {
+                *preloading_of_next_track_triggered = true;
+                if let Some(track_id) = self.preview_next_track() {
+                    self.player.preload(track_id);
+                }
+            }
+            SpircPlayStatus::LoadingPause { .. }
+            | SpircPlayStatus::LoadingPlay { .. }
+            | SpircPlayStatus::Stopped => (),
+        }
+    }
+
+    // Mark unavailable tracks so we can skip them later
+    fn handle_unavailable(&mut self, track_id: SpotifyId) {
+        let unavailables = self.get_track_index_for_spotify_id(&track_id, 0);
+        for &index in unavailables.iter() {
+            debug_assert_eq!(self.state.get_track()[index].get_gid(), track_id.to_raw());
+            let mut unplayable_track_ref = TrackRef::new();
+            unplayable_track_ref.set_gid(self.state.get_track()[index].get_gid().to_vec());
+            // Misuse context field to flag the track
+            unplayable_track_ref.set_context(String::from("NonPlayable"));
+            std::mem::swap(
+                &mut self.state.mut_track()[index],
+                &mut unplayable_track_ref,
+            );
+            debug!(
+                "Marked <{:?}> at {:?} as NonPlayable",
+                self.state.get_track()[index],
+                index,
+            );
+        }
+        self.handle_preload_next_track();
+    }
+
     fn handle_next(&mut self) {
         let mut new_index = self.consume_queued_track() as u32;
         let mut continue_playing = true;
@@ -919,7 +955,7 @@ impl SpircTask {
         if (context_uri.starts_with("spotify:station:")
             || context_uri.starts_with("spotify:dailymix:")
             // spotify:user:xxx:collection
-            || context_uri.starts_with(&format!("spotify:user:{}:collection",self.session.username())))
+            || context_uri.starts_with(&format!("spotify:user:{}:collection",url_encode(&self.session.username()))))
             && ((self.state.get_track().len() as u32) - new_index) < CONTEXT_FETCH_THRESHOLD
         {
             self.context_fut = self.resolve_station(&context_uri);
@@ -1137,10 +1173,32 @@ impl SpircTask {
         })
     }
 
-    fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
-        let tracks_len = self.state.get_track().len() as u32;
+    // Helper to find corresponding index(s) for track_id
+    fn get_track_index_for_spotify_id(
+        &self,
+        track_id: &SpotifyId,
+        start_index: usize,
+    ) -> Vec<usize> {
+        let index: Vec<usize> = self.state.get_track()[start_index..]
+            .iter()
+            .enumerate()
+            .filter(|&(_, track_ref)| track_ref.get_gid() == track_id.to_raw())
+            .map(|(idx, _)| start_index + idx)
+            .collect();
+        // Sanity check
+        debug_assert!(!index.is_empty());
+        index
+    }
 
-        let mut new_playlist_index = index;
+    // Broken out here so we can refactor this later when we move to SpotifyObjectID or similar
+    fn track_ref_is_unavailable(&self, track_ref: &TrackRef) -> bool {
+        track_ref.get_context() == "NonPlayable"
+    }
+
+    fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
+        let tracks_len = self.state.get_track().len();
+
+        let mut new_playlist_index = index as usize;
 
         if new_playlist_index >= tracks_len {
             new_playlist_index = 0;
@@ -1152,14 +1210,15 @@ impl SpircTask {
         // tracks in each frame either have a gid or uri (that may or may not be a valid track)
         // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
 
-        let mut track_ref = self.state.get_track()[new_playlist_index as usize].clone();
+        let mut track_ref = self.state.get_track()[new_playlist_index].clone();
         let mut track_id = self.get_spotify_id_for_track(&track_ref);
-        while track_id.is_err() || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable {
+        while self.track_ref_is_unavailable(&track_ref)
+            || track_id.is_err()
+            || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
+        {
             warn!(
                 "Skipping track <{:?}> at position [{}] of {}",
-                track_ref.get_uri(),
-                new_playlist_index,
-                tracks_len
+                track_ref, new_playlist_index, tracks_len
             );
 
             new_playlist_index += 1;
@@ -1171,12 +1230,12 @@ impl SpircTask {
                 warn!("No playable track found in state: {:?}", self.state);
                 return None;
             }
-            track_ref = self.state.get_track()[index as usize].clone();
+            track_ref = self.state.get_track()[new_playlist_index].clone();
             track_id = self.get_spotify_id_for_track(&track_ref);
         }
 
         match track_id {
-            Ok(track_id) => Some((track_id, new_playlist_index)),
+            Ok(track_id) => Some((track_id, new_playlist_index as u32)),
             Err(_) => None,
         }
     }

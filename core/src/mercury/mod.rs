@@ -1,4 +1,5 @@
 use crate::protocol;
+use crate::util::url_encode;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures::sync::{mpsc, oneshot};
@@ -192,7 +193,7 @@ impl MercuryManager {
         let header: protocol::mercury::Header = protobuf::parse_from_bytes(&header_data).unwrap();
 
         let response = MercuryResponse {
-            uri: header.get_uri().to_owned(),
+            uri: url_encode(header.get_uri()).to_owned(),
             status_code: header.get_status_code(),
             payload: pending.parts,
         };

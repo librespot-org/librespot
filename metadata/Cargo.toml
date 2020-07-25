@@ -1,6 +1,6 @@
 [package]
 name = "librespot-metadata"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description="The metadata logic for librespot"
 license="MIT"
@@ -10,12 +10,12 @@ edition = "2018"
 byteorder = "1.3"
 futures = "0.1"
 linear-map = "1.2"
-protobuf = "2.8.1"
+protobuf = "~2.14.0"
 log = "0.4"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.1.1"
+version = "0.1.2"
 [dependencies.librespot-protocol]
 path = "../protocol"
-version = "0.1.1"
+version = "0.1.2"

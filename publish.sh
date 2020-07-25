@@ -47,7 +47,7 @@ function publishCrates {
     crate_path="$WORKINGDIR/$CRATE"
     crate_path=${crate_path//\/\///}
     cd $crate_path
-
+    # Also need to update Cargo.lock in root directory
     crate_name=`echo $( awk -v FS="name = " 'NF>1{print $2; exit}' Cargo.toml )`
     echo "Publishing $crate_name to crates.io"
     if [ "$CRATE" == "protocol" ]
@@ -58,6 +58,7 @@ function publishCrates {
       cargo publish
     fi
     echo "Successfully published $crate_name to crates.io"
+    # Should sleep here for 30 seconds to allow Crates.io time to push updated package to edge servers.
   done
 }
 

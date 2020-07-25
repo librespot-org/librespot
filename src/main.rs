@@ -27,7 +27,7 @@ use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{Player, PlayerEvent};
 
 mod player_event_handler;
-use crate::player_event_handler::run_program_on_events;
+use crate::player_event_handler::{emit_sink_event, run_program_on_events};
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -87,6 +87,7 @@ struct Setup {
     enable_discovery: bool,
     zeroconf_port: u16,
     player_event_program: Option<String>,
+    emit_sink_events: bool,
 }
 
 fn setup(args: &[String]) -> Setup {
@@ -111,6 +112,7 @@ fn setup(args: &[String]) -> Setup {
             "Run PROGRAM when playback is about to begin.",
             "PROGRAM",
         )
+        .optflag("", "emit-sink-events", "Run program set by --onevent before sink is opened and after it is closed.")
         .optflag("v", "verbose", "Enable verbose output")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
@@ -359,6 +361,7 @@ fn setup(args: &[String]) -> Setup {
         mixer: mixer,
         mixer_config: mixer_config,
         player_event_program: matches.opt_str("onevent"),
+        emit_sink_events: matches.opt_present("emit-sink-events"),
     }
 }
 
@@ -386,6 +389,7 @@ struct Main {
 
     player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
     player_event_program: Option<String>,
+    emit_sink_events: bool,
 }
 
 impl Main {
@@ -412,6 +416,7 @@ impl Main {
 
             player_event_channel: None,
             player_event_program: setup.player_event_program,
+            emit_sink_events: setup.emit_sink_events,
         };
 
         if setup.enable_discovery {
@@ -480,6 +485,15 @@ impl Future for Main {
                         Player::new(player_config, session.clone(), audio_filter, move || {
                             (backend)(device)
                         });
+
+                    if self.emit_sink_events {
+                        if let Some(player_event_program) = &self.player_event_program {
+                            let player_event_program = player_event_program.clone();
+                            player.set_sink_event_callback(Some(Box::new(move |sink_status| {
+                                emit_sink_event(sink_status, &player_event_program)
+                            })));
+                        }
+                    }
 
                     let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
                     self.spirc = Some(spirc);
