@@ -17,6 +17,15 @@ extern crate libpulse_sys;
 #[cfg(feature = "jackaudio-backend")]
 extern crate jack;
 
+#[cfg(feature = "gstreamer-backend")]
+extern crate glib;
+#[cfg(feature = "gstreamer-backend")]
+extern crate gstreamer as gst;
+#[cfg(feature = "gstreamer-backend")]
+extern crate gstreamer_app as gst_app;
+#[cfg(feature = "gstreamer-backend")]
+extern crate zerocopy;
+
 #[cfg(feature = "sdl-backend")]
 extern crate sdl2;
 

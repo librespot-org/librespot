@@ -40,6 +40,8 @@ addons:
       - portaudio19-dev
       - libasound2-dev
       - libsdl2-dev
+      - gstreamer1.0-dev
+      - libgstreamer-plugins-base1.0-dev
 
 before_script:
     - mkdir -p ~/.cargo
@@ -58,6 +60,7 @@ script:
     - cargo build --locked --no-default-features --features "jackaudio-backend"
     - cargo build --locked --no-default-features --features "rodio-backend"
     - cargo build --locked --no-default-features --features "sdl-backend"
+    - cargo build --locked --no-default-features --features "gstreamer-backend"
     - cargo build --locked --no-default-features --target armv7-unknown-linux-gnueabihf
 
 notifications:

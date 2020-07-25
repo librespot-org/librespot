@@ -34,6 +34,11 @@ mod jackaudio;
 #[cfg(feature = "jackaudio-backend")]
 use self::jackaudio::JackSink;
 
+#[cfg(feature = "gstreamer-backend")]
+mod gstreamer;
+#[cfg(feature = "gstreamer-backend")]
+use self::gstreamer::GstreamerSink;
+
 #[cfg(feature = "rodio-backend")]
 mod rodio;
 #[cfg(feature = "rodio-backend")]
@@ -58,6 +63,8 @@ pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>
     ("pulseaudio", mk_sink::<PulseAudioSink>),
     #[cfg(feature = "jackaudio-backend")]
     ("jackaudio", mk_sink::<JackSink>),
+    #[cfg(feature = "gstreamer-backend")]
+    ("gstreamer", mk_sink::<GstreamerSink>),
     #[cfg(feature = "rodio-backend")]
     ("rodio", mk_sink::<RodioSink>),
     #[cfg(feature = "sdl-backend")]
