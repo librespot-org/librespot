@@ -235,10 +235,7 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
 
 fn volume_to_mixer(volume: u16, volume_ctrl: &VolumeCtrl) -> u16 {
     match volume_ctrl {
-        VolumeCtrl::Linear => {
-            debug!("linear volume: {}", volume);
-            volume
-        }
+        VolumeCtrl::Linear => volume,
         VolumeCtrl::Log => calc_logarithmic_volume(volume),
         VolumeCtrl::Fixed => volume,
     }

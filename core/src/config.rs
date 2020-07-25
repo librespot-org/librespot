@@ -110,6 +110,6 @@ impl FromStr for VolumeCtrl {
 
 impl Default for VolumeCtrl {
     fn default() -> VolumeCtrl {
-        VolumeCtrl::Linear
+        VolumeCtrl::Log
     }
 }
