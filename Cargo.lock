@@ -1083,6 +1083,7 @@ dependencies = [
 name = "librespot-protocol"
 version = "0.1.2"
 dependencies = [
+ "glob 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf-codegen 2.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf-codegen-pure 2.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
