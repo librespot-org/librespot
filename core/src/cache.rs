@@ -76,7 +76,10 @@ impl Cache {
 impl Cache {
     fn file_path(&self, file: FileId) -> PathBuf {
         let name = file.to_base16();
-        self.audio_root.join("files").join(&name[0..2]).join(&name[2..])
+        self.audio_root
+            .join("files")
+            .join(&name[0..2])
+            .join(&name[2..])
     }
 
     pub fn file(&self, file: FileId) -> Option<File> {

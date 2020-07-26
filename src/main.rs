@@ -250,11 +250,15 @@ fn setup(args: &[String]) -> Setup {
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
 
     let cache_directory = matches.opt_str("c").unwrap_or(String::from(""));
-    let system_cache_directory = matches.opt_str("system-cache").unwrap_or(String::from(cache_directory.clone()));
+    let system_cache_directory = matches
+        .opt_str("system-cache")
+        .unwrap_or(String::from(cache_directory.clone()));
+
     let cache = Some(Cache::new(
         PathBuf::from(cache_directory),
         PathBuf::from(system_cache_directory),
-        use_audio_cache));
+        use_audio_cache,
+    ));
 
     let initial_volume = matches
         .opt_str("initial-volume")
