@@ -27,6 +27,7 @@ function updateVersion {
     if [ "$CRATE" = "librespot" ]
     then
       cargo update
+      git add . && git commit -a -m "Update Cargo.lock"
     fi
   done
 }
@@ -76,7 +77,7 @@ function publishCrates {
       cargo publish
     fi
     echo "Successfully published $crate_name to crates.io"
-    remoteWait 30 crate_name
+    remoteWait 30 $crate_name
   done
 }
 
