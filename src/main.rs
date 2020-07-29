@@ -150,6 +150,11 @@ fn setup(args: &[String]) -> Setup {
             "Alsa mixer index, Index of the cards mixer. Defaults to 0",
             "MIXER_INDEX",
         )
+        .optflag(
+            "",
+            "mixer-linear-volume",
+            "Disable alsa's mapped volume scale (cubic). Default false",
+        )
         .optopt(
             "",
             "initial-volume",
@@ -241,6 +246,7 @@ fn setup(args: &[String]) -> Setup {
             .opt_str("mixer-index")
             .map(|index| index.parse::<u32>().unwrap())
             .unwrap_or(0),
+        mapped_volume: !matches.opt_present("mixer-linear-volume"),
     };
 
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
