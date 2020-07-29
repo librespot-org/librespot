@@ -89,12 +89,19 @@ function updateRepo {
   git push origin v$1
 }
 
+function rebaseDev {
+  git checkout dev
+  git merge master
+  git push
+}
+
 function run {
   switchBranch
   updateVersion $1
   commitAndTag $1
   publishCrates
   updateRepo $1
+  rebaseDev
   echo "Successfully published v$1 to crates.io and uploaded changes to repo."
 }
 
