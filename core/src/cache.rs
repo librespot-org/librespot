@@ -28,8 +28,10 @@ fn mkdir_existing(path: &Path) -> io::Result<()> {
 
 impl Cache {
     pub fn new(audio_location: PathBuf, system_location: PathBuf, use_audio_cache: bool) -> Cache {
-        mkdir_existing(&audio_location).unwrap();
-        mkdir_existing(&audio_location.join("files")).unwrap();
+        if use_audio_cache == true {
+            mkdir_existing(&audio_location).unwrap();
+            mkdir_existing(&audio_location.join("files")).unwrap();
+        }
         mkdir_existing(&system_location).unwrap();
 
         Cache {
