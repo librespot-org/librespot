@@ -83,15 +83,22 @@ impl Cache {
     pub fn save_file(&self, file: FileId, contents: &mut dyn Read) {
         if self.use_audio_cache {
             let path = self.file_path(file);
-
             mkdir_existing(path.parent().unwrap()).unwrap();
 
-            let mut cache_file = File::create(path)
-            match cache_file {
-                Ok(file) => ::std::io::copy(contents, &mut file).unwrap(),
-                Err(error) => {
-                    self.use_audio_cache = false
-                },
+            let file_create = File::create(path);
+            match file_create {
+                Ok(mut cache_file) => {
+                    ::std::io::copy(contents, &mut cache_file).unwrap();
+                }
+                Err(_error) => {
+                    ::std::fs::remove_dir_all(&self.root.join("files")).unwrap();
+                    mkdir_existing(&self.root.join("files")).unwrap();
+
+                    let path = self.file_path(file);
+                    mkdir_existing(path.parent().unwrap()).unwrap();
+                    let mut cache_file = File::create(path).unwrap();
+                    ::std::io::copy(contents, &mut cache_file).unwrap();
+                }
             };
         }
     }
