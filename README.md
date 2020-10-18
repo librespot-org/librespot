@@ -64,6 +64,12 @@ Once you've installed the dependencies and cloned this repository you can build 
 cargo build --release
 ```
 
+# Packages
+
+librespot is also available via official package system on various operating systems such as Linux, FreeBSD, NetBSD. [Repology](https://repology.org/project/librespot/versions) offers a good overview.
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/librespot.svg)](https://repology.org/project/librespot/versions)
+
 ## Usage
 A sample program implementing a headless Spotify Connect receiver is provided.
 Once you've built *librespot*, run it using :
