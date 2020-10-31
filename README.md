@@ -47,7 +47,7 @@ On Fedora systems, the following command will install these dependencies :
 sudo dnf install alsa-lib-devel make gcc
 ```
 
-librespot currently offers the a selection of [audio backends](https://github.com/librespot-org/librespot/wiki/Audio-Backends).
+librespot currently offers the following selection of [audio backends](https://github.com/librespot-org/librespot/wiki/Audio-Backends).
 ```
 Rodio (default)
 ALSA
