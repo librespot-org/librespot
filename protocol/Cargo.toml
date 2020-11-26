@@ -5,6 +5,7 @@ authors = ["Paul Liétar <paul@lietar.net>"]
 build = "build.rs"
 description="The protobuf logic for communicating with Spotify servers"
 license="MIT"
+repository = "https://github.com/librespot-org/librespot"
 edition = "2018"
 
 [dependencies]
