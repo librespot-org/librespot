@@ -1,5 +1,5 @@
 use super::{Open, Sink};
-use libpulse_binding as pulse;
+use libpulse_binding::{self as pulse, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::io;
 
@@ -39,14 +39,14 @@ impl Sink for PulseAudioSink {
 
         let device = self.device.as_ref().map(|s| (*s).as_str());
         let result = Simple::new(
-            None,               // Use the default server.
-            APP_NAME,           // Our application's name.
-            pulse::stream::Direction::Playback,
-            device,
-            STREAM_NAME,        // desc of our stream.
-            &self.ss,           // Our sample format.
-            None,               // Use default channel map
-            None,               // Use default buffering attributes.
+            None,                // Use the default server.
+            APP_NAME,            // Our application's name.
+            Direction::Playback, // Direction.
+            device,              // Our device (sink) name.
+            STREAM_NAME,         // Description of our stream.
+            &self.ss,            // Our sample format.
+            None,                // Use default channel map.
+            None,                // Use default buffering attributes.
         );
         match result {
             Ok(s) => {
