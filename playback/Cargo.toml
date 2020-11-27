@@ -25,8 +25,8 @@ shell-words = "0.1.0"
 
 alsa            = { version = "0.2", optional = true }
 portaudio-rs    = { version = "0.3", optional = true }
-libpulse-sys        = { version = "1.11", optional = true, default-features = false }
-libpulse-simple-sys = { version = "1.11", optional = true, default-features = false }
+libpulse-binding        = { version = "2.13", optional = true, default-features = false }
+libpulse-simple-binding = { version = "2.13", optional = true, default-features = false }
 jack            = { version = "0.5", optional = true }
 libc            = { version = "0.2", optional = true }
 rodio           = { version = "0.13", optional = true, default-features = false }
@@ -40,7 +40,7 @@ zerocopy        = { version = "0.2", optional = true }
 [features]
 alsa-backend = ["alsa"]
 portaudio-backend = ["portaudio-rs"]
-pulseaudio-backend = ["libpulse-sys", "libpulse-simple-sys", "libc"]
+pulseaudio-backend = ["libpulse-binding", "libpulse-simple-binding"]
 jackaudio-backend = ["jack"]
 rodio-backend = ["rodio", "cpal"]
 sdl-backend = ["sdl2"]
