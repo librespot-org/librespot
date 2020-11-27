@@ -35,7 +35,7 @@ sdl2            = { version = "0.32", optional = true }
 gstreamer       = { version = "0.16", optional = true }
 gstreamer-app   = { version = "0.16", optional = true }
 glib            = { version = "0.10", optional = true }
-zerocopy        = { version = "0.2", optional = true }
+zerocopy        = { version = "0.3", optional = true }
 
 [features]
 alsa-backend = ["alsa"]
