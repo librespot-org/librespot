@@ -36,7 +36,7 @@ tokio-codec = "0.1"
 tokio-core = "0.1"
 tokio-io = "0.1"
 url = "1.7"
-uuid = { version = "0.7", features = ["v4"] }
+uuid = { version = "0.8", features = ["v4"] }
 sha-1 = "0.8"
 hmac = "0.7"
 pbkdf2 = "0.3"
