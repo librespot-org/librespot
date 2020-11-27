@@ -1,6 +1,7 @@
 use super::{Open, Sink};
 use libc;
 use libpulse_sys::*;
+use libpulse_simple_sys::*;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::io;
