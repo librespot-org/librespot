@@ -8,10 +8,10 @@ extern crate shell_words;
 #[cfg(feature = "alsa-backend")]
 extern crate alsa;
 
-#[cfg(feature = "portaudio-rs")]
+#[cfg(feature = "portaudio-backend")]
 extern crate portaudio_rs;
 
-#[cfg(feature = "libpulse-sys")]
+#[cfg(feature = "pulseaudio-backend")]
 extern crate libpulse_sys;
 
 #[cfg(feature = "jackaudio-backend")]
