@@ -1,88 +1,110 @@
 use super::{Open, Sink};
 extern crate cpal;
 extern crate rodio;
+use cpal::traits::{DeviceTrait, HostTrait};
 use std::process::exit;
 use std::{io, thread, time};
 
 pub struct RodioSink {
     rodio_sink: rodio::Sink,
+    // We have to keep hold of this object, or the Sink can't play...
+    #[allow(dead_code)]
+    stream: rodio::OutputStream,
 }
 
 fn list_formats(ref device: &rodio::Device) {
-    let default_fmt = match device.default_output_format() {
-        Ok(fmt) => cpal::SupportedFormat::from(fmt),
+    let default_fmt = match device.default_output_config() {
+        Ok(fmt) => cpal::SupportedStreamConfig::from(fmt),
         Err(e) => {
-            warn!("Error getting default rodio::Sink format: {:?}", e);
+            warn!("Error getting default rodio::Sink config: {}", e);
             return;
         }
     };
+    debug!("  Default config:");
+    debug!("    {:?}", default_fmt);
 
-    let mut output_formats = match device.supported_output_formats() {
+    let mut output_configs = match device.supported_output_configs() {
         Ok(f) => f.peekable(),
         Err(e) => {
-            warn!("Error getting supported rodio::Sink formats: {:?}", e);
+            warn!("Error getting supported rodio::Sink configs: {}", e);
             return;
         }
     };
 
-    if output_formats.peek().is_some() {
-        debug!("  Available formats:");
-        for format in output_formats {
-            let s = format!(
-                "{}ch, {:?}, min {:?}, max {:?}",
-                format.channels, format.data_type, format.min_sample_rate, format.max_sample_rate
-            );
-            if format == default_fmt {
-                debug!("    (default) {}", s);
-            } else {
-                debug!("    {:?}", format);
-            }
+    if output_configs.peek().is_some() {
+        debug!("  Available configs:");
+        for format in output_configs {
+            debug!("    {:?}", format);
         }
     }
 }
 
 fn list_outputs() {
-    let default_device = rodio::default_output_device().unwrap();
-    println!("Default Audio Device:\n  {}", default_device.name());
+    let default_device = get_default_device();
+    let default_device_name = default_device.name().expect("cannot get output name");
+    println!("Default Audio Device:\n  {}", default_device_name);
     list_formats(&default_device);
 
     println!("Other Available Audio Devices:");
-    for device in rodio::output_devices() {
-        if device.name() != default_device.name() {
-            println!("  {}", device.name());
+    for device in cpal::default_host()
+        .output_devices()
+        .expect("cannot get list of output devices")
+    {
+        let device_name = device.name().expect("cannot get output name");
+        if device_name != default_device_name {
+            println!("  {}", device_name);
             list_formats(&device);
         }
     }
 }
 
-impl Open for RodioSink {
-    fn open(device: Option<String>) -> RodioSink {
-        debug!("Using rodio sink");
+fn get_default_device() -> rodio::Device {
+    cpal::default_host()
+        .default_output_device()
+        .expect("no default output device available")
+}
 
-        let mut rodio_device = rodio::default_output_device().expect("no output device available");
-        if device.is_some() {
-            let device_name = device.unwrap();
-
+fn match_device(device: Option<String>) -> rodio::Device {
+    match device {
+        Some(device_name) => {
             if device_name == "?".to_string() {
                 list_outputs();
                 exit(0)
             }
-            let mut found = false;
-            for d in rodio::output_devices() {
-                if d.name() == device_name {
-                    rodio_device = d;
-                    found = true;
-                    break;
+            for d in cpal::default_host()
+                .output_devices()
+                .expect("cannot get list of output devices")
+            {
+                if d.name().expect("cannot get output name") == device_name {
+                    return d;
                 }
             }
-            if !found {
-                println!("No output sink matching '{}' found.", device_name);
-                exit(0)
-            }
+            println!("No output sink matching '{}' found.", device_name);
+            exit(0)
         }
-        let sink = rodio::Sink::new(&rodio_device);
+        None => return get_default_device(),
+    }
+}
 
-        RodioSink { rodio_sink: sink }
+impl Open for RodioSink {
+    fn open(device: Option<String>) -> RodioSink {
+        debug!(
+            "Using rodio sink with cpal host: {:?}",
+            cpal::default_host().id()
+        );
+
+        let rodio_device = match_device(device);
+        debug!("Using cpal device");
+        let stream = rodio::OutputStream::try_from_device(&rodio_device)
+            .expect("Couldn't open output stream.");
+        debug!("Using rodio stream");
+        let sink = rodio::Sink::try_new(&stream.1).expect("Couldn't create output sink.");
+        debug!("Using rodio sink");
+
+        RodioSink {
+            rodio_sink: sink,
+            stream: stream.0,
+        }
     }
 }
 
