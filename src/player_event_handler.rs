@@ -58,6 +58,10 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
             env_vars.insert("DURATION_MS", duration_ms.to_string());
             env_vars.insert("POSITION_MS", position_ms.to_string());
         }
+        PlayerEvent::Preloading { track_id, .. } => {
+            env_vars.insert("PLAYER_EVENT", "preloading".to_string());
+            env_vars.insert("TRACK_ID", track_id.to_base62());
+        }
         PlayerEvent::VolumeSet { volume } => {
             env_vars.insert("PLAYER_EVENT", "volume_set".to_string());
             env_vars.insert("VOLUME", volume.to_string());
