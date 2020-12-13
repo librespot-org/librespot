@@ -28,8 +28,8 @@ portaudio-rs    = { version = "0.3", optional = true }
 libpulse-sys    = { version = "0.0.0", optional = true }
 jack            = { version = "0.5", optional = true }
 libc            = { version = "0.2", optional = true }
-rodio           = { version = "0.9", optional = true, default-features = false }
-cpal            = { version = "0.8", optional = true }
+rodio           = { version = "0.13", optional = true, default-features = false }
+cpal            = { version = "0.13", optional = true }
 sdl2            = { version = "0.32", optional = true }
 gstreamer       = { version = "0.15", optional = true }
 gstreamer-app   = { version = "0.15", optional = true }
