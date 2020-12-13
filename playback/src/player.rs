@@ -101,6 +101,10 @@ pub enum PlayerEvent {
         track_id: SpotifyId,
         position_ms: u32,
     },
+    // The player is preloading a track.
+    Preloading {
+        track_id: SpotifyId,
+    },
     // The player is playing a track.
     // This event is issued at the start of playback of whenever the position must be communicated
     // because it is out of sync. This includes:
@@ -173,7 +177,7 @@ impl PlayerEvent {
             | Stopped {
                 play_request_id, ..
             } => Some(*play_request_id),
-            Changed { .. } | VolumeSet { .. } => None,
+            Changed { .. } | Preloading { .. } | VolumeSet { .. } => None,
         }
     }
 }
@@ -799,6 +803,7 @@ impl Future for PlayerInternal {
             {
                 match loader.poll() {
                     Ok(Async::Ready(loaded_track)) => {
+                        self.send_event(PlayerEvent::Preloading { track_id });
                         self.preload = PlayerPreload::Ready {
                             track_id,
                             loaded_track,
