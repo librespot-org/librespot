@@ -8,11 +8,13 @@ extern crate shell_words;
 #[cfg(feature = "alsa-backend")]
 extern crate alsa;
 
-#[cfg(feature = "portaudio-rs")]
+#[cfg(feature = "portaudio-backend")]
 extern crate portaudio_rs;
 
-#[cfg(feature = "libpulse-sys")]
-extern crate libpulse_sys;
+#[cfg(feature = "pulseaudio-backend")]
+extern crate libpulse_binding;
+#[cfg(feature = "pulseaudio-backend")]
+extern crate libpulse_simple_binding;
 
 #[cfg(feature = "jackaudio-backend")]
 extern crate jack;
@@ -28,9 +30,6 @@ extern crate zerocopy;
 
 #[cfg(feature = "sdl-backend")]
 extern crate sdl2;
-
-#[cfg(feature = "libc")]
-extern crate libc;
 
 extern crate librespot_audio as audio;
 extern crate librespot_core;

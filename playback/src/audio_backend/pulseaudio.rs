@@ -1,130 +1,86 @@
 use super::{Open, Sink};
-use libc;
-use libpulse_sys::*;
-use std::ffi::CStr;
-use std::ffi::CString;
+use libpulse_binding::{self as pulse, stream::Direction};
+use libpulse_simple_binding::Simple;
 use std::io;
-use std::mem;
-use std::ptr::{null, null_mut};
+
+const APP_NAME: &str = "librespot";
+const STREAM_NAME: &str = "Spotify endpoint";
 
 pub struct PulseAudioSink {
-    s: *mut pa_simple,
-    ss: pa_sample_spec,
-    name: CString,
-    desc: CString,
-    device: Option<CString>,
-}
-
-fn call_pulseaudio<T, F, FailCheck>(
-    f: F,
-    fail_check: FailCheck,
-    kind: io::ErrorKind,
-) -> io::Result<T>
-where
-    T: Copy,
-    F: Fn(*mut libc::c_int) -> T,
-    FailCheck: Fn(T) -> bool,
-{
-    let mut error: libc::c_int = 0;
-    let ret = f(&mut error);
-    if fail_check(ret) {
-        let err_cstr = unsafe { CStr::from_ptr(pa_strerror(error)) };
-        let errstr = err_cstr.to_string_lossy().into_owned();
-        Err(io::Error::new(kind, errstr))
-    } else {
-        Ok(ret)
-    }
-}
-
-impl PulseAudioSink {
-    fn free_connection(&mut self) {
-        if self.s != null_mut() {
-            unsafe {
-                pa_simple_free(self.s);
-            }
-            self.s = null_mut();
-        }
-    }
-}
-
-impl Drop for PulseAudioSink {
-    fn drop(&mut self) {
-        self.free_connection();
-    }
+    s: Option<Simple>,
+    ss: pulse::sample::Spec,
+    device: Option<String>,
 }
 
 impl Open for PulseAudioSink {
     fn open(device: Option<String>) -> PulseAudioSink {
         debug!("Using PulseAudio sink");
 
-        let ss = pa_sample_spec {
-            format: PA_SAMPLE_S16LE,
+        let ss = pulse::sample::Spec {
+            format: pulse::sample::Format::S16le,
             channels: 2, // stereo
             rate: 44100,
         };
-
-        let name = CString::new("librespot").unwrap();
-        let description = CString::new("Spotify endpoint").unwrap();
+        debug_assert!(ss.is_valid());
 
         PulseAudioSink {
-            s: null_mut(),
+            s: None,
             ss: ss,
-            name: name,
-            desc: description,
-            device: device.and_then(|s| CString::new(s).ok()),
+            device: device,
         }
     }
 }
 
 impl Sink for PulseAudioSink {
     fn start(&mut self) -> io::Result<()> {
-        if self.s == null_mut() {
-            let device = match &self.device {
-                None => null(),
-                Some(device) => device.as_ptr(),
-            };
-            self.s = call_pulseaudio(
-                |err| unsafe {
-                    pa_simple_new(
-                        null(),             // Use the default server.
-                        self.name.as_ptr(), // Our application's name.
-                        PA_STREAM_PLAYBACK,
-                        device,
-                        self.desc.as_ptr(), // desc of our stream.
-                        &self.ss,           // Our sample format.
-                        null(),             // Use default channel map
-                        null(),             // Use default buffering attributes.
-                        err,
-                    )
-                },
-                |ptr| ptr == null_mut(),
-                io::ErrorKind::ConnectionRefused,
-            )?;
+        if self.s.is_some() {
+            return Ok(());
         }
-        Ok(())
+
+        let device = self.device.as_ref().map(|s| (*s).as_str());
+        let result = Simple::new(
+            None,                // Use the default server.
+            APP_NAME,            // Our application's name.
+            Direction::Playback, // Direction.
+            device,              // Our device (sink) name.
+            STREAM_NAME,         // Description of our stream.
+            &self.ss,            // Our sample format.
+            None,                // Use default channel map.
+            None,                // Use default buffering attributes.
+        );
+        match result {
+            Ok(s) => {
+                self.s = Some(s);
+                Ok(())
+            }
+            Err(e) => Err(io::Error::new(
+                io::ErrorKind::ConnectionRefused,
+                e.to_string().unwrap(),
+            )),
+        }
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        self.free_connection();
+        self.s = None;
         Ok(())
     }
 
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        if self.s == null_mut() {
+        if let Some(s) = &self.s {
+            let d: &[u8] = unsafe { std::mem::transmute(data) };
+
+            match s.write(d) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    e.to_string().unwrap(),
+                )),
+            }
+        } else {
             Err(io::Error::new(
                 io::ErrorKind::NotConnected,
                 "Not connected to pulseaudio",
             ))
-        } else {
-            let ptr = data.as_ptr() as *const libc::c_void;
-            let len = data.len() as usize * mem::size_of::<i16>();
-            assert!(len > 0);
-            call_pulseaudio(
-                |err| unsafe { pa_simple_write(self.s, ptr, len, err) },
-                |ret| ret < 0,
-                io::ErrorKind::BrokenPipe,
-            )?;
-            Ok(())
         }
     }
 }
