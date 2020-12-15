@@ -1,7 +1,6 @@
 use super::{Open, Sink};
-use jack::prelude::{
-    client_options, AsyncClient, AudioOutPort, AudioOutSpec, Client, JackControl, Port,
-    ProcessHandler, ProcessScope,
+use jack::{
+    AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
 use std::io;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
@@ -13,8 +12,8 @@ pub struct JackSink {
 
 pub struct JackData {
     rec: Receiver<i16>,
-    port_l: Port<AudioOutSpec>,
-    port_r: Port<AudioOutSpec>,
+    port_l: Port<AudioOut>,
+    port_r: Port<AudioOut>,
 }
 
 fn pcm_to_f32(sample: i16) -> f32 {
@@ -22,10 +21,10 @@ fn pcm_to_f32(sample: i16) -> f32 {
 }
 
 impl ProcessHandler for JackData {
-    fn process(&mut self, _: &Client, ps: &ProcessScope) -> JackControl {
+    fn process(&mut self, _: &Client, ps: &ProcessScope) -> Control {
         // get output port buffers
-        let mut out_r = AudioOutPort::new(&mut self.port_r, ps);
-        let mut out_l = AudioOutPort::new(&mut self.port_l, ps);
+        let mut out_r = self.port_r.as_mut_slice(ps);
+        let mut out_l = self.port_l.as_mut_slice(ps);
         let buf_r: &mut [f32] = &mut out_r;
         let buf_l: &mut [f32] = &mut out_l;
         // get queue iterator
@@ -36,7 +35,7 @@ impl ProcessHandler for JackData {
             buf_r[i] = pcm_to_f32(queue_iter.next().unwrap_or(0));
             buf_l[i] = pcm_to_f32(queue_iter.next().unwrap_or(0));
         }
-        JackControl::Continue
+        Control::Continue
     }
 }
 
@@ -46,13 +45,9 @@ impl Open for JackSink {
 
         let client_name = client_name.unwrap_or("librespot".to_string());
         let (client, _status) =
-            Client::new(&client_name[..], client_options::NO_START_SERVER).unwrap();
-        let ch_r = client
-            .register_port("out_0", AudioOutSpec::default())
-            .unwrap();
-        let ch_l = client
-            .register_port("out_1", AudioOutSpec::default())
-            .unwrap();
+            Client::new(&client_name[..], ClientOptions::NO_START_SERVER).unwrap();
+        let ch_r = client.register_port("out_0", AudioOut::default()).unwrap();
+        let ch_l = client.register_port("out_1", AudioOut::default()).unwrap();
         // buffer for samples from librespot (~10ms)
         let (tx, rx) = sync_channel(2 * 1024 * 4);
         let jack_data = JackData {
