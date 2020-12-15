@@ -1,3 +1,4 @@
+[![Build Status](https://img.shields.io/github/workflow/status/librespot-org/librespot/test/dev)](https://github.com/librespot-org/librespot/actions)
 [![Build Status](https://travis-ci.org/librespot-org/librespot.svg?branch=dev)](https://travis-ci.org/librespot-org/librespot)
 [![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/librespot-org/spotify-connect-resources)
 [![Crates.io](https://img.shields.io/crates/v/librespot.svg)](https://crates.io/crates/librespot)
