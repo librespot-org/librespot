@@ -234,11 +234,16 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
 }
 
 fn volume_to_mixer(volume: u16, volume_ctrl: &VolumeCtrl) -> u16 {
-    match volume_ctrl {
-        VolumeCtrl::Linear => volume,
-        VolumeCtrl::Log => calc_logarithmic_volume(volume),
-        VolumeCtrl::Fixed => volume,
-    }
+    info!("spotify volume: {}", volume);
+    let mut val = std::u16::MAX;
+    val
+
+
+    //match volume_ctrl {
+    //    VolumeCtrl::Linear => volume,
+    //    VolumeCtrl::Log => calc_logarithmic_volume(volume),
+    //    VolumeCtrl::Fixed => volume,
+    //}
 }
 
 impl Spirc {
