@@ -97,6 +97,11 @@ fn setup(args: &[String]) -> Setup {
         "cache",
         "Path to a directory where files will be cached.",
         "CACHE",
+    ).optopt(
+        "",
+        "system-cache",
+        "Path to a directory where system files (credentials, volume) will be cached. Can be different from cache option value",
+        "SYTEMCACHE",
     ).optflag("", "disable-audio-cache", "Disable caching of the audio data.")
         .reqopt("n", "name", "Device name", "NAME")
         .optopt("", "device-type", "Displayed device type", "DEVICE_TYPE")
@@ -251,9 +256,16 @@ fn setup(args: &[String]) -> Setup {
 
     let use_audio_cache = !matches.opt_present("disable-audio-cache");
 
-    let cache = matches
-        .opt_str("c")
-        .map(|cache_location| Cache::new(PathBuf::from(cache_location), use_audio_cache));
+    let cache_directory = matches.opt_str("c").unwrap_or(String::from(""));
+    let system_cache_directory = matches
+        .opt_str("system-cache")
+        .unwrap_or(String::from(cache_directory.clone()));
+
+    let cache = Some(Cache::new(
+        PathBuf::from(cache_directory),
+        PathBuf::from(system_cache_directory),
+        use_audio_cache,
+    ));
 
     let initial_volume = matches
         .opt_str("initial-volume")
