@@ -1,0 +1,100 @@
+# Note, this is used in the badge URL!
+name: test
+
+on:
+  push:
+    branches: [master, dev]
+    paths: ['**.rs', '**.toml', '**.lock', '**.yml']
+  pull_request:
+    branches: [master, dev]
+    paths: ['**.rs', '**.toml', '**.lock', '**.yml']
+
+jobs:
+  fmt:
+    name: 'Rust: format check'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only run the formatting check for stable
+        include:
+          - os: ubuntu-latest
+            toolchain: stable
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          # Use default profile to get rustfmt
+          profile: default
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - run: cargo fmt --verbose --all -- --check
+
+  test:
+    needs: fmt
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        toolchain:
+          - 1.40.0 # MSRV (Minimum supported rust version)
+          - stable
+          - beta
+        experimental: [false]
+        # Ignore failures in nightly, not ideal, but necessary
+        include:
+          - os: ubuntu-latest
+            toolchain: nightly
+            experimental: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Install developer package dependencies
+        run: sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+      - run: cargo build --locked --no-default-features
+      - run: cargo build --locked --examples
+      - run: cargo build --locked --no-default-features --features "with-tremor"
+      - run: cargo build --locked --no-default-features --features "with-vorbis"
+      - run: cargo build --locked --no-default-features --features "alsa-backend"
+      - run: cargo build --locked --no-default-features --features "portaudio-backend"
+      - run: cargo build --locked --no-default-features --features "pulseaudio-backend"
+      - run: cargo build --locked --no-default-features --features "jackaudio-backend"
+      - run: cargo build --locked --no-default-features --features "rodio-backend"
+      - run: cargo build --locked --no-default-features --features "sdl-backend"
+      - run: cargo build --locked --no-default-features --features "gstreamer-backend"
+
+  test-cross-arm:
+    needs: fmt
+    runs-on: ${{ matrix.os }}
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            toolchain: stable
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          target: ${{ matrix.target }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Install cross
+        run: cargo install cross || true
+      - name: Build
+        run: cross build --locked --target ${{ matrix.target }} --no-default-features
