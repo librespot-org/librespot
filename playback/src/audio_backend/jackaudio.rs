@@ -1,4 +1,5 @@
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
@@ -73,8 +74,8 @@ impl Sink for JackSink {
         Ok(())
     }
 
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        for s in data.iter() {
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+        for s in packet.samples().iter() {
             let res = self.send.send(*s);
             if res.is_err() {
                 error!("jackaudio: cannot write to channel");

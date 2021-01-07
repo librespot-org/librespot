@@ -1,3 +1,4 @@
+use crate::audio::AudioPacket;
 use std::io;
 
 pub trait Open {
@@ -7,7 +8,7 @@ pub trait Open {
 pub trait Sink {
     fn start(&mut self) -> io::Result<()>;
     fn stop(&mut self) -> io::Result<()>;
-    fn write(&mut self, data: &[i16]) -> io::Result<()>;
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()>;
 }
 
 fn mk_sink<S: Sink + Open + 'static>(device: Option<String>) -> Box<dyn Sink> {

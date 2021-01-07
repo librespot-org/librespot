@@ -1,4 +1,5 @@
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 use libpulse_binding::{self as pulse, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::io;
@@ -65,13 +66,17 @@ impl Sink for PulseAudioSink {
         Ok(())
     }
 
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         if let Some(s) = &self.s {
             // SAFETY: An i16 consists of two bytes, so that the given slice can be interpreted
             // as a byte array of double length. Each byte pointer is validly aligned, and so
             // is the newly created slice.
-            let d: &[u8] =
-                unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 2) };
+            let d: &[u8] = unsafe {
+                std::slice::from_raw_parts(
+                    packet.samples().as_ptr() as *const u8,
+                    packet.samples().len() * 2,
+                )
+            };
 
             match s.write(d) {
                 Ok(_) => Ok(()),

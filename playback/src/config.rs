@@ -55,6 +55,7 @@ pub struct PlayerConfig {
     pub normalisation_type: NormalisationType,
     pub normalisation_pregain: f32,
     pub gapless: bool,
+    pub passthrough: bool,
 }
 
 impl Default for PlayerConfig {
@@ -65,6 +66,7 @@ impl Default for PlayerConfig {
             normalisation_type: NormalisationType::default(),
             normalisation_pregain: 0.0,
             gapless: true,
+            passthrough: false,
         }
     }
 }

@@ -1,4 +1,5 @@
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 use gst::prelude::*;
 use gst::*;
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -104,9 +105,9 @@ impl Sink for GstreamerSink {
     fn stop(&mut self) -> io::Result<()> {
         Ok(())
     }
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         // Copy expensively (in to_vec()) to avoid thread synchronization
-        let deighta: &[u8] = data.as_bytes();
+        let deighta: &[u8] = packet.samples().as_bytes();
         self.tx
             .send(deighta.to_vec())
             .expect("tx send failed in write function");
