@@ -1,11 +1,4 @@
 // Passthrough decoder for librespot
-//
-// Copyright (c) 2021 Philippe <philippe_44@outlook.com>
-// and contributors. All rights reserved.
-// Licensed under MIT license, or Apache 2 license,
-// at your option. Please see the LICENSE file
-// attached to this source distribution for details.
-
 use super::{AudioDecoder, AudioError, AudioPacket};
 use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::io::{Error, Read, Seek, Write};
