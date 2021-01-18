@@ -13,7 +13,7 @@ use tokio_core::net::TcpStream;
 use tokio_core::reactor::Handle;
 use url::Url;
 
-use crate::authentication::Credentials;
+use crate::authentication::{AuthenticationError, Credentials};
 use crate::version;
 
 use crate::proxytunnel;
@@ -66,7 +66,7 @@ pub fn authenticate(
     transport: Transport,
     credentials: Credentials,
     device_id: String,
-) -> Box<dyn Future<Item = (Transport, Credentials), Error = io::Error>> {
+) -> Box<dyn Future<Item = (Transport, Credentials), Error = AuthenticationError>> {
     use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
     use crate::protocol::keyexchange::APLoginFailed;
 
@@ -101,6 +101,7 @@ pub fn authenticate(
         transport
             .send((cmd, data))
             .and_then(|transport| transport.into_future().map_err(|(err, _stream)| err))
+            .map_err(|io_err| io_err.into())
             .and_then(|(packet, transport)| match packet {
                 Some((0xac, data)) => {
                     let welcome_data: APWelcome =
@@ -118,10 +119,7 @@ pub fn authenticate(
                 Some((0xad, data)) => {
                     let error_data: APLoginFailed =
                         protobuf::parse_from_bytes(data.as_ref()).unwrap();
-                    panic!(
-                        "Authentication failed with reason: {:?}",
-                        error_data.get_error_code()
-                    )
+                    Err(error_data.into())
                 }
 
                 Some((cmd, _)) => panic!("Unexpected packet {:?}", cmd),

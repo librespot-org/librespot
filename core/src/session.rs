@@ -19,6 +19,8 @@ use crate::config::SessionConfig;
 use crate::connection;
 use crate::mercury::MercuryManager;
 
+pub use crate::authentication::{AuthenticationError, AuthenticationErrorKind};
+
 struct SessionData {
     country: String,
     time_delta: i64,
@@ -53,16 +55,18 @@ impl Session {
         credentials: Credentials,
         cache: Option<Cache>,
         handle: Handle,
-    ) -> Box<dyn Future<Item = Session, Error = io::Error>> {
+    ) -> Box<dyn Future<Item = Session, Error = AuthenticationError>> {
         let access_point =
             apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
 
         let handle_ = handle.clone();
         let proxy = config.proxy.clone();
-        let connection = access_point.and_then(move |addr| {
-            info!("Connecting to AP \"{}\"", addr);
-            connection::connect(addr, &handle_, &proxy)
-        });
+        let connection = access_point
+            .and_then(move |addr| {
+                info!("Connecting to AP \"{}\"", addr);
+                connection::connect(addr, &handle_, &proxy)
+            })
+            .map_err(|io_err| io_err.into());
 
         let device_id = config.device_id.clone();
         let authentication = connection.and_then(move |connection| {

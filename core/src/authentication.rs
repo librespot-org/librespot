@@ -13,6 +13,7 @@ use std::ops::FnOnce;
 use std::path::Path;
 
 use crate::protocol::authentication::AuthenticationType;
+use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
@@ -189,5 +190,39 @@ pub fn get_credentials<F: FnOnce(&String) -> String>(
         (None, _, Some(credentials)) => Some(credentials),
 
         (None, _, None) => None,
+    }
+}
+
+error_chain! {
+    types {
+        AuthenticationError, AuthenticationErrorKind, AuthenticationResultExt, AuthenticationResult;
+    }
+
+    foreign_links {
+        Io(::std::io::Error);
+    }
+
+    errors {
+        BadCredentials {
+            description("Bad credentials")
+            display("Authentication failed with error: Bad credentials")
+        }
+        PremiumAccountRequired {
+            description("Premium account required")
+            display("Authentication failed with error: Premium account required")
+        }
+    }
+}
+
+impl From<APLoginFailed> for AuthenticationError {
+    fn from(login_failure: APLoginFailed) -> Self {
+        let error_code = login_failure.get_error_code();
+        match error_code {
+            ErrorCode::BadCredentials => Self::from_kind(AuthenticationErrorKind::BadCredentials),
+            ErrorCode::PremiumAccountRequired => {
+                Self::from_kind(AuthenticationErrorKind::PremiumAccountRequired)
+            }
+            _ => format!("Authentication failed with error: {:?}", error_code).into(),
+        }
     }
 }
