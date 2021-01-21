@@ -694,6 +694,17 @@ impl PlayerTrackLoader {
 
         let key = self.session.audio_key().request(spotify_id, file_id);
 
+        let key = match key.wait() {
+            Ok(key) => key,
+            Err(_) => {
+                error!(
+                    "Unable to load decryption key for spotify id {:?}",
+                    spotify_id
+                );
+                return None;
+            }
+        };
+
         let encrypted_file =
             match self.get_encrypted_file(file_id, bytes_per_second, play_from_beginning) {
                 Some(encrypted_file) => encrypted_file,
@@ -711,14 +722,6 @@ impl PlayerTrackLoader {
             // we need to seek -> we set stream mode after the initial seek.
             stream_loader_controller.set_random_access_mode();
         }
-
-        let key = match key.wait() {
-            Ok(key) => key,
-            Err(_) => {
-                error!("Unable to load decryption key");
-                return None;
-            }
-        };
 
         let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
