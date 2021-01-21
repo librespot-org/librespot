@@ -1,5 +1,10 @@
+#![allow(clippy::unused_io_amount)]
+#![allow(clippy::redundant_field_names)]
 #[macro_use]
 extern crate log;
+
+#[macro_use]
+extern crate async_trait;
 
 extern crate byteorder;
 extern crate futures;
@@ -11,8 +16,6 @@ extern crate librespot_protocol as protocol;
 
 pub mod cover;
 
-use futures::future;
-use futures::Future;
 use linear_map::LinearMap;
 
 use librespot_core::mercury::MercuryError;
@@ -69,81 +72,67 @@ pub struct AudioItem {
 }
 
 impl AudioItem {
-    pub fn get_audio_item(
-        session: &Session,
-        id: SpotifyId,
-    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
+    pub async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<Self, MercuryError> {
         match id.audio_type {
-            SpotifyAudioType::Track => Track::get_audio_item(session, id),
-            SpotifyAudioType::Podcast => Episode::get_audio_item(session, id),
-            SpotifyAudioType::NonPlayable => {
-                Box::new(future::err::<AudioItem, MercuryError>(MercuryError))
-            }
+            SpotifyAudioType::Track => Track::get_audio_item(session, id).await,
+            SpotifyAudioType::Podcast => Episode::get_audio_item(session, id).await,
+            SpotifyAudioType::NonPlayable => Err(MercuryError),
         }
     }
 }
 
+#[async_trait]
 trait AudioFiles {
-    fn get_audio_item(
-        session: &Session,
-        id: SpotifyId,
-    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>>;
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError>;
 }
 
+#[async_trait]
 impl AudioFiles for Track {
-    fn get_audio_item(
-        session: &Session,
-        id: SpotifyId,
-    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
-        Box::new(Self::get(session, id).and_then(move |item| {
-            Ok(AudioItem {
-                id: id,
-                uri: format!("spotify:track:{}", id.to_base62()),
-                files: item.files,
-                name: item.name,
-                duration: item.duration,
-                available: item.available,
-                alternatives: Some(item.alternatives),
-            })
-        }))
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError> {
+        let item = Self::get(session, id).await?;
+        Ok(AudioItem {
+            id: id,
+            uri: format!("spotify:track:{}", id.to_base62()),
+            files: item.files,
+            name: item.name,
+            duration: item.duration,
+            available: item.available,
+            alternatives: Some(item.alternatives),
+        })
     }
 }
 
+#[async_trait]
 impl AudioFiles for Episode {
-    fn get_audio_item(
-        session: &Session,
-        id: SpotifyId,
-    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
-        Box::new(Self::get(session, id).and_then(move |item| {
-            Ok(AudioItem {
-                id: id,
-                uri: format!("spotify:episode:{}", id.to_base62()),
-                files: item.files,
-                name: item.name,
-                duration: item.duration,
-                available: item.available,
-                alternatives: None,
-            })
-        }))
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError> {
+        let item = Self::get(session, id).await?;
+
+        Ok(AudioItem {
+            id: id,
+            uri: format!("spotify:episode:{}", id.to_base62()),
+            files: item.files,
+            name: item.name,
+            duration: item.duration,
+            available: item.available,
+            alternatives: None,
+        })
     }
 }
+
+#[async_trait]
 pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::Message;
 
     fn request_url(id: SpotifyId) -> String;
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 
-    fn get(session: &Session, id: SpotifyId) -> Box<dyn Future<Item = Self, Error = MercuryError>> {
+    async fn get(session: &Session, id: SpotifyId) -> Result<Self, MercuryError> {
         let uri = Self::request_url(id);
-        let request = session.mercury().get(uri);
+        let response = session.mercury().get(uri).await?;
+        let data = response.payload.first().expect("Empty payload");
+        let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
 
-        let session = session.clone();
-        Box::new(request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty payload");
-            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
-
-            Ok(Self::parse(&msg, &session))
-        }))
+        Ok(Self::parse(&msg, &session))
     }
 }
 
