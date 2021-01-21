@@ -60,7 +60,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install developer package dependencies
-        run: sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+        run: sudo apt-get update && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - run: cargo build --locked --no-default-features
       - run: cargo build --locked --examples
       - run: cargo build --locked --no-default-features --features "with-tremor"
