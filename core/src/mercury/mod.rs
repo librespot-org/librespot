@@ -1,14 +1,14 @@
 use crate::protocol;
 use crate::util::url_encode;
+use crate::util::SeqGenerator;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::{mpsc, oneshot};
-use futures::{Async, Future, Poll};
-use protobuf;
-use std::collections::HashMap;
-use std::mem;
-
-use crate::util::SeqGenerator;
+use futures::{
+    channel::{mpsc, oneshot},
+    Future,
+};
+use std::{collections::HashMap, task::Poll};
+use std::{mem, pin::Pin, task::Context};
 
 mod types;
 pub use self::types::*;
@@ -31,17 +31,17 @@ pub struct MercuryPending {
     callback: Option<oneshot::Sender<Result<MercuryResponse, MercuryError>>>,
 }
 
-pub struct MercuryFuture<T>(oneshot::Receiver<Result<T, MercuryError>>);
-impl<T> Future for MercuryFuture<T> {
-    type Item = T;
-    type Error = MercuryError;
+#[pin_project]
+pub struct MercuryFuture<T>(#[pin] oneshot::Receiver<Result<T, MercuryError>>);
 
-    fn poll(&mut self) -> Poll<T, MercuryError> {
-        match self.0.poll() {
-            Ok(Async::Ready(Ok(value))) => Ok(Async::Ready(value)),
-            Ok(Async::Ready(Err(err))) => Err(err),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(oneshot::Canceled) => Err(MercuryError),
+impl<T> Future for MercuryFuture<T> {
+    type Output = Result<T, MercuryError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.project().0.poll(cx) {
+            Poll::Ready(Ok(x)) => Poll::Ready(x),
+            Poll::Ready(Err(_)) => Poll::Ready(Err(MercuryError)),
+            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -98,46 +98,46 @@ impl MercuryManager {
         MercurySender::new(self.clone(), uri.into())
     }
 
-    pub fn subscribe<T: Into<String>>(
+    pub async fn subscribe<T: Into<String>>(
         &self,
         uri: T,
-    ) -> Box<dyn Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>>
-    {
+    ) -> Result<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError> {
         let uri = uri.into();
-        let request = self.request(MercuryRequest {
-            method: MercuryMethod::SUB,
-            uri: uri.clone(),
-            content_type: None,
-            payload: Vec::new(),
-        });
+        let response = self
+            .request(MercuryRequest {
+                method: MercuryMethod::SUB,
+                uri: uri.clone(),
+                content_type: None,
+                payload: Vec::new(),
+            })
+            .await?;
+
+        let (tx, rx) = mpsc::unbounded();
 
         let manager = self.clone();
-        Box::new(request.map(move |response| {
-            let (tx, rx) = mpsc::unbounded();
 
-            manager.lock(move |inner| {
-                if !inner.invalid {
-                    debug!("subscribed uri={} count={}", uri, response.payload.len());
-                    if response.payload.len() > 0 {
-                        // Old subscription protocol, watch the provided list of URIs
-                        for sub in response.payload {
-                            let mut sub: protocol::pubsub::Subscription =
-                                protobuf::parse_from_bytes(&sub).unwrap();
-                            let sub_uri = sub.take_uri();
+        manager.lock(move |inner| {
+            if !inner.invalid {
+                debug!("subscribed uri={} count={}", uri, response.payload.len());
+                if !response.payload.is_empty() {
+                    // Old subscription protocol, watch the provided list of URIs
+                    for sub in response.payload {
+                        let mut sub: protocol::pubsub::Subscription =
+                            protobuf::parse_from_bytes(&sub).unwrap();
+                        let sub_uri = sub.take_uri();
 
-                            debug!("subscribed sub_uri={}", sub_uri);
+                        debug!("subscribed sub_uri={}", sub_uri);
 
-                            inner.subscriptions.push((sub_uri, tx.clone()));
-                        }
-                    } else {
-                        // New subscription protocol, watch the requested URI
-                        inner.subscriptions.push((uri, tx));
+                        inner.subscriptions.push((sub_uri, tx.clone()));
                     }
+                } else {
+                    // New subscription protocol, watch the requested URI
+                    inner.subscriptions.push((uri, tx));
                 }
-            });
+            }
+        });
 
-            rx
-        }))
+        Ok(rx)
     }
 
     pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
@@ -193,7 +193,7 @@ impl MercuryManager {
         let header: protocol::mercury::Header = protobuf::parse_from_bytes(&header_data).unwrap();
 
         let response = MercuryResponse {
-            uri: url_encode(header.get_uri()).to_owned(),
+            uri: url_encode(header.get_uri()),
             status_code: header.get_status_code(),
             payload: pending.parts,
         };

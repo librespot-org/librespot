@@ -1,5 +1,5 @@
-use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
-use std::collections::VecDeque;
+use futures::Sink;
+use std::{collections::VecDeque, pin::Pin, task::Context};
 
 use super::*;
 
@@ -30,27 +30,38 @@ impl Clone for MercurySender {
     }
 }
 
-impl Sink for MercurySender {
-    type SinkItem = Vec<u8>;
-    type SinkError = MercuryError;
+impl Sink<Vec<u8>> for MercurySender {
+    type Error = MercuryError;
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let task = self.mercury.send(self.uri.clone(), item);
-        self.pending.push_back(task);
-        Ok(AsyncSink::Ready)
+    fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.poll_flush(cx)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
             match self.pending.front_mut() {
                 Some(task) => {
-                    try_ready!(task.poll());
+                    match Pin::new(task).poll(cx) {
+                        Poll::Ready(Err(x)) => return Poll::Ready(Err(x)),
+                        Poll::Pending => return Poll::Pending,
+                        _ => (),
+                    };
                 }
                 None => {
-                    return Ok(Async::Ready(()));
+                    return Poll::Ready(Ok(()));
                 }
             }
             self.pending.pop_front();
         }
+    }
+
+    fn start_send(mut self: Pin<&mut Self>, item: Vec<u8>) -> Result<(), Self::Error> {
+        let task = self.mercury.send(self.uri.clone(), item);
+        self.pending.push_back(task);
+        Ok(())
     }
 }
