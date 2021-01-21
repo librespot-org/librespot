@@ -24,6 +24,7 @@ use crate::audio::{
 use crate::audio_backend::Sink;
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
+use librespot_core::spotify_id::FileId;
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 
@@ -611,6 +612,30 @@ impl PlayerTrackLoader {
         }
     }
 
+    fn get_encrypted_file(
+        &self,
+        file_id: FileId,
+        bytes_per_second: usize,
+        play_from_beginning: bool,
+    ) -> Option<AudioFile> {
+        let encrypted_file = AudioFile::open(
+            &self.session,
+            file_id,
+            bytes_per_second,
+            play_from_beginning,
+        );
+
+        let encrypted_file = match encrypted_file.wait() {
+            Ok(encrypted_file) => encrypted_file,
+            Err(_) => {
+                error!("Unable to load encrypted file.");
+                return None;
+            }
+        };
+
+        return Some(encrypted_file);
+    }
+
     fn load_track(&self, spotify_id: SpotifyId, position_ms: u32) -> Option<PlayerLoadedTrackData> {
         let audio = match AudioItem::get_audio_item(&self.session, spotify_id).wait() {
             Ok(audio) => audio,
@@ -668,20 +693,14 @@ impl PlayerTrackLoader {
         let play_from_beginning = position_ms == 0;
 
         let key = self.session.audio_key().request(spotify_id, file_id);
-        let encrypted_file = AudioFile::open(
-            &self.session,
-            file_id,
-            bytes_per_second,
-            play_from_beginning,
-        );
 
-        let encrypted_file = match encrypted_file.wait() {
-            Ok(encrypted_file) => encrypted_file,
-            Err(_) => {
-                error!("Unable to load encrypted file.");
-                return None;
-            }
-        };
+        let encrypted_file =
+            match self.get_encrypted_file(file_id, bytes_per_second, play_from_beginning) {
+                Some(encrypted_file) => encrypted_file,
+                None => {
+                    return None;
+                }
+            };
 
         let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
 
