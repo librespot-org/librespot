@@ -1,12 +1,13 @@
 #[macro_use]
-extern crate futures;
-#[macro_use]
 extern crate log;
+#[macro_use]
+extern crate pin_project;
 
 extern crate aes_ctr;
 extern crate bit_set;
 extern crate byteorder;
 extern crate bytes;
+extern crate futures;
 extern crate num_bigint;
 extern crate num_traits;
 extern crate tempfile;
@@ -24,7 +25,7 @@ mod libvorbis_decoder;
 mod range_set;
 
 pub use decrypt::AudioDecrypt;
-pub use fetch::{AudioFile, AudioFileOpen, StreamLoaderController};
+pub use fetch::{AudioFile, StreamLoaderController};
 pub use fetch::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
