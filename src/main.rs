@@ -22,7 +22,7 @@ use librespot::core::version;
 use librespot::connect::discovery::{discovery, DiscoveryStream};
 use librespot::connect::spirc::{Spirc, SpircTask};
 use librespot::playback::audio_backend::{self, Sink, BACKENDS};
-use librespot::playback::config::{Bitrate, PlayerConfig};
+use librespot::playback::config::{Bitrate, NormalisationType, PlayerConfig};
 use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{Player, PlayerEvent};
 
@@ -176,6 +176,12 @@ fn setup(args: &[String]) -> Setup {
             "",
             "enable-volume-normalisation",
             "Play all tracks at the same volume",
+        )
+        .optopt(
+            "",
+            "normalisation-gain-type",
+            "Specify the normalisation gain type to use - [track, album]. Default is track.",
+            "GAIN_TYPE",
         )
         .optopt(
             "",
@@ -338,10 +344,18 @@ fn setup(args: &[String]) -> Setup {
             .as_ref()
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or(Bitrate::default());
+        let gain_type = matches
+            .opt_str("normalisation-gain-type")
+            .as_ref()
+            .map(|gain_type| {
+                NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
+            })
+            .unwrap_or(NormalisationType::default());
         PlayerConfig {
             bitrate: bitrate,
             gapless: !matches.opt_present("disable-gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
+            normalisation_type: gain_type,
             normalisation_pregain: matches
                 .opt_str("normalisation-pregain")
                 .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))

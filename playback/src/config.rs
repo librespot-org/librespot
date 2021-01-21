@@ -26,9 +26,33 @@ impl Default for Bitrate {
 }
 
 #[derive(Clone, Debug)]
+pub enum NormalisationType {
+    Album,
+    Track,
+}
+
+impl FromStr for NormalisationType {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "album" => Ok(NormalisationType::Album),
+            "track" => Ok(NormalisationType::Track),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Default for NormalisationType {
+    fn default() -> NormalisationType {
+        NormalisationType::Album
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct PlayerConfig {
     pub bitrate: Bitrate,
     pub normalisation: bool,
+    pub normalisation_type: NormalisationType,
     pub normalisation_pregain: f32,
     pub gapless: bool,
 }
@@ -38,6 +62,7 @@ impl Default for PlayerConfig {
         PlayerConfig {
             bitrate: Bitrate::default(),
             normalisation: false,
+            normalisation_type: NormalisationType::default(),
             normalisation_pregain: 0.0,
             gapless: true,
         }

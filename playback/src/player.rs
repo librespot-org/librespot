@@ -9,7 +9,7 @@ use std::mem;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::config::{Bitrate, PlayerConfig};
+use crate::config::{Bitrate, NormalisationType, PlayerConfig};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::SpotifyId;
 
@@ -214,17 +214,20 @@ impl NormalisationData {
     }
 
     fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
-        let mut normalisation_factor = f32::powf(
-            10.0,
-            (data.track_gain_db + config.normalisation_pregain) / 20.0,
-        );
+        let [gain_db, gain_peak] = match config.normalisation_type {
+            NormalisationType::Album => [data.album_gain_db, data.album_peak],
+            NormalisationType::Track => [data.track_gain_db, data.track_peak],
+        };
+        let mut normalisation_factor =
+            f32::powf(10.0, (gain_db + config.normalisation_pregain) / 20.0);
 
-        if normalisation_factor * data.track_peak > 1.0 {
+        if normalisation_factor * gain_peak > 1.0 {
             warn!("Reducing normalisation factor to prevent clipping. Please add negative pregain to avoid.");
-            normalisation_factor = 1.0 / data.track_peak;
+            normalisation_factor = 1.0 / gain_peak;
         }
 
         debug!("Normalisation Data: {:?}", data);
+        debug!("Normalisation Type: {:?}", config.normalisation_type);
         debug!("Applied normalisation factor: {}", normalisation_factor);
 
         normalisation_factor
