@@ -1,7 +1,9 @@
+#![allow(clippy::unused_io_amount)]
+
 #[macro_use]
 extern crate log;
 #[macro_use]
-extern crate pin_project;
+extern crate pin_project_lite;
 
 extern crate aes_ctr;
 extern crate bit_set;

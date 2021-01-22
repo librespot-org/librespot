@@ -502,8 +502,8 @@ async fn audio_file_fetch_receive_data(
 
             future::ready(if request_length == 0 {
                 Err(TryFoldErr::FinishEarly)
-            } else { 
-                Ok(()) 
+            } else {
+                Ok(())
             })
         })
         .await;
@@ -532,7 +532,7 @@ async fn audio_file_fetch_receive_data(
         );
     }
 }
-/* 
+/*
 async fn audio_file_fetch(
     session: Session,
     shared: Arc<AudioFileShared>,
@@ -689,20 +689,21 @@ async fn audio_file_fetch(
     future::select_all(vec![f1, f2, f3]).await
 }*/
 
-#[pin_project]
-struct AudioFileFetch {
-    session: Session,
-    shared: Arc<AudioFileShared>,
-    output: Option<NamedTempFile>,
+pin_project! {
+    struct AudioFileFetch {
+        session: Session,
+        shared: Arc<AudioFileShared>,
+        output: Option<NamedTempFile>,
 
-    file_data_tx: mpsc::UnboundedSender<ReceivedData>,
-    #[pin]
-    file_data_rx: mpsc::UnboundedReceiver<ReceivedData>,
+        file_data_tx: mpsc::UnboundedSender<ReceivedData>,
+        #[pin]
+        file_data_rx: mpsc::UnboundedReceiver<ReceivedData>,
 
-    #[pin]
-    stream_loader_command_rx: mpsc::UnboundedReceiver<StreamLoaderCommand>,
-    complete_tx: Option<oneshot::Sender<NamedTempFile>>,
-    network_response_times_ms: Vec<usize>,
+        #[pin]
+        stream_loader_command_rx: mpsc::UnboundedReceiver<StreamLoaderCommand>,
+        complete_tx: Option<oneshot::Sender<NamedTempFile>>,
+        network_response_times_ms: Vec<usize>,
+    }
 }
 
 impl AudioFileFetch {
@@ -853,8 +854,6 @@ impl AudioFileFetch {
         }
     }
 
-
-
     fn poll_file_data_rx(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         loop {
             match Pin::new(&mut self.file_data_rx).poll_next(cx) {
@@ -923,12 +922,10 @@ impl AudioFileFetch {
 
                     if full {
                         self.finish();
-                        return Poll::Ready(())
+                        return Poll::Ready(());
                     }
                 }
-                Poll::Pending => {
-                    return Poll::Pending
-                }
+                Poll::Pending => return Poll::Pending,
             }
         }
     }
@@ -936,27 +933,22 @@ impl AudioFileFetch {
     fn poll_stream_loader_command_rx(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         loop {
             match Pin::new(&mut self.stream_loader_command_rx).poll_next(cx) {
-                Poll::Ready(None) => 
-                    return Poll::Ready(()),
-                Poll::Ready(Some(cmd)) => {
-                    match cmd {
-                        StreamLoaderCommand::Fetch(request) => {
-                            self.download_range(request.start, request.length);
-                        }
-                        StreamLoaderCommand::RandomAccessMode() => {
-                            *(self.shared.download_strategy.lock().unwrap()) =
-                            DownloadStrategy::RandomAccess();
-                        }
-                        StreamLoaderCommand::StreamMode() => {
-
-                            *(self.shared.download_strategy.lock().unwrap()) =
-                            DownloadStrategy::Streaming();
-                        }
-                        StreamLoaderCommand::Close() => return Poll::Ready(())
-
+                Poll::Ready(None) => return Poll::Ready(()),
+                Poll::Ready(Some(cmd)) => match cmd {
+                    StreamLoaderCommand::Fetch(request) => {
+                        self.download_range(request.start, request.length);
                     }
-                }
-                Poll::Pending => return Poll::Pending
+                    StreamLoaderCommand::RandomAccessMode() => {
+                        *(self.shared.download_strategy.lock().unwrap()) =
+                            DownloadStrategy::RandomAccess();
+                    }
+                    StreamLoaderCommand::StreamMode() => {
+                        *(self.shared.download_strategy.lock().unwrap()) =
+                            DownloadStrategy::Streaming();
+                    }
+                    StreamLoaderCommand::Close() => return Poll::Ready(()),
+                },
+                Poll::Pending => return Poll::Pending,
             }
         }
     }
@@ -974,11 +966,11 @@ impl Future for AudioFileFetch {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         if let Poll::Ready(()) = self.poll_stream_loader_command_rx(cx) {
-            return Poll::Ready(())
+            return Poll::Ready(());
         }
 
         if let Poll::Ready(()) = self.poll_file_data_rx(cx) {
-            return Poll::Ready(())
+            return Poll::Ready(());
         }
 
         if let DownloadStrategy::Streaming() = self.get_download_strategy() {

@@ -5,7 +5,7 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate pin_project;
+extern crate pin_project_lite;
 extern crate aes;
 extern crate base64;
 extern crate byteorder;
@@ -25,7 +25,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate sha1;
 extern crate shannon;
-extern crate tokio;
+pub extern crate tokio;
 extern crate tokio_util;
 extern crate url;
 extern crate uuid;

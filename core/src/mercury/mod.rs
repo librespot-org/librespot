@@ -31,14 +31,18 @@ pub struct MercuryPending {
     callback: Option<oneshot::Sender<Result<MercuryResponse, MercuryError>>>,
 }
 
-#[pin_project]
-pub struct MercuryFuture<T>(#[pin] oneshot::Receiver<Result<T, MercuryError>>);
+pin_project! {
+    pub struct MercuryFuture<T> {
+        #[pin]
+        receiver: oneshot::Receiver<Result<T, MercuryError>>
+    }
+}
 
 impl<T> Future for MercuryFuture<T> {
     type Output = Result<T, MercuryError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.project().0.poll(cx) {
+        match self.project().receiver.poll(cx) {
             Poll::Ready(Ok(x)) => Poll::Ready(x),
             Poll::Ready(Err(_)) => Poll::Ready(Err(MercuryError)),
             Poll::Pending => Poll::Pending,
@@ -73,7 +77,7 @@ impl MercuryManager {
         let data = req.encode(&seq);
 
         self.session().send_packet(cmd, data);
-        MercuryFuture(rx)
+        MercuryFuture { receiver: rx }
     }
 
     pub fn get<T: Into<String>>(&self, uri: T) -> MercuryFuture<MercuryResponse> {
