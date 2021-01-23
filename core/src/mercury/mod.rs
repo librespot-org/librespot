@@ -2,11 +2,15 @@ use crate::protocol;
 use crate::util::url_encode;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::{mpsc, oneshot};
-use futures::{Async, Future, Poll};
 use protobuf;
 use std::collections::HashMap;
 use std::mem;
+
+use futures::{
+    channel::{mpsc, oneshot},
+    Future, FutureExt,
+};
+use std::task::Poll;
 
 use crate::util::SeqGenerator;
 
@@ -33,14 +37,13 @@ pub struct MercuryPending {
 
 pub struct MercuryFuture<T>(oneshot::Receiver<Result<T, MercuryError>>);
 impl<T> Future for MercuryFuture<T> {
-    type Item = T;
-    type Error = MercuryError;
+    type Output = Result<T, MercuryError>;
 
-    fn poll(&mut self) -> Poll<T, MercuryError> {
+    fn poll(&mut self) -> Poll<Self::Output> {
         match self.0.poll() {
-            Ok(Async::Ready(Ok(value))) => Ok(Async::Ready(value)),
-            Ok(Async::Ready(Err(err))) => Err(err),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Poll::Ready(Ok(Ok(value))) => Poll::Ready(Ok(value)),
+            Poll::Ready(Ok(Err(err))) => Err(err),
+            Poll::Pending => Poll::Pending,
             Err(oneshot::Canceled) => Err(MercuryError),
         }
     }
@@ -98,11 +101,10 @@ impl MercuryManager {
         MercurySender::new(self.clone(), uri.into())
     }
 
-    pub fn subscribe<T: Into<String>>(
+    pub async fn subscribe<T: Into<String>>(
         &self,
         uri: T,
-    ) -> Box<dyn Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>>
-    {
+    ) -> Result<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError> {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
             method: MercuryMethod::SUB,
@@ -112,7 +114,7 @@ impl MercuryManager {
         });
 
         let manager = self.clone();
-        Box::new(request.map(move |response| {
+        request.await.map(move |response| {
             let (tx, rx) = mpsc::unbounded();
 
             manager.lock(move |inner| {
@@ -137,7 +139,7 @@ impl MercuryManager {
             });
 
             rx
-        }))
+        })
     }
 
     pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
