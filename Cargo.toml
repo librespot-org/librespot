@@ -44,7 +44,6 @@ base64 = "0.13"
 env_logger =  {version = "0.8", default-features = false, features = ["termcolor","humantime","atty"]}
 futures = "0.1"
 getopts = "0.2"
-hyper = "0.11"
 log = "0.4"
 num-bigint = "0.3"
 protobuf = "~2.14.0"
