@@ -1,14 +1,13 @@
 use std::io;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures::sync::mpsc;
 use futures::{Async, Future, IntoFuture, Poll, Stream};
-use tokio::runtime::current_thread;
-// use tokio::runtime::current_thread::Handle;
+use tokio::runtime::{current_thread, current_thread::Handle};
 
 use crate::apresolve::apresolve_or_fallback;
 use crate::audio_key::AudioKeyManager;
@@ -38,7 +37,7 @@ struct SessionInternal {
     mercury: Lazy<MercuryManager>,
     cache: Option<Arc<Cache>>,
 
-    // handle: Handle,
+    handle: Mutex<Handle>,
     session_id: usize,
 }
 
@@ -52,7 +51,7 @@ impl Session {
         config: SessionConfig,
         credentials: Credentials,
         cache: Option<Cache>,
-        // handle: Handle,
+        handle: Handle,
     ) -> Box<dyn Future<Item = Session, Error = io::Error>> {
         let access_point = apresolve_or_fallback::<io::Error>(&config.proxy, &config.ap_port);
 
@@ -74,7 +73,7 @@ impl Session {
             }
 
             let (session, task) = Session::create(
-                // &handle,
+                &handle,
                 transport,
                 config,
                 cache,
@@ -93,7 +92,7 @@ impl Session {
     }
 
     fn create(
-        // handle: &Handle,
+        handle: &Handle,
         transport: connection::Transport,
         config: SessionConfig,
         cache: Option<Cache>,
@@ -123,7 +122,7 @@ impl Session {
             channel: Lazy::new(),
             mercury: Lazy::new(),
 
-            // handle: handle.clone(),
+            handle: Mutex::new(handle.clone()),
             session_id: session_id,
         }));
 
@@ -158,12 +157,39 @@ impl Session {
         self.0.data.read().unwrap().time_delta
     }
 
+    // Spawn a future directly
     pub fn spawn<F>(&self, f: F)
     where
-        F: Future<Item = (), Error = ()> + 'static,
+        F: Future<Item = (), Error = ()> + Send + 'static,
     {
-        current_thread::spawn(f);
+        let handle = self.0.handle.lock().unwrap();
+        let spawn_res = handle.spawn(f);
+        match spawn_res {
+            Ok(_) => (),
+            Err(e) => error!("Session SpawnErr {:?}", e),
+        }
     }
+
+    // pub fn spawn<F, R>(&self, f: F)
+    // where
+    //     F: FnOnce() -> R + Send + 'static,
+    //     R: Future<Item = (), Error = ()> + Send + 'static,
+    // {
+    //     // This fails when called from a different thread
+    //     // current_thread::spawn(future::lazy(|| f()));
+    //
+    //     // These fail when the Future doesn't implement Send
+    //     let handle = self.0.handle.lock().unwrap();
+    //     let spawn_res = handle.spawn(lazy(|| f()));
+    //
+    //     // let mut te = current_thread::TaskExecutor::current();
+    //     // let spawn_res = te.spawn_local(Box::new(future::lazy(|| f())));
+    //
+    //     match spawn_res {
+    //         Ok(_) => (),
+    //         Err(e) => error!("Session SpawnErr {:?}", e),
+    //     }
+    // }
 
     fn debug_info(&self) {
         debug!(
