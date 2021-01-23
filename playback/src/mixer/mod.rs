@@ -1,10 +1,12 @@
+use librespot_core::volume::Volume;
+
 pub trait Mixer: Send {
     fn open(_: Option<MixerConfig>) -> Self
     where
         Self: Sized;
     fn start(&self);
     fn stop(&self);
-    fn set_volume(&self, volume: u16);
+    fn set_volume(&self, volume: Volume);
     fn volume(&self) -> u16;
     fn get_audio_filter(&self) -> Option<Box<dyn AudioFilter + Send>> {
         None

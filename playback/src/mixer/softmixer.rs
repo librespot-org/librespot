@@ -1,6 +1,8 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use librespot_core::volume::Volume;
+
 use super::AudioFilter;
 use super::{Mixer, MixerConfig};
 
@@ -20,8 +22,8 @@ impl Mixer for SoftMixer {
     fn volume(&self) -> u16 {
         self.volume.load(Ordering::Relaxed) as u16
     }
-    fn set_volume(&self, volume: u16) {
-        self.volume.store(volume as usize, Ordering::Relaxed);
+    fn set_volume(&self, volume: Volume) {
+        self.volume.store(volume.0 as usize, Ordering::Relaxed);
     }
     fn get_audio_filter(&self) -> Option<Box<dyn AudioFilter + Send>> {
         Some(Box::new(SoftVolumeApplier {

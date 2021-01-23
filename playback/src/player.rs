@@ -12,8 +12,8 @@ use std::time::{Duration, Instant};
 use crate::config::{Bitrate, PlayerConfig};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::SpotifyId;
-
 use librespot_core::util::SeqGenerator;
+use librespot_core::volume::Volume;
 
 use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
 use crate::audio::{VorbisDecoder, VorbisPacket};
@@ -72,7 +72,7 @@ enum PlayerCommand {
     Seek(u32),
     AddEventSender(futures::sync::mpsc::UnboundedSender<PlayerEvent>),
     SetSinkEventCallback(Option<SinkEventCallback>),
-    EmitVolumeSetEvent(u16),
+    EmitVolumeSetEvent(Volume),
 }
 
 #[derive(Debug, Clone)]
@@ -145,7 +145,7 @@ pub enum PlayerEvent {
     },
     // The mixer volume was set to a new level.
     VolumeSet {
-        volume: u16,
+        volume: Volume,
     },
 }
 
@@ -336,7 +336,7 @@ impl Player {
         self.command(PlayerCommand::SetSinkEventCallback(callback));
     }
 
-    pub fn emit_volume_set_event(&self, volume: u16) {
+    pub fn emit_volume_set_event(&self, volume: Volume) {
         self.command(PlayerCommand::EmitVolumeSetEvent(volume));
     }
 }

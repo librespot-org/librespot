@@ -211,13 +211,14 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
     }
 }
 
-fn calc_logarithmic_volume(volume: u16) -> u16 {
+fn calc_logarithmic_volume(volume: Volume) -> Volume {
     // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
     // Convert the given volume [0..0xffff] to a dB gain
     // We assume a dB range of 60dB.
     // Use the equation: a * exp(b * x)
     // in which a = IDEAL_FACTOR, b = 1/1000
     const IDEAL_FACTOR: f64 = 6.908;
+    let volume = volume.0;
     let normalized_volume = volume as f64 / std::u16::MAX as f64; // To get a value between 0 and 1
 
     let mut val = std::u16::MAX;
@@ -230,10 +231,10 @@ fn calc_logarithmic_volume(volume: u16) -> u16 {
     debug!("input volume:{} to mixer: {}", volume, val);
 
     // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
-    val
+    Volume(val)
 }
 
-fn volume_to_mixer(volume: u16, volume_ctrl: &VolumeCtrl) -> u16 {
+fn volume_to_mixer(volume: Volume, volume_ctrl: &VolumeCtrl) -> Volume {
     match volume_ctrl {
         VolumeCtrl::Linear => volume,
         VolumeCtrl::Log => calc_logarithmic_volume(volume),
@@ -776,7 +777,7 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeVolume => {
-                self.set_volume(frame.get_volume() as u16);
+                self.set_volume(Volume(frame.get_volume() as u16));
                 self.notify(None, true);
             }
 
@@ -1033,7 +1034,7 @@ impl SpircTask {
         if volume > 0xFFFF {
             volume = 0xFFFF;
         }
-        self.set_volume(volume as u16);
+        self.set_volume(Volume(volume as u16));
     }
 
     fn handle_volume_down(&mut self) {
@@ -1041,7 +1042,7 @@ impl SpircTask {
         if volume < 0 {
             volume = 0;
         }
-        self.set_volume(volume as u16);
+        self.set_volume(Volume(volume as u16));
     }
 
     fn handle_end_of_track(&mut self) {
@@ -1292,12 +1293,12 @@ impl SpircTask {
         cs.send();
     }
 
-    fn set_volume(&mut self, volume: u16) {
-        self.device.set_volume(volume as u32);
+    fn set_volume(&mut self, volume: Volume) {
+        self.device.set_volume(volume.0 as u32);
         self.mixer
             .set_volume(volume_to_mixer(volume, &self.config.volume_ctrl));
         if let Some(cache) = self.session.cache() {
-            cache.save_volume(Volume { volume })
+            cache.save_volume(volume)
         }
         self.player.emit_volume_set_event(volume);
     }

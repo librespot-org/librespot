@@ -18,6 +18,7 @@ use librespot::core::cache::Cache;
 use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
 use librespot::core::session::Session;
 use librespot::core::version;
+use librespot_core::volume::Volume;
 
 use librespot::connect::discovery::{discovery, DiscoveryStream};
 use librespot::connect::spirc::{Spirc, SpircTask};
@@ -365,7 +366,7 @@ fn setup(args: &[String]) -> Setup {
         ConnectConfig {
             name: name,
             device_type: device_type,
-            volume: initial_volume,
+            volume: Volume(initial_volume),
             volume_ctrl: volume_ctrl,
             autoplay: matches.opt_present("autoplay"),
         }

@@ -3,7 +3,7 @@ use std::str::FromStr;
 use url::Url;
 use uuid::Uuid;
 
-use crate::version;
+use crate::{version, volume::Volume};
 
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
@@ -83,7 +83,7 @@ impl Default for DeviceType {
 pub struct ConnectConfig {
     pub name: String,
     pub device_type: DeviceType,
-    pub volume: u16,
+    pub volume: Volume,
     pub volume_ctrl: VolumeCtrl,
     pub autoplay: bool,
 }
