@@ -15,7 +15,7 @@ version = "0.1.3"
 [dependencies]
 base64 = "0.13"
 byteorder = "1.3"
-bytes = "0.4"
+bytes = "0.5"
 error-chain = { version = "0.12", default_features = false }
 futures = {version = "0.3",features =["unstable","bilock"]}
 httparse = "1.3"
