@@ -19,8 +19,8 @@ bytes = "0.4"
 error-chain = { version = "0.12", default_features = false }
 futures = "0.1"
 httparse = "1.3"
-hyper = "0.11"
-hyper-proxy = { version = "0.4", default_features = false }
+hyper = "0.12"
+hyper-proxy = { version = "0.5", default_features = false }
 lazy_static = "1.3"
 log = "0.4"
 num-bigint = "0.3"
