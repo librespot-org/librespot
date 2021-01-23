@@ -255,18 +255,24 @@ fn setup(args: &[String]) -> Setup {
         mapped_volume: !matches.opt_present("mixer-linear-volume"),
     };
 
-    let cache = matches.opt_str("c").map(|cache_path| {
-        let use_audio_cache = !matches.opt_present("disable-audio-cache");
-        let system_cache_directory = matches
-            .opt_str("system-cache")
-            .unwrap_or(String::from(cache_path.clone()));
+    let use_audio_cache = !matches.opt_present("disable-audio-cache");
 
-        Cache::new(
-            PathBuf::from(cache_path),
-            PathBuf::from(system_cache_directory),
-            use_audio_cache,
-        )
-    });
+    let cache_directory = matches.opt_str("c").unwrap_or(String::from(""));
+    let system_cache_directory = matches
+        .opt_str("system-cache")
+        .unwrap_or(String::from(cache_directory.clone()));
+
+    let cache = match Cache::new(
+        PathBuf::from(cache_directory),
+        PathBuf::from(system_cache_directory),
+        use_audio_cache,
+    ) {
+        Ok(cache) => Some(cache),
+        Err(e) => {
+            warn!("Cannot create cache: {}", e);
+            None
+        }
+    };
 
     let initial_volume = matches
         .opt_str("initial-volume")
@@ -277,8 +283,9 @@ fn setup(args: &[String]) -> Setup {
             }
             (volume as i32 * 0xFFFF / 100) as u16
         })
+        .map(Volume)
         .or_else(|| cache.as_ref().and_then(Cache::volume))
-        .unwrap_or(0x8000);
+        .unwrap_or(Volume(0x8000));
 
     let zeroconf_port = matches
         .opt_str("zeroconf-port")
@@ -366,7 +373,7 @@ fn setup(args: &[String]) -> Setup {
         ConnectConfig {
             name: name,
             device_type: device_type,
-            volume: Volume(initial_volume),
+            volume: initial_volume,
             volume_ctrl: volume_ctrl,
             autoplay: matches.opt_present("autoplay"),
         }

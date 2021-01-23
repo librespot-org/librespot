@@ -1,16 +1,10 @@
 use aes::Aes192;
-use base64;
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use protobuf::ProtobufEnum;
-use serde;
-use serde_json;
 use sha1::{Digest, Sha1};
-use std::fs::File;
-use std::io::{self, Read, Write};
-use std::ops::FnOnce;
-use std::path::Path;
+use std::io::{self, Read};
 
 use crate::protocol::authentication::AuthenticationType;
 
@@ -111,27 +105,6 @@ impl Credentials {
             auth_type: auth_type,
             auth_data: auth_data,
         }
-    }
-
-    fn from_reader<R: Read>(mut reader: R) -> Credentials {
-        let mut contents = String::new();
-        reader.read_to_string(&mut contents).unwrap();
-
-        serde_json::from_str(&contents).unwrap()
-    }
-
-    pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Option<Credentials> {
-        File::open(path).ok().map(Credentials::from_reader)
-    }
-
-    fn save_to_writer<W: Write>(&self, writer: &mut W) {
-        let contents = serde_json::to_string(&self.clone()).unwrap();
-        writer.write_all(contents.as_bytes()).unwrap();
-    }
-
-    pub(crate) fn save_to_file<P: AsRef<Path>>(&self, path: P) {
-        let mut file = File::create(path).unwrap();
-        self.save_to_writer(&mut file)
     }
 }
 
