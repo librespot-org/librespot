@@ -328,7 +328,7 @@ impl AudioFileOpenStreaming {
             stream_loader_command_rx,
             complete_tx,
         );
-        self.session.spawn(move |_| fetcher);
+        self.session.spawn(fetcher);
 
         AudioFileStreaming {
             read_file: read_file,
@@ -425,7 +425,7 @@ impl AudioFile {
         };
 
         let session_ = session.clone();
-        session.spawn(move |_| {
+        session.spawn(
             complete_rx
                 .map(move |mut file| {
                     if let Some(cache) = session_.cache() {
@@ -435,8 +435,8 @@ impl AudioFile {
                         debug!("File {} complete", file_id);
                     }
                 })
-                .or_else(|oneshot::Canceled| Ok(()))
-        });
+                .or_else(|oneshot::Canceled| Ok(())),
+        );
 
         return AudioFileOpen::Streaming(open);
     }
@@ -671,7 +671,7 @@ impl AudioFileFetch {
             initial_request_sent_time,
         );
 
-        session.spawn(move |_| initial_data_receiver);
+        session.spawn(initial_data_receiver);
 
         AudioFileFetch {
             session: session,
@@ -746,7 +746,7 @@ impl AudioFileFetch {
                 Instant::now(),
             );
 
-            self.session.spawn(move |_| receiver);
+            self.session.spawn(receiver);
         }
     }
 
