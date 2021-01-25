@@ -21,6 +21,7 @@ futures = { version = "0.3", features = ["bilock", "unstable"] }
 hmac = "0.7"
 httparse = "1.3"
 hyper = { version = "0.14", features = ["client", "tcp", "http1", "http2"] }
+hyper-proxy = { git = "https://github.com/e00E/hyper-proxy.git", branch="upgrade-tokio", default_features = false }
 log = "0.4"
 num-bigint = "0.3"
 num-integer = "0.1"
