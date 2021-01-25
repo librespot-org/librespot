@@ -88,7 +88,7 @@ pub struct ConnectConfig {
     pub autoplay: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum VolumeCtrl {
     Linear,
     Log,

@@ -211,37 +211,6 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
     }
 }
 
-fn calc_logarithmic_volume(volume: Volume) -> Volume {
-    // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
-    // Convert the given volume [0..0xffff] to a dB gain
-    // We assume a dB range of 60dB.
-    // Use the equation: a * exp(b * x)
-    // in which a = IDEAL_FACTOR, b = 1/1000
-    const IDEAL_FACTOR: f64 = 6.908;
-    let volume = volume.0;
-    let normalized_volume = volume as f64 / std::u16::MAX as f64; // To get a value between 0 and 1
-
-    let mut val = std::u16::MAX;
-    // Prevent val > std::u16::MAX due to rounding errors
-    if normalized_volume < 0.999 {
-        let new_volume = (normalized_volume * IDEAL_FACTOR).exp() / 1000.0;
-        val = (new_volume * std::u16::MAX as f64) as u16;
-    }
-
-    debug!("input volume:{} to mixer: {}", volume, val);
-
-    // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
-    Volume(val)
-}
-
-fn volume_to_mixer(volume: Volume, volume_ctrl: &VolumeCtrl) -> Volume {
-    match volume_ctrl {
-        VolumeCtrl::Linear => volume,
-        VolumeCtrl::Log => calc_logarithmic_volume(volume),
-        VolumeCtrl::Fixed => volume,
-    }
-}
-
 impl Spirc {
     pub fn new(
         config: ConnectConfig,
@@ -1296,7 +1265,7 @@ impl SpircTask {
     fn set_volume(&mut self, volume: Volume) {
         self.device.set_volume(volume.0 as u32);
         self.mixer
-            .set_volume(volume_to_mixer(volume, &self.config.volume_ctrl));
+            .set_volume(volume.to_mixer_volume(self.config.volume_ctrl));
         if let Some(cache) = self.session.cache() {
             cache.save_volume(volume)
         }
