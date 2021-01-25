@@ -54,7 +54,7 @@ impl RangeSet {
     }
 
     pub fn len(&self) -> usize {
-        self.ranges.iter().map(|r| r.length).fold(0, std::ops::Add::add)
+        self.ranges.iter().map(|r| r.length).sum()
     }
 
     pub fn get_range(&self, index: usize) -> Range {
