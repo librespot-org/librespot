@@ -1,8 +1,4 @@
-// use futures::Future;
-use serde_json;
-
-use crate::mercury::MercuryError;
-use crate::session::Session;
+use crate::{mercury::MercuryError, session::Session};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -22,13 +18,7 @@ pub async fn get_token(
         "hm://keymaster/token/authenticated?client_id={}&scope={}",
         client_id, scopes
     );
-
-    // Box::new(session.mercury().get(url).map(move |response| {
-    session.mercury().get(url).await.map(move |response| {
-        let data = response.payload.first().expect("Empty payload");
-        let data = String::from_utf8(data.clone()).unwrap();
-        let token: Token = serde_json::from_str(&data).unwrap();
-
-        token
-    })
+    let response = session.mercury().get(url).await?;
+    let data = response.payload.first().expect("Empty payload");
+    serde_json::from_slice(data.as_ref()).map_err(|_| MercuryError)
 }

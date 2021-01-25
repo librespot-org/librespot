@@ -1,63 +1,56 @@
 mod codec;
 mod handshake;
 
-pub use self::{codec::APCodec, handshake::handshake};
-use crate::{authentication::Credentials, version};
+pub use self::codec::APCodec;
+pub use self::handshake::handshake;
 
 use futures::{SinkExt, StreamExt};
 use protobuf::{self, Message};
-use std::{io, net::ToSocketAddrs};
+use std::io;
+use std::net::ToSocketAddrs;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use url::Url;
 
-// use crate::proxytunnel;
+use crate::authentication::Credentials;
+use crate::version;
+
+use crate::proxytunnel;
 
 pub type Transport = Framed<TcpStream, APCodec>;
 
-pub async fn connect(addr: String, proxy: &Option<Url>) -> Result<Transport, io::Error> {
-    let (addr, connect_url): (_, Option<String>) = match *proxy {
-        Some(ref url) => {
-            info!("Using proxy \"{}\"", url);
-
-            let mut iter = url.to_socket_addrs()?;
-            let socket_addr = iter.next().ok_or_else(|| {
+pub async fn connect(addr: String, proxy: &Option<Url>) -> io::Result<Transport> {
+    let socket = if let Some(proxy) = proxy {
+        info!("Using proxy \"{}\"", proxy);
+        let socket_addr = proxy.to_socket_addrs().and_then(|mut iter| {
+            iter.next().ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::NotFound,
                     "Can't resolve proxy server address",
                 )
-            })?;
-            (socket_addr, Some(addr))
-        }
-        None => {
-            let mut iter = addr.to_socket_addrs()?;
-            let socket_addr = iter.next().ok_or_else(|| {
+            })
+        })?;
+        let socket = TcpStream::connect(&socket_addr).await?;
+        proxytunnel::connect(socket, &addr).await?
+    } else {
+        let socket_addr = addr.to_socket_addrs().and_then(|mut iter| {
+            iter.next().ok_or_else(|| {
                 io::Error::new(io::ErrorKind::NotFound, "Can't resolve server address")
-            })?;
-            (socket_addr, None)
-        }
+            })
+        })?;
+        TcpStream::connect(&socket_addr).await?
     };
 
-    let connection = TcpStream::connect(&addr).await?;
-    if let Some(connect_url) = connect_url {
-        unimplemented!()
-    // let connection = proxytunnel::connect(connection, &connect_url).await?;
-    // let connection = handshake(connection).await?;
-    // Ok(connection)
-    } else {
-        handshake(connection).await
-    }
+    handshake(socket).await
 }
 
 pub async fn authenticate(
-    mut transport: Transport,
+    transport: &mut Transport,
     credentials: Credentials,
-    device_id: String,
-) -> Result<(Transport, Credentials), io::Error> {
-    use crate::protocol::{
-        authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os},
-        keyexchange::APLoginFailed,
-    };
+    device_id: &str,
+) -> io::Result<Credentials> {
+    use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
+    use crate::protocol::keyexchange::APLoginFailed;
 
     let mut packet = ClientResponseEncrypted::new();
     packet
@@ -80,19 +73,18 @@ pub async fn authenticate(
             version::short_sha(),
             version::build_id()
         ));
-    packet.mut_system_info().set_device_id(device_id);
+    packet
+        .mut_system_info()
+        .set_device_id(device_id.to_string());
     packet.set_version_string(version::version_string());
 
-    let cmd: u8 = 0xab;
+    let cmd = 0xab;
     let data = packet.write_to_bytes().unwrap();
 
     transport.send((cmd, data)).await?;
-
-    let packet = transport.next().await;
-
-    // TODO: Don't panic?
-    match packet {
-        Some(Ok((0xac, data))) => {
+    let (cmd, data) = transport.next().await.expect("EOF")?;
+    match cmd {
+        0xac => {
             let welcome_data: APWelcome = protobuf::parse_from_bytes(data.as_ref()).unwrap();
 
             let reusable_credentials = Credentials {
@@ -101,10 +93,10 @@ pub async fn authenticate(
                 auth_data: welcome_data.get_reusable_auth_credentials().to_owned(),
             };
 
-            Ok((transport, reusable_credentials))
+            Ok(reusable_credentials)
         }
 
-        Some(Ok((0xad, data))) => {
+        0xad => {
             let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref()).unwrap();
             panic!(
                 "Authentication failed with reason: {:?}",
@@ -112,8 +104,6 @@ pub async fn authenticate(
             )
         }
 
-        Some(Ok((cmd, _))) => panic!("Unexpected packet {:?}", cmd),
-        Some(err @ Err(_)) => panic!("Packet error: {:?}", err),
-        None => panic!("EOF"),
+        _ => panic!("Unexpected packet {:?}", cmd),
     }
 }

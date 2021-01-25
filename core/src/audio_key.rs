@@ -3,7 +3,6 @@ use bytes::Bytes;
 use futures::channel::oneshot;
 use std::collections::HashMap;
 use std::io::Write;
-use thiserror::Error;
 
 use crate::spotify_id::{FileId, SpotifyId};
 use crate::util::SeqGenerator;
@@ -11,13 +10,8 @@ use crate::util::SeqGenerator;
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct AudioKey(pub [u8; 16]);
 
-#[derive(Error, Debug)]
-pub enum AudioKeyError {
-    #[error("AudioKey sender disconnected")]
-    Cancelled(#[from] oneshot::Canceled),
-    #[error("Unknown server response: `{0:?}`")]
-    UnknownResponse(Vec<u8>),
-}
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
+pub struct AudioKeyError;
 
 component! {
     AudioKeyManager : AudioKeyManagerInner {
@@ -45,11 +39,9 @@ impl AudioKeyManager {
                         data.as_ref()[0],
                         data.as_ref()[1]
                     );
-                    let _ = sender.send(Err(AudioKeyError::UnknownResponse(
-                        data.as_ref()[..1].to_vec(),
-                    )));
+                    let _ = sender.send(Err(AudioKeyError));
                 }
-                _ => warn!("Unexpected audioKey response: 0x{:x?} {:?}", cmd, data),
+                _ => (),
             }
         }
     }
@@ -64,7 +56,7 @@ impl AudioKeyManager {
         });
 
         self.send_key_request(seq, track, file);
-        rx.await?
+        rx.await.map_err(|_| AudioKeyError)?
     }
 
     fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) {

@@ -10,7 +10,9 @@ pub trait Sink {
     fn write(&mut self, data: &[i16]) -> io::Result<()>;
 }
 
-fn mk_sink<S: Sink + Open + 'static>(device: Option<String>) -> Box<dyn Sink> {
+pub type SinkBuilder = fn(Option<String>) -> Box<dyn Sink + Send>;
+
+fn mk_sink<S: Sink + Open + Send + 'static>(device: Option<String>) -> Box<dyn Sink + Send> {
     Box::new(S::open(device))
 }
 
@@ -54,7 +56,7 @@ use self::pipe::StdoutSink;
 mod subprocess;
 use self::subprocess::SubprocessSink;
 
-pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>)] = &[
+pub const BACKENDS: &'static [(&'static str, SinkBuilder)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
@@ -73,7 +75,7 @@ pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>
     ("subprocess", mk_sink::<SubprocessSink>),
 ];
 
-pub fn find(name: Option<String>) -> Option<fn(Option<String>) -> Box<dyn Sink>> {
+pub fn find(name: Option<String>) -> Option<SinkBuilder> {
     if let Some(name) = name {
         BACKENDS
             .iter()

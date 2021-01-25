@@ -35,11 +35,10 @@ impl APCodec {
     }
 }
 
-type APCodecItem = (u8, Vec<u8>);
-impl Encoder<APCodecItem> for APCodec {
+impl Encoder<(u8, Vec<u8>)> for APCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, item: APCodecItem, buf: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, item: (u8, Vec<u8>), buf: &mut BytesMut) -> io::Result<()> {
         let (cmd, payload) = item;
         let offset = buf.len();
 

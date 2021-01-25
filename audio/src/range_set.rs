@@ -54,11 +54,7 @@ impl RangeSet {
     }
 
     pub fn len(&self) -> usize {
-        let mut result = 0;
-        for range in self.ranges.iter() {
-            result += range.length;
-        }
-        return result;
+        self.ranges.iter().map(|r| r.length).fold(0, std::ops::Add::add)
     }
 
     pub fn get_range(&self, index: usize) -> Range {
@@ -98,12 +94,12 @@ impl RangeSet {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     pub fn add_range(&mut self, range: &Range) {
-        if range.length <= 0 {
-            // the interval is empty or invalid -> nothing to do.
+        if range.length == 0 {
+            // the interval is empty -> nothing to do.
             return;
         }
 
@@ -111,7 +107,7 @@ impl RangeSet {
             // the new range is clear of any ranges we already iterated over.
             if range.end() < self.ranges[index].start {
                 // the new range starts after anything we already passed and ends before the next range starts (they don't touch) -> insert it.
-                self.ranges.insert(index, range.clone());
+                self.ranges.insert(index, *range);
                 return;
             } else if range.start <= self.ranges[index].end()
                 && self.ranges[index].start <= range.end()
@@ -119,7 +115,7 @@ impl RangeSet {
                 // the new range overlaps (or touches) the first range. They are to be merged.
                 // In addition we might have to merge further ranges in as well.
 
-                let mut new_range = range.clone();
+                let mut new_range = *range;
 
                 while index < self.ranges.len() && self.ranges[index].start <= new_range.end() {
                     let new_end = max(new_range.end(), self.ranges[index].end());
@@ -134,7 +130,7 @@ impl RangeSet {
         }
 
         // the new range is after everything else -> just add it
-        self.ranges.push(range.clone());
+        self.ranges.push(*range);
     }
 
     #[allow(dead_code)]
@@ -152,7 +148,7 @@ impl RangeSet {
     }
 
     pub fn subtract_range(&mut self, range: &Range) {
-        if range.length <= 0 {
+        if range.length == 0 {
             return;
         }
 
