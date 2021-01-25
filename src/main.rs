@@ -5,7 +5,7 @@ use sha1::{Digest, Sha1};
 use std::env;
 use std::io::{self, stderr, Write};
 use std::mem;
-use std::path::PathBuf;
+use std::path::Path;
 use std::process::exit;
 use std::str::FromStr;
 use std::time::Instant;
@@ -254,22 +254,32 @@ fn setup(args: &[String]) -> Setup {
         mapped_volume: !matches.opt_present("mixer-linear-volume"),
     };
 
-    let use_audio_cache = !matches.opt_present("disable-audio-cache");
+    let cache = {
+        let audio_dir;
+        let system_dir;
+        if matches.opt_present("disable-audio-cache") {
+            audio_dir = None;
+            system_dir = matches
+                .opt_str("system-cache")
+                .or_else(|| matches.opt_str("c"))
+                .map(|p| p.into());
+        } else {
+            let cache_dir = matches.opt_str("c");
+            audio_dir = cache_dir
+                .as_ref()
+                .map(|p| AsRef::<Path>::as_ref(p).join("files"));
+            system_dir = matches
+                .opt_str("system-cache")
+                .or_else(|| cache_dir)
+                .map(|p| p.into());
+        }
 
-    let cache_directory = matches.opt_str("c").unwrap_or(String::from(""));
-    let system_cache_directory = matches
-        .opt_str("system-cache")
-        .unwrap_or(String::from(cache_directory.clone()));
-
-    let cache = match Cache::new(
-        PathBuf::from(cache_directory),
-        PathBuf::from(system_cache_directory),
-        use_audio_cache,
-    ) {
-        Ok(cache) => Some(cache),
-        Err(e) => {
-            warn!("Cannot create cache: {}", e);
-            None
+        match Cache::new(system_dir, audio_dir) {
+            Ok(cache) => Some(cache),
+            Err(e) => {
+                warn!("Cannot create cache: {}", e);
+                None
+            }
         }
     };
 
