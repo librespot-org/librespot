@@ -54,4 +54,3 @@ pub mod session;
 pub mod spotify_id;
 pub mod util;
 pub mod version;
-pub mod volume;

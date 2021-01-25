@@ -292,9 +292,8 @@ fn setup(args: &[String]) -> Setup {
             }
             (volume as i32 * 0xFFFF / 100) as u16
         })
-        .map(Volume)
         .or_else(|| cache.as_ref().and_then(Cache::volume))
-        .unwrap_or(Volume(0x8000));
+        .unwrap_or(0x8000);
 
     let zeroconf_port = matches
         .opt_str("zeroconf-port")

@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use crate::authentication::Credentials;
 use crate::spotify_id::FileId;
-use crate::volume::Volume;
 
 /// A cache for volume, credentials and audio files.
 #[derive(Clone)]
@@ -80,7 +79,7 @@ impl Cache {
         }
     }
 
-    pub fn volume(&self) -> Option<Volume> {
+    pub fn volume(&self) -> Option<u16> {
         let location = self.volume_location.as_ref()?;
 
         let read = || {
@@ -103,7 +102,7 @@ impl Cache {
         }
     }
 
-    pub fn save_volume(&self, volume: Volume) {
+    pub fn save_volume(&self, volume: u16) {
         if let Some(ref location) = self.volume_location {
             let result = File::create(location).and_then(|mut file| write!(file, "{}", volume));
             if let Err(e) = result {
