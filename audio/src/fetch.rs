@@ -430,9 +430,7 @@ impl AudioFile {
                 .map(move |mut file| {
                     if let Some(cache) = session_.cache() {
                         debug!("File {} complete, saving to cache", file_id);
-                        if let Err(err) = cache.save_file(file_id, &mut file) {
-                            warn!("Cannot save file to cache: {}", err);
-                        }
+                        cache.save_file(file_id, &mut file);
                     } else {
                         debug!("File {} complete", file_id);
                     }
