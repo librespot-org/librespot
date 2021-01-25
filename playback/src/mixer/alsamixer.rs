@@ -1,5 +1,6 @@
 use super::AudioFilter;
 use super::{Mixer, MixerConfig};
+use librespot_core::volume::Volume;
 use std;
 use std::error::Error;
 
@@ -209,8 +210,8 @@ impl Mixer for AlsaMixer {
         }
     }
 
-    fn set_volume(&self, volume: u16) {
-        match self.map_volume(Some(volume)) {
+    fn set_volume(&self, volume: Volume) {
+        match self.map_volume(Some(volume.0)) {
             Ok(_) => (),
             Err(e) => error!("Error setting volume for <{}>, {:?}", self.config.card, e),
         }
