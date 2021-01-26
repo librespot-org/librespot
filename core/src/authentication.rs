@@ -1,11 +1,9 @@
 use aes::Aes192;
-use base64;
+use aes::NewBlockCipher;
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use protobuf::ProtobufEnum;
-use serde;
-use serde_json;
 use sha1::{Digest, Sha1};
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -76,9 +74,9 @@ impl Credentials {
 
         // decrypt data using ECB mode without padding
         let blob = {
-            use aes::block_cipher_trait::generic_array::typenum::Unsigned;
-            use aes::block_cipher_trait::generic_array::GenericArray;
-            use aes::block_cipher_trait::BlockCipher;
+            use aes::cipher::generic_array::typenum::Unsigned;
+            use aes::cipher::generic_array::GenericArray;
+            use aes::cipher::BlockCipher;
 
             let mut data = base64::decode(encrypted_blob).unwrap();
             let cipher = Aes192::new(GenericArray::from_slice(&key));

@@ -1,9 +1,12 @@
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::{mpsc, BiLock};
-use futures::{Async, Poll, Stream};
-use std::collections::HashMap;
-use std::time::Instant;
+use futures::{channel::mpsc, lock::BiLock, Stream, StreamExt};
+use std::{
+    collections::HashMap,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Instant,
+};
 
 use crate::util::SeqGenerator;
 
@@ -101,12 +104,10 @@ impl ChannelManager {
 }
 
 impl Channel {
-    fn recv_packet(&mut self) -> Poll<Bytes, ChannelError> {
-        let (cmd, packet) = match self.receiver.poll() {
-            Ok(Async::Ready(Some(t))) => t,
-            Ok(Async::Ready(None)) => return Err(ChannelError), // The channel has been closed.
-            Ok(Async::NotReady) => return Ok(Async::NotReady),
-            Err(()) => unreachable!(),
+    fn recv_packet(&mut self, cx: &mut Context<'_>) -> Poll<Result<Bytes, ChannelError>> {
+        let (cmd, packet) = match self.receiver.poll_next_unpin(cx) {
+            Poll::Pending => return Poll::Pending,
+            Poll::Ready(o) => o.ok_or(ChannelError)?,
         };
 
         if cmd == 0xa {
@@ -115,9 +116,9 @@ impl Channel {
 
             self.state = ChannelState::Closed;
 
-            Err(ChannelError)
+            Poll::Ready(Err(ChannelError))
         } else {
-            Ok(Async::Ready(packet))
+            Poll::Ready(Ok(packet))
         }
     }
 
@@ -129,16 +130,19 @@ impl Channel {
 }
 
 impl Stream for Channel {
-    type Item = ChannelEvent;
-    type Error = ChannelError;
+    type Item = Result<ChannelEvent, ChannelError>;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
             match self.state.clone() {
                 ChannelState::Closed => panic!("Polling already terminated channel"),
                 ChannelState::Header(mut data) => {
                     if data.len() == 0 {
-                        data = try_ready!(self.recv_packet());
+                        data = match self.recv_packet(cx) {
+                            Poll::Ready(Ok(x)) => x,
+                            Poll::Ready(Err(x)) => return Poll::Ready(Some(Err(x))),
+                            Poll::Pending => return Poll::Pending,
+                        };
                     }
 
                     let length = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
@@ -152,19 +156,23 @@ impl Stream for Channel {
                         self.state = ChannelState::Header(data);
 
                         let event = ChannelEvent::Header(header_id, header_data);
-                        return Ok(Async::Ready(Some(event)));
+                        return Poll::Ready(Some(Ok(event)));
                     }
                 }
 
                 ChannelState::Data => {
-                    let data = try_ready!(self.recv_packet());
+                    let data = match self.recv_packet(cx) {
+                        Poll::Ready(Ok(x)) => x,
+                        Poll::Ready(Err(x)) => return Poll::Ready(Some(Err(x))),
+                        Poll::Pending => return Poll::Pending,
+                    };
                     if data.len() == 0 {
                         self.receiver.close();
                         self.state = ChannelState::Closed;
-                        return Ok(Async::Ready(None));
+                        return Poll::Ready(None);
                     } else {
                         let event = ChannelEvent::Data(data);
-                        return Ok(Async::Ready(Some(event)));
+                        return Poll::Ready(Some(Ok(event)));
                     }
                 }
             }
@@ -173,38 +181,45 @@ impl Stream for Channel {
 }
 
 impl Stream for ChannelData {
-    type Item = Bytes;
-    type Error = ChannelError;
+    type Item = Result<Bytes, ChannelError>;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let mut channel = match self.0.poll_lock() {
-            Async::Ready(c) => c,
-            Async::NotReady => return Ok(Async::NotReady),
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut channel = match self.0.poll_lock(cx) {
+            Poll::Ready(c) => c,
+            Poll::Pending => return Poll::Pending,
         };
 
         loop {
-            match try_ready!(channel.poll()) {
+            let x = match channel.poll_next_unpin(cx) {
+                Poll::Ready(x) => x.transpose()?,
+                Poll::Pending => return Poll::Pending,
+            };
+            match x {
                 Some(ChannelEvent::Header(..)) => (),
-                Some(ChannelEvent::Data(data)) => return Ok(Async::Ready(Some(data))),
-                None => return Ok(Async::Ready(None)),
+                Some(ChannelEvent::Data(data)) => return Poll::Ready(Some(Ok(data))),
+                None => return Poll::Ready(None),
             }
         }
     }
 }
 
 impl Stream for ChannelHeaders {
-    type Item = (u8, Vec<u8>);
-    type Error = ChannelError;
+    type Item = Result<(u8, Vec<u8>), ChannelError>;
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        let mut channel = match self.0.poll_lock() {
-            Async::Ready(c) => c,
-            Async::NotReady => return Ok(Async::NotReady),
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut channel = match self.0.poll_lock(cx) {
+            Poll::Ready(c) => c,
+            Poll::Pending => return Poll::Pending,
         };
 
-        match try_ready!(channel.poll()) {
-            Some(ChannelEvent::Header(id, data)) => Ok(Async::Ready(Some((id, data)))),
-            Some(ChannelEvent::Data(..)) | None => Ok(Async::Ready(None)),
+        let x = match channel.poll_next_unpin(cx) {
+            Poll::Ready(x) => x.transpose()?,
+            Poll::Pending => return Poll::Pending,
+        };
+
+        match x {
+            Some(ChannelEvent::Header(id, data)) => Poll::Ready(Some(Ok((id, data)))),
+            Some(ChannelEvent::Data(..)) | None => Poll::Ready(None),
         }
     }
 }

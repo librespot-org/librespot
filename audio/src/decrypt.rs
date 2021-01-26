@@ -1,7 +1,7 @@
 use std::io;
 
-use aes_ctr::stream_cipher::generic_array::GenericArray;
-use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek};
+use aes_ctr::cipher::generic_array::GenericArray;
+use aes_ctr::cipher::{NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek};
 use aes_ctr::Aes128Ctr;
 
 use librespot_core::audio_key::AudioKey;

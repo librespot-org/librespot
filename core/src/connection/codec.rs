@@ -2,7 +2,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, Bytes, BytesMut};
 use shannon::Shannon;
 use std::io;
-use tokio_io::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 const HEADER_SIZE: usize = 3;
 const MAC_SIZE: usize = 4;
@@ -35,8 +35,7 @@ impl APCodec {
     }
 }
 
-impl Encoder for APCodec {
-    type Item = (u8, Vec<u8>);
+impl Encoder<(u8, Vec<u8>)> for APCodec {
     type Error = io::Error;
 
     fn encode(&mut self, item: (u8, Vec<u8>), buf: &mut BytesMut) -> io::Result<()> {
@@ -45,7 +44,7 @@ impl Encoder for APCodec {
 
         buf.reserve(3 + payload.len());
         buf.put_u8(cmd);
-        buf.put_u16_be(payload.len() as u16);
+        buf.put_u16(payload.len() as u16);
         buf.extend_from_slice(&payload);
 
         self.encode_cipher.nonce_u32(self.encode_nonce);

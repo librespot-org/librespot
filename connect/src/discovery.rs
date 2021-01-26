@@ -5,8 +5,10 @@ use base64;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Stream};
 use hmac::{Hmac, Mac};
-use hyper::server::{Http, Request, Response, Service};
-use hyper::{self, Get, Post, StatusCode};
+
+use hyper::{
+    self, server::conn::Http, service::Service, Body, Method, Request, Response, StatusCode,
+};
 use sha1::{Digest, Sha1};
 
 #[cfg(feature = "with-dns-sd")]
@@ -20,7 +22,7 @@ use rand;
 use std::collections::BTreeMap;
 use std::io;
 use std::sync::Arc;
-use tokio_core::reactor::Handle;
+use tokio::runtime::current_thread::Handle;
 use url;
 
 use librespot_core::authentication::Credentials;
@@ -67,7 +69,7 @@ impl Discovery {
     fn handle_get_info(
         &self,
         _params: &BTreeMap<String, String>,
-    ) -> ::futures::Finished<Response, hyper::Error> {
+    ) -> ::futures::Finished<Response<hyper::Body>, hyper::Error> {
         let public_key = self.0.public_key.to_bytes_be();
         let public_key = base64::encode(&public_key);
 
@@ -88,13 +90,13 @@ impl Discovery {
         });
 
         let body = result.to_string();
-        ::futures::finished(Response::new().with_body(body))
+        ::futures::finished(Response::new(Body::from(body)))
     }
 
     fn handle_add_user(
         &self,
         params: &BTreeMap<String, String>,
-    ) -> ::futures::Finished<Response, hyper::Error> {
+    ) -> ::futures::Finished<Response<hyper::Body>, hyper::Error> {
         let username = params.get("userName").unwrap();
         let encrypted_blob = params.get("blob").unwrap();
         let client_key = params.get("clientKey").unwrap();
@@ -136,7 +138,7 @@ impl Discovery {
             });
 
             let body = result.to_string();
-            return ::futures::finished(Response::new().with_body(body));
+            return ::futures::finished(Response::new(Body::from(body)));
         }
 
         let decrypted = {
@@ -161,30 +163,33 @@ impl Discovery {
         });
 
         let body = result.to_string();
-        ::futures::finished(Response::new().with_body(body))
+        return ::futures::finished(Response::new(Body::from(body)));
     }
 
-    fn not_found(&self) -> ::futures::Finished<Response, hyper::Error> {
-        ::futures::finished(Response::new().with_status(StatusCode::NotFound))
+    fn not_found(&self) -> ::futures::Finished<Response<hyper::Body>, hyper::Error> {
+        let mut res = Response::default();
+        *res.status_mut() = StatusCode::NOT_FOUND;
+        ::futures::finished(res)
     }
 }
 
 impl Service for Discovery {
-    type Request = Request;
-    type Response = Response;
+    type ReqBody = Body;
+    type ResBody = Body;
     type Error = hyper::Error;
-    type Future = Box<dyn Future<Item = Response, Error = hyper::Error>>;
 
-    fn call(&self, request: Request) -> Self::Future {
+    type Future = Box<dyn Future<Item = Response<(Self::ResBody)>, Error = hyper::Error> + Send>;
+    fn call(&mut self, request: Request<(Self::ReqBody)>) -> Self::Future {
         let mut params = BTreeMap::new();
 
-        let (method, uri, _, _, body) = request.deconstruct();
-        if let Some(query) = uri.query() {
+        let (parts, body) = request.into_parts();
+
+        if let Some(query) = parts.uri.query() {
             params.extend(url::form_urlencoded::parse(query.as_bytes()).into_owned());
         }
 
-        if method != Get {
-            debug!("{:?} {:?} {:?}", method, uri.path(), params);
+        if parts.method != Method::GET {
+            debug!("{:?} {:?} {:?}", parts.method, parts.uri.path(), params);
         }
 
         let this = self.clone();
@@ -198,9 +203,9 @@ impl Service for Discovery {
                 params
             })
             .and_then(move |params| {
-                match (method, params.get("action").map(AsRef::as_ref)) {
-                    (Get, Some("getInfo")) => this.handle_get_info(&params),
-                    (Post, Some("addUser")) => this.handle_add_user(&params),
+                match (parts.method, params.get("action").map(AsRef::as_ref)) {
+                    (Method::GET, Some("getInfo")) => this.handle_get_info(&params),
+                    (Method::POST, Some("addUser")) => this.handle_add_user(&params),
                     _ => this.not_found(),
                 }
             }),
@@ -230,11 +235,9 @@ pub fn discovery(
 
     let serve = {
         let http = Http::new();
-        http.serve_addr_handle(
-            &format!("0.0.0.0:{}", port).parse().unwrap(),
-            &handle,
-            move || Ok(discovery.clone()),
-        )
+        http.serve_addr(&format!("0.0.0.0:{}", port).parse().unwrap(), move || {
+            Ok(discovery.clone())
+        })
         .unwrap()
     };
 
@@ -244,13 +247,18 @@ pub fn discovery(
     let server_future = {
         let handle = handle.clone();
         serve
-            .for_each(move |connection| {
-                handle.spawn(connection.then(|_| Ok(())));
-                Ok(())
-            })
+            .for_each(
+                move |connecting: hyper::server::conn::Connecting<
+                    hyper::server::conn::AddrStream,
+                    futures::Failed<_, hyper::Error>,
+                >| {
+                    handle.spawn(connecting.flatten().then(|_| Ok(()))).unwrap();
+                    Ok(())
+                },
+            )
             .then(|_| Ok(()))
     };
-    handle.spawn(server_future);
+    handle.spawn(server_future).unwrap();
 
     #[cfg(feature = "with-dns-sd")]
     let svc = DNSService::register(
