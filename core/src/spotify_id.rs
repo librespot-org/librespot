@@ -1,4 +1,4 @@
-use std;
+use std::convert::TryInto;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -8,41 +8,23 @@ pub enum SpotifyAudioType {
     NonPlayable,
 }
 
-impl SpotifyAudioType {
-    fn from_str(src: &str) -> SpotifyAudioType {
-        match src {
+impl From<&str> for SpotifyAudioType {
+    fn from(v: &str) -> Self {
+        match v {
             "track" => SpotifyAudioType::Track,
             "episode" => SpotifyAudioType::Podcast,
             _ => SpotifyAudioType::NonPlayable,
         }
     }
+}
 
-    fn to_str(self) -> &'static str {
+impl Into<&str> for SpotifyAudioType {
+    fn into(self) -> &'static str {
         match self {
             SpotifyAudioType::Track => "track",
             SpotifyAudioType::Podcast => "episode",
             SpotifyAudioType::NonPlayable => "unknown",
         }
-    }
-
-    fn len(self) -> usize {
-        match self {
-            SpotifyAudioType::Track => 5,
-            SpotifyAudioType::Podcast => 7,
-            SpotifyAudioType::NonPlayable => 7,
-        }
-    }
-}
-
-impl std::convert::From<&str> for SpotifyAudioType {
-    fn from(v: &str) -> Self {
-        SpotifyAudioType::from_str(v)
-    }
-}
-
-impl std::convert::Into<&str> for SpotifyAudioType {
-    fn into(self) -> &'static str {
-        self.to_str()
     }
 }
 
@@ -119,14 +101,10 @@ impl SpotifyId {
     ///
     /// The resulting `SpotifyId` will default to a `SpotifyAudioType::TRACK`.
     pub fn from_raw(src: &[u8]) -> Result<SpotifyId, SpotifyIdError> {
-        if src.len() != SpotifyId::SIZE {
-            return Err(SpotifyIdError);
-        };
-
-        let mut dst = [0u8; SpotifyId::SIZE];
-        dst.copy_from_slice(src);
-
-        Ok(SpotifyId::as_track(u128::from_be_bytes(dst)))
+        match src.try_into() {
+            Ok(dst) => Ok(SpotifyId::as_track(u128::from_be_bytes(dst))),
+            Err(_) => Err(SpotifyIdError),
+        }
     }
 
     /// Parses a [Spotify URI] into a `SpotifyId`.
@@ -143,10 +121,7 @@ impl SpotifyId {
             return Err(SpotifyIdError);
         }
 
-        let mut id = match SpotifyId::from_base62(&src[id_i..]) {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
+        let mut id = SpotifyId::from_base62(&src[id_i..])?;
 
         // Slice offset by 8 as we are skipping the "spotify:" prefix.
         id.audio_type = src[8..id_i - 1].into();
@@ -225,10 +200,11 @@ impl SpotifyId {
     pub fn to_uri(&self) -> String {
         // 8 chars for the "spotify:" prefix + 1 colon + 22 chars base62 encoded ID  = 31
         // + unknown size audio_type.
-        let mut dst = String::with_capacity(31 + self.audio_type.len());
+        let audio_type: &str = self.audio_type.into();
+        let mut dst = String::with_capacity(31 + audio_type.len());
         dst.push_str("spotify:");
-        dst.push_str(self.audio_type.into());
-        dst.push_str(":");
+        dst.push_str(audio_type);
+        dst.push(':');
         dst.push_str(&self.to_base62());
 
         dst
