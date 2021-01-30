@@ -7,6 +7,7 @@ mod tests {
     use apresolve::apresolve_or_fallback;
     #[tokio::test]
     async fn test_ap_resolve() {
+        env_logger::init();
         let ap = apresolve_or_fallback(&None, &None).await;
         println!("AP: {:?}", ap);
     }
