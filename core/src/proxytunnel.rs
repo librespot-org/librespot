@@ -17,29 +17,40 @@ pub async fn connect<T: AsyncRead + AsyncWrite + Unpin>(
     .into_bytes();
     connection.write_all(buffer.as_ref()).await?;
 
-    buffer.clear();
-    connection.read_to_end(&mut buffer).await?;
-    if buffer.is_empty() {
-        return Err(io::Error::new(io::ErrorKind::Other, "Early EOF from proxy"));
-    }
+    buffer.resize(buffer.capacity(), 0);
 
-    let mut headers = [httparse::EMPTY_HEADER; 16];
-    let mut response = httparse::Response::new(&mut headers);
-
-    response
-        .parse(&buffer[..])
-        .map_err(|err| io::Error::new(io::ErrorKind::Other, err.to_string()))?;
-
-    match response.code {
-        Some(200) => Ok(connection), // Proxy says all is well
-        Some(code) => {
-            let reason = response.reason.unwrap_or("no reason");
-            let msg = format!("Proxy responded with {}: {}", code, reason);
-            Err(io::Error::new(io::ErrorKind::Other, msg))
+    let mut offset = 0;
+    loop {
+        let bytes_read = connection.read(&mut buffer[offset..]).await?;
+        if bytes_read == 0 {
+            return Err(io::Error::new(io::ErrorKind::Other, "Early EOF from proxy"));
         }
-        None => Err(io::Error::new(
-            io::ErrorKind::Other,
-            "Malformed response from proxy",
-        )),
+        offset += bytes_read;
+
+        let mut headers = [httparse::EMPTY_HEADER; 16];
+        let mut response = httparse::Response::new(&mut headers);
+
+        let status = response
+            .parse(&buffer[..offset])
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+
+        if status.is_complete() {
+            return match response.code {
+                Some(200) => Ok(connection), // Proxy says all is well
+                Some(code) => {
+                    let reason = response.reason.unwrap_or("no reason");
+                    let msg = format!("Proxy responded with {}: {}", code, reason);
+                    Err(io::Error::new(io::ErrorKind::Other, msg))
+                }
+                None => Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Malformed response from proxy",
+                )),
+            };
+        }
+
+        if offset >= buffer.len() {
+            buffer.resize(buffer.len() * 2, 0);
+        }
     }
 }
