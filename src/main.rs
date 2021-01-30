@@ -180,7 +180,7 @@ fn setup(args: &[String]) -> Setup {
         .optopt(
             "",
             "normalisation-gain-type",
-            "Specify the normalisation gain type to use - [track, album]. Default is track.",
+            "Specify the normalisation gain type to use - [track, album]. Default is album.",
             "GAIN_TYPE",
         )
         .optopt(
