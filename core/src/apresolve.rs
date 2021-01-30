@@ -1,10 +1,11 @@
 const AP_FALLBACK: &'static str = "ap.spotify.com:443";
-const APRESOLVE_ENDPOINT: &'static str = "http://apresolve.spotify.com/";
+const APRESOLVE_ENDPOINT: &'static str = "http://apresolve.spotify.com:80";
 
-use hyper::{client::HttpConnector, Body, Client, Method, Request, Uri};
-use hyper_proxy::{Intercept, Proxy, ProxyConnector};
+use hyper::{Body, Client, Method, Request, Uri};
 use std::error::Error;
 use url::Url;
+
+use crate::proxytunnel::ProxyTunnel;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct APResolveData {
@@ -14,7 +15,7 @@ pub struct APResolveData {
 async fn apresolve(proxy: &Option<Url>, ap_port: &Option<u16>) -> Result<String, Box<dyn Error>> {
     let port = ap_port.unwrap_or(443);
 
-    let mut req = Request::builder()
+    let req = Request::builder()
         .method(Method::GET)
         .uri(
             APRESOLVE_ENDPOINT
@@ -24,18 +25,10 @@ async fn apresolve(proxy: &Option<Url>, ap_port: &Option<u16>) -> Result<String,
         .body(Body::empty())?;
 
     let response = if let Some(url) = proxy {
-        let proxy = {
-            let proxy_url = url.as_str().parse().expect("invalid http proxy");
-            let proxy = Proxy::new(Intercept::All, proxy_url);
-            let connector = HttpConnector::new();
-            ProxyConnector::from_proxy_unsecured(connector, proxy)
-        };
-
-        if let Some(headers) = proxy.http_headers(&APRESOLVE_ENDPOINT.parse().unwrap()) {
-            req.headers_mut().extend(headers.clone());
-        };
-
-        Client::builder().build(proxy).request(req).await?
+        Client::builder()
+            .build(ProxyTunnel::new(url)?)
+            .request(req)
+            .await?
     } else {
         Client::new().request(req).await?
     };

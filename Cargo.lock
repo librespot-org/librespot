@@ -996,31 +996,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
-name = "headers"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62689dc57c7456e69712607ffcbd0aa1dfcccf9af73727e9b25bc1825375cac3"
-dependencies = [
- "base64 0.13.0",
- "bitflags 1.2.1",
- "bytes",
- "headers-core",
- "http",
- "mime",
- "sha-1",
- "time 0.1.43",
-]
-
-[[package]]
-name = "headers-core"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7f66481bfee273957b1f20485a4ff3362987f85b2c236580d81b4eb7a326429"
-dependencies = [
- "http",
-]
-
-[[package]]
 name = "heck"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1109,20 +1084,6 @@ dependencies = [
  "tower-service",
  "tracing",
  "want",
-]
-
-[[package]]
-name = "hyper-proxy"
-version = "0.8.0"
-source = "git+https://github.com/e00E/hyper-proxy.git?branch=upgrade-tokio#4be706f2f0297bd3d14f301b6ea0be8f3078bb17"
-dependencies = [
- "bytes",
- "futures",
- "headers",
- "http",
- "hyper",
- "tokio",
- "tower-service",
 ]
 
 [[package]]
@@ -1402,7 +1363,6 @@ dependencies = [
  "hmac",
  "httparse",
  "hyper",
- "hyper-proxy",
  "librespot-protocol",
  "log",
  "num-bigint",
@@ -1420,6 +1380,7 @@ dependencies = [
  "shannon",
  "tokio",
  "tokio-util",
+ "tower-service",
  "url 1.7.2",
  "uuid",
  "vergen",
@@ -1531,12 +1492,6 @@ name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
-
-[[package]]
-name = "mime"
-version = "0.3.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 
 [[package]]
 name = "miniz_oxide"

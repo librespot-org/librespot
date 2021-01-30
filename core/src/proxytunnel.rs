@@ -1,27 +1,36 @@
-use std::io;
-
+use futures::Future;
 use hyper::Uri;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use std::{
+    io,
+    net::{SocketAddr, ToSocketAddrs},
+    pin::Pin,
+    task::Poll,
+};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    net::TcpStream,
+};
+use tower_service::Service;
 
 pub async fn connect<T: AsyncRead + AsyncWrite + Unpin>(
-    mut connection: T,
-    connect_url: &str,
+    mut proxy_connection: T,
+    connect_host: &str,
+    connect_port: u16,
 ) -> io::Result<T> {
-    let uri = connect_url.parse::<Uri>().unwrap();
-    let mut buffer = format!(
-        "CONNECT {0}:{1} HTTP/1.1\r\n\
-         \r\n",
-        uri.host().unwrap_or_else(|| panic!("No host in {}", uri)),
-        uri.port().unwrap_or_else(|| panic!("No port in {}", uri))
-    )
-    .into_bytes();
-    connection.write_all(buffer.as_ref()).await?;
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(b"CONNECT ");
+    buffer.extend_from_slice(connect_host.as_bytes());
+    buffer.push(b':');
+    buffer.extend_from_slice(connect_port.to_string().as_bytes());
+    buffer.extend_from_slice(b" HTTP/1.1\r\n\r\n");
+
+    proxy_connection.write_all(buffer.as_ref()).await?;
 
     buffer.resize(buffer.capacity(), 0);
 
     let mut offset = 0;
     loop {
-        let bytes_read = connection.read(&mut buffer[offset..]).await?;
+        let bytes_read = proxy_connection.read(&mut buffer[offset..]).await?;
         if bytes_read == 0 {
             return Err(io::Error::new(io::ErrorKind::Other, "Early EOF from proxy"));
         }
@@ -36,7 +45,7 @@ pub async fn connect<T: AsyncRead + AsyncWrite + Unpin>(
 
         if status.is_complete() {
             return match response.code {
-                Some(200) => Ok(connection), // Proxy says all is well
+                Some(200) => Ok(proxy_connection), // Proxy says all is well
                 Some(code) => {
                     let reason = response.reason.unwrap_or("no reason");
                     let msg = format!("Proxy responded with {}: {}", code, reason);
@@ -52,5 +61,46 @@ pub async fn connect<T: AsyncRead + AsyncWrite + Unpin>(
         if offset >= buffer.len() {
             buffer.resize(buffer.len() * 2, 0);
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct ProxyTunnel {
+    proxy_addr: SocketAddr,
+}
+
+impl ProxyTunnel {
+    pub fn new<T: ToSocketAddrs>(addr: T) -> io::Result<Self> {
+        let addr = addr.to_socket_addrs()?.next().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, "No socket address given")
+        })?;
+        Ok(Self { proxy_addr: addr })
+    }
+}
+
+impl Service<Uri> for ProxyTunnel {
+    type Response = TcpStream;
+    type Error = io::Error;
+    type Future = Pin<Box<dyn Future<Output = io::Result<TcpStream>> + Send>>;
+
+    fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, url: Uri) -> Self::Future {
+        let proxy_addr = self.proxy_addr;
+        let fut = async move {
+            let host = url
+                .host()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Host is missing"))?;
+            let port = url
+                .port()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Port is missing"))?;
+
+            let conn = TcpStream::connect(proxy_addr).await?;
+            connect(conn, host, port.as_u16()).await
+        };
+
+        Box::pin(fut)
     }
 }

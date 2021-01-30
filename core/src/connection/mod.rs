@@ -22,6 +22,21 @@ pub type Transport = Framed<TcpStream, APCodec>;
 pub async fn connect(addr: String, proxy: &Option<Url>) -> io::Result<Transport> {
     let socket = if let Some(proxy) = proxy {
         info!("Using proxy \"{}\"", proxy);
+
+        let mut split = addr.rsplit(':');
+
+        let port = split
+            .next()
+            .unwrap() // will never panic, split iterator contains at least one element
+            .parse()
+            .map_err(|e| {
+                io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid port: {}", e))
+            })?;
+        
+        let host = split
+            .next()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Missing port"))?;
+
         let socket_addr = proxy.to_socket_addrs().and_then(|mut iter| {
             iter.next().ok_or_else(|| {
                 io::Error::new(
@@ -31,7 +46,8 @@ pub async fn connect(addr: String, proxy: &Option<Url>) -> io::Result<Transport>
             })
         })?;
         let socket = TcpStream::connect(&socket_addr).await?;
-        proxytunnel::connect(socket, &addr).await?
+
+        proxytunnel::connect(socket, host, port).await?
     } else {
         let socket_addr = addr.to_socket_addrs().and_then(|mut iter| {
             iter.next().ok_or_else(|| {

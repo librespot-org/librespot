@@ -14,7 +14,6 @@ extern crate futures;
 extern crate hmac;
 extern crate httparse;
 extern crate hyper;
-extern crate hyper_proxy;
 extern crate num_bigint;
 extern crate num_integer;
 extern crate num_traits;
@@ -28,6 +27,7 @@ extern crate sha1;
 extern crate shannon;
 pub extern crate tokio;
 extern crate tokio_util;
+extern crate tower_service;
 extern crate url;
 extern crate uuid;
 
