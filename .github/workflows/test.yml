@@ -67,7 +67,7 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-build-${{ hashFiles('**/lockfiles') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
       - name: Install developer package dependencies
         run: sudo apt-get update && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - run: cargo build --locked --no-default-features
@@ -111,7 +111,7 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-build-${{ hashFiles('**/lockfiles') }}
+          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
       - name: Install cross
         run: cargo install cross || true
       - name: Build
