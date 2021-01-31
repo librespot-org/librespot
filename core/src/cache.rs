@@ -131,15 +131,35 @@ impl Cache {
     }
 
     pub fn save_file<F: Read>(&self, file: FileId, contents: &mut F) {
-        if let Some(path) = self.file_path(file) {
-            let parent = path.parent().unwrap();
-            let result = fs::create_dir_all(parent)
-                .and_then(|_| File::create(path))
-                .and_then(|mut file| io::copy(contents, &mut file));
+        let path = if let Some(path) = self.file_path(file) {
+            path
+        } else {
+            return;
+        };
+        let parent = path.parent().unwrap();
 
-            if let Err(e) = result {
-                warn!("Cannot save file to cache: {}", e)
+        let result = fs::create_dir_all(parent)
+            .and_then(|_| File::create(&path))
+            .and_then(|mut file| io::copy(contents, &mut file));
+
+        if let Err(e) = result {
+            if e.kind() == ErrorKind::Other {
+                // Perhaps there's no space left in the cache
+                // TODO: try to narrow down the error (platform-dependently)
+                info!("An error occured while writing to cache, trying to flush the cache");
+
+                if fs::remove_dir_all(self.audio_location.as_ref().unwrap())
+                    .and_then(|_| fs::create_dir_all(parent))
+                    .and_then(|_| File::create(&path))
+                    .and_then(|mut file| io::copy(contents, &mut file))
+                    .is_ok()
+                {
+                    // It worked, there's no need to print a warning
+                    return;
+                }
             }
+
+            warn!("Cannot save file to cache: {}", e)
         }
     }
 }
