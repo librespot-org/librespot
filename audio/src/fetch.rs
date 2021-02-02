@@ -459,6 +459,10 @@ impl AudioFile {
             }
         }
     }
+
+    pub fn is_cached(&self) -> bool {
+        matches!(self, AudioFile::Cached { .. })
+    }
 }
 
 fn request_range(session: &Session, file: FileId, offset: usize, length: usize) -> Channel {

@@ -682,6 +682,7 @@ impl PlayerTrackLoader {
                 return None;
             }
         };
+        let is_cached = encrypted_file.is_cached();
 
         let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
 
@@ -715,7 +716,27 @@ impl PlayerTrackLoader {
 
         let audio_file = Subfile::new(decrypted_file, 0xa7);
 
-        let mut decoder = VorbisDecoder::new(audio_file).unwrap();
+        let mut decoder = match VorbisDecoder::new(audio_file) {
+            Ok(decoder) => decoder,
+            Err(e) if is_cached => {
+                warn!(
+                    "Unable to read cached audio file: {}. Trying to download it.",
+                    e
+                );
+
+                // unwrap safety: The file is cached, so session must have a cache
+                if !self.session.cache().unwrap().remove_file(file_id) {
+                    return None;
+                }
+
+                // Just try it again
+                return self.load_track(spotify_id, position_ms);
+            }
+            Err(e) => {
+                error!("Unable to read audio file: {}", e);
+                return None;
+            }
+        };
 
         if position_ms != 0 {
             match decoder.seek(position_ms as i64) {
