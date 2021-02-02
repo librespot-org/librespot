@@ -651,18 +651,14 @@ impl PlayerTrackLoader {
                 FileFormat::OGG_VORBIS_96,
             ],
         };
-        let format = formats
-            .iter()
-            .find(|format| audio.files.contains_key(format))
-            .unwrap();
 
-        let file_id = match audio.files.get(&format) {
-            Some(&file_id) => file_id,
-            None => {
-                warn!("<{}> in not available in format {:?}", audio.name, format);
-                return None;
-            }
-        };
+        let (format, file_id) = formats
+            .iter()
+            .find_map(|format| Some((format, *audio.files.get(&format)?)))
+            .or_else(|| {
+                warn!("<{}> is not available in any supported format", audio.name);
+                None
+            })?;
 
         let bytes_per_second = self.stream_data_rate(*format);
         let play_from_beginning = position_ms == 0;
@@ -739,9 +735,8 @@ impl PlayerTrackLoader {
         };
 
         if position_ms != 0 {
-            match decoder.seek(position_ms as i64) {
-                Ok(_) => (),
-                Err(err) => error!("Vorbis error: {:?}", err),
+            if let Err(err) = decoder.seek(position_ms as i64) {
+                error!("Vorbis error: {}", err);
             }
             stream_loader_controller.set_stream_mode();
         }
