@@ -1538,9 +1538,9 @@ dependencies = [
 
 [[package]]
 name = "librespot-tremor"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b155a7dc4e4d272e01c37a1b85c1ee1bee7f04980ad4a7784c1a6e0f2de5929b"
+checksum = "97f525bff915d478a76940a7b988e5ea34911ba7280c97bd3a7673f54d68b4fe"
 dependencies = [
  "cc",
  "libc",
