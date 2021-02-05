@@ -1,6 +1,6 @@
 language: rust
 rust:
-  - 1.40.0
+  - 1.42.0
   - stable
   - beta
   - nightly
@@ -58,6 +58,7 @@ script:
     - cargo build --locked --no-default-features --features "portaudio-backend"
     - cargo build --locked --no-default-features --features "pulseaudio-backend"
     - cargo build --locked --no-default-features --features "jackaudio-backend"
+    - cargo build --locked --no-default-features --features "rodiojack-backend"
     - cargo build --locked --no-default-features --features "rodio-backend"
     - cargo build --locked --no-default-features --features "sdl-backend"
     - cargo build --locked --no-default-features --features "gstreamer-backend"
