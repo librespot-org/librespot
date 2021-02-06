@@ -3,7 +3,7 @@ use futures::{Async, Future, Poll, Stream};
 use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use std::env;
-use std::io::{self, stderr, Write};
+use std::io::{stderr, Write};
 use std::mem;
 use std::path::Path;
 use std::process::exit;
@@ -16,7 +16,7 @@ use url::Url;
 use librespot::core::authentication::{get_credentials, Credentials};
 use librespot::core::cache::Cache;
 use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
-use librespot::core::session::Session;
+use librespot::core::session::{AuthenticationError, Session};
 use librespot::core::version;
 
 use librespot::connect::discovery::{discovery, DiscoveryStream};
@@ -436,7 +436,7 @@ struct Main {
 
     spirc: Option<Spirc>,
     spirc_task: Option<SpircTask>,
-    connect: Box<dyn Future<Item = Session, Error = io::Error>>,
+    connect: Box<dyn Future<Item = Session, Error = AuthenticationError>>,
 
     shutdown: bool,
     last_credentials: Option<Credentials>,
