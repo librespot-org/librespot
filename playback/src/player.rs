@@ -322,7 +322,7 @@ impl Player {
         event_receiver
     }
 
-    pub fn get_end_of_track_future(&self) -> Box<dyn Future<Item = (), Error = ()>> {
+    pub fn get_end_of_track_future(&self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
         let result = self
             .get_player_event_channel()
             .filter(|event| match event {
