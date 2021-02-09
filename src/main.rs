@@ -225,10 +225,10 @@ fn setup(args: &[String]) -> Setup {
 
     info!(
         "librespot {} ({}). Built on {}. Build ID: {}",
-        version::short_sha(),
-        version::commit_date(),
-        version::short_now(),
-        version::build_id()
+        version::SHA_SHORT,
+        version::COMMIT_DATE,
+        version::BUILD_DATE,
+        version::BUILD_ID
     );
 
     let backend_name = matches.opt_str("backend");
@@ -329,7 +329,7 @@ fn setup(args: &[String]) -> Setup {
         let device_id = device_id(&name);
 
         SessionConfig {
-            user_agent: version::version_string(),
+            user_agent: version::VERSION_STRING.to_string(),
             device_id: device_id,
             proxy: matches.opt_str("proxy").or(std::env::var("http_proxy").ok()).map(
                 |s| {
