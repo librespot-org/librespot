@@ -652,15 +652,23 @@ impl PlayerTrackLoader {
             ],
         };
 
-        let (format, file_id) = formats
-            .iter()
-            .find_map(|format| Some((format, *audio.files.get(&format)?)))
-            .or_else(|| {
-                warn!("<{}> is not available in any supported format", audio.name);
+        let entry = formats.iter().find_map(|format| {
+            if let Some(&file_id) = audio.files.get(format) {
+                Some((*format, file_id))
+            } else {
                 None
-            })?;
+            }
+        });
 
-        let bytes_per_second = self.stream_data_rate(*format);
+        let (format, file_id) = match entry {
+            Some(t) => t,
+            None => {
+                warn!("<{}> is not available in any supported format", audio.name);
+                return None;
+            }
+        };
+
+        let bytes_per_second = self.stream_data_rate(format);
         let play_from_beginning = position_ms == 0;
 
         let key = self.session.audio_key().request(spotify_id, file_id);
