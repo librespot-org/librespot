@@ -75,7 +75,7 @@ impl Discovery {
             "status": 101,
             "statusString": "ERROR-OK",
             "spotifyError": 0,
-            "version": "2.1.0",
+            "version": "2.7.1",
             "deviceID": (self.0.device_id),
             "remoteName": (self.0.config.name),
             "activeUser": "",
@@ -85,6 +85,9 @@ impl Discovery {
             "accountReq": "PREMIUM",
             "brandDisplayName": "librespot",
             "modelDisplayName": "librespot",
+            "resolverVersion": "0",
+            "groupStatus": "NONE",
+            "voiceSupport": "NO",
         });
 
         let body = result.to_string();
