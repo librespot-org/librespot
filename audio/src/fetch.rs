@@ -461,7 +461,10 @@ impl AudioFile {
     }
 
     pub fn is_cached(&self) -> bool {
-        matches!(self, AudioFile::Cached { .. })
+        match self {
+            AudioFile::Cached { .. } => true,
+            _ => false,
+        }
     }
 }
 
