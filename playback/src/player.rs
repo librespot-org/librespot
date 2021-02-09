@@ -654,20 +654,24 @@ impl PlayerTrackLoader {
                 FileFormat::OGG_VORBIS_96,
             ],
         };
-        let format = formats
-            .iter()
-            .find(|format| audio.files.contains_key(format))
-            .unwrap();
 
-        let file_id = match audio.files.get(&format) {
-            Some(&file_id) => file_id,
+        let entry = formats.iter().find_map(|format| {
+            if let Some(&file_id) = audio.files.get(format) {
+                Some((*format, file_id))
+            } else {
+                None
+            }
+        });
+
+        let (format, file_id) = match entry {
+            Some(t) => t,
             None => {
-                warn!("<{}> in not available in format {:?}", audio.name, format);
+                warn!("<{}> is not available in any supported format", audio.name);
                 return None;
             }
         };
 
-        let bytes_per_second = self.stream_data_rate(*format);
+        let bytes_per_second = self.stream_data_rate(format);
         let play_from_beginning = position_ms == 0;
 
         let key = self.session.audio_key().request(spotify_id, file_id);
@@ -685,6 +689,7 @@ impl PlayerTrackLoader {
                 return None;
             }
         };
+        let is_cached = encrypted_file.is_cached();
 
         let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
 
@@ -718,12 +723,31 @@ impl PlayerTrackLoader {
 
         let audio_file = Subfile::new(decrypted_file, 0xa7);
 
-        let mut decoder = VorbisDecoder::new(audio_file).unwrap();
+        let mut decoder = match VorbisDecoder::new(audio_file) {
+            Ok(decoder) => decoder,
+            Err(e) if is_cached => {
+                warn!(
+                    "Unable to read cached audio file: {}. Trying to download it.",
+                    e
+                );
+
+                // unwrap safety: The file is cached, so session must have a cache
+                if !self.session.cache().unwrap().remove_file(file_id) {
+                    return None;
+                }
+
+                // Just try it again
+                return self.load_track(spotify_id, position_ms);
+            }
+            Err(e) => {
+                error!("Unable to read audio file: {}", e);
+                return None;
+            }
+        };
 
         if position_ms != 0 {
-            match decoder.seek(position_ms as i64) {
-                Ok(_) => (),
-                Err(err) => error!("Vorbis error: {:?}", err),
+            if let Err(err) = decoder.seek(position_ms as i64) {
+                error!("Vorbis error: {}", err);
             }
             stream_loader_controller.set_stream_mode();
         }
