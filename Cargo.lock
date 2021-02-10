@@ -1402,6 +1402,7 @@ dependencies = [
  "bit-set",
  "byteorder",
  "bytes",
+ "cfg-if 1.0.0",
  "futures",
  "lewton",
  "librespot-core",

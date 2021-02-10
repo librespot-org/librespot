@@ -19,11 +19,29 @@ extern crate librespot_core;
 mod decrypt;
 mod fetch;
 
-#[cfg(not(any(feature = "with-tremor", feature = "with-vorbis")))]
-mod lewton_decoder;
-#[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
-mod libvorbis_decoder;
+use cfg_if::cfg_if;
+
+#[cfg(any(
+    all(feature = "with-lewton", feature = "with-tremor"),
+    all(feature = "with-vorbis", feature = "with-tremor"),
+    all(feature = "with-lewton", feature = "with-vorbis")
+))]
+compile_error!("Cannot use two decoders at the same time.");
+
+cfg_if! {
+    if #[cfg(feature = "with-lewton")] {
+        mod lewton_decoder;
+        pub use lewton_decoder::{VorbisDecoder, VorbisError};
+    } else if #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))] {
+        mod libvorbis_decoder;
+        pub use crate::libvorbis_decoder::{VorbisDecoder, VorbisError};
+    } else {
+        compile_error!("Must choose a vorbis decoder.");
+    }
+}
+
 mod passthrough_decoder;
+pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
 
 mod range_set;
 
@@ -62,12 +80,6 @@ impl AudioPacket {
         }
     }
 }
-
-#[cfg(not(any(feature = "with-tremor", feature = "with-vorbis")))]
-pub use crate::lewton_decoder::{VorbisDecoder, VorbisError};
-#[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
-pub use libvorbis_decoder::{VorbisDecoder, VorbisError};
-pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
 
 #[derive(Debug)]
 pub enum AudioError {

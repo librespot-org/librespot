@@ -15,18 +15,20 @@ aes-ctr = "0.6"
 bit-set = "0.5"
 byteorder = "1.4"
 bytes = "1.0"
+cfg-if = "1"
 futures = "0.3"
-lewton = "0.10"
-ogg = "0.8"
 log = "0.4"
 num-bigint = "0.3"
 num-traits = "0.2"
+ogg = "0.8"
 pin-project-lite = "0.2.4"
 tempfile = "3.1"
 
+lewton = { version = "0.10", optional = true }
 librespot-tremor = { version = "0.2.0", optional = true }
 vorbis = { version ="0.0.14", optional = true }
 
 [features]
+with-lewton = ["lewton"]
 with-tremor = ["librespot-tremor"]
 with-vorbis = ["vorbis"]

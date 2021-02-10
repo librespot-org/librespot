@@ -75,10 +75,11 @@ gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
 with-tremor = ["librespot-audio/with-tremor"]
 with-vorbis = ["librespot-audio/with-vorbis"]
+with-lewton = ["librespot-audio/with-lewton"]
 
 # with-dns-sd = ["librespot-connect/with-dns-sd"]
 
-default = ["rodio-backend", "apresolve"]
+default = ["rodio-backend", "apresolve", "with-lewton"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
