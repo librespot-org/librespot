@@ -9,6 +9,7 @@ cfg_if! {
         use std::error::Error;
 
         use hyper::{Body, Client, Method, Request, Uri};
+        use serde::{Serialize, Deserialize};
 
         use crate::proxytunnel::ProxyTunnel;
 

@@ -4,7 +4,7 @@ mod handshake;
 pub use self::codec::APCodec;
 pub use self::handshake::handshake;
 
-use futures::{SinkExt, StreamExt};
+use futures_util::{SinkExt, StreamExt};
 use protobuf::{self, Message};
 use std::io;
 use std::net::ToSocketAddrs;

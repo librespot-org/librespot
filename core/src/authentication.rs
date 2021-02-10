@@ -1,10 +1,13 @@
+use std::io::{self, Read};
+use std::ops::FnOnce;
+
 use aes::Aes192;
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use protobuf::ProtobufEnum;
+use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
-use std::io::{self, Read};
 
 use crate::protocol::authentication::AuthenticationType;
 use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};

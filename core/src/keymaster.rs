@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 use crate::{mercury::MercuryError, session::Session};
 
 #[derive(Deserialize, Debug, Clone)]
