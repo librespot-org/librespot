@@ -162,4 +162,17 @@ impl Cache {
             warn!("Cannot save file to cache: {}", e)
         }
     }
+
+    pub fn remove_file(&self, file: FileId) -> bool {
+        if let Some(path) = self.file_path(file) {
+            if let Err(err) = fs::remove_file(path) {
+                warn!("Unable to remove file from cache: {}", err);
+                false
+            } else {
+                true
+            }
+        } else {
+            false
+        }
+    }
 }
