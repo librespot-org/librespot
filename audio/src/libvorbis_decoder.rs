@@ -1,7 +1,5 @@
 #[cfg(feature = "with-tremor")]
-extern crate librespot_tremor as vorbis;
-#[cfg(not(feature = "with-tremor"))]
-extern crate vorbis;
+use librespot_tremor as vorbis;
 
 use super::{AudioDecoder, AudioError, AudioPacket};
 use std::error;

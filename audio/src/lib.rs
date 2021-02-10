@@ -5,17 +5,6 @@ extern crate log;
 #[macro_use]
 extern crate pin_project_lite;
 
-extern crate aes_ctr;
-extern crate bit_set;
-extern crate byteorder;
-extern crate bytes;
-extern crate futures;
-extern crate num_bigint;
-extern crate num_traits;
-extern crate tempfile;
-
-extern crate librespot_core;
-
 mod decrypt;
 mod fetch;
 

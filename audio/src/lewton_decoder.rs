@@ -1,6 +1,4 @@
-extern crate lewton;
-
-use self::lewton::inside_ogg::OggStreamReader;
+use lewton::inside_ogg::OggStreamReader;
 
 use super::{AudioDecoder, AudioError, AudioPacket};
 use std::error;
@@ -32,10 +30,10 @@ where
     }
 
     fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError> {
-        use self::lewton::audio::AudioReadError::AudioIsHeader;
-        use self::lewton::OggReadError::NoCapturePatternFound;
-        use self::lewton::VorbisError::BadAudio;
-        use self::lewton::VorbisError::OggError;
+        use lewton::audio::AudioReadError::AudioIsHeader;
+        use lewton::OggReadError::NoCapturePatternFound;
+        use lewton::VorbisError::BadAudio;
+        use lewton::VorbisError::OggError;
         loop {
             match self.0.read_dec_packet_itl() {
                 Ok(Some(packet)) => return Ok(Some(AudioPacket::Samples(packet))),
