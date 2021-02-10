@@ -2,7 +2,7 @@ use std::cmp::{max, min};
 use std::fmt;
 use std::slice::Iter;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Range {
     pub start: usize,
     pub length: usize,

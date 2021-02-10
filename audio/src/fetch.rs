@@ -1,30 +1,23 @@
-use crate::range_set::{Range, RangeSet};
+use std::cmp::{max, min};
+use std::fs;
+use std::future::Future;
+use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::pin::Pin;
+use std::sync::atomic::{self, AtomicUsize};
+use std::sync::{Arc, Condvar, Mutex};
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
+
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
-use futures::{
-    channel::{mpsc, oneshot},
-    future,
-};
-use futures::{Future, Stream, StreamExt, TryFutureExt, TryStreamExt};
-
-use std::fs;
-use std::io::{self, Read, Seek, SeekFrom, Write};
-use std::sync::{Arc, Condvar, Mutex};
-use std::task::Poll;
-use std::time::{Duration, Instant};
-use std::{
-    cmp::{max, min},
-    pin::Pin,
-    task::Context,
-};
-use tempfile::NamedTempFile;
-
-use futures::channel::mpsc::unbounded;
+use futures_util::{future, StreamExt, TryFutureExt, TryStreamExt};
 use librespot_core::channel::{Channel, ChannelData, ChannelError, ChannelHeaders};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::FileId;
-use std::sync::atomic;
-use std::sync::atomic::AtomicUsize;
+use tempfile::NamedTempFile;
+use tokio::sync::{mpsc, oneshot};
+
+use crate::range_set::{Range, RangeSet};
 
 const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 16;
 // The minimum size of a block that is requested from the Spotify servers in one request.
@@ -96,6 +89,7 @@ pub enum AudioFile {
     Streaming(AudioFileStreaming),
 }
 
+#[derive(Debug)]
 enum StreamLoaderCommand {
     Fetch(Range),       // signal the stream loader to fetch a range of the file
     RandomAccessMode(), // optimise download strategy for random access
@@ -147,7 +141,7 @@ impl StreamLoaderController {
     fn send_stream_loader_command(&mut self, command: StreamLoaderCommand) {
         if let Some(ref mut channel) = self.channel_tx {
             // ignore the error in case the channel has been closed already.
-            let _ = channel.unbounded_send(command);
+            let _ = channel.send(command);
         }
     }
 
@@ -191,7 +185,7 @@ impl StreamLoaderController {
                     // We can't use self.fetch here because self can't be borrowed mutably, so we access the channel directly.
                     if let Some(ref mut channel) = self.channel_tx {
                         // ignore the error in case the channel has been closed already.
-                        let _ = channel.unbounded_send(StreamLoaderCommand::Fetch(range));
+                        let _ = channel.send(StreamLoaderCommand::Fetch(range));
                     }
                 }
             }
@@ -387,7 +381,7 @@ impl AudioFileStreaming {
 
         //let (seek_tx, seek_rx) = mpsc::unbounded();
         let (stream_loader_command_tx, stream_loader_command_rx) =
-            mpsc::unbounded::<StreamLoaderCommand>();
+            mpsc::unbounded_channel::<StreamLoaderCommand>();
 
         let fetcher = AudioFileFetch::new(
             session.clone(),
@@ -490,12 +484,12 @@ async fn audio_file_fetch_receive_data(
                     duration_ms = duration.as_millis() as u64;
                 }
                 let _ = file_data_tx
-                    .unbounded_send(ReceivedData::ResponseTimeMs(duration_ms as usize));
+                    .send(ReceivedData::ResponseTimeMs(duration_ms as usize));
                 measure_ping_time = false;
             }
             let data_size = data.len();
             let _ = file_data_tx
-                .unbounded_send(ReceivedData::Data(PartialFileData {
+                .send(ReceivedData::Data(PartialFileData {
                     offset: data_offset,
                     data: data,
                 }));
@@ -696,21 +690,17 @@ async fn audio_file_fetch(
     future::select_all(vec![f1, f2, f3]).await
 }*/
 
-pin_project! {
-    struct AudioFileFetch {
-        session: Session,
-        shared: Arc<AudioFileShared>,
-        output: Option<NamedTempFile>,
+struct AudioFileFetch {
+    session: Session,
+    shared: Arc<AudioFileShared>,
+    output: Option<NamedTempFile>,
 
-        file_data_tx: mpsc::UnboundedSender<ReceivedData>,
-        #[pin]
-        file_data_rx: mpsc::UnboundedReceiver<ReceivedData>,
+    file_data_tx: mpsc::UnboundedSender<ReceivedData>,
+    file_data_rx: mpsc::UnboundedReceiver<ReceivedData>,
 
-        #[pin]
-        stream_loader_command_rx: mpsc::UnboundedReceiver<StreamLoaderCommand>,
-        complete_tx: Option<oneshot::Sender<NamedTempFile>>,
-        network_response_times_ms: Vec<usize>,
-    }
+    stream_loader_command_rx: mpsc::UnboundedReceiver<StreamLoaderCommand>,
+    complete_tx: Option<oneshot::Sender<NamedTempFile>>,
+    network_response_times_ms: Vec<usize>,
 }
 
 impl AudioFileFetch {
@@ -725,7 +715,7 @@ impl AudioFileFetch {
         stream_loader_command_rx: mpsc::UnboundedReceiver<StreamLoaderCommand>,
         complete_tx: oneshot::Sender<NamedTempFile>,
     ) -> AudioFileFetch {
-        let (file_data_tx, file_data_rx) = unbounded::<ReceivedData>();
+        let (file_data_tx, file_data_rx) = mpsc::unbounded_channel::<ReceivedData>();
 
         {
             let requested_range = Range::new(0, initial_data_length);
@@ -863,7 +853,7 @@ impl AudioFileFetch {
 
     fn poll_file_data_rx(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         loop {
-            match Pin::new(&mut self.file_data_rx).poll_next(cx) {
+            match self.file_data_rx.poll_recv(cx) {
                 Poll::Ready(None) => return Poll::Ready(()),
                 Poll::Ready(Some(ReceivedData::ResponseTimeMs(response_time_ms))) => {
                     trace!("Ping time estimated as: {} ms.", response_time_ms);
@@ -939,7 +929,7 @@ impl AudioFileFetch {
 
     fn poll_stream_loader_command_rx(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         loop {
-            match Pin::new(&mut self.stream_loader_command_rx).poll_next(cx) {
+            match self.stream_loader_command_rx.poll_recv(cx) {
                 Poll::Ready(None) => return Poll::Ready(()),
                 Poll::Ready(Some(cmd)) => match cmd {
                     StreamLoaderCommand::Fetch(request) => {
@@ -1059,7 +1049,7 @@ impl Read for AudioFileStreaming {
 
         for &range in ranges_to_request.iter() {
             self.stream_loader_command_tx
-                .unbounded_send(StreamLoaderCommand::Fetch(range))
+                .send(StreamLoaderCommand::Fetch(range))
                 .unwrap();
         }
 

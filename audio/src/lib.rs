@@ -2,8 +2,6 @@
 
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate pin_project_lite;
 
 mod decrypt;
 mod fetch;
