@@ -8,43 +8,19 @@ extern crate serde_derive;
 extern crate pin_project_lite;
 #[macro_use]
 extern crate error_chain;
-extern crate aes;
-extern crate base64;
-extern crate byteorder;
-extern crate bytes;
-extern crate futures;
-extern crate hmac;
-extern crate httparse;
-extern crate hyper;
-extern crate num_bigint;
-extern crate num_integer;
-extern crate num_traits;
-extern crate once_cell;
-extern crate pbkdf2;
-extern crate protobuf;
-extern crate rand;
-extern crate serde;
-extern crate serde_json;
-extern crate sha1;
-extern crate shannon;
-pub extern crate tokio;
-extern crate tokio_util;
-extern crate tower_service;
-extern crate url;
-extern crate uuid;
 
-extern crate librespot_protocol as protocol;
+use librespot_protocol as protocol;
 
 #[macro_use]
 mod component;
 
-pub mod apresolve;
+mod apresolve;
 pub mod audio_key;
 pub mod authentication;
 pub mod cache;
 pub mod channel;
 pub mod config;
-pub mod connection;
+mod connection;
 pub mod diffie_hellman;
 pub mod keymaster;
 pub mod mercury;

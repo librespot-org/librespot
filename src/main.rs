@@ -12,7 +12,7 @@ use std::{
 };
 use url::Url;
 
-use librespot::core::authentication::{get_credentials, Credentials};
+use librespot::core::authentication::Credentials;
 use librespot::core::cache::Cache;
 use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
 use librespot::core::session::Session;
@@ -67,6 +67,29 @@ fn list_backends() {
         } else {
             println!("- {}", name);
         }
+    }
+}
+
+pub fn get_credentials<F: FnOnce(&String) -> Option<String>>(
+    username: Option<String>,
+    password: Option<String>,
+    cached_credentials: Option<Credentials>,
+    prompt: F,
+) -> Option<Credentials> {
+    if let Some(username) = username {
+        if let Some(password) = password {
+            return Some(Credentials::with_password(username, password));
+        }
+
+        match cached_credentials {
+            Some(credentials) if username == credentials.username => Some(credentials),
+            _ => {
+                let password = prompt(&username)?;
+                Some(Credentials::with_password(username, password))
+            }
+        }
+    } else {
+        cached_credentials
     }
 }
 
@@ -317,10 +340,10 @@ fn setup(args: &[String]) -> Setup {
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);
 
-        let password = |username: &String| -> String {
-            write!(stderr(), "Password for {}: ", username).unwrap();
-            stderr().flush().unwrap();
-            rpassword::read_password().unwrap()
+        let password = |username: &String| -> Option<String> {
+            write!(stderr(), "Password for {}: ", username).ok()?;
+            stderr().flush().ok()?;
+            rpassword::read_password().ok()
         };
 
         get_credentials(

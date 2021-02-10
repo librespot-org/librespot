@@ -142,30 +142,6 @@ where
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
-pub fn get_credentials<F: FnOnce(&String) -> String>(
-    username: Option<String>,
-    password: Option<String>,
-    cached_credentials: Option<Credentials>,
-    prompt: F,
-) -> Option<Credentials> {
-    match (username, password, cached_credentials) {
-        (Some(username), Some(password), _) => Some(Credentials::with_password(username, password)),
-
-        (Some(ref username), _, Some(ref credentials)) if *username == credentials.username => {
-            Some(credentials.clone())
-        }
-
-        (Some(username), None, _) => Some(Credentials::with_password(
-            username.clone(),
-            prompt(&username),
-        )),
-
-        (None, _, Some(credentials)) => Some(credentials),
-
-        (None, _, None) => None,
-    }
-}
-
 error_chain! {
     types {
         AuthenticationError, AuthenticationErrorKind, AuthenticationResultExt, AuthenticationResult;

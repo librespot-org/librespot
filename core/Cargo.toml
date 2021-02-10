@@ -40,7 +40,6 @@ tokio = { version = "1.0", features = ["io-util", "rt-multi-thread"] }
 tokio-util = { version = "0.6", features = ["codec"] }
 tower-service = "0.3"
 url = "1.7"
-uuid = { version = "0.8", features = ["v4"] }
 
 [build-dependencies]
 rand = "0.7"

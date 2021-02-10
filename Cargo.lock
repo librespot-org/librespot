@@ -1475,7 +1475,6 @@ dependencies = [
  "tokio-util",
  "tower-service",
  "url 1.7.2",
- "uuid",
  "vergen",
 ]
 
@@ -2988,15 +2987,6 @@ dependencies = [
  "idna 0.2.2",
  "matches",
  "percent-encoding 2.1.0",
-]
-
-[[package]]
-name = "uuid"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
-dependencies = [
- "getrandom 0.2.2",
 ]
 
 [[package]]
