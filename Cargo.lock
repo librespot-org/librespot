@@ -1450,6 +1450,7 @@ dependencies = [
  "base64",
  "byteorder",
  "bytes",
+ "cfg-if 1.0.0",
  "env_logger",
  "error-chain",
  "futures",
@@ -1473,7 +1474,6 @@ dependencies = [
  "shannon",
  "tokio",
  "tokio-util",
- "tower-service",
  "url 1.7.2",
  "vergen",
 ]

@@ -61,6 +61,9 @@ sha-1 = "0.8"
 hex = "0.4"
 
 [features]
+apresolve = ["librespot-core/apresolve"]
+apresolve-http2 = ["librespot-core/apresolve-http2"]
+
 alsa-backend = ["librespot-playback/alsa-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
@@ -75,7 +78,7 @@ with-vorbis = ["librespot-audio/with-vorbis"]
 
 # with-dns-sd = ["librespot-connect/with-dns-sd"]
 
-default = ["librespot-playback/rodio-backend"]
+default = ["rodio-backend", "apresolve"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
