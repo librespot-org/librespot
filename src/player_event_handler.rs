@@ -24,16 +24,16 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
             old_track_id,
             new_track_id,
         } => {
-            env_vars.insert("PLAYER_EVENT", "change".to_string());
+            env_vars.insert("PLAYER_EVENT", "changed".to_string());
             env_vars.insert("OLD_TRACK_ID", old_track_id.to_base62());
             env_vars.insert("TRACK_ID", new_track_id.to_base62());
         }
         PlayerEvent::Started { track_id, .. } => {
-            env_vars.insert("PLAYER_EVENT", "start".to_string());
+            env_vars.insert("PLAYER_EVENT", "started".to_string());
             env_vars.insert("TRACK_ID", track_id.to_base62());
         }
         PlayerEvent::Stopped { track_id, .. } => {
-            env_vars.insert("PLAYER_EVENT", "stop".to_string());
+            env_vars.insert("PLAYER_EVENT", "stopped".to_string());
             env_vars.insert("TRACK_ID", track_id.to_base62());
         }
         PlayerEvent::Playing {

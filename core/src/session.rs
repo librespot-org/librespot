@@ -19,6 +19,8 @@ use crate::config::SessionConfig;
 use crate::connection;
 use crate::mercury::MercuryManager;
 
+pub use crate::authentication::{AuthenticationError, AuthenticationErrorKind};
+
 struct SessionData {
     country: String,
     time_delta: i64,
@@ -50,7 +52,7 @@ impl Session {
         config: SessionConfig,
         credentials: Credentials,
         cache: Option<Cache>,
-    ) -> io::Result<Session> {
+    ) -> Result<Session, AuthenticationError> {
         let ap = apresolve_or_fallback(&config.proxy, &config.ap_port).await;
 
         info!("Connecting to AP \"{}\"", ap);

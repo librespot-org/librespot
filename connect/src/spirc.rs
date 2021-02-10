@@ -21,7 +21,6 @@ use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
 use librespot_core::util::url_encode;
 use librespot_core::util::SeqGenerator;
 use librespot_core::version;
-use librespot_core::volume::Volume;
 
 enum SpircPlayStatus {
     Stopped,
@@ -1297,7 +1296,7 @@ impl SpircTask {
         self.mixer
             .set_volume(volume_to_mixer(volume, &self.config.volume_ctrl));
         if let Some(cache) = self.session.cache() {
-            cache.save_volume(Volume { volume })
+            cache.save_volume(volume)
         }
         self.player.emit_volume_set_event(volume);
     }
