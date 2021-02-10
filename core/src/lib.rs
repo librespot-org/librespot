@@ -27,6 +27,7 @@ extern crate sha1;
 extern crate shannon;
 pub extern crate tokio;
 extern crate tokio_util;
+extern crate tower_service;
 extern crate url;
 extern crate uuid;
 

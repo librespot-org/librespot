@@ -1,9 +1,11 @@
 const AP_FALLBACK: &'static str = "ap.spotify.com:443";
-const APRESOLVE_ENDPOINT: &'static str = "http://apresolve.spotify.com/";
+const APRESOLVE_ENDPOINT: &'static str = "http://apresolve.spotify.com:80";
 
 use hyper::{Body, Client, Method, Request, Uri};
 use std::error::Error;
 use url::Url;
+
+use crate::proxytunnel::ProxyTunnel;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct APResolveData {
@@ -22,25 +24,14 @@ async fn apresolve(proxy: &Option<Url>, ap_port: &Option<u16>) -> Result<String,
         )
         .body(Body::empty())?;
 
-    let client = if proxy.is_some() {
-        todo!("proxies not yet supported")
-        /*let proxy = {
-            let proxy_url = val.as_str().parse().expect("invalid http proxy");
-            let mut proxy = Proxy::new(Intercept::All, proxy_url);
-            let connector = HttpConnector::new();
-            let proxy_connector = ProxyConnector::from_proxy_unsecured(connector, proxy);
-            proxy_connector
-        };
-
-        if let Some(headers) = proxy.http_headers(&APRESOLVE_ENDPOINT.parse().unwrap()) {
-            req.headers_mut().extend(headers.clone());
-        };
-        Client::builder().build(proxy)*/
+    let response = if let Some(url) = proxy {
+        Client::builder()
+            .build(ProxyTunnel::new(url)?)
+            .request(req)
+            .await?
     } else {
-        Client::new()
+        Client::new().request(req).await?
     };
-
-    let response = client.request(req).await?;
 
     let body = hyper::body::to_bytes(response.into_body()).await?;
     let data: APResolveData = serde_json::from_slice(body.as_ref())?;
@@ -57,6 +48,7 @@ async fn apresolve(proxy: &Option<Url>, ap_port: &Option<u16>) -> Result<String,
         data.ap_list.into_iter().next()
     }
     .ok_or("empty AP List")?;
+
     Ok(ap)
 }
 
