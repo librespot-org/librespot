@@ -1485,10 +1485,8 @@ version = "0.1.6"
 dependencies = [
  "async-trait",
  "byteorder",
- "futures",
  "librespot-core",
  "librespot-protocol",
- "linear-map",
  "log",
  "protobuf",
 ]
@@ -1541,12 +1539,6 @@ dependencies = [
  "ogg-sys",
  "pkg-config",
 ]
-
-[[package]]
-name = "linear-map"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfae20f6b19ad527b550c223fddc3077a547fc70cda94b9b566575423fd303ee"
 
 [[package]]
 name = "lock_api"
