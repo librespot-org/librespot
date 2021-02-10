@@ -34,7 +34,16 @@ mod jackaudio;
 #[cfg(feature = "jackaudio-backend")]
 use self::jackaudio::JackSink;
 
-#[cfg(feature = "rodiojack-backend")]
+#[cfg(all(
+    feature = "rodiojack-backend",
+    not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"))
+))]
+compile_error!("Rodio JACK backend is currently only supported on linux.");
+
+#[cfg(all(
+    feature = "rodiojack-backend",
+    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
+))]
 use self::rodio::JackRodioSink;
 
 #[cfg(feature = "gstreamer-backend")]

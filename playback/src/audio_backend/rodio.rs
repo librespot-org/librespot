@@ -12,7 +12,10 @@ pub struct RodioSink {
     stream: rodio::OutputStream,
 }
 
-#[cfg(feature = "rodiojack-backend")]
+#[cfg(all(
+    feature = "rodiojack-backend",
+    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
+))]
 pub struct JackRodioSink {
     jackrodio_sink: rodio::Sink,
     // We have to keep hold of this object, or the Sink can't play...
@@ -117,7 +120,10 @@ impl Open for RodioSink {
     }
 }
 
-#[cfg(feature = "rodiojack-backend")]
+#[cfg(all(
+    feature = "rodiojack-backend",
+    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
+))]
 impl Open for JackRodioSink {
     fn open(device: Option<String>) -> JackRodioSink {
         let host = cpal::host_from_id(
@@ -173,7 +179,10 @@ impl Sink for RodioSink {
     }
 }
 
-#[cfg(feature = "rodiojack-backend")]
+#[cfg(all(
+    feature = "rodiojack-backend",
+    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
+))]
 impl Sink for JackRodioSink {
     fn start(&mut self) -> io::Result<()> {
         // More similar to an "unpause" than "play". Doesn't undo "stop".
