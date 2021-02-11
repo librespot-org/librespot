@@ -6,6 +6,8 @@ extern crate log;
 extern crate serde_derive;
 #[macro_use]
 extern crate pin_project_lite;
+#[macro_use]
+extern crate error_chain;
 extern crate aes;
 extern crate base64;
 extern crate byteorder;
@@ -51,4 +53,3 @@ pub mod session;
 pub mod spotify_id;
 pub mod util;
 pub mod version;
-pub mod volume;

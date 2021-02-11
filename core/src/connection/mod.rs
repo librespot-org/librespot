@@ -12,7 +12,7 @@ use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use url::Url;
 
-use crate::authentication::Credentials;
+use crate::authentication::{AuthenticationError, Credentials};
 use crate::version;
 
 use crate::proxytunnel;
@@ -64,7 +64,7 @@ pub async fn authenticate(
     transport: &mut Transport,
     credentials: Credentials,
     device_id: &str,
-) -> io::Result<Credentials> {
+) -> Result<Credentials, AuthenticationError> {
     use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
     use crate::protocol::keyexchange::APLoginFailed;
 
@@ -114,10 +114,7 @@ pub async fn authenticate(
 
         0xad => {
             let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref()).unwrap();
-            panic!(
-                "Authentication failed with reason: {:?}",
-                error_data.get_error_code()
-            )
+            Err(error_data.into())
         }
 
         _ => panic!("Unexpected packet {:?}", cmd),

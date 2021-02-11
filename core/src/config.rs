@@ -36,6 +36,16 @@ pub enum DeviceType {
     AVR = 6,
     STB = 7,
     AudioDongle = 8,
+    GameConsole = 9,
+    CastAudio = 10,
+    CastVideo = 11,
+    Automobile = 12,
+    Smartwatch = 13,
+    Chromebook = 14,
+    UnknownSpotify = 100,
+    CarThing = 101,
+    Observer = 102,
+    HomeThing = 103,
 }
 
 impl FromStr for DeviceType {
@@ -51,6 +61,14 @@ impl FromStr for DeviceType {
             "avr" => Ok(AVR),
             "stb" => Ok(STB),
             "audiodongle" => Ok(AudioDongle),
+            "gameconsole" => Ok(GameConsole),
+            "castaudio" => Ok(CastAudio),
+            "castvideo" => Ok(CastVideo),
+            "automobile" => Ok(Automobile),
+            "smartwatch" => Ok(Smartwatch),
+            "chromebook" => Ok(Chromebook),
+            "carthing" => Ok(CarThing),
+            "homething" => Ok(HomeThing),
             _ => Err(()),
         }
     }
@@ -69,6 +87,16 @@ impl fmt::Display for DeviceType {
             AVR => f.write_str("AVR"),
             STB => f.write_str("STB"),
             AudioDongle => f.write_str("AudioDongle"),
+            GameConsole => f.write_str("GameConsole"),
+            CastAudio => f.write_str("CastAudio"),
+            CastVideo => f.write_str("CastVideo"),
+            Automobile => f.write_str("Automobile"),
+            Smartwatch => f.write_str("Smartwatch"),
+            Chromebook => f.write_str("Chromebook"),
+            UnknownSpotify => f.write_str("UnknownSpotify"),
+            CarThing => f.write_str("CarThing"),
+            Observer => f.write_str("Observer"),
+            HomeThing => f.write_str("HomeThing"),
         }
     }
 }

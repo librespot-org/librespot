@@ -17,6 +17,7 @@ aes = "0.6"
 base64 = "0.13"
 byteorder = "1.4"
 bytes = "1.0"
+error-chain = { version = "0.12", default-features = false }
 futures = { version = "0.3", features = ["bilock", "unstable"] }
 hmac = "0.7"
 httparse = "1.3"

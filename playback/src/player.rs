@@ -5,6 +5,7 @@ use crate::audio::{
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
 };
 use crate::audio_backend::Sink;
+use crate::config::NormalisationType;
 use crate::config::{Bitrate, PlayerConfig};
 use crate::librespot_core::tokio;
 use crate::metadata::{AudioItem, FileFormat};
@@ -217,17 +218,20 @@ impl NormalisationData {
     }
 
     fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
-        let mut normalisation_factor = f32::powf(
-            10.0,
-            (data.track_gain_db + config.normalisation_pregain) / 20.0,
-        );
+        let [gain_db, gain_peak] = match config.normalisation_type {
+            NormalisationType::Album => [data.album_gain_db, data.album_peak],
+            NormalisationType::Track => [data.track_gain_db, data.track_peak],
+        };
+        let mut normalisation_factor =
+            f32::powf(10.0, (gain_db + config.normalisation_pregain) / 20.0);
 
-        if normalisation_factor * data.track_peak > 1.0 {
+        if normalisation_factor * gain_peak > 1.0 {
             warn!("Reducing normalisation factor to prevent clipping. Please add negative pregain to avoid.");
-            normalisation_factor = 1.0 / data.track_peak;
+            normalisation_factor = 1.0 / gain_peak;
         }
 
         debug!("Normalisation Data: {:?}", data);
+        debug!("Normalisation Type: {:?}", config.normalisation_type);
         debug!("Applied normalisation factor: {}", normalisation_factor);
 
         normalisation_factor
@@ -652,49 +656,27 @@ impl PlayerTrackLoader {
                 FileFormat::OGG_VORBIS_96,
             ],
         };
-        let format = formats
-            .iter()
-            .find(|format| audio.files.contains_key(format))
-            .unwrap();
 
-        let file_id = match audio.files.get(&format) {
-            Some(&file_id) => file_id,
+        let entry = formats.iter().find_map(|format| {
+            if let Some(&file_id) = audio.files.get(format) {
+                Some((*format, file_id))
+            } else {
+                None
+            }
+        });
+
+        let (format, file_id) = match entry {
+            Some(t) => t,
             None => {
-                warn!("<{}> in not available in format {:?}", audio.name, format);
+                warn!("<{}> is not available in any supported format", audio.name);
                 return None;
             }
         };
 
-        let bytes_per_second = self.stream_data_rate(*format);
+        let bytes_per_second = self.stream_data_rate(format);
         let play_from_beginning = position_ms == 0;
 
-        let key = self.session.audio_key().request(spotify_id, file_id);
-        let encrypted_file = AudioFile::open(
-            &self.session,
-            file_id,
-            bytes_per_second,
-            play_from_beginning,
-        );
-
-        let encrypted_file = match encrypted_file.await {
-            Ok(encrypted_file) => encrypted_file,
-            Err(_) => {
-                error!("Unable to load encrypted file.");
-                return None;
-            }
-        };
-
-        let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
-
-        if play_from_beginning {
-            // No need to seek -> we stream from the beginning
-            stream_loader_controller.set_stream_mode();
-        } else {
-            // we need to seek -> we set stream mode after the initial seek.
-            stream_loader_controller.set_random_access_mode();
-        }
-
-        let key = match key.await {
+        let key = match self.session.audio_key().request(spotify_id, file_id).await {
             Ok(key) => key,
             Err(_) => {
                 error!("Unable to load decryption key");
@@ -702,39 +684,90 @@ impl PlayerTrackLoader {
             }
         };
 
-        let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+        // This is only a loop to be able to reload the file if an error occured
+        // while opening a cached file.
+        loop {
+            let encrypted_file = AudioFile::open(
+                &self.session,
+                file_id,
+                bytes_per_second,
+                play_from_beginning,
+            );
 
-        let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file) {
-            Ok(normalisation_data) => {
-                NormalisationData::get_factor(&self.config, normalisation_data)
+            let encrypted_file = match encrypted_file.await {
+                Ok(encrypted_file) => encrypted_file,
+                Err(_) => {
+                    error!("Unable to load encrypted file.");
+                    return None;
+                }
+            };
+            let is_cached = encrypted_file.is_cached();
+
+            let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
+
+            if play_from_beginning {
+                // No need to seek -> we stream from the beginning
+                stream_loader_controller.set_stream_mode();
+            } else {
+                // we need to seek -> we set stream mode after the initial seek.
+                stream_loader_controller.set_random_access_mode();
             }
-            Err(_) => {
-                warn!("Unable to extract normalisation data, using default value.");
-                1.0_f32
+
+            let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+
+            let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file)
+            {
+                Ok(normalisation_data) => {
+                    NormalisationData::get_factor(&self.config, normalisation_data)
+                }
+                Err(_) => {
+                    warn!("Unable to extract normalisation data, using default value.");
+                    1.0_f32
+                }
+            };
+
+            let audio_file = Subfile::new(decrypted_file, 0xa7);
+
+            let mut decoder = match VorbisDecoder::new(audio_file) {
+                Ok(decoder) => decoder,
+                Err(e) if is_cached => {
+                    warn!(
+                        "Unable to read cached audio file: {}. Trying to download it.",
+                        e
+                    );
+
+                    // unwrap safety: The file is cached, so session must have a cache
+                    if !self.session.cache().unwrap().remove_file(file_id) {
+                        return None;
+                    }
+
+                    // Just try it again
+                    continue;
+                }
+                Err(e) => {
+                    error!("Unable to read audio file: {}", e);
+                    return None;
+                }
+            };
+
+            if position_ms != 0 {
+                if let Err(err) = decoder.seek(position_ms as i64) {
+                    error!("Vorbis error: {}", err);
+                }
+                stream_loader_controller.set_stream_mode();
             }
-        };
+            let stream_position_pcm = PlayerInternal::position_ms_to_pcm(position_ms);
+            info!("<{}> ({} ms) loaded", audio.name, audio.duration);
 
-        let audio_file = Subfile::new(decrypted_file, 0xa7);
-
-        let mut decoder = VorbisDecoder::new(audio_file).unwrap();
-
-        if position_ms != 0 {
-            match decoder.seek(position_ms as i64) {
-                Ok(_) => (),
-                Err(err) => error!("Vorbis error: {:?}", err),
-            }
-            stream_loader_controller.set_stream_mode();
+            return Some(PlayerLoadedTrackData {
+                decoder,
+                normalisation_factor,
+                stream_loader_controller,
+                bytes_per_second,
+                duration_ms,
+                stream_position_pcm,
+            });
         }
-        let stream_position_pcm = PlayerInternal::position_ms_to_pcm(position_ms);
-        info!("<{}> ({} ms) loaded", audio.name, audio.duration);
-        Some(PlayerLoadedTrackData {
-            decoder,
-            normalisation_factor,
-            stream_loader_controller,
-            bytes_per_second,
-            duration_ms,
-            stream_position_pcm,
-        })
     }
 }
 

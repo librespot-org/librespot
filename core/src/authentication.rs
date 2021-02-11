@@ -5,12 +5,10 @@ use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use protobuf::ProtobufEnum;
 use sha1::{Digest, Sha1};
-use std::fs::File;
-use std::io::{self, Read, Write};
-use std::ops::FnOnce;
-use std::path::Path;
+use std::io::{self, Read};
 
 use crate::protocol::authentication::AuthenticationType;
+use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
@@ -110,27 +108,6 @@ impl Credentials {
             auth_data: auth_data,
         }
     }
-
-    fn from_reader<R: Read>(mut reader: R) -> Credentials {
-        let mut contents = String::new();
-        reader.read_to_string(&mut contents).unwrap();
-
-        serde_json::from_str(&contents).unwrap()
-    }
-
-    pub(crate) fn from_file<P: AsRef<Path>>(path: P) -> Option<Credentials> {
-        File::open(path).ok().map(Credentials::from_reader)
-    }
-
-    fn save_to_writer<W: Write>(&self, writer: &mut W) {
-        let contents = serde_json::to_string(&self.clone()).unwrap();
-        writer.write_all(contents.as_bytes()).unwrap();
-    }
-
-    pub(crate) fn save_to_file<P: AsRef<Path>>(&self, path: P) {
-        let mut file = File::create(path).unwrap();
-        self.save_to_writer(&mut file)
-    }
 }
 
 fn serialize_protobuf_enum<T, S>(v: &T, ser: S) -> Result<S::Ok, S::Error>
@@ -187,5 +164,39 @@ pub fn get_credentials<F: FnOnce(&String) -> String>(
         (None, _, Some(credentials)) => Some(credentials),
 
         (None, _, None) => None,
+    }
+}
+
+error_chain! {
+    types {
+        AuthenticationError, AuthenticationErrorKind, AuthenticationResultExt, AuthenticationResult;
+    }
+
+    foreign_links {
+        Io(::std::io::Error);
+    }
+
+    errors {
+        BadCredentials {
+            description("Bad credentials")
+            display("Authentication failed with error: Bad credentials")
+        }
+        PremiumAccountRequired {
+            description("Premium account required")
+            display("Authentication failed with error: Premium account required")
+        }
+    }
+}
+
+impl From<APLoginFailed> for AuthenticationError {
+    fn from(login_failure: APLoginFailed) -> Self {
+        let error_code = login_failure.get_error_code();
+        match error_code {
+            ErrorCode::BadCredentials => Self::from_kind(AuthenticationErrorKind::BadCredentials),
+            ErrorCode::PremiumAccountRequired => {
+                Self::from_kind(AuthenticationErrorKind::PremiumAccountRequired)
+            }
+            _ => format!("Authentication failed with error: {:?}", error_code).into(),
+        }
     }
 }

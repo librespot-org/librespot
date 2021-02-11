@@ -67,7 +67,11 @@ impl Sink for PulseAudioSink {
 
     fn write(&mut self, data: &[i16]) -> io::Result<()> {
         if let Some(s) = &self.s {
-            let d: &[u8] = unsafe { std::mem::transmute(data) };
+            // SAFETY: An i16 consists of two bytes, so that the given slice can be interpreted
+            // as a byte array of double length. Each byte pointer is validly aligned, and so
+            // is the newly created slice.
+            let d: &[u8] =
+                unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 2) };
 
             match s.write(d) {
                 Ok(_) => Ok(()),
