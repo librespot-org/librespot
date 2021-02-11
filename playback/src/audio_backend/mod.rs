@@ -34,15 +34,28 @@ mod jackaudio;
 #[cfg(feature = "jackaudio-backend")]
 use self::jackaudio::JackSink;
 
+#[cfg(all(
+    feature = "rodiojack-backend",
+    not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"))
+))]
+compile_error!("Rodio JACK backend is currently only supported on linux.");
+
+#[cfg(all(
+    feature = "rodiojack-backend",
+    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
+))]
+use self::rodio::JackRodioSink;
+
 #[cfg(feature = "gstreamer-backend")]
 mod gstreamer;
 #[cfg(feature = "gstreamer-backend")]
 use self::gstreamer::GstreamerSink;
 
-#[cfg(feature = "rodio-backend")]
+#[cfg(any(feature = "rodio-backend", feature = "rodiojack-backend"))]
 mod rodio;
 #[cfg(feature = "rodio-backend")]
 use self::rodio::RodioSink;
+
 #[cfg(feature = "sdl-backend")]
 mod sdl;
 #[cfg(feature = "sdl-backend")]
@@ -63,6 +76,11 @@ pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>
     ("pulseaudio", mk_sink::<PulseAudioSink>),
     #[cfg(feature = "jackaudio-backend")]
     ("jackaudio", mk_sink::<JackSink>),
+    #[cfg(all(
+        feature = "rodiojack-backend",
+        any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
+    ))]
+    ("rodiojack", mk_sink::<JackRodioSink>),
     #[cfg(feature = "gstreamer-backend")]
     ("gstreamer", mk_sink::<GstreamerSink>),
     #[cfg(feature = "rodio-backend")]
