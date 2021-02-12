@@ -29,75 +29,100 @@ pub struct RodioSink {
 }
 
 fn list_formats(device: &rodio::Device) {
-    let default_fmt = match device.default_output_config() {
-        Ok(fmt) => fmt,
-        Err(e) => {
-            warn!("Error getting default rodio::Sink config: {}", e);
-            return;
+    match device.default_output_config() {
+        Ok(cfg) => {
+            debug!("  Default config:");
+            debug!("    {:?}", cfg);
         }
-    };
-    debug!("  Default config:");
-    debug!("    {:?}", default_fmt);
-
-    let mut output_configs = match device.supported_output_configs() {
-        Ok(f) => f.peekable(),
         Err(e) => {
-            warn!("Error getting supported rodio::Sink configs: {}", e);
-            return;
+            // Use loglevel debug, since even the output is only debug
+            debug!("Error getting default rodio::Sink config: {}", e);
         }
     };
 
-    if output_configs.peek().is_some() {
-        debug!("  Available configs:");
-        for format in output_configs {
-            debug!("    {:?}", format);
+    match device.supported_output_configs() {
+        Ok(mut cfgs) => {
+            if let Some(first) = cfgs.next() {
+                debug!("  Available configs:");
+                debug!("    {:?}", first);
+            } else {
+                return;
+            }
+
+            for cfg in cfgs {
+                debug!("    {:?}", cfg);
+            }
+        }
+        Err(e) => {
+            debug!("Error getting supported rodio::Sink configs: {}", e);
         }
     }
 }
 
-fn list_outputs_and_exit() -> ! {
-    let default_device = get_default_device().unwrap();
-    let default_device_name = default_device.name().expect("cannot get output name");
-    println!("Default Audio Device:\n  {}", default_device_name);
-    list_formats(&default_device);
+fn list_outputs() -> Result<(), cpal::DevicesError> {
+    let mut default_device_name = None;
 
-    println!("Other Available Audio Devices:");
-    for device in cpal::default_host()
-        .output_devices()
-        .expect("cannot get list of output devices")
-    {
-        let device_name = device.name().expect("cannot get output name");
-        if device_name != default_device_name {
-            println!("  {}", device_name);
-            list_formats(&device);
+    if let Some(default_device) = get_default_device() {
+        default_device_name = default_device.name().ok();
+        println!(
+            "Default Audio Device:\n  {}",
+            default_device_name.as_deref().unwrap_or("[unknown name]")
+        );
+
+        list_formats(&default_device);
+
+        println!("Other Available Audio Devices:");
+    } else {
+        warn!("No default device was found");
+    }
+
+    for device in cpal::default_host().output_devices()? {
+        match device.name() {
+            Ok(name) if Some(&name) == default_device_name.as_ref() => (),
+            Ok(name) => {
+                println!("  {}", name);
+                list_formats(&device);
+            }
+            Err(e) => {
+                warn!("Cannot get device name: {}", e);
+                println!("   [unknown name]");
+                list_formats(&device);
+            }
         }
     }
 
-    exit(0)
+    Ok(())
 }
 
-fn get_default_device() -> Result<rodio::Device, RodioError> {
-    cpal::default_host()
-        .default_output_device()
-        .ok_or(RodioError::NoDeviceAvailable)
+fn get_default_device() -> Option<rodio::Device> {
+    cpal::default_host().default_output_device()
 }
 
 fn create_sink(device: Option<String>) -> Result<(rodio::Sink, rodio::OutputStream), RodioError> {
     let rodio_device = match device {
-        Some(ask) if &ask == "?" => list_outputs_and_exit(),
+        Some(ask) if &ask == "?" => {
+            let exit_code = match list_outputs() {
+                Ok(()) => 0,
+                Err(e) => {
+                    error!("{}", e);
+                    1
+                }
+            };
+            exit(exit_code)
+        }
         Some(device_name) => {
             cpal::default_host()
                 .output_devices()?
                 .find(|d| d.name().ok().map_or(false, |name| name == device_name)) // Ignore devices for which getting name fails
                 .ok_or(RodioError::DeviceNotAvailable(device_name))?
         }
-        None => get_default_device()?,
+        None => get_default_device().ok_or(RodioError::NoDeviceAvailable)?,
     };
 
     let name = rodio_device.name().ok();
     info!(
         "Using audio device: {}",
-        name.as_deref().unwrap_or("(unknown name)")
+        name.as_deref().unwrap_or("[unknown name]")
     );
 
     let (stream, handle) = rodio::OutputStream::try_from_device(&rodio_device)?;
