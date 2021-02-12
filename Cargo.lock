@@ -1375,6 +1375,7 @@ dependencies = [
  "rodio",
  "sdl2",
  "shell-words",
+ "thiserror",
  "zerocopy",
 ]
 
