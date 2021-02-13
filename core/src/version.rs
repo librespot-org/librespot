@@ -10,5 +10,8 @@ pub const SHA_SHORT: &str = env!("VERGEN_SHA_SHORT");
 /// Date of the latest git commit.
 pub const COMMIT_DATE: &str = env!("VERGEN_COMMIT_DATE");
 
+/// Librespot crate version.
+pub const SEMVER: &str = env!("CARGO_PKG_VERSION");
+
 /// A random build id.
-pub const BUILD_ID: &str = env!("VERGEN_BUILD_ID");
+pub const BUILD_ID: &str = env!("LIBRESPOT_BUILD_ID");

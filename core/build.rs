@@ -15,5 +15,6 @@ fn main() {
         .map(|()| rng.sample(Alphanumeric))
         .take(8)
         .collect();
-    println!("cargo:rustc-env=VERGEN_BUILD_ID={}", build_id);
+
+    println!("cargo:rustc-env=LIBRESPOT_BUILD_ID={}", build_id);
 }
