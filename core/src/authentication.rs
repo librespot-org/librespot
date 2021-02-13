@@ -71,9 +71,9 @@ impl Credentials {
 
         // decrypt data using ECB mode without padding
         let blob = {
-            use aes::block_cipher_trait::generic_array::typenum::Unsigned;
-            use aes::block_cipher_trait::generic_array::GenericArray;
-            use aes::block_cipher_trait::BlockCipher;
+            use aes::cipher::generic_array::typenum::Unsigned;
+            use aes::cipher::generic_array::GenericArray;
+            use aes::cipher::{BlockCipher, NewBlockCipher};
 
             let mut data = base64::decode(encrypted_blob).unwrap();
             let cipher = Aes192::new(GenericArray::from_slice(&key));
