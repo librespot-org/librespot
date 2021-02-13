@@ -1,5 +1,4 @@
 use std::io::{self, Read};
-use std::ops::FnOnce;
 
 use aes::Aes192;
 use byteorder::{BigEndian, ByteOrder};
@@ -10,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
 use crate::protocol::authentication::AuthenticationType;
-use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
@@ -143,38 +141,4 @@ where
 {
     let v: String = serde::Deserialize::deserialize(de)?;
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
-}
-
-error_chain! {
-    types {
-        AuthenticationError, AuthenticationErrorKind, AuthenticationResultExt, AuthenticationResult;
-    }
-
-    foreign_links {
-        Io(::std::io::Error);
-    }
-
-    errors {
-        BadCredentials {
-            description("Bad credentials")
-            display("Authentication failed with error: Bad credentials")
-        }
-        PremiumAccountRequired {
-            description("Premium account required")
-            display("Authentication failed with error: Premium account required")
-        }
-    }
-}
-
-impl From<APLoginFailed> for AuthenticationError {
-    fn from(login_failure: APLoginFailed) -> Self {
-        let error_code = login_failure.get_error_code();
-        match error_code {
-            ErrorCode::BadCredentials => Self::from_kind(AuthenticationErrorKind::BadCredentials),
-            ErrorCode::PremiumAccountRequired => {
-                Self::from_kind(AuthenticationErrorKind::PremiumAccountRequired)
-            }
-            _ => format!("Authentication failed with error: {:?}", error_code).into(),
-        }
-    }
 }

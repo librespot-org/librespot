@@ -12,6 +12,7 @@ use bytes::Bytes;
 use futures_core::TryStream;
 use futures_util::{FutureExt, StreamExt, TryStreamExt};
 use once_cell::sync::OnceCell;
+use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -21,10 +22,16 @@ use crate::authentication::Credentials;
 use crate::cache::Cache;
 use crate::channel::ChannelManager;
 use crate::config::SessionConfig;
-use crate::connection;
+use crate::connection::{self, AuthenticationError};
 use crate::mercury::MercuryManager;
 
-pub use crate::authentication::{AuthenticationError, AuthenticationErrorKind};
+#[derive(Debug, Error)]
+pub enum SessionError {
+    #[error(transparent)]
+    AuthenticationError(#[from] AuthenticationError),
+    #[error("Cannot create session: {0}")]
+    IoError(#[from] io::Error),
+}
 
 struct SessionData {
     country: String,
@@ -59,7 +66,7 @@ impl Session {
         config: SessionConfig,
         credentials: Credentials,
         cache: Option<Cache>,
-    ) -> Result<Session, AuthenticationError> {
+    ) -> Result<Session, SessionError> {
         let ap = apresolve_or_fallback(&config.proxy, &config.ap_port).await;
 
         info!("Connecting to AP \"{}\"", ap);

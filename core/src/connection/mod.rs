@@ -4,20 +4,59 @@ mod handshake;
 pub use self::codec::APCodec;
 pub use self::handshake::handshake;
 
-use futures_util::{SinkExt, StreamExt};
-use protobuf::{self, Message};
-use std::io;
+use std::io::{self, ErrorKind};
 use std::net::ToSocketAddrs;
+
+use futures_util::{SinkExt, StreamExt};
+use protobuf::{self, Message, ProtobufError};
+use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use url::Url;
 
-use crate::authentication::{AuthenticationError, Credentials};
+use crate::authentication::Credentials;
+use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
+use crate::proxytunnel;
 use crate::version;
 
-use crate::proxytunnel;
-
 pub type Transport = Framed<TcpStream, APCodec>;
+
+fn login_error_message(code: &ErrorCode) -> &'static str {
+    pub use ErrorCode::*;
+    match code {
+        ProtocolError => "Protocol error",
+        TryAnotherAP => "Try another AP",
+        BadConnectionId => "Bad connection id",
+        TravelRestriction => "Travel restriction",
+        PremiumAccountRequired => "Premium account required",
+        BadCredentials => "Bad credentials",
+        CouldNotValidateCredentials => "Could not validate credentials",
+        AccountExists => "Account exists",
+        ExtraVerificationRequired => "Extra verification required",
+        InvalidAppKey => "Invalid app key",
+        ApplicationBanned => "Application banned",
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum AuthenticationError {
+    #[error("Login failed with reason: {}", login_error_message(.0))]
+    LoginFailed(ErrorCode),
+    #[error("Authentication failed: {0}")]
+    IoError(#[from] io::Error),
+}
+
+impl From<ProtobufError> for AuthenticationError {
+    fn from(e: ProtobufError) -> Self {
+        io::Error::new(ErrorKind::InvalidData, e).into()
+    }
+}
+
+impl From<APLoginFailed> for AuthenticationError {
+    fn from(login_failure: APLoginFailed) -> Self {
+        Self::LoginFailed(login_failure.get_error_code())
+    }
+}
 
 pub async fn connect(addr: String, proxy: &Option<Url>) -> io::Result<Transport> {
     let socket = if let Some(proxy) = proxy {
@@ -66,7 +105,6 @@ pub async fn authenticate(
     device_id: &str,
 ) -> Result<Credentials, AuthenticationError> {
     use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
-    use crate::protocol::keyexchange::APLoginFailed;
 
     let mut packet = ClientResponseEncrypted::new();
     packet
@@ -101,7 +139,7 @@ pub async fn authenticate(
     let (cmd, data) = transport.next().await.expect("EOF")?;
     match cmd {
         0xac => {
-            let welcome_data: APWelcome = protobuf::parse_from_bytes(data.as_ref()).unwrap();
+            let welcome_data: APWelcome = protobuf::parse_from_bytes(data.as_ref())?;
 
             let reusable_credentials = Credentials {
                 username: welcome_data.get_canonical_username().to_owned(),
@@ -111,12 +149,13 @@ pub async fn authenticate(
 
             Ok(reusable_credentials)
         }
-
         0xad => {
-            let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref()).unwrap();
+            let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref())?;
             Err(error_data.into())
         }
-
-        _ => panic!("Unexpected packet {:?}", cmd),
+        _ => {
+            let msg = format!("Received invalid packet: {}", cmd);
+            Err(io::Error::new(ErrorKind::InvalidData, msg).into())
+        }
     }
 }

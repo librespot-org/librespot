@@ -4,8 +4,6 @@
 extern crate log;
 #[macro_use]
 extern crate cfg_if;
-#[macro_use]
-extern crate error_chain;
 
 use librespot_protocol as protocol;
 
