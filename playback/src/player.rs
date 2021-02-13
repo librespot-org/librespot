@@ -329,7 +329,10 @@ impl Player {
     pub async fn get_end_of_track_future(&self) {
         let mut channel = self.get_player_event_channel();
         while let Some(event) = channel.next().await {
-            if matches!(event, PlayerEvent::EndOfTrack { .. } | PlayerEvent::Stopped { .. }) {
+            if matches!(
+                event,
+                PlayerEvent::EndOfTrack { .. } | PlayerEvent::Stopped { .. }
+            ) {
                 return;
             }
         }
@@ -701,7 +704,7 @@ impl PlayerTrackLoader {
                 // we need to seek -> we set stream mode after the initial seek.
                 stream_loader_controller.set_random_access_mode();
             }
-            
+
             let key = match self.session.audio_key().request(spotify_id, file_id).await {
                 Ok(key) => key,
                 Err(_) => {
