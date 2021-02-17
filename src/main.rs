@@ -224,11 +224,11 @@ fn setup(args: &[String]) -> Setup {
     setup_logging(verbose);
 
     info!(
-        "librespot {} ({}). Built on {}. Build ID: {}",
-        version::SHA_SHORT,
-        version::COMMIT_DATE,
-        version::BUILD_DATE,
-        version::BUILD_ID
+        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
+        semver = version::SEMVER,
+        sha = version::SHA_SHORT,
+        build_date = version::BUILD_DATE,
+        build_id = version::BUILD_ID
     );
 
     let backend_name = matches.opt_str("backend");
