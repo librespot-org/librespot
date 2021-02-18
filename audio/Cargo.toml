@@ -1,6 +1,6 @@
 [package]
 name = "librespot-audio"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description="The audio fetching and processing logic for librespot"
 license="MIT"
