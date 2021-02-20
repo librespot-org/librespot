@@ -1,6 +1,6 @@
 [package]
 name = "librespot-core"
-version = "0.1.3"
+version = "0.1.5"
 authors = ["Paul Lietar <paul@lietar.net>"]
 build = "build.rs"
 description="The core functionality provided by librespot"
@@ -9,7 +9,7 @@ edition = "2018"
 
 [dependencies.librespot-protocol]
 path = "../protocol"
-version = "0.1.3"
+version = "0.1.5"
 
 [dependencies]
 base64 = "0.10"
