@@ -9,9 +9,9 @@ use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State,
 use futures::channel::mpsc;
 use futures::future::{self, FusedFuture};
 use futures::stream::FusedStream;
-use futures::{Future, FutureExt, Sink, SinkExt, StreamExt};
+use futures::{Future, FutureExt, StreamExt};
 use librespot_core::config::{ConnectConfig, VolumeCtrl};
-use librespot_core::mercury::MercuryError;
+use librespot_core::mercury::{MercuryError, MercurySender};
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
 use librespot_core::util::url_encode;
@@ -42,7 +42,6 @@ enum SpircPlayStatus {
 
 type BoxedFuture<T> = Pin<Box<dyn FusedFuture<Output = T> + Send>>;
 type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
-type BoxedSink<T, E> = Pin<Box<dyn Sink<T, Error = E> + Send>>;
 
 struct SpircTask {
     player: Player,
@@ -58,9 +57,8 @@ struct SpircTask {
     mixer_started: bool,
     play_status: SpircPlayStatus,
 
-    sender_flushed: bool,
     subscription: BoxedStream<Frame>,
-    sender: BoxedSink<Frame, MercuryError>,
+    sender: MercurySender,
     commands: mpsc::UnboundedReceiver<SpircCommand>,
     player_events: PlayerEventChannel,
 
@@ -272,12 +270,7 @@ impl Spirc {
                 }),
         );
 
-        let sender = Box::pin(
-            session
-                .mercury()
-                .sender(uri)
-                .with(|frame: Frame| future::ready(Ok(frame.write_to_bytes().unwrap()))),
-        );
+        let sender = session.mercury().sender(uri);
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded();
 
@@ -311,7 +304,6 @@ impl Spirc {
             commands: cmd_rx,
             player_events: player_events,
 
-            sender_flushed: true,
             shutdown: false,
             session: session,
 
@@ -372,13 +364,9 @@ impl SpircTask {
                 event = self.player_events.next(), if !self.player_events.is_terminated() => if let Some(event) = event {
                     self.handle_player_event(event)
                 },
-                result = self.sender.flush(), if !self.sender_flushed => {
-                    if result.is_err() {
-                        error!("Cannot flush spirc event sender.");
-                        break;
-                    }
-
-                    self.sender_flushed = true;
+                result = self.sender.flush(), if !self.sender.is_flushed() => if result.is_err() {
+                    error!("Cannot flush spirc event sender.");
+                    break;
                 },
                 context = &mut self.context_fut, if !self.context_fut.is_terminated() => {
                     match context {
@@ -424,8 +412,8 @@ impl SpircTask {
             }
         }
 
-        if self.sender.close().await.is_err() {
-            warn!("Cannot close spirc event sender.");
+        if self.sender.flush().await.is_err() {
+            warn!("Cannot flush spirc event sender.");
         }
     }
 
@@ -1320,14 +1308,7 @@ impl<'a> CommandSender<'a> {
         if !self.frame.has_state() && self.spirc.device.get_is_active() {
             self.frame.set_state(self.spirc.state.clone());
         }
-        let sender = &mut self.spirc.sender;
 
-        future::poll_fn(|cx| sender.as_mut().poll_ready(cx))
-            .now_or_never()
-            .unwrap()
-            .unwrap();
-
-        sender.as_mut().start_send(self.frame).unwrap();
-        self.spirc.sender_flushed = false;
+        self.spirc.sender.send(self.frame.write_to_bytes().unwrap());
     }
 }
