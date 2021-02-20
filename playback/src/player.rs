@@ -327,15 +327,15 @@ impl Player {
     }
 
     pub async fn get_end_of_track_future(&self) {
-        self.get_player_event_channel()
-            .filter(|event| {
-                future::ready(matches!(
-                    event,
-                    PlayerEvent::EndOfTrack { .. } | PlayerEvent::Stopped { .. }
-                ))
-            })
-            .for_each(|_| future::ready(()))
-            .await
+        let mut channel = self.get_player_event_channel();
+        while let Some(event) = channel.next().await {
+            if matches!(
+                event,
+                PlayerEvent::EndOfTrack { .. } | PlayerEvent::Stopped { .. }
+            ) {
+                return;
+            }
+        }
     }
 
     pub fn set_sink_event_callback(&self, callback: Option<SinkEventCallback>) {
@@ -676,14 +676,6 @@ impl PlayerTrackLoader {
         let bytes_per_second = self.stream_data_rate(format);
         let play_from_beginning = position_ms == 0;
 
-        let key = match self.session.audio_key().request(spotify_id, file_id).await {
-            Ok(key) => key,
-            Err(_) => {
-                error!("Unable to load decryption key");
-                return None;
-            }
-        };
-
         // This is only a loop to be able to reload the file if an error occured
         // while opening a cached file.
         loop {
@@ -712,6 +704,14 @@ impl PlayerTrackLoader {
                 // we need to seek -> we set stream mode after the initial seek.
                 stream_loader_controller.set_random_access_mode();
             }
+
+            let key = match self.session.audio_key().request(spotify_id, file_id).await {
+                Ok(key) => key,
+                Err(_) => {
+                    error!("Unable to load decryption key");
+                    return None;
+                }
+            };
 
             let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 

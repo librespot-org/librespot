@@ -32,7 +32,7 @@ pub async fn connect(addr: String, proxy: &Option<Url>) -> io::Result<Transport>
             .map_err(|e| {
                 io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid port: {}", e))
             })?;
-        
+
         let host = split
             .next()
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Missing port"))?;
