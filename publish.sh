@@ -91,7 +91,6 @@ function publishCrates {
     if [ "$CRATE" == "protocol" ]
     then
       # Protocol crate needs --no-verify option due to build.rs modification.
-      cargo publish --no-verify
       if [ "$DRY_RUN" = 'true' ] ; then
         cargo publish --no-verify --dry-run
       else
