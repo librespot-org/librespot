@@ -1,6 +1,6 @@
 [package]
 name = "librespot"
-version = "0.1.3"
+version = "0.1.5"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
@@ -22,22 +22,22 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
-version = "0.1.3"
+version = "0.1.5"
 [dependencies.librespot-connect]
 path = "connect"
-version = "0.1.3"
+version = "0.1.5"
 [dependencies.librespot-core]
 path = "core"
-version = "0.1.3"
+version = "0.1.5"
 [dependencies.librespot-metadata]
 path = "metadata"
-version = "0.1.3"
+version = "0.1.5"
 [dependencies.librespot-playback]
 path = "playback"
-version = "0.1.3"
+version = "0.1.5"
 [dependencies.librespot-protocol]
 path = "protocol"
-version = "0.1.3"
+version = "0.1.5"
 
 [dependencies]
 base64 = "0.13"
