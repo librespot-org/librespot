@@ -2,7 +2,7 @@ use aes_ctr::stream_cipher::generic_array::GenericArray;
 use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes128Ctr;
 use base64;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use futures::{Stream, StreamExt};
 use hmac::{Hmac, Mac};
 use hyper::service::{make_service_fn, service_fn};
@@ -10,6 +10,7 @@ use hyper::{Body, Method, Request, Response, StatusCode};
 use sha1::{Digest, Sha1};
 
 use std::borrow::Cow;
+use std::convert::Infallible;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::task::{Context, Poll};
 
@@ -204,12 +205,14 @@ impl Discovery {
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
     _svc: DNSService,
+    _close_tx: oneshot::Sender<Infallible>,
 }
 
 #[cfg(not(feature = "with-dns-sd"))]
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
     _svc: libmdns::Service,
+    _close_tx: oneshot::Sender<Infallible>,
 }
 
 pub fn discovery(
@@ -218,6 +221,7 @@ pub fn discovery(
     port: u16,
 ) -> io::Result<DiscoveryStream> {
     let (discovery, creds_rx) = Discovery::new(config.clone(), device_id);
+    let (close_tx, close_rx) = oneshot::channel();
 
     let address = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port);
 
@@ -231,7 +235,10 @@ pub fn discovery(
     let s_port = server.local_addr().port();
     debug!("Zeroconf server listening on 0.0.0.0:{}", s_port);
 
-    tokio::spawn(server);
+    tokio::spawn(server.with_graceful_shutdown(async {
+        close_rx.await.unwrap_err();
+        debug!("Shutting down discovery server");
+    }));
 
     #[cfg(feature = "with-dns-sd")]
     let svc = DNSService::register(
@@ -258,6 +265,7 @@ pub fn discovery(
     Ok(DiscoveryStream {
         credentials: creds_rx,
         _svc: svc,
+        _close_tx: close_tx,
     })
 }
 
