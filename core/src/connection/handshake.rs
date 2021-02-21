@@ -1,6 +1,6 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use futures::{Async, Future, Poll};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, NewMac};
 use protobuf::{self, Message};
 use rand::thread_rng;
 use sha1::Sha1;
@@ -195,16 +195,16 @@ fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<
     let mut data = Vec::with_capacity(0x64);
     for i in 1..6 {
         let mut mac = HmacSha1::new_varkey(&shared_secret).expect("HMAC can take key of any size");
-        mac.input(packets);
-        mac.input(&[i]);
-        data.extend_from_slice(&mac.result().code());
+        mac.update(packets);
+        mac.update(&[i]);
+        data.extend_from_slice(&mac.finalize().into_bytes());
     }
 
     let mut mac = HmacSha1::new_varkey(&data[..0x14]).expect("HMAC can take key of any size");
-    mac.input(packets);
+    mac.update(packets);
 
     (
-        mac.result().code().to_vec(),
+        mac.finalize().into_bytes().to_vec(),
         data[0x14..0x34].to_vec(),
         data[0x34..0x54].to_vec(),
     )

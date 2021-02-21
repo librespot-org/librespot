@@ -1,10 +1,10 @@
-use aes_ctr::stream_cipher::generic_array::GenericArray;
-use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
+use aes_ctr::cipher::generic_array::GenericArray;
+use aes_ctr::cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes128Ctr;
 use base64;
 use futures::sync::mpsc;
 use futures::{Future, Poll, Stream};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, NewMac};
 use hyper::server::{Http, Request, Response, Service};
 use hyper::{self, Get, Post, StatusCode};
 use sha1::{Digest, Sha1};
@@ -118,18 +118,18 @@ impl Discovery {
 
         let checksum_key = {
             let mut h = HmacSha1::new_varkey(base_key).expect("HMAC can take key of any size");
-            h.input(b"checksum");
-            h.result().code()
+            h.update(b"checksum");
+            h.finalize().into_bytes()
         };
 
         let encryption_key = {
             let mut h = HmacSha1::new_varkey(&base_key).expect("HMAC can take key of any size");
-            h.input(b"encryption");
-            h.result().code()
+            h.update(b"encryption");
+            h.finalize().into_bytes()
         };
 
         let mut h = HmacSha1::new_varkey(&checksum_key).expect("HMAC can take key of any size");
-        h.input(encrypted);
+        h.update(encrypted);
         if let Err(_) = h.verify(cksum) {
             warn!("Login error for user {:?}: MAC mismatch", username);
             let result = json!({
