@@ -1,26 +1,25 @@
+use std::future::Future;
 use std::pin::Pin;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::context::StationContext;
+use crate::core::config::{ConnectConfig, VolumeCtrl};
+use crate::core::mercury::{MercuryError, MercurySender};
+use crate::core::session::Session;
+use crate::core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
+use crate::core::util::url_encode;
+use crate::core::util::SeqGenerator;
+use crate::core::version;
 use crate::playback::mixer::Mixer;
 use crate::playback::player::{Player, PlayerEvent, PlayerEventChannel};
 use crate::protocol;
 use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
 
-use futures::future::{self, FusedFuture};
-use futures::stream::FusedStream;
-use futures::{Future, FutureExt, StreamExt};
-use librespot_core::config::{ConnectConfig, VolumeCtrl};
-use librespot_core::mercury::{MercuryError, MercurySender};
-use librespot_core::session::Session;
-use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
-use librespot_core::util::url_encode;
-use librespot_core::util::SeqGenerator;
-use librespot_core::version;
+use futures_util::future::{self, FusedFuture};
+use futures_util::stream::FusedStream;
+use futures_util::{FutureExt, StreamExt};
 use protobuf::{self, Message};
-use rand;
 use rand::seq::SliceRandom;
-use serde_json;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 

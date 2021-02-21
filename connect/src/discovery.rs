@@ -1,13 +1,13 @@
 use aes_ctr::cipher::generic_array::GenericArray;
 use aes_ctr::cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes128Ctr;
-use base64;
-use futures::channel::{mpsc, oneshot};
-use futures::{Stream, StreamExt};
+use futures_core::Stream;
 use hmac::{Hmac, Mac, NewMac};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, StatusCode};
+use serde_json::json;
 use sha1::{Digest, Sha1};
+use tokio::sync::{mpsc, oneshot};
 
 use std::borrow::Cow;
 use std::convert::Infallible;
@@ -50,7 +50,7 @@ impl Discovery {
         config: ConnectConfig,
         device_id: String,
     ) -> (Discovery, mpsc::UnboundedReceiver<Credentials>) {
-        let (tx, rx) = mpsc::unbounded();
+        let (tx, rx) = mpsc::unbounded_channel();
 
         let key_data = util::rand_vec(&mut rand::thread_rng(), 95);
         let private_key = BigUint::from_bytes_be(&key_data);
@@ -155,7 +155,7 @@ impl Discovery {
         let credentials =
             Credentials::with_blob(username.to_string(), &decrypted, &self.0.device_id);
 
-        self.0.tx.unbounded_send(credentials).unwrap();
+        self.0.tx.send(credentials).unwrap();
 
         let result = json!({
             "status": 101,
@@ -273,6 +273,6 @@ impl Stream for DiscoveryStream {
     type Item = Credentials;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.credentials.poll_next_unpin(cx)
+        self.credentials.poll_recv(cx)
     }
 }
