@@ -19,7 +19,6 @@ byteorder = "1.4"
 bytes = "1.0"
 cfg-if = "1"
 futures-core = { version = "0.3", default-features = false }
-futures-sink = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc", "bilock", "unstable", "sink"] }
 hmac = "0.10"
 httparse = "1.3"

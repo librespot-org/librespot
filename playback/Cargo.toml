@@ -18,7 +18,7 @@ path = "../metadata"
 version = "0.1.6"
 
 [dependencies]
-futures-executor = { version = "0.3", default_features = false }
+futures-executor = "0.3"
 futures-util = { version = "0.3", default_features = false, features = ["alloc"] }
 log = "0.4"
 byteorder = "1.4"

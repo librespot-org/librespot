@@ -1,4 +1,4 @@
-use futures::{future::FusedFuture, FutureExt, StreamExt};
+use futures_util::{future, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
 use log::{error, info, warn};
 use sha1::{Digest, Sha1};
@@ -468,8 +468,7 @@ async fn main() {
     let mut player_event_channel: Option<UnboundedReceiver<PlayerEvent>> = None;
     let mut auto_connect_times: Vec<Instant> = vec![];
     let mut discovery = None;
-    let mut connecting: Pin<Box<dyn FusedFuture<Output = _>>> =
-        Box::pin(futures::future::pending());
+    let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
 
     if setupp.enable_discovery {
         let config = setupp.connect_config.clone();

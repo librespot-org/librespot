@@ -47,18 +47,15 @@ version = "0.1.6"
 [dependencies]
 base64 = "0.13"
 env_logger =  {version = "0.8", default-features = false, features = ["termcolor","humantime","atty"]}
-futures = "0.3"
+futures-util = { version = "0.3", default_features = false }
 getopts = "0.2"
+hex = "0.4"
 hyper = "0.14"
 log = "0.4"
-num-bigint = "0.3"
-protobuf = "~2.14.0"
-rand = "0.7"
 rpassword = "5.0"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "sync", "process"] }
 url = "1.7"
-sha-1 = "0.8"
-hex = "0.4"
+sha-1 = "0.9"
 
 [features]
 apresolve = ["librespot-core/apresolve"]

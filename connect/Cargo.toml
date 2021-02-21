@@ -12,9 +12,9 @@ aes-ctr = "0.6"
 base64 = "0.13"
 block-modes = "0.7"
 futures-core = "0.3"
-futures-util = "0.3"
+futures-util = { version = "0.3", default_features = false }
 hmac = "0.10"
-hyper = { version = "0.14", features = ["server", "http1"] }
+hyper = { version = "0.14", features = ["server", "http1", "tcp"] }
 log = "0.4"
 num-bigint = "0.3"
 protobuf = "~2.14.0"
@@ -22,7 +22,7 @@ rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha-1 = "0.9"
-tokio = { version = "1.0", features = ["macros", "sync"] }
+tokio = { version = "1.0", features = ["macros", "rt", "sync"] }
 tokio-stream = { version = "0.1" }
 url = "1.7"
 
