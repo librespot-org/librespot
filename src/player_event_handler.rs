@@ -2,22 +2,12 @@ use librespot::playback::player::PlayerEvent;
 use log::info;
 use std::collections::HashMap;
 use std::io;
-use std::process::Command;
-use tokio_process::{Child, CommandExt};
+use std::process::{Command, ExitStatus};
 
-use futures::Future;
 use librespot::playback::player::SinkStatus;
+use tokio::process::{Child as AsyncChild, Command as AsyncCommand};
 
-fn run_program(program: &str, env_vars: HashMap<&str, String>) -> io::Result<Child> {
-    let mut v: Vec<&str> = program.split_whitespace().collect();
-    info!("Running {:?} with environment variables {:?}", v, env_vars);
-    Command::new(&v.remove(0))
-        .args(&v)
-        .envs(env_vars.iter())
-        .spawn_async()
-}
-
-pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Result<Child>> {
+pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Result<AsyncChild>> {
     let mut env_vars = HashMap::new();
     match event {
         PlayerEvent::Changed {
@@ -68,10 +58,18 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
         }
         _ => return None,
     }
-    Some(run_program(onevent, env_vars))
+
+    let mut v: Vec<&str> = onevent.split_whitespace().collect();
+    info!("Running {:?} with environment variables {:?}", v, env_vars);
+    Some(
+        AsyncCommand::new(&v.remove(0))
+            .args(&v)
+            .envs(env_vars.iter())
+            .spawn(),
+    )
 }
 
-pub fn emit_sink_event(sink_status: SinkStatus, onevent: &str) {
+pub fn emit_sink_event(sink_status: SinkStatus, onevent: &str) -> io::Result<ExitStatus> {
     let mut env_vars = HashMap::new();
     env_vars.insert("PLAYER_EVENT", "sink".to_string());
     let sink_status = match sink_status {
@@ -80,6 +78,12 @@ pub fn emit_sink_event(sink_status: SinkStatus, onevent: &str) {
         SinkStatus::Closed => "closed",
     };
     env_vars.insert("SINK_STATUS", sink_status.to_string());
+    let mut v: Vec<&str> = onevent.split_whitespace().collect();
+    info!("Running {:?} with environment variables {:?}", v, env_vars);
 
-    let _ = run_program(onevent, env_vars).and_then(|child| child.wait());
+    Command::new(&v.remove(0))
+        .args(&v)
+        .envs(env_vars.iter())
+        .spawn()?
+        .wait()
 }
