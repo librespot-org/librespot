@@ -1416,12 +1416,13 @@ dependencies = [
  "log",
  "num-bigint",
  "protobuf",
- "rand 0.7.3",
+ "rand 0.8.3",
  "serde",
  "serde_derive",
  "serde_json",
  "sha-1 0.9.4",
  "tokio",
+ "tokio-stream",
  "url 1.7.2",
 ]
 

@@ -1,4 +1,4 @@
-use futures::{channel::mpsc::UnboundedReceiver, future::FusedFuture, FutureExt, StreamExt};
+use futures::{future::FusedFuture, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
 use log::{error, info, warn};
 use sha1::{Digest, Sha1};
@@ -10,6 +10,7 @@ use std::{
     io::{stderr, Write},
     pin::Pin,
 };
+use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
 use librespot::core::authentication::Credentials;
@@ -589,7 +590,7 @@ async fn main() {
                     }
                 }
             },
-            event = async { player_event_channel.as_mut().unwrap().next().await }, if player_event_channel.is_some() => match event {
+            event = async { player_event_channel.as_mut().unwrap().recv().await }, if player_event_channel.is_some() => match event {
                 Some(event) => {
                     if let Some(program) = &setupp.player_event_program {
                         if let Some(child) = run_program_on_events(event, program) {
