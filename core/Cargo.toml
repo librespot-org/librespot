@@ -39,7 +39,7 @@ thiserror = "1"
 tokio = { version = "1.0", features = ["io-util", "net", "rt", "sync"] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.6", features = ["codec"] }
-url = "1.7"
+url = "2.1"
 
 [build-dependencies]
 rand = "0.8"

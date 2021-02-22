@@ -32,7 +32,7 @@ cfg_if! {
 
             let response = if let Some(url) = proxy {
                 Client::builder()
-                    .build(ProxyTunnel::new(url)?)
+                    .build(ProxyTunnel::new(&url.socket_addrs(|| None)?[..])?)
                     .request(req)
                     .await?
             } else {

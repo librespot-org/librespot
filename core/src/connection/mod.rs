@@ -76,8 +76,8 @@ pub async fn connect(addr: String, proxy: &Option<Url>) -> io::Result<Transport>
             .next()
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Missing port"))?;
 
-        let socket_addr = proxy.to_socket_addrs().and_then(|mut iter| {
-            iter.next().ok_or_else(|| {
+        let socket_addr = proxy.socket_addrs(|| None).and_then(|addrs| {
+            addrs.into_iter().next().ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::NotFound,
                     "Can't resolve proxy server address",
