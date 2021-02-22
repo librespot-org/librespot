@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cmp::max;
 use std::future::Future;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -8,7 +7,8 @@ use std::time::{Duration, Instant};
 use std::{mem, thread};
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use futures_util::{future, TryFutureExt};
+use futures_util::stream::futures_unordered::FuturesUnordered;
+use futures_util::{future, StreamExt, TryFutureExt};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::audio::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, VorbisDecoder};
@@ -576,21 +576,20 @@ struct PlayerTrackLoader {
 }
 
 impl PlayerTrackLoader {
-    async fn find_available_alternative<'a, 'b>(
-        &'a self,
-        audio: &'b AudioItem,
-    ) -> Option<Cow<'b, AudioItem>> {
+    async fn find_available_alternative(&self, audio: AudioItem) -> Option<AudioItem> {
         if audio.available {
-            Some(Cow::Borrowed(audio))
+            Some(audio)
         } else if let Some(alternatives) = &audio.alternatives {
-            let alternatives = alternatives
+            let alternatives: FuturesUnordered<_> = alternatives
                 .iter()
-                .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id));
-            let alternatives = future::try_join_all(alternatives).await.unwrap();
+                .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id))
+                .collect();
+
             alternatives
-                .into_iter()
-                .find(|alt| alt.available)
-                .map(Cow::Owned)
+                .filter_map(|x| future::ready(x.ok()))
+                .filter(|x| future::ready(x.available))
+                .next()
+                .await
         } else {
             None
         }
@@ -630,10 +629,10 @@ impl PlayerTrackLoader {
 
         info!("Loading <{}> with Spotify URI <{}>", audio.name, audio.uri);
 
-        let audio = match self.find_available_alternative(&audio).await {
+        let audio = match self.find_available_alternative(audio).await {
             Some(audio) => audio,
             None => {
-                warn!("<{}> is not available", audio.uri);
+                warn!("<{}> is not available", spotify_id.to_uri());
                 return None;
             }
         };
