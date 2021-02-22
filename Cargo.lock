@@ -1481,7 +1481,8 @@ dependencies = [
  "alsa",
  "byteorder",
  "cpal",
- "futures",
+ "futures-executor",
+ "futures-util",
  "glib",
  "gstreamer",
  "gstreamer-app",
@@ -1498,6 +1499,7 @@ dependencies = [
  "sdl2",
  "shell-words",
  "thiserror",
+ "tokio",
  "zerocopy",
 ]
 
