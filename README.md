@@ -56,7 +56,6 @@ ALSA
 PortAudio
 PulseAudio
 JACK
-JACK over Rodio
 SDL
 Pipe
 ```
