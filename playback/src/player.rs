@@ -15,8 +15,8 @@ use librespot_core::spotify_id::SpotifyId;
 
 use librespot_core::util::SeqGenerator;
 
+use crate::audio::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, VorbisDecoder};
 use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
-use crate::audio::{VorbisDecoder, VorbisPacket};
 use crate::audio::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
@@ -378,7 +378,7 @@ enum PlayerPreload {
     },
 }
 
-type Decoder = VorbisDecoder<Subfile<AudioDecrypt<AudioFile>>>;
+type Decoder = Box<dyn AudioDecoder + Send>;
 
 enum PlayerState {
     Stopped,
@@ -723,7 +723,19 @@ impl PlayerTrackLoader {
 
         let audio_file = Subfile::new(decrypted_file, 0xa7);
 
-        let mut decoder = match VorbisDecoder::new(audio_file) {
+        let result = if self.config.passthrough {
+            match PassthroughDecoder::new(audio_file) {
+                Ok(result) => Ok(Box::new(result) as Decoder),
+                Err(e) => Err(AudioError::PassthroughError(e)),
+            }
+        } else {
+            match VorbisDecoder::new(audio_file) {
+                Ok(result) => Ok(Box::new(result) as Decoder),
+                Err(e) => Err(AudioError::VorbisError(e)),
+            }
+        };
+
+        let mut decoder = match result {
             Ok(decoder) => decoder,
             Err(e) if is_cached => {
                 warn!(
@@ -873,37 +885,44 @@ impl Future for PlayerInternal {
                 {
                     let packet = decoder.next_packet().expect("Vorbis error");
 
-                    if let Some(ref packet) = packet {
-                        *stream_position_pcm =
-                            *stream_position_pcm + (packet.data().len() / 2) as u64;
-                        let stream_position_millis = Self::position_pcm_to_ms(*stream_position_pcm);
+                    if !self.config.passthrough {
+                        if let Some(ref packet) = packet {
+                            *stream_position_pcm =
+                                *stream_position_pcm + (packet.samples().len() / 2) as u64;
+                            let stream_position_millis =
+                                Self::position_pcm_to_ms(*stream_position_pcm);
 
-                        let notify_about_position = match *reported_nominal_start_time {
-                            None => true,
-                            Some(reported_nominal_start_time) => {
-                                // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we;re actually in time.
-                                let lag = (Instant::now() - reported_nominal_start_time).as_millis()
-                                    as i64
-                                    - stream_position_millis as i64;
-                                if lag > 1000 {
-                                    true
-                                } else {
-                                    false
+                            let notify_about_position = match *reported_nominal_start_time {
+                                None => true,
+                                Some(reported_nominal_start_time) => {
+                                    // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we;re actually in time.
+                                    let lag = (Instant::now() - reported_nominal_start_time)
+                                        .as_millis()
+                                        as i64
+                                        - stream_position_millis as i64;
+                                    if lag > 1000 {
+                                        true
+                                    } else {
+                                        false
+                                    }
                                 }
+                            };
+                            if notify_about_position {
+                                *reported_nominal_start_time = Some(
+                                    Instant::now()
+                                        - Duration::from_millis(stream_position_millis as u64),
+                                );
+                                self.send_event(PlayerEvent::Playing {
+                                    track_id,
+                                    play_request_id,
+                                    position_ms: stream_position_millis as u32,
+                                    duration_ms,
+                                });
                             }
-                        };
-                        if notify_about_position {
-                            *reported_nominal_start_time = Some(
-                                Instant::now()
-                                    - Duration::from_millis(stream_position_millis as u64),
-                            );
-                            self.send_event(PlayerEvent::Playing {
-                                track_id,
-                                play_request_id,
-                                position_ms: stream_position_millis as u32,
-                                duration_ms,
-                            });
                         }
+                    } else {
+                        // position, even if irrelevant, must be set so that seek() is called
+                        *stream_position_pcm = duration_ms.into();
                     }
 
                     self.handle_packet(packet, normalisation_factor);
@@ -1085,21 +1104,23 @@ impl PlayerInternal {
         }
     }
 
-    fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalisation_factor: f32) {
+    fn handle_packet(&mut self, packet: Option<AudioPacket>, normalisation_factor: f32) {
         match packet {
             Some(mut packet) => {
-                if packet.data().len() > 0 {
-                    if let Some(ref editor) = self.audio_filter {
-                        editor.modify_stream(&mut packet.data_mut())
-                    };
+                if !packet.is_empty() {
+                    if let AudioPacket::Samples(ref mut data) = packet {
+                        if let Some(ref editor) = self.audio_filter {
+                            editor.modify_stream(data)
+                        }
 
-                    if self.config.normalisation && normalisation_factor != 1.0 {
-                        for x in packet.data_mut().iter_mut() {
-                            *x = (*x as f32 * normalisation_factor) as i16;
+                        if self.config.normalisation && normalisation_factor != 1.0 {
+                            for x in data.iter_mut() {
+                                *x = (*x as f32 * normalisation_factor) as i16;
+                            }
                         }
                     }
 
-                    if let Err(err) = self.sink.write(&packet.data()) {
+                    if let Err(err) = self.sink.write(&packet) {
                         error!("Could not write audio: {}", err);
                         self.ensure_sink_stopped(false);
                     }

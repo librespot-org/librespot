@@ -1470,6 +1470,7 @@ dependencies = [
  "log 0.4.14",
  "num-bigint",
  "num-traits",
+ "ogg",
  "tempfile",
  "vorbis",
 ]

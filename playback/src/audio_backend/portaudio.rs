@@ -1,4 +1,5 @@
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 use portaudio_rs;
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
 use portaudio_rs::stream::*;
@@ -95,8 +96,8 @@ impl<'a> Sink for PortAudioSink<'a> {
         self.0 = None;
         Ok(())
     }
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        match self.0.as_mut().unwrap().write(data) {
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+        match self.0.as_mut().unwrap().write(packet.samples()) {
             Ok(_) => (),
             Err(portaudio_rs::PaError::OutputUnderflowed) => error!("PortAudio write underflow"),
             Err(e) => panic!("PA Error {}", e),
