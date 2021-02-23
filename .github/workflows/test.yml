@@ -78,6 +78,7 @@ jobs:
       - run: cargo build --locked --no-default-features --features "portaudio-backend"
       - run: cargo build --locked --no-default-features --features "pulseaudio-backend"
       - run: cargo build --locked --no-default-features --features "jackaudio-backend"
+      - run: cargo build --locked --no-default-features --features "rodiojack-backend" 
       - run: cargo build --locked --no-default-features --features "rodio-backend"
       - run: cargo build --locked --no-default-features --features "sdl-backend"
       - run: cargo build --locked --no-default-features --features "gstreamer-backend"

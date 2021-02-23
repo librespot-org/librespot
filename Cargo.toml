@@ -66,6 +66,7 @@ portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
 jackaudio-backend = ["librespot-playback/jackaudio-backend"]
 rodio-backend = ["librespot-playback/rodio-backend"]
+rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 

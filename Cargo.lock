@@ -433,6 +433,7 @@ dependencies = [
  "alsa",
  "core-foundation-sys",
  "coreaudio-rs",
+ "jack",
  "jni 0.17.0",
  "js-sys",
  "lazy_static",

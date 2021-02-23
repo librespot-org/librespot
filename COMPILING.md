@@ -46,6 +46,7 @@ Depending on the chosen backend, specific development libraries are required.
 |PortAudio           | `portaudio19-dev`            | `portaudio-devel`                 | `portaudio` |
 |PulseAudio          | `libpulse-dev`               | `pulseaudio-libs-devel`           |             |
 |JACK                | `libjack-dev`                | `jack-audio-connection-kit-devel` |             |
+|JACK over Rodio     | `libjack-dev`                | `jack-audio-connection-kit-devel` |  -          |
 |SDL                 | `libsdl2-dev`                | `SDL2-devel`                      |             |
 |Pipe                |  -                           |  -                                |  -          |
 

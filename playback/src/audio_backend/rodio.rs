@@ -5,8 +5,27 @@ use std::{io, thread, time};
 use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
-use super::{Open, Sink};
+use super::Sink;
 use crate::audio::AudioPacket;
+
+#[cfg(all(
+    feature = "rodiojack-backend",
+    not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"))
+))]
+compile_error!("Rodio JACK backend is currently only supported on linux.");
+
+#[cfg(feature = "rodio-backend")]
+pub fn mk_rodio(device: Option<String>) -> Box<dyn Sink + Send> {
+    Box::new(open(cpal::default_host(), device))
+}
+
+#[cfg(feature = "rodiojack-backend")]
+pub fn mk_rodiojack(device: Option<String>) -> Box<dyn Sink + Send> {
+    Box::new(open(
+        cpal::host_from_id(cpal::HostId::Jack).unwrap(),
+        device,
+    ))
+}
 
 #[derive(Debug, Error)]
 pub enum RodioError {
@@ -60,10 +79,10 @@ fn list_formats(device: &rodio::Device) {
     }
 }
 
-fn list_outputs() -> Result<(), cpal::DevicesError> {
+fn list_outputs(host: &cpal::Host) -> Result<(), cpal::DevicesError> {
     let mut default_device_name = None;
 
-    if let Some(default_device) = get_default_device() {
+    if let Some(default_device) = host.default_output_device() {
         default_device_name = default_device.name().ok();
         println!(
             "Default Audio Device:\n  {}",
@@ -77,7 +96,7 @@ fn list_outputs() -> Result<(), cpal::DevicesError> {
         warn!("No default device was found");
     }
 
-    for device in cpal::default_host().output_devices()? {
+    for device in host.output_devices()? {
         match device.name() {
             Ok(name) if Some(&name) == default_device_name.as_ref() => (),
             Ok(name) => {
@@ -95,14 +114,13 @@ fn list_outputs() -> Result<(), cpal::DevicesError> {
     Ok(())
 }
 
-fn get_default_device() -> Option<rodio::Device> {
-    cpal::default_host().default_output_device()
-}
-
-fn create_sink(device: Option<String>) -> Result<(rodio::Sink, rodio::OutputStream), RodioError> {
+fn create_sink(
+    host: &cpal::Host,
+    device: Option<String>,
+) -> Result<(rodio::Sink, rodio::OutputStream), RodioError> {
     let rodio_device = match device {
         Some(ask) if &ask == "?" => {
-            let exit_code = match list_outputs() {
+            let exit_code = match list_outputs(host) {
                 Ok(()) => 0,
                 Err(e) => {
                     error!("{}", e);
@@ -112,12 +130,13 @@ fn create_sink(device: Option<String>) -> Result<(rodio::Sink, rodio::OutputStre
             exit(exit_code)
         }
         Some(device_name) => {
-            cpal::default_host()
-                .output_devices()?
+            host.output_devices()?
                 .find(|d| d.name().ok().map_or(false, |name| name == device_name)) // Ignore devices for which getting name fails
                 .ok_or(RodioError::DeviceNotAvailable(device_name))?
         }
-        None => get_default_device().ok_or(RodioError::NoDeviceAvailable)?,
+        None => host
+            .default_output_device()
+            .ok_or(RodioError::NoDeviceAvailable)?,
     };
 
     let name = rodio_device.name().ok();
@@ -131,37 +150,32 @@ fn create_sink(device: Option<String>) -> Result<(rodio::Sink, rodio::OutputStre
     Ok((sink, stream))
 }
 
-impl Open for RodioSink {
-    fn open(device: Option<String>) -> RodioSink {
-        debug!(
-            "Using rodio sink with cpal host: {:?}",
-            cpal::default_host().id().name()
-        );
+pub fn open(host: cpal::Host, device: Option<String>) -> RodioSink {
+    debug!("Using rodio sink with cpal host: {}", host.id().name());
 
-        let (sink_tx, sink_rx) = mpsc::sync_channel(1);
-        let (close_tx, close_rx) = mpsc::sync_channel(1);
+    let (sink_tx, sink_rx) = mpsc::sync_channel(1);
+    let (close_tx, close_rx) = mpsc::sync_channel(1);
 
-        std::thread::spawn(move || match create_sink(device) {
-            Ok((sink, stream)) => {
-                sink_tx.send(Ok(sink)).unwrap();
+    std::thread::spawn(move || match create_sink(&host, device) {
+        Ok((sink, stream)) => {
+            sink_tx.send(Ok(sink)).unwrap();
 
-                close_rx.recv().unwrap_err(); // This will fail as soon as the sender is dropped
-                debug!("drop rodio::OutputStream");
-                drop(stream);
-            }
-            Err(e) => {
-                sink_tx.send(Err(e)).unwrap();
-            }
-        });
-
-        // Instead of the second `unwrap`, better error handling could be introduced
-        let sink = sink_rx.recv().unwrap().unwrap();
-
-        debug!("Rodio sink was created");
-        RodioSink {
-            rodio_sink: sink,
-            _close_tx: close_tx,
+            close_rx.recv().unwrap_err(); // This will fail as soon as the sender is dropped
+            debug!("drop rodio::OutputStream");
+            drop(stream);
         }
+        Err(e) => {
+            sink_tx.send(Err(e)).unwrap();
+        }
+    });
+
+    // Instead of the second `unwrap`, better error handling could be introduced
+    let sink = sink_rx.recv().unwrap().unwrap();
+
+    debug!("Rodio sink was created");
+    RodioSink {
+        rodio_sink: sink,
+        _close_tx: close_tx,
     }
 }
 
