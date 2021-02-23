@@ -6,6 +6,7 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 
 #[derive(Debug, Error)]
 pub enum RodioError {
@@ -178,8 +179,8 @@ impl Sink for RodioSink {
         Ok(())
     }
 
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        let source = rodio::buffer::SamplesBuffer::new(2, 44100, data);
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+        let source = rodio::buffer::SamplesBuffer::new(2, 44100, packet.samples());
         self.rodio_sink.append(source);
 
         // Chunk sizes seem to be about 256 to 3000 ish items long.

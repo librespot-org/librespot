@@ -1,4 +1,5 @@
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::mem;
@@ -26,12 +27,15 @@ impl Sink for StdoutSink {
         Ok(())
     }
 
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        let data: &[u8] = unsafe {
-            slice::from_raw_parts(
-                data.as_ptr() as *const u8,
-                data.len() * mem::size_of::<i16>(),
-            )
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+        let data: &[u8] = match packet {
+            AudioPacket::Samples(data) => unsafe {
+                slice::from_raw_parts(
+                    data.as_ptr() as *const u8,
+                    data.len() * mem::size_of::<i16>(),
+                )
+            },
+            AudioPacket::OggData(data) => data,
         };
 
         self.0.write_all(data)?;

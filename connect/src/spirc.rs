@@ -790,7 +790,7 @@ impl SpircTask {
                 self.handle_play()
             }
             SpircPlayStatus::Playing { .. } | SpircPlayStatus::LoadingPlay { .. } => {
-                self.handle_play()
+                self.handle_pause()
             }
             _ => (),
         }

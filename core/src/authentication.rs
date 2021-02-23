@@ -1,5 +1,4 @@
 use aes::Aes192;
-use aes::NewBlockCipher;
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
@@ -74,7 +73,7 @@ impl Credentials {
         let blob = {
             use aes::cipher::generic_array::typenum::Unsigned;
             use aes::cipher::generic_array::GenericArray;
-            use aes::cipher::BlockCipher;
+            use aes::cipher::{BlockCipher, NewBlockCipher};
 
             let mut data = base64::decode(encrypted_blob).unwrap();
             let cipher = Aes192::new(GenericArray::from_slice(&key));
