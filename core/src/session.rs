@@ -39,6 +39,8 @@ struct SessionInternal {
     mercury: OnceCell<MercuryManager>,
     cache: Option<Arc<Cache>>,
 
+    handle: tokio::runtime::Handle,
+
     session_id: usize,
 }
 
@@ -65,7 +67,13 @@ impl Session {
             cache.save_credentials(&reusable_credentials);
         }
 
-        let session = Session::create(conn, config, cache, reusable_credentials.username);
+        let session = Session::create(
+            conn,
+            config,
+            cache,
+            reusable_credentials.username,
+            tokio::runtime::Handle::current(),
+        );
 
         Ok(session)
     }
@@ -75,6 +83,7 @@ impl Session {
         config: SessionConfig,
         cache: Option<Cache>,
         username: String,
+        handle: tokio::runtime::Handle,
     ) -> Session {
         let (sink, stream) = transport.split();
 
@@ -99,6 +108,8 @@ impl Session {
             audio_key: OnceCell::new(),
             channel: OnceCell::new(),
             mercury: OnceCell::new(),
+
+            handle,
 
             session_id: session_id,
         }));
@@ -139,7 +150,7 @@ impl Session {
         T: Future + Send + 'static,
         T::Output: Send + 'static,
     {
-        tokio::spawn(task);
+        self.0.handle.spawn(task);
     }
 
     fn debug_info(&self) {

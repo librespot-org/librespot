@@ -15,18 +15,18 @@ edition = "2018"
 name = "librespot"
 path = "src/lib.rs"
 
-# [[bin]]
-# name = "librespot"
-# path = "src/main.rs"
-# doc = false
+[[bin]]
+name = "librespot"
+path = "src/main.rs"
+doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
 version = "0.1.3"
 
-# [dependencies.librespot-connect]
-# path = "connect"
-# version = "0.1.3"
+[dependencies.librespot-connect]
+path = "connect"
+version = "0.1.3"
 
 [dependencies.librespot-core]
 path = "core"
@@ -43,6 +43,22 @@ version = "0.1.3"
 [dependencies.librespot-protocol]
 path = "protocol"
 version = "0.1.3"
+
+[dependencies]
+base64 = "0.13"
+env_logger =  {version = "0.8", default-features = false, features = ["termcolor","humantime","atty"]}
+futures = "0.3"
+getopts = "0.2"
+hyper = "0.14"
+log = "0.4"
+num-bigint = "0.3"
+protobuf = "~2.14.0"
+rand = "0.7"
+rpassword = "5.0"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "process"] }
+url = "1.7"
+sha-1 = "0.8"
+hex = "0.4"
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]

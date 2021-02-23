@@ -2,14 +2,17 @@ use aes_ctr::stream_cipher::generic_array::GenericArray;
 use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
 use aes_ctr::Aes128Ctr;
 use base64;
-use futures::sync::mpsc;
-use futures::{Future, Poll, Stream};
+use futures::channel::{mpsc, oneshot};
+use futures::{Stream, StreamExt};
 use hmac::{Hmac, Mac};
-
-use hyper::{
-    self, server::conn::Http, service::Service, Body, Method, Request, Response, StatusCode,
-};
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Method, Request, Response, StatusCode};
 use sha1::{Digest, Sha1};
+
+use std::borrow::Cow;
+use std::convert::Infallible;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::task::{Context, Poll};
 
 #[cfg(feature = "with-dns-sd")]
 use dns_sd::DNSService;
@@ -21,8 +24,8 @@ use num_bigint::BigUint;
 use rand;
 use std::collections::BTreeMap;
 use std::io;
+use std::pin::Pin;
 use std::sync::Arc;
-use tokio::runtime::current_thread::Handle;
 use url;
 
 use librespot_core::authentication::Credentials;
@@ -63,13 +66,8 @@ impl Discovery {
 
         (discovery, rx)
     }
-}
 
-impl Discovery {
-    fn handle_get_info(
-        &self,
-        _params: &BTreeMap<String, String>,
-    ) -> ::futures::Finished<Response<hyper::Body>, hyper::Error> {
+    fn handle_get_info(&self, _: BTreeMap<Cow<'_, str>, Cow<'_, str>>) -> Response<hyper::Body> {
         let public_key = self.0.public_key.to_bytes_be();
         let public_key = base64::encode(&public_key);
 
@@ -93,20 +91,20 @@ impl Discovery {
         });
 
         let body = result.to_string();
-        ::futures::finished(Response::new(Body::from(body)))
+        Response::new(Body::from(body))
     }
 
     fn handle_add_user(
         &self,
-        params: &BTreeMap<String, String>,
-    ) -> ::futures::Finished<Response<hyper::Body>, hyper::Error> {
-        let username = params.get("userName").unwrap();
+        params: BTreeMap<Cow<'_, str>, Cow<'_, str>>,
+    ) -> Response<hyper::Body> {
+        let username = params.get("userName").unwrap().as_ref();
         let encrypted_blob = params.get("blob").unwrap();
         let client_key = params.get("clientKey").unwrap();
 
-        let encrypted_blob = base64::decode(encrypted_blob).unwrap();
+        let encrypted_blob = base64::decode(encrypted_blob.as_bytes()).unwrap();
 
-        let client_key = base64::decode(client_key).unwrap();
+        let client_key = base64::decode(client_key.as_bytes()).unwrap();
         let client_key = BigUint::from_bytes_be(&client_key);
 
         let shared_key = util::powm(&client_key, &self.0.private_key, &DH_PRIME);
@@ -141,7 +139,7 @@ impl Discovery {
             });
 
             let body = result.to_string();
-            return ::futures::finished(Response::new(Body::from(body)));
+            return Response::new(Body::from(body));
         }
 
         let decrypted = {
@@ -155,7 +153,7 @@ impl Discovery {
         };
 
         let credentials =
-            Credentials::with_blob(username.to_owned(), &decrypted, &self.0.device_id);
+            Credentials::with_blob(username.to_string(), &decrypted, &self.0.device_id);
 
         self.0.tx.unbounded_send(credentials).unwrap();
 
@@ -166,52 +164,39 @@ impl Discovery {
         });
 
         let body = result.to_string();
-        return ::futures::finished(Response::new(Body::from(body)));
+        Response::new(Body::from(body))
     }
 
-    fn not_found(&self) -> ::futures::Finished<Response<hyper::Body>, hyper::Error> {
+    fn not_found(&self) -> Response<hyper::Body> {
         let mut res = Response::default();
         *res.status_mut() = StatusCode::NOT_FOUND;
-        ::futures::finished(res)
+        res
     }
-}
 
-impl Service for Discovery {
-    type ReqBody = Body;
-    type ResBody = Body;
-    type Error = hyper::Error;
-
-    type Future = Box<dyn Future<Item = Response<(Self::ResBody)>, Error = hyper::Error> + Send>;
-    fn call(&mut self, request: Request<(Self::ReqBody)>) -> Self::Future {
+    async fn call(self, request: Request<Body>) -> hyper::Result<Response<Body>> {
         let mut params = BTreeMap::new();
 
         let (parts, body) = request.into_parts();
 
         if let Some(query) = parts.uri.query() {
-            params.extend(url::form_urlencoded::parse(query.as_bytes()).into_owned());
+            let query_params = url::form_urlencoded::parse(query.as_bytes());
+            params.extend(query_params);
         }
 
         if parts.method != Method::GET {
             debug!("{:?} {:?} {:?}", parts.method, parts.uri.path(), params);
         }
 
-        let this = self.clone();
-        Box::new(
-            body.fold(Vec::new(), |mut acc, chunk| {
-                acc.extend_from_slice(chunk.as_ref());
-                Ok::<_, hyper::Error>(acc)
-            })
-            .map(move |body| {
-                params.extend(url::form_urlencoded::parse(&body).into_owned());
-                params
-            })
-            .and_then(move |params| {
-                match (parts.method, params.get("action").map(AsRef::as_ref)) {
-                    (Method::GET, Some("getInfo")) => this.handle_get_info(&params),
-                    (Method::POST, Some("addUser")) => this.handle_add_user(&params),
-                    _ => this.not_found(),
-                }
-            }),
+        let body = hyper::body::to_bytes(body).await?;
+
+        params.extend(url::form_urlencoded::parse(&body));
+
+        Ok(
+            match (parts.method, params.get("action").map(AsRef::as_ref)) {
+                (Method::GET, Some("getInfo")) => self.handle_get_info(params),
+                (Method::POST, Some("addUser")) => self.handle_add_user(params),
+                _ => self.not_found(),
+            },
         )
     }
 }
@@ -220,48 +205,40 @@ impl Service for Discovery {
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
     _svc: DNSService,
+    _close_tx: oneshot::Sender<Infallible>,
 }
 
 #[cfg(not(feature = "with-dns-sd"))]
 pub struct DiscoveryStream {
     credentials: mpsc::UnboundedReceiver<Credentials>,
     _svc: libmdns::Service,
+    _close_tx: oneshot::Sender<Infallible>,
 }
 
 pub fn discovery(
-    handle: &Handle,
     config: ConnectConfig,
     device_id: String,
     port: u16,
 ) -> io::Result<DiscoveryStream> {
     let (discovery, creds_rx) = Discovery::new(config.clone(), device_id);
+    let (close_tx, close_rx) = oneshot::channel();
 
-    let serve = {
-        let http = Http::new();
-        http.serve_addr(&format!("0.0.0.0:{}", port).parse().unwrap(), move || {
-            Ok(discovery.clone())
-        })
-        .unwrap()
-    };
+    let address = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port);
 
-    let s_port = serve.incoming_ref().local_addr().port();
+    let make_service = make_service_fn(move |_| {
+        let discovery = discovery.clone();
+        async move { Ok::<_, hyper::Error>(service_fn(move |request| discovery.clone().call(request))) }
+    });
+
+    let server = hyper::Server::bind(&address).serve(make_service);
+
+    let s_port = server.local_addr().port();
     debug!("Zeroconf server listening on 0.0.0.0:{}", s_port);
 
-    let server_future = {
-        let handle = handle.clone();
-        serve
-            .for_each(
-                move |connecting: hyper::server::conn::Connecting<
-                    hyper::server::conn::AddrStream,
-                    futures::Failed<_, hyper::Error>,
-                >| {
-                    handle.spawn(connecting.flatten().then(|_| Ok(()))).unwrap();
-                    Ok(())
-                },
-            )
-            .then(|_| Ok(()))
-    };
-    handle.spawn(server_future).unwrap();
+    tokio::spawn(server.with_graceful_shutdown(async {
+        close_rx.await.unwrap_err();
+        debug!("Shutting down discovery server");
+    }));
 
     #[cfg(feature = "with-dns-sd")]
     let svc = DNSService::register(
@@ -275,7 +252,7 @@ pub fn discovery(
     .unwrap();
 
     #[cfg(not(feature = "with-dns-sd"))]
-    let responder = libmdns::Responder::spawn(&handle)?;
+    let responder = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?;
 
     #[cfg(not(feature = "with-dns-sd"))]
     let svc = responder.register(
@@ -288,14 +265,14 @@ pub fn discovery(
     Ok(DiscoveryStream {
         credentials: creds_rx,
         _svc: svc,
+        _close_tx: close_tx,
     })
 }
 
 impl Stream for DiscoveryStream {
     type Item = Credentials;
-    type Error = ();
 
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.credentials.poll()
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.credentials.poll_next_unpin(cx)
     }
 }
