@@ -15,7 +15,7 @@ pub struct GstreamerSink {
 impl Open for GstreamerSink {
     fn open(device: Option<String>) -> GstreamerSink {
         gst::init().expect("Failed to init gstreamer!");
-        let pipeline_str_preamble = r#"appsrc caps="audio/x-raw,format=S16LE,layout=interleaved,channels=2,rate=44100" block=true max-bytes=4096 name=appsrc0 "#;
+        let pipeline_str_preamble = r#"appsrc caps="audio/x-raw,format=F32,layout=interleaved,channels=2,rate=44100" block=true max-bytes=4096 name=appsrc0 "#;
         let pipeline_str_rest = r#" ! audioconvert ! autoaudiosink"#;
         let pipeline_str: String = match device {
             Some(x) => format!("{}{}", pipeline_str_preamble, x),

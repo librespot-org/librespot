@@ -8,13 +8,13 @@ use std::ffi::CString;
 use std::io;
 use std::process::exit;
 
-const PREFERED_PERIOD_SIZE: Frames = 5512; // Period of roughly 125ms
+const PREFERRED_PERIOD_SIZE: Frames = 11025; // Period of roughly 125ms
 const BUFFERED_PERIODS: Frames = 4;
 
 pub struct AlsaSink {
     pcm: Option<PCM>,
     device: String,
-    buffer: Vec<i16>,
+    buffer: Vec<f32>,
 }
 
 fn list_outputs() {
@@ -36,19 +36,19 @@ fn list_outputs() {
 
 fn open_device(dev_name: &str) -> Result<(PCM, Frames), Box<Error>> {
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
-    let mut period_size = PREFERED_PERIOD_SIZE;
+    let mut period_size = PREFERRED_PERIOD_SIZE;
     // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8
     // latency = period_size * periods / (rate * bytes_per_frame)
-    // For 16 Bit stereo data, one frame has a length of four bytes.
-    // 500ms  = buffer_size / (44100 * 4)
-    // buffer_size_bytes = 0.5 * 44100 / 4
+    // For stereo samples encoded as 32-bit floats, one frame has a length of eight bytes.
+    // 500ms  = buffer_size / (44100 * 8)
+    // buffer_size_bytes = 0.5 * 44100 / 8
     // buffer_size_frames = 0.5 * 44100 = 22050
     {
-        // Set hardware parameters: 44100 Hz / Stereo / 16 bit
+        // Set hardware parameters: 44100 Hz / Stereo / 32-bit float
         let hwp = HwParams::any(&pcm)?;
 
         hwp.set_access(Access::RWInterleaved)?;
-        hwp.set_format(Format::s16())?;
+        hwp.set_format(Format::float())?;
         hwp.set_rate(44100, ValueOr::Nearest)?;
         hwp.set_channels(2)?;
         period_size = hwp.set_period_size_near(period_size, ValueOr::Greater)?;
@@ -114,7 +114,7 @@ impl Sink for AlsaSink {
             let pcm = self.pcm.as_mut().unwrap();
             // Write any leftover data in the period buffer
             // before draining the actual buffer
-            let io = pcm.io_i16().unwrap();
+            let io = pcm.io_f32().unwrap();
             match io.writei(&self.buffer[..]) {
                 Ok(_) => (),
                 Err(err) => pcm.try_recover(err, false).unwrap(),
@@ -138,7 +138,7 @@ impl Sink for AlsaSink {
             processed_data += data_to_buffer;
             if self.buffer.len() == self.buffer.capacity() {
                 let pcm = self.pcm.as_mut().unwrap();
-                let io = pcm.io_i16().unwrap();
+                let io = pcm.io_f32().unwrap();
                 match io.writei(&self.buffer) {
                     Ok(_) => (),
                     Err(err) => pcm.try_recover(err, false).unwrap(),

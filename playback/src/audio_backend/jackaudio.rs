@@ -7,18 +7,16 @@ use std::io;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 pub struct JackSink {
-    send: SyncSender<i16>,
+    send: SyncSender<f32>,
+    // We have to keep hold of this object, or the Sink can't play...
+    #[allow(dead_code)]
     active_client: AsyncClient<(), JackData>,
 }
 
 pub struct JackData {
-    rec: Receiver<i16>,
+    rec: Receiver<f32>,
     port_l: Port<AudioOut>,
     port_r: Port<AudioOut>,
-}
-
-fn pcm_to_f32(sample: i16) -> f32 {
-    sample as f32 / 32768.0
 }
 
 impl ProcessHandler for JackData {
@@ -33,8 +31,8 @@ impl ProcessHandler for JackData {
 
         let buf_size = buf_r.len();
         for i in 0..buf_size {
-            buf_r[i] = pcm_to_f32(queue_iter.next().unwrap_or(0));
-            buf_l[i] = pcm_to_f32(queue_iter.next().unwrap_or(0));
+            buf_r[i] = queue_iter.next().unwrap_or(0.0);
+            buf_l[i] = queue_iter.next().unwrap_or(0.0);
         }
         Control::Continue
     }

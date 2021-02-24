@@ -3,6 +3,7 @@ use crate::audio::AudioPacket;
 use libpulse_binding::{self as pulse, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::io;
+use std::mem;
 
 const APP_NAME: &str = "librespot";
 const STREAM_NAME: &str = "Spotify endpoint";
@@ -18,7 +19,7 @@ impl Open for PulseAudioSink {
         debug!("Using PulseAudio sink");
 
         let ss = pulse::sample::Spec {
-            format: pulse::sample::Format::S16le,
+            format: pulse::sample::Format::F32le,
             channels: 2, // stereo
             rate: 44100,
         };
@@ -68,13 +69,13 @@ impl Sink for PulseAudioSink {
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         if let Some(s) = &self.s {
-            // SAFETY: An i16 consists of two bytes, so that the given slice can be interpreted
-            // as a byte array of double length. Each byte pointer is validly aligned, and so
-            // is the newly created slice.
+            // SAFETY: An f32 consists of four bytes, so that the given slice can be interpreted
+            // as a byte array of four. Each byte pointer is validly aligned, and so is the newly
+            // created slice.
             let d: &[u8] = unsafe {
                 std::slice::from_raw_parts(
                     packet.samples().as_ptr() as *const u8,
-                    packet.samples().len() * 2,
+                    packet.samples().len() * mem::size_of::<f32>(),
                 )
             };
 

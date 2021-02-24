@@ -39,7 +39,16 @@ where
     fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError> {
         loop {
             match self.0.packets().next() {
-                Some(Ok(packet)) => return Ok(Some(AudioPacket::Samples(packet.data))),
+                Some(Ok(packet)) => {
+                    // Losslessly represent [-32768, 32767] to [-1.0, 1.0] while maintaining DC linearity.
+                    return Ok(Some(AudioPacket::Samples(
+                        packet
+                            .data
+                            .iter()
+                            .map(|sample| ((*sample as f64 + 0.5) / (0x7FFF as f64 + 0.5)) as f32)
+                            .collect(),
+                    )));
+                }
                 None => return Ok(None),
 
                 Some(Err(vorbis::VorbisError::Hole)) => (),

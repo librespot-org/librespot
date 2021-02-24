@@ -48,7 +48,7 @@ impl Sink for SubprocessSink {
         let data: &[u8] = unsafe {
             slice::from_raw_parts(
                 packet.samples().as_ptr() as *const u8,
-                packet.samples().len() * mem::size_of::<i16>(),
+                packet.samples().len() * mem::size_of::<f32>(),
             )
         };
         if let Some(child) = &mut self.child {

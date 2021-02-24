@@ -48,12 +48,40 @@ impl Default for NormalisationType {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum NormalisationMethod {
+    Basic,
+    Dynamic,
+}
+
+impl FromStr for NormalisationMethod {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "basic" => Ok(NormalisationMethod::Basic),
+            "dynamic" => Ok(NormalisationMethod::Dynamic),
+            _ => Err(()),
+        }
+    }
+}
+
+impl Default for NormalisationMethod {
+    fn default() -> NormalisationMethod {
+        NormalisationMethod::Dynamic
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PlayerConfig {
     pub bitrate: Bitrate,
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
+    pub normalisation_method: NormalisationMethod,
     pub normalisation_pregain: f32,
+    pub normalisation_threshold: f32,
+    pub normalisation_attack: f32,
+    pub normalisation_release: f32,
+    pub normalisation_steepness: f32,
     pub gapless: bool,
     pub passthrough: bool,
 }
@@ -64,7 +92,12 @@ impl Default for PlayerConfig {
             bitrate: Bitrate::default(),
             normalisation: false,
             normalisation_type: NormalisationType::default(),
+            normalisation_method: NormalisationMethod::default(),
             normalisation_pregain: 0.0,
+            normalisation_threshold: -1.0,
+            normalisation_attack: 0.005,
+            normalisation_release: 0.1,
+            normalisation_steepness: 1.0,
             gapless: true,
             passthrough: false,
         }

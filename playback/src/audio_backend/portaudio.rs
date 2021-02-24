@@ -8,8 +8,8 @@ use std::process::exit;
 use std::time::Duration;
 
 pub struct PortAudioSink<'a>(
-    Option<portaudio_rs::stream::Stream<'a, i16, i16>>,
-    StreamParameters<i16>,
+    Option<portaudio_rs::stream::Stream<'a, f32, f32>>,
+    StreamParameters<f32>,
 );
 
 fn output_devices() -> Box<dyn Iterator<Item = (DeviceIndex, DeviceInfo)>> {
@@ -65,7 +65,7 @@ impl<'a> Open for PortAudioSink<'a> {
             device: device_idx,
             channel_count: 2,
             suggested_latency: latency,
-            data: 0i16,
+            data: 0.0,
         };
 
         PortAudioSink(None, params)

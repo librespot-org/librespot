@@ -198,7 +198,7 @@ impl Sink for JackRodioSink {
         Ok(())
     }
 
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
+    fn write(&mut self, data: &[f32]) -> io::Result<()> {
         let source = rodio::buffer::SamplesBuffer::new(2, 44100, data);
         self.jackrodio_sink.append(source);
 

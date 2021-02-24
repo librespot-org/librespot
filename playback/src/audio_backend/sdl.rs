@@ -3,7 +3,7 @@ use crate::audio::AudioPacket;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use std::{io, thread, time};
 
-type Channel = i16;
+type Channel = f32;
 
 pub struct SdlSink {
     queue: AudioQueue<Channel>,
@@ -47,7 +47,7 @@ impl Sink for SdlSink {
     }
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
-        while self.queue.size() > (2 * 2 * 44_100) {
+        while self.queue.size() > (2 * 4 * 44_100) {
             // sleep and wait for sdl thread to drain the queue a bit
             thread::sleep(time::Duration::from_millis(10));
         }

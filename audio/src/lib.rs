@@ -33,12 +33,12 @@ pub use fetch::{
 use std::fmt;
 
 pub enum AudioPacket {
-    Samples(Vec<i16>),
+    Samples(Vec<f32>),
     OggData(Vec<u8>),
 }
 
 impl AudioPacket {
-    pub fn samples(&self) -> &[i16] {
+    pub fn samples(&self) -> &[f32] {
         match self {
             AudioPacket::Samples(s) => s,
             AudioPacket::OggData(_) => panic!("can't return OggData on samples"),

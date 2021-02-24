@@ -32,7 +32,7 @@ impl Sink for StdoutSink {
             AudioPacket::Samples(data) => unsafe {
                 slice::from_raw_parts(
                     data.as_ptr() as *const u8,
-                    data.len() * mem::size_of::<i16>(),
+                    data.len() * mem::size_of::<f32>(),
                 )
             },
             AudioPacket::OggData(data) => data,
