@@ -17,7 +17,7 @@ impl Default for SessionConfig {
     fn default() -> SessionConfig {
         let device_id = Uuid::new_v4().to_hyphenated().to_string();
         SessionConfig {
-            user_agent: version::version_string(),
+            user_agent: version::VERSION_STRING.to_string(),
             device_id: device_id,
             proxy: None,
             ap_port: None,

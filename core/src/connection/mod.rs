@@ -88,11 +88,11 @@ pub fn authenticate(
         .mut_system_info()
         .set_system_information_string(format!(
             "librespot_{}_{}",
-            version::short_sha(),
-            version::build_id()
+            version::SHA_SHORT,
+            version::BUILD_ID
         ));
     packet.mut_system_info().set_device_id(device_id);
-    packet.set_version_string(version::version_string());
+    packet.set_version_string(version::VERSION_STRING.to_string());
 
     let cmd = 0xab;
     let data = packet.write_to_bytes().unwrap();

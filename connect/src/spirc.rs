@@ -102,7 +102,7 @@ fn initial_state() -> State {
 fn initial_device_state(config: ConnectConfig) -> DeviceState {
     {
         let mut msg = DeviceState::new();
-        msg.set_sw_version(version::version_string());
+        msg.set_sw_version(version::VERSION_STRING.to_string());
         msg.set_is_active(false);
         msg.set_can_play(true);
         msg.set_volume(0);
