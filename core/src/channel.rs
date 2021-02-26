@@ -1,12 +1,14 @@
+use std::collections::HashMap;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Instant;
+
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::{channel::mpsc, lock::BiLock, Stream, StreamExt};
-use std::{
-    collections::HashMap,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Instant,
-};
+use futures_core::Stream;
+use futures_util::lock::BiLock;
+use futures_util::StreamExt;
+use tokio::sync::mpsc;
 
 use crate::util::SeqGenerator;
 
@@ -46,7 +48,7 @@ enum ChannelState {
 
 impl ChannelManager {
     pub fn allocate(&self) -> (u16, Channel) {
-        let (tx, rx) = mpsc::unbounded();
+        let (tx, rx) = mpsc::unbounded_channel();
 
         let seq = self.lock(|inner| {
             let seq = inner.sequence.get();
@@ -85,7 +87,7 @@ impl ChannelManager {
             inner.download_measurement_bytes += data.len();
 
             if let Entry::Occupied(entry) = inner.channels.entry(id) {
-                let _ = entry.get().unbounded_send((cmd, data));
+                let _ = entry.get().send((cmd, data));
             }
         });
     }
@@ -105,7 +107,7 @@ impl ChannelManager {
 
 impl Channel {
     fn recv_packet(&mut self, cx: &mut Context<'_>) -> Poll<Result<Bytes, ChannelError>> {
-        let (cmd, packet) = match self.receiver.poll_next_unpin(cx) {
+        let (cmd, packet) = match self.receiver.poll_recv(cx) {
             Poll::Pending => return Poll::Pending,
             Poll::Ready(o) => o.ok_or(ChannelError)?,
         };

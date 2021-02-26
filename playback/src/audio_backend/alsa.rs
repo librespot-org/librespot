@@ -1,4 +1,5 @@
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, Error, ValueOr};
@@ -124,8 +125,9 @@ impl Sink for AlsaSink {
         Ok(())
     }
 
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         let mut processed_data = 0;
+        let data = packet.samples();
         while processed_data < data.len() {
             let data_to_buffer = min(
                 self.buffer.capacity() - self.buffer.len(),

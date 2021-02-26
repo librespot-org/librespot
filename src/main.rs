@@ -1,4 +1,4 @@
-use futures::{channel::mpsc::UnboundedReceiver, future::FusedFuture, FutureExt, StreamExt};
+use futures_util::{future, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
 use log::{error, info, warn};
 use sha1::{Digest, Sha1};
@@ -10,9 +10,10 @@ use std::{
     io::{stderr, Write},
     pin::Pin,
 };
+use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
-use librespot::core::authentication::{get_credentials, Credentials};
+use librespot::core::authentication::Credentials;
 use librespot::core::cache::Cache;
 use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
 use librespot::core::session::Session;
@@ -67,6 +68,29 @@ fn list_backends() {
         } else {
             println!("- {}", name);
         }
+    }
+}
+
+pub fn get_credentials<F: FnOnce(&String) -> Option<String>>(
+    username: Option<String>,
+    password: Option<String>,
+    cached_credentials: Option<Credentials>,
+    prompt: F,
+) -> Option<Credentials> {
+    if let Some(username) = username {
+        if let Some(password) = password {
+            return Some(Credentials::with_password(username, password));
+        }
+
+        match cached_credentials {
+            Some(credentials) if username == credentials.username => Some(credentials),
+            _ => {
+                let password = prompt(&username)?;
+                Some(Credentials::with_password(username, password))
+            }
+        }
+    } else {
+        cached_credentials
     }
 }
 
@@ -203,6 +227,11 @@ fn setup(args: &[String]) -> Setup {
             "",
             "disable-gapless",
             "disable gapless playback.",
+        )
+	    .optflag(
+            "",
+            "passthrough",
+            "Pass raw stream to output, only works for \"pipe\"."
         );
 
     let matches = match opts.parse(&args[1..]) {
@@ -312,10 +341,10 @@ fn setup(args: &[String]) -> Setup {
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);
 
-        let password = |username: &String| -> String {
-            write!(stderr(), "Password for {}: ", username).unwrap();
-            stderr().flush().unwrap();
-            rpassword::read_password().unwrap()
+        let password = |username: &String| -> Option<String> {
+            write!(stderr(), "Password for {}: ", username).ok()?;
+            stderr().flush().ok()?;
+            rpassword::read_password().ok()
         };
 
         get_credentials(
@@ -355,6 +384,8 @@ fn setup(args: &[String]) -> Setup {
         }
     };
 
+    let passthrough = matches.opt_present("passthrough");
+
     let player_config = {
         let bitrate = matches
             .opt_str("b")
@@ -377,6 +408,7 @@ fn setup(args: &[String]) -> Setup {
                 .opt_str("normalisation-pregain")
                 .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
                 .unwrap_or(PlayerConfig::default().normalisation_pregain),
+            passthrough,
         }
     };
 
@@ -436,8 +468,7 @@ async fn main() {
     let mut player_event_channel: Option<UnboundedReceiver<PlayerEvent>> = None;
     let mut auto_connect_times: Vec<Instant> = vec![];
     let mut discovery = None;
-    let mut connecting: Pin<Box<dyn FusedFuture<Output = _>>> =
-        Box::pin(futures::future::pending());
+    let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
 
     if setupp.enable_discovery {
         let config = setupp.connect_config.clone();
@@ -558,7 +589,7 @@ async fn main() {
                     }
                 }
             },
-            event = async { player_event_channel.as_mut().unwrap().next().await }, if player_event_channel.is_some() => match event {
+            event = async { player_event_channel.as_mut().unwrap().recv().await }, if player_event_channel.is_some() => match event {
                 Some(event) => {
                     if let Some(program) = &setupp.player_event_program {
                         if let Some(child) = run_program_on_events(event, program) {

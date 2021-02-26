@@ -1,4 +1,5 @@
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 use shell_words::split;
 use std::io::{self, Write};
 use std::mem;
@@ -43,11 +44,11 @@ impl Sink for SubprocessSink {
         Ok(())
     }
 
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         let data: &[u8] = unsafe {
             slice::from_raw_parts(
-                data.as_ptr() as *const u8,
-                data.len() * mem::size_of::<i16>(),
+                packet.samples().as_ptr() as *const u8,
+                packet.samples().len() * mem::size_of::<i16>(),
             )
         };
         if let Some(child) = &mut self.child {

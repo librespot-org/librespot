@@ -1,5 +1,18 @@
+use std::cmp::max;
+use std::future::Future;
+use std::io::{self, Read, Seek, SeekFrom};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
+use std::{mem, thread};
+
+use byteorder::{LittleEndian, ReadBytesExt};
+use futures_util::stream::futures_unordered::FuturesUnordered;
+use futures_util::{future, StreamExt, TryFutureExt};
+use tokio::sync::{mpsc, oneshot};
+
+use crate::audio::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, VorbisDecoder};
 use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
-use crate::audio::{VorbisDecoder, VorbisPacket};
 use crate::audio::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
@@ -7,23 +20,11 @@ use crate::audio::{
 use crate::audio_backend::Sink;
 use crate::config::NormalisationType;
 use crate::config::{Bitrate, PlayerConfig};
+use crate::core::session::Session;
+use crate::core::spotify_id::SpotifyId;
+use crate::core::util::SeqGenerator;
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
-use librespot_core::session::Session;
-use librespot_core::spotify_id::SpotifyId;
-use librespot_core::util::SeqGenerator;
-
-use byteorder::{LittleEndian, ReadBytesExt};
-use futures::channel::{mpsc, oneshot};
-use futures::{future, Future, Stream, StreamExt, TryFutureExt};
-use std::borrow::Cow;
-
-use std::cmp::max;
-use std::io::{self, Read, Seek, SeekFrom};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
-use std::{mem, thread};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 
@@ -244,8 +245,8 @@ impl Player {
     where
         F: FnOnce() -> Box<dyn Sink + Send> + Send + 'static,
     {
-        let (cmd_tx, cmd_rx) = mpsc::unbounded();
-        let (event_sender, event_receiver) = mpsc::unbounded();
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+        let (event_sender, event_receiver) = mpsc::unbounded_channel();
 
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
@@ -265,8 +266,8 @@ impl Player {
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
-            // It must be run by using wait() in a dedicated thread.
-            futures::executor::block_on(internal);
+            // It must be run by using block_on() in a dedicated thread.
+            futures_executor::block_on(internal);
             debug!("PlayerInternal thread finished.");
         });
 
@@ -281,7 +282,7 @@ impl Player {
     }
 
     fn command(&self, cmd: PlayerCommand) {
-        self.commands.as_ref().unwrap().unbounded_send(cmd).unwrap();
+        self.commands.as_ref().unwrap().send(cmd).unwrap();
     }
 
     pub fn load(&mut self, track_id: SpotifyId, start_playing: bool, position_ms: u32) -> u64 {
@@ -317,14 +318,14 @@ impl Player {
     }
 
     pub fn get_player_event_channel(&self) -> PlayerEventChannel {
-        let (event_sender, event_receiver) = mpsc::unbounded();
+        let (event_sender, event_receiver) = mpsc::unbounded_channel();
         self.command(PlayerCommand::AddEventSender(event_sender));
         event_receiver
     }
 
-    pub async fn get_end_of_track_future(&self) {
+    pub async fn await_end_of_track(&self) {
         let mut channel = self.get_player_event_channel();
-        while let Some(event) = channel.next().await {
+        while let Some(event) = channel.recv().await {
             if matches!(
                 event,
                 PlayerEvent::EndOfTrack { .. } | PlayerEvent::Stopped { .. }
@@ -377,7 +378,7 @@ enum PlayerPreload {
     },
 }
 
-type Decoder = VorbisDecoder<Subfile<AudioDecrypt<AudioFile>>>;
+type Decoder = Box<dyn AudioDecoder + Send>;
 
 enum PlayerState {
     Stopped,
@@ -575,21 +576,20 @@ struct PlayerTrackLoader {
 }
 
 impl PlayerTrackLoader {
-    async fn find_available_alternative<'a, 'b>(
-        &'a self,
-        audio: &'b AudioItem,
-    ) -> Option<Cow<'b, AudioItem>> {
+    async fn find_available_alternative(&self, audio: AudioItem) -> Option<AudioItem> {
         if audio.available {
-            Some(Cow::Borrowed(audio))
+            Some(audio)
         } else if let Some(alternatives) = &audio.alternatives {
-            let alternatives = alternatives
+            let alternatives: FuturesUnordered<_> = alternatives
                 .iter()
-                .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id));
-            let alternatives = future::try_join_all(alternatives).await.unwrap();
+                .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id))
+                .collect();
+
             alternatives
-                .into_iter()
-                .find(|alt| alt.available)
-                .map(Cow::Owned)
+                .filter_map(|x| future::ready(x.ok()))
+                .filter(|x| future::ready(x.available))
+                .next()
+                .await
         } else {
             None
         }
@@ -629,10 +629,10 @@ impl PlayerTrackLoader {
 
         info!("Loading <{}> with Spotify URI <{}>", audio.name, audio.uri);
 
-        let audio = match self.find_available_alternative(&audio).await {
+        let audio = match self.find_available_alternative(audio).await {
             Some(audio) => audio,
             None => {
-                warn!("<{}> is not available", audio.uri);
+                warn!("<{}> is not available", spotify_id.to_uri());
                 return None;
             }
         };
@@ -730,7 +730,19 @@ impl PlayerTrackLoader {
 
             let audio_file = Subfile::new(decrypted_file, 0xa7);
 
-            let mut decoder = match VorbisDecoder::new(audio_file) {
+            let result = if self.config.passthrough {
+                match PassthroughDecoder::new(audio_file) {
+                    Ok(result) => Ok(Box::new(result) as Decoder),
+                    Err(e) => Err(AudioError::PassthroughError(e)),
+                }
+            } else {
+                match VorbisDecoder::new(audio_file) {
+                    Ok(result) => Ok(Box::new(result) as Decoder),
+                    Err(e) => Err(AudioError::VorbisError(e)),
+                }
+            };
+
+            let mut decoder = match result {
                 Ok(decoder) => decoder,
                 Err(e) if is_cached => {
                     warn!(
@@ -779,12 +791,13 @@ impl Future for PlayerInternal {
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
         // While this is written as a future, it still contains blocking code.
         // It must be run on its own thread.
+        let passthrough = self.config.passthrough;
 
         loop {
             let mut all_futures_completed_or_not_ready = true;
 
             // process commands that were sent to us
-            let cmd = match Pin::new(&mut self.commands).poll_next(cx) {
+            let cmd = match self.commands.poll_recv(cx) {
                 Poll::Ready(None) => return Poll::Ready(()), // client has disconnected - shut down.
                 Poll::Ready(Some(cmd)) => {
                     all_futures_completed_or_not_ready = false;
@@ -880,32 +893,44 @@ impl Future for PlayerInternal {
                 {
                     let packet = decoder.next_packet().expect("Vorbis error");
 
-                    if let Some(ref packet) = packet {
-                        *stream_position_pcm += (packet.data().len() / 2) as u64;
-                        let stream_position_millis = Self::position_pcm_to_ms(*stream_position_pcm);
+                    if !passthrough {
+                        if let Some(ref packet) = packet {
+                            *stream_position_pcm =
+                                *stream_position_pcm + (packet.samples().len() / 2) as u64;
+                            let stream_position_millis =
+                                Self::position_pcm_to_ms(*stream_position_pcm);
 
-                        let notify_about_position = match *reported_nominal_start_time {
-                            None => true,
-                            Some(reported_nominal_start_time) => {
-                                // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we;re actually in time.
-                                let lag = (Instant::now() - reported_nominal_start_time).as_millis()
-                                    as i64
-                                    - stream_position_millis as i64;
-                                lag > 1000
+                            let notify_about_position = match *reported_nominal_start_time {
+                                None => true,
+                                Some(reported_nominal_start_time) => {
+                                    // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we;re actually in time.
+                                    let lag = (Instant::now() - reported_nominal_start_time)
+                                        .as_millis()
+                                        as i64
+                                        - stream_position_millis as i64;
+                                    if lag > 1000 {
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                            };
+                            if notify_about_position {
+                                *reported_nominal_start_time = Some(
+                                    Instant::now()
+                                        - Duration::from_millis(stream_position_millis as u64),
+                                );
+                                self.send_event(PlayerEvent::Playing {
+                                    track_id,
+                                    play_request_id,
+                                    position_ms: stream_position_millis as u32,
+                                    duration_ms,
+                                });
                             }
-                        };
-                        if notify_about_position {
-                            *reported_nominal_start_time = Some(
-                                Instant::now()
-                                    - Duration::from_millis(stream_position_millis as u64),
-                            );
-                            self.send_event(PlayerEvent::Playing {
-                                track_id,
-                                play_request_id,
-                                position_ms: stream_position_millis as u32,
-                                duration_ms,
-                            });
                         }
+                    } else {
+                        // position, even if irrelevant, must be set so that seek() is called
+                        *stream_position_pcm = duration_ms.into();
                     }
 
                     self.handle_packet(packet, normalisation_factor);
@@ -1087,23 +1112,23 @@ impl PlayerInternal {
         }
     }
 
-    fn handle_packet(&mut self, packet: Option<VorbisPacket>, normalisation_factor: f32) {
+    fn handle_packet(&mut self, packet: Option<AudioPacket>, normalisation_factor: f32) {
         match packet {
             Some(mut packet) => {
-                if !packet.data().is_empty() {
-                    if let Some(ref editor) = self.audio_filter {
-                        editor.modify_stream(&mut packet.data_mut())
-                    };
+                if !packet.is_empty() {
+                    if let AudioPacket::Samples(ref mut data) = packet {
+                        if let Some(ref editor) = self.audio_filter {
+                            editor.modify_stream(data)
+                        }
 
-                    if self.config.normalisation
-                        && (normalisation_factor - 1.0).abs() < f32::EPSILON
-                    {
-                        for x in packet.data_mut().iter_mut() {
-                            *x = (*x as f32 * normalisation_factor) as i16;
+                        if self.config.normalisation && normalisation_factor != 1.0 {
+                            for x in data.iter_mut() {
+                                *x = (*x as f32 * normalisation_factor) as i16;
+                            }
                         }
                     }
 
-                    if let Err(err) = self.sink.write(&packet.data()) {
+                    if let Err(err) = self.sink.write(&packet) {
                         error!("Could not write audio: {}", err);
                         self.ensure_sink_stopped(false);
                     }
@@ -1555,7 +1580,7 @@ impl PlayerInternal {
     fn send_event(&mut self, event: PlayerEvent) {
         let mut index = 0;
         while index < self.event_senders.len() {
-            match self.event_senders[index].unbounded_send(event.clone()) {
+            match self.event_senders[index].send(event.clone()) {
                 Ok(_) => index += 1,
                 Err(_) => {
                     self.event_senders.remove(index);
@@ -1583,7 +1608,7 @@ impl PlayerInternal {
         let (result_tx, result_rx) = oneshot::channel();
 
         std::thread::spawn(move || {
-            futures::executor::block_on(loader.load_track(spotify_id, position_ms)).and_then(
+            futures_executor::block_on(loader.load_track(spotify_id, position_ms)).and_then(
                 move |data| {
                     let _ = result_tx.send(data);
                     Some(())

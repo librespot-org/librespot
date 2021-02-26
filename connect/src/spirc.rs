@@ -1,26 +1,27 @@
+use std::future::Future;
 use std::pin::Pin;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::context::StationContext;
+use crate::core::config::{ConnectConfig, VolumeCtrl};
+use crate::core::mercury::{MercuryError, MercurySender};
+use crate::core::session::Session;
+use crate::core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
+use crate::core::util::url_encode;
+use crate::core::util::SeqGenerator;
+use crate::core::version;
 use crate::playback::mixer::Mixer;
 use crate::playback::player::{Player, PlayerEvent, PlayerEventChannel};
 use crate::protocol;
 use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
-use futures::channel::mpsc;
-use futures::future::{self, FusedFuture};
-use futures::stream::FusedStream;
-use futures::{Future, FutureExt, StreamExt};
-use librespot_core::config::{ConnectConfig, VolumeCtrl};
-use librespot_core::mercury::{MercuryError, MercurySender};
-use librespot_core::session::Session;
-use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
-use librespot_core::util::url_encode;
-use librespot_core::util::SeqGenerator;
-use librespot_core::version;
+
+use futures_util::future::{self, FusedFuture};
+use futures_util::stream::FusedStream;
+use futures_util::{FutureExt, StreamExt};
 use protobuf::{self, Message};
-use rand;
 use rand::seq::SliceRandom;
-use serde_json;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 enum SpircPlayStatus {
     Stopped,
@@ -59,8 +60,8 @@ struct SpircTask {
 
     subscription: BoxedStream<Frame>,
     sender: MercurySender,
-    commands: mpsc::UnboundedReceiver<SpircCommand>,
-    player_events: PlayerEventChannel,
+    commands: Option<mpsc::UnboundedReceiver<SpircCommand>>,
+    player_events: Option<PlayerEventChannel>,
 
     shutdown: bool,
     session: Session,
@@ -263,6 +264,7 @@ impl Spirc {
                 .mercury()
                 .subscribe(uri.clone())
                 .map(Result::unwrap)
+                .map(UnboundedReceiverStream::new)
                 .flatten_stream()
                 .map(|response| -> Frame {
                     let data = response.payload.first().unwrap();
@@ -272,7 +274,7 @@ impl Spirc {
 
         let sender = session.mercury().sender(uri);
 
-        let (cmd_tx, cmd_rx) = mpsc::unbounded();
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let volume = config.volume;
         let task_config = SpircTaskConfig {
@@ -301,8 +303,8 @@ impl Spirc {
 
             subscription: subscription,
             sender: sender,
-            commands: cmd_rx,
-            player_events: player_events,
+            commands: Some(cmd_rx),
+            player_events: Some(player_events),
 
             shutdown: false,
             session: session,
@@ -322,34 +324,36 @@ impl Spirc {
     }
 
     pub fn play(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Play);
+        let _ = self.commands.send(SpircCommand::Play);
     }
     pub fn play_pause(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::PlayPause);
+        let _ = self.commands.send(SpircCommand::PlayPause);
     }
     pub fn pause(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Pause);
+        let _ = self.commands.send(SpircCommand::Pause);
     }
     pub fn prev(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Prev);
+        let _ = self.commands.send(SpircCommand::Prev);
     }
     pub fn next(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Next);
+        let _ = self.commands.send(SpircCommand::Next);
     }
     pub fn volume_up(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::VolumeUp);
+        let _ = self.commands.send(SpircCommand::VolumeUp);
     }
     pub fn volume_down(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::VolumeDown);
+        let _ = self.commands.send(SpircCommand::VolumeDown);
     }
     pub fn shutdown(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Shutdown);
+        let _ = self.commands.send(SpircCommand::Shutdown);
     }
 }
 
 impl SpircTask {
     async fn run(mut self) {
         while !self.session.is_invalid() && !self.shutdown {
+            let commands = self.commands.as_mut();
+            let player_events = self.player_events.as_mut();
             tokio::select! {
                 frame = self.subscription.next() => match frame {
                     Some(frame) => self.handle_frame(frame),
@@ -358,10 +362,10 @@ impl SpircTask {
                         break;
                     }
                 },
-                cmd = self.commands.next(), if !self.commands.is_terminated() => if let Some(cmd) = cmd {
+                cmd = async { commands.unwrap().recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
                     self.handle_command(cmd);
                 },
-                event = self.player_events.next(), if !self.player_events.is_terminated() => if let Some(event) = event {
+                event = async { player_events.unwrap().recv().await }, if player_events.is_some() => if let Some(event) = event {
                     self.handle_player_event(event)
                 },
                 result = self.sender.flush(), if !self.sender.is_flushed() => if result.is_err() {
@@ -508,7 +512,7 @@ impl SpircTask {
             SpircCommand::Shutdown => {
                 CommandSender::new(self, MessageType::kMessageTypeGoodbye).send();
                 self.shutdown = true;
-                self.commands.close();
+                self.commands.as_mut().map(|rx| rx.close());
             }
         }
     }
@@ -790,7 +794,7 @@ impl SpircTask {
                 self.handle_play()
             }
             SpircPlayStatus::Playing { .. } | SpircPlayStatus::LoadingPlay { .. } => {
-                self.handle_play()
+                self.handle_pause()
             }
             _ => (),
         }

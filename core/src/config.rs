@@ -1,9 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
 use url::Url;
-use uuid::Uuid;
-
-use crate::version;
 
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
@@ -11,18 +8,6 @@ pub struct SessionConfig {
     pub device_id: String,
     pub proxy: Option<Url>,
     pub ap_port: Option<u16>,
-}
-
-impl Default for SessionConfig {
-    fn default() -> SessionConfig {
-        let device_id = Uuid::new_v4().to_hyphenated().to_string();
-        SessionConfig {
-            user_agent: version::version_string(),
-            device_id: device_id,
-            proxy: None,
-            ap_port: None,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]

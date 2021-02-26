@@ -1,26 +1,20 @@
 #![allow(clippy::unused_io_amount)]
 #![allow(clippy::redundant_field_names)]
+
 #[macro_use]
 extern crate log;
 
 #[macro_use]
 extern crate async_trait;
 
-extern crate byteorder;
-extern crate futures;
-extern crate linear_map;
-extern crate protobuf;
-
-extern crate librespot_core;
-extern crate librespot_protocol as protocol;
-
 pub mod cover;
 
-use linear_map::LinearMap;
+use std::collections::HashMap;
 
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId};
+use librespot_protocol as protocol;
 
 pub use crate::protocol::metadata::AudioFile_Format as FileFormat;
 
@@ -64,7 +58,7 @@ where
 pub struct AudioItem {
     pub id: SpotifyId,
     pub uri: String,
-    pub files: LinearMap<FileFormat, FileId>,
+    pub files: HashMap<FileFormat, FileId>,
     pub name: String,
     pub duration: i32,
     pub available: bool,
@@ -143,7 +137,7 @@ pub struct Track {
     pub duration: i32,
     pub album: SpotifyId,
     pub artists: Vec<SpotifyId>,
-    pub files: LinearMap<FileFormat, FileId>,
+    pub files: HashMap<FileFormat, FileId>,
     pub alternatives: Vec<SpotifyId>,
     pub available: bool,
 }
@@ -165,7 +159,7 @@ pub struct Episode {
     pub duration: i32,
     pub language: String,
     pub show: SpotifyId,
-    pub files: LinearMap<FileFormat, FileId>,
+    pub files: HashMap<FileFormat, FileId>,
     pub covers: Vec<FileId>,
     pub available: bool,
     pub explicit: bool,

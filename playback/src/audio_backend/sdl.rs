@@ -1,4 +1,5 @@
 use super::{Open, Sink};
+use crate::audio::AudioPacket;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use std::{io, thread, time};
 
@@ -45,12 +46,12 @@ impl Sink for SdlSink {
         Ok(())
     }
 
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         while self.queue.size() > (2 * 2 * 44_100) {
             // sleep and wait for sdl thread to drain the queue a bit
             thread::sleep(time::Duration::from_millis(10));
         }
-        self.queue.queue(data);
+        self.queue.queue(packet.samples());
         Ok(())
     }
 }

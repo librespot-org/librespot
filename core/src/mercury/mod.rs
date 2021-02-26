@@ -1,14 +1,17 @@
+use std::collections::HashMap;
+use std::future::Future;
+use std::mem;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
+
+use byteorder::{BigEndian, ByteOrder};
+use bytes::Bytes;
+use tokio::sync::{mpsc, oneshot};
+
 use crate::protocol;
 use crate::util::url_encode;
 use crate::util::SeqGenerator;
-use byteorder::{BigEndian, ByteOrder};
-use bytes::Bytes;
-use futures::{
-    channel::{mpsc, oneshot},
-    Future,
-};
-use std::{collections::HashMap, task::Poll};
-use std::{mem, pin::Pin, task::Context};
 
 mod types;
 pub use self::types::*;
@@ -31,18 +34,15 @@ pub struct MercuryPending {
     callback: Option<oneshot::Sender<Result<MercuryResponse, MercuryError>>>,
 }
 
-pin_project! {
-    pub struct MercuryFuture<T> {
-        #[pin]
-        receiver: oneshot::Receiver<Result<T, MercuryError>>
-    }
+pub struct MercuryFuture<T> {
+    receiver: oneshot::Receiver<Result<T, MercuryError>>,
 }
 
 impl<T> Future for MercuryFuture<T> {
     type Output = Result<T, MercuryError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.project().receiver.poll(cx) {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match Pin::new(&mut self.receiver).poll(cx) {
             Poll::Ready(Ok(x)) => Poll::Ready(x),
             Poll::Ready(Err(_)) => Poll::Ready(Err(MercuryError)),
             Poll::Pending => Poll::Pending,
@@ -119,7 +119,7 @@ impl MercuryManager {
         async move {
             let response = request.await?;
 
-            let (tx, rx) = mpsc::unbounded();
+            let (tx, rx) = mpsc::unbounded_channel();
 
             manager.lock(move |inner| {
                 if !inner.invalid {
@@ -221,7 +221,7 @@ impl MercuryManager {
 
                             // if send fails, remove from list of subs
                             // TODO: send unsub message
-                            sub.unbounded_send(response.clone()).is_ok()
+                            sub.send(response.clone()).is_ok()
                         } else {
                             // URI doesn't match
                             true

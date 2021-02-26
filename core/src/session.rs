@@ -1,14 +1,20 @@
+use std::future::Future;
+use std::io;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock, Weak};
+use std::task::Context;
 use std::task::Poll;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{io, pin::Pin, task::Context};
-
-use once_cell::sync::OnceCell;
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::{channel::mpsc, Future, FutureExt, StreamExt, TryStream, TryStreamExt};
+use futures_core::TryStream;
+use futures_util::{FutureExt, StreamExt, TryStreamExt};
+use once_cell::sync::OnceCell;
+use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::apresolve::apresolve_or_fallback;
 use crate::audio_key::AudioKeyManager;
@@ -16,10 +22,16 @@ use crate::authentication::Credentials;
 use crate::cache::Cache;
 use crate::channel::ChannelManager;
 use crate::config::SessionConfig;
-use crate::connection;
+use crate::connection::{self, AuthenticationError};
 use crate::mercury::MercuryManager;
 
-pub use crate::authentication::{AuthenticationError, AuthenticationErrorKind};
+#[derive(Debug, Error)]
+pub enum SessionError {
+    #[error(transparent)]
+    AuthenticationError(#[from] AuthenticationError),
+    #[error("Cannot create session: {0}")]
+    IoError(#[from] io::Error),
+}
 
 struct SessionData {
     country: String,
@@ -54,7 +66,7 @@ impl Session {
         config: SessionConfig,
         credentials: Credentials,
         cache: Option<Cache>,
-    ) -> Result<Session, AuthenticationError> {
+    ) -> Result<Session, SessionError> {
         let ap = apresolve_or_fallback(&config.proxy, &config.ap_port).await;
 
         info!("Connecting to AP \"{}\"", ap);
@@ -87,7 +99,7 @@ impl Session {
     ) -> Session {
         let (sink, stream) = transport.split();
 
-        let (sender_tx, sender_rx) = mpsc::unbounded();
+        let (sender_tx, sender_rx) = mpsc::unbounded_channel();
         let session_id = SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         debug!("new Session[{}]", session_id);
@@ -114,11 +126,13 @@ impl Session {
             session_id: session_id,
         }));
 
-        let sender_task = sender_rx.map(Ok::<_, io::Error>).forward(sink);
+        let sender_task = UnboundedReceiverStream::new(sender_rx)
+            .map(Ok)
+            .forward(sink);
         let receiver_task = DispatchTask(stream, session.weak());
 
         let task =
-            futures::future::join(sender_task, receiver_task).map(|_| io::Result::<_>::Ok(()));
+            futures_util::future::join(sender_task, receiver_task).map(|_| io::Result::<_>::Ok(()));
         tokio::spawn(task);
         session
     }
@@ -193,7 +207,7 @@ impl Session {
     }
 
     pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
-        self.0.tx_connection.unbounded_send((cmd, data)).unwrap();
+        self.0.tx_connection.send((cmd, data)).unwrap();
     }
 
     pub fn cache(&self) -> Option<&Arc<Cache>> {

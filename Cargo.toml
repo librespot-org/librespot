@@ -1,6 +1,6 @@
 [package]
 name = "librespot"
-version = "0.1.3"
+version = "0.1.6"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
@@ -22,59 +22,61 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
-version = "0.1.3"
+version = "0.1.6"
 
 [dependencies.librespot-connect]
 path = "connect"
-version = "0.1.3"
+version = "0.1.6"
 
 [dependencies.librespot-core]
 path = "core"
-version = "0.1.3"
+version = "0.1.6"
 
 [dependencies.librespot-metadata]
 path = "metadata"
-version = "0.1.3"
+version = "0.1.6"
 
 [dependencies.librespot-playback]
 path = "playback"
-version = "0.1.3"
+version = "0.1.6"
 
 [dependencies.librespot-protocol]
 path = "protocol"
-version = "0.1.3"
+version = "0.1.6"
 
 [dependencies]
 base64 = "0.13"
 env_logger =  {version = "0.8", default-features = false, features = ["termcolor","humantime","atty"]}
-futures = "0.3"
+futures-util = { version = "0.3", default_features = false }
 getopts = "0.2"
+hex = "0.4"
 hyper = "0.14"
 log = "0.4"
-num-bigint = "0.3"
-protobuf = "~2.14.0"
-rand = "0.7"
 rpassword = "5.0"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "process"] }
-url = "1.7"
-sha-1 = "0.8"
-hex = "0.4"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "sync", "process"] }
+url = "2.1"
+sha-1 = "0.9"
 
 [features]
+apresolve = ["librespot-core/apresolve"]
+apresolve-http2 = ["librespot-core/apresolve-http2"]
+
 alsa-backend = ["librespot-playback/alsa-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
 jackaudio-backend = ["librespot-playback/jackaudio-backend"]
 rodio-backend = ["librespot-playback/rodio-backend"]
+rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
 with-tremor = ["librespot-audio/with-tremor"]
 with-vorbis = ["librespot-audio/with-vorbis"]
+with-lewton = ["librespot-audio/with-lewton"]
 
 # with-dns-sd = ["librespot-connect/with-dns-sd"]
 
-default = ["librespot-playback/rodio-backend"]
+default = ["rodio-backend", "apresolve", "with-lewton"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"

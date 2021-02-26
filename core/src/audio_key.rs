@@ -1,8 +1,8 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
-use futures::channel::oneshot;
 use std::collections::HashMap;
 use std::io::Write;
+use tokio::sync::oneshot;
 
 use crate::spotify_id::{FileId, SpotifyId};
 use crate::util::SeqGenerator;

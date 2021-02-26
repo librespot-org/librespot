@@ -1,3 +1,4 @@
+use crate::audio::AudioPacket;
 use std::io;
 
 pub trait Open {
@@ -7,7 +8,7 @@ pub trait Open {
 pub trait Sink {
     fn start(&mut self) -> io::Result<()>;
     fn stop(&mut self) -> io::Result<()>;
-    fn write(&mut self, data: &[i16]) -> io::Result<()>;
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()>;
 }
 
 pub type SinkBuilder = fn(Option<String>) -> Box<dyn Sink + Send>;
@@ -41,10 +42,9 @@ mod gstreamer;
 #[cfg(feature = "gstreamer-backend")]
 use self::gstreamer::GstreamerSink;
 
-#[cfg(feature = "rodio-backend")]
+#[cfg(any(feature = "rodio-backend", feature = "rodiojack-backend"))]
 mod rodio;
-#[cfg(feature = "rodio-backend")]
-use self::rodio::RodioSink;
+
 #[cfg(feature = "sdl-backend")]
 mod sdl;
 #[cfg(feature = "sdl-backend")]
@@ -68,7 +68,9 @@ pub const BACKENDS: &'static [(&'static str, SinkBuilder)] = &[
     #[cfg(feature = "gstreamer-backend")]
     ("gstreamer", mk_sink::<GstreamerSink>),
     #[cfg(feature = "rodio-backend")]
-    ("rodio", mk_sink::<RodioSink>),
+    ("rodio", rodio::mk_rodio),
+    #[cfg(feature = "rodiojack-backend")]
+    ("rodiojack", rodio::mk_rodiojack),
     #[cfg(feature = "sdl-backend")]
     ("sdl", mk_sink::<SdlSink>),
     ("pipe", mk_sink::<StdoutSink>),
