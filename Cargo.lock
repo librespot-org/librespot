@@ -1143,6 +1143,7 @@ dependencies = [
  "librespot-audio",
  "librespot-connect",
  "librespot-core",
+ "librespot-discovery",
  "librespot-metadata",
  "librespot-playback",
  "librespot-protocol",
@@ -1172,15 +1173,8 @@ dependencies = [
 name = "librespot-connect"
 version = "0.2.0"
 dependencies = [
- "aes-ctr",
- "base64",
- "dns-sd",
  "form_urlencoded",
- "futures-core",
  "futures-util",
- "hmac",
- "hyper",
- "libmdns",
  "librespot-core",
  "librespot-playback",
  "librespot-protocol",
@@ -1189,10 +1183,8 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
- "sha-1",
  "tokio",
  "tokio-stream",
- "url",
 ]
 
 [[package]]
@@ -1233,6 +1225,27 @@ dependencies = [
  "url",
  "uuid",
  "vergen",
+]
+
+[[package]]
+name = "librespot-discovery"
+version = "0.2.0"
+dependencies = [
+ "aes-ctr",
+ "base64",
+ "cfg-if 1.0.0",
+ "dns-sd",
+ "form_urlencoded",
+ "futures-core",
+ "hmac",
+ "hyper",
+ "libmdns",
+ "librespot-core",
+ "log",
+ "rand",
+ "serde_json",
+ "sha-1",
+ "tokio",
 ]
 
 [[package]]

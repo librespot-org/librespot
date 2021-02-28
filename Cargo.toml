@@ -33,6 +33,10 @@ path = "core"
 version = "0.2.0"
 features = ["apresolve"]
 
+[dependencies.librespot-discovery]
+path = "discovery"
+version = "0.2.0"
+
 [dependencies.librespot-metadata]
 path = "metadata"
 version = "0.2.0"
@@ -72,7 +76,7 @@ gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 with-tremor = ["librespot-playback/with-tremor"]
 with-vorbis = ["librespot-playback/with-vorbis"]
 
-with-dns-sd = ["librespot-connect/with-dns-sd"]
+with-dns-sd = ["librespot-discovery/with-dns-sd"]
 
 default = ["rodio-backend"]
 
