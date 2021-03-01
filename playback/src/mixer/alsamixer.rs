@@ -1,9 +1,6 @@
 use super::AudioFilter;
 use super::{Mixer, MixerConfig};
-use std;
 use std::error::Error;
-
-use alsa;
 
 const SND_CTL_TLV_DB_GAIN_MUTE: i64 = -9999999;
 
@@ -72,14 +69,14 @@ impl AlsaMixer {
         }
 
         Ok(AlsaMixer {
-            config: config,
+            config,
             params: AlsaMixerVolumeParams {
-                min: min,
-                max: max,
+                min,
+                max,
                 range: (max - min) as f64,
-                min_db: min_db,
-                max_db: max_db,
-                has_switch: has_switch,
+                min_db,
+                max_db,
+                has_switch,
             },
         })
     }

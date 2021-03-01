@@ -45,7 +45,7 @@ impl SpotifyId {
     const SIZE_BASE16: usize = 32;
     const SIZE_BASE62: usize = 22;
 
-    fn as_track(n: u128) -> SpotifyId {
+    fn track(n: u128) -> SpotifyId {
         SpotifyId {
             id: n,
             audio_type: SpotifyAudioType::Track,
@@ -71,7 +71,7 @@ impl SpotifyId {
             dst += p;
         }
 
-        Ok(SpotifyId::as_track(dst))
+        Ok(SpotifyId::track(dst))
     }
 
     /// Parses a base62 encoded [Spotify ID] into a `SpotifyId`.
@@ -94,7 +94,7 @@ impl SpotifyId {
             dst += p;
         }
 
-        Ok(SpotifyId::as_track(dst))
+        Ok(SpotifyId::track(dst))
     }
 
     /// Creates a `SpotifyId` from a copy of `SpotifyId::SIZE` (16) bytes in big-endian order.
@@ -102,7 +102,7 @@ impl SpotifyId {
     /// The resulting `SpotifyId` will default to a `SpotifyAudioType::TRACK`.
     pub fn from_raw(src: &[u8]) -> Result<SpotifyId, SpotifyIdError> {
         match src.try_into() {
-            Ok(dst) => Ok(SpotifyId::as_track(u128::from_be_bytes(dst))),
+            Ok(dst) => Ok(SpotifyId::track(u128::from_be_bytes(dst))),
             Err(_) => Err(SpotifyIdError),
         }
     }

@@ -27,7 +27,7 @@ pub struct Credentials {
 impl Credentials {
     pub fn with_password(username: String, password: String) -> Credentials {
         Credentials {
-            username: username,
+            username,
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
             auth_data: password.into_bytes(),
         }
@@ -103,9 +103,9 @@ impl Credentials {
         let auth_data = read_bytes(&mut cursor).unwrap();
 
         Credentials {
-            username: username,
-            auth_type: auth_type,
-            auth_data: auth_data,
+            username,
+            auth_type,
+            auth_data,
         }
     }
 }

@@ -56,7 +56,7 @@ use self::pipe::StdoutSink;
 mod subprocess;
 use self::subprocess::SubprocessSink;
 
-pub const BACKENDS: &'static [(&'static str, SinkBuilder)] = &[
+pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]

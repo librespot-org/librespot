@@ -105,25 +105,20 @@ impl Session {
         debug!("new Session[{}]", session_id);
 
         let session = Session(Arc::new(SessionInternal {
-            config: config,
+            config,
             data: RwLock::new(SessionData {
                 country: String::new(),
                 canonical_username: username,
                 invalid: false,
                 time_delta: 0,
             }),
-
             tx_connection: sender_tx,
-
             cache: cache.map(Arc::new),
-
             audio_key: OnceCell::new(),
             channel: OnceCell::new(),
             mercury: OnceCell::new(),
-
             handle,
-
-            session_id: session_id,
+            session_id,
         }));
 
         let sender_task = UnboundedReceiverStream::new(sender_rx)

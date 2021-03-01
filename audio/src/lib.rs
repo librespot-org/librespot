@@ -1,4 +1,4 @@
-#![allow(clippy::unused_io_amount)]
+#![allow(clippy::unused_io_amount, clippy::too_many_arguments)]
 
 #[macro_use]
 extern crate log;
@@ -85,13 +85,13 @@ impl fmt::Display for AudioError {
 
 impl From<VorbisError> for AudioError {
     fn from(err: VorbisError) -> AudioError {
-        AudioError::VorbisError(VorbisError::from(err))
+        AudioError::VorbisError(err)
     }
 }
 
 impl From<PassthroughError> for AudioError {
     fn from(err: PassthroughError) -> AudioError {
-        AudioError::PassthroughError(PassthroughError::from(err))
+        AudioError::PassthroughError(err)
     }
 }
 

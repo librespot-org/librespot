@@ -26,8 +26,8 @@ impl Open for PulseAudioSink {
 
         PulseAudioSink {
             s: None,
-            ss: ss,
-            device: device,
+            ss,
+            device,
         }
     }
 }

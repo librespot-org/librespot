@@ -2,9 +2,10 @@ use super::{Open, Sink};
 use crate::audio::AudioPacket;
 use gst::prelude::*;
 use gst::*;
+use zerocopy::*;
+
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::{io, thread};
-use zerocopy::*;
 
 #[allow(dead_code)]
 pub struct GstreamerSink {
@@ -91,10 +92,7 @@ impl Open for GstreamerSink {
             .set_state(gst::State::Playing)
             .expect("Unable to set the pipeline to the `Playing` state");
 
-        GstreamerSink {
-            tx: tx,
-            pipeline: pipeline,
-        }
+        GstreamerSink { tx, pipeline }
     }
 }
 

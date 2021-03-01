@@ -211,30 +211,28 @@ impl MercuryManager {
             if let Some(cb) = pending.callback {
                 let _ = cb.send(Err(MercuryError));
             }
-        } else {
-            if cmd == 0xb5 {
-                self.lock(|inner| {
-                    let mut found = false;
-                    inner.subscriptions.retain(|&(ref prefix, ref sub)| {
-                        if response.uri.starts_with(prefix) {
-                            found = true;
+        } else if cmd == 0xb5 {
+            self.lock(|inner| {
+                let mut found = false;
+                inner.subscriptions.retain(|&(ref prefix, ref sub)| {
+                    if response.uri.starts_with(prefix) {
+                        found = true;
 
-                            // if send fails, remove from list of subs
-                            // TODO: send unsub message
-                            sub.send(response.clone()).is_ok()
-                        } else {
-                            // URI doesn't match
-                            true
-                        }
-                    });
-
-                    if !found {
-                        debug!("unknown subscription uri={}", response.uri);
+                        // if send fails, remove from list of subs
+                        // TODO: send unsub message
+                        sub.send(response.clone()).is_ok()
+                    } else {
+                        // URI doesn't match
+                        true
                     }
-                })
-            } else if let Some(cb) = pending.callback {
-                let _ = cb.send(Ok(response));
-            }
+                });
+
+                if !found {
+                    debug!("unknown subscription uri={}", response.uri);
+                }
+            })
+        } else if let Some(cb) = pending.callback {
+            let _ = cb.send(Ok(response));
         }
     }
 
