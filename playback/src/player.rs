@@ -888,14 +888,12 @@ impl Future for PlayerInternal {
                     if let Some(packet) = &packet {
                         *stream_position_pcm += packet.num_samples();
                         let stream_position_millis = Self::position_pcm_to_ms(*stream_position_pcm);
-                        let lag_ms = reported_nominal_start_time
-                            .as_ref()
-                            .map(|start_time| {
-                                let reported_position =
-                                    (Instant::now() - *start_time).as_millis() as i64;
-                                reported_position - stream_position_millis as i64
-                            });
-                        
+                        let lag_ms = reported_nominal_start_time.as_ref().map(|start_time| {
+                            let reported_position =
+                                (Instant::now() - *start_time).as_millis() as i64;
+                            reported_position - stream_position_millis as i64
+                        });
+
                         if lag_ms.map_or(false, |lag| lag < -1000) {
                             // We're too fast
                             std::thread::sleep(Duration::from_millis(500));
