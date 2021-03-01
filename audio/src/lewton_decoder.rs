@@ -38,7 +38,7 @@ where
         use self::lewton::VorbisError::OggError;
         loop {
             match self.0.read_dec_packet_itl() {
-                Ok(Some(packet)) => return Ok(Some(AudioPacket::Samples(packet))),
+                Ok(Some(packet)) => return Ok(Some(AudioPacket::Samples { data: packet })),
                 Ok(None) => return Ok(None),
 
                 Err(BadAudio(AudioIsHeader)) => (),

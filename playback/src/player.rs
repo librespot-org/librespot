@@ -885,44 +885,35 @@ impl Future for PlayerInternal {
                 {
                     let packet = decoder.next_packet().expect("Vorbis error");
 
-                    if !self.config.passthrough {
-                        if let Some(ref packet) = packet {
-                            *stream_position_pcm =
-                                *stream_position_pcm + (packet.samples().len() / 2) as u64;
-                            let stream_position_millis =
-                                Self::position_pcm_to_ms(*stream_position_pcm);
-
-                            let notify_about_position = match *reported_nominal_start_time {
-                                None => true,
-                                Some(reported_nominal_start_time) => {
-                                    // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we;re actually in time.
-                                    let lag = (Instant::now() - reported_nominal_start_time)
-                                        .as_millis()
-                                        as i64
-                                        - stream_position_millis as i64;
-                                    if lag > 1000 {
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
-                            };
-                            if notify_about_position {
-                                *reported_nominal_start_time = Some(
-                                    Instant::now()
-                                        - Duration::from_millis(stream_position_millis as u64),
-                                );
-                                self.send_event(PlayerEvent::Playing {
-                                    track_id,
-                                    play_request_id,
-                                    position_ms: stream_position_millis as u32,
-                                    duration_ms,
-                                });
-                            }
+                    if let Some(packet) = &packet {
+                        *stream_position_pcm += packet.num_samples();
+                        let stream_position_millis = Self::position_pcm_to_ms(*stream_position_pcm);
+                        let lag_ms = reported_nominal_start_time
+                            .as_ref()
+                            .map(|start_time| {
+                                let reported_position =
+                                    (Instant::now() - *start_time).as_millis() as i64;
+                                reported_position - stream_position_millis as i64
+                            });
+                        
+                        if lag_ms.map_or(false, |lag| lag < -1000) {
+                            // We're too fast
+                            std::thread::sleep(Duration::from_millis(500));
                         }
-                    } else {
-                        // position, even if irrelevant, must be set so that seek() is called
-                        *stream_position_pcm = duration_ms.into();
+
+                        let notify_about_position = lag_ms.map_or(true, |lag| lag > 1000);
+                        if notify_about_position {
+                            *reported_nominal_start_time = Some(
+                                Instant::now()
+                                    - Duration::from_millis(stream_position_millis as u64),
+                            );
+                            self.send_event(PlayerEvent::Playing {
+                                track_id,
+                                play_request_id,
+                                position_ms: stream_position_millis as u32,
+                                duration_ms,
+                            });
+                        }
                     }
 
                     self.handle_packet(packet, normalisation_factor);
@@ -1108,7 +1099,7 @@ impl PlayerInternal {
         match packet {
             Some(mut packet) => {
                 if !packet.is_empty() {
-                    if let AudioPacket::Samples(ref mut data) = packet {
+                    if let AudioPacket::Samples { data } = &mut packet {
                         if let Some(ref editor) = self.audio_filter {
                             editor.modify_stream(data)
                         }

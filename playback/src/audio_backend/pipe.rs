@@ -29,13 +29,13 @@ impl Sink for StdoutSink {
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         let data: &[u8] = match packet {
-            AudioPacket::Samples(data) => unsafe {
+            AudioPacket::Samples { data } => unsafe {
                 slice::from_raw_parts(
                     data.as_ptr() as *const u8,
                     data.len() * mem::size_of::<i16>(),
                 )
             },
-            AudioPacket::OggData(data) => data,
+            AudioPacket::OggData { data, .. } => data,
         };
 
         self.0.write_all(data)?;

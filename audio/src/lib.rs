@@ -33,29 +33,36 @@ pub use fetch::{
 use std::fmt;
 
 pub enum AudioPacket {
-    Samples(Vec<i16>),
-    OggData(Vec<u8>),
+    Samples { data: Vec<i16> },
+    OggData { data: Vec<u8>, num_samples: u64 },
 }
 
 impl AudioPacket {
     pub fn samples(&self) -> &[i16] {
         match self {
-            AudioPacket::Samples(s) => s,
-            AudioPacket::OggData(_) => panic!("can't return OggData on samples"),
+            AudioPacket::Samples { data } => data,
+            _ => panic!("can't return OggData on samples"),
         }
     }
 
     pub fn oggdata(&self) -> &[u8] {
         match self {
-            AudioPacket::Samples(_) => panic!("can't return samples on OggData"),
-            AudioPacket::OggData(d) => d,
+            AudioPacket::OggData { data, .. } => data,
+            _ => panic!("can't return samples on OggData"),
         }
     }
 
     pub fn is_empty(&self) -> bool {
         match self {
-            AudioPacket::Samples(s) => s.is_empty(),
-            AudioPacket::OggData(d) => d.is_empty(),
+            AudioPacket::Samples { data } => data.is_empty(),
+            AudioPacket::OggData { data, .. } => data.is_empty(),
+        }
+    }
+
+    pub fn num_samples(&self) -> u64 {
+        match self {
+            AudioPacket::Samples { data } => data.len() as u64 / 2,
+            AudioPacket::OggData { num_samples, .. } => *num_samples,
         }
     }
 }

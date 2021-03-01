@@ -128,6 +128,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
 
             let pckgp_page = pck.absgp_page();
             let lastgp_page = self.lastgp_page.get_or_insert(pckgp_page);
+            let num_samples = pckgp_page - *lastgp_page;
 
             // consume packets till next page to get a granule reference
             if skip {
@@ -140,7 +141,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
             }
 
             // now we can calculate absolute granule
-            self.absgp_page += pckgp_page - *lastgp_page;
+            self.absgp_page += num_samples;
             self.lastgp_page = Some(pckgp_page);
 
             // set packet type
@@ -165,7 +166,10 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
             let data = self.wtr.inner_mut();
 
             if data.len() > 0 {
-                let result = AudioPacket::OggData(std::mem::take(data));
+                let result = AudioPacket::OggData {
+                    data: std::mem::take(data),
+                    num_samples,
+                };
                 return Ok(Some(result));
             }
         }
