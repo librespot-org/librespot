@@ -1263,11 +1263,16 @@ impl PlayerInternal {
                                     }
                                 }
 
+                                *sample =
+                                    (*sample as f64 * actual_normalisation_factor as f64) as f32;
+
                                 // Extremely sharp attacks, however unlikely, *may* still clip and provide
                                 // undefined results, so strictly enforce output within [-1.0, 1.0].
-                                *sample = (*sample as f64 * actual_normalisation_factor as f64)
-                                    .clamp(-1.0, 1.0)
-                                    as f32;
+                                if *sample < -1.0 {
+                                    *sample = -1.0;
+                                } else if *sample > 1.0 {
+                                    *sample = 1.0;
+                                }
                             }
                         }
                     }
