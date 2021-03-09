@@ -60,7 +60,7 @@ impl Open for JackSink {
 
         JackSink {
             send: tx,
-            active_client: active_client,
+            active_client,
         }
     }
 }

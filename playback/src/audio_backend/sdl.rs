@@ -29,7 +29,7 @@ impl Open for SdlSink {
             .open_queue(None, &desired_spec)
             .expect("Could not open SDL audio device");
 
-        SdlSink { queue: queue }
+        SdlSink { queue }
     }
 }
 

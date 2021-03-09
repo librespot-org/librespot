@@ -1,6 +1,8 @@
 use super::{Open, Sink};
 use crate::audio::AudioPacket;
+
 use shell_words::split;
+
 use std::io::{self, Write};
 use std::mem;
 use std::process::{Child, Command, Stdio};
@@ -15,7 +17,7 @@ impl Open for SubprocessSink {
     fn open(shell_command: Option<String>) -> SubprocessSink {
         if let Some(shell_command) = shell_command {
             SubprocessSink {
-                shell_command: shell_command,
+                shell_command,
                 child: None,
             }
         } else {

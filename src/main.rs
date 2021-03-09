@@ -2,6 +2,23 @@ use futures_util::{future, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
 use log::{error, info, warn};
 use sha1::{Digest, Sha1};
+use tokio::sync::mpsc::UnboundedReceiver;
+use url::Url;
+
+use librespot::connect::spirc::Spirc;
+use librespot::core::authentication::Credentials;
+use librespot::core::cache::Cache;
+use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
+use librespot::core::session::Session;
+use librespot::core::version;
+use librespot::playback::audio_backend::{self, Sink, BACKENDS};
+use librespot::playback::config::{Bitrate, NormalisationType, PlayerConfig};
+use librespot::playback::mixer::{self, Mixer, MixerConfig};
+use librespot::playback::player::Player;
+
+mod player_event_handler;
+use player_event_handler::{emit_sink_event, run_program_on_events};
+
 use std::path::Path;
 use std::process::exit;
 use std::str::FromStr;
@@ -10,24 +27,6 @@ use std::{
     io::{stderr, Write},
     pin::Pin,
 };
-use tokio::sync::mpsc::UnboundedReceiver;
-use url::Url;
-
-use librespot::core::authentication::Credentials;
-use librespot::core::cache::Cache;
-use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
-use librespot::core::session::Session;
-use librespot::core::version;
-
-use librespot::connect::spirc::Spirc;
-use librespot::playback::audio_backend::{self, Sink, BACKENDS};
-use librespot::playback::config::{Bitrate, NormalisationType, PlayerConfig};
-use librespot::playback::mixer::{self, Mixer, MixerConfig};
-use librespot::playback::player::Player;
-
-mod player_event_handler;
-
-use player_event_handler::{emit_sink_event, run_program_on_events};
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -453,7 +452,7 @@ fn setup(args: &[String]) -> Setup {
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     if env::var("RUST_BACKTRACE").is_err() {
         env::set_var("RUST_BACKTRACE", "full")

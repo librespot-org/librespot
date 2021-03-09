@@ -252,8 +252,8 @@ impl Player {
             debug!("new Player[{}]", session.session_id());
 
             let internal = PlayerInternal {
-                session: session,
-                config: config,
+                session,
+                config,
                 commands: cmd_rx,
 
                 state: PlayerState::Stopped,
@@ -261,7 +261,7 @@ impl Player {
                 sink: sink_builder(),
                 sink_status: SinkStatus::Closed,
                 sink_event_callback: None,
-                audio_filter: audio_filter,
+                audio_filter,
                 event_senders: [event_sender].to_vec(),
             };
 
@@ -432,18 +432,12 @@ impl PlayerState {
     #[allow(dead_code)]
     fn is_stopped(&self) -> bool {
         use self::PlayerState::*;
-        match *self {
-            Stopped => true,
-            _ => false,
-        }
+        matches!(self, Stopped)
     }
 
     fn is_loading(&self) -> bool {
         use self::PlayerState::*;
-        match *self {
-            Loading { .. } => true,
-            _ => false,
-        }
+        matches!(self, Loading { .. })
     }
 
     fn decoder(&mut self) -> Option<&mut Decoder> {
@@ -697,7 +691,7 @@ impl PlayerTrackLoader {
             };
             let is_cached = encrypted_file.is_cached();
 
-            let mut stream_loader_controller = encrypted_file.get_stream_loader_controller();
+            let stream_loader_controller = encrypted_file.get_stream_loader_controller();
 
             if play_from_beginning {
                 // No need to seek -> we stream from the beginning
@@ -908,11 +902,7 @@ impl Future for PlayerInternal {
                                         .as_millis()
                                         as i64
                                         - stream_position_millis as i64;
-                                    if lag > 1000 {
-                                        true
-                                    } else {
-                                        false
-                                    }
+                                    lag > 1000
                                 }
                             };
                             if notify_about_position {

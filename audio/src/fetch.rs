@@ -138,19 +138,19 @@ impl StreamLoaderController {
         })
     }
 
-    fn send_stream_loader_command(&mut self, command: StreamLoaderCommand) {
-        if let Some(ref mut channel) = self.channel_tx {
+    fn send_stream_loader_command(&self, command: StreamLoaderCommand) {
+        if let Some(ref channel) = self.channel_tx {
             // ignore the error in case the channel has been closed already.
             let _ = channel.send(command);
         }
     }
 
-    pub fn fetch(&mut self, range: Range) {
+    pub fn fetch(&self, range: Range) {
         // signal the stream loader to fetch a range of the file
         self.send_stream_loader_command(StreamLoaderCommand::Fetch(range));
     }
 
-    pub fn fetch_blocking(&mut self, mut range: Range) {
+    pub fn fetch_blocking(&self, mut range: Range) {
         // signal the stream loader to tech a range of the file and block until it is loaded.
 
         // ensure the range is within the file's bounds.
@@ -182,47 +182,43 @@ impl StreamLoaderController {
                 {
                     // For some reason, the requested range is neither downloaded nor requested.
                     // This could be due to a network error. Request it again.
-                    // We can't use self.fetch here because self can't be borrowed mutably, so we access the channel directly.
-                    if let Some(ref mut channel) = self.channel_tx {
-                        // ignore the error in case the channel has been closed already.
-                        let _ = channel.send(StreamLoaderCommand::Fetch(range));
-                    }
+                    self.fetch(range);
                 }
             }
         }
     }
 
-    pub fn fetch_next(&mut self, length: usize) {
+    pub fn fetch_next(&self, length: usize) {
         if let Some(ref shared) = self.stream_shared {
             let range = Range {
                 start: shared.read_position.load(atomic::Ordering::Relaxed),
-                length: length,
+                length,
             };
             self.fetch(range)
         }
     }
 
-    pub fn fetch_next_blocking(&mut self, length: usize) {
+    pub fn fetch_next_blocking(&self, length: usize) {
         if let Some(ref shared) = self.stream_shared {
             let range = Range {
                 start: shared.read_position.load(atomic::Ordering::Relaxed),
-                length: length,
+                length,
             };
             self.fetch_blocking(range);
         }
     }
 
-    pub fn set_random_access_mode(&mut self) {
+    pub fn set_random_access_mode(&self) {
         // optimise download strategy for random access
         self.send_stream_loader_command(StreamLoaderCommand::RandomAccessMode());
     }
 
-    pub fn set_stream_mode(&mut self) {
+    pub fn set_stream_mode(&self) {
         // optimise download strategy for streaming
         self.send_stream_loader_command(StreamLoaderCommand::StreamMode());
     }
 
-    pub fn close(&mut self) {
+    pub fn close(&self) {
         // terminate stream loading and don't load any more data for this file.
         self.send_stream_loader_command(StreamLoaderCommand::Close());
     }
@@ -230,11 +226,8 @@ impl StreamLoaderController {
 
 pub struct AudioFileStreaming {
     read_file: fs::File,
-
     position: u64,
-
     stream_loader_command_tx: mpsc::UnboundedSender<StreamLoaderCommand>,
-
     shared: Arc<AudioFileShared>,
 }
 
@@ -332,10 +325,7 @@ impl AudioFile {
     }
 
     pub fn is_cached(&self) -> bool {
-        match self {
-            AudioFile::Cached { .. } => true,
-            _ => false,
-        }
+        matches!(self, AudioFile::Cached { .. })
     }
 }
 
@@ -359,7 +349,7 @@ impl AudioFileStreaming {
         let size = BigEndian::read_u32(&data) as usize * 4;
 
         let shared = Arc::new(AudioFileShared {
-            file_id: file_id,
+            file_id,
             file_size: size,
             stream_data_rate: streaming_data_rate,
             cond: Condvar::new(),
@@ -396,11 +386,10 @@ impl AudioFileStreaming {
 
         session.spawn(fetcher);
         Ok(AudioFileStreaming {
-            read_file: read_file,
+            read_file,
             position: 0,
-            //seek: seek_tx,
-            stream_loader_command_tx: stream_loader_command_tx,
-            shared: shared,
+            stream_loader_command_tx,
+            shared,
         })
     }
 }
@@ -486,7 +475,7 @@ async fn audio_file_fetch_receive_data(
         let data_size = data.len();
         let _ = file_data_tx.send(ReceivedData::Data(PartialFileData {
             offset: data_offset,
-            data: data,
+            data,
         }));
         data_offset += data_size;
         if request_length < data_size {
@@ -728,14 +717,12 @@ impl AudioFileFetch {
         ));
 
         AudioFileFetch {
-            session: session,
-            shared: shared,
+            session,
+            shared,
             output: Some(output),
-
-            file_data_tx: file_data_tx,
-            file_data_rx: file_data_rx,
-
-            stream_loader_command_rx: stream_loader_command_rx,
+            file_data_tx,
+            file_data_rx,
+            stream_loader_command_rx,
             complete_tx: Some(complete_tx),
             network_response_times_ms: Vec::new(),
         }

@@ -43,7 +43,6 @@ pub enum RodioError {
 
 pub struct RodioSink {
     rodio_sink: rodio::Sink,
-
     // will produce a TryRecvError on the receiver side when it is dropped.
     _close_tx: mpsc::SyncSender<Infallible>,
 }

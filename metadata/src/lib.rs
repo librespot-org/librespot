@@ -292,7 +292,7 @@ impl Metadata for Playlist {
             .get_items()
             .iter()
             .map(|item| {
-                let uri_split = item.get_uri().split(":");
+                let uri_split = item.get_uri().split(':');
                 let uri_parts: Vec<&str> = uri_split.collect();
                 SpotifyId::from_base62(uri_parts[2]).unwrap()
             })

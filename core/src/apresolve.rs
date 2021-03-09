@@ -1,10 +1,10 @@
-const AP_FALLBACK: &'static str = "ap.spotify.com:443";
+const AP_FALLBACK: &str = "ap.spotify.com:443";
 
 use url::Url;
 
 cfg_if! {
     if #[cfg(feature = "apresolve")] {
-        const APRESOLVE_ENDPOINT: &'static str = "http://apresolve.spotify.com:80";
+        const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
 
         use std::error::Error;
 

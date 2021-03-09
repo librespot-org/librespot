@@ -16,14 +16,11 @@ impl fmt::Display for Range {
 
 impl Range {
     pub fn new(start: usize, length: usize) -> Range {
-        return Range {
-            start: start,
-            length: length,
-        };
+        Range { start, length }
     }
 
     pub fn end(&self) -> usize {
-        return self.start + self.length;
+        self.start + self.length
     }
 }
 
@@ -50,7 +47,7 @@ impl RangeSet {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.ranges.is_empty();
+        self.ranges.is_empty()
     }
 
     pub fn len(&self) -> usize {
@@ -58,11 +55,11 @@ impl RangeSet {
     }
 
     pub fn get_range(&self, index: usize) -> Range {
-        return self.ranges[index].clone();
+        self.ranges[index]
     }
 
     pub fn iter(&self) -> Iter<Range> {
-        return self.ranges.iter();
+        self.ranges.iter()
     }
 
     pub fn contains(&self, value: usize) -> bool {
@@ -73,7 +70,7 @@ impl RangeSet {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     pub fn contained_length_from_value(&self, value: usize) -> usize {
@@ -84,7 +81,7 @@ impl RangeSet {
                 return range.end() - value;
             }
         }
-        return 0;
+        0
     }
 
     #[allow(dead_code)]
@@ -144,7 +141,7 @@ impl RangeSet {
     pub fn union(&self, other: &RangeSet) -> RangeSet {
         let mut result = self.clone();
         result.add_range_set(other);
-        return result;
+        result
     }
 
     pub fn subtract_range(&mut self, range: &Range) {
@@ -204,7 +201,7 @@ impl RangeSet {
     pub fn minus(&self, other: &RangeSet) -> RangeSet {
         let mut result = self.clone();
         result.subtract_range_set(other);
-        return result;
+        result
     }
 
     pub fn intersection(&self, other: &RangeSet) -> RangeSet {
@@ -240,6 +237,6 @@ impl RangeSet {
             }
         }
 
-        return result;
+        result
     }
 }

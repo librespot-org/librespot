@@ -1,6 +1,7 @@
+use super::{AudioDecoder, AudioError, AudioPacket};
+
 use lewton::inside_ogg::OggStreamReader;
 
-use super::{AudioDecoder, AudioError, AudioPacket};
 use std::error;
 use std::fmt;
 use std::io::{Read, Seek};
@@ -24,16 +25,15 @@ where
     fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
         let absgp = ms * 44100 / 1000;
         match self.0.seek_absgp_pg(absgp as u64) {
-            Ok(_) => return Ok(()),
-            Err(err) => return Err(AudioError::VorbisError(err.into())),
+            Ok(_) => Ok(()),
+            Err(err) => Err(AudioError::VorbisError(err.into())),
         }
     }
 
     fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError> {
         use lewton::audio::AudioReadError::AudioIsHeader;
         use lewton::OggReadError::NoCapturePatternFound;
-        use lewton::VorbisError::BadAudio;
-        use lewton::VorbisError::OggError;
+        use lewton::VorbisError::{BadAudio, OggError};
         loop {
             match self.0.read_dec_packet_itl() {
                 Ok(Some(packet)) => return Ok(Some(AudioPacket::Samples(packet))),

@@ -5,14 +5,10 @@ use futures_core::Stream;
 use hmac::{Hmac, Mac, NewMac};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, StatusCode};
+use num_bigint::BigUint;
 use serde_json::json;
 use sha1::{Digest, Sha1};
 use tokio::sync::{mpsc, oneshot};
-
-use std::borrow::Cow;
-use std::convert::Infallible;
-use std::net::{Ipv4Addr, SocketAddr};
-use std::task::{Context, Poll};
 
 #[cfg(feature = "with-dns-sd")]
 use dns_sd::DNSService;
@@ -20,18 +16,19 @@ use dns_sd::DNSService;
 #[cfg(not(feature = "with-dns-sd"))]
 use libmdns;
 
-use num_bigint::BigUint;
-use rand;
-use std::collections::BTreeMap;
-use std::io;
-use std::pin::Pin;
-use std::sync::Arc;
-use url;
-
 use librespot_core::authentication::Credentials;
 use librespot_core::config::ConnectConfig;
 use librespot_core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
 use librespot_core::util;
+
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::convert::Infallible;
+use std::io;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
 type HmacSha1 = Hmac<Sha1>;
 
