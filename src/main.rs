@@ -236,13 +236,7 @@ fn setup(args: &[String]) -> Setup {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            writeln!(
-                stderr(),
-                "error: {}\n{}",
-                f.to_string(),
-                usage(&args[0], &opts)
-            )
-            .unwrap();
+            eprintln!("error: {}\n{}", f.to_string(), usage(&args[0], &opts));
             exit(1);
         }
     };
@@ -360,7 +354,7 @@ fn setup(args: &[String]) -> Setup {
         SessionConfig {
             user_agent: version::version_string(),
             device_id: device_id,
-            proxy: matches.opt_str("proxy").or(std::env::var("http_proxy").ok()).map(
+            proxy: matches.opt_str("proxy").or_else(|| std::env::var("http_proxy").ok()).map(
                 |s| {
                     match Url::parse(&s) {
                         Ok(url) => {
@@ -390,14 +384,14 @@ fn setup(args: &[String]) -> Setup {
             .opt_str("b")
             .as_ref()
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
-            .unwrap_or(Bitrate::default());
+            .unwrap_or_default();
         let gain_type = matches
             .opt_str("normalisation-gain-type")
             .as_ref()
             .map(|gain_type| {
                 NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
             })
-            .unwrap_or(NormalisationType::default());
+            .unwrap_or_default();
         PlayerConfig {
             bitrate: bitrate,
             gapless: !matches.opt_present("disable-gapless"),
@@ -416,13 +410,13 @@ fn setup(args: &[String]) -> Setup {
             .opt_str("device-type")
             .as_ref()
             .map(|device_type| DeviceType::from_str(device_type).expect("Invalid device type"))
-            .unwrap_or(DeviceType::default());
+            .unwrap_or_default();
 
         let volume_ctrl = matches
             .opt_str("volume-ctrl")
             .as_ref()
             .map(|volume_ctrl| VolumeCtrl::from_str(volume_ctrl).expect("Invalid volume ctrl type"))
-            .unwrap_or(VolumeCtrl::default());
+            .unwrap_or_default();
 
         ConnectConfig {
             name: name,

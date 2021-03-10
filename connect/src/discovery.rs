@@ -13,9 +13,6 @@ use tokio::sync::{mpsc, oneshot};
 #[cfg(feature = "with-dns-sd")]
 use dns_sd::DNSService;
 
-#[cfg(not(feature = "with-dns-sd"))]
-use libmdns;
-
 use librespot_core::authentication::Credentials;
 use librespot_core::config::ConnectConfig;
 use librespot_core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
@@ -127,7 +124,7 @@ impl Discovery {
 
         let mut h = HmacSha1::new_varkey(&checksum_key).expect("HMAC can take key of any size");
         h.update(encrypted);
-        if let Err(_) = h.verify(cksum) {
+        if h.verify(cksum).is_err() {
             warn!("Login error for user {:?}: MAC mismatch", username);
             let result = json!({
                 "status": 102,
