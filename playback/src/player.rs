@@ -204,10 +204,10 @@ impl NormalisationData {
         let album_peak = file.read_f32::<LittleEndian>()?;
 
         let r = NormalisationData {
-            track_gain_db: track_gain_db,
-            track_peak: track_peak,
-            album_gain_db: album_gain_db,
-            album_peak: album_peak,
+            track_gain_db,
+            track_peak,
+            album_gain_db,
+            album_peak,
         };
 
         Ok(r)
@@ -1164,8 +1164,8 @@ impl PlayerInternal {
             });
 
             self.state = PlayerState::Playing {
-                track_id: track_id,
-                play_request_id: play_request_id,
+                track_id,
+                play_request_id,
                 decoder: loaded_track.decoder,
                 normalisation_factor: loaded_track.normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
@@ -1181,8 +1181,8 @@ impl PlayerInternal {
             self.ensure_sink_stopped(false);
 
             self.state = PlayerState::Paused {
-                track_id: track_id,
-                play_request_id: play_request_id,
+                track_id,
+                play_request_id,
                 decoder: loaded_track.decoder,
                 normalisation_factor: loaded_track.normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
@@ -1229,7 +1229,7 @@ impl PlayerInternal {
                 track_id: old_track_id,
                 ..
             } => self.send_event(PlayerEvent::Changed {
-                old_track_id: old_track_id,
+                old_track_id,
                 new_track_id: track_id,
             }),
             PlayerState::Stopped => self.send_event(PlayerEvent::Started {
@@ -1726,10 +1726,7 @@ struct Subfile<T: Read + Seek> {
 impl<T: Read + Seek> Subfile<T> {
     pub fn new(mut stream: T, offset: u64) -> Subfile<T> {
         stream.seek(SeekFrom::Start(offset)).unwrap();
-        Subfile {
-            stream: stream,
-            offset: offset,
-        }
+        Subfile { stream, offset }
     }
 }
 

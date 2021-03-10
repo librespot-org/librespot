@@ -287,27 +287,27 @@ impl Spirc {
         let player_events = player.get_player_event_channel();
 
         let mut task = SpircTask {
-            player: player,
-            mixer: mixer,
+            player,
+            mixer,
             config: task_config,
 
             sequence: SeqGenerator::new(1),
 
-            ident: ident,
+            ident,
 
-            device: device,
+            device,
             state: initial_state(),
             play_request_id: None,
             mixer_started: false,
             play_status: SpircPlayStatus::Stopped,
 
-            subscription: subscription,
-            sender: sender,
+            subscription,
+            sender,
             commands: Some(cmd_rx),
             player_events: Some(player_events),
 
             shutdown: false,
-            session: session,
+            session,
 
             context_fut: Box::pin(future::pending()),
             autoplay_fut: Box::pin(future::pending()),
@@ -1293,10 +1293,7 @@ impl<'a> CommandSender<'a> {
         frame.set_typ(cmd);
         frame.set_device_state(spirc.device.clone());
         frame.set_state_update_id(spirc.now_ms());
-        CommandSender {
-            spirc: spirc,
-            frame: frame,
-        }
+        CommandSender { spirc, frame }
     }
 
     fn recipient(mut self, recipient: &'a str) -> CommandSender {

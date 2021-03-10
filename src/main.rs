@@ -353,7 +353,7 @@ fn setup(args: &[String]) -> Setup {
 
         SessionConfig {
             user_agent: version::version_string(),
-            device_id: device_id,
+            device_id,
             proxy: matches.opt_str("proxy").or_else(|| std::env::var("http_proxy").ok()).map(
                 |s| {
                     match Url::parse(&s) {
@@ -393,7 +393,7 @@ fn setup(args: &[String]) -> Setup {
             })
             .unwrap_or_default();
         PlayerConfig {
-            bitrate: bitrate,
+            bitrate,
             gapless: !matches.opt_present("disable-gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
             normalisation_type: gain_type,
@@ -419,10 +419,10 @@ fn setup(args: &[String]) -> Setup {
             .unwrap_or_default();
 
         ConnectConfig {
-            name: name,
-            device_type: device_type,
+            name,
+            device_type,
             volume: initial_volume,
-            volume_ctrl: volume_ctrl,
+            volume_ctrl,
             autoplay: matches.opt_present("autoplay"),
         }
     };
@@ -430,17 +430,17 @@ fn setup(args: &[String]) -> Setup {
     let enable_discovery = !matches.opt_present("disable-discovery");
 
     Setup {
-        backend: backend,
-        cache: cache,
-        session_config: session_config,
-        player_config: player_config,
-        connect_config: connect_config,
-        credentials: credentials,
-        device: device,
-        enable_discovery: enable_discovery,
-        zeroconf_port: zeroconf_port,
-        mixer: mixer,
-        mixer_config: mixer_config,
+        backend,
+        cache,
+        session_config,
+        player_config,
+        connect_config,
+        credentials,
+        device,
+        enable_discovery,
+        zeroconf_port,
+        mixer,
+        mixer_config,
         player_event_program: matches.opt_str("onevent"),
         emit_sink_events: matches.opt_present("emit-sink-events"),
     }

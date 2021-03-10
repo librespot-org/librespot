@@ -51,11 +51,11 @@ impl Discovery {
         let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
 
         let discovery = Discovery(Arc::new(DiscoveryInner {
-            config: config,
-            device_id: device_id,
-            private_key: private_key,
-            public_key: public_key,
-            tx: tx,
+            config,
+            device_id,
+            private_key,
+            public_key,
+            tx,
         }));
 
         (discovery, rx)
