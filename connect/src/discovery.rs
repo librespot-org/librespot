@@ -5,7 +5,6 @@ use futures_core::Stream;
 use hmac::{Hmac, Mac, NewMac};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, StatusCode};
-use num_bigint::BigUint;
 use serde_json::json;
 use sha1::{Digest, Sha1};
 use tokio::sync::{mpsc, oneshot};
@@ -15,8 +14,7 @@ use dns_sd::DNSService;
 
 use librespot_core::authentication::Credentials;
 use librespot_core::config::ConnectConfig;
-use librespot_core::diffie_hellman::{DH_GENERATOR, DH_PRIME};
-use librespot_core::util;
+use librespot_core::diffie_hellman::DHLocalKeys;
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -34,8 +32,7 @@ struct Discovery(Arc<DiscoveryInner>);
 struct DiscoveryInner {
     config: ConnectConfig,
     device_id: String,
-    private_key: BigUint,
-    public_key: BigUint,
+    keys: DHLocalKeys,
     tx: mpsc::UnboundedSender<Credentials>,
 }
 
@@ -46,15 +43,10 @@ impl Discovery {
     ) -> (Discovery, mpsc::UnboundedReceiver<Credentials>) {
         let (tx, rx) = mpsc::unbounded_channel();
 
-        let key_data = util::rand_vec(&mut rand::thread_rng(), 95);
-        let private_key = BigUint::from_bytes_be(&key_data);
-        let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
-
         let discovery = Discovery(Arc::new(DiscoveryInner {
             config,
             device_id,
-            private_key,
-            public_key,
+            keys: DHLocalKeys::random(&mut rand::thread_rng()),
             tx,
         }));
 
@@ -62,8 +54,7 @@ impl Discovery {
     }
 
     fn handle_get_info(&self, _: BTreeMap<Cow<'_, str>, Cow<'_, str>>) -> Response<hyper::Body> {
-        let public_key = self.0.public_key.to_bytes_be();
-        let public_key = base64::encode(&public_key);
+        let public_key = base64::encode(&self.0.keys.public_key());
 
         let result = json!({
             "status": 101,
@@ -98,16 +89,16 @@ impl Discovery {
 
         let encrypted_blob = base64::decode(encrypted_blob.as_bytes()).unwrap();
 
-        let client_key = base64::decode(client_key.as_bytes()).unwrap();
-        let client_key = BigUint::from_bytes_be(&client_key);
-
-        let shared_key = util::powm(&client_key, &self.0.private_key, &DH_PRIME);
+        let shared_key = self
+            .0
+            .keys
+            .shared_secret(&base64::decode(client_key.as_bytes()).unwrap());
 
         let iv = &encrypted_blob[0..16];
         let encrypted = &encrypted_blob[16..encrypted_blob.len() - 20];
         let cksum = &encrypted_blob[encrypted_blob.len() - 20..encrypted_blob.len()];
 
-        let base_key = Sha1::digest(&shared_key.to_bytes_be());
+        let base_key = Sha1::digest(&shared_key);
         let base_key = &base_key[..16];
 
         let checksum_key = {
