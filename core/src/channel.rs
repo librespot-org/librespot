@@ -192,11 +192,12 @@ impl Stream for ChannelData {
         };
 
         loop {
-            let x = match channel.poll_next_unpin(cx) {
+            let event = match channel.poll_next_unpin(cx) {
                 Poll::Ready(x) => x.transpose()?,
                 Poll::Pending => return Poll::Pending,
             };
-            match x {
+
+            match event {
                 Some(ChannelEvent::Header(..)) => (),
                 Some(ChannelEvent::Data(data)) => return Poll::Ready(Some(Ok(data))),
                 None => return Poll::Ready(None),
@@ -214,12 +215,12 @@ impl Stream for ChannelHeaders {
             Poll::Pending => return Poll::Pending,
         };
 
-        let x = match channel.poll_next_unpin(cx) {
+        let event = match channel.poll_next_unpin(cx) {
             Poll::Ready(x) => x.transpose()?,
             Poll::Pending => return Poll::Pending,
         };
 
-        match x {
+        match event {
             Some(ChannelEvent::Header(id, data)) => Poll::Ready(Some(Ok((id, data)))),
             Some(ChannelEvent::Data(..)) | None => Poll::Ready(None),
         }

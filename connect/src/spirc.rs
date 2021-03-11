@@ -287,27 +287,27 @@ impl Spirc {
         let player_events = player.get_player_event_channel();
 
         let mut task = SpircTask {
-            player: player,
-            mixer: mixer,
+            player,
+            mixer,
             config: task_config,
 
             sequence: SeqGenerator::new(1),
 
-            ident: ident,
+            ident,
 
-            device: device,
+            device,
             state: initial_state(),
             play_request_id: None,
             mixer_started: false,
             play_status: SpircPlayStatus::Stopped,
 
-            subscription: subscription,
-            sender: sender,
+            subscription,
+            sender,
             commands: Some(cmd_rx),
             player_events: Some(player_events),
 
             shutdown: false,
-            session: session,
+            session,
 
             context_fut: Box::pin(future::pending()),
             autoplay_fut: Box::pin(future::pending()),
@@ -426,8 +426,8 @@ impl SpircTask {
             Ok(dur) => dur,
             Err(err) => err.duration(),
         };
-        (dur.as_secs() as i64 + self.session.time_delta()) * 1000
-            + (dur.subsec_nanos() / 1000_000) as i64
+
+        dur.as_millis() as i64 + 1000 * self.session.time_delta()
     }
 
     fn ensure_mixer_started(&mut self) {
@@ -512,7 +512,9 @@ impl SpircTask {
             SpircCommand::Shutdown => {
                 CommandSender::new(self, MessageType::kMessageTypeGoodbye).send();
                 self.shutdown = true;
-                self.commands.as_mut().map(|rx| rx.close());
+                if let Some(rx) = self.commands.as_mut() {
+                    rx.close()
+                }
             }
         }
     }
@@ -620,7 +622,7 @@ impl SpircTask {
         );
 
         if frame.get_ident() == self.ident
-            || (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident))
+            || (!frame.get_recipient().is_empty() && !frame.get_recipient().contains(&self.ident))
         {
             return;
         }
@@ -639,7 +641,7 @@ impl SpircTask {
 
                 self.update_tracks(&frame);
 
-                if self.state.get_track().len() > 0 {
+                if !self.state.get_track().is_empty() {
                     let start_playing =
                         frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
                     self.load_track(start_playing, frame.get_state().get_position_ms());
@@ -862,7 +864,7 @@ impl SpircTask {
 
     fn preview_next_track(&mut self) -> Option<SpotifyId> {
         self.get_track_id_to_play_from_playlist(self.state.get_playing_track_index() + 1)
-            .and_then(|(track_id, _)| Some(track_id))
+            .map(|(track_id, _)| track_id)
     }
 
     fn handle_preload_next_track(&mut self) {
@@ -981,7 +983,7 @@ impl SpircTask {
             };
             // Reinsert queued tracks after the new playing track.
             let mut pos = (new_index + 1) as usize;
-            for track in queue_tracks.into_iter() {
+            for track in queue_tracks {
                 self.state.mut_track().insert(pos, track);
                 pos += 1;
             }
@@ -1120,7 +1122,7 @@ impl SpircTask {
         }
 
         self.state.set_playing_track_index(index);
-        self.state.set_track(tracks.into_iter().cloned().collect());
+        self.state.set_track(tracks.iter().cloned().collect());
         self.state.set_context_uri(context_uri);
         // has_shuffle/repeat seem to always be true in these replace msgs,
         // but to replicate the behaviour of the Android client we have to
@@ -1291,10 +1293,7 @@ impl<'a> CommandSender<'a> {
         frame.set_typ(cmd);
         frame.set_device_state(spirc.device.clone());
         frame.set_state_update_id(spirc.now_ms());
-        CommandSender {
-            spirc: spirc,
-            frame: frame,
-        }
+        CommandSender { spirc, frame }
     }
 
     fn recipient(mut self, recipient: &'a str) -> CommandSender {

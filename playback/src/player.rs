@@ -196,19 +196,18 @@ struct NormalisationData {
 impl NormalisationData {
     fn parse_from_file<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
-        file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))
-            .unwrap();
+        file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
 
-        let track_gain_db = file.read_f32::<LittleEndian>().unwrap();
-        let track_peak = file.read_f32::<LittleEndian>().unwrap();
-        let album_gain_db = file.read_f32::<LittleEndian>().unwrap();
-        let album_peak = file.read_f32::<LittleEndian>().unwrap();
+        let track_gain_db = file.read_f32::<LittleEndian>()?;
+        let track_peak = file.read_f32::<LittleEndian>()?;
+        let album_gain_db = file.read_f32::<LittleEndian>()?;
+        let album_peak = file.read_f32::<LittleEndian>()?;
 
         let r = NormalisationData {
-            track_gain_db: track_gain_db,
-            track_peak: track_peak,
-            album_gain_db: album_gain_db,
-            album_peak: album_peak,
+            track_gain_db,
+            track_peak,
+            album_gain_db,
+            album_peak,
         };
 
         Ok(r)
@@ -889,8 +888,7 @@ impl Future for PlayerInternal {
 
                     if !passthrough {
                         if let Some(ref packet) = packet {
-                            *stream_position_pcm =
-                                *stream_position_pcm + (packet.samples().len() / 2) as u64;
+                            *stream_position_pcm += (packet.samples().len() / 2) as u64;
                             let stream_position_millis =
                                 Self::position_pcm_to_ms(*stream_position_pcm);
 
@@ -1111,7 +1109,9 @@ impl PlayerInternal {
                             editor.modify_stream(data)
                         }
 
-                        if self.config.normalisation && normalisation_factor != 1.0 {
+                        if self.config.normalisation
+                            && f32::abs(normalisation_factor - 1.0) > f32::EPSILON
+                        {
                             for x in data.iter_mut() {
                                 *x = (*x as f32 * normalisation_factor) as i16;
                             }
@@ -1164,8 +1164,8 @@ impl PlayerInternal {
             });
 
             self.state = PlayerState::Playing {
-                track_id: track_id,
-                play_request_id: play_request_id,
+                track_id,
+                play_request_id,
                 decoder: loaded_track.decoder,
                 normalisation_factor: loaded_track.normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
@@ -1181,8 +1181,8 @@ impl PlayerInternal {
             self.ensure_sink_stopped(false);
 
             self.state = PlayerState::Paused {
-                track_id: track_id,
-                play_request_id: play_request_id,
+                track_id,
+                play_request_id,
                 decoder: loaded_track.decoder,
                 normalisation_factor: loaded_track.normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
@@ -1229,7 +1229,7 @@ impl PlayerInternal {
                 track_id: old_track_id,
                 ..
             } => self.send_event(PlayerEvent::Changed {
-                old_track_id: old_track_id,
+                old_track_id,
                 new_track_id: track_id,
             }),
             PlayerState::Stopped => self.send_event(PlayerEvent::Started {
@@ -1598,12 +1598,10 @@ impl PlayerInternal {
         let (result_tx, result_rx) = oneshot::channel();
 
         std::thread::spawn(move || {
-            futures_executor::block_on(loader.load_track(spotify_id, position_ms)).and_then(
-                move |data| {
-                    let _ = result_tx.send(data);
-                    Some(())
-                },
-            );
+            let data = futures_executor::block_on(loader.load_track(spotify_id, position_ms));
+            if let Some(data) = data {
+                let _ = result_tx.send(data);
+            }
         });
 
         result_rx.map_err(|_| ())
@@ -1728,10 +1726,7 @@ struct Subfile<T: Read + Seek> {
 impl<T: Read + Seek> Subfile<T> {
     pub fn new(mut stream: T, offset: u64) -> Subfile<T> {
         stream.seek(SeekFrom::Start(offset)).unwrap();
-        Subfile {
-            stream: stream,
-            offset: offset,
-        }
+        Subfile { stream, offset }
     }
 }
 

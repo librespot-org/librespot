@@ -104,11 +104,11 @@ where
     Ok(message)
 }
 
-async fn read_into_accumulator<'a, T: AsyncRead + Unpin>(
-    connection: &mut T,
+async fn read_into_accumulator<'a, 'b, T: AsyncRead + Unpin>(
+    connection: &'a mut T,
     size: usize,
-    acc: &'a mut Vec<u8>,
-) -> io::Result<&'a mut [u8]> {
+    acc: &'b mut Vec<u8>,
+) -> io::Result<&'b mut [u8]> {
     let offset = acc.len();
     acc.resize(offset + size, 0);
 
