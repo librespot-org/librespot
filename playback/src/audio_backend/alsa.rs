@@ -11,7 +11,7 @@ use std::process::exit;
 use std::{io, mem};
 
 const BUFFERED_LATENCY: f32 = 0.125; // seconds
-const BUFFERED_PERIODS: u8 = 4;
+const BUFFERED_PERIODS: Frames = 4;
 
 pub struct AlsaSink {
     pcm: Option<PCM>,
@@ -48,7 +48,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
     // latency = period_size * periods / (rate * bytes_per_frame)
     // For stereo samples encoded as 32-bit float, one frame has a length of eight bytes.
     let mut period_size = ((SAMPLES_PER_SECOND * sample_size as u32) as f32
-        * (BUFFERED_LATENCY / BUFFERED_PERIODS as f32)) as i32;
+        * (BUFFERED_LATENCY / BUFFERED_PERIODS as f32)) as Frames;
 
     // Set hardware parameters: 44100 Hz / stereo / 32-bit float or 16-bit signed integer
     {
@@ -58,7 +58,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
         hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest)?;
         hwp.set_channels(NUM_CHANNELS as u32)?;
         period_size = hwp.set_period_size_near(period_size, ValueOr::Greater)?;
-        hwp.set_buffer_size_near(period_size * BUFFERED_PERIODS as i32)?;
+        hwp.set_buffer_size_near(period_size * BUFFERED_PERIODS)?;
         pcm.hw_params(&hwp)?;
 
         let swp = pcm.sw_params_current()?;
@@ -101,8 +101,7 @@ impl Sink for AlsaSink {
                 Ok((p, period_size)) => {
                     self.pcm = Some(p);
                     // Create a buffer for all samples for a full period
-                    self.buffer =
-                        Vec::with_capacity((period_size * BUFFERED_PERIODS as i32) as usize);
+                    self.buffer = Vec::with_capacity((period_size * BUFFERED_PERIODS) as usize);
                 }
                 Err(e) => {
                     error!("Alsa error PCM open {}", e);
