@@ -5,7 +5,7 @@ use librespot::core::authentication::Credentials;
 use librespot::core::config::SessionConfig;
 use librespot::core::session::Session;
 use librespot::core::spotify_id::SpotifyId;
-use librespot::playback::config::PlayerConfig;
+use librespot::playback::config::{AudioFormat, PlayerConfig};
 
 use librespot::playback::audio_backend;
 use librespot::playback::player::Player;
@@ -16,6 +16,7 @@ fn main() {
 
     let session_config = SessionConfig::default();
     let player_config = PlayerConfig::default();
+    let audio_format = AudioFormat::default();
 
     let args: Vec<_> = env::args().collect();
     if args.len() != 4 {
@@ -35,7 +36,7 @@ fn main() {
         .unwrap();
 
     let (mut player, _) = Player::new(player_config, session.clone(), None, move || {
-        (backend)(None)
+        (backend)(None, audio_format)
     });
 
     player.load(track, true, 0);
