@@ -1,10 +1,12 @@
 use super::{Open, Sink};
 use crate::audio::AudioPacket;
+use crate::config::AudioFormat;
+use crate::player::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
-use std::io;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::{io, mem};
 
 pub struct JackSink {
     send: SyncSender<f32>,
@@ -39,8 +41,15 @@ impl ProcessHandler for JackData {
 }
 
 impl Open for JackSink {
-    fn open(client_name: Option<String>) -> JackSink {
-        info!("Using jack sink!");
+    fn open(client_name: Option<String>, format: AudioFormat) -> JackSink {
+        info!("Using JACK sink with format {:?}", format);
+
+        if format != AudioFormat::F32 {
+            panic!(
+                "JACK sink only supports 32-bit floating point output. Use `--format {:?}`",
+                AudioFormat::F32
+            );
+        }
 
         let client_name = client_name.unwrap_or("librespot".to_string());
         let (client, _status) =
@@ -48,7 +57,7 @@ impl Open for JackSink {
         let ch_r = client.register_port("out_0", AudioOut::default()).unwrap();
         let ch_l = client.register_port("out_1", AudioOut::default()).unwrap();
         // buffer for samples from librespot (~10ms)
-        let (tx, rx) = sync_channel(2 * 1024 * 4);
+        let (tx, rx) = sync_channel::<f32>(NUM_CHANNELS as usize * 1024 * mem::size_of::<f32>());
         let jack_data = JackData {
             rec: rx,
             port_l: ch_l,
@@ -64,13 +73,7 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    fn start(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-
-    fn stop(&mut self) -> io::Result<()> {
-        Ok(())
-    }
+    start_stop_noop!();
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         for s in packet.samples().iter() {

@@ -58,6 +58,13 @@ impl AudioPacket {
             AudioPacket::OggData(d) => d.is_empty(),
         }
     }
+
+    pub fn f32_to_s16(samples: &[f32]) -> Vec<i16> {
+        samples
+            .iter()
+            .map(|sample| (*sample as f64 * (0x7FFF as f64 + 0.5) - 0.5) as i16)
+            .collect()
+    }
 }
 
 #[cfg(not(any(feature = "with-tremor", feature = "with-vorbis")))]

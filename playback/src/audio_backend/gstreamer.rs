@@ -1,21 +1,29 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkAsBytes};
 use crate::audio::AudioPacket;
+use crate::config::AudioFormat;
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use gst::prelude::*;
 use gst::*;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::{io, thread};
-use zerocopy::*;
+use zerocopy::AsBytes;
 
 #[allow(dead_code)]
 pub struct GstreamerSink {
     tx: SyncSender<Vec<u8>>,
     pipeline: gst::Pipeline,
+    format: AudioFormat,
 }
 
 impl Open for GstreamerSink {
-    fn open(device: Option<String>) -> GstreamerSink {
-        gst::init().expect("Failed to init gstreamer!");
-        let pipeline_str_preamble = r#"appsrc caps="audio/x-raw,format=F32,layout=interleaved,channels=2,rate=44100" block=true max-bytes=4096 name=appsrc0 "#;
+    fn open(device: Option<String>, format: AudioFormat) -> GstreamerSink {
+        info!("Using GStreamer sink with format: {:?}", format);
+
+        gst::init().expect("failed to init GStreamer!");
+        let pipeline_str_preamble = format!(
+            r#"appsrc caps="audio/x-raw,format={:?},layout=interleaved,channels={},rate={}" block=true max-bytes=4096 name=appsrc0 "#,
+            format, NUM_CHANNELS, SAMPLE_RATE
+        );
         let pipeline_str_rest = r#" ! audioconvert ! autoaudiosink"#;
         let pipeline_str: String = match device {
             Some(x) => format!("{}{}", pipeline_str_preamble, x),
@@ -27,25 +35,25 @@ impl Open for GstreamerSink {
         let pipelinee = gst::parse_launch(&*pipeline_str).expect("Couldn't launch pipeline; likely a GStreamer issue or an error in the pipeline string you specified in the 'device' argument to librespot.");
         let pipeline = pipelinee
             .dynamic_cast::<gst::Pipeline>()
-            .expect("Couldn't cast pipeline element at runtime!");
-        let bus = pipeline.get_bus().expect("Couldn't get bus from pipeline");
+            .expect("couldn't cast pipeline element at runtime!");
+        let bus = pipeline.get_bus().expect("couldn't get bus from pipeline");
         let mainloop = glib::MainLoop::new(None, false);
         let appsrce: gst::Element = pipeline
             .get_by_name("appsrc0")
-            .expect("Couldn't get appsrc from pipeline");
+            .expect("couldn't get appsrc from pipeline");
         let appsrc: gst_app::AppSrc = appsrce
             .dynamic_cast::<gst_app::AppSrc>()
-            .expect("Couldn't cast AppSrc element at runtime!");
+            .expect("couldn't cast AppSrc element at runtime!");
         let bufferpool = gst::BufferPool::new();
-        let appsrc_caps = appsrc.get_caps().expect("Couldn't get appsrc caps");
+        let appsrc_caps = appsrc.get_caps().expect("couldn't get appsrc caps");
         let mut conf = bufferpool.get_config();
         conf.set_params(Some(&appsrc_caps), 8192, 0, 0);
         bufferpool
             .set_config(conf)
-            .expect("Couldn't configure the buffer pool");
+            .expect("couldn't configure the buffer pool");
         bufferpool
             .set_active(true)
-            .expect("Couldn't activate buffer pool");
+            .expect("couldn't activate buffer pool");
 
         let (tx, rx) = sync_channel::<Vec<u8>>(128);
         thread::spawn(move || {
@@ -57,7 +65,7 @@ impl Open for GstreamerSink {
                     mutbuf.set_size(data.len());
                     mutbuf
                         .copy_from_slice(0, data.as_bytes())
-                        .expect("Failed to copy from slice");
+                        .expect("failed to copy from slice");
                     let _eat = appsrc.push_buffer(okbuffer);
                 }
             }
@@ -83,33 +91,32 @@ impl Open for GstreamerSink {
 
                 glib::Continue(true)
             })
-            .expect("Failed to add bus watch");
+            .expect("failed to add bus watch");
             thread_mainloop.run();
         });
 
         pipeline
             .set_state(gst::State::Playing)
-            .expect("Unable to set the pipeline to the `Playing` state");
+            .expect("unable to set the pipeline to the `Playing` state");
 
         GstreamerSink {
             tx: tx,
             pipeline: pipeline,
+            format: format,
         }
     }
 }
 
 impl Sink for GstreamerSink {
-    fn start(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-    fn stop(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+    start_stop_noop!();
+    sink_as_bytes!();
+}
+
+impl SinkAsBytes for GstreamerSink {
+    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
         // Copy expensively (in to_vec()) to avoid thread synchronization
-        let deighta: &[u8] = packet.samples().as_bytes();
         self.tx
-            .send(deighta.to_vec())
+            .send(data.to_vec())
             .expect("tx send failed in write function");
         Ok(())
     }

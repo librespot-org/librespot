@@ -25,8 +25,12 @@ use crate::audio_backend::Sink;
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
 
+pub const SAMPLE_RATE: u32 = 44100;
+pub const NUM_CHANNELS: u8 = 2;
+pub const SAMPLES_PER_SECOND: u32 = SAMPLE_RATE as u32 * NUM_CHANNELS as u32;
+
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
-const SAMPLES_PER_SECOND: u32 = 44100 * 2;
+const DB_VOLTAGE_RATIO: f32 = 20.0;
 
 pub struct Player {
     commands: Option<futures::sync::mpsc::UnboundedSender<PlayerCommand>>,
@@ -202,11 +206,11 @@ pub struct NormalisationData {
 
 impl NormalisationData {
     pub fn db_to_ratio(db: f32) -> f32 {
-        return f32::powf(10.0, db / 20.0);
+        return f32::powf(10.0, db / DB_VOLTAGE_RATIO);
     }
 
     pub fn ratio_to_db(ratio: f32) -> f32 {
-        return ratio.log10() * 20.0;
+        return ratio.log10() * DB_VOLTAGE_RATIO;
     }
 
     fn parse_from_file<T: Read + Seek>(mut file: T) -> Result<NormalisationData> {
@@ -937,8 +941,8 @@ impl Future for PlayerInternal {
 
                     if !self.config.passthrough {
                         if let Some(ref packet) = packet {
-                            *stream_position_pcm =
-                                *stream_position_pcm + (packet.samples().len() / 2) as u64;
+                            *stream_position_pcm = *stream_position_pcm
+                                + (packet.samples().len() / NUM_CHANNELS as usize) as u64;
                             let stream_position_millis =
                                 Self::position_pcm_to_ms(*stream_position_pcm);
 

@@ -2,6 +2,7 @@ use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
 use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
+use std::convert::TryFrom;
 use std::env;
 use std::io::{stderr, Write};
 use std::mem;
@@ -22,7 +23,9 @@ use librespot::core::version;
 use librespot::connect::discovery::{discovery, DiscoveryStream};
 use librespot::connect::spirc::{Spirc, SpircTask};
 use librespot::playback::audio_backend::{self, Sink, BACKENDS};
-use librespot::playback::config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig};
+use librespot::playback::config::{
+    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig,
+};
 use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{NormalisationData, Player, PlayerEvent};
 
@@ -85,7 +88,8 @@ fn print_version() {
 
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<dyn Sink>,
+    format: AudioFormat,
+    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink>,
     device: Option<String>,
 
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
@@ -148,6 +152,12 @@ fn setup(args: &[String]) -> Setup {
             "device",
             "Audio device to use. Use '?' to list options if using portaudio or alsa",
             "DEVICE",
+        )
+        .optopt(
+            "",
+            "format",
+            "Output format (F32 or S16). Defaults to F32",
+            "FORMAT",
         )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
@@ -292,9 +302,15 @@ fn setup(args: &[String]) -> Setup {
 
     let backend = audio_backend::find(backend_name).expect("Invalid backend");
 
+    let format = matches
+        .opt_str("format")
+        .as_ref()
+        .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
+        .unwrap_or(AudioFormat::default());
+
     let device = matches.opt_str("device");
     if device == Some("?".into()) {
-        backend(device);
+        backend(device, format);
         exit(0);
     }
 
@@ -496,6 +512,7 @@ fn setup(args: &[String]) -> Setup {
     let enable_discovery = !matches.opt_present("disable-discovery");
 
     Setup {
+        format: format,
         backend: backend,
         cache: cache,
         session_config: session_config,
@@ -517,7 +534,8 @@ struct Main {
     player_config: PlayerConfig,
     session_config: SessionConfig,
     connect_config: ConnectConfig,
-    backend: fn(Option<String>) -> Box<dyn Sink>,
+    format: AudioFormat,
+    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink>,
     device: Option<String>,
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
     mixer_config: MixerConfig,
@@ -547,6 +565,7 @@ impl Main {
             session_config: setup.session_config,
             player_config: setup.player_config,
             connect_config: setup.connect_config,
+            format: setup.format,
             backend: setup.backend,
             device: setup.device,
             mixer: setup.mixer,
@@ -626,11 +645,12 @@ impl Future for Main {
                     let connect_config = self.connect_config.clone();
 
                     let audio_filter = mixer.get_audio_filter();
+                    let format = self.format;
                     let backend = self.backend;
                     let device = self.device.clone();
                     let (player, event_channel) =
                         Player::new(player_config, session.clone(), audio_filter, move || {
-                            (backend)(device)
+                            (backend)(device, format)
                         });
 
                     if self.emit_sink_events {

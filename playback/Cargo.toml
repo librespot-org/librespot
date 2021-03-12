@@ -35,7 +35,7 @@ sdl2            = { version = "0.34", optional = true }
 gstreamer       = { version = "0.16", optional = true }
 gstreamer-app   = { version = "0.16", optional = true }
 glib            = { version = "0.10", optional = true }
-zerocopy        = { version = "0.3", optional = true }
+zerocopy        = { version = "0.3" }
 
 [features]
 alsa-backend = ["alsa"]
@@ -45,4 +45,4 @@ jackaudio-backend = ["jack"]
 rodiojack-backend = ["rodio", "cpal/jack"]
 rodio-backend = ["rodio", "cpal"]
 sdl-backend = ["sdl2"]
-gstreamer-backend = ["gstreamer", "gstreamer-app", "glib", "zerocopy"]
+gstreamer-backend = ["gstreamer", "gstreamer-app", "glib" ]

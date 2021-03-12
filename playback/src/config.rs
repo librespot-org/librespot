@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -22,6 +23,29 @@ impl FromStr for Bitrate {
 impl Default for Bitrate {
     fn default() -> Bitrate {
         Bitrate::Bitrate160
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub enum AudioFormat {
+    F32,
+    S16,
+}
+
+impl TryFrom<&String> for AudioFormat {
+    type Error = ();
+    fn try_from(s: &String) -> Result<Self, Self::Error> {
+        match s.to_uppercase().as_str() {
+            "F32" => Ok(AudioFormat::F32),
+            "S16" => Ok(AudioFormat::S16),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Default for AudioFormat {
+    fn default() -> AudioFormat {
+        AudioFormat::F32
     }
 }
 

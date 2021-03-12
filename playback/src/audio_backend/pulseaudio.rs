@@ -1,9 +1,10 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkAsBytes};
 use crate::audio::AudioPacket;
+use crate::config::AudioFormat;
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use libpulse_binding::{self as pulse, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::io;
-use std::mem;
 
 const APP_NAME: &str = "librespot";
 const STREAM_NAME: &str = "Spotify endpoint";
@@ -12,16 +13,22 @@ pub struct PulseAudioSink {
     s: Option<Simple>,
     ss: pulse::sample::Spec,
     device: Option<String>,
+    format: AudioFormat,
 }
 
 impl Open for PulseAudioSink {
-    fn open(device: Option<String>) -> PulseAudioSink {
-        debug!("Using PulseAudio sink");
+    fn open(device: Option<String>, format: AudioFormat) -> PulseAudioSink {
+        info!("Using PulseAudio sink with format: {:?}", format);
+
+        let pulse_format = match format {
+            AudioFormat::F32 => pulse::sample::Format::F32le,
+            AudioFormat::S16 => pulse::sample::Format::S16le,
+        };
 
         let ss = pulse::sample::Spec {
-            format: pulse::sample::Format::F32le,
-            channels: 2, // stereo
-            rate: 44100,
+            format: pulse_format,
+            channels: NUM_CHANNELS,
+            rate: SAMPLE_RATE,
         };
         debug_assert!(ss.is_valid());
 
@@ -29,6 +36,7 @@ impl Open for PulseAudioSink {
             s: None,
             ss: ss,
             device: device,
+            format: format,
         }
     }
 }
@@ -67,19 +75,13 @@ impl Sink for PulseAudioSink {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
-        if let Some(s) = &self.s {
-            // SAFETY: An f32 consists of four bytes, so that the given slice can be interpreted
-            // as a byte array of four. Each byte pointer is validly aligned, and so is the newly
-            // created slice.
-            let d: &[u8] = unsafe {
-                std::slice::from_raw_parts(
-                    packet.samples().as_ptr() as *const u8,
-                    packet.samples().len() * mem::size_of::<f32>(),
-                )
-            };
+    sink_as_bytes!();
+}
 
-            match s.write(d) {
+impl SinkAsBytes for PulseAudioSink {
+    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
+        if let Some(s) = &self.s {
+            match s.write(data) {
                 Ok(_) => Ok(()),
                 Err(e) => Err(io::Error::new(
                     io::ErrorKind::BrokenPipe,
@@ -89,7 +91,7 @@ impl Sink for PulseAudioSink {
         } else {
             Err(io::Error::new(
                 io::ErrorKind::NotConnected,
-                "Not connected to pulseaudio",
+                "Not connected to PulseAudio",
             ))
         }
     }
