@@ -1,6 +1,6 @@
 name: librespot
 base: core18
-adopt-info: librespot
+version: git
 summary: Librespot is an open source client library for Spotify
 description: |
   Librespot is an open source client library for Spotify written in Rust. It enables    
@@ -31,8 +31,8 @@ apps:
       - network-bind
       - unity7
       - audio-playback
-      - pulseaudio
-      - alsa
+      - pulseaudio #works without it but keeping it
+      - alsa #works without it but keeping it
 
 
 parts:
@@ -47,36 +47,16 @@ parts:
     stage-packages:
       - libasound2
       - libasound2-plugins
-      - yad
+#      - yad   #we are using ALWAYS_USE_PULSEAUDIO: '1' env var, so do not need yad prompts. Also adding this increasing size of snap by 38+Mb
       
   librespot:
     plugin: rust
     source: https://github.com/librespot-org/librespot.git
-    source-type: git
     source-branch: dev
-    override-pull: |
-      snapcraftctl pull
-      last_committed_tag="$(git tag -l --sort=version:refname | tail -n 1 | tr -d 'v')"
-      echo $last_committed_tag
-      last_released_tag="$(snap info $SNAPCRAFT_PROJECT_NAME | awk '$1 == "latest/beta:" { print $2 }')"
-      echo $last_released_tag
-      # If the latest tag from the upstream project has not been released to
-      # beta, build that tag instead of master.
-      if [ "${last_committed_tag}" != "${last_released_tag}" ]; then
-        git fetch
-        git checkout "v${last_committed_tag}"
-        echo "Setting version to $last_committed_tag"
-        snapcraftctl set-version "$(echo $last_committed_tag)"
-      else
-        echo "Setting version to $(git rev-parse --short HEAD)"
-        snapcraftctl set-version "$(git rev-parse --short HEAD)"
-      fi
+    source-depth: 1 #git shallow clone
     build-packages:
       - libasound2-dev
       - build-essential
       - pkg-config
-      - libpulse-dev
-    stage-packages:
-      - libpulse0
     after:
       - alsa-mixin
