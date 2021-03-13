@@ -49,3 +49,7 @@ parts:
     build-packages:
       - libasound2-dev
       - build-essential
+      - pkg-config
+      - libpulse-dev
+    stage-packages:
+      - libasound2
