@@ -7,6 +7,7 @@ use std::{io, mem, thread, time};
 
 pub enum SdlSink {
     F32(AudioQueue<f32>),
+    S32(AudioQueue<i32>),
     S16(AudioQueue<i16>),
 }
 
@@ -39,6 +40,7 @@ impl Open for SdlSink {
         }
         match format {
             AudioFormat::F32 => open_sink!(SdlSink::F32, f32),
+            AudioFormat::S32 => open_sink!(SdlSink::S32, i32),
             AudioFormat::S16 => open_sink!(SdlSink::S16, i16),
         }
     }
@@ -54,6 +56,7 @@ impl Sink for SdlSink {
         }
         match self {
             SdlSink::F32(queue) => start_sink!(queue),
+            SdlSink::S32(queue) => start_sink!(queue),
             SdlSink::S16(queue) => start_sink!(queue),
         };
         Ok(())
@@ -68,6 +71,7 @@ impl Sink for SdlSink {
         }
         match self {
             SdlSink::F32(queue) => stop_sink!(queue),
+            SdlSink::S32(queue) => stop_sink!(queue),
             SdlSink::S16(queue) => stop_sink!(queue),
         };
         Ok(())
@@ -86,6 +90,11 @@ impl Sink for SdlSink {
             SdlSink::F32(queue) => {
                 drain_sink!(queue, mem::size_of::<f32>());
                 queue.queue(packet.samples())
+            }
+            SdlSink::S32(queue) => {
+                drain_sink!(queue, mem::size_of::<i32>());
+                let samples_s32: Vec<i32> = AudioPacket::f32_to_s32(packet.samples());
+                queue.queue(&samples_s32)
             }
             SdlSink::S16(queue) => {
                 drain_sink!(queue, mem::size_of::<i16>());

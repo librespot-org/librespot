@@ -37,6 +37,22 @@ pub enum AudioPacket {
     OggData(Vec<u8>),
 }
 
+// Losslessly represent [-1.0, 1.0] to [$type::MIN, $type::MAX] while maintaining DC linearity.
+macro_rules! convert_samples_to {
+    ($type: ident, $samples: expr) => {
+        $samples
+            .iter()
+            .map(|sample| {
+                if *sample == 0.0 {
+                    0 as $type
+                } else {
+                    (*sample as f64 * (std::$type::MAX as f64 + 0.5) - 0.5) as $type
+                }
+            })
+            .collect()
+    };
+}
+
 impl AudioPacket {
     pub fn samples(&self) -> &[f32] {
         match self {
@@ -59,11 +75,12 @@ impl AudioPacket {
         }
     }
 
+    pub fn f32_to_s32(samples: &[f32]) -> Vec<i32> {
+        convert_samples_to!(i32, samples)
+    }
+
     pub fn f32_to_s16(samples: &[f32]) -> Vec<i16> {
-        samples
-            .iter()
-            .map(|sample| (*sample as f64 * (0x7FFF as f64 + 0.5) - 0.5) as i16)
-            .collect()
+        convert_samples_to!(i16, samples)
     }
 }
 

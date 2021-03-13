@@ -7,6 +7,8 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use std::process::exit;
 use std::{io, thread, time};
 
+const FORMAT_NOT_SUPPORTED: &'static str = "Rodio currently does not support that output format";
+
 // most code is shared between RodioSink and JackRodioSink
 macro_rules! rodio_sink {
     ($name: ident) => {
@@ -27,12 +29,13 @@ macro_rules! rodio_sink {
                     AudioFormat::F32 => {
                         let source = rodio::buffer::SamplesBuffer::new(2, 44100, samples);
                         self.rodio_sink.append(source)
-                    }
+                    },
                     AudioFormat::S16 => {
                         let samples_s16: Vec<i16> = AudioPacket::f32_to_s16(samples);
                         let source = rodio::buffer::SamplesBuffer::new(2, 44100, samples_s16);
                         self.rodio_sink.append(source)
-                    }
+                    },
+                    _ => panic!(FORMAT_NOT_SUPPORTED),
                 };
 
                 // Chunk sizes seem to be about 256 to 3000 ish items long.
@@ -48,12 +51,16 @@ macro_rules! rodio_sink {
 
         impl $name {
             fn open_sink(host: &cpal::Host, device: Option<String>, format: AudioFormat) -> $name {
-                if format != AudioFormat::S16 {
-                    #[cfg(target_os = "linux")]
-                    {
-                        warn!("Rodio output to Alsa is known to cause garbled sound on output formats other than 16-bit signed integer.");
-                        warn!("Consider using `--backend alsa` OR `--format {:?}`", AudioFormat::S16);
-                    }
+                match format  {
+                    AudioFormat::F32 => {
+                        #[cfg(target_os = "linux")]
+                        {
+                            warn!("Rodio output to Alsa is known to cause garbled sound on output formats other than 16-bit signed integer.");
+                            warn!("Consider using `--backend alsa` OR `--format {:?}`", AudioFormat::S16);
+                        }
+                    },
+                    AudioFormat::S16 => {},
+                    _ => panic!(FORMAT_NOT_SUPPORTED),
                 }
 
                 let rodio_device = match_device(&host, device);

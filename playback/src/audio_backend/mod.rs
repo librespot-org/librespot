@@ -28,6 +28,10 @@ macro_rules! sink_as_bytes {
             match packet {
                 AudioPacket::Samples(samples) => match self.format {
                     AudioFormat::F32 => self.write_bytes(samples.as_bytes()),
+                    AudioFormat::S32 => {
+                        let samples_s32 = AudioPacket::f32_to_s32(samples);
+                        self.write_bytes(samples_s32.as_bytes())
+                    }
                     AudioFormat::S16 => {
                         let samples_s16 = AudioPacket::f32_to_s16(samples);
                         self.write_bytes(samples_s16.as_bytes())

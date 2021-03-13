@@ -41,6 +41,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
     let (alsa_format, sample_size) = match format {
         AudioFormat::F32 => (Format::float(), mem::size_of::<f32>()),
+        AudioFormat::S32 => (Format::s32(), mem::size_of::<i32>()),
         AudioFormat::S16 => (Format::s16(), mem::size_of::<i16>()),
     };
 
@@ -156,6 +157,11 @@ impl AlsaSink {
             AudioFormat::F32 => {
                 let io = pcm.io_f32().unwrap();
                 io.writei(&self.buffer)
+            }
+            AudioFormat::S32 => {
+                let io = pcm.io_i32().unwrap();
+                let buf_s32: Vec<i32> = AudioPacket::f32_to_s32(&self.buffer);
+                io.writei(&buf_s32[..])
             }
             AudioFormat::S16 => {
                 let io = pcm.io_i16().unwrap();

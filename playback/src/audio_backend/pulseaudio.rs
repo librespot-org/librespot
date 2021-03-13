@@ -22,6 +22,7 @@ impl Open for PulseAudioSink {
 
         let pulse_format = match format {
             AudioFormat::F32 => pulse::sample::Format::F32le,
+            AudioFormat::S32 => pulse::sample::Format::S32le,
             AudioFormat::S16 => pulse::sample::Format::S16le,
         };
 

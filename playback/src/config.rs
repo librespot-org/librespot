@@ -29,6 +29,7 @@ impl Default for Bitrate {
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum AudioFormat {
     F32,
+    S32,
     S16,
 }
 
@@ -37,6 +38,7 @@ impl TryFrom<&String> for AudioFormat {
     fn try_from(s: &String) -> Result<Self, Self::Error> {
         match s.to_uppercase().as_str() {
             "F32" => Ok(AudioFormat::F32),
+            "S32" => Ok(AudioFormat::S32),
             "S16" => Ok(AudioFormat::S16),
             _ => unimplemented!(),
         }

@@ -14,6 +14,10 @@ pub enum PortAudioSink<'a> {
         Option<portaudio_rs::stream::Stream<'a, f32, f32>>,
         StreamParameters<f32>,
     ),
+    S32(
+        Option<portaudio_rs::stream::Stream<'a, i32, i32>>,
+        StreamParameters<i32>,
+    ),
     S16(
         Option<portaudio_rs::stream::Stream<'a, i16, i16>>,
         StreamParameters<i16>,
@@ -70,19 +74,20 @@ impl<'a> Open for PortAudioSink<'a> {
         };
 
         macro_rules! open_sink {
-            ($sink: expr, $data: expr) => {{
+            ($sink: expr, $type: ty) => {{
                 let params = StreamParameters {
                     device: device_idx,
                     channel_count: NUM_CHANNELS as u32,
                     suggested_latency: latency,
-                    data: $data,
+                    data: 0.0 as $type,
                 };
                 $sink(None, params)
             }};
         }
         match format {
-            AudioFormat::F32 => open_sink!(PortAudioSink::F32, 0.0),
-            AudioFormat::S16 => open_sink!(PortAudioSink::S16, 0),
+            AudioFormat::F32 => open_sink!(PortAudioSink::F32, f32),
+            AudioFormat::S32 => open_sink!(PortAudioSink::S32, i32),
+            AudioFormat::S16 => open_sink!(PortAudioSink::S16, i16),
         }
     }
 }
@@ -109,6 +114,7 @@ impl<'a> Sink for PortAudioSink<'a> {
         }
         match self {
             PortAudioSink::F32(stream, parameters) => start_sink!(stream, parameters),
+            PortAudioSink::S32(stream, parameters) => start_sink!(stream, parameters),
             PortAudioSink::S16(stream, parameters) => start_sink!(stream, parameters),
         };
 
@@ -124,6 +130,7 @@ impl<'a> Sink for PortAudioSink<'a> {
         }
         match self {
             PortAudioSink::F32(stream, _parameters) => stop_sink!(stream),
+            PortAudioSink::S32(stream, _parameters) => stop_sink!(stream),
             PortAudioSink::S16(stream, _parameters) => stop_sink!(stream),
         };
 
@@ -140,6 +147,10 @@ impl<'a> Sink for PortAudioSink<'a> {
             PortAudioSink::F32(stream, _parameters) => {
                 let samples = packet.samples();
                 write_sink!(stream, &samples)
+            }
+            PortAudioSink::S32(stream, _parameters) => {
+                let samples_s32: Vec<i32> = AudioPacket::f32_to_s32(packet.samples());
+                write_sink!(stream, &samples_s32)
             }
             PortAudioSink::S16(stream, _parameters) => {
                 let samples_s16: Vec<i16> = AudioPacket::f32_to_s16(packet.samples());
