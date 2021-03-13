@@ -11,10 +11,19 @@ description: |
 grade: stable
 confinement: strict
 
+#alsa fix from https://snapcraft-alsa.readthedocs.io/en/latest/snapcraft_usage.html
+layout:
+  /usr/lib/$SNAPCRAFT_ARCH_TRIPLET/alsa-lib:
+    bind: $SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/alsa-lib
+  /usr/share/alsa:
+    bind: $SNAP/usr/share/alsa
+
 apps:
   librespot:
+    command-chain: ["snap/command-chain/alsa-launch"]
     environment:
       LD_LIBRARY_PATH: "$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/pulseaudio"
+      ALWAYS_USE_PULSEAUDIO: '1'
       LC_ALL: "C.UTF-8"
     command: librespot
     plugs:
@@ -22,13 +31,29 @@ apps:
       - network-bind
       - unity7
       - audio-playback
+      - pulseaudio
+      - alsa
+
 
 parts:
+#issue with alsa > ALSA lib conf.c:3916:(snd_config_update_r) Cannot access file /usr/share/alsa/alsa.conf
+#alsa fix from https://snapcraft-alsa.readthedocs.io/en/latest/snapcraft_usage.html
+  alsa-mixin:
+    plugin: dump
+    source: https://github.com/diddlesnaps/snapcraft-alsa.git
+    source-subdir: snapcraft-assets
+    build-packages:
+      - libasound2-dev
+    stage-packages:
+      - libasound2
+      - libasound2-plugins
+      - yad
+      
   librespot:
     plugin: rust
     source: https://github.com/librespot-org/librespot.git
     source-type: git
-    source-branch: master
+    source-branch: dev
     override-pull: |
       snapcraftctl pull
       last_committed_tag="$(git tag -l --sort=version:refname | tail -n 1 | tr -d 'v')"
@@ -52,4 +77,6 @@ parts:
       - pkg-config
       - libpulse-dev
     stage-packages:
-      - libasound2
+      - libpulse0
+    after:
+      - alsa-mixin
