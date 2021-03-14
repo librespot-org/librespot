@@ -107,7 +107,7 @@ pub struct PlayerConfig {
     pub normalisation_threshold: f32,
     pub normalisation_attack: f32,
     pub normalisation_release: f32,
-    pub normalisation_steepness: f32,
+    pub normalisation_knee: f32,
     pub gapless: bool,
     pub passthrough: bool,
 }
@@ -123,7 +123,7 @@ impl Default for PlayerConfig {
             normalisation_threshold: -1.0,
             normalisation_attack: 0.005,
             normalisation_release: 0.1,
-            normalisation_steepness: 1.0,
+            normalisation_knee: 1.0,
             gapless: true,
             passthrough: false,
         }

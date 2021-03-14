@@ -238,9 +238,9 @@ fn setup(args: &[String]) -> Setup {
         )
         .optopt(
             "",
-            "normalisation-steepness",
-            "Steepness of the dynamic limiting curve. Default is 1.0.",
-            "STEEPNESS",
+            "normalisation-knee",
+            "Knee steepness of the dynamic limiter. Default is 1.0.",
+            "KNEE",
         )
         .optopt(
             "",
@@ -475,14 +475,10 @@ fn setup(args: &[String]) -> Setup {
                 .map(|release| release.parse::<f32>().expect("Invalid release float value"))
                 .unwrap_or(PlayerConfig::default().normalisation_release * MILLIS)
                 / MILLIS,
-            normalisation_steepness: matches
-                .opt_str("normalisation-steepness")
-                .map(|steepness| {
-                    steepness
-                        .parse::<f32>()
-                        .expect("Invalid steepness float value")
-                })
-                .unwrap_or(PlayerConfig::default().normalisation_steepness),
+            normalisation_knee: matches
+                .opt_str("normalisation-knee")
+                .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_knee),
             passthrough,
         }
     };

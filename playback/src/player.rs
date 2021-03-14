@@ -271,10 +271,7 @@ impl NormalisationData {
         if config.normalisation_method == NormalisationMethod::Dynamic {
             debug!("Normalisation Attack: {:?}", config.normalisation_attack);
             debug!("Normalisation Release: {:?}", config.normalisation_release);
-            debug!(
-                "Normalisation Steepness: {:?}",
-                config.normalisation_steepness
-            );
+            debug!("Normalisation Knee: {:?}", config.normalisation_knee);
         }
 
         normalisation_factor
@@ -1176,7 +1173,7 @@ impl PlayerInternal {
                                 if self.config.normalisation_method == NormalisationMethod::Dynamic
                                 {
                                     if self.limiter_active {
-                                        // "S"-shaped curve with a configurable steepness during attack and release:
+                                        // "S"-shaped curve with a configurable knee during attack and release:
                                         //  - > 1.0 yields soft knees at start and end, steeper in between
                                         //  - 1.0 yields a linear function from 0-100%
                                         //  - between 0.0 and 1.0 yields hard knees at start and end, flatter in between
@@ -1191,7 +1188,7 @@ impl PlayerInternal {
                                                     + f32::powf(
                                                         shaped_limiter_strength
                                                             / (1.0 - shaped_limiter_strength),
-                                                        -1.0 * self.config.normalisation_steepness,
+                                                        -1.0 * self.config.normalisation_knee,
                                                     ));
                                         }
                                         actual_normalisation_factor =
