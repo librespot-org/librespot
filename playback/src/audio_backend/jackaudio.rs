@@ -61,7 +61,7 @@ impl Open for JackSink {
         };
         let active_client = AsyncClient::new(client, (), jack_data).unwrap();
 
-        JackSink {
+        Self {
             send: tx,
             active_client: active_client,
         }

@@ -1473,6 +1473,7 @@ dependencies = [
  "ogg",
  "tempfile",
  "vorbis",
+ "zerocopy",
 ]
 
 [[package]]

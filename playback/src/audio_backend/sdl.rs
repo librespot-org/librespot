@@ -8,6 +8,7 @@ use std::{io, mem, thread, time};
 pub enum SdlSink {
     F32(AudioQueue<f32>),
     S32(AudioQueue<i32>),
+    S24(AudioQueue<i32>),
     S16(AudioQueue<i16>),
 }
 
@@ -16,7 +17,7 @@ impl Open for SdlSink {
         info!("Using SDL sink with format: {:?}", format);
 
         if device.is_some() {
-            panic!("SDL sink does not support specifying a device name");
+            warn!("SDL sink does not support specifying a device name");
         }
 
         let ctx = sdl2::init().expect("could not initialize SDL");
@@ -39,9 +40,11 @@ impl Open for SdlSink {
             }};
         }
         match format {
-            AudioFormat::F32 => open_sink!(SdlSink::F32, f32),
-            AudioFormat::S32 => open_sink!(SdlSink::S32, i32),
-            AudioFormat::S16 => open_sink!(SdlSink::S16, i16),
+            AudioFormat::F32 => open_sink!(Self::F32, f32),
+            AudioFormat::S32 => open_sink!(Self::S32, i32),
+            AudioFormat::S24 => open_sink!(Self::S24, i32),
+            AudioFormat::S24_3 => unimplemented!("SDL currently does not support S24_3 output"),
+            AudioFormat::S16 => open_sink!(Self::S16, i16),
         }
     }
 }
@@ -55,9 +58,10 @@ impl Sink for SdlSink {
             }};
         }
         match self {
-            SdlSink::F32(queue) => start_sink!(queue),
-            SdlSink::S32(queue) => start_sink!(queue),
-            SdlSink::S16(queue) => start_sink!(queue),
+            Self::F32(queue) => start_sink!(queue),
+            Self::S32(queue) => start_sink!(queue),
+            Self::S24(queue) => start_sink!(queue),
+            Self::S16(queue) => start_sink!(queue),
         };
         Ok(())
     }
@@ -70,9 +74,10 @@ impl Sink for SdlSink {
             }};
         }
         match self {
-            SdlSink::F32(queue) => stop_sink!(queue),
-            SdlSink::S32(queue) => stop_sink!(queue),
-            SdlSink::S16(queue) => stop_sink!(queue),
+            Self::F32(queue) => stop_sink!(queue),
+            Self::S32(queue) => stop_sink!(queue),
+            Self::S24(queue) => stop_sink!(queue),
+            Self::S16(queue) => stop_sink!(queue),
         };
         Ok(())
     }
@@ -87,16 +92,21 @@ impl Sink for SdlSink {
             }};
         }
         match self {
-            SdlSink::F32(queue) => {
+            Self::F32(queue) => {
                 drain_sink!(queue, mem::size_of::<f32>());
                 queue.queue(packet.samples())
             }
-            SdlSink::S32(queue) => {
+            Self::S32(queue) => {
                 drain_sink!(queue, mem::size_of::<i32>());
                 let samples_s32: Vec<i32> = AudioPacket::f32_to_s32(packet.samples());
                 queue.queue(&samples_s32)
             }
-            SdlSink::S16(queue) => {
+            Self::S24(queue) => {
+                drain_sink!(queue, mem::size_of::<i32>());
+                let samples_s24: Vec<i32> = AudioPacket::f32_to_s24(packet.samples());
+                queue.queue(&samples_s24)
+            }
+            Self::S16(queue) => {
                 drain_sink!(queue, mem::size_of::<i16>());
                 let samples_s16: Vec<i16> = AudioPacket::f32_to_s16(packet.samples());
                 queue.queue(&samples_s16)

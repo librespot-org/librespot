@@ -18,11 +18,18 @@ pub struct GstreamerSink {
 impl Open for GstreamerSink {
     fn open(device: Option<String>, format: AudioFormat) -> GstreamerSink {
         info!("Using GStreamer sink with format: {:?}", format);
-
         gst::init().expect("failed to init GStreamer!");
+
+        // GStreamer calls S24 and S24_3 different from the rest of the world
+        let gst_format = match format {
+            AudioFormat::S24 => "S24_32".to_string(),
+            AudioFormat::S24_3 => "S24".to_string(),
+            _ => format!("{:?}", format),
+        };
+
         let pipeline_str_preamble = format!(
-            r#"appsrc caps="audio/x-raw,format={:?},layout=interleaved,channels={},rate={}" block=true max-bytes=4096 name=appsrc0 "#,
-            format, NUM_CHANNELS, SAMPLE_RATE
+            "appsrc caps=\"audio/x-raw,format={}LE,layout=interleaved,channels={},rate={}\" block=true max-bytes=4096 name=appsrc0 ",
+            gst_format, NUM_CHANNELS, SAMPLE_RATE
         );
         let pipeline_str_rest = r#" ! audioconvert ! autoaudiosink"#;
         let pipeline_str: String = match device {
@@ -47,7 +54,7 @@ impl Open for GstreamerSink {
         let bufferpool = gst::BufferPool::new();
         let appsrc_caps = appsrc.get_caps().expect("couldn't get appsrc caps");
         let mut conf = bufferpool.get_config();
-        conf.set_params(Some(&appsrc_caps), 8192, 0, 0);
+        conf.set_params(Some(&appsrc_caps), 2048 * format.size() as u32, 0, 0);
         bufferpool
             .set_config(conf)
             .expect("couldn't configure the buffer pool");
@@ -55,7 +62,7 @@ impl Open for GstreamerSink {
             .set_active(true)
             .expect("couldn't activate buffer pool");
 
-        let (tx, rx) = sync_channel::<Vec<u8>>(128);
+        let (tx, rx) = sync_channel::<Vec<u8>>(64 * format.size());
         thread::spawn(move || {
             for data in rx {
                 let buffer = bufferpool.acquire_buffer(None);
@@ -99,7 +106,7 @@ impl Open for GstreamerSink {
             .set_state(gst::State::Playing)
             .expect("unable to set the pipeline to the `Playing` state");
 
-        GstreamerSink {
+        Self {
             tx: tx,
             pipeline: pipeline,
             format: format,

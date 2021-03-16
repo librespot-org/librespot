@@ -156,7 +156,7 @@ fn setup(args: &[String]) -> Setup {
         .optopt(
             "",
             "format",
-            "Output format (F32, S32 or S16). Defaults to S16",
+            "Output format (F32, S32, S24, S24_3 or S16). Defaults to S16",
             "FORMAT",
         )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")

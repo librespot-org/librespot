@@ -20,9 +20,12 @@ impl Open for PulseAudioSink {
     fn open(device: Option<String>, format: AudioFormat) -> PulseAudioSink {
         info!("Using PulseAudio sink with format: {:?}", format);
 
+        // PulseAudio calls S24 and S24_3 different from the rest of the world
         let pulse_format = match format {
             AudioFormat::F32 => pulse::sample::Format::F32le,
             AudioFormat::S32 => pulse::sample::Format::S32le,
+            AudioFormat::S24 => pulse::sample::Format::S24_32le,
+            AudioFormat::S24_3 => pulse::sample::Format::S24le,
             AudioFormat::S16 => pulse::sample::Format::S16le,
         };
 
@@ -33,7 +36,7 @@ impl Open for PulseAudioSink {
         };
         debug_assert!(ss.is_valid());
 
-        PulseAudioSink {
+        Self {
             s: None,
             ss: ss,
             device: device,

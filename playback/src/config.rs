@@ -1,4 +1,6 @@
+use crate::audio::i24;
 use std::convert::TryFrom;
+use std::mem;
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -30,6 +32,8 @@ impl Default for Bitrate {
 pub enum AudioFormat {
     F32,
     S32,
+    S24,
+    S24_3,
     S16,
 }
 
@@ -37,17 +41,31 @@ impl TryFrom<&String> for AudioFormat {
     type Error = ();
     fn try_from(s: &String) -> Result<Self, Self::Error> {
         match s.to_uppercase().as_str() {
-            "F32" => Ok(AudioFormat::F32),
-            "S32" => Ok(AudioFormat::S32),
-            "S16" => Ok(AudioFormat::S16),
-            _ => unimplemented!(),
+            "F32" => Ok(Self::F32),
+            "S32" => Ok(Self::S32),
+            "S24" => Ok(Self::S24),
+            "S24_3" => Ok(Self::S24_3),
+            "S16" => Ok(Self::S16),
+            _ => Err(()),
         }
     }
 }
 
 impl Default for AudioFormat {
     fn default() -> AudioFormat {
-        AudioFormat::S16
+        Self::S16
+    }
+}
+
+impl AudioFormat {
+    // not used by all backends
+    #[allow(dead_code)]
+    pub fn size(&self) -> usize {
+        match self {
+            Self::S24_3 => mem::size_of::<i24>(),
+            Self::S16 => mem::size_of::<i16>(),
+            _ => mem::size_of::<i32>(),
+        }
     }
 }
 

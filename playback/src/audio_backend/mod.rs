@@ -32,6 +32,14 @@ macro_rules! sink_as_bytes {
                         let samples_s32 = AudioPacket::f32_to_s32(samples);
                         self.write_bytes(samples_s32.as_bytes())
                     }
+                    AudioFormat::S24 => {
+                        let samples_s24 = AudioPacket::f32_to_s24(samples);
+                        self.write_bytes(samples_s24.as_bytes())
+                    }
+                    AudioFormat::S24_3 => {
+                        let samples_s24_3 = AudioPacket::f32_to_s24_3(samples);
+                        self.write_bytes(samples_s24_3.as_bytes())
+                    }
                     AudioFormat::S16 => {
                         let samples_s16 = AudioPacket::f32_to_s16(samples);
                         self.write_bytes(samples_s16.as_bytes())

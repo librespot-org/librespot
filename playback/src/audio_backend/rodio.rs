@@ -7,8 +7,6 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use std::process::exit;
 use std::{io, thread, time};
 
-const FORMAT_NOT_SUPPORTED: &'static str = "Rodio currently does not support that output format";
-
 // most code is shared between RodioSink and JackRodioSink
 macro_rules! rodio_sink {
     ($name: ident) => {
@@ -35,7 +33,7 @@ macro_rules! rodio_sink {
                         let source = rodio::buffer::SamplesBuffer::new(2, 44100, samples_s16);
                         self.rodio_sink.append(source)
                     },
-                    _ => panic!(FORMAT_NOT_SUPPORTED),
+                    _ => unimplemented!(),
                 };
 
                 // Chunk sizes seem to be about 256 to 3000 ish items long.
@@ -60,7 +58,7 @@ macro_rules! rodio_sink {
                         }
                     },
                     AudioFormat::S16 => {},
-                    _ => panic!(FORMAT_NOT_SUPPORTED),
+                    _ => unimplemented!("Rodio currently only supports F32 and S16 formats"),
                 }
 
                 let rodio_device = match_device(&host, device);
@@ -71,7 +69,7 @@ macro_rules! rodio_sink {
                 let sink = rodio::Sink::try_new(&stream.1).expect("couldn't create output sink.");
                 debug!("Using Rodio sink");
 
-                $name {
+                Self {
                     rodio_sink: sink,
                     stream: stream.0,
                     format: format,

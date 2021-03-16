@@ -1,4 +1,4 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkAsBytes};
 use crate::audio::AudioPacket;
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLES_PER_SECOND, SAMPLE_RATE};
@@ -7,8 +7,8 @@ use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, Error, ValueOr};
 use std::cmp::min;
 use std::ffi::CString;
+use std::io;
 use std::process::exit;
-use std::{io, mem};
 
 const BUFFERED_LATENCY: f32 = 0.125; // seconds
 const BUFFERED_PERIODS: Frames = 4;
@@ -17,7 +17,7 @@ pub struct AlsaSink {
     pcm: Option<PCM>,
     format: AudioFormat,
     device: String,
-    buffer: Vec<f32>,
+    buffer: Vec<u8>,
 }
 
 fn list_outputs() {
@@ -39,16 +39,18 @@ fn list_outputs() {
 
 fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box<Error>> {
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
-    let (alsa_format, sample_size) = match format {
-        AudioFormat::F32 => (Format::float(), mem::size_of::<f32>()),
-        AudioFormat::S32 => (Format::s32(), mem::size_of::<i32>()),
-        AudioFormat::S16 => (Format::s16(), mem::size_of::<i16>()),
+    let alsa_format = match format {
+        AudioFormat::F32 => Format::float(),
+        AudioFormat::S32 => Format::s32(),
+        AudioFormat::S24 => Format::s24(),
+        AudioFormat::S24_3 => Format::S243LE,
+        AudioFormat::S16 => Format::s16(),
     };
 
     // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8
     // latency = period_size * periods / (rate * bytes_per_frame)
     // For stereo samples encoded as 32-bit float, one frame has a length of eight bytes.
-    let mut period_size = ((SAMPLES_PER_SECOND * sample_size as u32) as f32
+    let mut period_size = ((SAMPLES_PER_SECOND * format.size() as u32) as f32
         * (BUFFERED_LATENCY / BUFFERED_PERIODS as f32)) as Frames;
 
     // Set hardware parameters: 44100 Hz / stereo / 32-bit float or 16-bit signed integer
@@ -85,7 +87,7 @@ impl Open for AlsaSink {
         }
         .to_string();
 
-        AlsaSink {
+        Self {
             pcm: None,
             format: format,
             device: name,
@@ -102,7 +104,9 @@ impl Sink for AlsaSink {
                 Ok((p, period_size)) => {
                     self.pcm = Some(p);
                     // Create a buffer for all samples for a full period
-                    self.buffer = Vec::with_capacity((period_size * BUFFERED_PERIODS) as usize);
+                    self.buffer = Vec::with_capacity(
+                        period_size as usize * BUFFERED_PERIODS as usize * self.format.size(),
+                    );
                 }
                 Err(e) => {
                     error!("Alsa error PCM open {}", e);
@@ -121,7 +125,7 @@ impl Sink for AlsaSink {
         {
             // Write any leftover data in the period buffer
             // before draining the actual buffer
-            self.write_buf().expect("could not flush buffer");
+            self.write_bytes(&[]).expect("could not flush buffer");
             let pcm = self.pcm.as_mut().unwrap();
             pcm.drain().unwrap();
         }
@@ -129,9 +133,12 @@ impl Sink for AlsaSink {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+    sink_as_bytes!();
+}
+
+impl SinkAsBytes for AlsaSink {
+    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
         let mut processed_data = 0;
-        let data = packet.samples();
         while processed_data < data.len() {
             let data_to_buffer = min(
                 self.buffer.capacity() - self.buffer.len(),
@@ -153,23 +160,8 @@ impl Sink for AlsaSink {
 impl AlsaSink {
     fn write_buf(&mut self) -> io::Result<()> {
         let pcm = self.pcm.as_mut().unwrap();
-        let io_result = match self.format {
-            AudioFormat::F32 => {
-                let io = pcm.io_f32().unwrap();
-                io.writei(&self.buffer)
-            }
-            AudioFormat::S32 => {
-                let io = pcm.io_i32().unwrap();
-                let buf_s32: Vec<i32> = AudioPacket::f32_to_s32(&self.buffer);
-                io.writei(&buf_s32[..])
-            }
-            AudioFormat::S16 => {
-                let io = pcm.io_i16().unwrap();
-                let buf_s16: Vec<i16> = AudioPacket::f32_to_s16(&self.buffer);
-                io.writei(&buf_s16[..])
-            }
-        };
-        match io_result {
+        let io = pcm.io_bytes();
+        match io.writei(&self.buffer) {
             Ok(_) => (),
             Err(err) => pcm.try_recover(err, false).unwrap(),
         };
