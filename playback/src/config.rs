@@ -47,7 +47,7 @@ impl TryFrom<&String> for AudioFormat {
 
 impl Default for AudioFormat {
     fn default() -> AudioFormat {
-        AudioFormat::F32
+        AudioFormat::S16
     }
 }
 
