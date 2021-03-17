@@ -1,73 +1,68 @@
-const AP_FALLBACK: &str = "ap.spotify.com:443";
+use std::error::Error;
 
+use hyper::client::HttpConnector;
+use hyper::{Body, Client, Method, Request, Uri};
+use hyper_proxy::{Intercept, Proxy, ProxyConnector};
+use serde::Deserialize;
 use url::Url;
 
-cfg_if! {
-    if #[cfg(feature = "apresolve")] {
-        const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
+use super::AP_FALLBACK;
 
-        use std::error::Error;
+const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
 
-        use hyper::{Body, Client, Method, Request, Uri};
-        use serde::{Serialize, Deserialize};
+#[derive(Clone, Debug, Deserialize)]
+struct APResolveData {
+    ap_list: Vec<String>,
+}
 
-        use crate::proxytunnel::ProxyTunnel;
+async fn try_apresolve(
+    proxy: Option<&Url>,
+    ap_port: Option<u16>,
+) -> Result<String, Box<dyn Error>> {
+    let port = ap_port.unwrap_or(443);
 
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        pub struct APResolveData {
-            ap_list: Vec<String>,
-        }
+    let mut req = Request::new(Body::empty());
+    *req.method_mut() = Method::GET;
+    // panic safety: APRESOLVE_ENDPOINT above is valid url.
+    *req.uri_mut() = APRESOLVE_ENDPOINT.parse().expect("invalid AP resolve URL");
 
-        async fn apresolve(proxy: &Option<Url>, ap_port: &Option<u16>) -> Result<String, Box<dyn Error>> {
-            let port = ap_port.unwrap_or(443);
-
-            let req = Request::builder()
-                .method(Method::GET)
-                .uri(
-                    APRESOLVE_ENDPOINT
-                        .parse::<Uri>()
-                        .expect("invalid AP resolve URL"),
-                )
-                .body(Body::empty())?;
-
-            let response = if let Some(url) = proxy {
-                Client::builder()
-                    .build(ProxyTunnel::new(&url.socket_addrs(|| None)?[..])?)
-                    .request(req)
-                    .await?
-            } else {
-                Client::new().request(req).await?
-            };
-
-            let body = hyper::body::to_bytes(response.into_body()).await?;
-            let data: APResolveData = serde_json::from_slice(body.as_ref())?;
-
-            let ap = if ap_port.is_some() || proxy.is_some() {
-                data.ap_list.into_iter().find_map(|ap| {
-                    if ap.parse::<Uri>().ok()?.port()? == port {
-                        Some(ap)
-                    } else {
-                        None
-                    }
-                })
-            } else {
-                data.ap_list.into_iter().next()
-            }
-            .ok_or("empty AP List")?;
-
-            Ok(ap)
-        }
-
-        pub async fn apresolve_or_fallback(proxy: &Option<Url>, ap_port: &Option<u16>) -> String {
-            apresolve(proxy, ap_port).await.unwrap_or_else(|e| {
-                warn!("Failed to resolve Access Point: {}", e);
-                warn!("Using fallback \"{}\"", AP_FALLBACK);
-                AP_FALLBACK.into()
-            })
-        }
+    let response = if let Some(url) = proxy {
+        // Panic safety: all URLs are valid URIs
+        let uri = url.to_string().parse().unwrap();
+        let proxy = Proxy::new(Intercept::All, uri);
+        let connector = HttpConnector::new();
+        let proxy_connector = ProxyConnector::from_proxy_unsecured(connector, proxy);
+        Client::builder()
+            .build(proxy_connector)
+            .request(req)
+            .await?
     } else {
-        pub async fn apresolve_or_fallback(_: &Option<Url>, _: &Option<u16>) -> String {
-            AP_FALLBACK.to_string()
-        }
+        Client::new().request(req).await?
+    };
+
+    let body = hyper::body::to_bytes(response.into_body()).await?;
+    let data: APResolveData = serde_json::from_slice(body.as_ref())?;
+
+    let ap = if ap_port.is_some() || proxy.is_some() {
+        data.ap_list.into_iter().find_map(|ap| {
+            if ap.parse::<Uri>().ok()?.port()? == port {
+                Some(ap)
+            } else {
+                None
+            }
+        })
+    } else {
+        data.ap_list.into_iter().next()
     }
+    .ok_or("empty AP List")?;
+
+    Ok(ap)
+}
+
+pub async fn apresolve(proxy: Option<&Url>, ap_port: Option<u16>) -> String {
+    try_apresolve(proxy, ap_port).await.unwrap_or_else(|e| {
+        warn!("Failed to resolve Access Point: {}", e);
+        warn!("Using fallback \"{}\"", AP_FALLBACK);
+        AP_FALLBACK.into()
+    })
 }

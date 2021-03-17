@@ -58,25 +58,11 @@ impl From<APLoginFailed> for AuthenticationError {
     }
 }
 
-pub async fn connect(addr: String, proxy: &Option<Url>) -> io::Result<Transport> {
-    let socket = if let Some(proxy) = proxy {
-        info!("Using proxy \"{}\"", proxy);
+pub async fn connect(addr: String, proxy: Option<&Url>) -> io::Result<Transport> {
+    let socket = if let Some(proxy_url) = proxy {
+        info!("Using proxy \"{}\"", proxy_url);
 
-        let mut split = addr.rsplit(':');
-
-        let port = split
-            .next()
-            .unwrap() // will never panic, split iterator contains at least one element
-            .parse()
-            .map_err(|e| {
-                io::Error::new(io::ErrorKind::InvalidInput, format!("Invalid port: {}", e))
-            })?;
-
-        let host = split
-            .next()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Missing port"))?;
-
-        let socket_addr = proxy.socket_addrs(|| None).and_then(|addrs| {
+        let socket_addr = proxy_url.socket_addrs(|| None).and_then(|addrs| {
             addrs.into_iter().next().ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::NotFound,
@@ -86,13 +72,34 @@ pub async fn connect(addr: String, proxy: &Option<Url>) -> io::Result<Transport>
         })?;
         let socket = TcpStream::connect(&socket_addr).await?;
 
-        proxytunnel::connect(socket, host, port).await?
-    } else {
-        let socket_addr = addr.to_socket_addrs().and_then(|mut iter| {
-            iter.next().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::NotFound, "Can't resolve server address")
-            })
+        let uri = addr.parse::<http::Uri>().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Can't parse access point address",
+            )
         })?;
+        let host = uri.host().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "The access point address contains no hostname",
+            )
+        })?;
+        let port = uri.port().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "The access point address contains no port",
+            )
+        })?;
+
+        proxytunnel::proxy_connect(socket, host, port.as_str()).await?
+    } else {
+        let socket_addr = addr.to_socket_addrs()?.next().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "Can't resolve access point address",
+            )
+        })?;
+
         TcpStream::connect(&socket_addr).await?
     };
 

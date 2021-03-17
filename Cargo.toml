@@ -59,7 +59,6 @@ sha-1 = "0.9"
 
 [features]
 apresolve = ["librespot-core/apresolve"]
-apresolve-http2 = ["librespot-core/apresolve-http2"]
 
 alsa-backend = ["librespot-playback/alsa-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
