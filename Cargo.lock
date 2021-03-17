@@ -1259,6 +1259,7 @@ dependencies = [
  "serde_json",
  "sha-1",
  "simple_logger",
+ "thiserror",
  "tokio",
 ]
 

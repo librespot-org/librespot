@@ -3,6 +3,9 @@
 //! This device will show up in the list of "available devices".
 //! Once it is selected from the list, [`Credentials`] are received.
 //! Those can be used to establish a new Session with [`librespot_core`].
+//!
+//! This library uses mDNS and DNS-SD so that other devices can find it,
+//! and spawns an http server to answer requests of Spotify clients.
 
 #![warn(clippy::all, missing_docs, rust_2018_idioms)]
 
@@ -15,6 +18,7 @@ use std::task::{Context, Poll};
 use cfg_if::cfg_if;
 use futures_core::Stream;
 use librespot_core as core;
+use thiserror::Error;
 
 use self::server::DiscoveryServer;
 
@@ -41,6 +45,17 @@ pub struct Discovery {
 pub struct Builder {
     server_config: server::Config,
     port: u16,
+}
+
+/// Errors that can occur while setting up a [`Discovery`] instance.
+#[derive(Debug, Error)]
+pub enum Error {
+    /// Setting up service discovery via DNS-SD failed.
+    #[error("Setting up dns-sd failed: {0}")]
+    DnsSdError(#[from] io::Error),
+    /// Setting up the http server failed.
+    #[error("Setting up the http server failed: {0}")]
+    HttpServerError(#[from] hyper::Error),
 }
 
 impl Builder {
@@ -79,22 +94,10 @@ impl Builder {
     ///
     /// # Errors
     /// If setting up the mdns service or creating the server fails, this function returns an error.
-    pub fn launch(self) -> io::Result<Discovery> {
-        Discovery::new(self)
-    }
-}
-
-impl Discovery {
-    /// Starts a [`Builder`] with the provided device id.
-    pub fn builder(device_id: String) -> Builder {
-        Builder::new(device_id)
-    }
-
-    fn new(builder: Builder) -> io::Result<Self> {
-        let name = builder.server_config.name.clone();
-        let mut port = builder.port;
-        let server = DiscoveryServer::new(builder.server_config, &mut port)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    pub fn launch(self) -> Result<Discovery, Error> {
+        let mut port = self.port;
+        let name = self.server_config.name.clone().into_owned();
+        let server = DiscoveryServer::new(self.server_config, &mut port)?;
 
         let svc;
 
@@ -114,14 +117,26 @@ impl Discovery {
                 let responder = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?;
                 svc = responder.register(
                     "_spotify-connect._tcp".to_owned(),
-                    name.into_owned(),
+                    name,
                     port,
                     &["VERSION=1.0", "CPath=/"],
                 )
             }
         };
 
-        Ok(Self { server, _svc: svc })
+        Ok(Discovery { server, _svc: svc })
+    }
+}
+
+impl Discovery {
+    /// Starts a [`Builder`] with the provided device id.
+    pub fn builder(device_id: String) -> Builder {
+        Builder::new(device_id)
+    }
+
+    /// Create a new instance with the specified device id and default paramaters.
+    pub fn new(device_id: String) -> Result<Self, Error> {
+        Self::builder(device_id).launch()
     }
 }
 
