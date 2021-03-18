@@ -1335,6 +1335,7 @@ dependencies = [
  "base64",
  "block-modes",
  "dns-sd",
+ "form_urlencoded",
  "futures-core",
  "futures-util",
  "hmac",
@@ -1363,6 +1364,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "env_logger",
+ "form_urlencoded",
  "futures-core",
  "futures-util",
  "hmac",
@@ -1640,6 +1642,7 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
+ "rand",
 ]
 
 [[package]]

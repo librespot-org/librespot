@@ -14,12 +14,14 @@ pub mod cache;
 pub mod channel;
 pub mod config;
 mod connection;
+#[doc(hidden)]
 pub mod diffie_hellman;
 pub mod keymaster;
 pub mod mercury;
 mod proxytunnel;
 pub mod session;
 pub mod spotify_id;
+#[doc(hidden)]
 pub mod util;
 pub mod version;
 

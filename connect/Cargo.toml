@@ -11,6 +11,7 @@ edition = "2018"
 aes-ctr = "0.6"
 base64 = "0.13"
 block-modes = "0.7"
+form_urlencoded = "1.0"
 futures-core = "0.3"
 futures-util = { version = "0.3", default_features = false }
 hmac = "0.10"
