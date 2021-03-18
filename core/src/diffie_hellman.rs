@@ -1,11 +1,11 @@
-use num_bigint::BigUint;
+use num_bigint::{BigUint, RandBigInt};
+use num_integer::Integer;
+use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 
-use crate::util;
-
-pub static DH_GENERATOR: Lazy<BigUint> = Lazy::new(|| BigUint::from_bytes_be(&[0x02]));
-pub static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
+static DH_GENERATOR: Lazy<BigUint> = Lazy::new(|| BigUint::from_bytes_be(&[0x02]));
+static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
     BigUint::from_bytes_be(&[
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc9, 0x0f, 0xda, 0xa2, 0x21, 0x68, 0xc2,
         0x34, 0xc4, 0xc6, 0x62, 0x8b, 0x80, 0xdc, 0x1c, 0xd1, 0x29, 0x02, 0x4e, 0x08, 0x8a, 0x67,
@@ -17,17 +17,31 @@ pub static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
     ])
 });
 
+fn powm(base: &BigUint, exp: &BigUint, modulus: &BigUint) -> BigUint {
+    let mut base = base.clone();
+    let mut exp = exp.clone();
+    let mut result: BigUint = One::one();
+
+    while !exp.is_zero() {
+        if exp.is_odd() {
+            result = (result * &base) % modulus;
+        }
+        exp >>= 1;
+        base = (&base * &base) % modulus;
+    }
+
+    result
+}
+
 pub struct DHLocalKeys {
     private_key: BigUint,
     public_key: BigUint,
 }
 
 impl DHLocalKeys {
-    pub fn random<R: Rng>(rng: &mut R) -> DHLocalKeys {
-        let key_data = util::rand_vec(rng, 95);
-
-        let private_key = BigUint::from_bytes_be(&key_data);
-        let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
+    pub fn random<R: Rng + CryptoRng>(rng: &mut R) -> DHLocalKeys {
+        let private_key = rng.gen_biguint(95 * 8);
+        let public_key = powm(&DH_GENERATOR, &private_key, &DH_PRIME);
 
         DHLocalKeys {
             private_key,
@@ -40,7 +54,7 @@ impl DHLocalKeys {
     }
 
     pub fn shared_secret(&self, remote_key: &[u8]) -> Vec<u8> {
-        let shared_key = util::powm(
+        let shared_key = powm(
             &BigUint::from_bytes_be(remote_key),
             &self.private_key,
             &DH_PRIME,

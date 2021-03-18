@@ -10,7 +10,6 @@ use bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::protocol;
-use crate::util::url_encode;
 use crate::util::SeqGenerator;
 
 mod types;
@@ -199,7 +198,7 @@ impl MercuryManager {
         let header: protocol::mercury::Header = protobuf::parse_from_bytes(&header_data).unwrap();
 
         let response = MercuryResponse {
-            uri: url_encode(header.get_uri()),
+            uri: form_urlencoded::byte_serialize(header.get_uri().as_bytes()).collect(),
             status_code: header.get_status_code(),
             payload: pending.parts,
         };
