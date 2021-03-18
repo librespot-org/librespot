@@ -5,8 +5,8 @@ use crate::player::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
+use std::io;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
-use std::{io, mem};
 
 pub struct JackSink {
     send: SyncSender<f32>,
@@ -53,7 +53,7 @@ impl Open for JackSink {
         let ch_r = client.register_port("out_0", AudioOut::default()).unwrap();
         let ch_l = client.register_port("out_1", AudioOut::default()).unwrap();
         // buffer for samples from librespot (~10ms)
-        let (tx, rx) = sync_channel::<f32>(NUM_CHANNELS as usize * 1024 * mem::size_of::<f32>());
+        let (tx, rx) = sync_channel::<f32>(NUM_CHANNELS as usize * 1024 * format.size());
         let jack_data = JackData {
             rec: rx,
             port_l: ch_l,
@@ -75,7 +75,7 @@ impl Sink for JackSink {
         for s in packet.samples().iter() {
             let res = self.send.send(*s);
             if res.is_err() {
-                error!("jackaudio: cannot write to channel");
+                error!("cannot write to channel");
             }
         }
         Ok(())

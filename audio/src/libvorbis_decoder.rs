@@ -45,13 +45,7 @@ where
                         packet
                             .data
                             .iter()
-                            .map(|sample| {
-                                if *sample == 0 {
-                                    0.0
-                                } else {
-                                    ((*sample as f64 + 0.5) / (0x7FFF as f64 + 0.5)) as f32
-                                }
-                            })
+                            .map(|sample| ((*sample as f64 + 0.5) / (0x7FFF as f64 + 0.5)) as f32)
                             .collect(),
                     )));
                 }

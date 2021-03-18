@@ -14,17 +14,17 @@ impl FromStr for Bitrate {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "96" => Ok(Bitrate::Bitrate96),
-            "160" => Ok(Bitrate::Bitrate160),
-            "320" => Ok(Bitrate::Bitrate320),
+            "96" => Ok(Self::Bitrate96),
+            "160" => Ok(Self::Bitrate160),
+            "320" => Ok(Self::Bitrate320),
             _ => Err(()),
         }
     }
 }
 
 impl Default for Bitrate {
-    fn default() -> Bitrate {
-        Bitrate::Bitrate160
+    fn default() -> Self {
+        Self::Bitrate160
     }
 }
 
@@ -52,7 +52,7 @@ impl TryFrom<&String> for AudioFormat {
 }
 
 impl Default for AudioFormat {
-    fn default() -> AudioFormat {
+    fn default() -> Self {
         Self::S16
     }
 }
@@ -64,7 +64,7 @@ impl AudioFormat {
         match self {
             Self::S24_3 => mem::size_of::<i24>(),
             Self::S16 => mem::size_of::<i16>(),
-            _ => mem::size_of::<i32>(),
+            _ => mem::size_of::<i32>(), // S32 and S24 are both stored in i32
         }
     }
 }
@@ -79,16 +79,16 @@ impl FromStr for NormalisationType {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "album" => Ok(NormalisationType::Album),
-            "track" => Ok(NormalisationType::Track),
+            "album" => Ok(Self::Album),
+            "track" => Ok(Self::Track),
             _ => Err(()),
         }
     }
 }
 
 impl Default for NormalisationType {
-    fn default() -> NormalisationType {
-        NormalisationType::Album
+    fn default() -> Self {
+        Self::Album
     }
 }
 
@@ -102,16 +102,16 @@ impl FromStr for NormalisationMethod {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "basic" => Ok(NormalisationMethod::Basic),
-            "dynamic" => Ok(NormalisationMethod::Dynamic),
+            "basic" => Ok(Self::Basic),
+            "dynamic" => Ok(Self::Dynamic),
             _ => Err(()),
         }
     }
 }
 
 impl Default for NormalisationMethod {
-    fn default() -> NormalisationMethod {
-        NormalisationMethod::Dynamic
+    fn default() -> Self {
+        Self::Dynamic
     }
 }
 

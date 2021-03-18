@@ -52,8 +52,6 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
     // For stereo samples encoded as 32-bit float, one frame has a length of eight bytes.
     let mut period_size = ((SAMPLES_PER_SECOND * format.size() as u32) as f32
         * (BUFFERED_LATENCY / BUFFERED_PERIODS as f32)) as Frames;
-
-    // Set hardware parameters: 44100 Hz / stereo / 32-bit float or 16-bit signed integer
     {
         let hwp = HwParams::any(&pcm)?;
         hwp.set_access(Access::RWInterleaved)?;
