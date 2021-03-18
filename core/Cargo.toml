@@ -24,7 +24,7 @@ hmac = "0.10"
 httparse = "1.3"
 hyper = { version = "0.14", optional = true, features = ["client", "tcp", "http1"] }
 log = "0.4"
-num-bigint = "0.3"
+num-bigint = "0.4"
 num-integer = "0.1"
 num-traits = "0.2"
 once_cell = "1.5.2"

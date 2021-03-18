@@ -1595,9 +1595,9 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e9a41747ae4633fce5adffb4d2e81ffc5e89593cb19917f8fb2cc5ff76507bf"
+checksum = "4e0d047c1062aa51e256408c560894e5251f08925980e53cf1aa5bd00eec6512"
 dependencies = [
  "autocfg",
  "num-integer",
