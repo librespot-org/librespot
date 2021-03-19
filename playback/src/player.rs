@@ -793,8 +793,7 @@ impl PlayerTrackLoader {
                         e
                     );
 
-                    // unwrap safety: The file is cached, so session must have a cache
-                    if !self.session.cache().unwrap().remove_file(file_id) {
+                    if self.session.cache().unwrap().remove_file(file_id).is_err() {
                         return None;
                     }
 

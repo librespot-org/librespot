@@ -367,7 +367,7 @@ fn get_setup(args: &[String]) -> Setup {
                 .map(|p| p.into());
         }
 
-        match Cache::new(system_dir, audio_dir) {
+        match Cache::new(system_dir, audio_dir, Some(50_000_000)) {
             Ok(cache) => Some(cache),
             Err(e) => {
                 warn!("Cannot create cache: {}", e);
