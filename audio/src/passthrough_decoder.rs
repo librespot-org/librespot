@@ -73,7 +73,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
         info!("Seeking to {}", ms);
 
         // add an eos to previous stream if missing
-        if self.bos == true && self.eos == false {
+        if self.bos && !self.eos {
             match self.rdr.read_packet() {
                 Ok(Some(pck)) => {
                     let absgp_page = pck.absgp_page() - self.ofsgp_page;
