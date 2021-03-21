@@ -70,6 +70,9 @@ mod alsa;
 #[cfg(feature = "alsa-backend")]
 use self::alsa::AlsaSink;
 
+#[cfg(feature = "cpal-backend")]
+mod cpal;
+
 #[cfg(feature = "portaudio-backend")]
 mod portaudio;
 #[cfg(feature = "portaudio-backend")]
@@ -107,6 +110,8 @@ use self::subprocess::SubprocessSink;
 pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
+    #[cfg(feature = "cpal-backend")]
+    ("cpal", cpal::open),
     #[cfg(feature = "portaudio-backend")]
     ("portaudio", mk_sink::<PortAudioSink>),
     #[cfg(feature = "pulseaudio-backend")]

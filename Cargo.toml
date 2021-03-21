@@ -60,6 +60,7 @@ sha-1 = "0.9"
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
+cpal-backend = ["librespot-playback/cpal-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
 jackaudio-backend = ["librespot-playback/jackaudio-backend"]

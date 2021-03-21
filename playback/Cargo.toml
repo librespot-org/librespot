@@ -40,10 +40,12 @@ zerocopy        = { version = "0.3" }
 # Rodio dependencies
 rodio           = { version = "0.13", optional = true, default-features = false }
 cpal            = { version = "0.13", optional = true }
+rtrb            = { version = "0.1", optional = true }
 thiserror       = { version = "1", optional = true }
 
 [features]
 alsa-backend = ["alsa"]
+cpal-backend = ["cpal", "thiserror", "rtrb"]
 portaudio-backend = ["portaudio-rs"]
 pulseaudio-backend = ["libpulse-binding", "libpulse-simple-binding"]
 jackaudio-backend = ["jack"]
