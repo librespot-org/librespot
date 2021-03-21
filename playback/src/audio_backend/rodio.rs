@@ -1,8 +1,9 @@
 use super::{Open, Sink};
 extern crate cpal;
 extern crate rodio;
-use crate::audio::AudioPacket;
+use crate::audio::{AudioPacket, SamplesConverter};
 use crate::config::AudioFormat;
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use cpal::traits::{DeviceTrait, HostTrait};
 use std::process::exit;
 use std::{io, thread, time};
@@ -25,12 +26,12 @@ macro_rules! rodio_sink {
                 let samples = packet.samples();
                 match self.format {
                     AudioFormat::F32 => {
-                        let source = rodio::buffer::SamplesBuffer::new(2, 44100, samples);
+                        let source = rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples);
                         self.rodio_sink.append(source)
                     },
                     AudioFormat::S16 => {
-                        let samples_s16: Vec<i16> = AudioPacket::f32_to_s16(samples);
-                        let source = rodio::buffer::SamplesBuffer::new(2, 44100, samples_s16);
+                        let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
+                        let source = rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples_s16);
                         self.rodio_sink.append(source)
                     },
                     _ => unimplemented!(),

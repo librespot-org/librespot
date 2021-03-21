@@ -1,5 +1,5 @@
 use super::{Open, Sink};
-use crate::audio::AudioPacket;
+use crate::audio::{AudioPacket, SamplesConverter};
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use portaudio_rs;
@@ -146,18 +146,19 @@ impl<'a> Sink for PortAudioSink<'a> {
                 $stream.as_mut().unwrap().write($samples)
             };
         }
+
+        let samples = packet.samples();
         let result = match self {
             Self::F32(stream, _parameters) => {
-                let samples = packet.samples();
-                write_sink!(stream, &samples)
+                write_sink!(stream, samples)
             }
             Self::S32(stream, _parameters) => {
-                let samples_s32: Vec<i32> = AudioPacket::f32_to_s32(packet.samples());
-                write_sink!(stream, &samples_s32)
+                let samples_s32: &[i32] = &SamplesConverter::to_s32(samples);
+                write_sink!(stream, samples_s32)
             }
             Self::S16(stream, _parameters) => {
-                let samples_s16: Vec<i16> = AudioPacket::f32_to_s16(packet.samples());
-                write_sink!(stream, &samples_s16)
+                let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
+                write_sink!(stream, samples_s16)
             }
         };
         match result {
