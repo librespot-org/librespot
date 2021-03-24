@@ -10,6 +10,7 @@ use sha1::{Digest, Sha1};
 
 use crate::protocol::authentication::AuthenticationType;
 
+/// The credentials are used to log into the Spotify API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
     pub username: String,
@@ -25,11 +26,22 @@ pub struct Credentials {
 }
 
 impl Credentials {
-    pub fn with_password(username: String, password: String) -> Credentials {
+    /// Intialize these credentials from a username and a password.
+    ///
+    /// ### Example
+    /// ```rust
+    /// use librespot_core::authentication::Credentials;
+    /// 
+    /// let creds = Credentials::with_password("my account", "my password");
+    /// ```
+    pub fn with_password(
+        username: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Credentials {
         Credentials {
-            username,
+            username: username.into(),
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
-            auth_data: password.into_bytes(),
+            auth_data: password.into().into_bytes(),
         }
     }
 

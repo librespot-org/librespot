@@ -10,6 +10,18 @@ pub struct SessionConfig {
     pub ap_port: Option<u16>,
 }
 
+impl Default for SessionConfig {
+    fn default() -> SessionConfig {
+        let device_id = uuid::Uuid::new_v4().to_hyphenated().to_string();
+        SessionConfig {
+            user_agent: crate::version::version_string(),
+            device_id,
+            proxy: None,
+            ap_port: None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum DeviceType {
     Unknown = 0,
