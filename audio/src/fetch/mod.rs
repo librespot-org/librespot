@@ -115,12 +115,12 @@ impl StreamLoaderController {
     pub fn range_available(&self, range: Range) -> bool {
         if let Some(ref shared) = self.stream_shared {
             let download_status = shared.download_status.lock().unwrap();
-            range.length
+            range.len()
                 <= download_status
                     .downloaded
-                    .contained_length_from_value(range.start)
+                    .contained_length_from_value(range.start())
         } else {
-            range.length <= self.len() - range.start
+            range.end() <= self.len()
         }
     }
 
@@ -153,31 +153,31 @@ impl StreamLoaderController {
         // signal the stream loader to tech a range of the file and block until it is loaded.
 
         // ensure the range is within the file's bounds.
-        if range.start >= self.len() {
-            range.length = 0;
+        if range.start() >= self.len() {
+            range.clear();
         } else if range.end() > self.len() {
-            range.length = self.len() - range.start;
+            range.set_len(self.len() - range.start());
         }
 
         self.fetch(range);
 
         if let Some(ref shared) = self.stream_shared {
             let mut download_status = shared.download_status.lock().unwrap();
-            while range.length
+            while range.len()
                 > download_status
                     .downloaded
-                    .contained_length_from_value(range.start)
+                    .contained_length_from_value(range.start())
             {
                 download_status = shared
                     .cond
                     .wait_timeout(download_status, Duration::from_millis(1000))
                     .unwrap()
                     .0;
-                if range.length
+                if range.len()
                     > (download_status
                         .downloaded
                         .union(&download_status.requested)
-                        .contained_length_from_value(range.start))
+                        .contained_length_from_value(range.start()))
                 {
                     // For some reason, the requested range is neither downloaded nor requested.
                     // This could be due to a network error. Request it again.
@@ -189,20 +189,16 @@ impl StreamLoaderController {
 
     pub fn fetch_next(&self, length: usize) {
         if let Some(ref shared) = self.stream_shared {
-            let range = Range {
-                start: shared.read_position.load(atomic::Ordering::Relaxed),
-                length,
-            };
+            let start = shared.read_position.load(atomic::Ordering::Relaxed);
+            let range = Range::new(start, length);
             self.fetch(range)
         }
     }
 
     pub fn fetch_next_blocking(&self, length: usize) {
         if let Some(ref shared) = self.stream_shared {
-            let range = Range {
-                start: shared.read_position.load(atomic::Ordering::Relaxed),
-                length,
-            };
+            let start = shared.read_position.load(atomic::Ordering::Relaxed);
+            let range = Range::new(start, length);
             self.fetch_blocking(range);
         }
     }
@@ -422,7 +418,7 @@ impl Read for AudioFileStreaming {
         };
 
         let mut ranges_to_request = RangeSet::new();
-        ranges_to_request.add_range(&Range::new(offset, length_to_request));
+        ranges_to_request.add_range(Range::new(offset, length_to_request));
 
         let mut download_status = self.shared.download_status.lock().unwrap();
         ranges_to_request.subtract_range_set(&download_status.downloaded);
