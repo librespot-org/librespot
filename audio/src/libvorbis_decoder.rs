@@ -45,7 +45,9 @@ where
                         packet
                             .data
                             .iter()
-                            .map(|sample| ((*sample as f64 + 0.5) / (std::i16::MAX as f64 + 0.5)) as f32)
+                            .map(|sample| {
+                                ((*sample as f64 + 0.5) / (std::i16::MAX as f64 + 0.5)) as f32
+                            })
                             .collect(),
                     )));
                 }
