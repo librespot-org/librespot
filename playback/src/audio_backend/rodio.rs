@@ -54,8 +54,7 @@ macro_rules! rodio_sink {
                     AudioFormat::F32 => {
                         #[cfg(target_os = "linux")]
                         {
-                            warn!("Rodio output to Alsa is known to cause garbled sound on output formats other than 16-bit signed integer.");
-                            warn!("Consider using `--backend alsa` OR `--format {:?}`", AudioFormat::S16);
+                            warn!("Rodio output to Alsa is known to cause garbled sound, consider using `--backend alsa`");
                         }
                     },
                     AudioFormat::S16 => {},
