@@ -98,7 +98,7 @@ impl<'a> Open for PortAudioSink<'a> {
 impl<'a> Sink for PortAudioSink<'a> {
     fn start(&mut self) -> io::Result<()> {
         macro_rules! start_sink {
-            ($stream: ident, $parameters: ident) => {{
+            (ref mut $stream: ident, ref $parameters: ident) => {{
                 if $stream.is_none() {
                     *$stream = Some(
                         Stream::open(
@@ -115,10 +115,11 @@ impl<'a> Sink for PortAudioSink<'a> {
                 $stream.as_mut().unwrap().start().unwrap()
             }};
         }
+
         match self {
-            Self::F32(stream, parameters) => start_sink!(stream, parameters),
-            Self::S32(stream, parameters) => start_sink!(stream, parameters),
-            Self::S16(stream, parameters) => start_sink!(stream, parameters),
+            Self::F32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
+            Self::S32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
+            Self::S16(stream, parameters) => start_sink!(ref mut stream, ref parameters),
         };
 
         Ok(())
@@ -126,15 +127,15 @@ impl<'a> Sink for PortAudioSink<'a> {
 
     fn stop(&mut self) -> io::Result<()> {
         macro_rules! stop_sink {
-            ($stream: expr) => {{
+            (ref mut $stream: ident) => {{
                 $stream.as_mut().unwrap().stop().unwrap();
                 *$stream = None;
             }};
         }
         match self {
-            Self::F32(stream, _parameters) => stop_sink!(stream),
-            Self::S32(stream, _parameters) => stop_sink!(stream),
-            Self::S16(stream, _parameters) => stop_sink!(stream),
+            Self::F32(stream, _parameters) => stop_sink!(ref mut stream),
+            Self::S32(stream, _parameters) => stop_sink!(ref mut stream),
+            Self::S16(stream, _parameters) => stop_sink!(ref mut stream),
         };
 
         Ok(())
@@ -142,7 +143,7 @@ impl<'a> Sink for PortAudioSink<'a> {
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         macro_rules! write_sink {
-            ($stream: expr, $samples: expr) => {
+            (ref mut $stream: expr, $samples: expr) => {
                 $stream.as_mut().unwrap().write($samples)
             };
         }
@@ -150,15 +151,15 @@ impl<'a> Sink for PortAudioSink<'a> {
         let samples = packet.samples();
         let result = match self {
             Self::F32(stream, _parameters) => {
-                write_sink!(stream, samples)
+                write_sink!(ref mut stream, samples)
             }
             Self::S32(stream, _parameters) => {
                 let samples_s32: &[i32] = &SamplesConverter::to_s32(samples);
-                write_sink!(stream, samples_s32)
+                write_sink!(ref mut stream, samples_s32)
             }
             Self::S16(stream, _parameters) => {
                 let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
-                write_sink!(stream, samples_s16)
+                write_sink!(ref mut stream, samples_s16)
             }
         };
         match result {

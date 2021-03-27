@@ -27,14 +27,14 @@ macro_rules! rodio_sink {
                 match self.format {
                     AudioFormat::F32 => {
                         let source = rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples);
-                        self.rodio_sink.append(source)
+                        self.rodio_sink.append(source);
                     },
                     AudioFormat::S16 => {
                         let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
                         let source = rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples_s16);
-                        self.rodio_sink.append(source)
+                        self.rodio_sink.append(source);
                     },
-                    _ => unimplemented!(),
+                    _ => unreachable!(),
                 };
 
                 // Chunk sizes seem to be about 256 to 3000 ish items long.
@@ -64,15 +64,15 @@ macro_rules! rodio_sink {
 
                 let rodio_device = match_device(&host, device);
                 debug!("Using cpal device");
-                let stream = rodio::OutputStream::try_from_device(&rodio_device)
+                let (stream, stream_handle) = rodio::OutputStream::try_from_device(&rodio_device)
                     .expect("couldn't open output stream.");
                 debug!("Using Rodio stream");
-                let sink = rodio::Sink::try_new(&stream.1).expect("couldn't create output sink.");
+                let sink = rodio::Sink::try_new(&stream_handle).expect("couldn't create output sink.");
                 debug!("Using Rodio sink");
 
                 Self {
                     rodio_sink: sink,
-                    stream: stream.0,
+                    stream: stream,
                     format: format,
                 }
             }

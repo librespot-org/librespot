@@ -795,9 +795,9 @@ dependencies = [
 
 [[package]]
 name = "gstreamer"
-version = "0.16.5"
+version = "0.16.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d50f822055923f1cbede233aa5dfd4ee957cf328fb3076e330886094e11d6cf"
+checksum = "9ff5d0f7ff308ae37e6eb47b6ded17785bdea06e438a708cd09e0288c1862f33"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
@@ -1061,9 +1061,9 @@ checksum = "dd25036021b0de88a0aff6b850051563c6516d0bf53f8638938edbb9de732736"
 
 [[package]]
 name = "jack"
-version = "0.6.5"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c1871c91fa65aa328f3bedbaa54a6e5d1de009264684c153eb708ba933aa6f5"
+checksum = "2deb4974bd7e6b2fb7784f27fa13d819d11292b3b004dce0185ec08163cf686a"
 dependencies = [
  "bitflags",
  "jack-sys",
@@ -1073,9 +1073,9 @@ dependencies = [
 
 [[package]]
 name = "jack-sys"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e1d6ab7ada402b6a27912a2b86504be62a48c58313c886fe72a059127acb4d7"
+checksum = "57983f0d72dfecf2b719ed39bc9cacd85194e1a94cb3f9146009eff9856fef41"
 dependencies = [
  "lazy_static",
  "libc",
@@ -1161,9 +1161,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.90"
+version = "0.2.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba4aede83fc3617411dc6993bc8c70919750c1c257c6ca6a502aed6e0e2394ae"
+checksum = "8916b1f6ca17130ec6568feccee27c156ad12037880833a3b842a823236502e7"
 
 [[package]]
 name = "libloading"
