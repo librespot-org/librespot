@@ -16,7 +16,7 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::apresolve::apresolve_or_fallback;
+use crate::apresolve::apresolve;
 use crate::audio_key::AudioKeyManager;
 use crate::authentication::Credentials;
 use crate::cache::Cache;
@@ -67,10 +67,10 @@ impl Session {
         credentials: Credentials,
         cache: Option<Cache>,
     ) -> Result<Session, SessionError> {
-        let ap = apresolve_or_fallback(&config.proxy, &config.ap_port).await;
+        let ap = apresolve(config.proxy.as_ref(), config.ap_port).await;
 
         info!("Connecting to AP \"{}\"", ap);
-        let mut conn = connection::connect(ap, &config.proxy).await?;
+        let mut conn = connection::connect(ap, config.proxy.as_ref()).await?;
 
         let reusable_credentials =
             connection::authenticate(&mut conn, credentials, &config.device_id).await?;
