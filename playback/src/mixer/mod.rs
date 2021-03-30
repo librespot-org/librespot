@@ -26,6 +26,8 @@ pub struct MixerConfig {
     pub mixer: String,
     pub index: u32,
     pub mapped_volume: bool,
+    pub decrease_left_channel: i64,
+    pub decrease_right_channel: i64,
 }
 
 impl Default for MixerConfig {
@@ -35,6 +37,8 @@ impl Default for MixerConfig {
             mixer: String::from("PCM"),
             index: 0,
             mapped_volume: true,
+            decrease_left_channel: 0,
+            decrease_right_channel: 0,
         }
     }
 }

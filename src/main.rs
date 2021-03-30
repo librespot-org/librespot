@@ -166,6 +166,18 @@ fn setup(args: &[String]) -> Setup {
             "Alsa mixer index, Index of the cards mixer. Defaults to 0",
             "MIXER_INDEX",
         )
+        .optopt(
+            "",
+            "decrease-left-channel",
+            "Decrease left channel volume by this value.",
+            "DECREASE_LEFT"
+        )
+        .optopt(
+            "",
+            "decrease-right-channel",
+            "Decrease right channel volume by this value.",
+            "DECREASE_RIGHT"
+        )
         .optflag(
             "",
             "mixer-linear-volume",
@@ -279,6 +291,14 @@ fn setup(args: &[String]) -> Setup {
             .map(|index| index.parse::<u32>().unwrap())
             .unwrap_or(0),
         mapped_volume: !matches.opt_present("mixer-linear-volume"),
+        decrease_left_channel: matches
+            .opt_str("decrease-left-channel")
+            .map(|decrease_left| decrease_left.parse::<i64>().unwrap())
+            .unwrap_or(0),
+        decrease_right_channel: matches
+            .opt_str("decrease-right-channel")
+            .map(|decrease_left| decrease_left.parse::<i64>().unwrap())
+            .unwrap_or(0)
     };
 
     let cache = {
