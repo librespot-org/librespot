@@ -130,10 +130,18 @@ impl AlsaMixer {
                     let vol_db = (self.pvol(vol, 0x0000, 0xFFFF).log10() * 6000.0).floor() as i64
                         + self.params.max_db.0;
                     selem
-                        .set_playback_db(alsa::mixer::SelemChannelId::FrontLeft, alsa::mixer::MilliBel(vol_db-self.config.decrease_left_channel), alsa::Round::Floor)
+                        .set_playback_db(
+                            alsa::mixer::SelemChannelId::FrontLeft,
+                            alsa::mixer::MilliBel(vol_db - self.config.decrease_left_channel),
+                            alsa::Round::Floor,
+                        )
                         .expect("Couldn't set alsa dB volume");
                     selem
-                        .set_playback_db(alsa::mixer::SelemChannelId::FrontRight, alsa::mixer::MilliBel(vol_db-self.config.decrease_right_channel), alsa::Round::Floor)
+                        .set_playback_db(
+                            alsa::mixer::SelemChannelId::FrontRight,
+                            alsa::mixer::MilliBel(vol_db - self.config.decrease_right_channel),
+                            alsa::Round::Floor,
+                        )
                         .expect("Couldn't set alsa dB volume");
                     debug!(
                         "Mapping volume [{:.3}%] {:?} [u16] ->> Alsa [{:.3}%] {:?} [dB] - {} [i64]",

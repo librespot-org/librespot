@@ -298,7 +298,7 @@ fn setup(args: &[String]) -> Setup {
         decrease_right_channel: matches
             .opt_str("decrease-right-channel")
             .map(|decrease_left| decrease_left.parse::<i64>().unwrap())
-            .unwrap_or(0)
+            .unwrap_or(0),
     };
 
     let cache = {
