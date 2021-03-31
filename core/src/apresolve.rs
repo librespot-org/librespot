@@ -11,7 +11,7 @@ use super::AP_FALLBACK;
 const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
 
 #[derive(Clone, Debug, Deserialize)]
-struct APResolveData {
+struct ApResolveData {
     ap_list: Vec<String>,
 }
 
@@ -41,7 +41,7 @@ async fn try_apresolve(
     };
 
     let body = hyper::body::to_bytes(response.into_body()).await?;
-    let data: APResolveData = serde_json::from_slice(body.as_ref())?;
+    let data: ApResolveData = serde_json::from_slice(body.as_ref())?;
 
     let ap = if ap_port.is_some() || proxy.is_some() {
         data.ap_list.into_iter().find_map(|ap| {

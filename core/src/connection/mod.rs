@@ -1,7 +1,7 @@
 mod codec;
 mod handshake;
 
-pub use self::codec::APCodec;
+pub use self::codec::ApCodec;
 pub use self::handshake::handshake;
 
 use std::io::{self, ErrorKind};
@@ -19,7 +19,7 @@ use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 use crate::proxytunnel;
 use crate::version;
 
-pub type Transport = Framed<TcpStream, APCodec>;
+pub type Transport = Framed<TcpStream, ApCodec>;
 
 fn login_error_message(code: &ErrorCode) -> &'static str {
     pub use ErrorCode::*;

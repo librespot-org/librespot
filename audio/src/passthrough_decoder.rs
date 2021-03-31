@@ -110,7 +110,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
 
     fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError> {
         // write headers if we are (re)starting
-        if self.bos == false {
+        if !self.bos {
             self.wtr
                 .write_packet(
                     self.ident.clone(),

@@ -82,7 +82,7 @@ impl MercuryManager {
 
     pub fn get<T: Into<String>>(&self, uri: T) -> MercuryFuture<MercuryResponse> {
         self.request(MercuryRequest {
-            method: MercuryMethod::GET,
+            method: MercuryMethod::Get,
             uri: uri.into(),
             content_type: None,
             payload: Vec::new(),
@@ -91,7 +91,7 @@ impl MercuryManager {
 
     pub fn send<T: Into<String>>(&self, uri: T, data: Vec<u8>) -> MercuryFuture<MercuryResponse> {
         self.request(MercuryRequest {
-            method: MercuryMethod::SEND,
+            method: MercuryMethod::Send,
             uri: uri.into(),
             content_type: None,
             payload: vec![data],
@@ -109,7 +109,7 @@ impl MercuryManager {
     {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
-            method: MercuryMethod::SUB,
+            method: MercuryMethod::Sub,
             uri: uri.clone(),
             content_type: None,
             payload: Vec::new(),

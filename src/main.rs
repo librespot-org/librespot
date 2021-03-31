@@ -345,7 +345,9 @@ fn setup(args: &[String]) -> Setup {
         .map(|port| port.parse::<u16>().unwrap())
         .unwrap_or(0);
 
-    let name = matches.opt_str("name").unwrap_or("Librespot".to_string());
+    let name = matches
+        .opt_str("name")
+        .unwrap_or_else(|| "Librespot".to_string());
 
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);

@@ -7,16 +7,16 @@ use std::io;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::{Decoder, Framed};
 
-use super::codec::APCodec;
-use crate::diffie_hellman::DHLocalKeys;
+use super::codec::ApCodec;
+use crate::diffie_hellman::DhLocalKeys;
 use crate::protocol;
 use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
 use crate::util;
 
 pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     mut connection: T,
-) -> io::Result<Framed<T, APCodec>> {
-    let local_keys = DHLocalKeys::random(&mut thread_rng());
+) -> io::Result<Framed<T, ApCodec>> {
+    let local_keys = DhLocalKeys::random(&mut thread_rng());
     let gc = local_keys.public_key();
     let mut accumulator = client_hello(&mut connection, gc).await?;
     let message: APResponseMessage = recv_packet(&mut connection, &mut accumulator).await?;
@@ -29,7 +29,7 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
 
     let shared_secret = local_keys.shared_secret(&remote_key);
     let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator);
-    let codec = APCodec::new(&send_key, &recv_key);
+    let codec = ApCodec::new(&send_key, &recv_key);
 
     client_response(&mut connection, challenge).await?;
 

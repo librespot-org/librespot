@@ -13,7 +13,7 @@ enum DecodeState {
     Payload(u8, usize),
 }
 
-pub struct APCodec {
+pub struct ApCodec {
     encode_nonce: u32,
     encode_cipher: Shannon,
 
@@ -22,9 +22,9 @@ pub struct APCodec {
     decode_state: DecodeState,
 }
 
-impl APCodec {
-    pub fn new(send_key: &[u8], recv_key: &[u8]) -> APCodec {
-        APCodec {
+impl ApCodec {
+    pub fn new(send_key: &[u8], recv_key: &[u8]) -> ApCodec {
+        ApCodec {
             encode_nonce: 0,
             encode_cipher: Shannon::new(send_key),
 
@@ -35,7 +35,7 @@ impl APCodec {
     }
 }
 
-impl Encoder<(u8, Vec<u8>)> for APCodec {
+impl Encoder<(u8, Vec<u8>)> for ApCodec {
     type Error = io::Error;
 
     fn encode(&mut self, item: (u8, Vec<u8>), buf: &mut BytesMut) -> io::Result<()> {
@@ -60,7 +60,7 @@ impl Encoder<(u8, Vec<u8>)> for APCodec {
     }
 }
 
-impl Decoder for APCodec {
+impl Decoder for ApCodec {
     type Item = (u8, Bytes);
     type Error = io::Error;
 

@@ -17,19 +17,19 @@ pub static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
     ])
 });
 
-pub struct DHLocalKeys {
+pub struct DhLocalKeys {
     private_key: BigUint,
     public_key: BigUint,
 }
 
-impl DHLocalKeys {
-    pub fn random<R: Rng>(rng: &mut R) -> DHLocalKeys {
+impl DhLocalKeys {
+    pub fn random<R: Rng>(rng: &mut R) -> DhLocalKeys {
         let key_data = util::rand_vec(rng, 95);
 
         let private_key = BigUint::from_bytes_be(&key_data);
         let public_key = util::powm(&DH_GENERATOR, &private_key, &DH_PRIME);
 
-        DHLocalKeys {
+        DhLocalKeys {
             private_key,
             public_key,
         }
