@@ -31,6 +31,7 @@ version = "0.1.6"
 [dependencies.librespot-core]
 path = "core"
 version = "0.1.6"
+features = ["apresolve"]
 
 [dependencies.librespot-metadata]
 path = "metadata"
@@ -58,8 +59,6 @@ url = "2.1"
 sha-1 = "0.9"
 
 [features]
-apresolve = ["librespot-core/apresolve"]
-
 alsa-backend = ["librespot-playback/alsa-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
@@ -75,7 +74,7 @@ with-lewton = ["librespot-audio/with-lewton"]
 
 # with-dns-sd = ["librespot-connect/with-dns-sd"]
 
-default = ["rodio-backend", "apresolve", "with-lewton"]
+default = ["rodio-backend", "with-lewton"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
