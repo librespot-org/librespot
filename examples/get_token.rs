@@ -20,7 +20,9 @@ async fn main() {
 
     println!("Connecting..");
     let credentials = Credentials::with_password(&args[1], &args[2]);
-    let session = Session::connect(session_config, credentials, None).await.unwrap();
+    let session = Session::connect(session_config, credentials, None)
+        .await
+        .unwrap();
 
     println!(
         "Token: {:#?}",
