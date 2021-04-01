@@ -50,7 +50,7 @@ struct PlayerInternal {
 
     state: PlayerState,
     preload: PlayerPreload,
-    sink: Box<dyn Sink + Send>,
+    sink: Box<dyn Sink>,
     sink_status: SinkStatus,
     sink_event_callback: Option<SinkEventCallback>,
     audio_filter: Option<Box<dyn AudioFilter + Send>>,
@@ -242,7 +242,7 @@ impl Player {
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
     where
-        F: FnOnce() -> Box<dyn Sink + Send> + Send + 'static,
+        F: FnOnce() -> Box<dyn Sink> + Send + 'static,
     {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
         let (event_sender, event_receiver) = mpsc::unbounded_channel();

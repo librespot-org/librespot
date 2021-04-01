@@ -105,7 +105,7 @@ fn print_version() {
 
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<dyn Sink + Send + 'static>,
+    backend: fn(Option<String>) -> Box<dyn Sink + 'static>,
     device: Option<String>,
 
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,

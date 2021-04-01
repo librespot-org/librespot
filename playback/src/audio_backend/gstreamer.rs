@@ -1,7 +1,9 @@
 use super::{Open, Sink};
 use crate::audio::AudioPacket;
+
 use gst::prelude::*;
-use gst::*;
+use gstreamer as gst;
+use gstreamer_app as gst_app;
 use zerocopy::*;
 
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -52,14 +54,13 @@ impl Open for GstreamerSink {
         thread::spawn(move || {
             for data in rx {
                 let buffer = bufferpool.acquire_buffer(None);
-                if !buffer.is_err() {
-                    let mut okbuffer = buffer.unwrap();
-                    let mutbuf = okbuffer.make_mut();
+                if let Ok(mut buffer) = buffer {
+                    let mutbuf = buffer.make_mut();
                     mutbuf.set_size(data.len());
                     mutbuf
                         .copy_from_slice(0, data.as_bytes())
                         .expect("Failed to copy from slice");
-                    let _eat = appsrc.push_buffer(okbuffer);
+                    let _eat = appsrc.push_buffer(buffer);
                 }
             }
         });
@@ -69,8 +70,8 @@ impl Open for GstreamerSink {
             let watch_mainloop = thread_mainloop.clone();
             bus.add_watch(move |_, msg| {
                 match msg.view() {
-                    MessageView::Eos(..) => watch_mainloop.quit(),
-                    MessageView::Error(err) => {
+                    gst::MessageView::Eos(..) => watch_mainloop.quit(),
+                    gst::MessageView::Error(err) => {
                         println!(
                             "Error from {:?}: {} ({:?})",
                             err.get_src().map(|s| s.get_path_string()),

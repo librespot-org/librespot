@@ -11,9 +11,9 @@ pub trait Sink {
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()>;
 }
 
-pub type SinkBuilder = fn(Option<String>) -> Box<dyn Sink + Send>;
+pub type SinkBuilder = fn(Option<String>) -> Box<dyn Sink>;
 
-fn mk_sink<S: Sink + Open + Send + 'static>(device: Option<String>) -> Box<dyn Sink + Send> {
+fn mk_sink<S: Sink + Open + 'static>(device: Option<String>) -> Box<dyn Sink> {
     Box::new(S::open(device))
 }
 

@@ -1,5 +1,4 @@
 use std::process::exit;
-use std::{convert::Infallible, sync::mpsc};
 use std::{io, thread, time};
 
 use cpal::traits::{DeviceTrait, HostTrait};
@@ -15,12 +14,12 @@ use crate::audio::AudioPacket;
 compile_error!("Rodio JACK backend is currently only supported on linux.");
 
 #[cfg(feature = "rodio-backend")]
-pub fn mk_rodio(device: Option<String>) -> Box<dyn Sink + Send> {
+pub fn mk_rodio(device: Option<String>) -> Box<dyn Sink> {
     Box::new(open(cpal::default_host(), device))
 }
 
 #[cfg(feature = "rodiojack-backend")]
-pub fn mk_rodiojack(device: Option<String>) -> Box<dyn Sink + Send> {
+pub fn mk_rodiojack(device: Option<String>) -> Box<dyn Sink> {
     Box::new(open(
         cpal::host_from_id(cpal::HostId::Jack).unwrap(),
         device,
@@ -43,8 +42,7 @@ pub enum RodioError {
 
 pub struct RodioSink {
     rodio_sink: rodio::Sink,
-    // will produce a TryRecvError on the receiver side when it is dropped.
-    _close_tx: mpsc::SyncSender<Infallible>,
+    _stream: rodio::OutputStream,
 }
 
 fn list_formats(device: &rodio::Device) {
@@ -152,29 +150,12 @@ fn create_sink(
 pub fn open(host: cpal::Host, device: Option<String>) -> RodioSink {
     debug!("Using rodio sink with cpal host: {}", host.id().name());
 
-    let (sink_tx, sink_rx) = mpsc::sync_channel(1);
-    let (close_tx, close_rx) = mpsc::sync_channel(1);
-
-    std::thread::spawn(move || match create_sink(&host, device) {
-        Ok((sink, stream)) => {
-            sink_tx.send(Ok(sink)).unwrap();
-
-            close_rx.recv().unwrap_err(); // This will fail as soon as the sender is dropped
-            debug!("drop rodio::OutputStream");
-            drop(stream);
-        }
-        Err(e) => {
-            sink_tx.send(Err(e)).unwrap();
-        }
-    });
-
-    // Instead of the second `unwrap`, better error handling could be introduced
-    let sink = sink_rx.recv().unwrap().unwrap();
+    let (sink, stream) = create_sink(&host, device).unwrap();
 
     debug!("Rodio sink was created");
     RodioSink {
         rodio_sink: sink,
-        _close_tx: close_tx,
+        _stream: stream,
     }
 }
 
