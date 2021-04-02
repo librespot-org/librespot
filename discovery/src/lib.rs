@@ -11,6 +11,7 @@
 
 mod server;
 
+use std::borrow::Cow;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -60,19 +61,19 @@ pub enum Error {
 
 impl Builder {
     /// Starts a new builder using the provided device id.
-    pub fn new(device_id: String) -> Self {
+    pub fn new(device_id: impl Into<String>) -> Self {
         Self {
             server_config: server::Config {
                 name: "Librespot".into(),
                 device_type: DeviceType::default(),
-                device_id,
+                device_id: device_id.into(),
             },
             port: 0,
         }
     }
 
     /// Sets the name to be displayed. Default is `"Librespot"`.
-    pub fn name(mut self, name: String) -> Self {
+    pub fn name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
         self.server_config.name = name.into();
         self
     }
@@ -130,12 +131,12 @@ impl Builder {
 
 impl Discovery {
     /// Starts a [`Builder`] with the provided device id.
-    pub fn builder(device_id: String) -> Builder {
+    pub fn builder(device_id: impl Into<String>) -> Builder {
         Builder::new(device_id)
     }
 
     /// Create a new instance with the specified device id and default paramaters.
-    pub fn new(device_id: String) -> Result<Self, Error> {
+    pub fn new(device_id: impl Into<String>) -> Result<Self, Error> {
         Self::builder(device_id).launch()
     }
 }

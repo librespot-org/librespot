@@ -10,7 +10,7 @@ async fn main() {
         .init()
         .unwrap();
 
-    let name = "Librespot".to_string();
+    let name = "Librespot";
     let device_id = hex::encode(Sha1::digest(name.as_bytes()));
 
     let mut server = librespot_discovery::Discovery::builder(device_id)
