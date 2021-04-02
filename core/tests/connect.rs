@@ -1,34 +1,18 @@
-use librespot_core::*;
+use librespot_core::authentication::Credentials;
+use librespot_core::config::SessionConfig;
+use librespot_core::session::Session;
 
-// TODO: test is broken
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     // Test AP Resolve
-//     use apresolve::apresolve_or_fallback;
-//     #[tokio::test]
-//     async fn test_ap_resolve() {
-//         env_logger::init();
-//         let ap = apresolve_or_fallback(&None, &None).await;
-//         println!("AP: {:?}", ap);
-//     }
+#[tokio::test]
+async fn test_connection() {
+    let result = Session::connect(
+        SessionConfig::default(),
+        Credentials::with_password("test", "test"),
+        None,
+    )
+    .await;
 
-//     // Test connect
-//     use authentication::Credentials;
-//     use config::SessionConfig;
-//     #[tokio::test]
-//     async fn test_connection() -> Result<(), Box<dyn std::error::Error>> {
-//         println!("Running connection test");
-//         let ap = apresolve_or_fallback(&None, &None).await;
-//         let credentials = Credentials::with_password(String::from("test"), String::from("test"));
-//         let session_config = SessionConfig::default();
-//         let proxy = None;
-
-//         println!("Connecting to AP \"{}\"", ap);
-//         let mut connection = connection::connect(ap, &proxy).await?;
-//         let rc = connection::authenticate(&mut connection, credentials, &session_config.device_id)
-//             .await?;
-//         println!("Authenticated as \"{}\"", rc.username);
-//         Ok(())
-//     }
-// }
+    match result {
+        Ok(_) => panic!("Authentication succeeded despite of bad credentials."),
+        Err(e) => assert_eq!(e.to_string(), "Login failed with reason: Bad credentials"),
+    };
+}

@@ -66,3 +66,26 @@ pub async fn apresolve(proxy: Option<&Url>, ap_port: Option<u16>) -> String {
         AP_FALLBACK.into()
     })
 }
+
+#[cfg(test)]
+mod test {
+    use std::net::ToSocketAddrs;
+
+    use super::try_apresolve;
+
+    #[tokio::test]
+    async fn test_apresolve() {
+        let ap = try_apresolve(None, None).await.unwrap();
+
+        // Assert that the result contains a valid host and port
+        ap.to_socket_addrs().unwrap().next().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_apresolve_port_443() {
+        let ap = try_apresolve(None, Some(443)).await.unwrap();
+
+        let port = ap.to_socket_addrs().unwrap().next().unwrap().port();
+        assert_eq!(port, 443);
+    }
+}
