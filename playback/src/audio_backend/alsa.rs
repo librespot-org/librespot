@@ -71,7 +71,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
 }
 
 impl Open for AlsaSink {
-    fn open(device: Option<String>, format: AudioFormat) -> AlsaSink {
+    fn open(device: Option<String>, format: AudioFormat) -> Self {
         info!("Using Alsa sink with format: {:?}", format);
 
         let name = match device.as_ref().map(AsRef::as_ref) {

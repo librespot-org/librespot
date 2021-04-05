@@ -12,7 +12,7 @@ pub enum SdlSink {
 }
 
 impl Open for SdlSink {
-    fn open(device: Option<String>, format: AudioFormat) -> SdlSink {
+    fn open(device: Option<String>, format: AudioFormat) -> Self {
         info!("Using SDL sink with format: {:?}", format);
 
         if device.is_some() {

@@ -41,7 +41,7 @@ impl ProcessHandler for JackData {
 }
 
 impl Open for JackSink {
-    fn open(client_name: Option<String>, format: AudioFormat) -> JackSink {
+    fn open(client_name: Option<String>, format: AudioFormat) -> Self {
         if format != AudioFormat::F32 {
             warn!("JACK currently does not support {:?} output", format);
         }

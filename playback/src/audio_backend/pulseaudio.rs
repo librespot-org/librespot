@@ -17,7 +17,7 @@ pub struct PulseAudioSink {
 }
 
 impl Open for PulseAudioSink {
-    fn open(device: Option<String>, format: AudioFormat) -> PulseAudioSink {
+    fn open(device: Option<String>, format: AudioFormat) -> Self {
         info!("Using PulseAudio sink with format: {:?}", format);
 
         // PulseAudio calls S24 and S24_3 different from the rest of the world

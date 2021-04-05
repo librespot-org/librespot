@@ -10,7 +10,7 @@ pub struct StdoutSink {
 }
 
 impl Open for StdoutSink {
-    fn open(path: Option<String>, format: AudioFormat) -> StdoutSink {
+    fn open(path: Option<String>, format: AudioFormat) -> Self {
         info!("Using pipe sink with format: {:?}", format);
 
         let output: Box<dyn Write> = match path {

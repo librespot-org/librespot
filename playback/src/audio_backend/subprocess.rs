@@ -12,7 +12,7 @@ pub struct SubprocessSink {
 }
 
 impl Open for SubprocessSink {
-    fn open(shell_command: Option<String>, format: AudioFormat) -> SubprocessSink {
+    fn open(shell_command: Option<String>, format: AudioFormat) -> Self {
         info!("Using subprocess sink with format: {:?}", format);
 
         if let Some(shell_command) = shell_command {
