@@ -23,21 +23,32 @@ doc = false
 [dependencies.librespot-audio]
 path = "audio"
 version = "0.1.6"
+optional = true
+
 [dependencies.librespot-connect]
 path = "connect"
 version = "0.1.6"
+optional = true
+
 [dependencies.librespot-core]
 path = "core"
 version = "0.1.6"
+optional = true
+
 [dependencies.librespot-metadata]
 path = "metadata"
 version = "0.1.6"
+optional = true
+
 [dependencies.librespot-playback]
 path = "playback"
 version = "0.1.6"
+optional = true
+
 [dependencies.librespot-protocol]
 path = "protocol"
 version = "0.1.6"
+optional = true
 
 [dependencies]
 base64 = "0.13"
@@ -59,21 +70,28 @@ sha-1 = "0.8"
 hex = "0.4"
 
 [features]
-alsa-backend = ["librespot-playback/alsa-backend"]
-portaudio-backend = ["librespot-playback/portaudio-backend"]
-pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
-jackaudio-backend = ["librespot-playback/jackaudio-backend"]
-rodiojack-backend = ["librespot-playback/rodiojack-backend"]
-rodio-backend = ["librespot-playback/rodio-backend"]
-sdl-backend = ["librespot-playback/sdl-backend"]
-gstreamer-backend = ["librespot-playback/gstreamer-backend"]
+alsa-backend = ["librespot-playback/alsa-backend", "playback"]
+portaudio-backend = ["librespot-playback/portaudio-backend", "playback"]
+pulseaudio-backend = ["librespot-playback/pulseaudio-backend", "playback"]
+jackaudio-backend = ["librespot-playback/jackaudio-backend", "playback"]
+rodio-backend = ["librespot-playback/rodio-backend", "playback"]
+rodiojack-backend = ["librespot-playback/rodiojack-backend", "playback"]
+sdl-backend = ["librespot-playback/sdl-backend", "playback"]
+gstreamer-backend = ["librespot-playback/gstreamer-backend", "playback"]
 
-with-tremor = ["librespot-audio/with-tremor"]
-with-vorbis = ["librespot-audio/with-vorbis"]
+with-tremor = ["librespot-audio/with-tremor", "audio"]
+with-vorbis = ["librespot-audio/with-vorbis", "audio"]
 
-with-dns-sd = ["librespot-connect/with-dns-sd"]
+with-dns-sd = ["librespot-connect/with-dns-sd", "connect"]
 
-default = ["librespot-playback/rodio-backend"]
+protocol = ["librespot-protocol"]
+core = ["protocol", "librespot-core"]
+audio = ["core", "librespot-audio"]
+metadata = ["core", "librespot-metadata"]
+playback = ["metadata", "audio", "core", "librespot-playback"]
+connect = ["core", "playback", "protocol", "librespot-connect"]
+
+default = ["rodio-backend", "connect"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
