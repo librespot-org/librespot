@@ -4,36 +4,49 @@ name: test
 on:
   push:
     branches: [master, dev]
-    paths: ['**.rs', '**.toml', '**.lock', '**.yml']
+    paths:
+      [
+        "**.rs",
+        "Cargo.toml",
+        "/Cargo.lock",
+        "/rustfmt.toml",
+        "/.github/workflows",
+      ]
   pull_request:
-    branches: [master, dev]
-    paths: ['**.rs', '**.toml', '**.lock', '**.yml']
+    paths:
+      [
+        "**.rs",
+        "Cargo.toml",
+        "/Cargo.lock",
+        "/rustfmt.toml",
+        "/.github/workflows",
+      ]
+  schedule:
+    # Run CI every week
+    - cron: "00 01 * * 0"
+
+env:
+  RUST_BACKTRACE: 1
 
 jobs:
   fmt:
-    name: 'Rust: format check'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # Only run the formatting check for stable
-        include:
-          - os: ubuntu-latest
-            toolchain: stable
+    name: rustfmt
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
-          # Use default profile to get rustfmt
-          profile: default
-          toolchain: ${{ matrix.toolchain }}
+          profile: minimal
+          toolchain: stable
           override: true
-      - run: cargo fmt --verbose --all -- --check
+          components: rustfmt
+      - run: cargo fmt --all -- --check
 
-  test:
+  test-linux:
     needs: fmt
+    name: cargo +${{ matrix.toolchain }} build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
@@ -45,7 +58,7 @@ jobs:
           - stable
           - beta
         experimental: [false]
-        # Ignore failures in nightly, not ideal, but necessary
+        # Ignore failures in nightly
         include:
           - os: ubuntu-latest
             toolchain: nightly
@@ -53,12 +66,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
           override: true
+
+      - name: Get Rustc version
+        id: get-rustc-version
+        run: echo "::set-output name=version::$(rustc -V)"
+        shell: bash
+
       - name: Cache Rust dependencies
         uses: actions/cache@v2
         with:
@@ -67,21 +87,65 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Install developer package dependencies
-        run: sudo apt-get update && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-      - run: cargo build --locked --no-default-features
-      - run: cargo build --locked --examples
-      - run: cargo build --locked --no-default-features --features "with-tremor"
-      - run: cargo build --locked --no-default-features --features "with-vorbis"
-      - run: cargo build --locked --no-default-features --features "alsa-backend"
-      - run: cargo build --locked --no-default-features --features "portaudio-backend"
-      - run: cargo build --locked --no-default-features --features "pulseaudio-backend"
-      - run: cargo build --locked --no-default-features --features "jackaudio-backend"
-      - run: cargo build --locked --no-default-features --features "rodiojack-backend" 
-      - run: cargo build --locked --no-default-features --features "rodio-backend"
-      - run: cargo build --locked --no-default-features --features "sdl-backend"
-      - run: cargo build --locked --no-default-features --features "gstreamer-backend"
+        run: sudo apt-get update && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev libavahi-compat-libdnssd-dev
+
+      - run: cargo build --workspace --examples
+      - run: cargo test --workspace
+
+      - run: cargo install cargo-hack
+      - run: cargo hack  --workspace --remove-dev-deps
+      - run: cargo build -p librespot-core --no-default-features
+      - run: cargo build -p librespot-core
+      - run: cargo hack build --each-feature -p librespot-audio
+      - run: cargo build -p librespot-connect
+      - run: cargo build -p librespot-connect --no-default-features --features with-dns-sd
+      - run: cargo hack build --locked --each-feature
+
+  test-windows:
+    needs: fmt
+    name: cargo build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+        toolchain: [stable]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          profile: minimal
+          override: true
+
+      - name: Get Rustc version
+        id: get-rustc-version
+        run: echo "::set-output name=version::$(rustc -V)"
+        shell: bash
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - run: cargo build --workspace --examples
+      - run: cargo test --workspace
+
+      - run: cargo install cargo-hack
+      - run: cargo hack  --workspace --remove-dev-deps
+      - run: cargo build --no-default-features
+      - run: cargo build
 
   test-cross-arm:
     needs: fmt
@@ -97,6 +161,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -104,6 +169,12 @@ jobs:
           target: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
           override: true
+
+      - name: Get Rustc version
+        id: get-rustc-version
+        run: echo "::set-output name=version::$(rustc -V)"
+        shell: bash
+
       - name: Cache Rust dependencies
         uses: actions/cache@v2
         with:
@@ -112,7 +183,7 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.target }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
       - name: Install cross
         run: cargo install cross || true
       - name: Build
