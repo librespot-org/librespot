@@ -339,9 +339,9 @@ dependencies = [
 
 [[package]]
 name = "cpal"
-version = "0.13.2"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "840981d3f30230d9120328d64be72319dbbedabb61bcd4c370a54cdd051238ac"
+checksum = "8351ddf2aaa3c583fa388029f8b3d26f3c7035a20911fdd5f2e2ed7ab57dad25"
 dependencies = [
  "alsa",
  "core-foundation-sys",
@@ -1161,9 +1161,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.91"
+version = "0.2.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8916b1f6ca17130ec6568feccee27c156ad12037880833a3b842a823236502e7"
+checksum = "9385f66bf6105b241aa65a61cb923ef20efc665cb9f9bb50ac2f0c4b7f378d41"
 
 [[package]]
 name = "libloading"
@@ -1195,9 +1195,9 @@ dependencies = [
 
 [[package]]
 name = "libpulse-binding"
-version = "2.23.0"
+version = "2.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2405f806801527dfb3d2b6d48a282cdebe9a1b41b0652e0d7b5bad81dbc700e"
+checksum = "db951f37898e19a6785208e3a290261e0f1a8e086716be596aaad684882ca8e3"
 dependencies = [
  "bitflags",
  "libc",
@@ -2209,9 +2209,9 @@ dependencies = [
 
 [[package]]
 name = "rodio"
-version = "0.13.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9683532495146e98878d4948fa1a1953f584cd923f2a5f5c26b7a8701b56943"
+checksum = "b65c2eda643191f6d1bb12ea323a9db8d9ba95374e9be3780b5a9fb5cfb8520f"
 dependencies = [
  "cpal",
 ]
@@ -2288,9 +2288,9 @@ dependencies = [
 
 [[package]]
 name = "sdl2-sys"
-version = "0.34.3"
+version = "0.34.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d81feded049b9c14eceb4a4f6d596a98cebbd59abdba949c5552a015466d33"
+checksum = "4cb164f53dbcad111de976bbf1f3083d3fcdeda88da9cfa281c70822720ee3da"
 dependencies = [
  "cfg-if 0.1.10",
  "libc",

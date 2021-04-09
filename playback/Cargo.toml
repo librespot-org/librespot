@@ -31,7 +31,7 @@ jack            = { version = "0.6", optional = true }
 libc            = { version = "0.2", optional = true }
 rodio           = { version = "0.13", optional = true, default-features = false }
 cpal            = { version = "0.13", optional = true }
-sdl2            = { version = "0.34", optional = true }
+sdl2            = { version = "0.34.3", optional = true }
 gstreamer       = { version = "0.16", optional = true }
 gstreamer-app   = { version = "0.16", optional = true }
 glib            = { version = "0.10", optional = true }
@@ -45,4 +45,4 @@ jackaudio-backend = ["jack"]
 rodiojack-backend = ["rodio", "cpal/jack"]
 rodio-backend = ["rodio", "cpal"]
 sdl-backend = ["sdl2"]
-gstreamer-backend = ["gstreamer", "gstreamer-app", "glib" ]
+gstreamer-backend = ["gstreamer", "gstreamer-app", "glib"]
