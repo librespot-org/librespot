@@ -21,7 +21,16 @@ macro_rules! convert_samples_to {
         $samples
             .iter()
             .map(|sample| {
-                (*sample as f64 * (std::$type::MAX as f64 + 0.5) - 0.5) as $type >> $drop_bits
+                // Losslessly represent [-1.0, 1.0] to [$type::MIN, $type::MAX]
+                // while maintaining DC linearity. There is nothing to be gained
+                // by doing this in f64, as the significand of a f32 is 24 bits,
+                // just like the maximum bit depth we are converting to.
+                let int_value = *sample * (std::$type::MAX as f32 + 0.5) - 0.5;
+
+                // Casting floats to ints truncates by default, which results
+                // in larger quantization error than rounding arithmetically.
+                // Flooring is faster, but again with larger error.
+                int_value.round() as $type >> $drop_bits
             })
             .collect()
     };
