@@ -93,6 +93,16 @@ pub fn get_credentials<F: FnOnce(&String) -> Option<String>>(
     }
 }
 
+fn print_version() {
+    println!(
+        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
+        semver = version::SEMVER,
+        sha = version::SHA_SHORT,
+        build_date = version::BUILD_DATE,
+        build_id = version::BUILD_ID
+    );
+}
+
 #[derive(Clone)]
 struct Setup {
     backend: fn(Option<String>) -> Box<dyn Sink + Send + 'static>,
@@ -125,7 +135,7 @@ fn setup(args: &[String]) -> Setup {
         "Path to a directory where system files (credentials, volume) will be cached. Can be different from cache option value",
         "SYTEMCACHE",
     ).optflag("", "disable-audio-cache", "Disable caching of the audio data.")
-        .reqopt("n", "name", "Device name", "NAME")
+        .optopt("n", "name", "Device name", "NAME")
         .optopt("", "device-type", "Displayed device type", "DEVICE_TYPE")
         .optopt(
             "b",
@@ -141,6 +151,7 @@ fn setup(args: &[String]) -> Setup {
         )
         .optflag("", "emit-sink-events", "Run program set by --onevent before sink is opened and after it is closed.")
         .optflag("v", "verbose", "Enable verbose output")
+        .optflag("V", "version", "Display librespot version string")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
         .optopt("", "proxy", "HTTP proxy to use when connecting", "PROXY")
@@ -241,15 +252,20 @@ fn setup(args: &[String]) -> Setup {
         }
     };
 
+    if matches.opt_present("version") {
+        print_version();
+        exit(0);
+    }
+
     let verbose = matches.opt_present("verbose");
     setup_logging(verbose);
 
     info!(
-        "librespot {} ({}). Built on {}. Build ID: {}",
-        version::short_sha(),
-        version::commit_date(),
-        version::short_now(),
-        version::build_id()
+        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
+        semver = version::SEMVER,
+        sha = version::SHA_SHORT,
+        build_date = version::BUILD_DATE,
+        build_id = version::BUILD_ID
     );
 
     let backend_name = matches.opt_str("backend");
@@ -329,7 +345,7 @@ fn setup(args: &[String]) -> Setup {
         .map(|port| port.parse::<u16>().unwrap())
         .unwrap_or(0);
 
-    let name = matches.opt_str("name").unwrap();
+    let name = matches.opt_str("name").unwrap_or("Librespot".to_string());
 
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);
@@ -352,7 +368,7 @@ fn setup(args: &[String]) -> Setup {
         let device_id = device_id(&name);
 
         SessionConfig {
-            user_agent: version::version_string(),
+            user_agent: version::VERSION_STRING.to_string(),
             device_id,
             proxy: matches.opt_str("proxy").or_else(|| std::env::var("http_proxy").ok()).map(
                 |s| {

@@ -13,7 +13,7 @@ curl https://sh.rustup.rs -sSf | sh
 
 Follow any prompts it gives you to install Rust. Once that’s done, Rust's standard tools should be setup and ready to use.
 
-*Note: The current minimum required Rust version at the time of writing is 1.40.0, you can find the current minimum version specified in the `.github/workflow/test.yml` file.*
+*Note: The current minimum required Rust version at the time of writing is 1.41, you can find the current minimum version specified in the `.github/workflow/test.yml` file.*
 
 #### Additional Rust tools - `rustfmt`
 To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-lang/rustfmt), which is installed by default with `rustup` these days, else it can be installed manually with:
