@@ -199,8 +199,6 @@ impl Sink for RodioSink {
             }
             _ => unreachable!(),
         };
-        let source = rodio::buffer::SamplesBuffer::new(2, 44100, packet.samples());
-        self.rodio_sink.append(source);
 
         // Chunk sizes seem to be about 256 to 3000 ish items long.
         // Assuming they're on average 1628 then a half second buffer is:
