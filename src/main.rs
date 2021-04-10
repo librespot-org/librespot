@@ -128,7 +128,7 @@ struct Setup {
     emit_sink_events: bool,
 }
 
-fn setup(args: &[String]) -> Setup {
+fn get_setup(args: &[String]) -> Setup {
     let mut opts = getopts::Options::new();
     opts.optopt(
         "c",
@@ -553,7 +553,7 @@ async fn main() {
     }
 
     let args: Vec<String> = std::env::args().collect();
-    let setupp = setup(&args);
+    let setup = get_setup(&args);
 
     let mut last_credentials = None;
     let mut spirc: Option<Spirc> = None;
@@ -563,23 +563,23 @@ async fn main() {
     let mut discovery = None;
     let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
 
-    if setupp.enable_discovery {
-        let config = setupp.connect_config.clone();
-        let device_id = setupp.session_config.device_id.clone();
+    if setup.enable_discovery {
+        let config = setup.connect_config.clone();
+        let device_id = setup.session_config.device_id.clone();
 
         discovery = Some(
-            librespot_connect::discovery::discovery(config, device_id, setupp.zeroconf_port)
+            librespot_connect::discovery::discovery(config, device_id, setup.zeroconf_port)
                 .unwrap(),
         );
     }
 
-    if let Some(credentials) = setupp.credentials {
+    if let Some(credentials) = setup.credentials {
         last_credentials = Some(credentials.clone());
         connecting = Box::pin(
             Session::connect(
-                setupp.session_config.clone(),
+                setup.session_config.clone(),
                 credentials,
-                setupp.cache.clone(),
+                setup.cache.clone(),
             )
             .fuse(),
         );
@@ -602,9 +602,9 @@ async fn main() {
                         }
 
                         connecting = Box::pin(Session::connect(
-                            setupp.session_config.clone(),
+                            setup.session_config.clone(),
                             credentials,
-                            setupp.cache.clone(),
+                            setup.cache.clone(),
                         ).fuse());
                     },
                     None => {
@@ -615,22 +615,22 @@ async fn main() {
             },
             session = &mut connecting, if !connecting.is_terminated() => match session {
                 Ok(session) => {
-                    let mixer_config = setupp.mixer_config.clone();
-                    let mixer = (setupp.mixer)(Some(mixer_config));
-                    let player_config = setupp.player_config.clone();
-                    let connect_config = setupp.connect_config.clone();
+                    let mixer_config = setup.mixer_config.clone();
+                    let mixer = (setup.mixer)(Some(mixer_config));
+                    let player_config = setup.player_config.clone();
+                    let connect_config = setup.connect_config.clone();
 
                     let audio_filter = mixer.get_audio_filter();
-                    let format = setupp.format;
-                    let backend = setupp.backend;
-                    let device = setupp.device.clone();
+                    let format = setup.format;
+                    let backend = setup.backend;
+                    let device = setup.device.clone();
                     let (player, event_channel) =
                         Player::new(player_config, session.clone(), audio_filter, move || {
                             (backend)(device, format)
                         });
 
-                    if setupp.emit_sink_events {
-                        if let Some(player_event_program) = setupp.player_event_program.clone() {
+                    if setup.emit_sink_events {
+                        if let Some(player_event_program) = setup.player_event_program.clone() {
                             player.set_sink_event_callback(Some(Box::new(move |sink_status| {
                                 match emit_sink_event(sink_status, &player_event_program) {
                                     Ok(e) if e.success() => (),
@@ -676,16 +676,16 @@ async fn main() {
                         auto_connect_times.push(Instant::now());
 
                         connecting = Box::pin(Session::connect(
-                            setupp.session_config.clone(),
+                            setup.session_config.clone(),
                             credentials,
-                            setupp.cache.clone(),
+                            setup.cache.clone(),
                         ).fuse());
                     }
                 }
             },
             event = async { player_event_channel.as_mut().unwrap().recv().await }, if player_event_channel.is_some() => match event {
                 Some(event) => {
-                    if let Some(program) = &setupp.player_event_program {
+                    if let Some(program) = &setup.player_event_program {
                         if let Some(child) = run_program_on_events(event, program) {
                             let mut child = child.expect("program failed to start");
 
