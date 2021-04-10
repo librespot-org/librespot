@@ -11,6 +11,9 @@ use priority_queue::PriorityQueue;
 use crate::authentication::Credentials;
 use crate::spotify_id::FileId;
 
+/// Some kind of data structure that holds some paths, the size of these files and a timestamp.
+/// It keeps track of the file sizes and is able to pop the path with the oldest timestamp if
+/// a given limit is exceeded.
 struct SizeLimiter {
     queue: PriorityQueue<PathBuf, Reverse<SystemTime>>,
     sizes: HashMap<PathBuf, u64>,
@@ -19,6 +22,7 @@ struct SizeLimiter {
 }
 
 impl SizeLimiter {
+    /// Creates a new instance with the given size limit.
     fn new(limit: u64) -> Self {
         Self {
             queue: PriorityQueue::new(),
@@ -41,16 +45,26 @@ impl SizeLimiter {
         }
     }
 
+    /// Returns true if the limit is exceeded.
+    fn exceeds_limit(&self) -> bool {
+        self.in_use > self.size_limit
+    }
+
     /// Returns the least recently accessed file if the size of the cache exceeds
     /// the limit.
     ///
     /// The entry is removed from the data structure, but the caller is responsible
     /// to delete the file in the file system.
     fn pop(&mut self) -> Option<PathBuf> {
-        if self.in_use > self.size_limit {
-            let (next, _) = self.queue.pop()?;
-            // panic safety: It is guaranteed that `queue` and `sizes` have the same keys.
-            let size = self.sizes.remove(&next).unwrap();
+        if self.exceeds_limit() {
+            let (next, _) = self
+                .queue
+                .pop()
+                .expect("in_use was > 0, so the queue should have contained an item.");
+            let size = self
+                .sizes
+                .remove(&next)
+                .expect("`queue` and `sizes` should have the same keys.");
             self.in_use -= size;
             Some(next)
         } else {
@@ -58,18 +72,26 @@ impl SizeLimiter {
         }
     }
 
+    /// Updates the timestamp of an existing element. Returns `true` if the item did exist.
     fn update(&mut self, file: &Path, access_time: SystemTime) -> bool {
         self.queue
             .change_priority(file, Reverse(access_time))
             .is_some()
     }
 
-    fn remove(&mut self, file: &Path) {
+    /// Removes an element with the specified path. Returns `true` if the item did exist.
+    fn remove(&mut self, file: &Path) -> bool {
         if self.queue.remove(file).is_none() {
-            return;
+            return false;
         }
-        let size = self.sizes.remove(file).unwrap();
+
+        let size = self
+            .sizes
+            .remove(file)
+            .expect("`queue` and `sizes` should have the same keys.");
         self.in_use -= size;
+
+        true
     }
 }
 
@@ -78,29 +100,75 @@ struct FsSizeLimiter {
 }
 
 impl FsSizeLimiter {
+    /// Returns access time and file size of a given path.
     fn get_metadata(file: &Path) -> io::Result<(SystemTime, u64)> {
         let metadata = file.metadata()?;
+
+        // The first of the following timestamps which is available will be chosen as access time:
+        // 1. Access time
+        // 2. Modification time
+        // 3. Creation time
+        // 4. Current time
         let access_time = metadata
             .accessed()
+            .or_else(|_| metadata.modified())
             .or_else(|_| metadata.created())
             .unwrap_or_else(|_| SystemTime::now());
+
         let size = metadata.len();
 
         Ok((access_time, size))
     }
 
+    /// Recursively search a directory for files and add them to the `limiter` struct.
     fn init_dir(limiter: &mut SizeLimiter, path: &Path) {
-        for entry in fs::read_dir(path).into_iter().flatten().flatten() {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_dir() {
+        let list_dir = match fs::read_dir(path) {
+            Ok(list_dir) => list_dir,
+            Err(e) => {
+                warn!("Could not read directory {:?} in cache dir: {}", path, e);
+                return;
+            }
+        };
+
+        for entry in list_dir {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(e) => {
+                    warn!("Could not directory {:?} in cache dir: {}", path, e);
+                    return;
+                }
+            };
+
+            match entry.file_type() {
+                Ok(file_type) if file_type.is_dir() || file_type.is_symlink() => {
                     Self::init_dir(limiter, &entry.path())
-                } else if file_type.is_file() {
+                }
+                Ok(file_type) if file_type.is_file() => {
                     let path = entry.path();
-                    if let Ok((access_time, size)) = Self::get_metadata(&path) {
-                        limiter.add(&path, size, access_time);
+                    match Self::get_metadata(&path) {
+                        Ok((access_time, size)) => {
+                            limiter.add(&path, size, access_time);
+                        }
+                        Err(e) => {
+                            warn!("Could not read file {:?} in cache dir: {}", path, e)
+                        }
                     }
                 }
-            }
+                Ok(ft) => {
+                    warn!(
+                        "File {:?} in cache dir has unsupported type {:?}",
+                        entry.path(),
+                        ft
+                    )
+                }
+                Err(e) => {
+                    warn!(
+                        "Could not get type of file {:?} in cache dir: {}",
+                        entry.path(),
+                        e
+                    )
+                }
+            };
         }
     }
 
@@ -119,19 +187,37 @@ impl FsSizeLimiter {
         self.limiter.lock().unwrap().remove(file);
     }
 
-    fn shrink(&self) {
-        while let Some(file) = self.limiter.lock().unwrap().pop() {
-            let _ = fs::remove_file(file);
+    fn prune_internal<F: FnMut() -> Option<PathBuf>>(mut pop: F) {
+        let mut first = true;
+        let mut count = 0;
+
+        while let Some(file) = pop() {
+            if first {
+                debug!("Cache dir exceeds limit, removing least recently used files.");
+                first = false;
+            }
+
+            if let Err(e) = fs::remove_file(&file) {
+                warn!("Could not remove file {:?} from cache dir: {}", file, e);
+            } else {
+                count += 1;
+            }
         }
+
+        if count > 0 {
+            info!("Removed {} cache files.", count);
+        }
+    }
+
+    fn prune(&self) {
+        Self::prune_internal(|| self.limiter.lock().unwrap().pop())
     }
 
     fn new(path: &Path, limit: u64) -> Self {
         let mut limiter = SizeLimiter::new(limit);
-        Self::init_dir(&mut limiter, path);
 
-        while let Some(file) = limiter.pop() {
-            let _ = fs::remove_file(file);
-        }
+        Self::init_dir(&mut limiter, path);
+        Self::prune_internal(|| limiter.pop());
 
         Self {
             limiter: Mutex::new(limiter),
@@ -297,7 +383,7 @@ impl Cache {
         if let Ok(size) = result {
             if let Some(limiter) = self.size_limiter.as_deref() {
                 limiter.add(&path, size);
-                limiter.shrink();
+                limiter.prune();
             }
         }
     }
@@ -314,5 +400,57 @@ impl Cache {
             }
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::time::Duration;
+
+    fn ordered_time(v: u64) -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(v)
+    }
+
+    #[test]
+    fn test_size_limiter() {
+        let mut limiter = SizeLimiter::new(1000);
+
+        limiter.add(Path::new("a"), 500, ordered_time(2));
+        limiter.add(Path::new("b"), 500, ordered_time(1));
+
+        // b (500) -> a (500)  => sum: 1000 <= 1000
+        assert!(!limiter.exceeds_limit());
+        assert_eq!(limiter.pop(), None);
+
+        limiter.add(Path::new("c"), 1000, ordered_time(3));
+
+        // b (500) -> a (500) -> c (1000)  => sum: 2000 > 1000
+        assert!(limiter.exceeds_limit());
+        assert_eq!(limiter.pop().as_deref(), Some(Path::new("b")));
+        // a (500) -> c (1000)  => sum: 1500 > 1000
+        assert_eq!(limiter.pop().as_deref(), Some(Path::new("a")));
+        // c (1000)   => sum: 1000 <= 1000
+        assert_eq!(limiter.pop().as_deref(), None);
+
+        limiter.add(Path::new("d"), 5, ordered_time(2));
+        // d (5) -> c (1000) => sum: 1005 > 1000
+        assert_eq!(limiter.pop().as_deref(), Some(Path::new("d")));
+        // c (1000)   => sum: 1000 <= 1000
+        assert_eq!(limiter.pop().as_deref(), None);
+
+        // Test updating
+
+        limiter.add(Path::new("e"), 500, ordered_time(3));
+        //  c (1000) -> e (500)  => sum: 1500 > 1000
+        assert!(limiter.update(Path::new("c"), ordered_time(4)));
+        // e (500) -> c (1000)  => sum: 1500 > 1000
+        assert_eq!(limiter.pop().as_deref(), Some(Path::new("e")));
+        // c (1000)  => sum: 1000 <= 1000
+
+        // Test removing
+        limiter.add(Path::new("f"), 500, ordered_time(2));
+        assert!(limiter.remove(Path::new("c")));
+        assert!(!limiter.exceeds_limit());
     }
 }
