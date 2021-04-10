@@ -21,9 +21,10 @@ futures-util = { version = "0.3", default_features = false }
 ogg = "0.8"
 tempfile = "3.1"
 tokio = { version = "1", features = ["sync", "macros"] }
+zerocopy = "0.3"
 
-librespot-tremor = { version = "0.2.0", optional = true }
-vorbis = { version ="0.0.14", optional = true }
+librespot-tremor = { version = "0.2", optional = true }
+vorbis = { version ="0.0", optional = true }
 
 [features]
 with-tremor = ["librespot-tremor"]

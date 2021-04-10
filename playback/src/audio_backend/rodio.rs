@@ -5,7 +5,9 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
 use super::Sink;
-use crate::audio::AudioPacket;
+use crate::audio::{AudioPacket, SamplesConverter};
+use crate::config::AudioFormat;
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 
 #[cfg(all(
     feature = "rodiojack-backend",
@@ -14,15 +16,16 @@ use crate::audio::AudioPacket;
 compile_error!("Rodio JACK backend is currently only supported on linux.");
 
 #[cfg(feature = "rodio-backend")]
-pub fn mk_rodio(device: Option<String>) -> Box<dyn Sink> {
-    Box::new(open(cpal::default_host(), device))
+pub fn mk_rodio(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+    Box::new(open(cpal::default_host(), device, format))
 }
 
 #[cfg(feature = "rodiojack-backend")]
-pub fn mk_rodiojack(device: Option<String>) -> Box<dyn Sink> {
+pub fn mk_rodiojack(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
     Box::new(open(
         cpal::host_from_id(cpal::HostId::Jack).unwrap(),
         device,
+        format,
     ))
 }
 
@@ -42,6 +45,7 @@ pub enum RodioError {
 
 pub struct RodioSink {
     rodio_sink: rodio::Sink,
+    format: AudioFormat,
     _stream: rodio::OutputStream,
 }
 
@@ -147,33 +151,54 @@ fn create_sink(
     Ok((sink, stream))
 }
 
-pub fn open(host: cpal::Host, device: Option<String>) -> RodioSink {
-    debug!("Using rodio sink with cpal host: {}", host.id().name());
+pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> RodioSink {
+    debug!(
+        "Using rodio sink with format {:?} and cpal host: {}",
+        format,
+        host.id().name()
+    );
+
+    match format {
+        AudioFormat::F32 => {
+            #[cfg(target_os = "linux")]
+            warn!("Rodio output to Alsa is known to cause garbled sound, consider using `--backend alsa`")
+        }
+        AudioFormat::S16 => (),
+        _ => unimplemented!("Rodio currently only supports F32 and S16 formats"),
+    }
 
     let (sink, stream) = create_sink(&host, device).unwrap();
 
     debug!("Rodio sink was created");
     RodioSink {
         rodio_sink: sink,
+        format,
         _stream: stream,
     }
 }
 
 impl Sink for RodioSink {
-    fn start(&mut self) -> io::Result<()> {
-        // More similar to an "unpause" than "play". Doesn't undo "stop".
-        // self.rodio_sink.play();
-        Ok(())
-    }
-
-    fn stop(&mut self) -> io::Result<()> {
-        // This will immediately stop playback, but the sink is then unusable.
-        // We just have to let the current buffer play till the end.
-        // self.rodio_sink.stop();
-        Ok(())
-    }
+    start_stop_noop!();
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+        let samples = packet.samples();
+        match self.format {
+            AudioFormat::F32 => {
+                let source =
+                    rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples);
+                self.rodio_sink.append(source);
+            }
+            AudioFormat::S16 => {
+                let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
+                let source = rodio::buffer::SamplesBuffer::new(
+                    NUM_CHANNELS as u16,
+                    SAMPLE_RATE,
+                    samples_s16,
+                );
+                self.rodio_sink.append(source);
+            }
+            _ => unreachable!(),
+        };
         let source = rodio::buffer::SamplesBuffer::new(2, 44100, packet.samples());
         self.rodio_sink.append(source);
 
