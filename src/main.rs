@@ -322,7 +322,7 @@ fn setup(args: &[String]) -> Setup {
         .opt_str("format")
         .as_ref()
         .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
-        .unwrap_or(AudioFormat::default());
+        .unwrap_or_default();
 
     let device = matches.opt_str("device");
     if device == Some("?".into()) {
@@ -470,7 +470,7 @@ fn setup(args: &[String]) -> Setup {
             bitrate,
             gapless: !matches.opt_present("disable-gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
-            normalisation_method: normalisation_method,
+            normalisation_method,
             normalisation_type: gain_type,
             normalisation_pregain: matches
                 .opt_str("normalisation-pregain")

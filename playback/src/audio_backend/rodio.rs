@@ -5,7 +5,7 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
 use super::Sink;
-use crate::audio::{AudioPacket, SamplesConverter};
+use crate::audio::{convert, AudioPacket};
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 
@@ -189,7 +189,7 @@ impl Sink for RodioSink {
                 self.rodio_sink.append(source);
             }
             AudioFormat::S16 => {
-                let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
+                let samples_s16: &[i16] = &convert::to_s16(samples);
                 let source = rodio::buffer::SamplesBuffer::new(
                     NUM_CHANNELS as u16,
                     SAMPLE_RATE,

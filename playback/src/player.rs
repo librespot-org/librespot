@@ -206,11 +206,11 @@ pub struct NormalisationData {
 
 impl NormalisationData {
     pub fn db_to_ratio(db: f32) -> f32 {
-        return f32::powf(10.0, db / DB_VOLTAGE_RATIO);
+        f32::powf(10.0, db / DB_VOLTAGE_RATIO)
     }
 
     pub fn ratio_to_db(ratio: f32) -> f32 {
-        return ratio.log10() * DB_VOLTAGE_RATIO;
+        ratio.log10() * DB_VOLTAGE_RATIO
     }
 
     fn parse_from_file<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
@@ -1161,7 +1161,7 @@ impl PlayerInternal {
                         }
 
                         if self.config.normalisation
-                            && (normalisation_factor != 1.0
+                            && (f32::abs(normalisation_factor - 1.0) < f32::EPSILON
                                 || self.config.normalisation_method != NormalisationMethod::Basic)
                         {
                             for sample in data.iter_mut() {

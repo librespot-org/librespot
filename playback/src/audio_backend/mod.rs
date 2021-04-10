@@ -26,25 +26,25 @@ fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat
 macro_rules! sink_as_bytes {
     () => {
         fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
-            use crate::audio::{i24, SamplesConverter};
+            use crate::audio::convert::{self, i24};
             use zerocopy::AsBytes;
             match packet {
                 AudioPacket::Samples(samples) => match self.format {
                     AudioFormat::F32 => self.write_bytes(samples.as_bytes()),
                     AudioFormat::S32 => {
-                        let samples_s32: &[i32] = &SamplesConverter::to_s32(samples);
+                        let samples_s32: &[i32] = &convert::to_s32(samples);
                         self.write_bytes(samples_s32.as_bytes())
                     }
                     AudioFormat::S24 => {
-                        let samples_s24: &[i32] = &SamplesConverter::to_s24(samples);
+                        let samples_s24: &[i32] = &convert::to_s24(samples);
                         self.write_bytes(samples_s24.as_bytes())
                     }
                     AudioFormat::S24_3 => {
-                        let samples_s24_3: &[i24] = &SamplesConverter::to_s24_3(samples);
+                        let samples_s24_3: &[i24] = &convert::to_s24_3(samples);
                         self.write_bytes(samples_s24_3.as_bytes())
                     }
                     AudioFormat::S16 => {
-                        let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
+                        let samples_s16: &[i16] = &convert::to_s16(samples);
                         self.write_bytes(samples_s16.as_bytes())
                     }
                 },

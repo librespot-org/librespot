@@ -47,7 +47,7 @@ impl Open for JackSink {
         }
         info!("Using JACK sink with format {:?}", AudioFormat::F32);
 
-        let client_name = client_name.unwrap_or("librespot".to_string());
+        let client_name = client_name.unwrap_or_else(|| "librespot".to_string());
         let (client, _status) =
             Client::new(&client_name[..], ClientOptions::NO_START_SERVER).unwrap();
         let ch_r = client.register_port("out_0", AudioOut::default()).unwrap();

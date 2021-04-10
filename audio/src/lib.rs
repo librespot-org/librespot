@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate log;
 
-mod convert;
+pub mod convert;
 mod decrypt;
 mod fetch;
 
@@ -24,7 +24,6 @@ pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
 
 mod range_set;
 
-pub use convert::{i24, SamplesConverter};
 pub use decrypt::AudioDecrypt;
 pub use fetch::{AudioFile, StreamLoaderController};
 pub use fetch::{
