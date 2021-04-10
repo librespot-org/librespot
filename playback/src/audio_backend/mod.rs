@@ -1,8 +1,9 @@
 use crate::audio::AudioPacket;
+use crate::config::AudioFormat;
 use std::io;
 
 pub trait Open {
-    fn open(_: Option<String>) -> Self;
+    fn open(_: Option<String>, format: AudioFormat) -> Self;
 }
 
 pub trait Sink {
@@ -11,8 +12,55 @@ pub trait Sink {
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()>;
 }
 
-fn mk_sink<S: Sink + Open + 'static>(device: Option<String>) -> Box<dyn Sink> {
-    Box::new(S::open(device))
+pub trait SinkAsBytes {
+    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()>;
+}
+
+fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+    Box::new(S::open(device, format))
+}
+
+// reuse code for various backends
+macro_rules! sink_as_bytes {
+    () => {
+        fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+            use crate::audio::{i24, SamplesConverter};
+            use zerocopy::AsBytes;
+            match packet {
+                AudioPacket::Samples(samples) => match self.format {
+                    AudioFormat::F32 => self.write_bytes(samples.as_bytes()),
+                    AudioFormat::S32 => {
+                        let samples_s32: &[i32] = &SamplesConverter::to_s32(samples);
+                        self.write_bytes(samples_s32.as_bytes())
+                    }
+                    AudioFormat::S24 => {
+                        let samples_s24: &[i32] = &SamplesConverter::to_s24(samples);
+                        self.write_bytes(samples_s24.as_bytes())
+                    }
+                    AudioFormat::S24_3 => {
+                        let samples_s24_3: &[i24] = &SamplesConverter::to_s24_3(samples);
+                        self.write_bytes(samples_s24_3.as_bytes())
+                    }
+                    AudioFormat::S16 => {
+                        let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
+                        self.write_bytes(samples_s16.as_bytes())
+                    }
+                },
+                AudioPacket::OggData(samples) => self.write_bytes(samples),
+            }
+        }
+    };
+}
+
+macro_rules! start_stop_noop {
+    () => {
+        fn start(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+        fn stop(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    };
 }
 
 #[cfg(feature = "alsa-backend")]
@@ -68,7 +116,10 @@ use self::pipe::StdoutSink;
 mod subprocess;
 use self::subprocess::SubprocessSink;
 
-pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>)] = &[
+pub const BACKENDS: &'static [(
+    &'static str,
+    fn(Option<String>, AudioFormat) -> Box<dyn Sink>,
+)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
@@ -92,7 +143,7 @@ pub const BACKENDS: &'static [(&'static str, fn(Option<String>) -> Box<dyn Sink>
     ("subprocess", mk_sink::<SubprocessSink>),
 ];
 
-pub fn find(name: Option<String>) -> Option<fn(Option<String>) -> Box<dyn Sink>> {
+pub fn find(name: Option<String>) -> Option<fn(Option<String>, AudioFormat) -> Box<dyn Sink>> {
     if let Some(name) = name {
         BACKENDS
             .iter()

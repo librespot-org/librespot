@@ -1,22 +1,25 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkAsBytes};
 use crate::audio::AudioPacket;
+use crate::config::AudioFormat;
 use shell_words::split;
 use std::io::{self, Write};
-use std::mem;
 use std::process::{Child, Command, Stdio};
-use std::slice;
 
 pub struct SubprocessSink {
     shell_command: String,
     child: Option<Child>,
+    format: AudioFormat,
 }
 
 impl Open for SubprocessSink {
-    fn open(shell_command: Option<String>) -> SubprocessSink {
+    fn open(shell_command: Option<String>, format: AudioFormat) -> Self {
+        info!("Using subprocess sink with format: {:?}", format);
+
         if let Some(shell_command) = shell_command {
             SubprocessSink {
                 shell_command: shell_command,
                 child: None,
+                format: format,
             }
         } else {
             panic!("subprocess sink requires specifying a shell command");
@@ -44,16 +47,15 @@ impl Sink for SubprocessSink {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
-        let data: &[u8] = unsafe {
-            slice::from_raw_parts(
-                packet.samples().as_ptr() as *const u8,
-                packet.samples().len() * mem::size_of::<i16>(),
-            )
-        };
+    sink_as_bytes!();
+}
+
+impl SinkAsBytes for SubprocessSink {
+    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
         if let Some(child) = &mut self.child {
             let child_stdin = child.stdin.as_mut().unwrap();
             child_stdin.write_all(data)?;
+            child_stdin.flush()?;
         }
         Ok(())
     }

@@ -2,6 +2,7 @@ use futures::sync::mpsc::UnboundedReceiver;
 use futures::{Async, Future, Poll, Stream};
 use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
+use std::convert::TryFrom;
 use std::env;
 use std::io::{stderr, Write};
 use std::mem;
@@ -22,12 +23,16 @@ use librespot::core::version;
 use librespot::connect::discovery::{discovery, DiscoveryStream};
 use librespot::connect::spirc::{Spirc, SpircTask};
 use librespot::playback::audio_backend::{self, Sink, BACKENDS};
-use librespot::playback::config::{Bitrate, NormalisationType, PlayerConfig};
+use librespot::playback::config::{
+    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig,
+};
 use librespot::playback::mixer::{self, Mixer, MixerConfig};
-use librespot::playback::player::{Player, PlayerEvent};
+use librespot::playback::player::{NormalisationData, Player, PlayerEvent};
 
 mod player_event_handler;
 use crate::player_event_handler::{emit_sink_event, run_program_on_events};
+
+const MILLIS: f32 = 1000.0;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -83,7 +88,8 @@ fn print_version() {
 
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<dyn Sink>,
+    format: AudioFormat,
+    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink>,
     device: Option<String>,
 
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
@@ -147,6 +153,12 @@ fn setup(args: &[String]) -> Setup {
             "Audio device to use. Use '?' to list options if using portaudio or alsa",
             "DEVICE",
         )
+        .optopt(
+            "",
+            "format",
+            "Output format (F32, S32, S24, S24_3 or S16). Defaults to S16",
+            "FORMAT",
+        )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
             "m",
@@ -190,6 +202,12 @@ fn setup(args: &[String]) -> Setup {
         )
         .optopt(
             "",
+            "normalisation-method",
+            "Specify the normalisation method to use - [basic, dynamic]. Default is dynamic.",
+            "NORMALISATION_METHOD",
+        )
+        .optopt(
+            "",
             "normalisation-gain-type",
             "Specify the normalisation gain type to use - [track, album]. Default is album.",
             "GAIN_TYPE",
@@ -199,6 +217,30 @@ fn setup(args: &[String]) -> Setup {
             "normalisation-pregain",
             "Pregain (dB) applied by volume normalisation",
             "PREGAIN",
+        )
+        .optopt(
+            "",
+            "normalisation-threshold",
+            "Threshold (dBFS) to prevent clipping. Default is -1.0.",
+            "THRESHOLD",
+        )
+        .optopt(
+            "",
+            "normalisation-attack",
+            "Attack time (ms) in which the dynamic limiter is reducing gain. Default is 5.",
+            "ATTACK",
+        )
+        .optopt(
+            "",
+            "normalisation-release",
+            "Release or decay time (ms) in which the dynamic limiter is restoring gain. Default is 100.",
+            "RELEASE",
+        )
+        .optopt(
+            "",
+            "normalisation-knee",
+            "Knee steepness of the dynamic limiter. Default is 1.0.",
+            "KNEE",
         )
         .optopt(
             "",
@@ -260,9 +302,15 @@ fn setup(args: &[String]) -> Setup {
 
     let backend = audio_backend::find(backend_name).expect("Invalid backend");
 
+    let format = matches
+        .opt_str("format")
+        .as_ref()
+        .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
+        .unwrap_or(AudioFormat::default());
+
     let device = matches.opt_str("device");
     if device == Some("?".into()) {
-        backend(device);
+        backend(device, format);
         exit(0);
     }
 
@@ -390,15 +438,47 @@ fn setup(args: &[String]) -> Setup {
                 NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
             })
             .unwrap_or(NormalisationType::default());
+        let normalisation_method = matches
+            .opt_str("normalisation-method")
+            .as_ref()
+            .map(|gain_type| {
+                NormalisationMethod::from_str(gain_type).expect("Invalid normalisation method")
+            })
+            .unwrap_or(NormalisationMethod::default());
         PlayerConfig {
             bitrate: bitrate,
             gapless: !matches.opt_present("disable-gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
+            normalisation_method: normalisation_method,
             normalisation_type: gain_type,
             normalisation_pregain: matches
                 .opt_str("normalisation-pregain")
                 .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
                 .unwrap_or(PlayerConfig::default().normalisation_pregain),
+            normalisation_threshold: NormalisationData::db_to_ratio(
+                matches
+                    .opt_str("normalisation-threshold")
+                    .map(|threshold| {
+                        threshold
+                            .parse::<f32>()
+                            .expect("Invalid threshold float value")
+                    })
+                    .unwrap_or(PlayerConfig::default().normalisation_threshold),
+            ),
+            normalisation_attack: matches
+                .opt_str("normalisation-attack")
+                .map(|attack| attack.parse::<f32>().expect("Invalid attack float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_attack * MILLIS)
+                / MILLIS,
+            normalisation_release: matches
+                .opt_str("normalisation-release")
+                .map(|release| release.parse::<f32>().expect("Invalid release float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_release * MILLIS)
+                / MILLIS,
+            normalisation_knee: matches
+                .opt_str("normalisation-knee")
+                .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_knee),
             passthrough,
         }
     };
@@ -428,6 +508,7 @@ fn setup(args: &[String]) -> Setup {
     let enable_discovery = !matches.opt_present("disable-discovery");
 
     Setup {
+        format: format,
         backend: backend,
         cache: cache,
         session_config: session_config,
@@ -449,7 +530,8 @@ struct Main {
     player_config: PlayerConfig,
     session_config: SessionConfig,
     connect_config: ConnectConfig,
-    backend: fn(Option<String>) -> Box<dyn Sink>,
+    format: AudioFormat,
+    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink>,
     device: Option<String>,
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
     mixer_config: MixerConfig,
@@ -479,6 +561,7 @@ impl Main {
             session_config: setup.session_config,
             player_config: setup.player_config,
             connect_config: setup.connect_config,
+            format: setup.format,
             backend: setup.backend,
             device: setup.device,
             mixer: setup.mixer,
@@ -558,11 +641,12 @@ impl Future for Main {
                     let connect_config = self.connect_config.clone();
 
                     let audio_filter = mixer.get_audio_filter();
+                    let format = self.format;
                     let backend = self.backend;
                     let device = self.device.clone();
                     let (player, event_channel) =
                         Player::new(player_config, session.clone(), audio_filter, move || {
-                            (backend)(device)
+                            (backend)(device, format)
                         });
 
                     if self.emit_sink_events {

@@ -13,6 +13,7 @@ extern crate tempfile;
 
 extern crate librespot_core;
 
+mod convert;
 mod decrypt;
 mod fetch;
 
@@ -24,6 +25,7 @@ mod passthrough_decoder;
 
 mod range_set;
 
+pub use convert::{i24, SamplesConverter};
 pub use decrypt::AudioDecrypt;
 pub use fetch::{AudioFile, AudioFileOpen, StreamLoaderController};
 pub use fetch::{
@@ -33,12 +35,12 @@ pub use fetch::{
 use std::fmt;
 
 pub enum AudioPacket {
-    Samples(Vec<i16>),
+    Samples(Vec<f32>),
     OggData(Vec<u8>),
 }
 
 impl AudioPacket {
-    pub fn samples(&self) -> &[i16] {
+    pub fn samples(&self) -> &[f32] {
         match self {
             AudioPacket::Samples(s) => s,
             AudioPacket::OggData(_) => panic!("can't return OggData on samples"),
