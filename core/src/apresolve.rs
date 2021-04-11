@@ -11,7 +11,7 @@ use super::AP_FALLBACK;
 const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
 
 #[derive(Clone, Debug, Deserialize)]
-struct APResolveData {
+struct ApResolveData {
     ap_list: Vec<String>,
 }
 
@@ -41,7 +41,7 @@ async fn try_apresolve(
     };
 
     let body = hyper::body::to_bytes(response.into_body()).await?;
-    let data: APResolveData = serde_json::from_slice(body.as_ref())?;
+    let data: ApResolveData = serde_json::from_slice(body.as_ref())?;
 
     let ap = if ap_port.is_some() || proxy.is_some() {
         data.ap_list.into_iter().find_map(|ap| {
@@ -65,4 +65,27 @@ pub async fn apresolve(proxy: Option<&Url>, ap_port: Option<u16>) -> String {
         warn!("Using fallback \"{}\"", AP_FALLBACK);
         AP_FALLBACK.into()
     })
+}
+
+#[cfg(test)]
+mod test {
+    use std::net::ToSocketAddrs;
+
+    use super::try_apresolve;
+
+    #[tokio::test]
+    async fn test_apresolve() {
+        let ap = try_apresolve(None, None).await.unwrap();
+
+        // Assert that the result contains a valid host and port
+        ap.to_socket_addrs().unwrap().next().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_apresolve_port_443() {
+        let ap = try_apresolve(None, Some(443)).await.unwrap();
+
+        let port = ap.to_socket_addrs().unwrap().next().unwrap().port();
+        assert_eq!(port, 443);
+    }
 }

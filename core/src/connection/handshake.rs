@@ -1,22 +1,21 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use hmac::{Hmac, Mac, NewMac};
 use protobuf::{self, Message};
-use rand::thread_rng;
+use rand::{thread_rng, RngCore};
 use sha1::Sha1;
 use std::io;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::{Decoder, Framed};
 
-use super::codec::APCodec;
-use crate::diffie_hellman::DHLocalKeys;
+use super::codec::ApCodec;
+use crate::diffie_hellman::DhLocalKeys;
 use crate::protocol;
 use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
-use crate::util;
 
 pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     mut connection: T,
-) -> io::Result<Framed<T, APCodec>> {
-    let local_keys = DHLocalKeys::random(&mut thread_rng());
+) -> io::Result<Framed<T, ApCodec>> {
+    let local_keys = DhLocalKeys::random(&mut thread_rng());
     let gc = local_keys.public_key();
     let mut accumulator = client_hello(&mut connection, gc).await?;
     let message: APResponseMessage = recv_packet(&mut connection, &mut accumulator).await?;
@@ -29,7 +28,7 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
 
     let shared_secret = local_keys.shared_secret(&remote_key);
     let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator);
-    let codec = APCodec::new(&send_key, &recv_key);
+    let codec = ApCodec::new(&send_key, &recv_key);
 
     client_response(&mut connection, challenge).await?;
 
@@ -40,6 +39,9 @@ async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>
 where
     T: AsyncWrite + Unpin,
 {
+    let mut client_nonce = vec![0; 0x10];
+    thread_rng().fill_bytes(&mut client_nonce);
+
     let mut packet = ClientHello::new();
     packet
         .mut_build_info()
@@ -59,7 +61,7 @@ where
         .mut_login_crypto_hello()
         .mut_diffie_hellman()
         .set_server_keys_known(1);
-    packet.set_client_nonce(util::rand_vec(&mut thread_rng(), 0x10));
+    packet.set_client_nonce(client_nonce);
     packet.set_padding(vec![0x1e]);
 
     let mut buffer = vec![0, 4];

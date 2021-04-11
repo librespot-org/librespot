@@ -31,13 +31,10 @@ impl Credentials {
     /// ### Example
     /// ```rust
     /// use librespot_core::authentication::Credentials;
-    /// 
+    ///
     /// let creds = Credentials::with_password("my account", "my password");
     /// ```
-    pub fn with_password(
-        username: impl Into<String>,
-        password: impl Into<String>,
-    ) -> Credentials {
+    pub fn with_password(username: impl Into<String>, password: impl Into<String>) -> Credentials {
         Credentials {
             username: username.into(),
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,

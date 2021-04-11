@@ -1,7 +1,7 @@
 mod codec;
 mod handshake;
 
-pub use self::codec::APCodec;
+pub use self::codec::ApCodec;
 pub use self::handshake::handshake;
 
 use std::io::{self, ErrorKind};
@@ -19,7 +19,7 @@ use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 use crate::proxytunnel;
 use crate::version;
 
-pub type Transport = Framed<TcpStream, APCodec>;
+pub type Transport = Framed<TcpStream, ApCodec>;
 
 fn login_error_message(code: &ErrorCode) -> &'static str {
     pub use ErrorCode::*;
@@ -131,13 +131,13 @@ pub async fn authenticate(
         .mut_system_info()
         .set_system_information_string(format!(
             "librespot_{}_{}",
-            version::short_sha(),
-            version::build_id()
+            version::SHA_SHORT,
+            version::BUILD_ID
         ));
     packet
         .mut_system_info()
         .set_device_id(device_id.to_string());
-    packet.set_version_string(version::version_string());
+    packet.set_version_string(version::VERSION_STRING.to_string());
 
     let cmd = 0xab;
     let data = packet.write_to_bytes().unwrap();

@@ -25,7 +25,9 @@ async fn main() {
 
     let plist_uri = SpotifyId::from_base62(uri_parts[2]).unwrap();
 
-    let session = Session::connect(session_config, credentials, None).await.unwrap();
+    let session = Session::connect(session_config, credentials, None)
+        .await
+        .unwrap();
 
     let plist = Playlist::get(&session, plist_uri).await.unwrap();
     println!("{:?}", plist);

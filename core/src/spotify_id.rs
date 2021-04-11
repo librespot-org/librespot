@@ -18,9 +18,9 @@ impl From<&str> for SpotifyAudioType {
     }
 }
 
-impl Into<&str> for SpotifyAudioType {
-    fn into(self) -> &'static str {
-        match self {
+impl From<SpotifyAudioType> for &str {
+    fn from(audio_type: SpotifyAudioType) -> &'static str {
+        match audio_type {
             SpotifyAudioType::Track => "track",
             SpotifyAudioType::Podcast => "episode",
             SpotifyAudioType::NonPlayable => "unknown",

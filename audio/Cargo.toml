@@ -15,17 +15,17 @@ aes-ctr = "0.6"
 byteorder = "1.4"
 bytes = "1.0"
 cfg-if = "1"
+lewton = "0.10"
 log = "0.4"
 futures-util = { version = "0.3", default_features = false }
 ogg = "0.8"
 tempfile = "3.1"
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "macros"] }
+zerocopy = "0.3"
 
-lewton = { version = "0.10", optional = true }
-librespot-tremor = { version = "0.2.0", optional = true }
-vorbis = { version ="0.0.14", optional = true }
+librespot-tremor = { version = "0.2", optional = true }
+vorbis = { version ="0.0", optional = true }
 
 [features]
-with-lewton = ["lewton"]
 with-tremor = ["librespot-tremor"]
 with-vorbis = ["vorbis"]

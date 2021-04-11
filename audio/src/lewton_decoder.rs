@@ -35,8 +35,11 @@ where
         use lewton::OggReadError::NoCapturePatternFound;
         use lewton::VorbisError::{BadAudio, OggError};
         loop {
-            match self.0.read_dec_packet_itl() {
-                Ok(Some(packet)) => return Ok(Some(AudioPacket::Samples(packet))),
+            match self
+                .0
+                .read_dec_packet_generic::<lewton::samples::InterleavedSamples<f32>>()
+            {
+                Ok(Some(packet)) => return Ok(Some(AudioPacket::Samples(packet.samples))),
                 Ok(None) => return Ok(None),
 
                 Err(BadAudio(AudioIsHeader)) => (),

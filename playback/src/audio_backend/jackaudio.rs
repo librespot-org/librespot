@@ -1,5 +1,7 @@
 use super::{Open, Sink};
 use crate::audio::AudioPacket;
+use crate::config::AudioFormat;
+use crate::player::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
@@ -7,18 +9,16 @@ use std::io;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 pub struct JackSink {
-    send: SyncSender<i16>,
+    send: SyncSender<f32>,
+    // We have to keep hold of this object, or the Sink can't play...
+    #[allow(dead_code)]
     active_client: AsyncClient<(), JackData>,
 }
 
 pub struct JackData {
-    rec: Receiver<i16>,
+    rec: Receiver<f32>,
     port_l: Port<AudioOut>,
     port_r: Port<AudioOut>,
-}
-
-fn pcm_to_f32(sample: i16) -> f32 {
-    sample as f32 / 32768.0
 }
 
 impl ProcessHandler for JackData {
@@ -33,24 +33,27 @@ impl ProcessHandler for JackData {
 
         let buf_size = buf_r.len();
         for i in 0..buf_size {
-            buf_r[i] = pcm_to_f32(queue_iter.next().unwrap_or(0));
-            buf_l[i] = pcm_to_f32(queue_iter.next().unwrap_or(0));
+            buf_r[i] = queue_iter.next().unwrap_or(0.0);
+            buf_l[i] = queue_iter.next().unwrap_or(0.0);
         }
         Control::Continue
     }
 }
 
 impl Open for JackSink {
-    fn open(client_name: Option<String>) -> JackSink {
-        info!("Using jack sink!");
+    fn open(client_name: Option<String>, format: AudioFormat) -> Self {
+        if format != AudioFormat::F32 {
+            warn!("JACK currently does not support {:?} output", format);
+        }
+        info!("Using JACK sink with format {:?}", AudioFormat::F32);
 
-        let client_name = client_name.unwrap_or("librespot".to_string());
+        let client_name = client_name.unwrap_or_else(|| "librespot".to_string());
         let (client, _status) =
             Client::new(&client_name[..], ClientOptions::NO_START_SERVER).unwrap();
         let ch_r = client.register_port("out_0", AudioOut::default()).unwrap();
         let ch_l = client.register_port("out_1", AudioOut::default()).unwrap();
         // buffer for samples from librespot (~10ms)
-        let (tx, rx) = sync_channel(2 * 1024 * 4);
+        let (tx, rx) = sync_channel::<f32>(NUM_CHANNELS as usize * 1024 * AudioFormat::F32.size());
         let jack_data = JackData {
             rec: rx,
             port_l: ch_l,
@@ -58,7 +61,7 @@ impl Open for JackSink {
         };
         let active_client = AsyncClient::new(client, (), jack_data).unwrap();
 
-        JackSink {
+        Self {
             send: tx,
             active_client,
         }
@@ -66,19 +69,13 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    fn start(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-
-    fn stop(&mut self) -> io::Result<()> {
-        Ok(())
-    }
+    start_stop_noop!();
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         for s in packet.samples().iter() {
             let res = self.send.send(*s);
             if res.is_err() {
-                error!("jackaudio: cannot write to channel");
+                error!("cannot write to channel");
             }
         }
         Ok(())

@@ -25,17 +25,17 @@ byteorder = "1.4"
 shell-words = "1.0.0"
 tokio = { version = "1", features = ["sync"] }
 
-alsa            = { version = "0.4", optional = true }
+alsa            = { version = "0.5", optional = true }
 portaudio-rs    = { version = "0.3", optional = true }
-libpulse-binding        = { version = "2.13", optional = true, default-features = false }
-libpulse-simple-binding = { version = "2.13", optional = true, default-features = false }
+libpulse-binding        = { version = "2", optional = true, default-features = false }
+libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 jack            = { version = "0.6", optional = true }
 libc            = { version = "0.2", optional = true }
-sdl2            = { version = "0.34", optional = true }
+sdl2            = { version = "0.34.3", optional = true }
 gstreamer       = { version = "0.16", optional = true }
 gstreamer-app   = { version = "0.16", optional = true }
 glib            = { version = "0.10", optional = true }
-zerocopy        = { version = "0.3", optional = true }
+zerocopy        = { version = "0.3" }
 
 # Rodio dependencies
 rodio           = { version = "0.13", optional = true, default-features = false }
@@ -50,4 +50,4 @@ jackaudio-backend = ["jack"]
 rodio-backend = ["rodio", "cpal", "thiserror"]
 rodiojack-backend = ["rodio", "cpal/jack", "thiserror"]
 sdl-backend = ["sdl2"]
-gstreamer-backend = ["gstreamer", "gstreamer-app", "glib", "zerocopy"]
+gstreamer-backend = ["gstreamer", "gstreamer-app", "glib"]

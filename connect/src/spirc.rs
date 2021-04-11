@@ -7,7 +7,6 @@ use crate::core::config::{ConnectConfig, VolumeCtrl};
 use crate::core::mercury::{MercuryError, MercurySender};
 use crate::core::session::Session;
 use crate::core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
-use crate::core::util::url_encode;
 use crate::core::util::SeqGenerator;
 use crate::core::version;
 use crate::playback::mixer::Mixer;
@@ -106,7 +105,7 @@ fn initial_state() -> State {
 fn initial_device_state(config: ConnectConfig) -> DeviceState {
     {
         let mut msg = DeviceState::new();
-        msg.set_sw_version(version::version_string());
+        msg.set_sw_version(version::VERSION_STRING.to_string());
         msg.set_is_active(false);
         msg.set_can_play(true);
         msg.set_volume(0);
@@ -244,6 +243,10 @@ fn volume_to_mixer(volume: u16, volume_ctrl: &VolumeCtrl) -> u16 {
     }
 }
 
+fn url_encode(bytes: impl AsRef<[u8]>) -> String {
+    form_urlencoded::byte_serialize(bytes.as_ref()).collect()
+}
+
 impl Spirc {
     pub fn new(
         config: ConnectConfig,
@@ -256,7 +259,7 @@ impl Spirc {
         let ident = session.device_id().to_owned();
 
         // Uri updated in response to issue #288
-        debug!("canonical_username: {}", url_encode(&session.username()));
+        debug!("canonical_username: {}", &session.username());
         let uri = format!("hm://remote/user/{}/", url_encode(&session.username()));
 
         let subscription = Box::pin(

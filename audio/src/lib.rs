@@ -3,27 +3,19 @@
 #[macro_use]
 extern crate log;
 
+pub mod convert;
 mod decrypt;
 mod fetch;
 
 use cfg_if::cfg_if;
 
-#[cfg(any(
-    all(feature = "with-lewton", feature = "with-tremor"),
-    all(feature = "with-vorbis", feature = "with-tremor"),
-    all(feature = "with-lewton", feature = "with-vorbis")
-))]
-compile_error!("Cannot use two decoders at the same time.");
-
 cfg_if! {
-    if #[cfg(feature = "with-lewton")] {
-        mod lewton_decoder;
-        pub use lewton_decoder::{VorbisDecoder, VorbisError};
-    } else if #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))] {
+    if #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))] {
         mod libvorbis_decoder;
         pub use crate::libvorbis_decoder::{VorbisDecoder, VorbisError};
     } else {
-        compile_error!("Must choose a vorbis decoder.");
+        mod lewton_decoder;
+        pub use lewton_decoder::{VorbisDecoder, VorbisError};
     }
 }
 
@@ -41,12 +33,12 @@ pub use fetch::{
 use std::fmt;
 
 pub enum AudioPacket {
-    Samples(Vec<i16>),
+    Samples(Vec<f32>),
     OggData(Vec<u8>),
 }
 
 impl AudioPacket {
-    pub fn samples(&self) -> &[i16] {
+    pub fn samples(&self) -> &[f32] {
         match self {
             AudioPacket::Samples(s) => s,
             AudioPacket::OggData(_) => panic!("can't return OggData on samples"),

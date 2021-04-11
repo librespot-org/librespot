@@ -12,13 +12,16 @@ use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCt
 use librespot::core::session::Session;
 use librespot::core::version;
 use librespot::playback::audio_backend::{self, Sink, BACKENDS};
-use librespot::playback::config::{Bitrate, NormalisationType, PlayerConfig};
+use librespot::playback::config::{
+    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig,
+};
 use librespot::playback::mixer::{self, Mixer, MixerConfig};
-use librespot::playback::player::Player;
+use librespot::playback::player::{NormalisationData, Player};
 
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
 
+use std::convert::TryFrom;
 use std::path::Path;
 use std::process::exit;
 use std::str::FromStr;
@@ -27,6 +30,8 @@ use std::{
     io::{stderr, Write},
     pin::Pin,
 };
+
+const MILLIS: f32 = 1000.0;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -93,9 +98,20 @@ pub fn get_credentials<F: FnOnce(&String) -> Option<String>>(
     }
 }
 
+fn print_version() {
+    println!(
+        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
+        semver = version::SEMVER,
+        sha = version::SHA_SHORT,
+        build_date = version::BUILD_DATE,
+        build_id = version::BUILD_ID
+    );
+}
+
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<dyn Sink + Send + 'static>,
+    format: AudioFormat,
+    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink + 'static>,
     device: Option<String>,
 
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
@@ -112,7 +128,7 @@ struct Setup {
     emit_sink_events: bool,
 }
 
-fn setup(args: &[String]) -> Setup {
+fn get_setup(args: &[String]) -> Setup {
     let mut opts = getopts::Options::new();
     opts.optopt(
         "c",
@@ -125,7 +141,7 @@ fn setup(args: &[String]) -> Setup {
         "Path to a directory where system files (credentials, volume) will be cached. Can be different from cache option value",
         "SYTEMCACHE",
     ).optflag("", "disable-audio-cache", "Disable caching of the audio data.")
-        .reqopt("n", "name", "Device name", "NAME")
+        .optopt("n", "name", "Device name", "NAME")
         .optopt("", "device-type", "Displayed device type", "DEVICE_TYPE")
         .optopt(
             "b",
@@ -141,6 +157,7 @@ fn setup(args: &[String]) -> Setup {
         )
         .optflag("", "emit-sink-events", "Run program set by --onevent before sink is opened and after it is closed.")
         .optflag("v", "verbose", "Enable verbose output")
+        .optflag("V", "version", "Display librespot version string")
         .optopt("u", "username", "Username to sign in with", "USERNAME")
         .optopt("p", "password", "Password", "PASSWORD")
         .optopt("", "proxy", "HTTP proxy to use when connecting", "PROXY")
@@ -157,6 +174,12 @@ fn setup(args: &[String]) -> Setup {
             "device",
             "Audio device to use. Use '?' to list options if using portaudio or alsa",
             "DEVICE",
+        )
+        .optopt(
+            "",
+            "format",
+            "Output format (F32, S32, S24, S24_3 or S16). Defaults to S16",
+            "FORMAT",
         )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
@@ -201,6 +224,12 @@ fn setup(args: &[String]) -> Setup {
         )
         .optopt(
             "",
+            "normalisation-method",
+            "Specify the normalisation method to use - [basic, dynamic]. Default is dynamic.",
+            "NORMALISATION_METHOD",
+        )
+        .optopt(
+            "",
             "normalisation-gain-type",
             "Specify the normalisation gain type to use - [track, album]. Default is album.",
             "GAIN_TYPE",
@@ -210,6 +239,30 @@ fn setup(args: &[String]) -> Setup {
             "normalisation-pregain",
             "Pregain (dB) applied by volume normalisation",
             "PREGAIN",
+        )
+        .optopt(
+            "",
+            "normalisation-threshold",
+            "Threshold (dBFS) to prevent clipping. Default is -1.0.",
+            "THRESHOLD",
+        )
+        .optopt(
+            "",
+            "normalisation-attack",
+            "Attack time (ms) in which the dynamic limiter is reducing gain. Default is 5.",
+            "ATTACK",
+        )
+        .optopt(
+            "",
+            "normalisation-release",
+            "Release or decay time (ms) in which the dynamic limiter is restoring gain. Default is 100.",
+            "RELEASE",
+        )
+        .optopt(
+            "",
+            "normalisation-knee",
+            "Knee steepness of the dynamic limiter. Default is 1.0.",
+            "KNEE",
         )
         .optopt(
             "",
@@ -241,15 +294,20 @@ fn setup(args: &[String]) -> Setup {
         }
     };
 
+    if matches.opt_present("version") {
+        print_version();
+        exit(0);
+    }
+
     let verbose = matches.opt_present("verbose");
     setup_logging(verbose);
 
     info!(
-        "librespot {} ({}). Built on {}. Build ID: {}",
-        version::short_sha(),
-        version::commit_date(),
-        version::short_now(),
-        version::build_id()
+        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
+        semver = version::SEMVER,
+        sha = version::SHA_SHORT,
+        build_date = version::BUILD_DATE,
+        build_id = version::BUILD_ID
     );
 
     let backend_name = matches.opt_str("backend");
@@ -260,9 +318,15 @@ fn setup(args: &[String]) -> Setup {
 
     let backend = audio_backend::find(backend_name).expect("Invalid backend");
 
+    let format = matches
+        .opt_str("format")
+        .as_ref()
+        .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
+        .unwrap_or_default();
+
     let device = matches.opt_str("device");
     if device == Some("?".into()) {
-        backend(device);
+        backend(device, format);
         exit(0);
     }
 
@@ -329,7 +393,9 @@ fn setup(args: &[String]) -> Setup {
         .map(|port| port.parse::<u16>().unwrap())
         .unwrap_or(0);
 
-    let name = matches.opt_str("name").unwrap();
+    let name = matches
+        .opt_str("name")
+        .unwrap_or_else(|| "Librespot".to_string());
 
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);
@@ -352,7 +418,7 @@ fn setup(args: &[String]) -> Setup {
         let device_id = device_id(&name);
 
         SessionConfig {
-            user_agent: version::version_string(),
+            user_agent: version::VERSION_STRING.to_string(),
             device_id,
             proxy: matches.opt_str("proxy").or_else(|| std::env::var("http_proxy").ok()).map(
                 |s| {
@@ -392,15 +458,48 @@ fn setup(args: &[String]) -> Setup {
                 NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
             })
             .unwrap_or_default();
+        let normalisation_method = matches
+            .opt_str("normalisation-method")
+            .as_ref()
+            .map(|gain_type| {
+                NormalisationMethod::from_str(gain_type).expect("Invalid normalisation method")
+            })
+            .unwrap_or_default();
+
         PlayerConfig {
             bitrate,
             gapless: !matches.opt_present("disable-gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
+            normalisation_method,
             normalisation_type: gain_type,
             normalisation_pregain: matches
                 .opt_str("normalisation-pregain")
                 .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
                 .unwrap_or(PlayerConfig::default().normalisation_pregain),
+            normalisation_threshold: NormalisationData::db_to_ratio(
+                matches
+                    .opt_str("normalisation-threshold")
+                    .map(|threshold| {
+                        threshold
+                            .parse::<f32>()
+                            .expect("Invalid threshold float value")
+                    })
+                    .unwrap_or(PlayerConfig::default().normalisation_threshold),
+            ),
+            normalisation_attack: matches
+                .opt_str("normalisation-attack")
+                .map(|attack| attack.parse::<f32>().expect("Invalid attack float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_attack * MILLIS)
+                / MILLIS,
+            normalisation_release: matches
+                .opt_str("normalisation-release")
+                .map(|release| release.parse::<f32>().expect("Invalid release float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_release * MILLIS)
+                / MILLIS,
+            normalisation_knee: matches
+                .opt_str("normalisation-knee")
+                .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_knee),
             passthrough,
         }
     };
@@ -430,6 +529,7 @@ fn setup(args: &[String]) -> Setup {
     let enable_discovery = !matches.opt_present("disable-discovery");
 
     Setup {
+        format,
         backend,
         cache,
         session_config,
@@ -453,7 +553,7 @@ async fn main() {
     }
 
     let args: Vec<String> = std::env::args().collect();
-    let setupp = setup(&args);
+    let setup = get_setup(&args);
 
     let mut last_credentials = None;
     let mut spirc: Option<Spirc> = None;
@@ -463,23 +563,23 @@ async fn main() {
     let mut discovery = None;
     let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
 
-    if setupp.enable_discovery {
-        let config = setupp.connect_config.clone();
-        let device_id = setupp.session_config.device_id.clone();
+    if setup.enable_discovery {
+        let config = setup.connect_config.clone();
+        let device_id = setup.session_config.device_id.clone();
 
         discovery = Some(
-            librespot_connect::discovery::discovery(config, device_id, setupp.zeroconf_port)
+            librespot_connect::discovery::discovery(config, device_id, setup.zeroconf_port)
                 .unwrap(),
         );
     }
 
-    if let Some(credentials) = setupp.credentials {
+    if let Some(credentials) = setup.credentials {
         last_credentials = Some(credentials.clone());
         connecting = Box::pin(
             Session::connect(
-                setupp.session_config.clone(),
+                setup.session_config.clone(),
                 credentials,
-                setupp.cache.clone(),
+                setup.cache.clone(),
             )
             .fuse(),
         );
@@ -502,9 +602,9 @@ async fn main() {
                         }
 
                         connecting = Box::pin(Session::connect(
-                            setupp.session_config.clone(),
+                            setup.session_config.clone(),
                             credentials,
-                            setupp.cache.clone(),
+                            setup.cache.clone(),
                         ).fuse());
                     },
                     None => {
@@ -515,21 +615,22 @@ async fn main() {
             },
             session = &mut connecting, if !connecting.is_terminated() => match session {
                 Ok(session) => {
-                    let mixer_config = setupp.mixer_config.clone();
-                    let mixer = (setupp.mixer)(Some(mixer_config));
-                    let player_config = setupp.player_config.clone();
-                    let connect_config = setupp.connect_config.clone();
+                    let mixer_config = setup.mixer_config.clone();
+                    let mixer = (setup.mixer)(Some(mixer_config));
+                    let player_config = setup.player_config.clone();
+                    let connect_config = setup.connect_config.clone();
 
                     let audio_filter = mixer.get_audio_filter();
-                    let backend = setupp.backend;
-                    let device = setupp.device.clone();
+                    let format = setup.format;
+                    let backend = setup.backend;
+                    let device = setup.device.clone();
                     let (player, event_channel) =
                         Player::new(player_config, session.clone(), audio_filter, move || {
-                            (backend)(device)
+                            (backend)(device, format)
                         });
 
-                    if setupp.emit_sink_events {
-                        if let Some(player_event_program) = setupp.player_event_program.clone() {
+                    if setup.emit_sink_events {
+                        if let Some(player_event_program) = setup.player_event_program.clone() {
                             player.set_sink_event_callback(Some(Box::new(move |sink_status| {
                                 match emit_sink_event(sink_status, &player_event_program) {
                                     Ok(e) if e.success() => (),
@@ -575,16 +676,16 @@ async fn main() {
                         auto_connect_times.push(Instant::now());
 
                         connecting = Box::pin(Session::connect(
-                            setupp.session_config.clone(),
+                            setup.session_config.clone(),
                             credentials,
-                            setupp.cache.clone(),
+                            setup.cache.clone(),
                         ).fuse());
                     }
                 }
             },
             event = async { player_event_channel.as_mut().unwrap().recv().await }, if player_event_channel.is_some() => match event {
                 Some(event) => {
-                    if let Some(program) = &setupp.player_event_program {
+                    if let Some(program) = &setup.player_event_program {
                         if let Some(child) = run_program_on_events(event, program) {
                             let mut child = child.expect("program failed to start");
 

@@ -10,7 +10,6 @@ use bytes::Bytes;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::protocol;
-use crate::util::url_encode;
 use crate::util::SeqGenerator;
 
 mod types;
@@ -82,7 +81,7 @@ impl MercuryManager {
 
     pub fn get<T: Into<String>>(&self, uri: T) -> MercuryFuture<MercuryResponse> {
         self.request(MercuryRequest {
-            method: MercuryMethod::GET,
+            method: MercuryMethod::Get,
             uri: uri.into(),
             content_type: None,
             payload: Vec::new(),
@@ -91,7 +90,7 @@ impl MercuryManager {
 
     pub fn send<T: Into<String>>(&self, uri: T, data: Vec<u8>) -> MercuryFuture<MercuryResponse> {
         self.request(MercuryRequest {
-            method: MercuryMethod::SEND,
+            method: MercuryMethod::Send,
             uri: uri.into(),
             content_type: None,
             payload: vec![data],
@@ -109,7 +108,7 @@ impl MercuryManager {
     {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
-            method: MercuryMethod::SUB,
+            method: MercuryMethod::Sub,
             uri: uri.clone(),
             content_type: None,
             payload: Vec::new(),
@@ -199,7 +198,7 @@ impl MercuryManager {
         let header: protocol::mercury::Header = protobuf::parse_from_bytes(&header_data).unwrap();
 
         let response = MercuryResponse {
-            uri: url_encode(header.get_uri()),
+            uri: header.get_uri().to_string(),
             status_code: header.get_status_code(),
             payload: pending.parts,
         };
@@ -214,8 +213,21 @@ impl MercuryManager {
         } else if cmd == 0xb5 {
             self.lock(|inner| {
                 let mut found = false;
+
+                // TODO: This is just a workaround to make utf-8 encoded usernames work.
+                // A better solution would be to use an uri struct and urlencode it directly
+                // before sending while saving the subscription under its unencoded form.
+                let mut uri_split = response.uri.split('/');
+
+                let encoded_uri = std::iter::once(uri_split.next().unwrap().to_string())
+                    .chain(uri_split.map(|component| {
+                        form_urlencoded::byte_serialize(component.as_bytes()).collect::<String>()
+                    }))
+                    .collect::<Vec<String>>()
+                    .join("/");
+
                 inner.subscriptions.retain(|&(ref prefix, ref sub)| {
-                    if response.uri.starts_with(prefix) {
+                    if encoded_uri.starts_with(prefix) {
                         found = true;
 
                         // if send fails, remove from list of subs

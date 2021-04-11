@@ -1,44 +1,17 @@
-pub fn version_string() -> String {
-    format!("librespot-{}", short_sha())
-}
+/// Version string of the form "librespot-<sha>"
+pub const VERSION_STRING: &str = concat!("librespot-", env!("VERGEN_SHA_SHORT"));
 
-// Generate a timestamp representing now (UTC) in RFC3339 format.
-pub fn now() -> &'static str {
-    env!("VERGEN_BUILD_TIMESTAMP")
-}
+/// Generate a timestamp string representing the build date (UTC).
+pub const BUILD_DATE: &str = env!("VERGEN_BUILD_DATE");
 
-// Generate a timstamp string representing now (UTC).
-pub fn short_now() -> &'static str {
-    env!("VERGEN_BUILD_DATE")
-}
+/// Short sha of the latest git commit.
+pub const SHA_SHORT: &str = env!("VERGEN_SHA_SHORT");
 
-// Generate a SHA string
-pub fn sha() -> &'static str {
-    env!("VERGEN_SHA")
-}
+/// Date of the latest git commit.
+pub const COMMIT_DATE: &str = env!("VERGEN_COMMIT_DATE");
 
-// Generate a short SHA string
-pub fn short_sha() -> &'static str {
-    env!("VERGEN_SHA_SHORT")
-}
+/// Librespot crate version.
+pub const SEMVER: &str = env!("CARGO_PKG_VERSION");
 
-// Generate the commit date string
-pub fn commit_date() -> &'static str {
-    env!("VERGEN_COMMIT_DATE")
-}
-
-// Generate the target triple string
-pub fn target() -> &'static str {
-    env!("VERGEN_TARGET_TRIPLE")
-}
-
-// Generate a semver string
-pub fn semver() -> &'static str {
-    // env!("VERGEN_SEMVER")
-    env!("CARGO_PKG_VERSION")
-}
-
-// Generate a random build id.
-pub fn build_id() -> &'static str {
-    env!("VERGEN_BUILD_ID")
-}
+/// A random build id.
+pub const BUILD_ID: &str = env!("LIBRESPOT_BUILD_ID");

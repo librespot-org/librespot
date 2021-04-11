@@ -1,12 +1,13 @@
 use std::process::exit;
-use std::{convert::Infallible, sync::mpsc};
 use std::{io, thread, time};
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
 use super::Sink;
-use crate::audio::AudioPacket;
+use crate::audio::{convert, AudioPacket};
+use crate::config::AudioFormat;
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 
 #[cfg(all(
     feature = "rodiojack-backend",
@@ -15,15 +16,16 @@ use crate::audio::AudioPacket;
 compile_error!("Rodio JACK backend is currently only supported on linux.");
 
 #[cfg(feature = "rodio-backend")]
-pub fn mk_rodio(device: Option<String>) -> Box<dyn Sink + Send> {
-    Box::new(open(cpal::default_host(), device))
+pub fn mk_rodio(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+    Box::new(open(cpal::default_host(), device, format))
 }
 
 #[cfg(feature = "rodiojack-backend")]
-pub fn mk_rodiojack(device: Option<String>) -> Box<dyn Sink + Send> {
+pub fn mk_rodiojack(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
     Box::new(open(
         cpal::host_from_id(cpal::HostId::Jack).unwrap(),
         device,
+        format,
     ))
 }
 
@@ -43,8 +45,8 @@ pub enum RodioError {
 
 pub struct RodioSink {
     rodio_sink: rodio::Sink,
-    // will produce a TryRecvError on the receiver side when it is dropped.
-    _close_tx: mpsc::SyncSender<Infallible>,
+    format: AudioFormat,
+    _stream: rodio::OutputStream,
 }
 
 fn list_formats(device: &rodio::Device) {
@@ -149,52 +151,54 @@ fn create_sink(
     Ok((sink, stream))
 }
 
-pub fn open(host: cpal::Host, device: Option<String>) -> RodioSink {
-    debug!("Using rodio sink with cpal host: {}", host.id().name());
+pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> RodioSink {
+    debug!(
+        "Using rodio sink with format {:?} and cpal host: {}",
+        format,
+        host.id().name()
+    );
 
-    let (sink_tx, sink_rx) = mpsc::sync_channel(1);
-    let (close_tx, close_rx) = mpsc::sync_channel(1);
-
-    std::thread::spawn(move || match create_sink(&host, device) {
-        Ok((sink, stream)) => {
-            sink_tx.send(Ok(sink)).unwrap();
-
-            close_rx.recv().unwrap_err(); // This will fail as soon as the sender is dropped
-            debug!("drop rodio::OutputStream");
-            drop(stream);
+    match format {
+        AudioFormat::F32 => {
+            #[cfg(target_os = "linux")]
+            warn!("Rodio output to Alsa is known to cause garbled sound, consider using `--backend alsa`")
         }
-        Err(e) => {
-            sink_tx.send(Err(e)).unwrap();
-        }
-    });
+        AudioFormat::S16 => (),
+        _ => unimplemented!("Rodio currently only supports F32 and S16 formats"),
+    }
 
-    // Instead of the second `unwrap`, better error handling could be introduced
-    let sink = sink_rx.recv().unwrap().unwrap();
+    let (sink, stream) = create_sink(&host, device).unwrap();
 
     debug!("Rodio sink was created");
     RodioSink {
         rodio_sink: sink,
-        _close_tx: close_tx,
+        format,
+        _stream: stream,
     }
 }
 
 impl Sink for RodioSink {
-    fn start(&mut self) -> io::Result<()> {
-        // More similar to an "unpause" than "play". Doesn't undo "stop".
-        // self.rodio_sink.play();
-        Ok(())
-    }
-
-    fn stop(&mut self) -> io::Result<()> {
-        // This will immediately stop playback, but the sink is then unusable.
-        // We just have to let the current buffer play till the end.
-        // self.rodio_sink.stop();
-        Ok(())
-    }
+    start_stop_noop!();
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
-        let source = rodio::buffer::SamplesBuffer::new(2, 44100, packet.samples());
-        self.rodio_sink.append(source);
+        let samples = packet.samples();
+        match self.format {
+            AudioFormat::F32 => {
+                let source =
+                    rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples);
+                self.rodio_sink.append(source);
+            }
+            AudioFormat::S16 => {
+                let samples_s16: &[i16] = &convert::to_s16(samples);
+                let source = rodio::buffer::SamplesBuffer::new(
+                    NUM_CHANNELS as u16,
+                    SAMPLE_RATE,
+                    samples_s16,
+                );
+                self.rodio_sink.append(source);
+            }
+            _ => unreachable!(),
+        };
 
         // Chunk sizes seem to be about 256 to 3000 ish items long.
         // Assuming they're on average 1628 then a half second buffer is:

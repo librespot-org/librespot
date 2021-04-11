@@ -12,7 +12,7 @@ pub trait Mixer: Send {
 }
 
 pub trait AudioFilter {
-    fn modify_stream(&self, data: &mut [i16]);
+    fn modify_stream(&self, data: &mut [f32]);
 }
 
 #[cfg(feature = "alsa-backend")]
