@@ -54,7 +54,11 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 }
 
 impl<'a> Open for PortAudioSink<'a> {
-    fn open(device: Option<String>, format: AudioFormat, requantizer: Requantizer) -> PortAudioSink<'a> {
+    fn open(
+        device: Option<String>,
+        format: AudioFormat,
+        requantizer: Requantizer,
+    ) -> PortAudioSink<'a> {
         info!("Using PortAudio sink with format: {:?}", format);
 
         warn!("This backend is known to panic on several platforms.");
