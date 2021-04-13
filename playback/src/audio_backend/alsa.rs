@@ -1,5 +1,7 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkAsBytes};
 use crate::audio::AudioPacket;
+use crate::config::AudioFormat;
+use crate::player::{NUM_CHANNELS, SAMPLES_PER_SECOND, SAMPLE_RATE};
 use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, Error, ValueOr};
@@ -8,13 +10,14 @@ use std::ffi::CString;
 use std::io;
 use std::process::exit;
 
-const PREFERED_PERIOD_SIZE: Frames = 5512; // Period of roughly 125ms
+const BUFFERED_LATENCY: f32 = 0.125; // seconds
 const BUFFERED_PERIODS: Frames = 4;
 
 pub struct AlsaSink {
     pcm: Option<PCM>,
+    format: AudioFormat,
     device: String,
-    buffer: Vec<i16>,
+    buffer: Vec<u8>,
 }
 
 fn list_outputs() {
@@ -34,23 +37,27 @@ fn list_outputs() {
     }
 }
 
-fn open_device(dev_name: &str) -> Result<(PCM, Frames), Box<Error>> {
+fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box<Error>> {
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
-    let mut period_size = PREFERED_PERIOD_SIZE;
+    let alsa_format = match format {
+        AudioFormat::F32 => Format::float(),
+        AudioFormat::S32 => Format::s32(),
+        AudioFormat::S24 => Format::s24(),
+        AudioFormat::S24_3 => Format::S243LE,
+        AudioFormat::S16 => Format::s16(),
+    };
+
     // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8
     // latency = period_size * periods / (rate * bytes_per_frame)
-    // For 16 Bit stereo data, one frame has a length of four bytes.
-    // 500ms  = buffer_size / (44100 * 4)
-    // buffer_size_bytes = 0.5 * 44100 / 4
-    // buffer_size_frames = 0.5 * 44100 = 22050
+    // For stereo samples encoded as 32-bit float, one frame has a length of eight bytes.
+    let mut period_size = ((SAMPLES_PER_SECOND * format.size() as u32) as f32
+        * (BUFFERED_LATENCY / BUFFERED_PERIODS as f32)) as Frames;
     {
-        // Set hardware parameters: 44100 Hz / Stereo / 16 bit
         let hwp = HwParams::any(&pcm)?;
-
         hwp.set_access(Access::RWInterleaved)?;
-        hwp.set_format(Format::s16())?;
-        hwp.set_rate(44100, ValueOr::Nearest)?;
-        hwp.set_channels(2)?;
+        hwp.set_format(alsa_format)?;
+        hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest)?;
+        hwp.set_channels(NUM_CHANNELS as u32)?;
         period_size = hwp.set_period_size_near(period_size, ValueOr::Greater)?;
         hwp.set_buffer_size_near(period_size * BUFFERED_PERIODS)?;
         pcm.hw_params(&hwp)?;
@@ -64,12 +71,12 @@ fn open_device(dev_name: &str) -> Result<(PCM, Frames), Box<Error>> {
 }
 
 impl Open for AlsaSink {
-    fn open(device: Option<String>) -> AlsaSink {
-        info!("Using alsa sink");
+    fn open(device: Option<String>, format: AudioFormat) -> Self {
+        info!("Using Alsa sink with format: {:?}", format);
 
         let name = match device.as_ref().map(AsRef::as_ref) {
             Some("?") => {
-                println!("Listing available alsa outputs");
+                println!("Listing available Alsa outputs:");
                 list_outputs();
                 exit(0)
             }
@@ -78,8 +85,9 @@ impl Open for AlsaSink {
         }
         .to_string();
 
-        AlsaSink {
+        Self {
             pcm: None,
+            format,
             device: name,
             buffer: vec![],
         }
@@ -89,12 +97,14 @@ impl Open for AlsaSink {
 impl Sink for AlsaSink {
     fn start(&mut self) -> io::Result<()> {
         if self.pcm.is_none() {
-            let pcm = open_device(&self.device);
+            let pcm = open_device(&self.device, self.format);
             match pcm {
                 Ok((p, period_size)) => {
                     self.pcm = Some(p);
                     // Create a buffer for all samples for a full period
-                    self.buffer = Vec::with_capacity((period_size * 2) as usize);
+                    self.buffer = Vec::with_capacity(
+                        period_size as usize * BUFFERED_PERIODS as usize * self.format.size(),
+                    );
                 }
                 Err(e) => {
                     error!("Alsa error PCM open {}", e);
@@ -111,23 +121,22 @@ impl Sink for AlsaSink {
 
     fn stop(&mut self) -> io::Result<()> {
         {
-            let pcm = self.pcm.as_mut().unwrap();
             // Write any leftover data in the period buffer
             // before draining the actual buffer
-            let io = pcm.io_i16().unwrap();
-            match io.writei(&self.buffer[..]) {
-                Ok(_) => (),
-                Err(err) => pcm.try_recover(err, false).unwrap(),
-            }
+            self.write_bytes(&[]).expect("could not flush buffer");
+            let pcm = self.pcm.as_mut().unwrap();
             pcm.drain().unwrap();
         }
         self.pcm = None;
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+    sink_as_bytes!();
+}
+
+impl SinkAsBytes for AlsaSink {
+    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
         let mut processed_data = 0;
-        let data = packet.samples();
         while processed_data < data.len() {
             let data_to_buffer = min(
                 self.buffer.capacity() - self.buffer.len(),
@@ -137,16 +146,22 @@ impl Sink for AlsaSink {
                 .extend_from_slice(&data[processed_data..processed_data + data_to_buffer]);
             processed_data += data_to_buffer;
             if self.buffer.len() == self.buffer.capacity() {
-                let pcm = self.pcm.as_mut().unwrap();
-                let io = pcm.io_i16().unwrap();
-                match io.writei(&self.buffer) {
-                    Ok(_) => (),
-                    Err(err) => pcm.try_recover(err, false).unwrap(),
-                }
+                self.write_buf();
                 self.buffer.clear();
             }
         }
 
         Ok(())
+    }
+}
+
+impl AlsaSink {
+    fn write_buf(&mut self) {
+        let pcm = self.pcm.as_mut().unwrap();
+        let io = pcm.io_bytes();
+        match io.writei(&self.buffer) {
+            Ok(_) => (),
+            Err(err) => pcm.try_recover(err, false).unwrap(),
+        };
     }
 }

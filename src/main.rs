@@ -1,33 +1,37 @@
-use futures::sync::mpsc::UnboundedReceiver;
-use futures::{Async, Future, Poll, Stream};
-use log::{error, info, trace, warn};
+use futures_util::{future, FutureExt, StreamExt};
+use librespot_playback::player::PlayerEvent;
+use log::{error, info, warn};
 use sha1::{Digest, Sha1};
-use std::env;
-use std::io::{stderr, Write};
-use std::mem;
+use tokio::sync::mpsc::UnboundedReceiver;
+use url::Url;
+
+use librespot::connect::spirc::Spirc;
+use librespot::core::authentication::Credentials;
+use librespot::core::cache::Cache;
+use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
+use librespot::core::session::Session;
+use librespot::core::version;
+use librespot::playback::audio_backend::{self, Sink, BACKENDS};
+use librespot::playback::config::{
+    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig,
+};
+use librespot::playback::mixer::{self, Mixer, MixerConfig};
+use librespot::playback::player::{NormalisationData, Player};
+
+mod player_event_handler;
+use player_event_handler::{emit_sink_event, run_program_on_events};
+
+use std::convert::TryFrom;
 use std::path::Path;
 use std::process::exit;
 use std::str::FromStr;
-use std::time::Instant;
-use tokio_core::reactor::{Core, Handle};
-use tokio_io::IoStream;
-use url::Url;
+use std::{env, time::Instant};
+use std::{
+    io::{stderr, Write},
+    pin::Pin,
+};
 
-use librespot::core::authentication::{get_credentials, Credentials};
-use librespot::core::cache::Cache;
-use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
-use librespot::core::session::{AuthenticationError, Session};
-use librespot::core::version;
-
-use librespot::connect::discovery::{discovery, DiscoveryStream};
-use librespot::connect::spirc::{Spirc, SpircTask};
-use librespot::playback::audio_backend::{self, Sink, BACKENDS};
-use librespot::playback::config::{Bitrate, NormalisationType, PlayerConfig};
-use librespot::playback::mixer::{self, Mixer, MixerConfig};
-use librespot::playback::player::{Player, PlayerEvent};
-
-mod player_event_handler;
-use crate::player_event_handler::{emit_sink_event, run_program_on_events};
+const MILLIS: f32 = 1000.0;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -71,6 +75,29 @@ fn list_backends() {
     }
 }
 
+pub fn get_credentials<F: FnOnce(&String) -> Option<String>>(
+    username: Option<String>,
+    password: Option<String>,
+    cached_credentials: Option<Credentials>,
+    prompt: F,
+) -> Option<Credentials> {
+    if let Some(username) = username {
+        if let Some(password) = password {
+            return Some(Credentials::with_password(username, password));
+        }
+
+        match cached_credentials {
+            Some(credentials) if username == credentials.username => Some(credentials),
+            _ => {
+                let password = prompt(&username)?;
+                Some(Credentials::with_password(username, password))
+            }
+        }
+    } else {
+        cached_credentials
+    }
+}
+
 fn print_version() {
     println!(
         "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
@@ -83,7 +110,8 @@ fn print_version() {
 
 #[derive(Clone)]
 struct Setup {
-    backend: fn(Option<String>) -> Box<dyn Sink>,
+    format: AudioFormat,
+    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink + 'static>,
     device: Option<String>,
 
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
@@ -100,7 +128,7 @@ struct Setup {
     emit_sink_events: bool,
 }
 
-fn setup(args: &[String]) -> Setup {
+fn get_setup(args: &[String]) -> Setup {
     let mut opts = getopts::Options::new();
     opts.optopt(
         "c",
@@ -146,6 +174,12 @@ fn setup(args: &[String]) -> Setup {
             "device",
             "Audio device to use. Use '?' to list options if using portaudio or alsa",
             "DEVICE",
+        )
+        .optopt(
+            "",
+            "format",
+            "Output format (F32, S32, S24, S24_3 or S16). Defaults to S16",
+            "FORMAT",
         )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
@@ -202,6 +236,12 @@ fn setup(args: &[String]) -> Setup {
         )
         .optopt(
             "",
+            "normalisation-method",
+            "Specify the normalisation method to use - [basic, dynamic]. Default is dynamic.",
+            "NORMALISATION_METHOD",
+        )
+        .optopt(
+            "",
             "normalisation-gain-type",
             "Specify the normalisation gain type to use - [track, album]. Default is album.",
             "GAIN_TYPE",
@@ -211,6 +251,30 @@ fn setup(args: &[String]) -> Setup {
             "normalisation-pregain",
             "Pregain (dB) applied by volume normalisation",
             "PREGAIN",
+        )
+        .optopt(
+            "",
+            "normalisation-threshold",
+            "Threshold (dBFS) to prevent clipping. Default is -1.0.",
+            "THRESHOLD",
+        )
+        .optopt(
+            "",
+            "normalisation-attack",
+            "Attack time (ms) in which the dynamic limiter is reducing gain. Default is 5.",
+            "ATTACK",
+        )
+        .optopt(
+            "",
+            "normalisation-release",
+            "Release or decay time (ms) in which the dynamic limiter is restoring gain. Default is 100.",
+            "RELEASE",
+        )
+        .optopt(
+            "",
+            "normalisation-knee",
+            "Knee steepness of the dynamic limiter. Default is 1.0.",
+            "KNEE",
         )
         .optopt(
             "",
@@ -237,13 +301,7 @@ fn setup(args: &[String]) -> Setup {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            writeln!(
-                stderr(),
-                "error: {}\n{}",
-                f.to_string(),
-                usage(&args[0], &opts)
-            )
-            .unwrap();
+            eprintln!("error: {}\n{}", f.to_string(), usage(&args[0], &opts));
             exit(1);
         }
     };
@@ -272,9 +330,15 @@ fn setup(args: &[String]) -> Setup {
 
     let backend = audio_backend::find(backend_name).expect("Invalid backend");
 
+    let format = matches
+        .opt_str("format")
+        .as_ref()
+        .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
+        .unwrap_or_default();
+
     let device = matches.opt_str("device");
     if device == Some("?".into()) {
-        backend(device);
+        backend(device, format);
         exit(0);
     }
 
@@ -284,8 +348,10 @@ fn setup(args: &[String]) -> Setup {
     let mixer_config = MixerConfig {
         card: matches
             .opt_str("mixer-card")
-            .unwrap_or(String::from("default")),
-        mixer: matches.opt_str("mixer-name").unwrap_or(String::from("PCM")),
+            .unwrap_or_else(|| String::from("default")),
+        mixer: matches
+            .opt_str("mixer-name")
+            .unwrap_or_else(|| String::from("PCM")),
         index: matches
             .opt_str("mixer-index")
             .map(|index| index.parse::<u32>().unwrap())
@@ -317,7 +383,7 @@ fn setup(args: &[String]) -> Setup {
                 .map(|p| AsRef::<Path>::as_ref(p).join("files"));
             system_dir = matches
                 .opt_str("system-cache")
-                .or_else(|| cache_dir)
+                .or(cache_dir)
                 .map(|p| p.into());
         }
 
@@ -347,15 +413,17 @@ fn setup(args: &[String]) -> Setup {
         .map(|port| port.parse::<u16>().unwrap())
         .unwrap_or(0);
 
-    let name = matches.opt_str("name").unwrap_or("Librespot".to_string());
+    let name = matches
+        .opt_str("name")
+        .unwrap_or_else(|| "Librespot".to_string());
 
     let credentials = {
         let cached_credentials = cache.as_ref().and_then(Cache::credentials);
 
-        let password = |username: &String| -> String {
-            write!(stderr(), "Password for {}: ", username).unwrap();
-            stderr().flush().unwrap();
-            rpassword::read_password().unwrap()
+        let password = |username: &String| -> Option<String> {
+            write!(stderr(), "Password for {}: ", username).ok()?;
+            stderr().flush().ok()?;
+            rpassword::read_password().ok()
         };
 
         get_credentials(
@@ -371,8 +439,8 @@ fn setup(args: &[String]) -> Setup {
 
         SessionConfig {
             user_agent: version::VERSION_STRING.to_string(),
-            device_id: device_id,
-            proxy: matches.opt_str("proxy").or(std::env::var("http_proxy").ok()).map(
+            device_id,
+            proxy: matches.opt_str("proxy").or_else(|| std::env::var("http_proxy").ok()).map(
                 |s| {
                     match Url::parse(&s) {
                         Ok(url) => {
@@ -402,23 +470,56 @@ fn setup(args: &[String]) -> Setup {
             .opt_str("b")
             .as_ref()
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
-            .unwrap_or(Bitrate::default());
+            .unwrap_or_default();
         let gain_type = matches
             .opt_str("normalisation-gain-type")
             .as_ref()
             .map(|gain_type| {
                 NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
             })
-            .unwrap_or(NormalisationType::default());
+            .unwrap_or_default();
+        let normalisation_method = matches
+            .opt_str("normalisation-method")
+            .as_ref()
+            .map(|gain_type| {
+                NormalisationMethod::from_str(gain_type).expect("Invalid normalisation method")
+            })
+            .unwrap_or_default();
+
         PlayerConfig {
-            bitrate: bitrate,
+            bitrate,
             gapless: !matches.opt_present("disable-gapless"),
             normalisation: matches.opt_present("enable-volume-normalisation"),
+            normalisation_method,
             normalisation_type: gain_type,
             normalisation_pregain: matches
                 .opt_str("normalisation-pregain")
                 .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
                 .unwrap_or(PlayerConfig::default().normalisation_pregain),
+            normalisation_threshold: NormalisationData::db_to_ratio(
+                matches
+                    .opt_str("normalisation-threshold")
+                    .map(|threshold| {
+                        threshold
+                            .parse::<f32>()
+                            .expect("Invalid threshold float value")
+                    })
+                    .unwrap_or(PlayerConfig::default().normalisation_threshold),
+            ),
+            normalisation_attack: matches
+                .opt_str("normalisation-attack")
+                .map(|attack| attack.parse::<f32>().expect("Invalid attack float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_attack * MILLIS)
+                / MILLIS,
+            normalisation_release: matches
+                .opt_str("normalisation-release")
+                .map(|release| release.parse::<f32>().expect("Invalid release float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_release * MILLIS)
+                / MILLIS,
+            normalisation_knee: matches
+                .opt_str("normalisation-knee")
+                .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
+                .unwrap_or(PlayerConfig::default().normalisation_knee),
             passthrough,
         }
     };
@@ -428,19 +529,19 @@ fn setup(args: &[String]) -> Setup {
             .opt_str("device-type")
             .as_ref()
             .map(|device_type| DeviceType::from_str(device_type).expect("Invalid device type"))
-            .unwrap_or(DeviceType::default());
+            .unwrap_or_default();
 
         let volume_ctrl = matches
             .opt_str("volume-ctrl")
             .as_ref()
             .map(|volume_ctrl| VolumeCtrl::from_str(volume_ctrl).expect("Invalid volume ctrl type"))
-            .unwrap_or(VolumeCtrl::default());
+            .unwrap_or_default();
 
         ConnectConfig {
-            name: name,
-            device_type: device_type,
+            name,
+            device_type,
             volume: initial_volume,
-            volume_ctrl: volume_ctrl,
+            volume_ctrl,
             autoplay: matches.opt_present("autoplay"),
         }
     };
@@ -448,247 +549,197 @@ fn setup(args: &[String]) -> Setup {
     let enable_discovery = !matches.opt_present("disable-discovery");
 
     Setup {
-        backend: backend,
-        cache: cache,
-        session_config: session_config,
-        player_config: player_config,
-        connect_config: connect_config,
-        credentials: credentials,
-        device: device,
-        enable_discovery: enable_discovery,
-        zeroconf_port: zeroconf_port,
-        mixer: mixer,
-        mixer_config: mixer_config,
+        format,
+        backend,
+        cache,
+        session_config,
+        player_config,
+        connect_config,
+        credentials,
+        device,
+        enable_discovery,
+        zeroconf_port,
+        mixer,
+        mixer_config,
         player_event_program: matches.opt_str("onevent"),
         emit_sink_events: matches.opt_present("emit-sink-events"),
     }
 }
 
-struct Main {
-    cache: Option<Cache>,
-    player_config: PlayerConfig,
-    session_config: SessionConfig,
-    connect_config: ConnectConfig,
-    backend: fn(Option<String>) -> Box<dyn Sink>,
-    device: Option<String>,
-    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
-    mixer_config: MixerConfig,
-    handle: Handle,
-
-    discovery: Option<DiscoveryStream>,
-    signal: IoStream<()>,
-
-    spirc: Option<Spirc>,
-    spirc_task: Option<SpircTask>,
-    connect: Box<dyn Future<Item = Session, Error = AuthenticationError>>,
-
-    shutdown: bool,
-    last_credentials: Option<Credentials>,
-    auto_connect_times: Vec<Instant>,
-
-    player_event_channel: Option<UnboundedReceiver<PlayerEvent>>,
-    player_event_program: Option<String>,
-    emit_sink_events: bool,
-}
-
-impl Main {
-    fn new(handle: Handle, setup: Setup) -> Main {
-        let mut task = Main {
-            handle: handle.clone(),
-            cache: setup.cache,
-            session_config: setup.session_config,
-            player_config: setup.player_config,
-            connect_config: setup.connect_config,
-            backend: setup.backend,
-            device: setup.device,
-            mixer: setup.mixer,
-            mixer_config: setup.mixer_config,
-
-            connect: Box::new(futures::future::empty()),
-            discovery: None,
-            spirc: None,
-            spirc_task: None,
-            shutdown: false,
-            last_credentials: None,
-            auto_connect_times: Vec::new(),
-            signal: Box::new(tokio_signal::ctrl_c().flatten_stream()),
-
-            player_event_channel: None,
-            player_event_program: setup.player_event_program,
-            emit_sink_events: setup.emit_sink_events,
-        };
-
-        if setup.enable_discovery {
-            let config = task.connect_config.clone();
-            let device_id = task.session_config.device_id.clone();
-
-            task.discovery =
-                Some(discovery(&handle, config, device_id, setup.zeroconf_port).unwrap());
-        }
-
-        if let Some(credentials) = setup.credentials {
-            task.credentials(credentials);
-        }
-
-        task
-    }
-
-    fn credentials(&mut self, credentials: Credentials) {
-        self.last_credentials = Some(credentials.clone());
-        let config = self.session_config.clone();
-        let handle = self.handle.clone();
-
-        let connection = Session::connect(config, credentials, self.cache.clone(), handle);
-
-        self.connect = connection;
-        self.spirc = None;
-        let task = mem::replace(&mut self.spirc_task, None);
-        if let Some(task) = task {
-            self.handle.spawn(task);
-        }
-    }
-}
-
-impl Future for Main {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<(), ()> {
-        loop {
-            let mut progress = false;
-
-            if let Some(Async::Ready(Some(creds))) =
-                self.discovery.as_mut().map(|d| d.poll().unwrap())
-            {
-                if let Some(ref spirc) = self.spirc {
-                    spirc.shutdown();
-                }
-                self.auto_connect_times.clear();
-                self.credentials(creds);
-
-                progress = true;
-            }
-
-            match self.connect.poll() {
-                Ok(Async::Ready(session)) => {
-                    self.connect = Box::new(futures::future::empty());
-                    let mixer_config = self.mixer_config.clone();
-                    let mixer = (self.mixer)(Some(mixer_config));
-                    let player_config = self.player_config.clone();
-                    let connect_config = self.connect_config.clone();
-
-                    let audio_filter = mixer.get_audio_filter();
-                    let backend = self.backend;
-                    let device = self.device.clone();
-                    let (player, event_channel) =
-                        Player::new(player_config, session.clone(), audio_filter, move || {
-                            (backend)(device)
-                        });
-
-                    if self.emit_sink_events {
-                        if let Some(player_event_program) = &self.player_event_program {
-                            let player_event_program = player_event_program.clone();
-                            player.set_sink_event_callback(Some(Box::new(move |sink_status| {
-                                emit_sink_event(sink_status, &player_event_program)
-                            })));
-                        }
-                    }
-
-                    let (spirc, spirc_task) = Spirc::new(connect_config, session, player, mixer);
-                    self.spirc = Some(spirc);
-                    self.spirc_task = Some(spirc_task);
-                    self.player_event_channel = Some(event_channel);
-
-                    progress = true;
-                }
-                Ok(Async::NotReady) => (),
-                Err(error) => {
-                    error!("Could not connect to server: {}", error);
-                    self.connect = Box::new(futures::future::empty());
-                }
-            }
-
-            if let Async::Ready(Some(())) = self.signal.poll().unwrap() {
-                trace!("Ctrl-C received");
-                if !self.shutdown {
-                    if let Some(ref spirc) = self.spirc {
-                        spirc.shutdown();
-                    } else {
-                        return Ok(Async::Ready(()));
-                    }
-                    self.shutdown = true;
-                } else {
-                    return Ok(Async::Ready(()));
-                }
-
-                progress = true;
-            }
-
-            let mut drop_spirc_and_try_to_reconnect = false;
-            if let Some(ref mut spirc_task) = self.spirc_task {
-                if let Async::Ready(()) = spirc_task.poll().unwrap() {
-                    if self.shutdown {
-                        return Ok(Async::Ready(()));
-                    } else {
-                        warn!("Spirc shut down unexpectedly");
-                        drop_spirc_and_try_to_reconnect = true;
-                    }
-                    progress = true;
-                }
-            }
-            if drop_spirc_and_try_to_reconnect {
-                self.spirc_task = None;
-                while (!self.auto_connect_times.is_empty())
-                    && ((Instant::now() - self.auto_connect_times[0]).as_secs() > 600)
-                {
-                    let _ = self.auto_connect_times.remove(0);
-                }
-
-                if let Some(credentials) = self.last_credentials.clone() {
-                    if self.auto_connect_times.len() >= 5 {
-                        warn!("Spirc shut down too often. Not reconnecting automatically.");
-                    } else {
-                        self.auto_connect_times.push(Instant::now());
-                        self.credentials(credentials);
-                    }
-                }
-            }
-
-            if let Some(ref mut player_event_channel) = self.player_event_channel {
-                if let Async::Ready(Some(event)) = player_event_channel.poll().unwrap() {
-                    progress = true;
-                    if let Some(ref program) = self.player_event_program {
-                        if let Some(child) = run_program_on_events(event, program) {
-                            let child = child
-                                .expect("program failed to start")
-                                .map(|status| {
-                                    if !status.success() {
-                                        error!("child exited with status {:?}", status.code());
-                                    }
-                                })
-                                .map_err(|e| error!("failed to wait on child process: {}", e));
-
-                            self.handle.spawn(child);
-                        }
-                    }
-                }
-            }
-
-            if !progress {
-                return Ok(Async::NotReady);
-            }
-        }
-    }
-}
-
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
     if env::var("RUST_BACKTRACE").is_err() {
         env::set_var("RUST_BACKTRACE", "full")
     }
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
 
     let args: Vec<String> = std::env::args().collect();
+    let setup = get_setup(&args);
 
-    core.run(Main::new(handle, setup(&args))).unwrap()
+    let mut last_credentials = None;
+    let mut spirc: Option<Spirc> = None;
+    let mut spirc_task: Option<Pin<_>> = None;
+    let mut player_event_channel: Option<UnboundedReceiver<PlayerEvent>> = None;
+    let mut auto_connect_times: Vec<Instant> = vec![];
+    let mut discovery = None;
+    let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
+
+    if setup.enable_discovery {
+        let config = setup.connect_config.clone();
+        let device_id = setup.session_config.device_id.clone();
+
+        discovery = Some(
+            librespot_connect::discovery::discovery(config, device_id, setup.zeroconf_port)
+                .unwrap(),
+        );
+    }
+
+    if let Some(credentials) = setup.credentials {
+        last_credentials = Some(credentials.clone());
+        connecting = Box::pin(
+            Session::connect(
+                setup.session_config.clone(),
+                credentials,
+                setup.cache.clone(),
+            )
+            .fuse(),
+        );
+    }
+
+    loop {
+        tokio::select! {
+            credentials = async { discovery.as_mut().unwrap().next().await }, if discovery.is_some() => {
+                match credentials {
+                    Some(credentials) => {
+                        last_credentials = Some(credentials.clone());
+                        auto_connect_times.clear();
+
+                        if let Some(spirc) = spirc.take() {
+                            spirc.shutdown();
+                        }
+                        if let Some(spirc_task) = spirc_task.take() {
+                            // Continue shutdown in its own task
+                            tokio::spawn(spirc_task);
+                        }
+
+                        connecting = Box::pin(Session::connect(
+                            setup.session_config.clone(),
+                            credentials,
+                            setup.cache.clone(),
+                        ).fuse());
+                    },
+                    None => {
+                        warn!("Discovery stopped!");
+                        discovery = None;
+                    }
+                }
+            },
+            session = &mut connecting, if !connecting.is_terminated() => match session {
+                Ok(session) => {
+                    let mixer_config = setup.mixer_config.clone();
+                    let mixer = (setup.mixer)(Some(mixer_config));
+                    let player_config = setup.player_config.clone();
+                    let connect_config = setup.connect_config.clone();
+
+                    let audio_filter = mixer.get_audio_filter();
+                    let format = setup.format;
+                    let backend = setup.backend;
+                    let device = setup.device.clone();
+                    let (player, event_channel) =
+                        Player::new(player_config, session.clone(), audio_filter, move || {
+                            (backend)(device, format)
+                        });
+
+                    if setup.emit_sink_events {
+                        if let Some(player_event_program) = setup.player_event_program.clone() {
+                            player.set_sink_event_callback(Some(Box::new(move |sink_status| {
+                                match emit_sink_event(sink_status, &player_event_program) {
+                                    Ok(e) if e.success() => (),
+                                    Ok(e) => {
+                                        if let Some(code) = e.code() {
+                                            warn!("Sink event prog returned exit code {}", code);
+                                        } else {
+                                            warn!("Sink event prog returned failure");
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!("Emitting sink event failed: {}", e);
+                                    }
+                                }
+                            })));
+                        }
+                    };
+
+                    let (spirc_, spirc_task_) = Spirc::new(connect_config, session, player, mixer);
+
+                    spirc = Some(spirc_);
+                    spirc_task = Some(Box::pin(spirc_task_));
+                    player_event_channel = Some(event_channel);
+                },
+                Err(e) => {
+                    warn!("Connection failed: {}", e);
+                }
+            },
+            _ = async { spirc_task.as_mut().unwrap().await }, if spirc_task.is_some() => {
+                spirc_task = None;
+
+                warn!("Spirc shut down unexpectedly");
+                while !auto_connect_times.is_empty()
+                    && ((Instant::now() - auto_connect_times[0]).as_secs() > 600)
+                {
+                    let _ = auto_connect_times.remove(0);
+                }
+
+                if let Some(credentials) = last_credentials.clone() {
+                    if auto_connect_times.len() >= 5 {
+                        warn!("Spirc shut down too often. Not reconnecting automatically.");
+                    } else {
+                        auto_connect_times.push(Instant::now());
+
+                        connecting = Box::pin(Session::connect(
+                            setup.session_config.clone(),
+                            credentials,
+                            setup.cache.clone(),
+                        ).fuse());
+                    }
+                }
+            },
+            event = async { player_event_channel.as_mut().unwrap().recv().await }, if player_event_channel.is_some() => match event {
+                Some(event) => {
+                    if let Some(program) = &setup.player_event_program {
+                        if let Some(child) = run_program_on_events(event, program) {
+                            let mut child = child.expect("program failed to start");
+
+                            tokio::spawn(async move {
+                                match child.wait().await  {
+                                    Ok(status) if !status.success() => error!("child exited with status {:?}", status.code()),
+                                    Err(e) => error!("failed to wait on child process: {}", e),
+                                    _ => {}
+                                }
+                            });
+                        }
+                    }
+                },
+                None => {
+                    player_event_channel = None;
+                }
+            },
+            _ = tokio::signal::ctrl_c() => {
+                break;
+            }
+        }
+    }
+
+    info!("Gracefully shutting down");
+
+    // Shutdown spirc if necessary
+    if let Some(spirc) = spirc {
+        spirc.shutdown();
+
+        if let Some(mut spirc_task) = spirc_task {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => (),
+                _ = spirc_task.as_mut() => ()
+            }
+        }
+    }
 }

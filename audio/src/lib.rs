@@ -1,31 +1,31 @@
-#[macro_use]
-extern crate futures;
+#![allow(clippy::unused_io_amount, clippy::too_many_arguments)]
+
 #[macro_use]
 extern crate log;
 
-extern crate aes_ctr;
-extern crate bit_set;
-extern crate byteorder;
-extern crate bytes;
-extern crate num_bigint;
-extern crate num_traits;
-extern crate tempfile;
-
-extern crate librespot_core;
-
+pub mod convert;
 mod decrypt;
 mod fetch;
 
-#[cfg(not(any(feature = "with-tremor", feature = "with-vorbis")))]
-mod lewton_decoder;
-#[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
-mod libvorbis_decoder;
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))] {
+        mod libvorbis_decoder;
+        pub use crate::libvorbis_decoder::{VorbisDecoder, VorbisError};
+    } else {
+        mod lewton_decoder;
+        pub use lewton_decoder::{VorbisDecoder, VorbisError};
+    }
+}
+
 mod passthrough_decoder;
+pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
 
 mod range_set;
 
 pub use decrypt::AudioDecrypt;
-pub use fetch::{AudioFile, AudioFileOpen, StreamLoaderController};
+pub use fetch::{AudioFile, StreamLoaderController};
 pub use fetch::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
@@ -33,12 +33,12 @@ pub use fetch::{
 use std::fmt;
 
 pub enum AudioPacket {
-    Samples(Vec<i16>),
+    Samples(Vec<f32>),
     OggData(Vec<u8>),
 }
 
 impl AudioPacket {
-    pub fn samples(&self) -> &[i16] {
+    pub fn samples(&self) -> &[f32] {
         match self {
             AudioPacket::Samples(s) => s,
             AudioPacket::OggData(_) => panic!("can't return OggData on samples"),
@@ -60,12 +60,6 @@ impl AudioPacket {
     }
 }
 
-#[cfg(not(any(feature = "with-tremor", feature = "with-vorbis")))]
-pub use crate::lewton_decoder::{VorbisDecoder, VorbisError};
-#[cfg(any(feature = "with-tremor", feature = "with-vorbis"))]
-pub use libvorbis_decoder::{VorbisDecoder, VorbisError};
-pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
-
 #[derive(Debug)]
 pub enum AudioError {
     PassthroughError(PassthroughError),
@@ -83,13 +77,13 @@ impl fmt::Display for AudioError {
 
 impl From<VorbisError> for AudioError {
     fn from(err: VorbisError) -> AudioError {
-        AudioError::VorbisError(VorbisError::from(err))
+        AudioError::VorbisError(err)
     }
 }
 
 impl From<PassthroughError> for AudioError {
     fn from(err: PassthroughError) -> AudioError {
-        AudioError::PassthroughError(PassthroughError::from(err))
+        AudioError::PassthroughError(err)
     }
 }
 

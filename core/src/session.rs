@@ -1,25 +1,37 @@
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock, Weak};
+use std::task::Context;
+use std::task::Poll;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::mpsc;
-use futures::{Async, Future, IntoFuture, Poll, Stream};
-use tokio_core::reactor::{Handle, Remote};
+use futures_core::TryStream;
+use futures_util::{future, StreamExt, TryStreamExt};
+use once_cell::sync::OnceCell;
+use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::apresolve::apresolve_or_fallback;
+use crate::apresolve::apresolve;
 use crate::audio_key::AudioKeyManager;
 use crate::authentication::Credentials;
 use crate::cache::Cache;
 use crate::channel::ChannelManager;
-use crate::component::Lazy;
 use crate::config::SessionConfig;
-use crate::connection;
+use crate::connection::{self, AuthenticationError};
 use crate::mercury::MercuryManager;
 
-pub use crate::authentication::{AuthenticationError, AuthenticationErrorKind};
+#[derive(Debug, Error)]
+pub enum SessionError {
+    #[error(transparent)]
+    AuthenticationError(#[from] AuthenticationError),
+    #[error("Cannot create session: {0}")]
+    IoError(#[from] io::Error),
+}
 
 struct SessionData {
     country: String,
@@ -34,12 +46,12 @@ struct SessionInternal {
 
     tx_connection: mpsc::UnboundedSender<(u8, Vec<u8>)>,
 
-    audio_key: Lazy<AudioKeyManager>,
-    channel: Lazy<ChannelManager>,
-    mercury: Lazy<MercuryManager>,
+    audio_key: OnceCell<AudioKeyManager>,
+    channel: OnceCell<ChannelManager>,
+    mercury: OnceCell<MercuryManager>,
     cache: Option<Arc<Cache>>,
 
-    handle: Remote,
+    handle: tokio::runtime::Handle,
 
     session_id: usize,
 }
@@ -50,127 +62,109 @@ static SESSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
 pub struct Session(Arc<SessionInternal>);
 
 impl Session {
-    pub fn connect(
+    pub async fn connect(
         config: SessionConfig,
         credentials: Credentials,
         cache: Option<Cache>,
-        handle: Handle,
-    ) -> Box<dyn Future<Item = Session, Error = AuthenticationError>> {
-        let access_point =
-            apresolve_or_fallback::<io::Error>(&handle, &config.proxy, &config.ap_port);
+    ) -> Result<Session, SessionError> {
+        let ap = apresolve(config.proxy.as_ref(), config.ap_port).await;
 
-        let handle_ = handle.clone();
-        let proxy = config.proxy.clone();
-        let connection = access_point
-            .and_then(move |addr| {
-                info!("Connecting to AP \"{}\"", addr);
-                connection::connect(addr, &handle_, &proxy)
-            })
-            .map_err(|io_err| io_err.into());
+        info!("Connecting to AP \"{}\"", ap);
+        let mut conn = connection::connect(ap, config.proxy.as_ref()).await?;
 
-        let device_id = config.device_id.clone();
-        let authentication = connection.and_then(move |connection| {
-            connection::authenticate(connection, credentials, device_id)
-        });
+        let reusable_credentials =
+            connection::authenticate(&mut conn, credentials, &config.device_id).await?;
+        info!("Authenticated as \"{}\" !", reusable_credentials.username);
+        if let Some(cache) = &cache {
+            cache.save_credentials(&reusable_credentials);
+        }
 
-        let result = authentication.map(move |(transport, reusable_credentials)| {
-            info!("Authenticated as \"{}\" !", reusable_credentials.username);
-            if let Some(ref cache) = cache {
-                cache.save_credentials(&reusable_credentials);
-            }
+        let session = Session::create(
+            conn,
+            config,
+            cache,
+            reusable_credentials.username,
+            tokio::runtime::Handle::current(),
+        );
 
-            let (session, task) = Session::create(
-                &handle,
-                transport,
-                config,
-                cache,
-                reusable_credentials.username.clone(),
-            );
-
-            handle.spawn(task.map_err(|e| {
-                error!("{:?}", e);
-            }));
-
-            session
-        });
-
-        Box::new(result)
+        Ok(session)
     }
 
     fn create(
-        handle: &Handle,
         transport: connection::Transport,
         config: SessionConfig,
         cache: Option<Cache>,
         username: String,
-    ) -> (Session, Box<dyn Future<Item = (), Error = io::Error>>) {
+        handle: tokio::runtime::Handle,
+    ) -> Session {
         let (sink, stream) = transport.split();
 
-        let (sender_tx, sender_rx) = mpsc::unbounded();
+        let (sender_tx, sender_rx) = mpsc::unbounded_channel();
         let session_id = SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         debug!("new Session[{}]", session_id);
 
         let session = Session(Arc::new(SessionInternal {
-            config: config,
+            config,
             data: RwLock::new(SessionData {
                 country: String::new(),
                 canonical_username: username,
                 invalid: false,
                 time_delta: 0,
             }),
-
             tx_connection: sender_tx,
-
             cache: cache.map(Arc::new),
-
-            audio_key: Lazy::new(),
-            channel: Lazy::new(),
-            mercury: Lazy::new(),
-
-            handle: handle.remote().clone(),
-
-            session_id: session_id,
+            audio_key: OnceCell::new(),
+            channel: OnceCell::new(),
+            mercury: OnceCell::new(),
+            handle,
+            session_id,
         }));
 
-        let sender_task = sender_rx
-            .map_err(|e| -> io::Error { panic!(e) })
-            .forward(sink)
-            .map(|_| ());
+        let sender_task = UnboundedReceiverStream::new(sender_rx)
+            .map(Ok)
+            .forward(sink);
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task = Box::new(
-            (receiver_task, sender_task)
-                .into_future()
-                .map(|((), ())| ()),
-        );
+        tokio::spawn(async move {
+            let result = future::try_join(sender_task, receiver_task).await;
 
-        (session, task)
+            if let Err(e) = result {
+                error!("{}", e);
+            }
+        });
+
+        session
     }
 
     pub fn audio_key(&self) -> &AudioKeyManager {
-        self.0.audio_key.get(|| AudioKeyManager::new(self.weak()))
+        self.0
+            .audio_key
+            .get_or_init(|| AudioKeyManager::new(self.weak()))
     }
 
     pub fn channel(&self) -> &ChannelManager {
-        self.0.channel.get(|| ChannelManager::new(self.weak()))
+        self.0
+            .channel
+            .get_or_init(|| ChannelManager::new(self.weak()))
     }
 
     pub fn mercury(&self) -> &MercuryManager {
-        self.0.mercury.get(|| MercuryManager::new(self.weak()))
+        self.0
+            .mercury
+            .get_or_init(|| MercuryManager::new(self.weak()))
     }
 
     pub fn time_delta(&self) -> i64 {
         self.0.data.read().unwrap().time_delta
     }
 
-    pub fn spawn<F, R>(&self, f: F)
+    pub fn spawn<T>(&self, task: T)
     where
-        F: FnOnce(&Handle) -> R + Send + 'static,
-        R: IntoFuture<Item = (), Error = ()>,
-        R::Future: 'static,
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
     {
-        self.0.handle.spawn(f)
+        self.0.handle.spawn(task);
     }
 
     fn debug_info(&self) {
@@ -182,7 +176,7 @@ impl Session {
         );
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
+    #[allow(clippy::match_same_arms)]
     fn dispatch(&self, cmd: u8, data: Bytes) {
         match cmd {
             0x4 => {
@@ -213,7 +207,7 @@ impl Session {
     }
 
     pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
-        self.0.tx_connection.unbounded_send((cmd, data)).unwrap();
+        self.0.tx_connection.send((cmd, data)).unwrap();
     }
 
     pub fn cache(&self) -> Option<&Arc<Cache>> {
@@ -277,35 +271,34 @@ impl Drop for SessionInternal {
 
 struct DispatchTask<S>(S, SessionWeak)
 where
-    S: Stream<Item = (u8, Bytes)>;
+    S: TryStream<Ok = (u8, Bytes)> + Unpin;
 
 impl<S> Future for DispatchTask<S>
 where
-    S: Stream<Item = (u8, Bytes)>,
-    <S as Stream>::Error: ::std::fmt::Debug,
+    S: TryStream<Ok = (u8, Bytes)> + Unpin,
+    <S as TryStream>::Ok: std::fmt::Debug,
 {
-    type Item = ();
-    type Error = S::Error;
+    type Output = Result<(), S::Error>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let session = match self.1.try_upgrade() {
             Some(session) => session,
-            None => return Ok(Async::Ready(())),
+            None => return Poll::Ready(Ok(())),
         };
 
         loop {
-            let (cmd, data) = match self.0.poll() {
-                Ok(Async::Ready(Some(t))) => t,
-                Ok(Async::Ready(None)) => {
+            let (cmd, data) = match self.0.try_poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok(t))) => t,
+                Poll::Ready(None) => {
                     warn!("Connection to server closed.");
                     session.shutdown();
-                    return Ok(Async::Ready(()));
+                    return Poll::Ready(Ok(()));
                 }
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
-                Err(e) => {
+                Poll::Ready(Some(Err(e))) => {
                     session.shutdown();
-                    return Err(From::from(e));
+                    return Poll::Ready(Err(e));
                 }
+                Poll::Pending => return Poll::Pending,
             };
 
             session.dispatch(cmd, data);
@@ -315,7 +308,7 @@ where
 
 impl<S> Drop for DispatchTask<S>
 where
-    S: Stream<Item = (u8, Bytes)>,
+    S: TryStream<Ok = (u8, Bytes)> + Unpin,
 {
     fn drop(&mut self) {
         debug!("drop Dispatch");

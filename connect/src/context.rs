@@ -1,7 +1,7 @@
+use crate::core::spotify_id::SpotifyId;
 use crate::protocol::spirc::TrackRef;
-use librespot_core::spotify_id::SpotifyId;
 
-use serde;
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct StationContext {

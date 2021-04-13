@@ -1,4 +1,3 @@
-use futures::{Async, AsyncSink, Future, Poll, Sink, StartSend};
 use std::collections::VecDeque;
 
 use super::*;
@@ -13,10 +12,26 @@ impl MercurySender {
     // TODO: pub(super) when stable
     pub(crate) fn new(mercury: MercuryManager, uri: String) -> MercurySender {
         MercurySender {
-            mercury: mercury,
-            uri: uri,
+            mercury,
+            uri,
             pending: VecDeque::new(),
         }
+    }
+
+    pub fn is_flushed(&self) -> bool {
+        self.pending.is_empty()
+    }
+
+    pub fn send(&mut self, item: Vec<u8>) {
+        let task = self.mercury.send(self.uri.clone(), item);
+        self.pending.push_back(task);
+    }
+
+    pub async fn flush(&mut self) -> Result<(), MercuryError> {
+        for fut in self.pending.drain(..) {
+            fut.await?;
+        }
+        Ok(())
     }
 }
 
@@ -26,31 +41,6 @@ impl Clone for MercurySender {
             mercury: self.mercury.clone(),
             uri: self.uri.clone(),
             pending: VecDeque::new(),
-        }
-    }
-}
-
-impl Sink for MercurySender {
-    type SinkItem = Vec<u8>;
-    type SinkError = MercuryError;
-
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let task = self.mercury.send(self.uri.clone(), item);
-        self.pending.push_back(task);
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        loop {
-            match self.pending.front_mut() {
-                Some(task) => {
-                    try_ready!(task.poll());
-                }
-                None => {
-                    return Ok(Async::Ready(()));
-                }
-            }
-            self.pending.pop_front();
         }
     }
 }

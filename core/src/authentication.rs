@@ -1,14 +1,16 @@
+use std::io::{self, Read};
+
 use aes::Aes192;
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
 use protobuf::ProtobufEnum;
+use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
-use std::io::{self, Read};
 
 use crate::protocol::authentication::AuthenticationType;
-use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 
+/// The credentials are used to log into the Spotify API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Credentials {
     pub username: String,
@@ -24,11 +26,19 @@ pub struct Credentials {
 }
 
 impl Credentials {
-    pub fn with_password(username: String, password: String) -> Credentials {
+    /// Intialize these credentials from a username and a password.
+    ///
+    /// ### Example
+    /// ```rust
+    /// use librespot_core::authentication::Credentials;
+    ///
+    /// let creds = Credentials::with_password("my account", "my password");
+    /// ```
+    pub fn with_password(username: impl Into<String>, password: impl Into<String>) -> Credentials {
         Credentials {
-            username: username,
+            username: username.into(),
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
-            auth_data: password.into_bytes(),
+            auth_data: password.into().into_bytes(),
         }
     }
 
@@ -102,9 +112,9 @@ impl Credentials {
         let auth_data = read_bytes(&mut cursor).unwrap();
 
         Credentials {
-            username: username,
-            auth_type: auth_type,
-            auth_data: auth_data,
+            username,
+            auth_type,
+            auth_data,
         }
     }
 }
@@ -140,62 +150,4 @@ where
 {
     let v: String = serde::Deserialize::deserialize(de)?;
     base64::decode(&v).map_err(|e| serde::de::Error::custom(e.to_string()))
-}
-
-pub fn get_credentials<F: FnOnce(&String) -> String>(
-    username: Option<String>,
-    password: Option<String>,
-    cached_credentials: Option<Credentials>,
-    prompt: F,
-) -> Option<Credentials> {
-    match (username, password, cached_credentials) {
-        (Some(username), Some(password), _) => Some(Credentials::with_password(username, password)),
-
-        (Some(ref username), _, Some(ref credentials)) if *username == credentials.username => {
-            Some(credentials.clone())
-        }
-
-        (Some(username), None, _) => Some(Credentials::with_password(
-            username.clone(),
-            prompt(&username),
-        )),
-
-        (None, _, Some(credentials)) => Some(credentials),
-
-        (None, _, None) => None,
-    }
-}
-
-error_chain! {
-    types {
-        AuthenticationError, AuthenticationErrorKind, AuthenticationResultExt, AuthenticationResult;
-    }
-
-    foreign_links {
-        Io(::std::io::Error);
-    }
-
-    errors {
-        BadCredentials {
-            description("Bad credentials")
-            display("Authentication failed with error: Bad credentials")
-        }
-        PremiumAccountRequired {
-            description("Premium account required")
-            display("Authentication failed with error: Premium account required")
-        }
-    }
-}
-
-impl From<APLoginFailed> for AuthenticationError {
-    fn from(login_failure: APLoginFailed) -> Self {
-        let error_code = login_failure.get_error_code();
-        match error_code {
-            ErrorCode::BadCredentials => Self::from_kind(AuthenticationErrorKind::BadCredentials),
-            ErrorCode::PremiumAccountRequired => {
-                Self::from_kind(AuthenticationErrorKind::PremiumAccountRequired)
-            }
-            _ => format!("Authentication failed with error: {:?}", error_code).into(),
-        }
-    }
 }

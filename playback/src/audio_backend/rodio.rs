@@ -1,211 +1,209 @@
-use super::{Open, Sink};
-extern crate cpal;
-extern crate rodio;
-use crate::audio::AudioPacket;
-use cpal::traits::{DeviceTrait, HostTrait};
 use std::process::exit;
 use std::{io, thread, time};
 
+use cpal::traits::{DeviceTrait, HostTrait};
+use thiserror::Error;
+
+use super::Sink;
+use crate::audio::{convert, AudioPacket};
+use crate::config::AudioFormat;
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
+
+#[cfg(all(
+    feature = "rodiojack-backend",
+    not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"))
+))]
+compile_error!("Rodio JACK backend is currently only supported on linux.");
+
+#[cfg(feature = "rodio-backend")]
+pub fn mk_rodio(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+    Box::new(open(cpal::default_host(), device, format))
+}
+
+#[cfg(feature = "rodiojack-backend")]
+pub fn mk_rodiojack(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+    Box::new(open(
+        cpal::host_from_id(cpal::HostId::Jack).unwrap(),
+        device,
+        format,
+    ))
+}
+
+#[derive(Debug, Error)]
+pub enum RodioError {
+    #[error("Rodio: no device available")]
+    NoDeviceAvailable,
+    #[error("Rodio: device \"{0}\" is not available")]
+    DeviceNotAvailable(String),
+    #[error("Rodio play error: {0}")]
+    PlayError(#[from] rodio::PlayError),
+    #[error("Rodio stream error: {0}")]
+    StreamError(#[from] rodio::StreamError),
+    #[error("Cannot get audio devices: {0}")]
+    DevicesError(#[from] cpal::DevicesError),
+}
+
 pub struct RodioSink {
     rodio_sink: rodio::Sink,
-    // We have to keep hold of this object, or the Sink can't play...
-    #[allow(dead_code)]
-    stream: rodio::OutputStream,
+    format: AudioFormat,
+    _stream: rodio::OutputStream,
 }
 
-#[cfg(all(
-    feature = "rodiojack-backend",
-    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
-))]
-pub struct JackRodioSink {
-    jackrodio_sink: rodio::Sink,
-    // We have to keep hold of this object, or the Sink can't play...
-    #[allow(dead_code)]
-    stream: rodio::OutputStream,
-}
-
-fn list_formats(ref device: &rodio::Device) {
-    let default_fmt = match device.default_output_config() {
-        Ok(fmt) => cpal::SupportedStreamConfig::from(fmt),
-        Err(e) => {
-            warn!("Error getting default rodio::Sink config: {}", e);
-            return;
+fn list_formats(device: &rodio::Device) {
+    match device.default_output_config() {
+        Ok(cfg) => {
+            debug!("  Default config:");
+            debug!("    {:?}", cfg);
         }
-    };
-    debug!("  Default config:");
-    debug!("    {:?}", default_fmt);
-
-    let mut output_configs = match device.supported_output_configs() {
-        Ok(f) => f.peekable(),
         Err(e) => {
-            warn!("Error getting supported rodio::Sink configs: {}", e);
-            return;
+            // Use loglevel debug, since even the output is only debug
+            debug!("Error getting default rodio::Sink config: {}", e);
         }
     };
 
-    if output_configs.peek().is_some() {
-        debug!("  Available configs:");
-        for format in output_configs {
-            debug!("    {:?}", format);
-        }
-    }
-}
-
-fn list_outputs(ref host: &cpal::Host) {
-    let default_device = get_default_device(host);
-    let default_device_name = default_device.name().expect("cannot get output name");
-    println!("Default Audio Device:\n  {}", default_device_name);
-    list_formats(&default_device);
-
-    println!("Other Available Audio Devices:");
-
-    let found_devices = host.output_devices().expect(&format!(
-        "Cannot get list of output devices of Host: {:?}",
-        host.id()
-    ));
-    for device in found_devices {
-        let device_name = device.name().expect("cannot get output name");
-        if device_name != default_device_name {
-            println!("  {}", device_name);
-            list_formats(&device);
-        }
-    }
-}
-
-fn get_default_device(ref host: &cpal::Host) -> rodio::Device {
-    host.default_output_device()
-        .expect("no default output device available")
-}
-
-fn match_device(ref host: &cpal::Host, device: Option<String>) -> rodio::Device {
-    match device {
-        Some(device_name) => {
-            if device_name == "?".to_string() {
-                list_outputs(host);
-                exit(0)
+    match device.supported_output_configs() {
+        Ok(mut cfgs) => {
+            if let Some(first) = cfgs.next() {
+                debug!("  Available configs:");
+                debug!("    {:?}", first);
+            } else {
+                return;
             }
 
-            let found_devices = host.output_devices().expect(&format!(
-                "Cannot get list of output devices of Host: {:?}",
-                host.id()
-            ));
-            for d in found_devices {
-                if d.name().expect("cannot get output name") == device_name {
-                    return d;
+            for cfg in cfgs {
+                debug!("    {:?}", cfg);
+            }
+        }
+        Err(e) => {
+            debug!("Error getting supported rodio::Sink configs: {}", e);
+        }
+    }
+}
+
+fn list_outputs(host: &cpal::Host) -> Result<(), cpal::DevicesError> {
+    let mut default_device_name = None;
+
+    if let Some(default_device) = host.default_output_device() {
+        default_device_name = default_device.name().ok();
+        println!(
+            "Default Audio Device:\n  {}",
+            default_device_name.as_deref().unwrap_or("[unknown name]")
+        );
+
+        list_formats(&default_device);
+
+        println!("Other Available Audio Devices:");
+    } else {
+        warn!("No default device was found");
+    }
+
+    for device in host.output_devices()? {
+        match device.name() {
+            Ok(name) if Some(&name) == default_device_name.as_ref() => (),
+            Ok(name) => {
+                println!("  {}", name);
+                list_formats(&device);
+            }
+            Err(e) => {
+                warn!("Cannot get device name: {}", e);
+                println!("   [unknown name]");
+                list_formats(&device);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn create_sink(
+    host: &cpal::Host,
+    device: Option<String>,
+) -> Result<(rodio::Sink, rodio::OutputStream), RodioError> {
+    let rodio_device = match device {
+        Some(ask) if &ask == "?" => {
+            let exit_code = match list_outputs(host) {
+                Ok(()) => 0,
+                Err(e) => {
+                    error!("{}", e);
+                    1
                 }
-            }
-            println!("No output sink matching '{}' found.", device_name);
-            exit(0)
+            };
+            exit(exit_code)
         }
-        None => return get_default_device(host),
-    }
+        Some(device_name) => {
+            host.output_devices()?
+                .find(|d| d.name().ok().map_or(false, |name| name == device_name)) // Ignore devices for which getting name fails
+                .ok_or(RodioError::DeviceNotAvailable(device_name))?
+        }
+        None => host
+            .default_output_device()
+            .ok_or(RodioError::NoDeviceAvailable)?,
+    };
+
+    let name = rodio_device.name().ok();
+    info!(
+        "Using audio device: {}",
+        name.as_deref().unwrap_or("[unknown name]")
+    );
+
+    let (stream, handle) = rodio::OutputStream::try_from_device(&rodio_device)?;
+    let sink = rodio::Sink::try_new(&handle)?;
+    Ok((sink, stream))
 }
 
-impl Open for RodioSink {
-    fn open(device: Option<String>) -> RodioSink {
-        let host = cpal::default_host();
-        debug!("Using rodio sink with cpal host: {:?}", host.id());
+pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> RodioSink {
+    debug!(
+        "Using rodio sink with format {:?} and cpal host: {}",
+        format,
+        host.id().name()
+    );
 
-        let rodio_device = match_device(&host, device);
-        debug!("Using cpal device");
-        let stream = rodio::OutputStream::try_from_device(&rodio_device)
-            .expect("Couldn't open output stream.");
-        debug!("Using rodio stream");
-        let sink = rodio::Sink::try_new(&stream.1).expect("Couldn't create output sink.");
-        debug!("Using rodio sink");
-
-        RodioSink {
-            rodio_sink: sink,
-            stream: stream.0,
+    match format {
+        AudioFormat::F32 => {
+            #[cfg(target_os = "linux")]
+            warn!("Rodio output to Alsa is known to cause garbled sound, consider using `--backend alsa`")
         }
+        AudioFormat::S16 => (),
+        _ => unimplemented!("Rodio currently only supports F32 and S16 formats"),
     }
-}
 
-#[cfg(all(
-    feature = "rodiojack-backend",
-    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
-))]
-impl Open for JackRodioSink {
-    fn open(device: Option<String>) -> JackRodioSink {
-        let host = cpal::host_from_id(
-            cpal::available_hosts()
-                .into_iter()
-                .find(|id| *id == cpal::HostId::Jack)
-                .expect("Jack Host not found"),
-        )
-        .expect("Jack Host not found");
-        debug!("Using jack rodio sink with cpal Jack host");
+    let (sink, stream) = create_sink(&host, device).unwrap();
 
-        let rodio_device = match_device(&host, device);
-        debug!("Using cpal device");
-        let stream = rodio::OutputStream::try_from_device(&rodio_device)
-            .expect("Couldn't open output stream.");
-        debug!("Using jack rodio stream");
-        let sink = rodio::Sink::try_new(&stream.1).expect("Couldn't create output sink.");
-        debug!("Using jack rodio sink");
-
-        JackRodioSink {
-            jackrodio_sink: sink,
-            stream: stream.0,
-        }
+    debug!("Rodio sink was created");
+    RodioSink {
+        rodio_sink: sink,
+        format,
+        _stream: stream,
     }
 }
 
 impl Sink for RodioSink {
-    fn start(&mut self) -> io::Result<()> {
-        // More similar to an "unpause" than "play". Doesn't undo "stop".
-        // self.rodio_sink.play();
-        Ok(())
-    }
-
-    fn stop(&mut self) -> io::Result<()> {
-        // This will immediately stop playback, but the sink is then unusable.
-        // We just have to let the current buffer play till the end.
-        // self.rodio_sink.stop();
-        Ok(())
-    }
+    start_stop_noop!();
 
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
-        let source = rodio::buffer::SamplesBuffer::new(2, 44100, packet.samples());
-        self.rodio_sink.append(source);
+        let samples = packet.samples();
+        match self.format {
+            AudioFormat::F32 => {
+                let source =
+                    rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples);
+                self.rodio_sink.append(source);
+            }
+            AudioFormat::S16 => {
+                let samples_s16: &[i16] = &convert::to_s16(samples);
+                let source = rodio::buffer::SamplesBuffer::new(
+                    NUM_CHANNELS as u16,
+                    SAMPLE_RATE,
+                    samples_s16,
+                );
+                self.rodio_sink.append(source);
+            }
+            _ => unreachable!(),
+        };
 
         // Chunk sizes seem to be about 256 to 3000 ish items long.
         // Assuming they're on average 1628 then a half second buffer is:
         // 44100 elements --> about 27 chunks
         while self.rodio_sink.len() > 26 {
-            // sleep and wait for rodio to drain a bit
-            thread::sleep(time::Duration::from_millis(10));
-        }
-        Ok(())
-    }
-}
-
-#[cfg(all(
-    feature = "rodiojack-backend",
-    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
-))]
-impl Sink for JackRodioSink {
-    fn start(&mut self) -> io::Result<()> {
-        // More similar to an "unpause" than "play". Doesn't undo "stop".
-        // self.rodio_sink.play();
-        Ok(())
-    }
-
-    fn stop(&mut self) -> io::Result<()> {
-        // This will immediately stop playback, but the sink is then unusable.
-        // We just have to let the current buffer play till the end.
-        // self.rodio_sink.stop();
-        Ok(())
-    }
-
-    fn write(&mut self, data: &[i16]) -> io::Result<()> {
-        let source = rodio::buffer::SamplesBuffer::new(2, 44100, data);
-        self.jackrodio_sink.append(source);
-
-        // Chunk sizes seem to be about 256 to 3000 ish items long.
-        // Assuming they're on average 1628 then a half second buffer is:
-        // 44100 elements --> about 27 chunks
-        while self.jackrodio_sink.len() > 26 {
             // sleep and wait for rodio to drain a bit
             thread::sleep(time::Duration::from_millis(10));
         }
