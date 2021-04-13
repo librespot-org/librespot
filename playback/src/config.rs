@@ -1,4 +1,4 @@
-use crate::audio::convert::i24;
+pub use crate::audio::convert::{i24, Requantizer};
 use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;

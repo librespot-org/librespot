@@ -1,6 +1,6 @@
 use super::{Open, Sink, SinkAsBytes};
 use crate::audio::AudioPacket;
-use crate::config::AudioFormat;
+use crate::config::{AudioFormat, Requantizer};
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use libpulse_binding::{self as pulse, stream::Direction};
 use libpulse_simple_binding::Simple;
@@ -14,10 +14,11 @@ pub struct PulseAudioSink {
     ss: pulse::sample::Spec,
     device: Option<String>,
     format: AudioFormat,
+    requantizer: Requantizer,
 }
 
 impl Open for PulseAudioSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
+    fn open(device: Option<String>, format: AudioFormat, requantizer: Requantizer) -> Self {
         info!("Using PulseAudio sink with format: {:?}", format);
 
         // PulseAudio calls S24 and S24_3 different from the rest of the world
@@ -41,6 +42,7 @@ impl Open for PulseAudioSink {
             ss,
             device,
             format,
+            requantizer,
         }
     }
 }

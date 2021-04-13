@@ -1,3 +1,5 @@
+use crate::dither::*;
+use crate::shape_noise::*;
 use zerocopy::AsBytes;
 
 #[derive(AsBytes, Copy, Clone, Debug)]
@@ -12,12 +14,30 @@ impl i24 {
     }
 }
 
-// Losslessly represent [-1.0, 1.0] to [$type::MIN, $type::MAX] while maintaining DC linearity.
+pub struct Requantizer {
+    ditherer: Box<dyn Ditherer>,
+    noise_shaper: Box<dyn NoiseShaper>,
+}
+
+impl Requantizer {
+    pub fn new(ditherer: Box<dyn Ditherer>, noise_shaper: Box<dyn NoiseShaper>) -> Self {
+        Self {
+            ditherer,
+            noise_shaper,
+        }
+    }
+
+    pub fn shaped_dither(&mut self, sample: f32) -> f32 {
+        let noise = self.ditherer.noise(sample);
+        self.noise_shaper.shape(sample, noise)
+    }
+}
+
 macro_rules! convert_samples_to {
-    ($type: ident, $samples: expr) => {
-        convert_samples_to!($type, $samples, 0)
+    ($type: ident, $samples: expr, $requantizer: expr) => {
+        convert_samples_to!($type, $samples, $requantizer, 0)
     };
-    ($type: ident, $samples: expr, $drop_bits: expr) => {
+    ($type: ident, $samples: expr, $requantizer: expr, $drop_bits: expr) => {
         $samples
             .iter()
             .map(|sample| {
@@ -25,32 +45,37 @@ macro_rules! convert_samples_to {
                 // while maintaining DC linearity. There is nothing to be gained
                 // by doing this in f64, as the significand of a f32 is 24 bits,
                 // just like the maximum bit depth we are converting to.
-                let int_value = *sample * (std::$type::MAX as f32 + 0.5) - 0.5;
+                let mut int_value = *sample * (std::$type::MAX as f32 + 0.5) - 0.5;
+                int_value = $requantizer.shaped_dither(int_value);
 
-                // Casting floats to ints truncates by default, which results
-                // in larger quantization error than rounding arithmetically.
-                // Flooring is faster, but again with larger error.
-                int_value.round() as $type >> $drop_bits
+                // https://doc.rust-lang.org/nomicon/casts.html:
+                // casting float to integer rounds towards zero, then saturates.
+                // ideally ties round to even, but since it is extremely
+                // unlikely that a float has *exactly* .5 as fraction, this
+                // should be more than precise enough
+                int_value as $type >> $drop_bits
             })
             .collect()
     };
 }
 
-pub fn to_s32(samples: &[f32]) -> Vec<i32> {
-    convert_samples_to!(i32, samples)
+pub fn to_s32(samples: &[f32], requantizer: &mut Requantizer) -> Vec<i32> {
+    convert_samples_to!(i32, samples, requantizer)
 }
 
-pub fn to_s24(samples: &[f32]) -> Vec<i32> {
-    convert_samples_to!(i32, samples, 8)
+// S24 is 24-bit PCM packed in an upper 32-bit word
+pub fn to_s24(samples: &[f32], requantizer: &mut Requantizer) -> Vec<i32> {
+    convert_samples_to!(i32, samples, requantizer, 8)
 }
 
-pub fn to_s24_3(samples: &[f32]) -> Vec<i24> {
-    to_s32(samples)
+pub fn to_s24_3(samples: &[f32], requantizer: &mut Requantizer) -> Vec<i24> {
+    // TODO - can we improve performance by passing this as a closure?
+    to_s32(samples, requantizer)
         .iter()
         .map(|sample| i24::pcm_from_i32(*sample))
         .collect()
 }
 
-pub fn to_s16(samples: &[f32]) -> Vec<i16> {
-    convert_samples_to!(i16, samples)
+pub fn to_s16(samples: &[f32], requantizer: &mut Requantizer) -> Vec<i16> {
+    convert_samples_to!(i16, samples, requantizer)
 }

@@ -1,5 +1,5 @@
 use super::{Open, Sink};
-use crate::audio::{convert, AudioPacket};
+use crate::audio::{convert, AudioPacket, Requantizer};
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
@@ -12,14 +12,17 @@ pub enum PortAudioSink<'a> {
     F32(
         Option<portaudio_rs::stream::Stream<'a, f32, f32>>,
         StreamParameters<f32>,
+        Requantizer,
     ),
     S32(
         Option<portaudio_rs::stream::Stream<'a, i32, i32>>,
         StreamParameters<i32>,
+        Requantizer,
     ),
     S16(
         Option<portaudio_rs::stream::Stream<'a, i16, i16>>,
         StreamParameters<i16>,
+        Requantizer,
     ),
 }
 
@@ -51,7 +54,7 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 }
 
 impl<'a> Open for PortAudioSink<'a> {
-    fn open(device: Option<String>, format: AudioFormat) -> PortAudioSink<'a> {
+    fn open(device: Option<String>, format: AudioFormat, requantizer: Requantizer) -> PortAudioSink<'a> {
         info!("Using PortAudio sink with format: {:?}", format);
 
         warn!("This backend is known to panic on several platforms.");
@@ -83,7 +86,7 @@ impl<'a> Open for PortAudioSink<'a> {
                     suggested_latency: latency,
                     data: 0.0 as $type,
                 };
-                $sink(None, params)
+                $sink(None, params, requantizer)
             }};
         }
         match format {
@@ -119,9 +122,9 @@ impl<'a> Sink for PortAudioSink<'a> {
         }
 
         match self {
-            Self::F32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
-            Self::S32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
-            Self::S16(stream, parameters) => start_sink!(ref mut stream, ref parameters),
+            Self::F32(stream, parameters, _) => start_sink!(ref mut stream, ref parameters),
+            Self::S32(stream, parameters, _) => start_sink!(ref mut stream, ref parameters),
+            Self::S16(stream, parameters, _) => start_sink!(ref mut stream, ref parameters),
         };
 
         Ok(())
@@ -135,9 +138,9 @@ impl<'a> Sink for PortAudioSink<'a> {
             }};
         }
         match self {
-            Self::F32(stream, _parameters) => stop_sink!(ref mut stream),
-            Self::S32(stream, _parameters) => stop_sink!(ref mut stream),
-            Self::S16(stream, _parameters) => stop_sink!(ref mut stream),
+            Self::F32(stream, _, _) => stop_sink!(ref mut stream),
+            Self::S32(stream, _, _) => stop_sink!(ref mut stream),
+            Self::S16(stream, _, _) => stop_sink!(ref mut stream),
         };
 
         Ok(())
@@ -152,15 +155,15 @@ impl<'a> Sink for PortAudioSink<'a> {
 
         let samples = packet.samples();
         let result = match self {
-            Self::F32(stream, _parameters) => {
+            Self::F32(stream, _parameters, _) => {
                 write_sink!(ref mut stream, samples)
             }
-            Self::S32(stream, _parameters) => {
-                let samples_s32: &[i32] = &convert::to_s32(samples);
+            Self::S32(stream, _parameters, ref mut requantizer) => {
+                let samples_s32: &[i32] = &convert::to_s32(samples, requantizer);
                 write_sink!(ref mut stream, samples_s32)
             }
-            Self::S16(stream, _parameters) => {
-                let samples_s16: &[i16] = &convert::to_s16(samples);
+            Self::S16(stream, _parameters, ref mut requantizer) => {
+                let samples_s16: &[i16] = &convert::to_s16(samples, requantizer);
                 write_sink!(ref mut stream, samples_s16)
             }
         };

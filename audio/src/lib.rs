@@ -5,7 +5,9 @@ extern crate log;
 
 pub mod convert;
 mod decrypt;
+pub mod dither;
 mod fetch;
+pub mod shape_noise;
 
 use cfg_if::cfg_if;
 
@@ -24,12 +26,15 @@ pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
 
 mod range_set;
 
+pub use convert::Requantizer;
 pub use decrypt::AudioDecrypt;
+pub use dither::{find_ditherer, Ditherer};
 pub use fetch::{AudioFile, StreamLoaderController};
 pub use fetch::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
 };
+pub use shape_noise::{find_noise_shaper, NoiseShaper};
 use std::fmt;
 
 pub enum AudioPacket {

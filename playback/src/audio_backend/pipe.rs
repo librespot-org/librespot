@@ -1,5 +1,5 @@
 use super::{Open, Sink, SinkAsBytes};
-use crate::audio::AudioPacket;
+use crate::audio::{AudioPacket, Requantizer};
 use crate::config::AudioFormat;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -7,10 +7,11 @@ use std::io::{self, Write};
 pub struct StdoutSink {
     output: Box<dyn Write>,
     format: AudioFormat,
+    requantizer: Requantizer,
 }
 
 impl Open for StdoutSink {
-    fn open(path: Option<String>, format: AudioFormat) -> Self {
+    fn open(path: Option<String>, format: AudioFormat, requantizer: Requantizer) -> Self {
         info!("Using pipe sink with format: {:?}", format);
 
         let output: Box<dyn Write> = match path {
@@ -18,7 +19,11 @@ impl Open for StdoutSink {
             _ => Box::new(io::stdout()),
         };
 
-        Self { output, format }
+        Self {
+            output,
+            format,
+            requantizer,
+        }
     }
 }
 

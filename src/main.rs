@@ -5,6 +5,11 @@ use sha1::{Digest, Sha1};
 use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
+use librespot::audio::convert::Requantizer;
+use librespot::audio::dither::{
+    self, mk_ditherer, Ditherer, HighPassDitherer, NoDithering, TriangularDitherer,
+};
+use librespot::audio::shape_noise::{self, mk_noise_shaper, NoShaping, NoiseShaper, Wannamaker9};
 use librespot::connect::spirc::Spirc;
 use librespot::core::authentication::Credentials;
 use librespot::core::cache::Cache;
@@ -108,10 +113,11 @@ fn print_version() {
     );
 }
 
-#[derive(Clone)]
 struct Setup {
     format: AudioFormat,
-    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink + 'static>,
+    ditherer: fn() -> Box<dyn Ditherer>,
+    noise_shaper: fn() -> Box<dyn NoiseShaper>,
+    backend: fn(Option<String>, AudioFormat, Requantizer) -> Box<dyn Sink + 'static>,
     device: Option<String>,
 
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
@@ -180,6 +186,18 @@ fn get_setup(args: &[String]) -> Setup {
             "format",
             "Output format (F32, S32, S24, S24_3 or S16). Defaults to S16",
             "FORMAT",
+        )
+        .optopt(
+            "",
+            "dither",
+            "Override the dither algorithm to use - [none, rect, sto, tri, hp, gauss].",
+            "DITHER",
+        )
+        .optopt(
+            "",
+            "shape-noise",
+            "Override the noise shaping algorithm to use - [none, fract, iew5, iew9, fw3, fw9, fw24].",
+            "SHAPE_NOISE",
         )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
@@ -324,9 +342,36 @@ fn get_setup(args: &[String]) -> Setup {
         .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
         .unwrap_or_default();
 
+    let ditherer_name = matches.opt_str("dither");
+    let noise_shaper_name = matches.opt_str("shape-noise");
+
+    if format == AudioFormat::F32 && (ditherer_name.is_some() || noise_shaper_name.is_some()) {
+        unimplemented!(
+            "Dithering and noise shaping is not implemented for format {:?}",
+            format
+        );
+    }
+
+    let ditherer = match ditherer_name {
+        Some(_) => dither::find_ditherer(ditherer_name).expect("Invalid ditherer"),
+        _ => match format {
+            AudioFormat::S24 | AudioFormat::S24_3 => mk_ditherer::<HighPassDitherer>,
+            AudioFormat::S16 => mk_ditherer::<TriangularDitherer>,
+            _ => mk_ditherer::<NoDithering>,
+        },
+    };
+
+    let noise_shaper = match noise_shaper_name {
+        Some(_) => shape_noise::find_noise_shaper(noise_shaper_name).expect("Invalid noise shaper"),
+        _ => match format {
+            AudioFormat::S16 => mk_noise_shaper::<Wannamaker9>,
+            _ => mk_noise_shaper::<NoShaping>,
+        },
+    };
+
     let device = matches.opt_str("device");
     if device == Some("?".into()) {
-        backend(device, format);
+        backend(device, format, Requantizer::new(ditherer(), noise_shaper()));
         exit(0);
     }
 
@@ -530,6 +575,8 @@ fn get_setup(args: &[String]) -> Setup {
 
     Setup {
         format,
+        ditherer,
+        noise_shaper,
         backend,
         cache,
         session_config,
@@ -622,11 +669,13 @@ async fn main() {
 
                     let audio_filter = mixer.get_audio_filter();
                     let format = setup.format;
+                    let ditherer = setup.ditherer;
+                    let noise_shaper = setup.noise_shaper;
                     let backend = setup.backend;
                     let device = setup.device.clone();
                     let (player, event_channel) =
                         Player::new(player_config, session.clone(), audio_filter, move || {
-                            (backend)(device, format)
+                            (backend)(device, format, Requantizer::new(ditherer(), noise_shaper()))
                         });
 
                     if setup.emit_sink_events {

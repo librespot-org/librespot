@@ -1,5 +1,5 @@
 use super::{Open, Sink, SinkAsBytes};
-use crate::audio::AudioPacket;
+use crate::audio::{AudioPacket, Requantizer};
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLES_PER_SECOND, SAMPLE_RATE};
 use alsa::device_name::HintIter;
@@ -18,6 +18,7 @@ pub struct AlsaSink {
     format: AudioFormat,
     device: String,
     buffer: Vec<u8>,
+    requantizer: Requantizer,
 }
 
 fn list_outputs() {
@@ -71,7 +72,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
 }
 
 impl Open for AlsaSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
+    fn open(device: Option<String>, format: AudioFormat, requantizer: Requantizer) -> Self {
         info!("Using Alsa sink with format: {:?}", format);
 
         let name = match device.as_ref().map(AsRef::as_ref) {
@@ -90,6 +91,7 @@ impl Open for AlsaSink {
             format,
             device: name,
             buffer: vec![],
+            requantizer,
         }
     }
 }

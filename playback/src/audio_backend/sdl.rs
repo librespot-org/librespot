@@ -1,18 +1,18 @@
 use super::{Open, Sink};
-use crate::audio::{convert, AudioPacket};
+use crate::audio::{convert, AudioPacket, Requantizer};
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use std::{io, thread, time};
 
 pub enum SdlSink {
-    F32(AudioQueue<f32>),
-    S32(AudioQueue<i32>),
-    S16(AudioQueue<i16>),
+    F32(AudioQueue<f32>, Requantizer),
+    S32(AudioQueue<i32>, Requantizer),
+    S16(AudioQueue<i16>, Requantizer),
 }
 
 impl Open for SdlSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
+    fn open(device: Option<String>, format: AudioFormat, requantizer: Requantizer) -> Self {
         info!("Using SDL sink with format: {:?}", format);
 
         if device.is_some() {
@@ -35,7 +35,7 @@ impl Open for SdlSink {
                 let queue: AudioQueue<$type> = audio
                     .open_queue(None, &desired_spec)
                     .expect("could not open SDL audio device");
-                $sink(queue)
+                $sink(queue, requantizer)
             }};
         }
         match format {
@@ -58,9 +58,9 @@ impl Sink for SdlSink {
             }};
         }
         match self {
-            Self::F32(queue) => start_sink!(queue),
-            Self::S32(queue) => start_sink!(queue),
-            Self::S16(queue) => start_sink!(queue),
+            Self::F32(queue, _) => start_sink!(queue),
+            Self::S32(queue, _) => start_sink!(queue),
+            Self::S16(queue, _) => start_sink!(queue),
         };
         Ok(())
     }
@@ -73,9 +73,9 @@ impl Sink for SdlSink {
             }};
         }
         match self {
-            Self::F32(queue) => stop_sink!(queue),
-            Self::S32(queue) => stop_sink!(queue),
-            Self::S16(queue) => stop_sink!(queue),
+            Self::F32(queue, _) => stop_sink!(queue),
+            Self::S32(queue, _) => stop_sink!(queue),
+            Self::S16(queue, _) => stop_sink!(queue),
         };
         Ok(())
     }
@@ -92,17 +92,17 @@ impl Sink for SdlSink {
 
         let samples = packet.samples();
         match self {
-            Self::F32(queue) => {
+            Self::F32(queue, _) => {
                 drain_sink!(queue, AudioFormat::F32.size());
                 queue.queue(samples)
             }
-            Self::S32(queue) => {
-                let samples_s32: &[i32] = &convert::to_s32(samples);
+            Self::S32(queue, ref mut requantizer) => {
+                let samples_s32: &[i32] = &convert::to_s32(samples, requantizer);
                 drain_sink!(queue, AudioFormat::S32.size());
                 queue.queue(samples_s32)
             }
-            Self::S16(queue) => {
-                let samples_s16: &[i16] = &convert::to_s16(samples);
+            Self::S16(queue, ref mut requantizer) => {
+                let samples_s16: &[i16] = &convert::to_s16(samples, requantizer);
                 drain_sink!(queue, AudioFormat::S16.size());
                 queue.queue(samples_s16)
             }

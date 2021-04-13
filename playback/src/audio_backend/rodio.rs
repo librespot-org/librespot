@@ -5,7 +5,7 @@ use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
 use super::Sink;
-use crate::audio::{convert, AudioPacket};
+use crate::audio::{convert, AudioPacket, Requantizer};
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 
@@ -16,16 +16,25 @@ use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 compile_error!("Rodio JACK backend is currently only supported on linux.");
 
 #[cfg(feature = "rodio-backend")]
-pub fn mk_rodio(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
-    Box::new(open(cpal::default_host(), device, format))
+pub fn mk_rodio(
+    device: Option<String>,
+    format: AudioFormat,
+    requantizer: Requantizer,
+) -> Box<dyn Sink> {
+    Box::new(open(cpal::default_host(), device, format, requantizer))
 }
 
 #[cfg(feature = "rodiojack-backend")]
-pub fn mk_rodiojack(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+pub fn mk_rodiojack(
+    device: Option<String>,
+    format: AudioFormat,
+    requantizer: Requantizer,
+) -> Box<dyn Sink> {
     Box::new(open(
         cpal::host_from_id(cpal::HostId::Jack).unwrap(),
         device,
         format,
+        requantizer,
     ))
 }
 
@@ -47,6 +56,7 @@ pub struct RodioSink {
     rodio_sink: rodio::Sink,
     format: AudioFormat,
     _stream: rodio::OutputStream,
+    requantizer: Requantizer,
 }
 
 fn list_formats(device: &rodio::Device) {
@@ -151,7 +161,12 @@ fn create_sink(
     Ok((sink, stream))
 }
 
-pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> RodioSink {
+pub fn open(
+    host: cpal::Host,
+    device: Option<String>,
+    format: AudioFormat,
+    requantizer: Requantizer,
+) -> RodioSink {
     debug!(
         "Using rodio sink with format {:?} and cpal host: {}",
         format,
@@ -173,6 +188,7 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
     RodioSink {
         rodio_sink: sink,
         format,
+        requantizer,
         _stream: stream,
     }
 }
@@ -189,7 +205,7 @@ impl Sink for RodioSink {
                 self.rodio_sink.append(source);
             }
             AudioFormat::S16 => {
-                let samples_s16: &[i16] = &convert::to_s16(samples);
+                let samples_s16: &[i16] = &convert::to_s16(samples, &mut self.requantizer);
                 let source = rodio::buffer::SamplesBuffer::new(
                     NUM_CHANNELS as u16,
                     SAMPLE_RATE,
