@@ -1,5 +1,8 @@
 use std::env;
 
+use librespot::audio::convert::Requantizer;
+use librespot::audio::dither::{self};
+use librespot::audio::shape_noise::{self};
 use librespot::core::authentication::Credentials;
 use librespot::core::config::SessionConfig;
 use librespot::core::session::Session;
@@ -24,6 +27,8 @@ async fn main() {
     let track = SpotifyId::from_base62(&args[3]).unwrap();
 
     let backend = audio_backend::find(None).unwrap();
+    let ditherer = dither::find_ditherer(None).unwrap();
+    let noise_shaper = shape_noise::find_noise_shaper(None).unwrap();
 
     println!("Connecting ..");
     let session = Session::connect(session_config, credentials, None)
@@ -31,7 +36,11 @@ async fn main() {
         .unwrap();
 
     let (mut player, _) = Player::new(player_config, session, None, move || {
-        backend(None, audio_format)
+        backend(
+            None,
+            audio_format,
+            Requantizer::new(ditherer(), noise_shaper()),
+        )
     });
 
     player.load(track, true, 0);
