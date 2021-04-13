@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+* [librespot-audio] Removed `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `AudioError`, `AudioDecoder` and the `convert` module from `librespot_audio`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly.
+
 ## [0.2.0] - 2021-05-04
 
 ## [0.1.6] - 2021-02-22

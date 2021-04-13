@@ -1,6 +1,6 @@
 use super::{Open, Sink};
-use crate::audio::AudioPacket;
 use crate::config::AudioFormat;
+use crate::decoder::AudioPacket;
 use crate::player::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,

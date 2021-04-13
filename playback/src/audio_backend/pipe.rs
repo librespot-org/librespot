@@ -1,6 +1,6 @@
 use super::{Open, Sink, SinkAsBytes};
-use crate::audio::AudioPacket;
 use crate::config::AudioFormat;
+use crate::decoder::AudioPacket;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 

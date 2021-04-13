@@ -11,7 +11,6 @@ use futures_util::stream::futures_unordered::FuturesUnordered;
 use futures_util::{future, StreamExt, TryFutureExt};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::audio::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, VorbisDecoder};
 use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
 use crate::audio::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
@@ -22,6 +21,7 @@ use crate::config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfi
 use crate::core::session::Session;
 use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
+use crate::decoder::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, VorbisDecoder};
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
 
