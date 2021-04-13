@@ -36,24 +36,21 @@ macro_rules! convert_samples_to {
     };
 }
 
-pub struct SamplesConverter {}
-impl SamplesConverter {
-    pub fn to_s32(samples: &[f32]) -> Vec<i32> {
-        convert_samples_to!(i32, samples)
-    }
+pub fn to_s32(samples: &[f32]) -> Vec<i32> {
+    convert_samples_to!(i32, samples)
+}
 
-    pub fn to_s24(samples: &[f32]) -> Vec<i32> {
-        convert_samples_to!(i32, samples, 8)
-    }
+pub fn to_s24(samples: &[f32]) -> Vec<i32> {
+    convert_samples_to!(i32, samples, 8)
+}
 
-    pub fn to_s24_3(samples: &[f32]) -> Vec<i24> {
-        Self::to_s32(samples)
-            .iter()
-            .map(|sample| i24::pcm_from_i32(*sample))
-            .collect()
-    }
+pub fn to_s24_3(samples: &[f32]) -> Vec<i24> {
+    to_s32(samples)
+        .iter()
+        .map(|sample| i24::pcm_from_i32(*sample))
+        .collect()
+}
 
-    pub fn to_s16(samples: &[f32]) -> Vec<i16> {
-        convert_samples_to!(i16, samples)
-    }
+pub fn to_s16(samples: &[f32]) -> Vec<i16> {
+    convert_samples_to!(i16, samples)
 }

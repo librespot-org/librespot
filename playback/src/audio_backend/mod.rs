@@ -12,6 +12,8 @@ pub trait Sink {
     fn write(&mut self, packet: &AudioPacket) -> io::Result<()>;
 }
 
+pub type SinkBuilder = fn(Option<String>, AudioFormat) -> Box<dyn Sink>;
+
 pub trait SinkAsBytes {
     fn write_bytes(&mut self, data: &[u8]) -> io::Result<()>;
 }
@@ -24,25 +26,25 @@ fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat
 macro_rules! sink_as_bytes {
     () => {
         fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
-            use crate::audio::{i24, SamplesConverter};
+            use crate::audio::convert::{self, i24};
             use zerocopy::AsBytes;
             match packet {
                 AudioPacket::Samples(samples) => match self.format {
                     AudioFormat::F32 => self.write_bytes(samples.as_bytes()),
                     AudioFormat::S32 => {
-                        let samples_s32: &[i32] = &SamplesConverter::to_s32(samples);
+                        let samples_s32: &[i32] = &convert::to_s32(samples);
                         self.write_bytes(samples_s32.as_bytes())
                     }
                     AudioFormat::S24 => {
-                        let samples_s24: &[i32] = &SamplesConverter::to_s24(samples);
+                        let samples_s24: &[i32] = &convert::to_s24(samples);
                         self.write_bytes(samples_s24.as_bytes())
                     }
                     AudioFormat::S24_3 => {
-                        let samples_s24_3: &[i24] = &SamplesConverter::to_s24_3(samples);
+                        let samples_s24_3: &[i24] = &convert::to_s24_3(samples);
                         self.write_bytes(samples_s24_3.as_bytes())
                     }
                     AudioFormat::S16 => {
-                        let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
+                        let samples_s16: &[i16] = &convert::to_s16(samples);
                         self.write_bytes(samples_s16.as_bytes())
                     }
                 },
@@ -83,18 +85,6 @@ mod jackaudio;
 #[cfg(feature = "jackaudio-backend")]
 use self::jackaudio::JackSink;
 
-#[cfg(all(
-    feature = "rodiojack-backend",
-    not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"))
-))]
-compile_error!("Rodio JACK backend is currently only supported on linux.");
-
-#[cfg(all(
-    feature = "rodiojack-backend",
-    any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
-))]
-use self::rodio::JackRodioSink;
-
 #[cfg(feature = "gstreamer-backend")]
 mod gstreamer;
 #[cfg(feature = "gstreamer-backend")]
@@ -102,8 +92,6 @@ use self::gstreamer::GstreamerSink;
 
 #[cfg(any(feature = "rodio-backend", feature = "rodiojack-backend"))]
 mod rodio;
-#[cfg(feature = "rodio-backend")]
-use self::rodio::RodioSink;
 
 #[cfg(feature = "sdl-backend")]
 mod sdl;
@@ -116,10 +104,7 @@ use self::pipe::StdoutSink;
 mod subprocess;
 use self::subprocess::SubprocessSink;
 
-pub const BACKENDS: &'static [(
-    &'static str,
-    fn(Option<String>, AudioFormat) -> Box<dyn Sink>,
-)] = &[
+pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
@@ -128,22 +113,19 @@ pub const BACKENDS: &'static [(
     ("pulseaudio", mk_sink::<PulseAudioSink>),
     #[cfg(feature = "jackaudio-backend")]
     ("jackaudio", mk_sink::<JackSink>),
-    #[cfg(all(
-        feature = "rodiojack-backend",
-        any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd")
-    ))]
-    ("rodiojack", mk_sink::<JackRodioSink>),
     #[cfg(feature = "gstreamer-backend")]
     ("gstreamer", mk_sink::<GstreamerSink>),
     #[cfg(feature = "rodio-backend")]
-    ("rodio", mk_sink::<RodioSink>),
+    ("rodio", rodio::mk_rodio),
+    #[cfg(feature = "rodiojack-backend")]
+    ("rodiojack", rodio::mk_rodiojack),
     #[cfg(feature = "sdl-backend")]
     ("sdl", mk_sink::<SdlSink>),
     ("pipe", mk_sink::<StdoutSink>),
     ("subprocess", mk_sink::<SubprocessSink>),
 ];
 
-pub fn find(name: Option<String>) -> Option<fn(Option<String>, AudioFormat) -> Box<dyn Sink>> {
+pub fn find(name: Option<String>) -> Option<SinkBuilder> {
     if let Some(name) = name {
         BACKENDS
             .iter()

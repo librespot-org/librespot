@@ -2,6 +2,7 @@ use super::{Open, Sink, SinkAsBytes};
 use crate::audio::AudioPacket;
 use crate::config::AudioFormat;
 use shell_words::split;
+
 use std::io::{self, Write};
 use std::process::{Child, Command, Stdio};
 
@@ -17,9 +18,9 @@ impl Open for SubprocessSink {
 
         if let Some(shell_command) = shell_command {
             SubprocessSink {
-                shell_command: shell_command,
+                shell_command,
                 child: None,
-                format: format,
+                format,
             }
         } else {
             panic!("subprocess sink requires specifying a shell command");

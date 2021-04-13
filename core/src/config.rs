@@ -1,9 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
 use url::Url;
-use uuid::Uuid;
-
-use crate::version;
 
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
@@ -15,10 +12,10 @@ pub struct SessionConfig {
 
 impl Default for SessionConfig {
     fn default() -> SessionConfig {
-        let device_id = Uuid::new_v4().to_hyphenated().to_string();
+        let device_id = uuid::Uuid::new_v4().to_hyphenated().to_string();
         SessionConfig {
-            user_agent: version::VERSION_STRING.to_string(),
-            device_id: device_id,
+            user_agent: crate::version::VERSION_STRING.to_string(),
+            device_id,
             proxy: None,
             ap_port: None,
         }
@@ -32,9 +29,9 @@ pub enum DeviceType {
     Tablet = 2,
     Smartphone = 3,
     Speaker = 4,
-    TV = 5,
-    AVR = 6,
-    STB = 7,
+    Tv = 5,
+    Avr = 6,
+    Stb = 7,
     AudioDongle = 8,
     GameConsole = 9,
     CastAudio = 10,
@@ -57,9 +54,9 @@ impl FromStr for DeviceType {
             "tablet" => Ok(Tablet),
             "smartphone" => Ok(Smartphone),
             "speaker" => Ok(Speaker),
-            "tv" => Ok(TV),
-            "avr" => Ok(AVR),
-            "stb" => Ok(STB),
+            "tv" => Ok(Tv),
+            "avr" => Ok(Avr),
+            "stb" => Ok(Stb),
             "audiodongle" => Ok(AudioDongle),
             "gameconsole" => Ok(GameConsole),
             "castaudio" => Ok(CastAudio),
@@ -83,9 +80,9 @@ impl fmt::Display for DeviceType {
             Tablet => f.write_str("Tablet"),
             Smartphone => f.write_str("Smartphone"),
             Speaker => f.write_str("Speaker"),
-            TV => f.write_str("TV"),
-            AVR => f.write_str("AVR"),
-            STB => f.write_str("STB"),
+            Tv => f.write_str("TV"),
+            Avr => f.write_str("AVR"),
+            Stb => f.write_str("STB"),
             AudioDongle => f.write_str("AudioDongle"),
             GameConsole => f.write_str("GameConsole"),
             CastAudio => f.write_str("CastAudio"),

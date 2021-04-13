@@ -1,23 +1,19 @@
+#![allow(clippy::unused_io_amount)]
+
 #[macro_use]
 extern crate log;
 
-extern crate byteorder;
-extern crate futures;
-extern crate linear_map;
-extern crate protobuf;
-
-extern crate librespot_core;
-extern crate librespot_protocol as protocol;
+#[macro_use]
+extern crate async_trait;
 
 pub mod cover;
 
-use futures::future;
-use futures::Future;
-use linear_map::LinearMap;
+use std::collections::HashMap;
 
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId};
+use librespot_protocol as protocol;
 
 pub use crate::protocol::metadata::AudioFile_Format as FileFormat;
 
@@ -61,7 +57,7 @@ where
 pub struct AudioItem {
     pub id: SpotifyId,
     pub uri: String,
-    pub files: LinearMap<FileFormat, FileId>,
+    pub files: HashMap<FileFormat, FileId>,
     pub name: String,
     pub duration: i32,
     pub available: bool,
@@ -69,81 +65,67 @@ pub struct AudioItem {
 }
 
 impl AudioItem {
-    pub fn get_audio_item(
-        session: &Session,
-        id: SpotifyId,
-    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
+    pub async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<Self, MercuryError> {
         match id.audio_type {
-            SpotifyAudioType::Track => Track::get_audio_item(session, id),
-            SpotifyAudioType::Podcast => Episode::get_audio_item(session, id),
-            SpotifyAudioType::NonPlayable => {
-                Box::new(future::err::<AudioItem, MercuryError>(MercuryError))
-            }
+            SpotifyAudioType::Track => Track::get_audio_item(session, id).await,
+            SpotifyAudioType::Podcast => Episode::get_audio_item(session, id).await,
+            SpotifyAudioType::NonPlayable => Err(MercuryError),
         }
     }
 }
 
+#[async_trait]
 trait AudioFiles {
-    fn get_audio_item(
-        session: &Session,
-        id: SpotifyId,
-    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>>;
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError>;
 }
 
+#[async_trait]
 impl AudioFiles for Track {
-    fn get_audio_item(
-        session: &Session,
-        id: SpotifyId,
-    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
-        Box::new(Self::get(session, id).and_then(move |item| {
-            Ok(AudioItem {
-                id: id,
-                uri: format!("spotify:track:{}", id.to_base62()),
-                files: item.files,
-                name: item.name,
-                duration: item.duration,
-                available: item.available,
-                alternatives: Some(item.alternatives),
-            })
-        }))
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError> {
+        let item = Self::get(session, id).await?;
+        Ok(AudioItem {
+            id,
+            uri: format!("spotify:track:{}", id.to_base62()),
+            files: item.files,
+            name: item.name,
+            duration: item.duration,
+            available: item.available,
+            alternatives: Some(item.alternatives),
+        })
     }
 }
 
+#[async_trait]
 impl AudioFiles for Episode {
-    fn get_audio_item(
-        session: &Session,
-        id: SpotifyId,
-    ) -> Box<dyn Future<Item = AudioItem, Error = MercuryError>> {
-        Box::new(Self::get(session, id).and_then(move |item| {
-            Ok(AudioItem {
-                id: id,
-                uri: format!("spotify:episode:{}", id.to_base62()),
-                files: item.files,
-                name: item.name,
-                duration: item.duration,
-                available: item.available,
-                alternatives: None,
-            })
-        }))
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError> {
+        let item = Self::get(session, id).await?;
+
+        Ok(AudioItem {
+            id,
+            uri: format!("spotify:episode:{}", id.to_base62()),
+            files: item.files,
+            name: item.name,
+            duration: item.duration,
+            available: item.available,
+            alternatives: None,
+        })
     }
 }
+
+#[async_trait]
 pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::Message;
 
     fn request_url(id: SpotifyId) -> String;
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 
-    fn get(session: &Session, id: SpotifyId) -> Box<dyn Future<Item = Self, Error = MercuryError>> {
+    async fn get(session: &Session, id: SpotifyId) -> Result<Self, MercuryError> {
         let uri = Self::request_url(id);
-        let request = session.mercury().get(uri);
+        let response = session.mercury().get(uri).await?;
+        let data = response.payload.first().expect("Empty payload");
+        let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
 
-        let session = session.clone();
-        Box::new(request.and_then(move |response| {
-            let data = response.payload.first().expect("Empty payload");
-            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
-
-            Ok(Self::parse(&msg, &session))
-        }))
+        Ok(Self::parse(&msg, &session))
     }
 }
 
@@ -154,7 +136,7 @@ pub struct Track {
     pub duration: i32,
     pub album: SpotifyId,
     pub artists: Vec<SpotifyId>,
-    pub files: LinearMap<FileFormat, FileId>,
+    pub files: HashMap<FileFormat, FileId>,
     pub alternatives: Vec<SpotifyId>,
     pub available: bool,
 }
@@ -176,7 +158,7 @@ pub struct Episode {
     pub duration: i32,
     pub language: String,
     pub show: SpotifyId,
-    pub files: LinearMap<FileFormat, FileId>,
+    pub files: HashMap<FileFormat, FileId>,
     pub covers: Vec<FileId>,
     pub available: bool,
     pub explicit: bool,
@@ -239,8 +221,8 @@ impl Metadata for Track {
             name: msg.get_name().to_owned(),
             duration: msg.get_duration(),
             album: SpotifyId::from_raw(msg.get_album().get_gid()).unwrap(),
-            artists: artists,
-            files: files,
+            artists,
+            files,
             alternatives: msg
                 .get_alternative()
                 .iter()
@@ -289,9 +271,9 @@ impl Metadata for Album {
         Album {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
-            artists: artists,
-            tracks: tracks,
-            covers: covers,
+            artists,
+            tracks,
+            covers,
         }
     }
 }
@@ -309,7 +291,7 @@ impl Metadata for Playlist {
             .get_items()
             .iter()
             .map(|item| {
-                let uri_split = item.get_uri().split(":");
+                let uri_split = item.get_uri().split(':');
                 let uri_parts: Vec<&str> = uri_split.collect();
                 SpotifyId::from_base62(uri_parts[2]).unwrap()
             })
@@ -326,7 +308,7 @@ impl Metadata for Playlist {
         Playlist {
             revision: msg.get_revision().to_vec(),
             name: msg.get_attributes().get_name().to_owned(),
-            tracks: tracks,
+            tracks,
             user: msg.get_owner_username().to_string(),
         }
     }
@@ -359,7 +341,7 @@ impl Metadata for Artist {
         Artist {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
-            top_tracks: top_tracks,
+            top_tracks,
         }
     }
 }
@@ -405,8 +387,8 @@ impl Metadata for Episode {
             duration: msg.get_duration().to_owned(),
             language: msg.get_language().to_owned(),
             show: SpotifyId::from_raw(msg.get_show().get_gid()).unwrap(),
-            covers: covers,
-            files: files,
+            covers,
+            files,
             available: parse_restrictions(msg.get_restriction(), &country, "premium"),
             explicit: msg.get_explicit().to_owned(),
         }
@@ -444,8 +426,8 @@ impl Metadata for Show {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             publisher: msg.get_publisher().to_owned(),
-            episodes: episodes,
-            covers: covers,
+            episodes,
+            covers,
         }
     }
 }

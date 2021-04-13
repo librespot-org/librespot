@@ -87,7 +87,7 @@ impl Open for AlsaSink {
 
         Self {
             pcm: None,
-            format: format,
+            format,
             device: name,
             buffer: vec![],
         }
@@ -146,7 +146,7 @@ impl SinkAsBytes for AlsaSink {
                 .extend_from_slice(&data[processed_data..processed_data + data_to_buffer]);
             processed_data += data_to_buffer;
             if self.buffer.len() == self.buffer.capacity() {
-                self.write_buf().expect("could not append to buffer");
+                self.write_buf();
                 self.buffer.clear();
             }
         }
@@ -156,14 +156,12 @@ impl SinkAsBytes for AlsaSink {
 }
 
 impl AlsaSink {
-    fn write_buf(&mut self) -> io::Result<()> {
+    fn write_buf(&mut self) {
         let pcm = self.pcm.as_mut().unwrap();
         let io = pcm.io_bytes();
         match io.writei(&self.buffer) {
             Ok(_) => (),
             Err(err) => pcm.try_recover(err, false).unwrap(),
         };
-
-        Ok(())
     }
 }

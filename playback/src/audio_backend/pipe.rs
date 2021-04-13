@@ -18,10 +18,7 @@ impl Open for StdoutSink {
             _ => Box::new(io::stdout()),
         };
 
-        Self {
-            output: output,
-            format: format,
-        }
+        Self { output, format }
     }
 }
 

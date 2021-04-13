@@ -1,74 +1,117 @@
 mod codec;
 mod handshake;
 
-pub use self::codec::APCodec;
+pub use self::codec::ApCodec;
 pub use self::handshake::handshake;
 
-use futures::{Future, Sink, Stream};
-use protobuf::{self, Message};
-use std::io;
+use std::io::{self, ErrorKind};
 use std::net::ToSocketAddrs;
-use tokio_codec::Framed;
-use tokio_core::net::TcpStream;
-use tokio_core::reactor::Handle;
+
+use futures_util::{SinkExt, StreamExt};
+use protobuf::{self, Message, ProtobufError};
+use thiserror::Error;
+use tokio::net::TcpStream;
+use tokio_util::codec::Framed;
 use url::Url;
 
-use crate::authentication::{AuthenticationError, Credentials};
+use crate::authentication::Credentials;
+use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
+use crate::proxytunnel;
 use crate::version;
 
-use crate::proxytunnel;
+pub type Transport = Framed<TcpStream, ApCodec>;
 
-pub type Transport = Framed<TcpStream, APCodec>;
-
-pub fn connect(
-    addr: String,
-    handle: &Handle,
-    proxy: &Option<Url>,
-) -> Box<dyn Future<Item = Transport, Error = io::Error>> {
-    let (addr, connect_url) = match *proxy {
-        Some(ref url) => {
-            info!("Using proxy \"{}\"", url);
-            match url.to_socket_addrs().and_then(|mut iter| {
-                iter.next().ok_or(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Can't resolve proxy server address",
-                ))
-            }) {
-                Ok(socket_addr) => (socket_addr, Some(addr)),
-                Err(error) => return Box::new(futures::future::err(error)),
-            }
-        }
-        None => {
-            match addr.to_socket_addrs().and_then(|mut iter| {
-                iter.next().ok_or(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Can't resolve server address",
-                ))
-            }) {
-                Ok(socket_addr) => (socket_addr, None),
-                Err(error) => return Box::new(futures::future::err(error)),
-            }
-        }
-    };
-
-    let socket = TcpStream::connect(&addr, handle);
-    if let Some(connect_url) = connect_url {
-        let connection = socket
-            .and_then(move |socket| proxytunnel::connect(socket, &connect_url).and_then(handshake));
-        Box::new(connection)
-    } else {
-        let connection = socket.and_then(handshake);
-        Box::new(connection)
+fn login_error_message(code: &ErrorCode) -> &'static str {
+    pub use ErrorCode::*;
+    match code {
+        ProtocolError => "Protocol error",
+        TryAnotherAP => "Try another AP",
+        BadConnectionId => "Bad connection id",
+        TravelRestriction => "Travel restriction",
+        PremiumAccountRequired => "Premium account required",
+        BadCredentials => "Bad credentials",
+        CouldNotValidateCredentials => "Could not validate credentials",
+        AccountExists => "Account exists",
+        ExtraVerificationRequired => "Extra verification required",
+        InvalidAppKey => "Invalid app key",
+        ApplicationBanned => "Application banned",
     }
 }
 
-pub fn authenticate(
-    transport: Transport,
+#[derive(Debug, Error)]
+pub enum AuthenticationError {
+    #[error("Login failed with reason: {}", login_error_message(.0))]
+    LoginFailed(ErrorCode),
+    #[error("Authentication failed: {0}")]
+    IoError(#[from] io::Error),
+}
+
+impl From<ProtobufError> for AuthenticationError {
+    fn from(e: ProtobufError) -> Self {
+        io::Error::new(ErrorKind::InvalidData, e).into()
+    }
+}
+
+impl From<APLoginFailed> for AuthenticationError {
+    fn from(login_failure: APLoginFailed) -> Self {
+        Self::LoginFailed(login_failure.get_error_code())
+    }
+}
+
+pub async fn connect(addr: String, proxy: Option<&Url>) -> io::Result<Transport> {
+    let socket = if let Some(proxy_url) = proxy {
+        info!("Using proxy \"{}\"", proxy_url);
+
+        let socket_addr = proxy_url.socket_addrs(|| None).and_then(|addrs| {
+            addrs.into_iter().next().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "Can't resolve proxy server address",
+                )
+            })
+        })?;
+        let socket = TcpStream::connect(&socket_addr).await?;
+
+        let uri = addr.parse::<http::Uri>().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Can't parse access point address",
+            )
+        })?;
+        let host = uri.host().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "The access point address contains no hostname",
+            )
+        })?;
+        let port = uri.port().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "The access point address contains no port",
+            )
+        })?;
+
+        proxytunnel::proxy_connect(socket, host, port.as_str()).await?
+    } else {
+        let socket_addr = addr.to_socket_addrs()?.next().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "Can't resolve access point address",
+            )
+        })?;
+
+        TcpStream::connect(&socket_addr).await?
+    };
+
+    handshake(socket).await
+}
+
+pub async fn authenticate(
+    transport: &mut Transport,
     credentials: Credentials,
-    device_id: String,
-) -> Box<dyn Future<Item = (Transport, Credentials), Error = AuthenticationError>> {
+    device_id: &str,
+) -> Result<Credentials, AuthenticationError> {
     use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
-    use crate::protocol::keyexchange::APLoginFailed;
 
     let mut packet = ClientResponseEncrypted::new();
     packet
@@ -91,39 +134,35 @@ pub fn authenticate(
             version::SHA_SHORT,
             version::BUILD_ID
         ));
-    packet.mut_system_info().set_device_id(device_id);
+    packet
+        .mut_system_info()
+        .set_device_id(device_id.to_string());
     packet.set_version_string(version::VERSION_STRING.to_string());
 
     let cmd = 0xab;
     let data = packet.write_to_bytes().unwrap();
 
-    Box::new(
-        transport
-            .send((cmd, data))
-            .and_then(|transport| transport.into_future().map_err(|(err, _stream)| err))
-            .map_err(|io_err| io_err.into())
-            .and_then(|(packet, transport)| match packet {
-                Some((0xac, data)) => {
-                    let welcome_data: APWelcome =
-                        protobuf::parse_from_bytes(data.as_ref()).unwrap();
+    transport.send((cmd, data)).await?;
+    let (cmd, data) = transport.next().await.expect("EOF")?;
+    match cmd {
+        0xac => {
+            let welcome_data: APWelcome = protobuf::parse_from_bytes(data.as_ref())?;
 
-                    let reusable_credentials = Credentials {
-                        username: welcome_data.get_canonical_username().to_owned(),
-                        auth_type: welcome_data.get_reusable_auth_credentials_type(),
-                        auth_data: welcome_data.get_reusable_auth_credentials().to_owned(),
-                    };
+            let reusable_credentials = Credentials {
+                username: welcome_data.get_canonical_username().to_owned(),
+                auth_type: welcome_data.get_reusable_auth_credentials_type(),
+                auth_data: welcome_data.get_reusable_auth_credentials().to_owned(),
+            };
 
-                    Ok((transport, reusable_credentials))
-                }
-
-                Some((0xad, data)) => {
-                    let error_data: APLoginFailed =
-                        protobuf::parse_from_bytes(data.as_ref()).unwrap();
-                    Err(error_data.into())
-                }
-
-                Some((cmd, _)) => panic!("Unexpected packet {:?}", cmd),
-                None => panic!("EOF"),
-            }),
-    )
+            Ok(reusable_credentials)
+        }
+        0xad => {
+            let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref())?;
+            Err(error_data.into())
+        }
+        _ => {
+            let msg = format!("Received invalid packet: {}", cmd);
+            Err(io::Error::new(ErrorKind::InvalidData, msg).into())
+        }
+    }
 }

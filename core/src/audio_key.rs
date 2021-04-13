@@ -1,9 +1,8 @@
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
-use futures::sync::oneshot;
-use futures::{Async, Future, Poll};
 use std::collections::HashMap;
 use std::io::Write;
+use tokio::sync::oneshot;
 
 use crate::spotify_id::{FileId, SpotifyId};
 use crate::util::SeqGenerator;
@@ -47,7 +46,7 @@ impl AudioKeyManager {
         }
     }
 
-    pub fn request(&self, track: SpotifyId, file: FileId) -> AudioKeyFuture<AudioKey> {
+    pub async fn request(&self, track: SpotifyId, file: FileId) -> Result<AudioKey, AudioKeyError> {
         let (tx, rx) = oneshot::channel();
 
         let seq = self.lock(move |inner| {
@@ -57,7 +56,7 @@ impl AudioKeyManager {
         });
 
         self.send_key_request(seq, track, file);
-        AudioKeyFuture(rx)
+        rx.await.map_err(|_| AudioKeyError)?
     }
 
     fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) {
@@ -68,20 +67,5 @@ impl AudioKeyManager {
         data.write_u16::<BigEndian>(0x0000).unwrap();
 
         self.session().send_packet(0xc, data)
-    }
-}
-
-pub struct AudioKeyFuture<T>(oneshot::Receiver<Result<T, AudioKeyError>>);
-impl<T> Future for AudioKeyFuture<T> {
-    type Item = T;
-    type Error = AudioKeyError;
-
-    fn poll(&mut self) -> Poll<T, AudioKeyError> {
-        match self.0.poll() {
-            Ok(Async::Ready(Ok(value))) => Ok(Async::Ready(value)),
-            Ok(Async::Ready(Err(err))) => Err(err),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(oneshot::Canceled) => Err(AudioKeyError),
-        }
     }
 }

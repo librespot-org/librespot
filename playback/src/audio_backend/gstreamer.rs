@@ -2,11 +2,15 @@ use super::{Open, Sink, SinkAsBytes};
 use crate::audio::AudioPacket;
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
+
+use gstreamer as gst;
+use gstreamer_app as gst_app;
+
 use gst::prelude::*;
-use gst::*;
+use zerocopy::AsBytes;
+
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::{io, thread};
-use zerocopy::AsBytes;
 
 #[allow(dead_code)]
 pub struct GstreamerSink {
@@ -68,14 +72,13 @@ impl Open for GstreamerSink {
         thread::spawn(move || {
             for data in rx {
                 let buffer = bufferpool.acquire_buffer(None);
-                if !buffer.is_err() {
-                    let mut okbuffer = buffer.unwrap();
-                    let mutbuf = okbuffer.make_mut();
+                if let Ok(mut buffer) = buffer {
+                    let mutbuf = buffer.make_mut();
                     mutbuf.set_size(data.len());
                     mutbuf
                         .copy_from_slice(0, data.as_bytes())
-                        .expect("failed to copy from slice");
-                    let _eat = appsrc.push_buffer(okbuffer);
+                        .expect("Failed to copy from slice");
+                    let _eat = appsrc.push_buffer(buffer);
                 }
             }
         });
@@ -85,8 +88,8 @@ impl Open for GstreamerSink {
             let watch_mainloop = thread_mainloop.clone();
             bus.add_watch(move |_, msg| {
                 match msg.view() {
-                    MessageView::Eos(..) => watch_mainloop.quit(),
-                    MessageView::Error(err) => {
+                    gst::MessageView::Eos(..) => watch_mainloop.quit(),
+                    gst::MessageView::Error(err) => {
                         println!(
                             "Error from {:?}: {} ({:?})",
                             err.get_src().map(|s| s.get_path_string()),
@@ -109,9 +112,9 @@ impl Open for GstreamerSink {
             .expect("unable to set the pipeline to the `Playing` state");
 
         Self {
-            tx: tx,
-            pipeline: pipeline,
-            format: format,
+            tx,
+            pipeline,
+            format,
         }
     }
 }

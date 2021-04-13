@@ -38,9 +38,9 @@ impl Open for PulseAudioSink {
 
         Self {
             s: None,
-            ss: ss,
-            device: device,
-            format: format,
+            ss,
+            device,
+            format,
         }
     }
 }

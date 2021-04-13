@@ -1,8 +1,7 @@
 use super::{Open, Sink};
-use crate::audio::{AudioPacket, SamplesConverter};
+use crate::audio::{convert, AudioPacket};
 use crate::config::AudioFormat;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
-use portaudio_rs;
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
 use portaudio_rs::stream::*;
 use std::io;
@@ -157,11 +156,11 @@ impl<'a> Sink for PortAudioSink<'a> {
                 write_sink!(ref mut stream, samples)
             }
             Self::S32(stream, _parameters) => {
-                let samples_s32: &[i32] = &SamplesConverter::to_s32(samples);
+                let samples_s32: &[i32] = &convert::to_s32(samples);
                 write_sink!(ref mut stream, samples_s32)
             }
             Self::S16(stream, _parameters) => {
-                let samples_s16: &[i16] = &SamplesConverter::to_s16(samples);
+                let samples_s16: &[i16] = &convert::to_s16(samples);
                 write_sink!(ref mut stream, samples_s16)
             }
         };

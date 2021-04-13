@@ -6,10 +6,10 @@ use crate::protocol;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MercuryMethod {
-    GET,
-    SUB,
-    UNSUB,
-    SEND,
+    Get,
+    Sub,
+    Unsub,
+    Send,
 }
 
 #[derive(Debug)]
@@ -33,10 +33,10 @@ pub struct MercuryError;
 impl ToString for MercuryMethod {
     fn to_string(&self) -> String {
         match *self {
-            MercuryMethod::GET => "GET",
-            MercuryMethod::SUB => "SUB",
-            MercuryMethod::UNSUB => "UNSUB",
-            MercuryMethod::SEND => "SEND",
+            MercuryMethod::Get => "GET",
+            MercuryMethod::Sub => "SUB",
+            MercuryMethod::Unsub => "UNSUB",
+            MercuryMethod::Send => "SEND",
         }
         .to_owned()
     }
@@ -45,9 +45,9 @@ impl ToString for MercuryMethod {
 impl MercuryMethod {
     pub fn command(&self) -> u8 {
         match *self {
-            MercuryMethod::GET | MercuryMethod::SEND => 0xb2,
-            MercuryMethod::SUB => 0xb3,
-            MercuryMethod::UNSUB => 0xb4,
+            MercuryMethod::Get | MercuryMethod::Send => 0xb2,
+            MercuryMethod::Sub => 0xb3,
+            MercuryMethod::Unsub => 0xb4,
         }
     }
 }

@@ -18,7 +18,7 @@ where
         return Err(PassthroughError(OggReadError::InvalidData));
     }
 
-    return Ok(pck.data.into_boxed_slice());
+    Ok(pck.data.into_boxed_slice())
 }
 
 pub struct PassthroughDecoder<R: Read + Seek> {
@@ -54,7 +54,7 @@ impl<R: Read + Seek> PassthroughDecoder<R> {
         // remove un-needed packets
         rdr.delete_unread_packets();
 
-        return Ok(PassthroughDecoder {
+        Ok(PassthroughDecoder {
             rdr,
             wtr: PacketWriter::new(Vec::new()),
             ofsgp_page: 0,
@@ -64,7 +64,7 @@ impl<R: Read + Seek> PassthroughDecoder<R> {
             setup,
             eos: false,
             bos: false,
-        });
+        })
     }
 }
 
@@ -102,15 +102,15 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                 let pck = self.rdr.read_packet().unwrap().unwrap();
                 self.ofsgp_page = pck.absgp_page();
                 debug!("Seek to offset page {}", self.ofsgp_page);
-                return Ok(());
+                Ok(())
             }
-            Err(err) => return Err(AudioError::PassthroughError(err.into())),
+            Err(err) => Err(AudioError::PassthroughError(err.into())),
         }
     }
 
     fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError> {
         // write headers if we are (re)starting
-        if self.bos == false {
+        if !self.bos {
             self.wtr
                 .write_packet(
                     self.ident.clone(),
@@ -177,7 +177,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
 
             let data = self.wtr.inner_mut();
 
-            if data.len() > 0 {
+            if !data.is_empty() {
                 let result = AudioPacket::OggData(std::mem::take(data));
                 return Ok(Some(result));
             }

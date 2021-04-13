@@ -1,4 +1,4 @@
-use crate::audio::i24;
+use crate::audio::convert::i24;
 use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;
