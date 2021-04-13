@@ -54,6 +54,7 @@ hex = "0.4"
 hyper = "0.14"
 log = "0.4"
 rpassword = "5.0"
+thiserror = "1.0"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "sync", "process"] }
 url = "2.1"
 sha-1 = "0.9"

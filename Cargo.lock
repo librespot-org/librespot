@@ -1147,6 +1147,7 @@ dependencies = [
  "log",
  "rpassword",
  "sha-1",
+ "thiserror",
  "tokio",
  "url",
 ]
