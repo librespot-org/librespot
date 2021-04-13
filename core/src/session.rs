@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
-use futures_util::{FutureExt, StreamExt, TryStreamExt};
+use futures_util::{future, StreamExt, TryStreamExt};
 use once_cell::sync::OnceCell;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -126,9 +126,14 @@ impl Session {
             .forward(sink);
         let receiver_task = DispatchTask(stream, session.weak());
 
-        let task =
-            futures_util::future::join(sender_task, receiver_task).map(|_| io::Result::<_>::Ok(()));
-        tokio::spawn(task);
+        tokio::spawn(async move {
+            let result = future::try_join(sender_task, receiver_task).await;
+
+            if let Err(e) = result {
+                error!("{}", e);
+            }
+        });
+
         session
     }
 
