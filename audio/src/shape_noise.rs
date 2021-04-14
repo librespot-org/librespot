@@ -1,3 +1,5 @@
+use std::fmt;
+
 const NUM_CHANNELS: usize = 2;
 
 // Noise shapers take the noise caused by errors in the digital-to-analog
@@ -23,17 +25,24 @@ pub trait NoiseShaper {
     fn new() -> Self
     where
         Self: Sized;
+    fn name(&self) -> String;
     fn shape(&mut self, sample: f32, noise: f32) -> f32;
+}
+
+impl fmt::Display for dyn NoiseShaper {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name())
+    }
 }
 
 pub struct NoShaping {}
 impl NoiseShaper for NoShaping {
     fn new() -> Self {
-        // Doing nothing here means that the requantizer will simply cast to
-        // integer. For Rust the default behavior then is to round towards
-        // zero.
-        debug!("Noise Shaper: None (rounding towards zero)");
         Self {}
+    }
+
+    fn name(&self) -> String {
+        String::from("None")
     }
 
     fn shape(&mut self, sample: f32, noise: f32) -> f32 {
@@ -56,11 +65,14 @@ pub struct FractionSaver {
 
 impl NoiseShaper for FractionSaver {
     fn new() -> Self {
-        debug!("Noise Shaper: Fraction Saver");
         Self {
             active_channel: 0,
             previous_fractions: [0.0; NUM_CHANNELS],
         }
+    }
+
+    fn name(&self) -> String {
+        String::from("Fraction Saver")
     }
 
     fn shape(&mut self, sample: f32, noise: f32) -> f32 {
@@ -85,14 +97,13 @@ macro_rules! fir_shaper {
 
         impl NoiseShaper for $name {
             fn new() -> Self {
-                debug!(
-                    "Noise Shaper: {}, {} taps",
-                    $description,
-                    Self::WEIGHTS.len()
-                );
                 Self {
                     fir: FIR::new(&Self::WEIGHTS),
                 }
+            }
+
+            fn name(&self) -> String {
+                format!("{}, {} taps", $description, Self::WEIGHTS.len())
             }
 
             fn shape(&mut self, sample: f32, noise: f32) -> f32 {

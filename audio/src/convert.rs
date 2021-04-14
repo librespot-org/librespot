@@ -21,6 +21,10 @@ pub struct Requantizer {
 
 impl Requantizer {
     pub fn new(ditherer: Box<dyn Ditherer>, noise_shaper: Box<dyn NoiseShaper>) -> Self {
+        info!(
+            "Requantizing with ditherer: {} and noise shaper: {}",
+            ditherer, noise_shaper
+        );
         Self {
             ditherer,
             noise_shaper,

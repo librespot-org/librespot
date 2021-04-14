@@ -1,5 +1,6 @@
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Normal, Triangular, Uniform};
+use std::fmt;
 
 // Dithering lowers digital-to-analog conversion ("requantization") error,
 // lowering distortion and replacing it with a constant, fixed noise level,
@@ -23,14 +24,24 @@ pub trait Ditherer {
     fn new() -> Self
     where
         Self: Sized;
+    fn name(&self) -> String;
     fn noise(&mut self, sample: f32) -> f32;
+}
+
+impl fmt::Display for dyn Ditherer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name())
+    }
 }
 
 pub struct NoDithering {}
 impl Ditherer for NoDithering {
     fn new() -> Self {
-        debug!("Ditherer: None");
         Self {}
+    }
+
+    fn name(&self) -> String {
+        String::from("None")
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
@@ -51,11 +62,14 @@ pub struct RectangularDitherer {
 
 impl Ditherer for RectangularDitherer {
     fn new() -> Self {
-        debug!("Ditherer: Rectangular");
         Self {
             cached_rng: rand::thread_rng(),
             distribution: Uniform::new_inclusive(-0.5, 0.5), // 1 LSB
         }
+    }
+
+    fn name(&self) -> String {
+        String::from("Rectangular")
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
@@ -72,11 +86,14 @@ pub struct StochasticDitherer {
 
 impl Ditherer for StochasticDitherer {
     fn new() -> Self {
-        debug!("Ditherer: Stochastic");
         Self {
             cached_rng: rand::thread_rng(),
             distribution: Uniform::new(0.0, 1.0),
         }
+    }
+
+    fn name(&self) -> String {
+        String::from("Stochastic")
     }
 
     fn noise(&mut self, sample: f32) -> f32 {
@@ -100,11 +117,14 @@ pub struct TriangularDitherer {
 
 impl Ditherer for TriangularDitherer {
     fn new() -> Self {
-        debug!("Ditherer: Triangular");
         Self {
             cached_rng: rand::thread_rng(),
             distribution: Triangular::new(-1.0, 1.0, 0.0).unwrap(), // 2 LSB
         }
+    }
+
+    fn name(&self) -> String {
+        String::from("Triangular")
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
@@ -122,11 +142,14 @@ pub struct GaussianDitherer {
 
 impl Ditherer for GaussianDitherer {
     fn new() -> Self {
-        debug!("Ditherer: Gaussian");
         Self {
             cached_rng: rand::thread_rng(),
             distribution: Normal::new(0.0, 0.25).unwrap(), // 1/2 LSB
         }
+    }
+
+    fn name(&self) -> String {
+        String::from("Gaussian")
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
@@ -146,12 +169,15 @@ pub struct HighPassDitherer {
 
 impl Ditherer for HighPassDitherer {
     fn new() -> Self {
-        debug!("Ditherer: High-Pass");
         Self {
             previous_noise: 0.0,
             cached_rng: rand::thread_rng(),
             distribution: Uniform::new_inclusive(-0.5, 0.5), // 1 LSB +/- 1 LSB (previous) = 2 LSB
         }
+    }
+
+    fn name(&self) -> String {
+        String::from("High Pass")
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
