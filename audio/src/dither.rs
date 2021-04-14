@@ -8,20 +8,17 @@ use rand_distr::{Distribution, Normal, Triangular, Uniform};
 // audio to a perceived 120 dB.
 //
 // Guidance: experts can configure many different configurations of ditherers
-// and noise shapers. For the rest of us, these are sane defaults depending
-// on the output format:
+// and noise shapers. For the rest of us:
 //
-// | Format     | Recommended ditherer | Recommended noise shaper                 |
-// +------------+----------------------+------------------------------------------+
-// | S16        | Triangular (tri)     | Wannamaker9 (fw9) or Wannamaker24 (fw24) |
-// | S24, S24_3 | High Pass (hp)       | None                                     |
-// | S32        | None                 | None                                     |
-// | F32        | Not supported        | Not supported                            |
+//  * Don't dither or shape noise on S32 or F32 (not supported anyway).
 //
-// Notes:
-//  * Try swapping ditherers with Gaussian if you prefer a more analog sound.
-//  * Try swapping noise shapers with Fraction Saving if you are running on
-//    power-constrained hardware. In this case, disable dithering.
+//  * Generally use high pass dithering (hp) without noise shaping. Depending
+//    on personal preference you may use Gaussian dithering (gauss) instead
+//    if you prefer a more analog sound.
+//
+//  * On power-constrained hardware, use the fraction saving noise shaper
+//    instead of dithering.
+//
 pub trait Ditherer {
     fn new() -> Self
     where

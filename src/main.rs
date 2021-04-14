@@ -6,10 +6,8 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
 use librespot::audio::convert::Requantizer;
-use librespot::audio::dither::{
-    self, mk_ditherer, Ditherer, HighPassDitherer, NoDithering, TriangularDitherer,
-};
-use librespot::audio::shape_noise::{self, mk_noise_shaper, NoShaping, NoiseShaper, Wannamaker9};
+use librespot::audio::dither::{self, mk_ditherer, Ditherer, HighPassDitherer, NoDithering};
+use librespot::audio::shape_noise::{self, NoiseShaper};
 use librespot::connect::spirc::Spirc;
 use librespot::core::authentication::Credentials;
 use librespot::core::cache::Cache;
@@ -355,19 +353,15 @@ fn get_setup(args: &[String]) -> Setup {
     let ditherer = match ditherer_name {
         Some(_) => dither::find_ditherer(ditherer_name).expect("Invalid ditherer"),
         _ => match format {
-            AudioFormat::S24 | AudioFormat::S24_3 => mk_ditherer::<HighPassDitherer>,
-            AudioFormat::S16 => mk_ditherer::<TriangularDitherer>,
+            AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
+                mk_ditherer::<HighPassDitherer>
+            }
             _ => mk_ditherer::<NoDithering>,
         },
     };
 
-    let noise_shaper = match noise_shaper_name {
-        Some(_) => shape_noise::find_noise_shaper(noise_shaper_name).expect("Invalid noise shaper"),
-        _ => match format {
-            AudioFormat::S16 => mk_noise_shaper::<Wannamaker9>,
-            _ => mk_noise_shaper::<NoShaping>,
-        },
-    };
+    let noise_shaper =
+        shape_noise::find_noise_shaper(noise_shaper_name).expect("Invalid noise shaper");
 
     let device = matches.opt_str("device");
     if device == Some("?".into()) {

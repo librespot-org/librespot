@@ -18,6 +18,7 @@ const NUM_CHANNELS: usize = 2;
 // absolute noise power and perceived noise. Co-incidentally, the lower the
 // perceived noise, the higher the absolute power, and the higher the CPU-
 // usage. All shapers have something going for them.
+//
 pub trait NoiseShaper {
     fn new() -> Self
     where
