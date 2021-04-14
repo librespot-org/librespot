@@ -181,6 +181,6 @@ pub fn find_ditherer(name: Option<String>) -> Option<fn() -> Box<dyn Ditherer>> 
             .iter()
             .find(|ditherer| name == ditherer.0)
             .map(|ditherer| ditherer.1),
-        _ => None,
+        _ => Some(mk_ditherer::<NoDithering>),
     }
 }

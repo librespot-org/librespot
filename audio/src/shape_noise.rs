@@ -236,6 +236,6 @@ pub fn find_noise_shaper(name: Option<String>) -> Option<fn() -> Box<dyn NoiseSh
             .iter()
             .find(|noise_shaper| name == noise_shaper.0)
             .map(|noise_shaper| noise_shaper.1),
-        _ => None,
+        _ => Some(mk_noise_shaper::<NoShaping>),
     }
 }
