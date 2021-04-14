@@ -1,9 +1,5 @@
 use rand::rngs::ThreadRng;
-use rand::Rng;
-use rand_distr::{Distribution, StandardNormal, Triangular, Uniform};
-
-const MIN_BOUND: f32 = -0.5;
-const MAX_BOUND: f32 = 0.5;
+use rand_distr::{Distribution, Normal, Triangular, Uniform};
 
 // Dithering lowers digital-to-analog conversion ("requantization") error,
 // lowering distortion and replacing it with a constant, fixed noise level,
@@ -61,7 +57,7 @@ impl Ditherer for RectangularDitherer {
         debug!("Ditherer: Rectangular");
         Self {
             cached_rng: rand::thread_rng(),
-            distribution: Uniform::new_inclusive(MIN_BOUND, MAX_BOUND),
+            distribution: Uniform::new_inclusive(-0.5, 0.5), // 1 LSB
         }
     }
 
@@ -110,7 +106,7 @@ impl Ditherer for TriangularDitherer {
         debug!("Ditherer: Triangular");
         Self {
             cached_rng: rand::thread_rng(),
-            distribution: Triangular::new(MIN_BOUND, MAX_BOUND, MIN_BOUND + MAX_BOUND).unwrap(),
+            distribution: Triangular::new(-1.0, 1.0, 0.0).unwrap(), // 2 LSB
         }
     }
 
@@ -124,6 +120,7 @@ impl Ditherer for TriangularDitherer {
 // if a more analog sound is sought after.
 pub struct GaussianDitherer {
     cached_rng: ThreadRng,
+    distribution: Normal<f32>,
 }
 
 impl Ditherer for GaussianDitherer {
@@ -131,11 +128,12 @@ impl Ditherer for GaussianDitherer {
         debug!("Ditherer: Gaussian");
         Self {
             cached_rng: rand::thread_rng(),
+            distribution: Normal::new(0.0, 0.25).unwrap(), // 1/2 LSB
         }
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
-        (self.cached_rng.sample::<f32, _>(StandardNormal) - MAX_BOUND) / 2.0 // 1/2 LSB
+        self.distribution.sample(&mut self.cached_rng)
     }
 }
 
@@ -155,7 +153,7 @@ impl Ditherer for HighPassDitherer {
         Self {
             previous_noise: 0.0,
             cached_rng: rand::thread_rng(),
-            distribution: Uniform::new_inclusive(MIN_BOUND, MAX_BOUND),
+            distribution: Uniform::new_inclusive(-0.5, 0.5), // 1 LSB +/- 1 LSB (previous) = 2 LSB
         }
     }
 
