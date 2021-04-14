@@ -188,13 +188,13 @@ fn get_setup(args: &[String]) -> Setup {
         .optopt(
             "",
             "dither",
-            "Override the dither algorithm to use - [none, rect, sto, tri, hp, gauss].",
+            "Specify the dither algorithm to use - [none, rect, sto, tri, hp, gauss]. Defaults to 'hp' for formats S16, S24, S24_3 and 'none' for other formats.",
             "DITHER",
         )
         .optopt(
             "",
             "shape-noise",
-            "Override the noise shaping algorithm to use - [none, fract, iew5, iew9, fw3, fw9, fw24].",
+            "Specify the noise shaping algorithm to use - [none, fract, iew5, iew9, fw3, fw9, fw24]. Defaults to 'none'.",
             "SHAPE_NOISE",
         )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
