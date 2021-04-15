@@ -103,7 +103,7 @@ macro_rules! fir_shaper {
             }
 
             fn name(&self) -> &'static str {
-                concat!($description, ", ", stringify!(Self::WEIGHTS.len()), " taps")
+                concat!($description, ", ", stringify!($taps), " taps")
             }
 
             fn shape(&mut self, sample: f32, noise: f32) -> f32 {
