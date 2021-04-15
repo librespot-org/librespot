@@ -25,7 +25,7 @@ pub trait NoiseShaper {
     fn new() -> Self
     where
         Self: Sized;
-    fn name(&self) -> String;
+    fn name(&self) -> &'static str;
     fn shape(&mut self, sample: f32, noise: f32) -> f32;
 }
 
@@ -41,8 +41,8 @@ impl NoiseShaper for NoShaping {
         Self {}
     }
 
-    fn name(&self) -> String {
-        String::from("None")
+    fn name(&self) -> &'static str {
+        "None"
     }
 
     fn shape(&mut self, sample: f32, noise: f32) -> f32 {
@@ -71,8 +71,8 @@ impl NoiseShaper for FractionSaver {
         }
     }
 
-    fn name(&self) -> String {
-        String::from("Fraction Saver")
+    fn name(&self) -> &'static str {
+        "Fraction Saver"
     }
 
     fn shape(&mut self, sample: f32, noise: f32) -> f32 {
@@ -102,8 +102,8 @@ macro_rules! fir_shaper {
                 }
             }
 
-            fn name(&self) -> String {
-                format!("{}, {} taps", $description, Self::WEIGHTS.len())
+            fn name(&self) -> &'static str {
+                concat!($description, ", ", stringify!(Self::WEIGHTS.len()), " taps")
             }
 
             fn shape(&mut self, sample: f32, noise: f32) -> f32 {

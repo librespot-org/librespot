@@ -24,7 +24,7 @@ pub trait Ditherer {
     fn new() -> Self
     where
         Self: Sized;
-    fn name(&self) -> String;
+    fn name(&self) -> &'static str;
     fn noise(&mut self, sample: f32) -> f32;
 }
 
@@ -40,8 +40,8 @@ impl Ditherer for NoDithering {
         Self {}
     }
 
-    fn name(&self) -> String {
-        String::from("None")
+    fn name(&self) -> &'static str {
+        "None"
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
@@ -68,8 +68,8 @@ impl Ditherer for RectangularDitherer {
         }
     }
 
-    fn name(&self) -> String {
-        String::from("Rectangular")
+    fn name(&self) -> &'static str {
+        "Rectangular"
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
@@ -92,8 +92,8 @@ impl Ditherer for StochasticDitherer {
         }
     }
 
-    fn name(&self) -> String {
-        String::from("Stochastic")
+    fn name(&self) -> &'static str {
+        "Stochastic"
     }
 
     fn noise(&mut self, sample: f32) -> f32 {
@@ -123,8 +123,8 @@ impl Ditherer for TriangularDitherer {
         }
     }
 
-    fn name(&self) -> String {
-        String::from("Triangular")
+    fn name(&self) -> &'static str {
+        "Triangular"
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
@@ -148,8 +148,8 @@ impl Ditherer for GaussianDitherer {
         }
     }
 
-    fn name(&self) -> String {
-        String::from("Gaussian")
+    fn name(&self) -> &'static str {
+        "Gaussian"
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
@@ -176,8 +176,8 @@ impl Ditherer for HighPassDitherer {
         }
     }
 
-    fn name(&self) -> String {
-        String::from("High Pass")
+    fn name(&self) -> &'static str {
+        "High Pass"
     }
 
     fn noise(&mut self, _sample: f32) -> f32 {
