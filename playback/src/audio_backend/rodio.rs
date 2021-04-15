@@ -167,19 +167,14 @@ pub fn open(
     format: AudioFormat,
     requantizer: Requantizer,
 ) -> RodioSink {
-    debug!(
-        "Using rodio sink with format {:?} and cpal host: {}",
+    info!(
+        "Using Rodio sink with format {:?} and cpal host: {}",
         format,
         host.id().name()
     );
 
-    match format {
-        AudioFormat::F32 => {
-            #[cfg(target_os = "linux")]
-            warn!("Rodio output to Alsa is known to cause garbled sound, consider using `--backend alsa`")
-        }
-        AudioFormat::S16 => (),
-        _ => unimplemented!("Rodio currently only supports F32 and S16 formats"),
+    if format != AudioFormat::S16 && format != AudioFormat::F32 {
+        unimplemented!("Rodio currently only supports F32 and S16 formats");
     }
 
     let (sink, stream) = create_sink(&host, device).unwrap();
