@@ -1161,8 +1161,8 @@ impl PlayerInternal {
                         }
 
                         if self.config.normalisation
-                            && (f32::abs(normalisation_factor - 1.0) < f32::EPSILON
-                                || self.config.normalisation_method != NormalisationMethod::Basic)
+                            && !(f32::abs(normalisation_factor - 1.0) <= f32::EPSILON
+                                && self.config.normalisation_method == NormalisationMethod::Basic)
                         {
                             for sample in data.iter_mut() {
                                 let mut actual_normalisation_factor = normalisation_factor;
