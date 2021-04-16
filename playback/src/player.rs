@@ -246,7 +246,7 @@ impl NormalisationData {
             let limited_normalisation_power = Self::ratio_to_db(limited_normalisation_factor);
 
             if config.normalisation_method == NormalisationMethod::Basic {
-                warn!("Limiting gain to {:.2} for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
+                warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
                 normalisation_factor = limited_normalisation_factor;
             } else {
                 warn!(
