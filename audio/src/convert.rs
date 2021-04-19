@@ -1,5 +1,5 @@
-use crate::dither::*;
-use crate::shape_noise::*;
+use crate::dither::Ditherer;
+use crate::shape_noise::NoiseShaper;
 use zerocopy::AsBytes;
 
 #[derive(AsBytes, Copy, Clone, Debug)]

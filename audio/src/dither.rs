@@ -11,14 +11,22 @@ use std::fmt;
 // Guidance: experts can configure many different configurations of ditherers
 // and noise shapers. For the rest of us:
 //
-//  * Don't dither or shape noise on S32 or F32 (not supported anyway).
+//  * Don't dither or shape noise on S32 or F32. On F32 it's not supported
+//    anyway (there are no rounding errors due to integer conversions) and on
+//    S32 the noise level is so far down that it is simply inaudible.
 //
 //  * Generally use high pass dithering (hp) without noise shaping. Depending
-//    on personal preference you may use Gaussian dithering (gauss) instead
-//    if you prefer a more analog sound.
+//    on personal preference you may use Gaussian dithering (gauss) instead;
+//    it's not as good objectively, but it may be preferred subjectively if
+//    you are looking for a more "analog" sound.
 //
 //  * On power-constrained hardware, use the fraction saving noise shaper
-//    instead of dithering.
+//    instead of dithering. Performance-wise, this is not necessary even on a
+//    Raspberry Pi Zero, but if you're on batteries...
+//
+// Implementation note: we save the handle to ThreadRng so it doesn't require
+// a lookup on each call (which is on each sample!). This is ~2.5x as fast.
+// Downside is that it is not Send so we cannot move it around player threads.
 //
 pub trait Ditherer {
     fn new() -> Self
@@ -26,6 +34,12 @@ pub trait Ditherer {
         Self: Sized;
     fn name(&self) -> &'static str;
     fn noise(&mut self, sample: f32) -> f32;
+}
+
+impl dyn Ditherer {
+    pub fn default() -> fn() -> Box<Self> {
+        mk_ditherer::<HighPassDitherer>
+    }
 }
 
 impl fmt::Display for dyn Ditherer {
@@ -52,7 +66,7 @@ impl Ditherer for NoDithering {
 // "True" white noise (refer to Gaussian for analog source hiss). Advantages:
 // least CPU-intensive dither, lowest signal-to-noise ratio. Disadvantage:
 // highest perceived loudness, suffers from intermodulation distortion unless
-// you are using this for subtractive dithering, which you most likely are not
+// you are using this for subtractive dithering, which you most likely are not,
 // and is not supported by any of the librespot backends. Guidance: use some
 // other ditherer unless you know what you're doing.
 pub struct RectangularDitherer {
@@ -64,7 +78,8 @@ impl Ditherer for RectangularDitherer {
     fn new() -> Self {
         Self {
             cached_rng: rand::thread_rng(),
-            distribution: Uniform::new_inclusive(-0.5, 0.5), // 1 LSB
+            // 1 LSB peak-to-peak needed to linearize the response:
+            distribution: Uniform::new_inclusive(-0.5, 0.5),
         }
     }
 
@@ -119,7 +134,8 @@ impl Ditherer for TriangularDitherer {
     fn new() -> Self {
         Self {
             cached_rng: rand::thread_rng(),
-            distribution: Triangular::new(-1.0, 1.0, 0.0).unwrap(), // 2 LSB
+            // 2 LSB peak-to-peak needed to linearize the response:
+            distribution: Triangular::new(-1.0, 1.0, 0.0).unwrap(),
         }
     }
 
@@ -144,7 +160,8 @@ impl Ditherer for GaussianDitherer {
     fn new() -> Self {
         Self {
             cached_rng: rand::thread_rng(),
-            distribution: Normal::new(0.0, 0.25).unwrap(), // 1/2 LSB
+            // 1/2 LSB RMS needed to linearize the response:
+            distribution: Normal::new(0.0, 0.5).unwrap(),
         }
     }
 
@@ -192,7 +209,9 @@ pub fn mk_ditherer<D: Ditherer + 'static>() -> Box<dyn Ditherer> {
     Box::new(D::new())
 }
 
-pub const DITHERERS: &'static [(&'static str, fn() -> Box<dyn Ditherer>)] = &[
+pub type DithererBuilder = fn() -> Box<dyn Ditherer>;
+
+pub const DITHERERS: &[(&str, DithererBuilder)] = &[
     ("none", mk_ditherer::<NoDithering>),
     ("rect", mk_ditherer::<RectangularDitherer>),
     ("sto", mk_ditherer::<StochasticDitherer>),

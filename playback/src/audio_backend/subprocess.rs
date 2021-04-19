@@ -10,11 +10,10 @@ pub struct SubprocessSink {
     shell_command: String,
     child: Option<Child>,
     format: AudioFormat,
-    requantizer: Requantizer,
 }
 
 impl Open for SubprocessSink {
-    fn open(shell_command: Option<String>, format: AudioFormat, requantizer: Requantizer) -> Self {
+    fn open(shell_command: Option<String>, format: AudioFormat) -> Self {
         info!("Using subprocess sink with format: {:?}", format);
 
         if let Some(shell_command) = shell_command {
@@ -22,7 +21,6 @@ impl Open for SubprocessSink {
                 shell_command,
                 child: None,
                 format,
-                requantizer,
             }
         } else {
             panic!("subprocess sink requires specifying a shell command");

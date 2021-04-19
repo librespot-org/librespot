@@ -1,4 +1,6 @@
-pub use crate::audio::convert::{i24, Requantizer};
+pub use crate::audio::convert::i24;
+pub use crate::audio::dither::{mk_ditherer, Ditherer};
+pub use crate::audio::shape_noise::{mk_noise_shaper, NoiseShaper};
 use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;
@@ -115,7 +117,7 @@ impl Default for NormalisationMethod {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct PlayerConfig {
     pub bitrate: Bitrate,
     pub normalisation: bool,
@@ -128,6 +130,11 @@ pub struct PlayerConfig {
     pub normalisation_knee: f32,
     pub gapless: bool,
     pub passthrough: bool,
+
+    // pass function pointers so they can be lazily instantiated *after* spawning a thread
+    // (thereby circumventing Send bounds that they might not satisfy)
+    pub ditherer: fn() -> Box<dyn Ditherer>,
+    pub noise_shaper: fn() -> Box<dyn NoiseShaper>,
 }
 
 impl Default for PlayerConfig {
@@ -144,6 +151,8 @@ impl Default for PlayerConfig {
             normalisation_knee: 1.0,
             gapless: true,
             passthrough: false,
+            ditherer: Ditherer::default(),
+            noise_shaper: NoiseShaper::default(),
         }
     }
 }

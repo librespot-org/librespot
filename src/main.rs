@@ -5,9 +5,8 @@ use sha1::{Digest, Sha1};
 use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
-use librespot::audio::convert::Requantizer;
-use librespot::audio::dither::{self, mk_ditherer, Ditherer, HighPassDitherer, NoDithering};
-use librespot::audio::shape_noise::{self, NoiseShaper};
+use librespot::audio::dither::{self, mk_ditherer, HighPassDitherer, NoDithering};
+use librespot::audio::shape_noise::{self};
 use librespot::connect::spirc::Spirc;
 use librespot::core::authentication::Credentials;
 use librespot::core::cache::Cache;
@@ -113,9 +112,7 @@ fn print_version() {
 
 struct Setup {
     format: AudioFormat,
-    ditherer: fn() -> Box<dyn Ditherer>,
-    noise_shaper: fn() -> Box<dyn NoiseShaper>,
-    backend: fn(Option<String>, AudioFormat, Requantizer) -> Box<dyn Sink + 'static>,
+    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink + 'static>,
     device: Option<String>,
 
     mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
@@ -340,32 +337,9 @@ fn get_setup(args: &[String]) -> Setup {
         .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
         .unwrap_or_default();
 
-    let ditherer_name = matches.opt_str("dither");
-    let noise_shaper_name = matches.opt_str("shape-noise");
-
-    if format == AudioFormat::F32 && (ditherer_name.is_some() || noise_shaper_name.is_some()) {
-        unimplemented!(
-            "Dithering and noise shaping is not implemented for format {:?}",
-            format
-        );
-    }
-
-    let ditherer = match ditherer_name {
-        Some(_) => dither::find_ditherer(ditherer_name).expect("Invalid ditherer"),
-        _ => match format {
-            AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
-                mk_ditherer::<HighPassDitherer>
-            }
-            _ => mk_ditherer::<NoDithering>,
-        },
-    };
-
-    let noise_shaper =
-        shape_noise::find_noise_shaper(noise_shaper_name).expect("Invalid noise shaper");
-
     let device = matches.opt_str("device");
     if device == Some("?".into()) {
-        backend(device, format, Requantizer::new(ditherer(), noise_shaper()));
+        backend(device, format);
         exit(0);
     }
 
@@ -490,13 +464,10 @@ fn get_setup(args: &[String]) -> Setup {
             .as_ref()
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or_default();
-        let gain_type = matches
-            .opt_str("normalisation-gain-type")
-            .as_ref()
-            .map(|gain_type| {
-                NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
-            })
-            .unwrap_or_default();
+
+        let gapless = !matches.opt_present("disable-gapless");
+
+        let normalisation = matches.opt_present("enable-volume-normalisation");
         let normalisation_method = matches
             .opt_str("normalisation-method")
             .as_ref()
@@ -504,42 +475,79 @@ fn get_setup(args: &[String]) -> Setup {
                 NormalisationMethod::from_str(gain_type).expect("Invalid normalisation method")
             })
             .unwrap_or_default();
+        let normalisation_type = matches
+            .opt_str("normalisation-gain-type")
+            .as_ref()
+            .map(|gain_type| {
+                NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
+            })
+            .unwrap_or_default();
+        let normalisation_pregain = matches
+            .opt_str("normalisation-pregain")
+            .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
+            .unwrap_or(PlayerConfig::default().normalisation_pregain);
+        let normalisation_threshold = NormalisationData::db_to_ratio(
+            matches
+                .opt_str("normalisation-threshold")
+                .map(|threshold| {
+                    threshold
+                        .parse::<f32>()
+                        .expect("Invalid threshold float value")
+                })
+                .unwrap_or(PlayerConfig::default().normalisation_threshold),
+        );
+        let normalisation_attack = matches
+            .opt_str("normalisation-attack")
+            .map(|attack| attack.parse::<f32>().expect("Invalid attack float value"))
+            .unwrap_or(PlayerConfig::default().normalisation_attack * MILLIS)
+            / MILLIS;
+        let normalisation_release = matches
+            .opt_str("normalisation-release")
+            .map(|release| release.parse::<f32>().expect("Invalid release float value"))
+            .unwrap_or(PlayerConfig::default().normalisation_release * MILLIS)
+            / MILLIS;
+        let normalisation_knee = matches
+            .opt_str("normalisation-knee")
+            .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
+            .unwrap_or(PlayerConfig::default().normalisation_knee);
+
+        let ditherer_name = matches.opt_str("dither");
+        let noise_shaper_name = matches.opt_str("shape-noise");
+
+        if format == AudioFormat::F32 && (ditherer_name.is_some() || noise_shaper_name.is_some()) {
+            unimplemented!(
+                "Dithering and noise shaping is not implemented for format {:?}",
+                format
+            );
+        }
+
+        let ditherer = match ditherer_name {
+            Some(_) => dither::find_ditherer(ditherer_name).expect("Invalid ditherer"),
+            _ => match format {
+                AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
+                    mk_ditherer::<HighPassDitherer>
+                }
+                _ => mk_ditherer::<NoDithering>,
+            },
+        };
+
+        let noise_shaper =
+            shape_noise::find_noise_shaper(noise_shaper_name).expect("Invalid noise shaper");
 
         PlayerConfig {
             bitrate,
-            gapless: !matches.opt_present("disable-gapless"),
-            normalisation: matches.opt_present("enable-volume-normalisation"),
+            gapless,
+            normalisation,
             normalisation_method,
-            normalisation_type: gain_type,
-            normalisation_pregain: matches
-                .opt_str("normalisation-pregain")
-                .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
-                .unwrap_or(PlayerConfig::default().normalisation_pregain),
-            normalisation_threshold: NormalisationData::db_to_ratio(
-                matches
-                    .opt_str("normalisation-threshold")
-                    .map(|threshold| {
-                        threshold
-                            .parse::<f32>()
-                            .expect("Invalid threshold float value")
-                    })
-                    .unwrap_or(PlayerConfig::default().normalisation_threshold),
-            ),
-            normalisation_attack: matches
-                .opt_str("normalisation-attack")
-                .map(|attack| attack.parse::<f32>().expect("Invalid attack float value"))
-                .unwrap_or(PlayerConfig::default().normalisation_attack * MILLIS)
-                / MILLIS,
-            normalisation_release: matches
-                .opt_str("normalisation-release")
-                .map(|release| release.parse::<f32>().expect("Invalid release float value"))
-                .unwrap_or(PlayerConfig::default().normalisation_release * MILLIS)
-                / MILLIS,
-            normalisation_knee: matches
-                .opt_str("normalisation-knee")
-                .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
-                .unwrap_or(PlayerConfig::default().normalisation_knee),
+            normalisation_type,
+            normalisation_pregain,
+            normalisation_threshold,
+            normalisation_attack,
+            normalisation_release,
+            normalisation_knee,
             passthrough,
+            ditherer,
+            noise_shaper,
         }
     };
 
@@ -569,8 +577,6 @@ fn get_setup(args: &[String]) -> Setup {
 
     Setup {
         format,
-        ditherer,
-        noise_shaper,
         backend,
         cache,
         session_config,
@@ -663,13 +669,11 @@ async fn main() {
 
                     let audio_filter = mixer.get_audio_filter();
                     let format = setup.format;
-                    let ditherer = setup.ditherer;
-                    let noise_shaper = setup.noise_shaper;
                     let backend = setup.backend;
                     let device = setup.device.clone();
                     let (player, event_channel) =
                         Player::new(player_config, session.clone(), audio_filter, move || {
-                            (backend)(device, format, Requantizer::new(ditherer(), noise_shaper()))
+                            (backend)(device, format)
                         });
 
                     if setup.emit_sink_events {

@@ -29,6 +29,12 @@ pub trait NoiseShaper {
     fn shape(&mut self, sample: f32, noise: f32) -> f32;
 }
 
+impl dyn NoiseShaper {
+    pub fn default() -> fn() -> Box<Self> {
+        mk_noise_shaper::<NoShaping>
+    }
+}
+
 impl fmt::Display for dyn NoiseShaper {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())
@@ -78,7 +84,7 @@ impl NoiseShaper for FractionSaver {
     fn shape(&mut self, sample: f32, noise: f32) -> f32 {
         let sample_with_fraction = sample + noise + self.previous_fractions[self.active_channel];
         self.previous_fractions[self.active_channel] = sample_with_fraction.fract();
-        self.active_channel = self.active_channel ^ 1;
+        self.active_channel ^= 1;
         sample_with_fraction.floor()
     }
 }
@@ -92,13 +98,13 @@ impl NoiseShaper for FractionSaver {
 macro_rules! fir_shaper {
     ($name: ident, $description: tt, $taps: expr, $weights: expr) => {
         pub struct $name {
-            fir: FIR,
+            filter: FirFilter,
         }
 
         impl NoiseShaper for $name {
             fn new() -> Self {
                 Self {
-                    fir: FIR::new(&Self::WEIGHTS),
+                    filter: FirFilter::new(&Self::WEIGHTS),
                 }
             }
 
@@ -107,7 +113,7 @@ macro_rules! fir_shaper {
             }
 
             fn shape(&mut self, sample: f32, noise: f32) -> f32 {
-                self.fir.shape(sample, noise)
+                self.filter.shape(sample, noise)
             }
         }
 
@@ -170,13 +176,13 @@ fir_shaper!(
     "Wannamaker F-weighted",
     24,
     [
-        2.391510, -3.284444, 3.679506, -3.635044, 2.524185, -1.146701, 0.115354, 0.513745,
-        -0.749277, 0.512386, -0.188997, -0.043705, 0.149843, -0.151186, 0.076302, -0.012070,
+        2.39151, -3.284444, 3.679506, -3.635044, 2.524185, -1.146701, 0.115354, 0.513745,
+        -0.749277, 0.512386, -0.188997, -0.043705, 0.149843, -0.151186, 0.076302, -0.01207,
         -0.021127, 0.025232, -0.016121, 0.004453, 0.000876, -0.001799, 0.000774, -0.000128
     ]
 );
 
-struct FIR {
+struct FirFilter {
     taps: usize,
     weights: Vec<f32>,
     active_channel: usize,
@@ -184,7 +190,7 @@ struct FIR {
     buffer_index: usize,
 }
 
-impl FIR {
+impl FirFilter {
     fn new(weights: &[f32]) -> Self {
         let taps = weights.len();
         Self {
@@ -200,7 +206,7 @@ impl FIR {
         // apply FIR filter
         let mut sample_with_shaped_noise = sample as f64;
         for index in 0..self.taps {
-            sample_with_shaped_noise = sample_with_shaped_noise + self.weighted_error(index);
+            sample_with_shaped_noise += self.weighted_error(index);
         }
 
         let dithered_sample = (sample_with_shaped_noise + noise as f64).round();
@@ -211,13 +217,13 @@ impl FIR {
         self.buffer_index = (self.buffer_index + self.active_channel) % self.taps;
         let index = self.index_at_samples_ago(0);
         self.error_buffer[index] = sample_with_shaped_noise - dithered_sample;
-        self.active_channel = self.active_channel ^ 1;
+        self.active_channel ^= 1;
 
         dithered_sample as f32
     }
 }
 
-impl FIR {
+impl FirFilter {
     fn index_at_samples_ago(&self, errors_ago: usize) -> usize {
         ((self.buffer_index + self.taps - errors_ago) % self.taps) + self.taps * self.active_channel
     }
@@ -231,7 +237,9 @@ pub fn mk_noise_shaper<S: NoiseShaper + 'static>() -> Box<dyn NoiseShaper> {
     Box::new(S::new())
 }
 
-pub const NOISE_SHAPERS: &'static [(&'static str, fn() -> Box<dyn NoiseShaper>)] = &[
+pub type NoiseShaperBuilder = fn() -> Box<dyn NoiseShaper>;
+
+pub const NOISE_SHAPERS: &[(&str, NoiseShaperBuilder)] = &[
     ("none", mk_noise_shaper::<NoShaping>),
     ("fract", mk_noise_shaper::<FractionSaver>),
     ("iew5", mk_noise_shaper::<Lipshitz5>),

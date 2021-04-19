@@ -12,17 +12,14 @@ pub enum PortAudioSink<'a> {
     F32(
         Option<portaudio_rs::stream::Stream<'a, f32, f32>>,
         StreamParameters<f32>,
-        Requantizer,
     ),
     S32(
         Option<portaudio_rs::stream::Stream<'a, i32, i32>>,
         StreamParameters<i32>,
-        Requantizer,
     ),
     S16(
         Option<portaudio_rs::stream::Stream<'a, i16, i16>>,
         StreamParameters<i16>,
-        Requantizer,
     ),
 }
 
@@ -54,11 +51,7 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 }
 
 impl<'a> Open for PortAudioSink<'a> {
-    fn open(
-        device: Option<String>,
-        format: AudioFormat,
-        requantizer: Requantizer,
-    ) -> PortAudioSink<'a> {
+    fn open(device: Option<String>, format: AudioFormat) -> PortAudioSink<'a> {
         info!("Using PortAudio sink with format: {:?}", format);
 
         warn!("This backend is known to panic on several platforms.");
@@ -90,7 +83,7 @@ impl<'a> Open for PortAudioSink<'a> {
                     suggested_latency: latency,
                     data: 0.0 as $type,
                 };
-                $sink(None, params, requantizer)
+                $sink(None, params)
             }};
         }
         match format {
@@ -126,9 +119,9 @@ impl<'a> Sink for PortAudioSink<'a> {
         }
 
         match self {
-            Self::F32(stream, parameters, _) => start_sink!(ref mut stream, ref parameters),
-            Self::S32(stream, parameters, _) => start_sink!(ref mut stream, ref parameters),
-            Self::S16(stream, parameters, _) => start_sink!(ref mut stream, ref parameters),
+            Self::F32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
+            Self::S32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
+            Self::S16(stream, parameters) => start_sink!(ref mut stream, ref parameters),
         };
 
         Ok(())
@@ -142,15 +135,15 @@ impl<'a> Sink for PortAudioSink<'a> {
             }};
         }
         match self {
-            Self::F32(stream, _, _) => stop_sink!(ref mut stream),
-            Self::S32(stream, _, _) => stop_sink!(ref mut stream),
-            Self::S16(stream, _, _) => stop_sink!(ref mut stream),
+            Self::F32(stream, _) => stop_sink!(ref mut stream),
+            Self::S32(stream, _) => stop_sink!(ref mut stream),
+            Self::S16(stream, _) => stop_sink!(ref mut stream),
         };
 
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, requantizer: &mut Requantizer) -> io::Result<()> {
         macro_rules! write_sink {
             (ref mut $stream: expr, $samples: expr) => {
                 $stream.as_mut().unwrap().write($samples)
@@ -159,14 +152,14 @@ impl<'a> Sink for PortAudioSink<'a> {
 
         let samples = packet.samples();
         let result = match self {
-            Self::F32(stream, _parameters, _) => {
+            Self::F32(stream, _parameters) => {
                 write_sink!(ref mut stream, samples)
             }
-            Self::S32(stream, _parameters, ref mut requantizer) => {
+            Self::S32(stream, _parameters) => {
                 let samples_s32: &[i32] = &convert::to_s32(samples, requantizer);
                 write_sink!(ref mut stream, samples_s32)
             }
-            Self::S16(stream, _parameters, ref mut requantizer) => {
+            Self::S16(stream, _parameters) => {
                 let samples_s16: &[i16] = &convert::to_s16(samples, requantizer);
                 write_sink!(ref mut stream, samples_s16)
             }

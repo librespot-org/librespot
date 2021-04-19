@@ -3,69 +3,57 @@ use crate::config::AudioFormat;
 use std::io;
 
 pub trait Open {
-    fn open(_: Option<String>, format: AudioFormat, requantizer: Requantizer) -> Self;
+    fn open(_: Option<String>, format: AudioFormat) -> Self;
 }
 
 pub trait Sink {
-    fn start(&mut self) -> io::Result<()>;
-    fn stop(&mut self) -> io::Result<()>;
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()>;
+    fn start(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+    fn stop(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+    fn write(&mut self, packet: &AudioPacket, requantizer: &mut Requantizer) -> io::Result<()>;
 }
 
-pub type SinkBuilder = fn(Option<String>, AudioFormat, Requantizer) -> Box<dyn Sink>;
+pub type SinkBuilder = fn(Option<String>, AudioFormat) -> Box<dyn Sink>;
 
 pub trait SinkAsBytes {
     fn write_bytes(&mut self, data: &[u8]) -> io::Result<()>;
 }
 
-fn mk_sink<S: Sink + Open + 'static>(
-    device: Option<String>,
-    format: AudioFormat,
-    requantizer: Requantizer,
-) -> Box<dyn Sink> {
-    Box::new(S::open(device, format, requantizer))
+fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+    Box::new(S::open(device, format))
 }
 
 // reuse code for various backends
 macro_rules! sink_as_bytes {
     () => {
-        fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+        fn write(&mut self, packet: &AudioPacket, requantizer: &mut Requantizer) -> io::Result<()> {
             use crate::audio::convert::{self, i24};
             use zerocopy::AsBytes;
             match packet {
                 AudioPacket::Samples(samples) => match self.format {
                     AudioFormat::F32 => self.write_bytes(samples.as_bytes()),
                     AudioFormat::S32 => {
-                        let samples_s32: &[i32] = &convert::to_s32(samples, &mut self.requantizer);
+                        let samples_s32: &[i32] = &convert::to_s32(samples, requantizer);
                         self.write_bytes(samples_s32.as_bytes())
                     }
                     AudioFormat::S24 => {
-                        let samples_s24: &[i32] = &convert::to_s24(samples, &mut self.requantizer);
+                        let samples_s24: &[i32] = &convert::to_s24(samples, requantizer);
                         self.write_bytes(samples_s24.as_bytes())
                     }
                     AudioFormat::S24_3 => {
-                        let samples_s24_3: &[i24] =
-                            &convert::to_s24_3(samples, &mut self.requantizer);
+                        let samples_s24_3: &[i24] = &convert::to_s24_3(samples, requantizer);
                         self.write_bytes(samples_s24_3.as_bytes())
                     }
                     AudioFormat::S16 => {
-                        let samples_s16: &[i16] = &convert::to_s16(samples, &mut self.requantizer);
+                        let samples_s16: &[i16] = &convert::to_s16(samples, requantizer);
                         self.write_bytes(samples_s16.as_bytes())
                     }
                 },
                 AudioPacket::OggData(samples) => self.write_bytes(samples),
             }
-        }
-    };
-}
-
-macro_rules! start_stop_noop {
-    () => {
-        fn start(&mut self) -> io::Result<()> {
-            Ok(())
-        }
-        fn stop(&mut self) -> io::Result<()> {
-            Ok(())
         }
     };
 }

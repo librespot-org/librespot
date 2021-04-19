@@ -1,6 +1,6 @@
 use super::{Open, Sink};
-use crate::audio::AudioPacket;
-use crate::config::{AudioFormat, Requantizer};
+use crate::audio::{AudioPacket, Requantizer};
+use crate::config::AudioFormat;
 use crate::player::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
@@ -41,7 +41,7 @@ impl ProcessHandler for JackData {
 }
 
 impl Open for JackSink {
-    fn open(client_name: Option<String>, format: AudioFormat, _requantizer: Requantizer) -> Self {
+    fn open(client_name: Option<String>, format: AudioFormat) -> Self {
         if format != AudioFormat::F32 {
             warn!("JACK currently does not support {:?} output", format);
         }
@@ -69,9 +69,7 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    start_stop_noop!();
-
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, _requantizer: &mut Requantizer) -> io::Result<()> {
         for s in packet.samples().iter() {
             let res = self.send.send(*s);
             if res.is_err() {

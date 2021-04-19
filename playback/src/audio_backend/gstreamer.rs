@@ -17,11 +17,10 @@ pub struct GstreamerSink {
     tx: SyncSender<Vec<u8>>,
     pipeline: gst::Pipeline,
     format: AudioFormat,
-    requantizer: Requantizer,
 }
 
 impl Open for GstreamerSink {
-    fn open(device: Option<String>, format: AudioFormat, requantizer: Requantizer) -> Self {
+    fn open(device: Option<String>, format: AudioFormat) -> Self {
         info!("Using GStreamer sink with format: {:?}", format);
         gst::init().expect("failed to init GStreamer!");
 
@@ -116,13 +115,11 @@ impl Open for GstreamerSink {
             tx,
             pipeline,
             format,
-            requantizer,
         }
     }
 }
 
 impl Sink for GstreamerSink {
-    start_stop_noop!();
     sink_as_bytes!();
 }
 

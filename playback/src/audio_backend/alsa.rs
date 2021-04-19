@@ -18,7 +18,6 @@ pub struct AlsaSink {
     format: AudioFormat,
     device: String,
     buffer: Vec<u8>,
-    requantizer: Requantizer,
 }
 
 fn list_outputs() {
@@ -72,7 +71,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
 }
 
 impl Open for AlsaSink {
-    fn open(device: Option<String>, format: AudioFormat, requantizer: Requantizer) -> Self {
+    fn open(device: Option<String>, format: AudioFormat) -> Self {
         info!("Using Alsa sink with format: {:?}", format);
 
         let name = match device.as_ref().map(AsRef::as_ref) {
@@ -91,7 +90,6 @@ impl Open for AlsaSink {
             format,
             device: name,
             buffer: vec![],
-            requantizer,
         }
     }
 }

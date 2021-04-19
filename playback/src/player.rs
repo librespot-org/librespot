@@ -11,7 +11,9 @@ use futures_util::stream::futures_unordered::FuturesUnordered;
 use futures_util::{future, StreamExt, TryFutureExt};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::audio::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, VorbisDecoder};
+use crate::audio::{
+    AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, Requantizer, VorbisDecoder,
+};
 use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
 use crate::audio::{
     READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
@@ -59,6 +61,7 @@ struct PlayerInternal {
     sink_event_callback: Option<SinkEventCallback>,
     audio_filter: Option<Box<dyn AudioFilter + Send>>,
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
+    requantizer: Requantizer,
 
     limiter_active: bool,
     limiter_attack_counter: u32,
@@ -293,6 +296,8 @@ impl Player {
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
 
+            let requantizer = Requantizer::new((config.ditherer)(), (config.noise_shaper)());
+
             let internal = PlayerInternal {
                 session,
                 config,
@@ -305,6 +310,7 @@ impl Player {
                 sink_event_callback: None,
                 audio_filter,
                 event_senders: [event_sender].to_vec(),
+                requantizer,
 
                 limiter_active: false,
                 limiter_attack_counter: 0,
@@ -1274,7 +1280,7 @@ impl PlayerInternal {
                         }
                     }
 
-                    if let Err(err) = self.sink.write(&packet) {
+                    if let Err(err) = self.sink.write(&packet, &mut self.requantizer) {
                         error!("Could not write audio: {}", err);
                         self.ensure_sink_stopped(false);
                     }
