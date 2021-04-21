@@ -1,13 +1,15 @@
-use crate::protocol;
-use crate::util::url_encode;
+use std::collections::HashMap;
+use std::future::Future;
+use std::mem;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
+
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
-use futures::sync::{mpsc, oneshot};
-use futures::{Async, Future, Poll};
-use protobuf;
-use std::collections::HashMap;
-use std::mem;
+use tokio::sync::{mpsc, oneshot};
 
+use crate::protocol;
 use crate::util::SeqGenerator;
 
 mod types;
@@ -31,17 +33,18 @@ pub struct MercuryPending {
     callback: Option<oneshot::Sender<Result<MercuryResponse, MercuryError>>>,
 }
 
-pub struct MercuryFuture<T>(oneshot::Receiver<Result<T, MercuryError>>);
-impl<T> Future for MercuryFuture<T> {
-    type Item = T;
-    type Error = MercuryError;
+pub struct MercuryFuture<T> {
+    receiver: oneshot::Receiver<Result<T, MercuryError>>,
+}
 
-    fn poll(&mut self) -> Poll<T, MercuryError> {
-        match self.0.poll() {
-            Ok(Async::Ready(Ok(value))) => Ok(Async::Ready(value)),
-            Ok(Async::Ready(Err(err))) => Err(err),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(oneshot::Canceled) => Err(MercuryError),
+impl<T> Future for MercuryFuture<T> {
+    type Output = Result<T, MercuryError>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match Pin::new(&mut self.receiver).poll(cx) {
+            Poll::Ready(Ok(x)) => Poll::Ready(x),
+            Poll::Ready(Err(_)) => Poll::Ready(Err(MercuryError)),
+            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -73,12 +76,12 @@ impl MercuryManager {
         let data = req.encode(&seq);
 
         self.session().send_packet(cmd, data);
-        MercuryFuture(rx)
+        MercuryFuture { receiver: rx }
     }
 
     pub fn get<T: Into<String>>(&self, uri: T) -> MercuryFuture<MercuryResponse> {
         self.request(MercuryRequest {
-            method: MercuryMethod::GET,
+            method: MercuryMethod::Get,
             uri: uri.into(),
             content_type: None,
             payload: Vec::new(),
@@ -87,7 +90,7 @@ impl MercuryManager {
 
     pub fn send<T: Into<String>>(&self, uri: T, data: Vec<u8>) -> MercuryFuture<MercuryResponse> {
         self.request(MercuryRequest {
-            method: MercuryMethod::SEND,
+            method: MercuryMethod::Send,
             uri: uri.into(),
             content_type: None,
             payload: vec![data],
@@ -101,24 +104,26 @@ impl MercuryManager {
     pub fn subscribe<T: Into<String>>(
         &self,
         uri: T,
-    ) -> Box<dyn Future<Item = mpsc::UnboundedReceiver<MercuryResponse>, Error = MercuryError>>
+    ) -> impl Future<Output = Result<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError>> + 'static
     {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
-            method: MercuryMethod::SUB,
+            method: MercuryMethod::Sub,
             uri: uri.clone(),
             content_type: None,
             payload: Vec::new(),
         });
 
         let manager = self.clone();
-        Box::new(request.map(move |response| {
-            let (tx, rx) = mpsc::unbounded();
+        async move {
+            let response = request.await?;
+
+            let (tx, rx) = mpsc::unbounded_channel();
 
             manager.lock(move |inner| {
                 if !inner.invalid {
                     debug!("subscribed uri={} count={}", uri, response.payload.len());
-                    if response.payload.len() > 0 {
+                    if !response.payload.is_empty() {
                         // Old subscription protocol, watch the provided list of URIs
                         for sub in response.payload {
                             let mut sub: protocol::pubsub::Subscription =
@@ -136,8 +141,8 @@ impl MercuryManager {
                 }
             });
 
-            rx
-        }))
+            Ok(rx)
+        }
     }
 
     pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
@@ -193,7 +198,7 @@ impl MercuryManager {
         let header: protocol::mercury::Header = protobuf::parse_from_bytes(&header_data).unwrap();
 
         let response = MercuryResponse {
-            uri: url_encode(header.get_uri()).to_owned(),
+            uri: header.get_uri().to_string(),
             status_code: header.get_status_code(),
             payload: pending.parts,
         };
@@ -205,30 +210,41 @@ impl MercuryManager {
             if let Some(cb) = pending.callback {
                 let _ = cb.send(Err(MercuryError));
             }
-        } else {
-            if cmd == 0xb5 {
-                self.lock(|inner| {
-                    let mut found = false;
-                    inner.subscriptions.retain(|&(ref prefix, ref sub)| {
-                        if response.uri.starts_with(prefix) {
-                            found = true;
+        } else if cmd == 0xb5 {
+            self.lock(|inner| {
+                let mut found = false;
 
-                            // if send fails, remove from list of subs
-                            // TODO: send unsub message
-                            sub.unbounded_send(response.clone()).is_ok()
-                        } else {
-                            // URI doesn't match
-                            true
-                        }
-                    });
+                // TODO: This is just a workaround to make utf-8 encoded usernames work.
+                // A better solution would be to use an uri struct and urlencode it directly
+                // before sending while saving the subscription under its unencoded form.
+                let mut uri_split = response.uri.split('/');
 
-                    if !found {
-                        debug!("unknown subscription uri={}", response.uri);
+                let encoded_uri = std::iter::once(uri_split.next().unwrap().to_string())
+                    .chain(uri_split.map(|component| {
+                        form_urlencoded::byte_serialize(component.as_bytes()).collect::<String>()
+                    }))
+                    .collect::<Vec<String>>()
+                    .join("/");
+
+                inner.subscriptions.retain(|&(ref prefix, ref sub)| {
+                    if encoded_uri.starts_with(prefix) {
+                        found = true;
+
+                        // if send fails, remove from list of subs
+                        // TODO: send unsub message
+                        sub.send(response.clone()).is_ok()
+                    } else {
+                        // URI doesn't match
+                        true
                     }
-                })
-            } else if let Some(cb) = pending.callback {
-                let _ = cb.send(Ok(response));
-            }
+                });
+
+                if !found {
+                    debug!("unknown subscription uri={}", response.uri);
+                }
+            })
+        } else if let Some(cb) = pending.callback {
+            let _ = cb.send(Ok(response));
         }
     }
 

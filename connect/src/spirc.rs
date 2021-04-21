@@ -1,26 +1,26 @@
-use std;
+use std::future::Future;
+use std::pin::Pin;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use futures::future;
-use futures::sync::mpsc;
-use futures::{Async, Future, Poll, Sink, Stream};
-use protobuf::{self, Message};
-use rand;
-use rand::seq::SliceRandom;
-use serde_json;
-
 use crate::context::StationContext;
+use crate::core::config::{ConnectConfig, VolumeCtrl};
+use crate::core::mercury::{MercuryError, MercurySender};
+use crate::core::session::Session;
+use crate::core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
+use crate::core::util::SeqGenerator;
+use crate::core::version;
 use crate::playback::mixer::Mixer;
 use crate::playback::player::{Player, PlayerEvent, PlayerEventChannel};
 use crate::protocol;
 use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
-use librespot_core::config::{ConnectConfig, VolumeCtrl};
-use librespot_core::mercury::MercuryError;
-use librespot_core::session::Session;
-use librespot_core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
-use librespot_core::util::url_encode;
-use librespot_core::util::SeqGenerator;
-use librespot_core::version;
+
+use futures_util::future::{self, FusedFuture};
+use futures_util::stream::FusedStream;
+use futures_util::{FutureExt, StreamExt};
+use protobuf::{self, Message};
+use rand::seq::SliceRandom;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 enum SpircPlayStatus {
     Stopped,
@@ -40,7 +40,10 @@ enum SpircPlayStatus {
     },
 }
 
-pub struct SpircTask {
+type BoxedFuture<T> = Pin<Box<dyn FusedFuture<Output = T> + Send>>;
+type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
+
+struct SpircTask {
     player: Player,
     mixer: Box<dyn Mixer>,
     config: SpircTaskConfig,
@@ -54,15 +57,15 @@ pub struct SpircTask {
     mixer_started: bool,
     play_status: SpircPlayStatus,
 
-    subscription: Box<dyn Stream<Item = Frame, Error = MercuryError>>,
-    sender: Box<dyn Sink<SinkItem = Frame, SinkError = MercuryError>>,
-    commands: mpsc::UnboundedReceiver<SpircCommand>,
-    player_events: PlayerEventChannel,
+    subscription: BoxedStream<Frame>,
+    sender: MercurySender,
+    commands: Option<mpsc::UnboundedReceiver<SpircCommand>>,
+    player_events: Option<PlayerEventChannel>,
 
     shutdown: bool,
     session: Session,
-    context_fut: Box<dyn Future<Item = serde_json::Value, Error = MercuryError>>,
-    autoplay_fut: Box<dyn Future<Item = String, Error = MercuryError>>,
+    context_fut: BoxedFuture<Result<serde_json::Value, MercuryError>>,
+    autoplay_fut: BoxedFuture<Result<String, MercuryError>>,
     context: Option<StationContext>,
 }
 
@@ -240,38 +243,41 @@ fn volume_to_mixer(volume: u16, volume_ctrl: &VolumeCtrl) -> u16 {
     }
 }
 
+fn url_encode(bytes: impl AsRef<[u8]>) -> String {
+    form_urlencoded::byte_serialize(bytes.as_ref()).collect()
+}
+
 impl Spirc {
     pub fn new(
         config: ConnectConfig,
         session: Session,
         player: Player,
         mixer: Box<dyn Mixer>,
-    ) -> (Spirc, SpircTask) {
+    ) -> (Spirc, impl Future<Output = ()>) {
         debug!("new Spirc[{}]", session.session_id());
 
         let ident = session.device_id().to_owned();
 
         // Uri updated in response to issue #288
-        debug!("canonical_username: {}", url_encode(&session.username()));
+        debug!("canonical_username: {}", &session.username());
         let uri = format!("hm://remote/user/{}/", url_encode(&session.username()));
 
-        let subscription = session.mercury().subscribe(&uri as &str);
-        let subscription = subscription
-            .map(|stream| stream.map_err(|_| MercuryError))
-            .flatten_stream();
-        let subscription = Box::new(subscription.map(|response| -> Frame {
-            let data = response.payload.first().unwrap();
-            protobuf::parse_from_bytes(data).unwrap()
-        }));
-
-        let sender = Box::new(
+        let subscription = Box::pin(
             session
                 .mercury()
-                .sender(uri)
-                .with(|frame: Frame| Ok(frame.write_to_bytes().unwrap())),
+                .subscribe(uri.clone())
+                .map(Result::unwrap)
+                .map(UnboundedReceiverStream::new)
+                .flatten_stream()
+                .map(|response| -> Frame {
+                    let data = response.payload.first().unwrap();
+                    protobuf::parse_from_bytes(data).unwrap()
+                }),
         );
 
-        let (cmd_tx, cmd_rx) = mpsc::unbounded();
+        let sender = session.mercury().sender(uri);
+
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let volume = config.volume;
         let task_config = SpircTaskConfig {
@@ -284,30 +290,30 @@ impl Spirc {
         let player_events = player.get_player_event_channel();
 
         let mut task = SpircTask {
-            player: player,
-            mixer: mixer,
+            player,
+            mixer,
             config: task_config,
 
             sequence: SeqGenerator::new(1),
 
-            ident: ident,
+            ident,
 
-            device: device,
+            device,
             state: initial_state(),
             play_request_id: None,
             mixer_started: false,
             play_status: SpircPlayStatus::Stopped,
 
-            subscription: subscription,
-            sender: sender,
-            commands: cmd_rx,
-            player_events: player_events,
+            subscription,
+            sender,
+            commands: Some(cmd_rx),
+            player_events: Some(player_events),
 
             shutdown: false,
-            session: session.clone(),
+            session,
 
-            context_fut: Box::new(future::empty()),
-            autoplay_fut: Box::new(future::empty()),
+            context_fut: Box::pin(future::pending()),
+            autoplay_fut: Box::pin(future::pending()),
             context: None,
         };
 
@@ -317,150 +323,114 @@ impl Spirc {
 
         task.hello();
 
-        (spirc, task)
+        (spirc, task.run())
     }
 
     pub fn play(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Play);
+        let _ = self.commands.send(SpircCommand::Play);
     }
     pub fn play_pause(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::PlayPause);
+        let _ = self.commands.send(SpircCommand::PlayPause);
     }
     pub fn pause(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Pause);
+        let _ = self.commands.send(SpircCommand::Pause);
     }
     pub fn prev(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Prev);
+        let _ = self.commands.send(SpircCommand::Prev);
     }
     pub fn next(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Next);
+        let _ = self.commands.send(SpircCommand::Next);
     }
     pub fn volume_up(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::VolumeUp);
+        let _ = self.commands.send(SpircCommand::VolumeUp);
     }
     pub fn volume_down(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::VolumeDown);
+        let _ = self.commands.send(SpircCommand::VolumeDown);
     }
     pub fn shutdown(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Shutdown);
-    }
-}
-
-impl Future for SpircTask {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<(), ()> {
-        loop {
-            let mut progress = false;
-
-            if self.session.is_invalid() {
-                return Ok(Async::Ready(()));
-            }
-
-            if !self.shutdown {
-                match self.subscription.poll().unwrap() {
-                    Async::Ready(Some(frame)) => {
-                        progress = true;
-                        self.handle_frame(frame);
-                    }
-                    Async::Ready(None) => {
-                        error!("subscription terminated");
-                        self.shutdown = true;
-                        self.commands.close();
-                    }
-                    Async::NotReady => (),
-                }
-
-                match self.commands.poll().unwrap() {
-                    Async::Ready(Some(command)) => {
-                        progress = true;
-                        self.handle_command(command);
-                    }
-                    Async::Ready(None) => (),
-                    Async::NotReady => (),
-                }
-
-                match self.player_events.poll() {
-                    Ok(Async::NotReady) => (),
-                    Ok(Async::Ready(None)) => (),
-                    Err(_) => (),
-                    Ok(Async::Ready(Some(event))) => {
-                        progress = true;
-                        self.handle_player_event(event);
-                    }
-                }
-                // TODO: Refactor
-                match self.context_fut.poll() {
-                    Ok(Async::Ready(value)) => {
-                        let r_context = serde_json::from_value::<StationContext>(value.clone());
-                        self.context = match r_context {
-                            Ok(context) => {
-                                info!(
-                                    "Resolved {:?} tracks from <{:?}>",
-                                    context.tracks.len(),
-                                    self.state.get_context_uri(),
-                                );
-                                Some(context)
-                            }
-                            Err(e) => {
-                                error!("Unable to parse JSONContext {:?}\n{:?}", e, value);
-                                None
-                            }
-                        };
-                        // It needn't be so verbose - can be as simple as
-                        // if let Some(ref context) = r_context {
-                        //     info!("Got {:?} tracks from <{}>", context.tracks.len(), context.uri);
-                        // }
-                        // self.context = r_context;
-
-                        progress = true;
-                        self.context_fut = Box::new(future::empty());
-                    }
-                    Ok(Async::NotReady) => (),
-                    Err(err) => {
-                        self.context_fut = Box::new(future::empty());
-                        error!("ContextError: {:?}", err)
-                    }
-                }
-
-                match self.autoplay_fut.poll() {
-                    Ok(Async::Ready(autoplay_station_uri)) => {
-                        info!("Autoplay uri resolved to <{:?}>", autoplay_station_uri);
-                        self.context_fut = self.resolve_station(&autoplay_station_uri);
-                        progress = true;
-                        self.autoplay_fut = Box::new(future::empty());
-                    }
-                    Ok(Async::NotReady) => (),
-                    Err(err) => {
-                        self.autoplay_fut = Box::new(future::empty());
-                        error!("AutoplayError: {:?}", err)
-                    }
-                }
-            }
-
-            let poll_sender = self.sender.poll_complete().unwrap();
-
-            // Only shutdown once we've flushed out all our messages
-            if self.shutdown && poll_sender.is_ready() {
-                return Ok(Async::Ready(()));
-            }
-
-            if !progress {
-                return Ok(Async::NotReady);
-            }
-        }
+        let _ = self.commands.send(SpircCommand::Shutdown);
     }
 }
 
 impl SpircTask {
+    async fn run(mut self) {
+        while !self.session.is_invalid() && !self.shutdown {
+            let commands = self.commands.as_mut();
+            let player_events = self.player_events.as_mut();
+            tokio::select! {
+                frame = self.subscription.next() => match frame {
+                    Some(frame) => self.handle_frame(frame),
+                    None => {
+                        error!("subscription terminated");
+                        break;
+                    }
+                },
+                cmd = async { commands.unwrap().recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
+                    self.handle_command(cmd);
+                },
+                event = async { player_events.unwrap().recv().await }, if player_events.is_some() => if let Some(event) = event {
+                    self.handle_player_event(event)
+                },
+                result = self.sender.flush(), if !self.sender.is_flushed() => if result.is_err() {
+                    error!("Cannot flush spirc event sender.");
+                    break;
+                },
+                context = &mut self.context_fut, if !self.context_fut.is_terminated() => {
+                    match context {
+                        Ok(value) => {
+                            let r_context = serde_json::from_value::<StationContext>(value);
+                            self.context = match r_context {
+                                Ok(context) => {
+                                    info!(
+                                        "Resolved {:?} tracks from <{:?}>",
+                                        context.tracks.len(),
+                                        self.state.get_context_uri(),
+                                    );
+                                    Some(context)
+                                }
+                                Err(e) => {
+                                    error!("Unable to parse JSONContext {:?}", e);
+                                    None
+                                }
+                            };
+                            // It needn't be so verbose - can be as simple as
+                            // if let Some(ref context) = r_context {
+                            //     info!("Got {:?} tracks from <{}>", context.tracks.len(), context.uri);
+                            // }
+                            // self.context = r_context;
+                        },
+                        Err(err) => {
+                            error!("ContextError: {:?}", err)
+                        }
+                    }
+                },
+                autoplay = &mut self.autoplay_fut, if !self.autoplay_fut.is_terminated() => {
+                    match autoplay {
+                        Ok(autoplay_station_uri) => {
+                            info!("Autoplay uri resolved to <{:?}>", autoplay_station_uri);
+                            self.context_fut = self.resolve_station(&autoplay_station_uri);
+                        },
+                        Err(err) => {
+                            error!("AutoplayError: {:?}", err)
+                        }
+                    }
+                },
+                else => break
+            }
+        }
+
+        if self.sender.flush().await.is_err() {
+            warn!("Cannot flush spirc event sender.");
+        }
+    }
+
     fn now_ms(&mut self) -> i64 {
         let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(dur) => dur,
             Err(err) => err.duration(),
         };
-        (dur.as_secs() as i64 + self.session.time_delta()) * 1000
-            + (dur.subsec_nanos() / 1000_000) as i64
+
+        dur.as_millis() as i64 + 1000 * self.session.time_delta()
     }
 
     fn ensure_mixer_started(&mut self) {
@@ -545,7 +515,9 @@ impl SpircTask {
             SpircCommand::Shutdown => {
                 CommandSender::new(self, MessageType::kMessageTypeGoodbye).send();
                 self.shutdown = true;
-                self.commands.close();
+                if let Some(rx) = self.commands.as_mut() {
+                    rx.close()
+                }
             }
         }
     }
@@ -653,7 +625,7 @@ impl SpircTask {
         );
 
         if frame.get_ident() == self.ident
-            || (frame.get_recipient().len() > 0 && !frame.get_recipient().contains(&self.ident))
+            || (!frame.get_recipient().is_empty() && !frame.get_recipient().contains(&self.ident))
         {
             return;
         }
@@ -672,7 +644,7 @@ impl SpircTask {
 
                 self.update_tracks(&frame);
 
-                if self.state.get_track().len() > 0 {
+                if !self.state.get_track().is_empty() {
                     let start_playing =
                         frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
                     self.load_track(start_playing, frame.get_state().get_position_ms());
@@ -895,7 +867,7 @@ impl SpircTask {
 
     fn preview_next_track(&mut self) -> Option<SpotifyId> {
         self.get_track_id_to_play_from_playlist(self.state.get_playing_track_index() + 1)
-            .and_then(|(track_id, _)| Some(track_id))
+            .map(|(track_id, _)| track_id)
     }
 
     fn handle_preload_next_track(&mut self) {
@@ -1014,7 +986,7 @@ impl SpircTask {
             };
             // Reinsert queued tracks after the new playing track.
             let mut pos = (new_index + 1) as usize;
-            for track in queue_tracks.into_iter() {
+            for track in queue_tracks {
                 self.state.mut_track().insert(pos, track);
                 pos += 1;
             }
@@ -1060,52 +1032,53 @@ impl SpircTask {
         }
     }
 
-    fn resolve_station(
-        &self,
-        uri: &str,
-    ) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
+    fn resolve_station(&self, uri: &str) -> BoxedFuture<Result<serde_json::Value, MercuryError>> {
         let radio_uri = format!("hm://radio-apollo/v3/stations/{}", uri);
 
         self.resolve_uri(&radio_uri)
     }
 
-    fn resolve_autoplay_uri(
-        &self,
-        uri: &str,
-    ) -> Box<dyn Future<Item = String, Error = MercuryError>> {
+    fn resolve_autoplay_uri(&self, uri: &str) -> BoxedFuture<Result<String, MercuryError>> {
         let query_uri = format!("hm://autoplay-enabled/query?uri={}", uri);
         let request = self.session.mercury().get(query_uri);
-        Box::new(request.and_then(move |response| {
-            if response.status_code == 200 {
+        Box::pin(
+            async {
+                let response = request.await?;
+
+                if response.status_code == 200 {
+                    let data = response
+                        .payload
+                        .first()
+                        .expect("Empty autoplay uri")
+                        .to_vec();
+                    let autoplay_uri = String::from_utf8(data).unwrap();
+                    Ok(autoplay_uri)
+                } else {
+                    warn!("No autoplay_uri found");
+                    Err(MercuryError)
+                }
+            }
+            .fuse(),
+        )
+    }
+
+    fn resolve_uri(&self, uri: &str) -> BoxedFuture<Result<serde_json::Value, MercuryError>> {
+        let request = self.session.mercury().get(uri);
+
+        Box::pin(
+            async move {
+                let response = request.await?;
+
                 let data = response
                     .payload
                     .first()
-                    .expect("Empty autoplay uri")
-                    .to_vec();
-                let autoplay_uri = String::from_utf8(data).unwrap();
-                Ok(autoplay_uri)
-            } else {
-                warn!("No autoplay_uri found");
-                Err(MercuryError)
+                    .expect("Empty payload on context uri");
+                let response: serde_json::Value = serde_json::from_slice(&data).unwrap();
+
+                Ok(response)
             }
-        }))
-    }
-
-    fn resolve_uri(
-        &self,
-        uri: &str,
-    ) -> Box<dyn Future<Item = serde_json::Value, Error = MercuryError>> {
-        let request = self.session.mercury().get(uri);
-
-        Box::new(request.and_then(move |response| {
-            let data = response
-                .payload
-                .first()
-                .expect("Empty payload on context uri");
-            let response: serde_json::Value = serde_json::from_slice(&data).unwrap();
-
-            Ok(response)
-        }))
+            .fuse(),
+        )
     }
 
     fn update_tracks_from_context(&mut self) {
@@ -1152,7 +1125,7 @@ impl SpircTask {
         }
 
         self.state.set_playing_track_index(index);
-        self.state.set_track(tracks.into_iter().cloned().collect());
+        self.state.set_track(tracks.iter().cloned().collect());
         self.state.set_context_uri(context_uri);
         // has_shuffle/repeat seem to always be true in these replace msgs,
         // but to replicate the behaviour of the Android client we have to
@@ -1323,10 +1296,7 @@ impl<'a> CommandSender<'a> {
         frame.set_typ(cmd);
         frame.set_device_state(spirc.device.clone());
         frame.set_state_update_id(spirc.now_ms());
-        CommandSender {
-            spirc: spirc,
-            frame: frame,
-        }
+        CommandSender { spirc, frame }
     }
 
     fn recipient(mut self, recipient: &'a str) -> CommandSender {
@@ -1345,7 +1315,6 @@ impl<'a> CommandSender<'a> {
             self.frame.set_state(self.spirc.state.clone());
         }
 
-        let send = self.spirc.sender.start_send(self.frame).unwrap();
-        assert!(send.is_ready());
+        self.spirc.sender.send(self.frame.write_to_bytes().unwrap());
     }
 }

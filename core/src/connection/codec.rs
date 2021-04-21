@@ -2,7 +2,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, Bytes, BytesMut};
 use shannon::Shannon;
 use std::io;
-use tokio_io::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 const HEADER_SIZE: usize = 3;
 const MAC_SIZE: usize = 4;
@@ -13,7 +13,7 @@ enum DecodeState {
     Payload(u8, usize),
 }
 
-pub struct APCodec {
+pub struct ApCodec {
     encode_nonce: u32,
     encode_cipher: Shannon,
 
@@ -22,9 +22,9 @@ pub struct APCodec {
     decode_state: DecodeState,
 }
 
-impl APCodec {
-    pub fn new(send_key: &[u8], recv_key: &[u8]) -> APCodec {
-        APCodec {
+impl ApCodec {
+    pub fn new(send_key: &[u8], recv_key: &[u8]) -> ApCodec {
+        ApCodec {
             encode_nonce: 0,
             encode_cipher: Shannon::new(send_key),
 
@@ -35,8 +35,7 @@ impl APCodec {
     }
 }
 
-impl Encoder for APCodec {
-    type Item = (u8, Vec<u8>);
+impl Encoder<(u8, Vec<u8>)> for ApCodec {
     type Error = io::Error;
 
     fn encode(&mut self, item: (u8, Vec<u8>), buf: &mut BytesMut) -> io::Result<()> {
@@ -45,7 +44,7 @@ impl Encoder for APCodec {
 
         buf.reserve(3 + payload.len());
         buf.put_u8(cmd);
-        buf.put_u16_be(payload.len() as u16);
+        buf.put_u16(payload.len() as u16);
         buf.extend_from_slice(&payload);
 
         self.encode_cipher.nonce_u32(self.encode_nonce);
@@ -61,7 +60,7 @@ impl Encoder for APCodec {
     }
 }
 
-impl Decoder for APCodec {
+impl Decoder for ApCodec {
     type Item = (u8, Bytes);
     type Error = io::Error;
 

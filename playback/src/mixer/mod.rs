@@ -12,7 +12,7 @@ pub trait Mixer: Send {
 }
 
 pub trait AudioFilter {
-    fn modify_stream(&self, data: &mut [i16]);
+    fn modify_stream(&self, data: &mut [f32]);
 }
 
 #[cfg(feature = "alsa-backend")]
@@ -42,11 +42,13 @@ impl Default for MixerConfig {
 pub mod softmixer;
 use self::softmixer::SoftMixer;
 
+type MixerFn = fn(Option<MixerConfig>) -> Box<dyn Mixer>;
+
 fn mk_sink<M: Mixer + 'static>(device: Option<MixerConfig>) -> Box<dyn Mixer> {
     Box::new(M::open(device))
 }
 
-pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<fn(Option<MixerConfig>) -> Box<dyn Mixer>> {
+pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<MixerFn> {
     match name.as_ref().map(AsRef::as_ref) {
         None | Some("softvol") => Some(mk_sink::<SoftMixer>),
         #[cfg(feature = "alsa-backend")]
