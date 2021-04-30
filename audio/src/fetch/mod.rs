@@ -248,6 +248,7 @@ struct AudioFileShared {
     cond: Condvar,
     download_status: Mutex<AudioFileDownloadStatus>,
     download_strategy: Mutex<DownloadStrategy>,
+    number_of_open_requests: AtomicUsize,
     ping_time_ms: AtomicUsize,
     read_position: AtomicUsize,
 }
@@ -356,6 +357,7 @@ impl AudioFileStreaming {
                 downloaded: RangeSet::new(),
             }),
             download_strategy: Mutex::new(DownloadStrategy::RandomAccess()), // start with random access mode until someone tells us otherwise
+            number_of_open_requests: AtomicUsize::new(0),
             ping_time_ms: AtomicUsize::new(0),
             read_position: AtomicUsize::new(0),
         });
