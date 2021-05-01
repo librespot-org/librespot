@@ -768,15 +768,20 @@ async fn main() {
                 Some(event) => {
                     if let Some(program) = &setup.player_event_program {
                         if let Some(child) = run_program_on_events(event, program) {
-                            let mut child = child.expect("program failed to start");
+                            if child.is_ok() {
 
-                            tokio::spawn(async move {
-                                match child.wait().await  {
-                                    Ok(status) if !status.success() => error!("child exited with status {:?}", status.code()),
-                                    Err(e) => error!("failed to wait on child process: {}", e),
-                                    _ => {}
-                                }
-                            });
+                                let mut child = child.unwrap();
+
+                                tokio::spawn(async move {
+                                    match child.wait().await  {
+                                        Ok(status) if !status.success() => error!("child exited with status {:?}", status.code()),
+                                        Err(e) => error!("failed to wait on child process: {}", e),
+                                        _ => {}
+                                    }
+                                });
+                            } else {
+                                error!("program failed to start");
+                            }
                         }
                     }
                 },
