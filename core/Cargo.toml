@@ -20,7 +20,7 @@ bytes = "1.0"
 form_urlencoded = "1.0"
 futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc", "bilock", "unstable", "sink"] }
-hmac = "0.10"
+hmac = "0.11"
 httparse = "1.3"
 http = "0.2"
 hyper = { version = "0.14", optional = true, features = ["client", "tcp", "http1"] }
@@ -30,7 +30,7 @@ num-bigint = { version = "0.4", features = ["rand"] }
 num-integer = "0.1"
 num-traits = "0.2"
 once_cell = "1.5.2"
-pbkdf2 = { version = "0.7", default-features = false, features = ["hmac"] }
+pbkdf2 = { version = "0.8", default-features = false, features = ["hmac"] }
 priority-queue = "1.1"
 protobuf = "~2.14.0"
 rand = "0.8"
