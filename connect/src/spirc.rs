@@ -352,7 +352,7 @@ impl Spirc {
         let _ = self.commands.send(SpircCommand::Shutdown);
     }
     pub fn shuffle(&self) {
-        let _ = self.commands.unbounded_send(SpircCommand::Shuffle);
+        let _ = self.commands.send(SpircCommand::Shuffle);
     }
 }
 
@@ -525,7 +525,6 @@ impl SpircTask {
             }
             SpircCommand::Shuffle => {
                 CommandSender::new(self, MessageType::kMessageTypeShuffle).send();
-                self.commands.close();
             }
         }
     }
