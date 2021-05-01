@@ -7,6 +7,7 @@ use std::task::Poll;
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
+use futures_util::FutureExt;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::protocol;
@@ -41,11 +42,7 @@ impl<T> Future for MercuryFuture<T> {
     type Output = Result<T, MercuryError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match Pin::new(&mut self.receiver).poll(cx) {
-            Poll::Ready(Ok(x)) => Poll::Ready(x),
-            Poll::Ready(Err(_)) => Poll::Ready(Err(MercuryError)),
-            Poll::Pending => Poll::Pending,
-        }
+        self.receiver.poll_unpin(cx).map_err(|_| MercuryError)?
     }
 }
 

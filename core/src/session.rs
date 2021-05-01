@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
-use futures_util::{future, StreamExt, TryStreamExt};
+use futures_util::{future, ready, StreamExt, TryStreamExt};
 use once_cell::sync::OnceCell;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -287,18 +287,17 @@ where
         };
 
         loop {
-            let (cmd, data) = match self.0.try_poll_next_unpin(cx) {
-                Poll::Ready(Some(Ok(t))) => t,
-                Poll::Ready(None) => {
+            let (cmd, data) = match ready!(self.0.try_poll_next_unpin(cx)) {
+                Some(Ok(t)) => t,
+                None => {
                     warn!("Connection to server closed.");
                     session.shutdown();
                     return Poll::Ready(Ok(()));
                 }
-                Poll::Ready(Some(Err(e))) => {
+                Some(Err(e)) => {
                     session.shutdown();
                     return Poll::Ready(Err(e));
                 }
-                Poll::Pending => return Poll::Pending,
             };
 
             session.dispatch(cmd, data);
