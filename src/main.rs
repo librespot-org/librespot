@@ -2,6 +2,7 @@ use futures_util::{future, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
 use log::{error, info, warn};
 use sha1::{Digest, Sha1};
+use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
@@ -98,6 +99,66 @@ pub fn get_credentials<F: FnOnce(&String) -> Option<String>>(
     }
 }
 
+#[derive(Debug, Error)]
+pub enum ParseFileSizeError {
+    #[error("empty argument")]
+    EmptyInput,
+    #[error("invalid suffix")]
+    InvalidSuffix,
+    #[error("invalid number: {0}")]
+    InvalidNumber(#[from] std::num::ParseFloatError),
+    #[error("non-finite number specified")]
+    NotFinite(f64),
+}
+
+pub fn parse_file_size(input: &str) -> Result<u64, ParseFileSizeError> {
+    use ParseFileSizeError::*;
+
+    let mut iter = input.chars();
+    let mut suffix = iter.next_back().ok_or(EmptyInput)?;
+    let mut suffix_len = 0;
+
+    let iec = matches!(suffix, 'i' | 'I');
+
+    if iec {
+        suffix_len += 1;
+        suffix = iter.next_back().ok_or(InvalidSuffix)?;
+    }
+
+    let base: u64 = if iec { 1024 } else { 1000 };
+
+    suffix_len += 1;
+    let exponent = match suffix.to_ascii_uppercase() {
+        '0'..='9' if !iec => {
+            suffix_len -= 1;
+            0
+        }
+        'K' => 1,
+        'M' => 2,
+        'G' => 3,
+        'T' => 4,
+        'P' => 5,
+        'E' => 6,
+        'Z' => 7,
+        'Y' => 8,
+        _ => return Err(InvalidSuffix),
+    };
+
+    let num = {
+        let mut iter = input.chars();
+
+        for _ in (&mut iter).rev().take(suffix_len) {}
+
+        iter.as_str().parse::<f64>()?
+    };
+
+    if !num.is_finite() {
+        return Err(NotFinite(num));
+    }
+
+    Ok((num * base.pow(exponent) as f64) as u64)
+}
+
 fn print_version() {
     println!(
         "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
@@ -140,6 +201,11 @@ fn get_setup(args: &[String]) -> Setup {
         "system-cache",
         "Path to a directory where system files (credentials, volume) will be cached. Can be different from cache option value",
         "SYTEMCACHE",
+    ).optopt(
+        "",
+        "cache-size-limit",
+        "Limits the size of the cache for audio files.",
+        "CACHE_SIZE_LIMIT"
     ).optflag("", "disable-audio-cache", "Disable caching of the audio data.")
         .optopt("n", "name", "Device name", "NAME")
         .optopt("", "device-type", "Displayed device type", "DEVICE_TYPE")
@@ -367,7 +433,22 @@ fn get_setup(args: &[String]) -> Setup {
                 .map(|p| p.into());
         }
 
-        match Cache::new(system_dir, audio_dir) {
+        let limit = if audio_dir.is_some() {
+            matches
+                .opt_str("cache-size-limit")
+                .as_deref()
+                .map(parse_file_size)
+                .map(|e| {
+                    e.unwrap_or_else(|e| {
+                        eprintln!("Invalid argument passed as cache size limit: {}", e);
+                        exit(1);
+                    })
+                })
+        } else {
+            None
+        };
+
+        match Cache::new(system_dir, audio_dir, limit) {
             Ok(cache) => Some(cache),
             Err(e) => {
                 warn!("Cannot create cache: {}", e);

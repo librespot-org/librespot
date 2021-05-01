@@ -728,6 +728,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
+
+[[package]]
 name = "headers"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -910,6 +916,16 @@ checksum = "de74b9dd780476e837e5eb5ab7c88b49ed304126e412030a0adba99c8efe79ea"
 dependencies = [
  "cc",
  "libc",
+]
+
+[[package]]
+name = "indexmap"
+version = "1.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "824845a0bf897a9042383849b02c1bc219c2383772efcd5c6f9766fa4b81aef3"
+dependencies = [
+ "autocfg",
+ "hashbrown",
 ]
 
 [[package]]
@@ -1131,6 +1147,7 @@ dependencies = [
  "log",
  "rpassword",
  "sha-1",
+ "thiserror",
  "tokio",
  "url",
 ]
@@ -1207,6 +1224,7 @@ dependencies = [
  "num-traits",
  "once_cell",
  "pbkdf2",
+ "priority-queue",
  "protobuf",
  "rand",
  "serde",
@@ -1722,6 +1740,16 @@ name = "pretty-hex"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5c99d529f0d30937f6f4b8a86d988047327bb88d04d2c4afc356de74722131"
+
+[[package]]
+name = "priority-queue"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f16f1277a63996195ef38361e2c909314614c6f25f2ac4968f87dfd94a625d3d"
+dependencies = [
+ "autocfg",
+ "indexmap",
+]
 
 [[package]]
 name = "proc-macro-crate"
