@@ -1,5 +1,3 @@
-extern crate glob;
-
 use std::{
     env, fs,
     ops::Deref,
