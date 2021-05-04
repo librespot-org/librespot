@@ -1,6 +1,6 @@
 [package]
 name = "librespot-connect"
-version = "0.1.6"
+version = "0.2.0"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The discovery and Spotify Connect logic for librespot"
 license = "MIT"
@@ -30,15 +30,15 @@ dns-sd = { version = "0.1.3", optional = true }
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.1.6"
+version = "0.2.0"
 
 [dependencies.librespot-playback]
 path = "../playback"
-version = "0.1.6"
+version = "0.2.0"
 
 [dependencies.librespot-protocol]
 path = "../protocol"
-version = "0.1.6"
+version = "0.2.0"
 
 [features]
 with-dns-sd = ["dns-sd"]
