@@ -30,7 +30,6 @@ portaudio-rs    = { version = "0.3", optional = true }
 libpulse-binding        = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 jack            = { version = "0.6", optional = true }
-libc            = { version = "0.2", optional = true }
 sdl2            = { version = "0.34.3", optional = true }
 gstreamer       = { version = "0.16", optional = true }
 gstreamer-app   = { version = "0.16", optional = true }

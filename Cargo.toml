@@ -49,7 +49,7 @@ version = "0.1.6"
 base64 = "0.13"
 env_logger =  {version = "0.8", default-features = false, features = ["termcolor","humantime","atty"]}
 futures-util = { version = "0.3", default_features = false }
-getopts = "0.2"
+getopts = "0.2.21"
 hex = "0.4"
 hyper = "0.14"
 log = "0.4"

@@ -102,18 +102,18 @@ impl Discovery {
         let base_key = &base_key[..16];
 
         let checksum_key = {
-            let mut h = HmacSha1::new_varkey(base_key).expect("HMAC can take key of any size");
+            let mut h = HmacSha1::new_from_slice(base_key).expect("HMAC can take key of any size");
             h.update(b"checksum");
             h.finalize().into_bytes()
         };
 
         let encryption_key = {
-            let mut h = HmacSha1::new_varkey(&base_key).expect("HMAC can take key of any size");
+            let mut h = HmacSha1::new_from_slice(&base_key).expect("HMAC can take key of any size");
             h.update(b"encryption");
             h.finalize().into_bytes()
         };
 
-        let mut h = HmacSha1::new_varkey(&checksum_key).expect("HMAC can take key of any size");
+        let mut h = HmacSha1::new_from_slice(&checksum_key).expect("HMAC can take key of any size");
         h.update(encrypted);
         if h.verify(cksum).is_err() {
             warn!("Login error for user {:?}: MAC mismatch", username);
