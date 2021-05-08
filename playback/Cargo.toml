@@ -29,7 +29,7 @@ alsa            = { version = "0.5", optional = true }
 portaudio-rs    = { version = "0.3", optional = true }
 libpulse-binding        = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
-jack            = { version = "0.6", optional = true }
+jack            = { version = "0.7", optional = true }
 sdl2            = { version = "0.34.3", optional = true }
 gstreamer       = { version = "0.16", optional = true }
 gstreamer-app   = { version = "0.16", optional = true }
