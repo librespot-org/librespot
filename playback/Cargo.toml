@@ -34,7 +34,7 @@ sdl2            = { version = "0.34.3", optional = true }
 gstreamer       = { version = "0.16", optional = true }
 gstreamer-app   = { version = "0.16", optional = true }
 glib            = { version = "0.10", optional = true }
-zerocopy        = { version = "0.3" }
+zerocopy        = { version = "0.5" }
 
 # Rodio dependencies
 rodio           = { version = "0.13", optional = true, default-features = false }
