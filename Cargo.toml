@@ -47,7 +47,7 @@ version = "0.2.0"
 
 [dependencies]
 base64 = "0.13"
-env_logger =  {version = "0.8", default-features = false, features = ["termcolor","humantime","atty"]}
+env_logger =  {version = "0.8", default-features = false, features = ["humantime"]}
 futures-util = { version = "0.3", default_features = false }
 getopts = "0.2.21"
 hex = "0.4"
@@ -74,7 +74,9 @@ with-vorbis = ["librespot-audio/with-vorbis"]
 
 with-dns-sd = ["librespot-connect/with-dns-sd"]
 
-default = ["rodio-backend"]
+colored-output = ["env_logger/termcolor", "env_logger/atty"]
+
+default = ["colored-output", "rodio-backend"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
