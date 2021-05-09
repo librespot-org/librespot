@@ -538,10 +538,10 @@ impl PlayerState {
                     play_request_id,
                     loaded_track: PlayerLoadedTrackData {
                         decoder,
-                        duration_ms,
-                        bytes_per_second,
                         normalisation_factor,
                         stream_loader_controller,
+                        bytes_per_second,
+                        duration_ms,
                         stream_position_pcm,
                     },
                 };

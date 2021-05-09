@@ -8,6 +8,7 @@ use std::task::Poll;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_util::FutureExt;
+use protobuf::Message;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::protocol;
@@ -123,8 +124,8 @@ impl MercuryManager {
                     if !response.payload.is_empty() {
                         // Old subscription protocol, watch the provided list of URIs
                         for sub in response.payload {
-                            let mut sub: protocol::pubsub::Subscription =
-                                protobuf::parse_from_bytes(&sub).unwrap();
+                            let mut sub =
+                                protocol::pubsub::Subscription::parse_from_bytes(&sub).unwrap();
                             let sub_uri = sub.take_uri();
 
                             debug!("subscribed sub_uri={}", sub_uri);
@@ -192,7 +193,7 @@ impl MercuryManager {
 
     fn complete_request(&self, cmd: u8, mut pending: MercuryPending) {
         let header_data = pending.parts.remove(0);
-        let header: protocol::mercury::Header = protobuf::parse_from_bytes(&header_data).unwrap();
+        let header = protocol::mercury::Header::parse_from_bytes(&header_data).unwrap();
 
         let response = MercuryResponse {
             uri: header.get_uri().to_string(),
