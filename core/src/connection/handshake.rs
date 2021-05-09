@@ -102,7 +102,7 @@ where
     let header = read_into_accumulator(connection, 4, acc).await?;
     let size = BigEndian::read_u32(header) as usize;
     let data = read_into_accumulator(connection, size - 4, acc).await?;
-    let message = protobuf::parse_from_bytes(data).unwrap();
+    let message = M::parse_from_bytes(data).unwrap();
     Ok(message)
 }
 

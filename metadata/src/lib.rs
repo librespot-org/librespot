@@ -14,6 +14,7 @@ use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId};
 use librespot_protocol as protocol;
+use protobuf::Message;
 
 pub use crate::protocol::metadata::AudioFile_Format as FileFormat;
 
@@ -123,7 +124,7 @@ pub trait Metadata: Send + Sized + 'static {
         let uri = Self::request_url(id);
         let response = session.mercury().get(uri).await?;
         let data = response.payload.first().expect("Empty payload");
-        let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
+        let msg = Self::Message::parse_from_bytes(data).unwrap();
 
         Ok(Self::parse(&msg, &session))
     }
