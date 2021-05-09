@@ -281,7 +281,7 @@ dependencies = [
  "alsa",
  "core-foundation-sys",
  "coreaudio-rs",
- "jack",
+ "jack 0.6.6",
  "jni",
  "js-sys",
  "lazy_static",
@@ -953,6 +953,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "jack"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "370ed0ab943f1484a94d6328bf612907f5de2748531b873994f513d8806e9d9d"
+dependencies = [
+ "bitflags",
+ "jack-sys",
+ "lazy_static",
+ "libc",
+]
+
+[[package]]
 name = "jack-sys"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1251,7 +1263,7 @@ dependencies = [
  "glib",
  "gstreamer",
  "gstreamer-app",
- "jack",
+ "jack 0.7.0",
  "libpulse-binding",
  "libpulse-simple-binding",
  "librespot-audio",
