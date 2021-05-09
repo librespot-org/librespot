@@ -1187,6 +1187,7 @@ dependencies = [
  "form_urlencoded",
  "futures-util",
  "librespot-core",
+ "librespot-discovery",
  "librespot-playback",
  "librespot-protocol",
  "log",

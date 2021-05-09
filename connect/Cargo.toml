@@ -29,3 +29,10 @@ version = "0.2.0"
 [dependencies.librespot-protocol]
 path = "../protocol"
 version = "0.2.0"
+
+[dependencies.librespot-discovery]
+path = "../discovery"
+version = "0.2.0"
+
+[features]
+with-dns-sd = ["librespot-discovery/with-dns-sd"]
