@@ -799,8 +799,13 @@ impl PlayerTrackLoader {
                         e
                     );
 
-                    // unwrap safety: The file is cached, so session must have a cache
-                    if !self.session.cache().unwrap().remove_file(file_id) {
+                    if self
+                        .session
+                        .cache()
+                        .expect("If the audio file is cached, a cache should exist")
+                        .remove_file(file_id)
+                        .is_err()
+                    {
                         return None;
                     }
 

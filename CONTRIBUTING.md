@@ -29,6 +29,8 @@ In order to prepare for a PR, you will need to do a couple of things first:
 
 Make any changes that you are going to make to the code, but do not commit yet.
 
+Unless your changes are negligible, please add an entry in the "Unreleased" section of `CHANGELOG.md`. Refer to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) for instructions on how this entry should look like.
+
 Make sure that the code is correctly formatted by running:
 ```bash
 cargo +stable fmt --all
@@ -43,7 +45,7 @@ cargo build
 Once it has built, and you have confirmed there are no warnings or errors, you should commit your changes.
 
 ```bash
-git commit -a -m “My fancy fix”
+git commit -a -m "My fancy fix"
 ```
 
 **N.B.** Please, for the sake of a readable history, do not bundle multiple major changes into a single commit. Instead, break it up into multiple commits.

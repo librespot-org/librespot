@@ -1,6 +1,6 @@
 [package]
 name = "librespot-playback"
-version = "0.1.6"
+version = "0.2.0"
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
 description = "The audio playback logic for librespot"
 license = "MIT"
@@ -9,13 +9,13 @@ edition = "2018"
 
 [dependencies.librespot-audio]
 path = "../audio"
-version = "0.1.6"
+version = "0.2.0"
 [dependencies.librespot-core]
 path = "../core"
-version = "0.1.6"
+version = "0.2.0"
 [dependencies.librespot-metadata]
 path = "../metadata"
-version = "0.1.6"
+version = "0.2.0"
 
 [dependencies]
 futures-executor = "0.3"
@@ -29,8 +29,7 @@ alsa            = { version = "0.5", optional = true }
 portaudio-rs    = { version = "0.3", optional = true }
 libpulse-binding        = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
-jack            = { version = "0.6", optional = true }
-libc            = { version = "0.2", optional = true }
+jack            = { version = "0.7", optional = true }
 sdl2            = { version = "0.34.3", optional = true }
 gstreamer       = { version = "0.16", optional = true }
 gstreamer-app   = { version = "0.16", optional = true }
