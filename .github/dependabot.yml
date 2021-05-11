@@ -5,4 +5,4 @@ updates:
     schedule:
       interval: "daily"
     allow:
-      dependency-type: "all"
+      - dependency-type: "all"
