@@ -69,8 +69,8 @@ rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
-with-tremor = ["librespot-audio/with-tremor"]
-with-vorbis = ["librespot-audio/with-vorbis"]
+with-tremor = ["librespot-playback/with-tremor"]
+with-vorbis = ["librespot-playback/with-vorbis"]
 
 with-dns-sd = ["librespot-connect/with-dns-sd"]
 

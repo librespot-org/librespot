@@ -1159,17 +1159,11 @@ dependencies = [
  "aes-ctr",
  "byteorder",
  "bytes",
- "cfg-if 1.0.0",
  "futures-util",
- "lewton",
  "librespot-core",
- "librespot-tremor",
  "log",
- "ogg",
  "tempfile",
  "tokio",
- "vorbis",
- "zerocopy",
 ]
 
 [[package]]
@@ -1257,6 +1251,7 @@ version = "0.2.0"
 dependencies = [
  "alsa",
  "byteorder",
+ "cfg-if 1.0.0",
  "cpal",
  "futures-executor",
  "futures-util",
@@ -1264,18 +1259,22 @@ dependencies = [
  "gstreamer",
  "gstreamer-app",
  "jack 0.7.0",
+ "lewton",
  "libpulse-binding",
  "libpulse-simple-binding",
  "librespot-audio",
  "librespot-core",
  "librespot-metadata",
+ "librespot-tremor",
  "log",
+ "ogg",
  "portaudio-rs",
  "rodio",
  "sdl2",
  "shell-words",
  "thiserror",
  "tokio",
+ "vorbis",
  "zerocopy",
 ]
 

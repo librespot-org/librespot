@@ -7,5 +7,7 @@ use librespot_metadata as metadata;
 
 pub mod audio_backend;
 pub mod config;
+mod convert;
+mod decoder;
 pub mod mixer;
 pub mod player;

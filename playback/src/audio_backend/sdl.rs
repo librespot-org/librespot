@@ -1,6 +1,7 @@
 use super::{Open, Sink};
-use crate::audio::{convert, AudioPacket};
 use crate::config::AudioFormat;
+use crate::convert;
+use crate::decoder::AudioPacket;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use std::{io, thread, time};
