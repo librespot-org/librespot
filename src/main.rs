@@ -618,15 +618,15 @@ fn get_setup(args: &[String]) -> Setup {
         PlayerConfig {
             bitrate,
             gapless,
+            passthrough,
             normalisation,
-            normalisation_method,
             normalisation_type,
+            normalisation_method,
             normalisation_pregain,
             normalisation_threshold,
             normalisation_attack,
             normalisation_release,
             normalisation_knee,
-            passthrough,
             ditherer,
             noise_shaper,
         }

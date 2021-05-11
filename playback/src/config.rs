@@ -1,6 +1,6 @@
 pub use crate::audio::convert::i24;
-pub use crate::audio::dither::{mk_ditherer, Ditherer};
-pub use crate::audio::shape_noise::{mk_noise_shaper, NoiseShaper};
+pub use crate::audio::dither::{Ditherer, DithererBuilder};
+pub use crate::audio::shape_noise::{NoiseShaper, NoiseShaperBuilder};
 use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;
@@ -120,6 +120,9 @@ impl Default for NormalisationMethod {
 #[derive(Clone)]
 pub struct PlayerConfig {
     pub bitrate: Bitrate,
+    pub gapless: bool,
+    pub passthrough: bool,
+
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
     pub normalisation_method: NormalisationMethod,
@@ -128,13 +131,11 @@ pub struct PlayerConfig {
     pub normalisation_attack: f32,
     pub normalisation_release: f32,
     pub normalisation_knee: f32,
-    pub gapless: bool,
-    pub passthrough: bool,
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
     // (thereby circumventing Send bounds that they might not satisfy)
-    pub ditherer: fn() -> Box<dyn Ditherer>,
-    pub noise_shaper: fn() -> Box<dyn NoiseShaper>,
+    pub ditherer: DithererBuilder,
+    pub noise_shaper: NoiseShaperBuilder,
 }
 
 impl Default for PlayerConfig {
@@ -151,8 +152,8 @@ impl Default for PlayerConfig {
             normalisation_knee: 1.0,
             gapless: true,
             passthrough: false,
-            ditherer: Ditherer::default(),
-            noise_shaper: NoiseShaper::default(),
+            ditherer: <dyn Ditherer>::default(),
+            noise_shaper: <dyn NoiseShaper>::default(),
         }
     }
 }
