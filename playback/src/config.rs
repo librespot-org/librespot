@@ -1,4 +1,6 @@
+use super::player::NormalisationData;
 use crate::convert::i24;
+
 use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;
@@ -138,7 +140,7 @@ impl Default for PlayerConfig {
             normalisation_type: NormalisationType::default(),
             normalisation_method: NormalisationMethod::default(),
             normalisation_pregain: 0.0,
-            normalisation_threshold: -1.0,
+            normalisation_threshold: NormalisationData::db_to_ratio(-1.0),
             normalisation_attack: 0.005,
             normalisation_release: 0.1,
             normalisation_knee: 1.0,

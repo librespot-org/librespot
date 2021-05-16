@@ -557,26 +557,26 @@ fn get_setup(args: &[String]) -> Setup {
                 .opt_str("normalisation-pregain")
                 .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
                 .unwrap_or(PlayerConfig::default().normalisation_pregain),
-            normalisation_threshold: NormalisationData::db_to_ratio(
-                matches
-                    .opt_str("normalisation-threshold")
-                    .map(|threshold| {
+            normalisation_threshold: matches
+                .opt_str("normalisation-threshold")
+                .map(|threshold| {
+                    NormalisationData::db_to_ratio(
                         threshold
                             .parse::<f32>()
-                            .expect("Invalid threshold float value")
-                    })
-                    .unwrap_or(PlayerConfig::default().normalisation_threshold),
-            ),
+                            .expect("Invalid threshold float value"),
+                    )
+                })
+                .unwrap_or(PlayerConfig::default().normalisation_threshold),
             normalisation_attack: matches
                 .opt_str("normalisation-attack")
-                .map(|attack| attack.parse::<f32>().expect("Invalid attack float value"))
-                .unwrap_or(PlayerConfig::default().normalisation_attack * MILLIS)
-                / MILLIS,
+                .map(|attack| attack.parse::<f32>().expect("Invalid attack float value") / MILLIS)
+                .unwrap_or(PlayerConfig::default().normalisation_attack),
             normalisation_release: matches
                 .opt_str("normalisation-release")
-                .map(|release| release.parse::<f32>().expect("Invalid release float value"))
-                .unwrap_or(PlayerConfig::default().normalisation_release * MILLIS)
-                / MILLIS,
+                .map(|release| {
+                    release.parse::<f32>().expect("Invalid release float value") / MILLIS
+                })
+                .unwrap_or(PlayerConfig::default().normalisation_release),
             normalisation_knee: matches
                 .opt_str("normalisation-knee")
                 .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
