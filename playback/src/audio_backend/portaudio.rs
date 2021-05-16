@@ -1,6 +1,7 @@
 use super::{Open, Sink};
-use crate::audio::{convert, AudioPacket, Requantizer};
 use crate::config::AudioFormat;
+use crate::convert::{self, Requantizer};
+use crate::decoder::AudioPacket;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
 use portaudio_rs::stream::*;

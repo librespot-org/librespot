@@ -1,6 +1,6 @@
-pub use crate::audio::convert::i24;
-pub use crate::audio::dither::{Ditherer, DithererBuilder};
-pub use crate::audio::shape_noise::{NoiseShaper, NoiseShaperBuilder};
+use crate::convert::i24;
+pub use crate::dither::{Ditherer, DithererBuilder};
+pub use crate::shape_noise::{NoiseShaper, NoiseShaperBuilder};
 use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;

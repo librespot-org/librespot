@@ -146,7 +146,7 @@ pub async fn authenticate(
     let (cmd, data) = transport.next().await.expect("EOF")?;
     match cmd {
         0xac => {
-            let welcome_data: APWelcome = protobuf::parse_from_bytes(data.as_ref())?;
+            let welcome_data = APWelcome::parse_from_bytes(data.as_ref())?;
 
             let reusable_credentials = Credentials {
                 username: welcome_data.get_canonical_username().to_owned(),
@@ -157,7 +157,7 @@ pub async fn authenticate(
             Ok(reusable_credentials)
         }
         0xad => {
-            let error_data: APLoginFailed = protobuf::parse_from_bytes(data.as_ref())?;
+            let error_data = APLoginFailed::parse_from_bytes(data.as_ref())?;
             Err(error_data.into())
         }
         _ => {

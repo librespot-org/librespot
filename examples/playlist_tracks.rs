@@ -1,4 +1,3 @@
-use env_logger;
 use std::env;
 
 use librespot::core::authentication::Credentials;

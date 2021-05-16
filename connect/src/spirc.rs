@@ -272,7 +272,7 @@ impl Spirc {
                 .flatten_stream()
                 .map(|response| -> Frame {
                     let data = response.payload.first().unwrap();
-                    protobuf::parse_from_bytes(data).unwrap()
+                    Frame::parse_from_bytes(data).unwrap()
                 }),
         );
 

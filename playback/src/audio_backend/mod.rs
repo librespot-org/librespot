@@ -1,5 +1,6 @@
-use crate::audio::{AudioPacket, Requantizer};
 use crate::config::AudioFormat;
+use crate::convert::Requantizer;
+use crate::decoder::AudioPacket;
 use std::io;
 
 pub trait Open {
@@ -30,7 +31,7 @@ fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat
 macro_rules! sink_as_bytes {
     () => {
         fn write(&mut self, packet: &AudioPacket, requantizer: &mut Requantizer) -> io::Result<()> {
-            use crate::audio::convert::{self, i24};
+            use crate::convert::{self, i24};
             use zerocopy::AsBytes;
             match packet {
                 AudioPacket::Samples(samples) => match self.format {

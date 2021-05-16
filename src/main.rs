@@ -6,8 +6,6 @@ use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
-use librespot::audio::dither::{self, mk_ditherer, HighPassDitherer, NoDithering};
-use librespot::audio::shape_noise::{self};
 use librespot::connect::spirc::Spirc;
 use librespot::core::authentication::Credentials;
 use librespot::core::cache::Cache;
@@ -18,8 +16,10 @@ use librespot::playback::audio_backend::{self, Sink, BACKENDS};
 use librespot::playback::config::{
     AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig,
 };
+use librespot::playback::dither::{self, mk_ditherer, HighPassDitherer, NoDithering};
 use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{NormalisationData, Player};
+use librespot::playback::shape_noise::{self};
 
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};

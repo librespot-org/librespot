@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- [audio] Add support for dithering with `--dither` for lower requantization error (breaking)
-- [audio] Add support for noise shaping with `--shape-noise` for lower perceived noise (breaking)
+- [playback] Add support for dithering with `--dither` for lower requantization error (breaking)
+- [playback] Add support for noise shaping with `--shape-noise` for lower perceived noise (breaking)
+
+### Changed
+
+* [audio, playback] Moved `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `AudioError`, `AudioDecoder` and the `convert` module from `librespot-audio` to `librespot-playback`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly. (breaking)
 
 ## [0.2.0] - 2021-05-04
 

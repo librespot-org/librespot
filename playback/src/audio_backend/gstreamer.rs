@@ -1,6 +1,7 @@
 use super::{Open, Sink, SinkAsBytes};
-use crate::audio::{AudioPacket, Requantizer};
 use crate::config::AudioFormat;
+use crate::convert::Requantizer;
+use crate::decoder::AudioPacket;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 
 use gstreamer as gst;
