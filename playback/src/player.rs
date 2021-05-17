@@ -233,6 +233,10 @@ impl NormalisationData {
     }
 
     fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
+        if !config.normalisation {
+            return 1.0;
+        }
+
         let [gain_db, gain_peak] = match config.normalisation_type {
             NormalisationType::Album => [data.album_gain_db, data.album_peak],
             NormalisationType::Track => [data.track_gain_db, data.track_peak],
