@@ -6,14 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) since v0.2.0.
 
 ## [Unreleased]
-
-### Removed
-* [audio] Removed `with-vorbis` and `with-tremor` features
-* [audio] Removed `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `AudioError`, `AudioDecoder` and the `convert` module from `librespot_audio`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly.
+### Changed
+* [audio, playback] Moved VorbisDecoder, VorbisError, AudioPacket, PassthroughDecoder, PassthroughError, AudioError, AudioDecoder and the convert module from librespot-audio to librespot-playback. The underlying crates vorbis, librespot-tremor, lewton and ogg should be used directly. (breaking)
 
 ### Fixed
-
 * [playback] Incorrect `PlayerConfig::default().normalisation_threshold` caused distortion when using dynamic volume normalisation downstream
+
+### Removed
+* [playback] Removed `with-vorbis` and `with-tremor` features
 
 ## [0.2.0] - 2021-05-04
 
