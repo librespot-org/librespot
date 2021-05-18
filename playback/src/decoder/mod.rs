@@ -1,16 +1,7 @@
 use std::fmt;
 
-use cfg_if::cfg_if;
-
-cfg_if! {
-    if #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))] {
-        mod libvorbis_decoder;
-        pub use libvorbis_decoder::{VorbisDecoder, VorbisError};
-    } else {
-        mod lewton_decoder;
-        pub use lewton_decoder::{VorbisDecoder, VorbisError};
-    }
-}
+mod lewton_decoder;
+pub use lewton_decoder::{VorbisDecoder, VorbisError};
 
 mod passthrough_decoder;
 pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
