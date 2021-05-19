@@ -17,15 +17,15 @@ impl i24 {
     }
 }
 
-pub struct Requantizer {
+pub struct Converter {
     ditherer: Box<dyn Ditherer>,
     noise_shaper: Box<dyn NoiseShaper>,
 }
 
-impl Requantizer {
+impl Converter {
     pub fn new(ditherer: Box<dyn Ditherer>, noise_shaper: Box<dyn NoiseShaper>) -> Self {
         info!(
-            "Requantizing with ditherer: {} and noise shaper: {}",
+            "Converting with ditherer: {} and noise shaper: {}",
             ditherer, noise_shaper
         );
         Self {
@@ -67,43 +67,43 @@ impl Requantizer {
         let noise = self.ditherer.noise(sample);
         self.noise_shaper.shape(sample, noise)
     }
-}
 
-// https://doc.rust-lang.org/nomicon/casts.html: casting float to integer
-// rounds towards zero, then saturates. Ideally halves should round to even to
-// prevent any bias, but since it is extremely unlikely that a float has
-// *exactly* .5 as fraction, this should be more than precise enough.
-pub fn to_s32(samples: &[f32], requantizer: &mut Requantizer) -> Vec<i32> {
-    samples
-        .iter()
-        .map(|sample| requantizer.scale(*sample, std::i32::MAX) as i32)
-        .collect()
-}
+    // https://doc.rust-lang.org/nomicon/casts.html: casting float to integer
+    // rounds towards zero, then saturates. Ideally halves should round to even to
+    // prevent any bias, but since it is extremely unlikely that a float has
+    // *exactly* .5 as fraction, this should be more than precise enough.
+    pub fn f32_to_s32(&mut self, samples: &[f32]) -> Vec<i32> {
+        samples
+            .iter()
+            .map(|sample| self.scale(*sample, std::i32::MAX) as i32)
+            .collect()
+    }
 
-// S24 is 24-bit PCM packed in an upper 32-bit word
-pub fn to_s24(samples: &[f32], requantizer: &mut Requantizer) -> Vec<i32> {
-    samples
-        .iter()
-        .map(|sample| requantizer.clamping_scale(*sample, i24::MIN, i24::MAX) as i32)
-        .collect()
-}
+    // S24 is 24-bit PCM packed in an upper 32-bit word
+    pub fn f32_to_s24(&mut self, samples: &[f32]) -> Vec<i32> {
+        samples
+            .iter()
+            .map(|sample| self.clamping_scale(*sample, i24::MIN, i24::MAX) as i32)
+            .collect()
+    }
 
-// S24_3 is 24-bit PCM in a 3-byte array
-pub fn to_s24_3(samples: &[f32], requantizer: &mut Requantizer) -> Vec<i24> {
-    samples
-        .iter()
-        .map(|sample| {
-            // Not as DRY as calling to_s24 first, but this saves iterating
-            // over all samples twice.
-            let int_value = requantizer.clamping_scale(*sample, i24::MIN, i24::MAX) as i32;
-            i24::from_s24(int_value)
-        })
-        .collect()
-}
+    // S24_3 is 24-bit PCM in a 3-byte array
+    pub fn f32_to_s24_3(&mut self, samples: &[f32]) -> Vec<i24> {
+        samples
+            .iter()
+            .map(|sample| {
+                // Not as DRY as calling f32_to_s24 first, but this saves iterating
+                // over all samples twice.
+                let int_value = self.clamping_scale(*sample, i24::MIN, i24::MAX) as i32;
+                i24::from_s24(int_value)
+            })
+            .collect()
+    }
 
-pub fn to_s16(samples: &[f32], requantizer: &mut Requantizer) -> Vec<i16> {
-    samples
-        .iter()
-        .map(|sample| requantizer.scale(*sample, std::i16::MAX as i32) as i16)
-        .collect()
+    pub fn f32_to_s16(&mut self, samples: &[f32]) -> Vec<i16> {
+        samples
+            .iter()
+            .map(|sample| self.scale(*sample, std::i16::MAX as i32) as i16)
+            .collect()
+    }
 }

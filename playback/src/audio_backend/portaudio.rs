@@ -1,6 +1,6 @@
 use super::{Open, Sink};
 use crate::config::AudioFormat;
-use crate::convert::{self, Requantizer};
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
@@ -144,7 +144,7 @@ impl<'a> Sink for PortAudioSink<'a> {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket, requantizer: &mut Requantizer) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
         macro_rules! write_sink {
             (ref mut $stream: expr, $samples: expr) => {
                 $stream.as_mut().unwrap().write($samples)
@@ -157,11 +157,11 @@ impl<'a> Sink for PortAudioSink<'a> {
                 write_sink!(ref mut stream, samples)
             }
             Self::S32(stream, _parameters) => {
-                let samples_s32: &[i32] = &convert::to_s32(samples, requantizer);
+                let samples_s32: &[i32] = &converter.f32_to_s32(samples);
                 write_sink!(ref mut stream, samples_s32)
             }
             Self::S16(stream, _parameters) => {
-                let samples_s16: &[i16] = &convert::to_s16(samples, requantizer);
+                let samples_s16: &[i16] = &converter.f32_to_s16(samples);
                 write_sink!(ref mut stream, samples_s16)
             }
         };

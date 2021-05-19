@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use super::Sink;
 use crate::config::AudioFormat;
-use crate::convert::{self, Requantizer};
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 
@@ -174,7 +174,7 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
 }
 
 impl Sink for RodioSink {
-    fn write(&mut self, packet: &AudioPacket, requantizer: &mut Requantizer) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
         let samples = packet.samples();
         match self.format {
             AudioFormat::F32 => {
@@ -183,7 +183,7 @@ impl Sink for RodioSink {
                 self.rodio_sink.append(source);
             }
             AudioFormat::S16 => {
-                let samples_s16: &[i16] = &convert::to_s16(samples, requantizer);
+                let samples_s16: &[i16] = &converter.f32_to_s16(samples);
                 let source = rodio::buffer::SamplesBuffer::new(
                     NUM_CHANNELS as u16,
                     SAMPLE_RATE,
