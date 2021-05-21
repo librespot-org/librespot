@@ -7,9 +7,6 @@ use zerocopy::AsBytes;
 #[repr(transparent)]
 pub struct i24([u8; 3]);
 impl i24 {
-    pub const MIN: i32 = -8388608;
-    pub const MAX: i32 = 8388607;
-
     fn from_s24(sample: i32) -> Self {
         // trim the padding in the most significant byte
         let [a, b, c, _d] = sample.to_le_bytes();
@@ -35,13 +32,10 @@ impl Converter {
     }
 
     // Denormalize, dither and shape noise
-    pub fn scale(&mut self, sample: f32, max: i32) -> f32 {
-        // Losslessly represent [-1.0..1.0] as some signed integer value while
-        // maintaining DC linearity. There is nothing to be gained by doing
-        // this in f64, as the significand of a f32 is 24 bits, just like the
-        // maximum bit depth we are converting to. Taken from:
-        // http://blog.bjornroche.com/2009/12/int-float-int-its-jungle-out-there.html
-        let int_value = sample * (max as f32 + 0.5) - 0.5;
+    pub fn scale(&mut self, sample: f32, factor: i64) -> f32 {
+        // From the many float to int conversion methods available, match what
+        // the reference Vorbis implementation uses: sample * 32768 (for 16 bit)
+        let int_value = sample * factor as f32;
         self.shaped_dither(int_value)
     }
 
@@ -50,11 +44,13 @@ impl Converter {
     // byte is zero. Otherwise, dithering may cause an overflow. This is not
     // necessary for other formats, because casting to integer will saturate
     // to the bounds of the primitive.
-    pub fn clamping_scale(&mut self, sample: f32, min: i32, max: i32) -> f32 {
-        let int_value = self.scale(sample, max);
+    pub fn clamping_scale(&mut self, sample: f32, factor: i64) -> f32 {
+        let int_value = self.scale(sample, factor);
 
-        let min = min as f32;
-        let max = max as f32;
+        // In two's complement, there are more negative than positive values.
+        let min = -factor as f32;
+        let max = (factor - 1) as f32;
+
         if int_value < min {
             return min;
         } else if int_value > max {
@@ -75,7 +71,7 @@ impl Converter {
     pub fn f32_to_s32(&mut self, samples: &[f32]) -> Vec<i32> {
         samples
             .iter()
-            .map(|sample| self.scale(*sample, std::i32::MAX) as i32)
+            .map(|sample| self.scale(*sample, 0x80000000) as i32)
             .collect()
     }
 
@@ -83,7 +79,7 @@ impl Converter {
     pub fn f32_to_s24(&mut self, samples: &[f32]) -> Vec<i32> {
         samples
             .iter()
-            .map(|sample| self.clamping_scale(*sample, i24::MIN, i24::MAX) as i32)
+            .map(|sample| self.clamping_scale(*sample, 0x800000) as i32)
             .collect()
     }
 
@@ -94,7 +90,7 @@ impl Converter {
             .map(|sample| {
                 // Not as DRY as calling f32_to_s24 first, but this saves iterating
                 // over all samples twice.
-                let int_value = self.clamping_scale(*sample, i24::MIN, i24::MAX) as i32;
+                let int_value = self.clamping_scale(*sample, 0x800000) as i32;
                 i24::from_s24(int_value)
             })
             .collect()
@@ -103,7 +99,7 @@ impl Converter {
     pub fn f32_to_s16(&mut self, samples: &[f32]) -> Vec<i16> {
         samples
             .iter()
-            .map(|sample| self.scale(*sample, std::i16::MAX as i32) as i16)
+            .map(|sample| self.scale(*sample, 0x8000) as i16)
             .collect()
     }
 }
