@@ -1,12 +1,12 @@
 use std::error::Error;
 
 use hyper::client::HttpConnector;
-use hyper::{Body, Client, Method, Request, Uri};
+use hyper::{Body, Client, Method, Request};
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use serde::Deserialize;
 use url::Url;
 
-use super::AP_FALLBACK;
+use super::ap_fallback;
 
 const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
 
@@ -18,7 +18,7 @@ struct ApResolveData {
 async fn try_apresolve(
     proxy: Option<&Url>,
     ap_port: Option<u16>,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<(String, u16), Box<dyn Error>> {
     let port = ap_port.unwrap_or(443);
 
     let mut req = Request::new(Body::empty());
@@ -43,27 +43,29 @@ async fn try_apresolve(
     let body = hyper::body::to_bytes(response.into_body()).await?;
     let data: ApResolveData = serde_json::from_slice(body.as_ref())?;
 
+    let mut aps = data.ap_list.into_iter().filter_map(|ap| {
+        let mut split = ap.rsplitn(2, ':');
+        let port = split
+            .next()
+            .expect("rsplitn should not return empty iterator");
+        let host = split.next()?.to_owned();
+        let port: u16 = port.parse().ok()?;
+        Some((host, port))
+    });
     let ap = if ap_port.is_some() || proxy.is_some() {
-        data.ap_list.into_iter().find_map(|ap| {
-            if ap.parse::<Uri>().ok()?.port()? == port {
-                Some(ap)
-            } else {
-                None
-            }
-        })
+        aps.find(|(_, p)| *p == port)
     } else {
-        data.ap_list.into_iter().next()
+        aps.next()
     }
-    .ok_or("empty AP List")?;
+    .ok_or("no valid AP in list")?;
 
     Ok(ap)
 }
 
-pub async fn apresolve(proxy: Option<&Url>, ap_port: Option<u16>) -> String {
+pub async fn apresolve(proxy: Option<&Url>, ap_port: Option<u16>) -> (String, u16) {
     try_apresolve(proxy, ap_port).await.unwrap_or_else(|e| {
-        warn!("Failed to resolve Access Point: {}", e);
-        warn!("Using fallback \"{}\"", AP_FALLBACK);
-        AP_FALLBACK.into()
+        warn!("Failed to resolve Access Point: {}, using fallback.", e);
+        ap_fallback()
     })
 }
 

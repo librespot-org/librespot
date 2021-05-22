@@ -69,8 +69,8 @@ impl Session {
     ) -> Result<Session, SessionError> {
         let ap = apresolve(config.proxy.as_ref(), config.ap_port).await;
 
-        info!("Connecting to AP \"{}\"", ap);
-        let mut conn = connection::connect(ap, config.proxy.as_ref()).await?;
+        info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
+        let mut conn = connection::connect(&ap.0, ap.1, config.proxy.as_ref()).await?;
 
         let reusable_credentials =
             connection::authenticate(&mut conn, credentials, &config.device_id).await?;

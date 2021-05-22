@@ -5,7 +5,6 @@ pub use self::codec::ApCodec;
 pub use self::handshake::handshake;
 
 use std::io::{self, ErrorKind};
-use std::net::ToSocketAddrs;
 
 use futures_util::{SinkExt, StreamExt};
 use protobuf::{self, Message, ProtobufError};
@@ -16,7 +15,6 @@ use url::Url;
 
 use crate::authentication::Credentials;
 use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
-use crate::proxytunnel;
 use crate::version;
 
 pub type Transport = Framed<TcpStream, ApCodec>;
@@ -58,50 +56,8 @@ impl From<APLoginFailed> for AuthenticationError {
     }
 }
 
-pub async fn connect(addr: String, proxy: Option<&Url>) -> io::Result<Transport> {
-    let socket = if let Some(proxy_url) = proxy {
-        info!("Using proxy \"{}\"", proxy_url);
-
-        let socket_addr = proxy_url.socket_addrs(|| None).and_then(|addrs| {
-            addrs.into_iter().next().ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Can't resolve proxy server address",
-                )
-            })
-        })?;
-        let socket = TcpStream::connect(&socket_addr).await?;
-
-        let uri = addr.parse::<http::Uri>().map_err(|_| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Can't parse access point address",
-            )
-        })?;
-        let host = uri.host().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "The access point address contains no hostname",
-            )
-        })?;
-        let port = uri.port().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "The access point address contains no port",
-            )
-        })?;
-
-        proxytunnel::proxy_connect(socket, host, port.as_str()).await?
-    } else {
-        let socket_addr = addr.to_socket_addrs()?.next().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::NotFound,
-                "Can't resolve access point address",
-            )
-        })?;
-
-        TcpStream::connect(&socket_addr).await?
-    };
+pub async fn connect(host: &str, port: u16, proxy: Option<&Url>) -> io::Result<Transport> {
+    let socket = crate::socket::connect(host, port, proxy).await?;
 
     handshake(socket).await
 }
