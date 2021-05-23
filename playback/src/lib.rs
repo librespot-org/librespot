@@ -12,4 +12,3 @@ mod decoder;
 pub mod dither;
 pub mod mixer;
 pub mod player;
-pub mod shape_noise;

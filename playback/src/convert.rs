@@ -1,5 +1,4 @@
-use crate::dither::Ditherer;
-use crate::shape_noise::NoiseShaper;
+use crate::dither::{Ditherer, DithererBuilder};
 use zerocopy::AsBytes;
 
 #[derive(AsBytes, Copy, Clone, Debug)]
@@ -15,28 +14,32 @@ impl i24 {
 }
 
 pub struct Converter {
-    ditherer: Box<dyn Ditherer>,
-    noise_shaper: Box<dyn NoiseShaper>,
+    ditherer: Option<Box<dyn Ditherer>>,
 }
 
 impl Converter {
-    pub fn new(ditherer: Box<dyn Ditherer>, noise_shaper: Box<dyn NoiseShaper>) -> Self {
-        info!(
-            "Converting with ditherer: {} and noise shaper: {}",
-            ditherer, noise_shaper
-        );
-        Self {
-            ditherer,
-            noise_shaper,
+    pub fn new(dither_config: Option<DithererBuilder>) -> Self {
+        if let Some(ref ditherer_builder) = dither_config {
+            let ditherer = (ditherer_builder)();
+            info!("Converting with ditherer: {}", ditherer.name());
+            Self {
+                ditherer: Some(ditherer),
+            }
+        } else {
+            Self { ditherer: None }
         }
     }
 
-    // Denormalize, dither and shape noise
+    // Denormalize and dither
     pub fn scale(&mut self, sample: f32, factor: i64) -> f32 {
         // From the many float to int conversion methods available, match what
         // the reference Vorbis implementation uses: sample * 32768 (for 16 bit)
         let int_value = sample * factor as f32;
-        self.shaped_dither(int_value)
+
+        match self.ditherer {
+            Some(ref mut d) => int_value + d.noise(int_value),
+            None => int_value,
+        }
     }
 
     // Special case for samples packed in a word of greater bit depth (e.g.
@@ -57,11 +60,6 @@ impl Converter {
             return max;
         }
         int_value
-    }
-
-    fn shaped_dither(&mut self, sample: f32) -> f32 {
-        let noise = self.ditherer.noise(sample);
-        self.noise_shaper.shape(sample, noise)
     }
 
     // https://doc.rust-lang.org/nomicon/casts.html: casting float to integer

@@ -299,7 +299,7 @@ impl Player {
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
 
-            let converter = Converter::new((config.ditherer)(), (config.noise_shaper)());
+            let converter = Converter::new(config.ditherer);
 
             let internal = PlayerInternal {
                 session,

@@ -1,7 +1,6 @@
 use super::player::NormalisationData;
 use crate::convert::i24;
 pub use crate::dither::{Ditherer, DithererBuilder};
-pub use crate::shape_noise::{NoiseShaper, NoiseShaperBuilder};
 
 use std::convert::TryFrom;
 use std::mem;
@@ -136,8 +135,7 @@ pub struct PlayerConfig {
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
     // (thereby circumventing Send bounds that they might not satisfy)
-    pub ditherer: DithererBuilder,
-    pub noise_shaper: NoiseShaperBuilder,
+    pub ditherer: Option<DithererBuilder>,
 }
 
 impl Default for PlayerConfig {
@@ -154,8 +152,7 @@ impl Default for PlayerConfig {
             normalisation_knee: 1.0,
             gapless: true,
             passthrough: false,
-            ditherer: <dyn Ditherer>::default(),
-            noise_shaper: <dyn NoiseShaper>::default(),
+            ditherer: Some(<dyn Ditherer>::default()),
         }
     }
 }

@@ -16,10 +16,9 @@ use librespot::playback::audio_backend::{self, Sink, BACKENDS};
 use librespot::playback::config::{
     AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig,
 };
-use librespot::playback::dither::{self, mk_ditherer, HighPassDitherer, NoDithering};
+use librespot::playback::dither::{self, Ditherer};
 use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{NormalisationData, Player};
-use librespot::playback::shape_noise::{self};
 
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
@@ -251,14 +250,8 @@ fn get_setup(args: &[String]) -> Setup {
         .optopt(
             "",
             "dither",
-            "Specify the dither algorithm to use - [none, rect, sto, tri, hp, gauss]. Defaults to 'hp' for formats S16, S24, S24_3 and 'none' for other formats.",
+            "Specify the dither algorithm to use - [none, gpdf, tpdf, tpdf_hp]. Defaults to 'tpdf' for formats S16, S24, S24_3 and 'none' for other formats.",
             "DITHER",
-        )
-        .optopt(
-            "",
-            "shape-noise",
-            "Specify the noise shaping algorithm to use - [none, fract, iew5, iew9, fw3, fw9, fw24]. Defaults to 'none'.",
-            "SHAPE_NOISE",
         )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
@@ -591,27 +584,24 @@ fn get_setup(args: &[String]) -> Setup {
             .unwrap_or(PlayerConfig::default().normalisation_knee);
 
         let ditherer_name = matches.opt_str("dither");
-        let noise_shaper_name = matches.opt_str("shape-noise");
-
-        if format == AudioFormat::F32 && (ditherer_name.is_some() || noise_shaper_name.is_some()) {
-            unimplemented!(
-                "Dithering and noise shaping is not implemented for format {:?}",
-                format
-            );
-        }
-
-        let ditherer = match ditherer_name {
-            Some(_) => dither::find_ditherer(ditherer_name).expect("Invalid ditherer"),
-            _ => match format {
-                AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
-                    mk_ditherer::<HighPassDitherer>
+        let ditherer = match ditherer_name.as_deref() {
+            // explicitly disabled on command line
+            Some("none") => None,
+            // explicitly set on command line
+            Some(_) => {
+                if format == AudioFormat::F32 {
+                    unimplemented!("Dithering is not available on format {:?}", format);
                 }
-                _ => mk_ditherer::<NoDithering>,
+                Some(dither::find_ditherer(ditherer_name).expect("Invalid ditherer"))
+            }
+            // nothing set on command line => use default
+            None => match format {
+                AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
+                    Some(<dyn Ditherer>::default())
+                }
+                _ => None,
             },
         };
-
-        let noise_shaper =
-            shape_noise::find_noise_shaper(noise_shaper_name).expect("Invalid noise shaper");
 
         PlayerConfig {
             bitrate,
@@ -626,7 +616,6 @@ fn get_setup(args: &[String]) -> Setup {
             normalisation_release,
             normalisation_knee,
             ditherer,
-            noise_shaper,
         }
     };
 
