@@ -1,6 +1,6 @@
 use super::player::NormalisationData;
 use crate::convert::i24;
-pub use crate::dither::{Ditherer, DithererBuilder};
+pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
 
 use std::convert::TryFrom;
 use std::mem;
@@ -139,8 +139,8 @@ pub struct PlayerConfig {
 }
 
 impl Default for PlayerConfig {
-    fn default() -> PlayerConfig {
-        PlayerConfig {
+    fn default() -> Self {
+        Self {
             bitrate: Bitrate::default(),
             normalisation: false,
             normalisation_type: NormalisationType::default(),
@@ -152,7 +152,7 @@ impl Default for PlayerConfig {
             normalisation_knee: 1.0,
             gapless: true,
             passthrough: false,
-            ditherer: Some(<dyn Ditherer>::default()),
+            ditherer: Some(mk_ditherer::<TriangularDitherer>),
         }
     }
 }

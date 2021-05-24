@@ -35,12 +35,6 @@ pub trait Ditherer {
     fn noise(&mut self, sample: f32) -> f32;
 }
 
-impl dyn Ditherer {
-    pub fn default() -> fn() -> Box<Self> {
-        mk_ditherer::<TriangularDitherer>
-    }
-}
-
 impl fmt::Display for dyn Ditherer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name())

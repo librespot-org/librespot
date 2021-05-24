@@ -16,7 +16,7 @@ use librespot::playback::audio_backend::{self, Sink, BACKENDS};
 use librespot::playback::config::{
     AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig,
 };
-use librespot::playback::dither::{self, Ditherer};
+use librespot::playback::dither;
 use librespot::playback::mixer::{self, Mixer, MixerConfig};
 use librespot::playback::player::{NormalisationData, Player};
 
@@ -597,7 +597,7 @@ fn get_setup(args: &[String]) -> Setup {
             // nothing set on command line => use default
             None => match format {
                 AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
-                    Some(<dyn Ditherer>::default())
+                    PlayerConfig::default().ditherer
                 }
                 _ => None,
             },
