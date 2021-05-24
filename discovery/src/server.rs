@@ -63,7 +63,7 @@ impl RequestHandler {
             "activeUser": "",
             "publicKey": (public_key),
             "deviceType": (device_type),
-            "libraryVersion": "0.1.0",
+            "libraryVersion": crate::core::version::SEMVER,
             "accountReq": "PREMIUM",
             "brandDisplayName": "librespot",
             "modelDisplayName": "librespot",
