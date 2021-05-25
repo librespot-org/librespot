@@ -38,7 +38,8 @@ impl Open for GstreamerSink {
             "appsrc caps=\"audio/x-raw,format={}LE,layout=interleaved,channels={},rate={}\" block=true max-bytes={} name=appsrc0 ",
             gst_format, NUM_CHANNELS, SAMPLE_RATE, gst_bytes
         );
-        let pipeline_str_rest = r#" ! audioconvert ! autoaudiosink"#;
+        // no need to dither twice; use librespot dithering instead
+        let pipeline_str_rest = r#" ! audioconvert dithering=none ! autoaudiosink"#;
         let pipeline_str: String = match device {
             Some(x) => format!("{}{}", pipeline_str_preamble, x),
             None => format!("{}{}", pipeline_str_preamble, pipeline_str_rest),

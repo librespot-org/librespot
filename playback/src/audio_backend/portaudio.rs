@@ -55,9 +55,6 @@ impl<'a> Open for PortAudioSink<'a> {
     fn open(device: Option<String>, format: AudioFormat) -> PortAudioSink<'a> {
         info!("Using PortAudio sink with format: {:?}", format);
 
-        warn!("This backend is known to panic on several platforms.");
-        warn!("Consider using some other backend, or better yet, contributing a fix.");
-
         portaudio_rs::initialize().unwrap();
 
         let device_idx = match device.as_ref().map(AsRef::as_ref) {
@@ -109,7 +106,7 @@ impl<'a> Sink for PortAudioSink<'a> {
                             Some(*$parameters),
                             SAMPLE_RATE as f64,
                             FRAMES_PER_BUFFER_UNSPECIFIED,
-                            StreamFlags::empty(),
+                            StreamFlags::DITHER_OFF, // no need to dither twice; use librespot dithering instead
                             None,
                         )
                         .unwrap(),
