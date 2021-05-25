@@ -250,13 +250,13 @@ fn get_setup(args: &[String]) -> Setup {
         .optopt(
             "m",
             "mixer-name",
-            "Alsa mixer name, e.g \"PCM\" or \"Master\". Defaults to 'PCM'",
+            "Alsa mixer control, e.g. 'PCM' or 'Master'. Defaults to 'PCM'.",
             "MIXER_NAME",
         )
         .optopt(
             "",
             "mixer-card",
-            "Alsa mixer card, e.g \"hw:0\" or similar from `aplay -l`. Defaults to 'default' ",
+            "Alsa mixer card, e.g 'hw:0' or similar from `aplay -l`. Defaults to DEVICE if specified, 'default' otherwise.",
             "MIXER_CARD",
         )
         .optopt(
@@ -268,7 +268,7 @@ fn get_setup(args: &[String]) -> Setup {
         .optopt(
             "",
             "initial-volume",
-            "Initial volume in %, once connected (must be from 0 to 100)",
+            "Initial volume (%) once connected {0..100}. Defaults to 50 for softvol and for Alsa mixer the current volume.",
             "VOLUME",
         )
         .optopt(
@@ -327,14 +327,14 @@ fn get_setup(args: &[String]) -> Setup {
         .optopt(
             "",
             "volume-ctrl",
-            "Volume control type - [cubic, fixed, linear, log]. Default is log.",
+            "Volume control type {cubic|fixed|linear|log}. Defaults to log.",
             "VOLUME_CTRL"
         )
-		.optopt(
- 			"",
- 			"volume-range",
- 			"Range of the volume control (dB). Defaults to 60 for softvol and for alsa what the mixer supports.",
-             "RANGE",
+        .optopt(
+            "",
+            "volume-range",
+            "Range of the volume control (dB). Defaults to 60 for softvol and for Alsa mixer what the mixer supports.",
+            "RANGE",
         )
         .optflag(
             "",
@@ -423,7 +423,7 @@ fn get_setup(args: &[String]) -> Setup {
             });
         if volume_range < 0.0 {
             // User might have specified range as minimum dB volume.
-            volume_range *= -1.0;
+            volume_range = -volume_range;
             warn!(
                 "Please enter positive volume ranges only, assuming {:.2} dB",
                 volume_range
@@ -546,15 +546,15 @@ fn get_setup(args: &[String]) -> Setup {
                     match Url::parse(&s) {
                         Ok(url) => {
                             if url.host().is_none() || url.port_or_known_default().is_none() {
-                                panic!("Invalid proxy url, only URLs on the format \"http://host:port\" are allowed");
+                                panic!("Invalid proxy url, only urls on the format \"http://host:port\" are allowed");
                             }
 
                             if url.scheme() != "http" {
-                                panic!("Only insecure http:// proxies are supported");
+                                panic!("Only unsecure http:// proxies are supported");
                             }
                             url
                         },
-                    Err(err) => panic!("Invalid proxy URL: {}, only URLs in the format \"http://host:port\" are allowed", err)
+                    Err(err) => panic!("Invalid proxy url: {}, only urls on the format \"http://host:port\" are allowed", err)
                     }
                 },
             ),
@@ -575,8 +575,8 @@ fn get_setup(args: &[String]) -> Setup {
         let normalisation_method = matches
             .opt_str("normalisation-method")
             .as_ref()
-            .map(|gain_type| {
-                NormalisationMethod::from_str(gain_type).expect("Invalid normalisation method")
+            .map(|method| {
+                NormalisationMethod::from_str(method).expect("Invalid normalisation method")
             })
             .unwrap_or_default();
         let normalisation_type = matches
