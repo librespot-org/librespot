@@ -195,167 +195,177 @@ fn get_setup(args: &[String]) -> Setup {
         "c",
         "cache",
         "Path to a directory where files will be cached.",
-        "CACHE",
+        "PATH",
     ).optopt(
         "",
         "system-cache",
-        "Path to a directory where system files (credentials, volume) will be cached. Can be different from cache option value",
-        "SYTEMCACHE",
+        "Path to a directory where system files (credentials, volume) will be cached. Can be different from cache option value.",
+        "PATH",
     ).optopt(
         "",
         "cache-size-limit",
         "Limits the size of the cache for audio files.",
-        "CACHE_SIZE_LIMIT"
+        "SIZE"
     ).optflag("", "disable-audio-cache", "Disable caching of the audio data.")
-        .optopt("n", "name", "Device name", "NAME")
-        .optopt("", "device-type", "Displayed device type", "DEVICE_TYPE")
-        .optopt(
-            "b",
-            "bitrate",
-            "Bitrate (96, 160 or 320). Defaults to 160",
-            "BITRATE",
-        )
-        .optopt(
-            "",
-            "onevent",
-            "Run PROGRAM when playback is about to begin.",
-            "PROGRAM",
-        )
-        .optflag("", "emit-sink-events", "Run program set by --onevent before sink is opened and after it is closed.")
-        .optflag("v", "verbose", "Enable verbose output")
-        .optflag("V", "version", "Display librespot version string")
-        .optopt("u", "username", "Username to sign in with", "USERNAME")
-        .optopt("p", "password", "Password", "PASSWORD")
-        .optopt("", "proxy", "HTTP proxy to use when connecting", "PROXY")
-        .optopt("", "ap-port", "Connect to AP with specified port. If no AP with that port are present fallback AP will be used. Available ports are usually 80, 443 and 4070", "AP_PORT")
-        .optflag("", "disable-discovery", "Disable discovery mode")
-        .optopt(
-            "",
-            "backend",
-            "Audio backend to use. Use '?' to list options",
-            "BACKEND",
-        )
-        .optopt(
-            "",
-            "device",
-            "Audio device to use. Use '?' to list options if using portaudio or alsa",
-            "DEVICE",
-        )
-        .optopt(
-            "",
-            "format",
-            "Output format (F32, S32, S24, S24_3 or S16). Defaults to S16",
-            "FORMAT",
-        )
-        .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
-        .optopt(
-            "m",
-            "mixer-name",
-            "Alsa mixer name, e.g \"PCM\" or \"Master\". Defaults to 'PCM'",
-            "MIXER_NAME",
-        )
-        .optopt(
-            "",
-            "mixer-card",
-            "Alsa mixer card, e.g \"hw:0\" or similar from `aplay -l`. Defaults to 'default' ",
-            "MIXER_CARD",
-        )
-        .optopt(
-            "",
-            "mixer-index",
-            "Alsa mixer index, Index of the cards mixer. Defaults to 0",
-            "MIXER_INDEX",
-        )
-        .optflag(
-            "",
-            "mixer-linear-volume",
-            "Disable alsa's mapped volume scale (cubic). Default false",
-        )
-        .optopt(
-            "",
-            "initial-volume",
-            "Initial volume in %, once connected (must be from 0 to 100)",
-            "VOLUME",
-        )
-        .optopt(
-            "",
-            "zeroconf-port",
-            "The port the internal server advertised over zeroconf uses.",
-            "ZEROCONF_PORT",
-        )
-        .optflag(
-            "",
-            "enable-volume-normalisation",
-            "Play all tracks at the same volume",
-        )
-        .optopt(
-            "",
-            "normalisation-method",
-            "Specify the normalisation method to use - [basic, dynamic]. Default is dynamic.",
-            "NORMALISATION_METHOD",
-        )
-        .optopt(
-            "",
-            "normalisation-gain-type",
-            "Specify the normalisation gain type to use - [track, album]. Default is album.",
-            "GAIN_TYPE",
-        )
-        .optopt(
-            "",
-            "normalisation-pregain",
-            "Pregain (dB) applied by volume normalisation",
-            "PREGAIN",
-        )
-        .optopt(
-            "",
-            "normalisation-threshold",
-            "Threshold (dBFS) to prevent clipping. Default is -1.0.",
-            "THRESHOLD",
-        )
-        .optopt(
-            "",
-            "normalisation-attack",
-            "Attack time (ms) in which the dynamic limiter is reducing gain. Default is 5.",
-            "ATTACK",
-        )
-        .optopt(
-            "",
-            "normalisation-release",
-            "Release or decay time (ms) in which the dynamic limiter is restoring gain. Default is 100.",
-            "RELEASE",
-        )
-        .optopt(
-            "",
-            "normalisation-knee",
-            "Knee steepness of the dynamic limiter. Default is 1.0.",
-            "KNEE",
-        )
-        .optopt(
-            "",
-            "volume-ctrl",
-            "Volume control type - [linear, log, fixed]. Default is logarithmic",
-            "VOLUME_CTRL"
-        )
-        .optflag(
-            "",
-            "autoplay",
-            "autoplay similar songs when your music ends.",
-        )
-        .optflag(
-            "",
-            "disable-gapless",
-            "disable gapless playback.",
-        )
-	    .optflag(
-            "",
-            "passthrough",
-            "Pass raw stream to output, only works for \"pipe\"."
-        );
+    .optopt("n", "name", "Device name.", "NAME")
+    .optopt("", "device-type", "Displayed device type.", "TYPE")
+    .optopt(
+        "b",
+        "bitrate",
+        "Bitrate (kbps) {96|160|320}. Defaults to 160.",
+        "BITRATE",
+    )
+    .optopt(
+        "",
+        "onevent",
+        "Run PROGRAM when a playback event occurs.",
+        "PROGRAM",
+    )
+    .optflag("", "emit-sink-events", "Run program set by --onevent before sink is opened and after it is closed.")
+    .optflag("v", "verbose", "Enable verbose output.")
+    .optflag("V", "version", "Display librespot version string.")
+    .optopt("u", "username", "Username to sign in with.", "USERNAME")
+    .optopt("p", "password", "Password", "PASSWORD")
+    .optopt("", "proxy", "HTTP proxy to use when connecting.", "URL")
+    .optopt("", "ap-port", "Connect to AP with specified port. If no AP with that port are present fallback AP will be used. Available ports are usually 80, 443 and 4070.", "PORT")
+    .optflag("", "disable-discovery", "Disable discovery mode.")
+    .optopt(
+        "",
+        "backend",
+        "Audio backend to use. Use '?' to list options.",
+        "NAME",
+    )
+    .optopt(
+        "",
+        "device",
+        "Audio device to use. Use '?' to list options if using alsa, portaudio or rodio.",
+        "NAME",
+    )
+    .optopt(
+        "",
+        "format",
+        "Output format {F32|S32|S24|S24_3|S16}. Defaults to S16.",
+        "FORMAT",
+    )
+    .optopt("", "mixer", "Mixer to use {alsa|softvol}.", "MIXER")
+    .optopt(
+        "m",
+        "mixer-name",
+        "Alsa mixer control, e.g. 'PCM' or 'Master'. Defaults to 'PCM'.",
+        "NAME",
+    )
+    .optopt(
+        "",
+        "mixer-card",
+        "Alsa mixer card, e.g 'hw:0' or similar from `aplay -l`. Defaults to 'default'.",
+        "CARD",
+    )
+    .optopt(
+        "",
+        "mixer-index",
+        "Alsa index of the cards mixer. Defaults to 0.",
+        "INDEX",
+    )
+    .optflag(
+        "",
+        "mixer-linear-volume",
+        "Disable Alsa mixer mapped volume scale (cubic). Defaults to false.",
+    )
+    .optopt(
+        "",
+        "initial-volume",
+        "Initial volume (%) once connected {0..100}. Defaults to 50.",
+        "VOLUME",
+    )
+    .optopt(
+        "",
+        "zeroconf-port",
+        "The port the internal server advertised over zeroconf uses.",
+        "PORT",
+    )
+    .optflag(
+        "",
+        "enable-volume-normalisation",
+        "Play all tracks at the same volume.",
+    )
+    .optopt(
+        "",
+        "normalisation-method",
+        "Specify the normalisation method to use {basic|dynamic}. Defaults to dynamic.",
+        "METHOD",
+    )
+    .optopt(
+        "",
+        "normalisation-gain-type",
+        "Specify the normalisation gain type to use {track|album}. Defaults to album.",
+        "TYPE",
+    )
+    .optopt(
+        "",
+        "normalisation-pregain",
+        "Pregain (dB) applied by volume normalisation. Defaults to 0.",
+        "PREGAIN",
+    )
+    .optopt(
+        "",
+        "normalisation-threshold",
+        "Threshold (dBFS) to prevent clipping. Defaults to -1.0.",
+        "THRESHOLD",
+    )
+    .optopt(
+        "",
+        "normalisation-attack",
+        "Attack time (ms) in which the dynamic limiter is reducing gain. Defaults to 5.",
+        "TIME",
+    )
+    .optopt(
+        "",
+        "normalisation-release",
+        "Release or decay time (ms) in which the dynamic limiter is restoring gain. Defaults to 100.",
+        "TIME",
+    )
+    .optopt(
+        "",
+        "normalisation-knee",
+        "Knee steepness of the dynamic limiter. Defaults to 1.0.",
+        "KNEE",
+    )
+    .optopt(
+        "",
+        "volume-ctrl",
+        "Volume control type {fixed|linear|log}. Defaults to log.",
+        "CTRL",
+    )
+	.optopt(
+        "",
+        "volume-range",
+        "Range of the volume control (dB). Defaults to 60 for softvol and for alsa what the mixer supports.",
+        "RANGE",
+    )
+    .optflag(
+        "",
+        "autoplay",
+        "Automatically play similar songs when your music ends.",
+    )
+    .optflag(
+        "",
+        "disable-gapless",
+        "Disable gapless playback.",
+    )
+    .optflag(
+        "",
+        "passthrough",
+        "Pass raw stream to output, only works for pipe and subprocess.",
+    );
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            eprintln!("error: {}\n{}", f.to_string(), usage(&args[0], &opts));
+            eprintln!(
+                "Error parsing command line options: {}\n{}",
+                f.to_string(),
+                usage(&args[0], &opts)
+            );
             exit(1);
         }
     };
@@ -506,7 +516,7 @@ fn get_setup(args: &[String]) -> Setup {
                     match Url::parse(&s) {
                         Ok(url) => {
                             if url.host().is_none() || url.port_or_known_default().is_none() {
-                                panic!("Invalid proxy url, only urls on the format \"http://host:port\" are allowed");
+                                panic!("Invalid proxy url, only URLs on the format \"http://host:port\" are allowed");
                             }
 
                             if url.scheme() != "http" {
@@ -514,7 +524,7 @@ fn get_setup(args: &[String]) -> Setup {
                             }
                             url
                         },
-                    Err(err) => panic!("Invalid proxy url: {}, only urls on the format \"http://host:port\" are allowed", err)
+                        Err(err) => panic!("Invalid proxy URL: {}, only URLs in the format \"http://host:port\" are allowed", err)
                     }
                 },
             ),
@@ -595,7 +605,9 @@ fn get_setup(args: &[String]) -> Setup {
         let volume_ctrl = matches
             .opt_str("volume-ctrl")
             .as_ref()
-            .map(|volume_ctrl| VolumeCtrl::from_str(volume_ctrl).expect("Invalid volume ctrl type"))
+            .map(|volume_ctrl| {
+                VolumeCtrl::from_str(volume_ctrl).expect("Invalid volume control type")
+            })
             .unwrap_or_default();
 
         ConnectConfig {
@@ -717,14 +729,14 @@ async fn main() {
                                     Ok(e) if e.success() => (),
                                     Ok(e) => {
                                         if let Some(code) = e.code() {
-                                            warn!("Sink event prog returned exit code {}", code);
+                                            warn!("Sink event program returned exit code {}", code);
                                         } else {
-                                            warn!("Sink event prog returned failure");
+                                            warn!("Sink event program returned failure");
                                         }
-                                    }
+                                    },
                                     Err(e) => {
                                         warn!("Emitting sink event failed: {}", e);
-                                    }
+                                    },
                                 }
                             })));
                         }
@@ -774,13 +786,21 @@ async fn main() {
 
                                 tokio::spawn(async move {
                                     match child.wait().await  {
-                                        Ok(status) if !status.success() => error!("child exited with status {:?}", status.code()),
-                                        Err(e) => error!("failed to wait on child process: {}", e),
-                                        _ => {}
+                                        Ok(e) if e.success() => (),
+                                        Ok(e) => {
+                                            if let Some(code) = e.code() {
+                                                warn!("On event program returned exit code {}", code);
+                                            } else {
+                                                warn!("On event program returned failure");
+                                            }
+                                        },
+                                        Err(e) => {
+                                            warn!("On event program failed: {}", e);
+                                        },
                                     }
                                 });
                             } else {
-                                error!("program failed to start");
+                                warn!("On event program failed to start");
                             }
                         }
                     }
