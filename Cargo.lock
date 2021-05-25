@@ -956,9 +956,9 @@ dependencies = [
 
 [[package]]
 name = "jack"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "370ed0ab943f1484a94d6328bf612907f5de2748531b873994f513d8806e9d9d"
+checksum = "49e720259b4a3e1f33cba335ca524a99a5f2411d405b05f6405fadd69269e2db"
 dependencies = [
  "bitflags",
  "jack-sys",
@@ -1260,7 +1260,7 @@ dependencies = [
  "glib",
  "gstreamer",
  "gstreamer-app",
- "jack 0.7.0",
+ "jack 0.7.1",
  "lewton",
  "libpulse-binding",
  "libpulse-simple-binding",
@@ -1913,9 +1913,9 @@ dependencies = [
 
 [[package]]
 name = "rodio"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b65c2eda643191f6d1bb12ea323a9db8d9ba95374e9be3780b5a9fb5cfb8520f"
+checksum = "4d98f5e557b61525057e2bc142c8cd7f0e70d75dc32852309bec440e6e046bf9"
 dependencies = [
  "cpal",
 ]
