@@ -336,12 +336,6 @@ fn get_setup(args: &[String]) -> Setup {
         "Volume control type {fixed|linear|log}. Defaults to log.",
         "CTRL",
     )
-	.optopt(
-        "",
-        "volume-range",
-        "Range of the volume control (dB). Defaults to 60 for softvol and for alsa what the mixer supports.",
-        "RANGE",
-    )
     .optflag(
         "",
         "autoplay",
