@@ -1,4 +1,5 @@
 use crate::config::AudioFormat;
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use std::io;
 
@@ -7,9 +8,13 @@ pub trait Open {
 }
 
 pub trait Sink {
-    fn start(&mut self) -> io::Result<()>;
-    fn stop(&mut self) -> io::Result<()>;
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()>;
+    fn start(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+    fn stop(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()>;
 }
 
 pub type SinkBuilder = fn(Option<String>, AudioFormat) -> Box<dyn Sink>;
@@ -25,42 +30,31 @@ fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat
 // reuse code for various backends
 macro_rules! sink_as_bytes {
     () => {
-        fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
-            use crate::convert::{self, i24};
+        fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+            use crate::convert::i24;
             use zerocopy::AsBytes;
             match packet {
                 AudioPacket::Samples(samples) => match self.format {
                     AudioFormat::F32 => self.write_bytes(samples.as_bytes()),
                     AudioFormat::S32 => {
-                        let samples_s32: &[i32] = &convert::to_s32(samples);
+                        let samples_s32: &[i32] = &converter.f32_to_s32(samples);
                         self.write_bytes(samples_s32.as_bytes())
                     }
                     AudioFormat::S24 => {
-                        let samples_s24: &[i32] = &convert::to_s24(samples);
+                        let samples_s24: &[i32] = &converter.f32_to_s24(samples);
                         self.write_bytes(samples_s24.as_bytes())
                     }
                     AudioFormat::S24_3 => {
-                        let samples_s24_3: &[i24] = &convert::to_s24_3(samples);
+                        let samples_s24_3: &[i24] = &converter.f32_to_s24_3(samples);
                         self.write_bytes(samples_s24_3.as_bytes())
                     }
                     AudioFormat::S16 => {
-                        let samples_s16: &[i16] = &convert::to_s16(samples);
+                        let samples_s16: &[i16] = &converter.f32_to_s16(samples);
                         self.write_bytes(samples_s16.as_bytes())
                     }
                 },
                 AudioPacket::OggData(samples) => self.write_bytes(samples),
             }
-        }
-    };
-}
-
-macro_rules! start_stop_noop {
-    () => {
-        fn start(&mut self) -> io::Result<()> {
-            Ok(())
-        }
-        fn stop(&mut self) -> io::Result<()> {
-            Ok(())
         }
     };
 }
@@ -105,6 +99,8 @@ mod subprocess;
 use self::subprocess::SubprocessSink;
 
 pub const BACKENDS: &[(&str, SinkBuilder)] = &[
+    #[cfg(feature = "rodio-backend")]
+    ("rodio", rodio::mk_rodio), // default goes first
     #[cfg(feature = "alsa-backend")]
     ("alsa", mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
@@ -115,8 +111,6 @@ pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     ("jackaudio", mk_sink::<JackSink>),
     #[cfg(feature = "gstreamer-backend")]
     ("gstreamer", mk_sink::<GstreamerSink>),
-    #[cfg(feature = "rodio-backend")]
-    ("rodio", rodio::mk_rodio),
     #[cfg(feature = "rodiojack-backend")]
     ("rodiojack", rodio::mk_rodiojack),
     #[cfg(feature = "sdl-backend")]

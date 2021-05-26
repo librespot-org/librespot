@@ -99,8 +99,8 @@ jobs:
       - run: cargo hack  --workspace --remove-dev-deps
       - run: cargo build -p librespot-core --no-default-features
       - run: cargo build -p librespot-core
-      - run: cargo build -p librespot-connect
-      - run: cargo build -p librespot-connect --no-default-features --features with-dns-sd
+      - run: cargo hack build --each-feature -p librespot-discovery
+      - run: cargo hack build --each-feature -p librespot-playback
       - run: cargo hack build --each-feature
 
   test-windows:

@@ -9,5 +9,6 @@ pub mod audio_backend;
 pub mod config;
 mod convert;
 mod decoder;
+pub mod dither;
 pub mod mixer;
 pub mod player;

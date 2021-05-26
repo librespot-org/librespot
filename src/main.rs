@@ -9,15 +9,17 @@ use url::Url;
 use librespot::connect::spirc::Spirc;
 use librespot::core::authentication::Credentials;
 use librespot::core::cache::Cache;
-use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig, VolumeCtrl};
+use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig};
 use librespot::core::session::Session;
 use librespot::core::version;
-use librespot::playback::audio_backend::{self, Sink, BACKENDS};
+use librespot::playback::audio_backend::{self, SinkBuilder, BACKENDS};
 use librespot::playback::config::{
-    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig,
+    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
 };
-use librespot::playback::mixer::{self, Mixer, MixerConfig};
-use librespot::playback::player::{NormalisationData, Player};
+use librespot::playback::dither;
+use librespot::playback::mixer::mappings::MappedCtrl;
+use librespot::playback::mixer::{self, MixerConfig, MixerFn};
+use librespot::playback::player::{db_to_ratio, Player};
 
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
@@ -66,7 +68,7 @@ fn setup_logging(verbose: bool) {
 }
 
 fn list_backends() {
-    println!("Available Backends : ");
+    println!("Available backends : ");
     for (&(name, _), idx) in BACKENDS.iter().zip(0..) {
         if idx == 0 {
             println!("- {} (default)", name);
@@ -169,14 +171,11 @@ fn print_version() {
     );
 }
 
-#[derive(Clone)]
 struct Setup {
     format: AudioFormat,
-    backend: fn(Option<String>, AudioFormat) -> Box<dyn Sink + 'static>,
+    backend: SinkBuilder,
     device: Option<String>,
-
-    mixer: fn(Option<MixerConfig>) -> Box<dyn Mixer>,
-
+    mixer: MixerFn,
     cache: Option<Cache>,
     player_config: PlayerConfig,
     session_config: SessionConfig,
@@ -194,7 +193,7 @@ fn get_setup(args: &[String]) -> Setup {
     opts.optflag(
         "h",
         "help",
-        "Print this help menu",
+        "Print this help menu.",
     ).optopt(
         "c",
         "cache",
@@ -251,6 +250,12 @@ fn get_setup(args: &[String]) -> Setup {
         "Output format {F32|S32|S24|S24_3|S16}. Defaults to S16.",
         "FORMAT",
     )
+    .optopt(
+        "",
+        "dither",
+        "Specify the dither algorithm to use - [none, gpdf, tpdf, tpdf_hp]. Defaults to 'tpdf' for formats S16, S24, S24_3 and 'none' for other formats.",
+        "DITHER",
+    )
     .optopt("", "mixer", "Mixer to use {alsa|softvol}.", "MIXER")
     .optopt(
         "m",
@@ -261,8 +266,8 @@ fn get_setup(args: &[String]) -> Setup {
     .optopt(
         "",
         "mixer-card",
-        "Alsa mixer card, e.g 'hw:0' or similar from `aplay -l`. Defaults to 'default'.",
-        "CARD",
+        "Alsa mixer card, e.g 'hw:0' or similar from `aplay -l`. Defaults to DEVICE if specified, 'default' otherwise.",
+        "MIXER_CARD",
     )
     .optopt(
         "",
@@ -278,7 +283,7 @@ fn get_setup(args: &[String]) -> Setup {
     .optopt(
         "",
         "initial-volume",
-        "Initial volume (%) once connected {0..100}. Defaults to 50.",
+        "Initial volume once connected {0-100}%. Defaults to 50 for softvol and for Alsa mixer the current volume.",
         "VOLUME",
     )
     .optopt(
@@ -337,8 +342,14 @@ fn get_setup(args: &[String]) -> Setup {
     .optopt(
         "",
         "volume-ctrl",
-        "Volume control type {fixed|linear|log}. Defaults to log.",
-        "CTRL",
+        "Volume control type {cubic|fixed|linear|log}. Defaults to log.",
+        "VOLUME_CTRL"
+    )
+    .optopt(
+        "",
+        "volume-range",
+        "Range of the volume control (dB). Defaults to 60 for softvol and for Alsa mixer what the mixer supports.",
+        "RANGE",
     )
     .optflag(
         "",
@@ -412,18 +423,55 @@ fn get_setup(args: &[String]) -> Setup {
     let mixer_name = matches.opt_str("mixer");
     let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
 
-    let mixer_config = MixerConfig {
-        card: matches
-            .opt_str("mixer-card")
-            .unwrap_or_else(|| String::from("default")),
-        mixer: matches
-            .opt_str("mixer-name")
-            .unwrap_or_else(|| String::from("PCM")),
-        index: matches
+    let mixer_config = {
+        let card = matches.opt_str("mixer-card").unwrap_or_else(|| {
+            if let Some(ref device_name) = device {
+                device_name.to_string()
+            } else {
+                String::from("default")
+            }
+        });
+        let index = matches
             .opt_str("mixer-index")
             .map(|index| index.parse::<u32>().unwrap())
-            .unwrap_or(0),
-        mapped_volume: !matches.opt_present("mixer-linear-volume"),
+            .unwrap_or(0);
+        let control = matches
+            .opt_str("mixer-name")
+            .unwrap_or_else(|| String::from("PCM"));
+        let mut volume_range = matches
+            .opt_str("volume-range")
+            .map(|range| range.parse::<f32>().unwrap())
+            .unwrap_or_else(|| match mixer_name.as_ref().map(AsRef::as_ref) {
+                Some("alsa") => 0.0, // let Alsa query the control
+                _ => VolumeCtrl::DEFAULT_DB_RANGE,
+            });
+        if volume_range < 0.0 {
+            // User might have specified range as minimum dB volume.
+            volume_range = -volume_range;
+            warn!(
+                "Please enter positive volume ranges only, assuming {:.2} dB",
+                volume_range
+            );
+        }
+        let volume_ctrl = matches
+            .opt_str("volume-ctrl")
+            .as_ref()
+            .map(|volume_ctrl| {
+                VolumeCtrl::from_str_with_range(volume_ctrl, volume_range)
+                    .expect("Invalid volume control type")
+            })
+            .unwrap_or_else(|| {
+                let mut volume_ctrl = VolumeCtrl::default();
+                volume_ctrl.set_db_range(volume_range);
+                volume_ctrl
+            });
+
+        MixerConfig {
+            card,
+            control,
+            index,
+            volume_ctrl,
+        }
     };
 
     let cache = {
@@ -472,15 +520,18 @@ fn get_setup(args: &[String]) -> Setup {
 
     let initial_volume = matches
         .opt_str("initial-volume")
-        .map(|volume| {
-            let volume = volume.parse::<u16>().unwrap();
+        .map(|initial_volume| {
+            let volume = initial_volume.parse::<u16>().unwrap();
             if volume > 100 {
-                panic!("Initial volume must be in the range 0-100");
+                error!("Initial volume must be in the range 0-100.");
+                // the cast will saturate, not necessary to take further action
             }
-            (volume as i32 * 0xFFFF / 100) as u16
+            (volume as f32 / 100.0 * VolumeCtrl::MAX_VOLUME as f32) as u16
         })
-        .or_else(|| cache.as_ref().and_then(Cache::volume))
-        .unwrap_or(0x8000);
+        .or_else(|| match mixer_name.as_ref().map(AsRef::as_ref) {
+            Some("alsa") => None,
+            _ => cache.as_ref().and_then(Cache::volume),
+        });
 
     let zeroconf_port = matches
         .opt_str("zeroconf-port")
@@ -537,64 +588,92 @@ fn get_setup(args: &[String]) -> Setup {
         }
     };
 
-    let passthrough = matches.opt_present("passthrough");
-
     let player_config = {
         let bitrate = matches
             .opt_str("b")
             .as_ref()
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or_default();
-        let gain_type = matches
+
+        let gapless = !matches.opt_present("disable-gapless");
+
+        let normalisation = matches.opt_present("enable-volume-normalisation");
+        let normalisation_method = matches
+            .opt_str("normalisation-method")
+            .as_ref()
+            .map(|method| {
+                NormalisationMethod::from_str(method).expect("Invalid normalisation method")
+            })
+            .unwrap_or_default();
+        let normalisation_type = matches
             .opt_str("normalisation-gain-type")
             .as_ref()
             .map(|gain_type| {
                 NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
             })
             .unwrap_or_default();
-        let normalisation_method = matches
-            .opt_str("normalisation-method")
-            .as_ref()
-            .map(|gain_type| {
-                NormalisationMethod::from_str(gain_type).expect("Invalid normalisation method")
+        let normalisation_pregain = matches
+            .opt_str("normalisation-pregain")
+            .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
+            .unwrap_or(PlayerConfig::default().normalisation_pregain);
+        let normalisation_threshold = matches
+            .opt_str("normalisation-threshold")
+            .map(|threshold| {
+                db_to_ratio(
+                    threshold
+                        .parse::<f32>()
+                        .expect("Invalid threshold float value"),
+                )
             })
-            .unwrap_or_default();
+            .unwrap_or(PlayerConfig::default().normalisation_threshold);
+        let normalisation_attack = matches
+            .opt_str("normalisation-attack")
+            .map(|attack| attack.parse::<f32>().expect("Invalid attack float value") / MILLIS)
+            .unwrap_or(PlayerConfig::default().normalisation_attack);
+        let normalisation_release = matches
+            .opt_str("normalisation-release")
+            .map(|release| release.parse::<f32>().expect("Invalid release float value") / MILLIS)
+            .unwrap_or(PlayerConfig::default().normalisation_release);
+        let normalisation_knee = matches
+            .opt_str("normalisation-knee")
+            .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
+            .unwrap_or(PlayerConfig::default().normalisation_knee);
+
+        let ditherer_name = matches.opt_str("dither");
+        let ditherer = match ditherer_name.as_deref() {
+            // explicitly disabled on command line
+            Some("none") => None,
+            // explicitly set on command line
+            Some(_) => {
+                if format == AudioFormat::F32 {
+                    unimplemented!("Dithering is not available on format {:?}", format);
+                }
+                Some(dither::find_ditherer(ditherer_name).expect("Invalid ditherer"))
+            }
+            // nothing set on command line => use default
+            None => match format {
+                AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
+                    PlayerConfig::default().ditherer
+                }
+                _ => None,
+            },
+        };
+
+        let passthrough = matches.opt_present("passthrough");
 
         PlayerConfig {
             bitrate,
-            gapless: !matches.opt_present("disable-gapless"),
-            normalisation: matches.opt_present("enable-volume-normalisation"),
-            normalisation_method,
-            normalisation_type: gain_type,
-            normalisation_pregain: matches
-                .opt_str("normalisation-pregain")
-                .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
-                .unwrap_or(PlayerConfig::default().normalisation_pregain),
-            normalisation_threshold: matches
-                .opt_str("normalisation-threshold")
-                .map(|threshold| {
-                    NormalisationData::db_to_ratio(
-                        threshold
-                            .parse::<f32>()
-                            .expect("Invalid threshold float value"),
-                    )
-                })
-                .unwrap_or(PlayerConfig::default().normalisation_threshold),
-            normalisation_attack: matches
-                .opt_str("normalisation-attack")
-                .map(|attack| attack.parse::<f32>().expect("Invalid attack float value") / MILLIS)
-                .unwrap_or(PlayerConfig::default().normalisation_attack),
-            normalisation_release: matches
-                .opt_str("normalisation-release")
-                .map(|release| {
-                    release.parse::<f32>().expect("Invalid release float value") / MILLIS
-                })
-                .unwrap_or(PlayerConfig::default().normalisation_release),
-            normalisation_knee: matches
-                .opt_str("normalisation-knee")
-                .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
-                .unwrap_or(PlayerConfig::default().normalisation_knee),
+            gapless,
             passthrough,
+            normalisation,
+            normalisation_type,
+            normalisation_method,
+            normalisation_pregain,
+            normalisation_threshold,
+            normalisation_attack,
+            normalisation_release,
+            normalisation_knee,
+            ditherer,
         }
     };
 
@@ -604,41 +683,37 @@ fn get_setup(args: &[String]) -> Setup {
             .as_ref()
             .map(|device_type| DeviceType::from_str(device_type).expect("Invalid device type"))
             .unwrap_or_default();
-
-        let volume_ctrl = matches
-            .opt_str("volume-ctrl")
-            .as_ref()
-            .map(|volume_ctrl| {
-                VolumeCtrl::from_str(volume_ctrl).expect("Invalid volume control type")
-            })
-            .unwrap_or_default();
+        let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
+        let autoplay = matches.opt_present("autoplay");
 
         ConnectConfig {
             name,
             device_type,
-            volume: initial_volume,
-            volume_ctrl,
-            autoplay: matches.opt_present("autoplay"),
+            initial_volume,
+            has_volume_ctrl,
+            autoplay,
         }
     };
 
     let enable_discovery = !matches.opt_present("disable-discovery");
+    let player_event_program = matches.opt_str("onevent");
+    let emit_sink_events = matches.opt_present("emit-sink-events");
 
     Setup {
         format,
         backend,
-        cache,
-        session_config,
-        player_config,
-        connect_config,
-        credentials,
         device,
+        mixer,
+        cache,
+        player_config,
+        session_config,
+        connect_config,
+        mixer_config,
+        credentials,
         enable_discovery,
         zeroconf_port,
-        mixer,
-        mixer_config,
-        player_event_program: matches.opt_str("onevent"),
-        emit_sink_events: matches.opt_present("emit-sink-events"),
+        player_event_program,
+        emit_sink_events,
     }
 }
 
@@ -660,11 +735,14 @@ async fn main() {
     let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
 
     if setup.enable_discovery {
-        let config = setup.connect_config.clone();
         let device_id = setup.session_config.device_id.clone();
 
         discovery = Some(
-            librespot_connect::discovery::discovery(config, device_id, setup.zeroconf_port)
+            librespot::discovery::Discovery::builder(device_id)
+                .name(setup.connect_config.name.clone())
+                .device_type(setup.connect_config.device_type)
+                .port(setup.zeroconf_port)
+                .launch()
                 .unwrap(),
         );
     }
@@ -712,7 +790,7 @@ async fn main() {
             session = &mut connecting, if !connecting.is_terminated() => match session {
                 Ok(session) => {
                     let mixer_config = setup.mixer_config.clone();
-                    let mixer = (setup.mixer)(Some(mixer_config));
+                    let mixer = (setup.mixer)(mixer_config);
                     let player_config = setup.player_config.clone();
                     let connect_config = setup.connect_config.clone();
 

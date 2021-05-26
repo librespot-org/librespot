@@ -1,6 +1,6 @@
 use super::{Open, Sink};
 use crate::config::AudioFormat;
-use crate::convert;
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
@@ -81,7 +81,7 @@ impl Sink for SdlSink {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
         macro_rules! drain_sink {
             ($queue: expr, $size: expr) => {{
                 // sleep and wait for sdl thread to drain the queue a bit
@@ -98,12 +98,12 @@ impl Sink for SdlSink {
                 queue.queue(samples)
             }
             Self::S32(queue) => {
-                let samples_s32: &[i32] = &convert::to_s32(samples);
+                let samples_s32: &[i32] = &converter.f32_to_s32(samples);
                 drain_sink!(queue, AudioFormat::S32.size());
                 queue.queue(samples_s32)
             }
             Self::S16(queue) => {
-                let samples_s16: &[i16] = &convert::to_s16(samples);
+                let samples_s16: &[i16] = &converter.f32_to_s16(samples);
                 drain_sink!(queue, AudioFormat::S16.size());
                 queue.queue(samples_s16)
             }
