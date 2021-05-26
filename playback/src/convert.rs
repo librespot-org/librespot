@@ -1,3 +1,4 @@
+use crate::dither::{Ditherer, DithererBuilder};
 use zerocopy::AsBytes;
 
 #[derive(AsBytes, Copy, Clone, Debug)]
@@ -5,52 +6,98 @@ use zerocopy::AsBytes;
 #[repr(transparent)]
 pub struct i24([u8; 3]);
 impl i24 {
-    fn pcm_from_i32(sample: i32) -> Self {
-        // drop the least significant byte
-        let [a, b, c, _d] = (sample >> 8).to_le_bytes();
+    fn from_s24(sample: i32) -> Self {
+        // trim the padding in the most significant byte
+        let [a, b, c, _d] = sample.to_le_bytes();
         i24([a, b, c])
     }
 }
 
-// Losslessly represent [-1.0, 1.0] to [$type::MIN, $type::MAX] while maintaining DC linearity.
-macro_rules! convert_samples_to {
-    ($type: ident, $samples: expr) => {
-        convert_samples_to!($type, $samples, 0)
-    };
-    ($type: ident, $samples: expr, $drop_bits: expr) => {
-        $samples
+pub struct Converter {
+    ditherer: Option<Box<dyn Ditherer>>,
+}
+
+impl Converter {
+    pub fn new(dither_config: Option<DithererBuilder>) -> Self {
+        if let Some(ref ditherer_builder) = dither_config {
+            let ditherer = (ditherer_builder)();
+            info!("Converting with ditherer: {}", ditherer.name());
+            Self {
+                ditherer: Some(ditherer),
+            }
+        } else {
+            Self { ditherer: None }
+        }
+    }
+
+    // Denormalize and dither
+    pub fn scale(&mut self, sample: f32, factor: i64) -> f32 {
+        // From the many float to int conversion methods available, match what
+        // the reference Vorbis implementation uses: sample * 32768 (for 16 bit)
+        let int_value = sample * factor as f32;
+
+        match self.ditherer {
+            Some(ref mut d) => int_value + d.noise(int_value),
+            None => int_value,
+        }
+    }
+
+    // Special case for samples packed in a word of greater bit depth (e.g.
+    // S24): clamp between min and max to ensure that the most significant
+    // byte is zero. Otherwise, dithering may cause an overflow. This is not
+    // necessary for other formats, because casting to integer will saturate
+    // to the bounds of the primitive.
+    pub fn clamping_scale(&mut self, sample: f32, factor: i64) -> f32 {
+        let int_value = self.scale(sample, factor);
+
+        // In two's complement, there are more negative than positive values.
+        let min = -factor as f32;
+        let max = (factor - 1) as f32;
+
+        if int_value < min {
+            return min;
+        } else if int_value > max {
+            return max;
+        }
+        int_value
+    }
+
+    // https://doc.rust-lang.org/nomicon/casts.html: casting float to integer
+    // rounds towards zero, then saturates. Ideally halves should round to even to
+    // prevent any bias, but since it is extremely unlikely that a float has
+    // *exactly* .5 as fraction, this should be more than precise enough.
+    pub fn f32_to_s32(&mut self, samples: &[f32]) -> Vec<i32> {
+        samples
+            .iter()
+            .map(|sample| self.scale(*sample, 0x80000000) as i32)
+            .collect()
+    }
+
+    // S24 is 24-bit PCM packed in an upper 32-bit word
+    pub fn f32_to_s24(&mut self, samples: &[f32]) -> Vec<i32> {
+        samples
+            .iter()
+            .map(|sample| self.clamping_scale(*sample, 0x800000) as i32)
+            .collect()
+    }
+
+    // S24_3 is 24-bit PCM in a 3-byte array
+    pub fn f32_to_s24_3(&mut self, samples: &[f32]) -> Vec<i24> {
+        samples
             .iter()
             .map(|sample| {
-                // Losslessly represent [-1.0, 1.0] to [$type::MIN, $type::MAX]
-                // while maintaining DC linearity. There is nothing to be gained
-                // by doing this in f64, as the significand of a f32 is 24 bits,
-                // just like the maximum bit depth we are converting to.
-                let int_value = *sample * (std::$type::MAX as f32 + 0.5) - 0.5;
-
-                // Casting floats to ints truncates by default, which results
-                // in larger quantization error than rounding arithmetically.
-                // Flooring is faster, but again with larger error.
-                int_value.round() as $type >> $drop_bits
+                // Not as DRY as calling f32_to_s24 first, but this saves iterating
+                // over all samples twice.
+                let int_value = self.clamping_scale(*sample, 0x800000) as i32;
+                i24::from_s24(int_value)
             })
             .collect()
-    };
-}
+    }
 
-pub fn to_s32(samples: &[f32]) -> Vec<i32> {
-    convert_samples_to!(i32, samples)
-}
-
-pub fn to_s24(samples: &[f32]) -> Vec<i32> {
-    convert_samples_to!(i32, samples, 8)
-}
-
-pub fn to_s24_3(samples: &[f32]) -> Vec<i24> {
-    to_s32(samples)
-        .iter()
-        .map(|sample| i24::pcm_from_i32(*sample))
-        .collect()
-}
-
-pub fn to_s16(samples: &[f32]) -> Vec<i16> {
-    convert_samples_to!(i16, samples)
+    pub fn f32_to_s16(&mut self, samples: &[f32]) -> Vec<i16> {
+        samples
+            .iter()
+            .map(|sample| self.scale(*sample, 0x8000) as i16)
+            .collect()
+    }
 }

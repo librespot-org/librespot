@@ -1,5 +1,6 @@
 use super::{Open, Sink, SinkAsBytes};
 use crate::config::AudioFormat;
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use libpulse_binding::{self as pulse, stream::Direction};

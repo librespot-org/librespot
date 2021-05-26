@@ -38,13 +38,17 @@ gstreamer-app   = { version = "0.16", optional = true }
 glib            = { version = "0.10", optional = true }
 
 # Rodio dependencies
-rodio           = { version = "0.13", optional = true, default-features = false }
+rodio           = { version = "0.14", optional = true, default-features = false }
 cpal            = { version = "0.13", optional = true }
 thiserror       = { version = "1", optional = true }
 
 # Decoder
 lewton = "0.10"
 ogg = "0.8"
+
+# Dithering
+rand = "0.8"
+rand_distr = "0.4"
 
 [features]
 alsa-backend = ["alsa"]
