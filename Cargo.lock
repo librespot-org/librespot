@@ -238,6 +238,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "colored"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4ffc801dacf156c5854b9df4f425a626539c3a6ef7893cc0c5084a23f0b6c59"
+dependencies = [
+ "atty",
+ "lazy_static",
+ "winapi",
+]
+
+[[package]]
 name = "combine"
 version = "4.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1143,6 +1154,7 @@ dependencies = [
  "librespot-audio",
  "librespot-connect",
  "librespot-core",
+ "librespot-discovery",
  "librespot-metadata",
  "librespot-playback",
  "librespot-protocol",
@@ -1172,16 +1184,10 @@ dependencies = [
 name = "librespot-connect"
 version = "0.2.0"
 dependencies = [
- "aes-ctr",
- "base64",
- "dns-sd",
  "form_urlencoded",
- "futures-core",
  "futures-util",
- "hmac",
- "hyper",
- "libmdns",
  "librespot-core",
+ "librespot-discovery",
  "librespot-playback",
  "librespot-protocol",
  "log",
@@ -1189,10 +1195,8 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
- "sha-1",
  "tokio",
  "tokio-stream",
- "url",
 ]
 
 [[package]]
@@ -1233,6 +1237,31 @@ dependencies = [
  "url",
  "uuid",
  "vergen",
+]
+
+[[package]]
+name = "librespot-discovery"
+version = "0.2.0"
+dependencies = [
+ "aes-ctr",
+ "base64",
+ "cfg-if 1.0.0",
+ "dns-sd",
+ "form_urlencoded",
+ "futures",
+ "futures-core",
+ "hex",
+ "hmac",
+ "hyper",
+ "libmdns",
+ "librespot-core",
+ "log",
+ "rand",
+ "serde_json",
+ "sha-1",
+ "simple_logger",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2079,6 +2108,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16f1d0fef1604ba8f7a073c7e701f213e056707210e9020af4528e0101ce11a6"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "simple_logger"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd57f17c093ead1d4a1499dc9acaafdd71240908d64775465543b8d9a9f1d198"
+dependencies = [
+ "atty",
+ "chrono",
+ "colored",
+ "log",
+ "winapi",
 ]
 
 [[package]]
