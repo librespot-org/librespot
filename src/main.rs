@@ -275,15 +275,10 @@ fn get_setup(args: &[String]) -> Setup {
         "Alsa index of the cards mixer. Defaults to 0.",
         "INDEX",
     )
-    .optflag(
-        "",
-        "mixer-linear-volume",
-        "Disable Alsa mixer mapped volume scale (cubic). Defaults to false.",
-    )
     .optopt(
         "",
         "initial-volume",
-        "Initial volume once connected {0-100}%. Defaults to 50 for softvol and for Alsa mixer the current volume.",
+        "Initial volume in % from 0-100. Default for softvol: '50'. For the Alsa mixer: the current volume.",
         "VOLUME",
     )
     .optopt(
@@ -348,7 +343,7 @@ fn get_setup(args: &[String]) -> Setup {
     .optopt(
         "",
         "volume-range",
-        "Range of the volume control (dB). Defaults to 60 for softvol and for Alsa mixer what the mixer supports.",
+        "Range of the volume control (dB). Default for softvol: 60. For the Alsa mixer: what the control supports.",
         "RANGE",
     )
     .optflag(
