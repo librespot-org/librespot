@@ -1,5 +1,6 @@
 use super::{Open, Sink, SinkAsBytes};
 use crate::config::AudioFormat;
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -23,7 +24,6 @@ impl Open for StdoutSink {
 }
 
 impl Sink for StdoutSink {
-    start_stop_noop!();
     sink_as_bytes!();
 }
 
