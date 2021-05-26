@@ -372,7 +372,7 @@ fn get_setup(args: &[String]) -> Setup {
         Err(f) => {
             eprintln!(
                 "Error parsing command line options: {}\n{}",
-                f.to_string(),
+                f,
                 usage(&args[0], &opts)
             );
             exit(1);
