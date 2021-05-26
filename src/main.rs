@@ -191,7 +191,11 @@ struct Setup {
 
 fn get_setup(args: &[String]) -> Setup {
     let mut opts = getopts::Options::new();
-    opts.optopt(
+    opts.optflag(
+        "h",
+        "help",
+        "Print this help menu",
+    ).optopt(
         "c",
         "cache",
         "Path to a directory where files will be cached.",
@@ -363,6 +367,11 @@ fn get_setup(args: &[String]) -> Setup {
             exit(1);
         }
     };
+
+    if matches.opt_present("h") {
+        println!("{}", usage(&args[0], &opts));
+        exit(0);
+    }
 
     if matches.opt_present("version") {
         print_version();
