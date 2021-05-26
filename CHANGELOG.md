@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - [discovery] The crate `librespot-discovery` for discovery in LAN was created. Its functionality was previously part of `librespot-connect`.
+- [playback] Add support for dithering with `--dither` for lower requantization error (breaking)
 - [playback] Add `--volume-range` option to set dB range and control `log` and `cubic` volume control curves
 - [playback] `alsamixer`: support for querying dB range from Alsa softvol
 

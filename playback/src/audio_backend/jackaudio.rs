@@ -1,5 +1,6 @@
 use super::{Open, Sink};
 use crate::config::AudioFormat;
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::player::NUM_CHANNELS;
 use jack::{
@@ -69,9 +70,7 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    start_stop_noop!();
-
-    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, _: &mut Converter) -> io::Result<()> {
         for s in packet.samples().iter() {
             let res = self.send.send(*s);
             if res.is_err() {

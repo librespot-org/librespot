@@ -18,6 +18,7 @@ use crate::audio::{
 };
 use crate::audio_backend::Sink;
 use crate::config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig};
+use crate::convert::Converter;
 use crate::core::session::Session;
 use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
@@ -59,6 +60,7 @@ struct PlayerInternal {
     sink_event_callback: Option<SinkEventCallback>,
     audio_filter: Option<Box<dyn AudioFilter + Send>>,
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
+    converter: Converter,
 
     limiter_active: bool,
     limiter_attack_counter: u32,
@@ -297,6 +299,8 @@ impl Player {
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
 
+            let converter = Converter::new(config.ditherer);
+
             let internal = PlayerInternal {
                 session,
                 config,
@@ -309,6 +313,7 @@ impl Player {
                 sink_event_callback: None,
                 audio_filter,
                 event_senders: [event_sender].to_vec(),
+                converter,
 
                 limiter_active: false,
                 limiter_attack_counter: 0,
@@ -1283,7 +1288,7 @@ impl PlayerInternal {
                         }
                     }
 
-                    if let Err(err) = self.sink.write(&packet) {
+                    if let Err(err) = self.sink.write(&packet, &mut self.converter) {
                         error!("Could not write audio: {}", err);
                         self.ensure_sink_stopped(false);
                     }

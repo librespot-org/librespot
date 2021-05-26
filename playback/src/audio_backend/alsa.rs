@@ -1,5 +1,6 @@
 use super::{Open, Sink, SinkAsBytes};
 use crate::config::AudioFormat;
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::player::{NUM_CHANNELS, SAMPLES_PER_SECOND, SAMPLE_RATE};
 use alsa::device_name::HintIter;

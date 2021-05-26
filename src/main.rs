@@ -16,6 +16,7 @@ use librespot::playback::audio_backend::{self, SinkBuilder, BACKENDS};
 use librespot::playback::config::{
     AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
 };
+use librespot::playback::dither;
 use librespot::playback::mixer::mappings::MappedCtrl;
 use librespot::playback::mixer::{self, MixerConfig, MixerFn};
 use librespot::playback::player::{db_to_ratio, Player};
@@ -170,7 +171,6 @@ fn print_version() {
     );
 }
 
-#[derive(Clone)]
 struct Setup {
     format: AudioFormat,
     backend: SinkBuilder,
@@ -245,6 +245,12 @@ fn get_setup(args: &[String]) -> Setup {
             "format",
             "Output format (F32, S32, S24, S24_3 or S16). Defaults to S16",
             "FORMAT",
+        )
+        .optopt(
+            "",
+            "dither",
+            "Specify the dither algorithm to use - [none, gpdf, tpdf, tpdf_hp]. Defaults to 'tpdf' for formats S16, S24, S24_3 and 'none' for other formats.",
+            "DITHER",
         )
         .optopt("", "mixer", "Mixer to use (alsa or softvol)", "MIXER")
         .optopt(
@@ -570,7 +576,9 @@ fn get_setup(args: &[String]) -> Setup {
             .as_ref()
             .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or_default();
+
         let gapless = !matches.opt_present("disable-gapless");
+
         let normalisation = matches.opt_present("enable-volume-normalisation");
         let normalisation_method = matches
             .opt_str("normalisation-method")
@@ -612,11 +620,33 @@ fn get_setup(args: &[String]) -> Setup {
             .opt_str("normalisation-knee")
             .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
             .unwrap_or(PlayerConfig::default().normalisation_knee);
+
+        let ditherer_name = matches.opt_str("dither");
+        let ditherer = match ditherer_name.as_deref() {
+            // explicitly disabled on command line
+            Some("none") => None,
+            // explicitly set on command line
+            Some(_) => {
+                if format == AudioFormat::F32 {
+                    unimplemented!("Dithering is not available on format {:?}", format);
+                }
+                Some(dither::find_ditherer(ditherer_name).expect("Invalid ditherer"))
+            }
+            // nothing set on command line => use default
+            None => match format {
+                AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
+                    PlayerConfig::default().ditherer
+                }
+                _ => None,
+            },
+        };
+
         let passthrough = matches.opt_present("passthrough");
 
         PlayerConfig {
             bitrate,
             gapless,
+            passthrough,
             normalisation,
             normalisation_type,
             normalisation_method,
@@ -625,7 +655,7 @@ fn get_setup(args: &[String]) -> Setup {
             normalisation_attack,
             normalisation_release,
             normalisation_knee,
-            passthrough,
+            ditherer,
         }
     };
 
