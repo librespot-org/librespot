@@ -287,6 +287,10 @@ impl Player {
         if config.normalisation {
             debug!("Normalisation Type: {:?}", config.normalisation_type);
             debug!(
+                "Normalisation Pregain: {:.1} dB",
+                config.normalisation_pregain
+            );
+            debug!(
                 "Normalisation Threshold: {:.1} dBFS",
                 ratio_to_db(config.normalisation_threshold)
             );
