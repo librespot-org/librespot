@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsamixer`: use `--device` name for `--mixer-card` unless specified otherwise
 
 ### Deprecated
-- [connect] The `discovery` module
+- [connect] The `discovery` module was deprecated in favor of the `librespot-discovery` crate
 
 ### Removed
 - [connect] Removed no-op mixer started/stopped logic (breaking)
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - [connect] Fix step size on volume up/down events
-- [playback] Incorrect `PlayerConfig::default().normalisation_threshold` caused distortion when using dynamic volume normalisation downstream in librespot-connect was deprecated in favor of the `librespot-discovery` crate.
+- [playback] Incorrect `PlayerConfig::default().normalisation_threshold` caused distortion when using dynamic volume normalisation downstream 
 - [playback] Fix `log` and `cubic` volume controls to be mute at zero volume
 - [playback] `alsamixer`: make `cubic` consistent between cards that report minimum volume as mute, and cards that report some dB value
 - [playback] `alsamixer`: make `--volume-ctrl {linear|log}` work as expected
