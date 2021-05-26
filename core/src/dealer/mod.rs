@@ -574,6 +574,7 @@ async fn run<F, Fut>(
                     Ok((s, r)) => tasks = (init_task(s), init_task(r)),
                     Err(e) => {
                         warn!("Error while connecting: {}", e);
+                        tokio::time::sleep(Duration::from_secs(10)).await;
                     }
                 }
             }
