@@ -73,9 +73,6 @@ rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
-with-tremor = ["librespot-playback/with-tremor"]
-with-vorbis = ["librespot-playback/with-vorbis"]
-
 with-dns-sd = ["librespot-discovery/with-dns-sd"]
 
 default = ["rodio-backend"]

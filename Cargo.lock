@@ -530,12 +530,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcc"
-version = "0.3.55"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
-
-[[package]]
 name = "generic-array"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1286,7 +1280,6 @@ version = "0.2.0"
 dependencies = [
  "alsa",
  "byteorder",
- "cfg-if 1.0.0",
  "cpal",
  "futures-executor",
  "futures-util",
@@ -1300,7 +1293,6 @@ dependencies = [
  "librespot-audio",
  "librespot-core",
  "librespot-metadata",
- "librespot-tremor",
  "log",
  "ogg",
  "portaudio-rs",
@@ -1311,7 +1303,6 @@ dependencies = [
  "shell-words",
  "thiserror",
  "tokio",
- "vorbis",
  "zerocopy",
 ]
 
@@ -1322,18 +1313,6 @@ dependencies = [
  "glob",
  "protobuf",
  "protobuf-codegen-pure",
-]
-
-[[package]]
-name = "librespot-tremor"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97f525bff915d478a76940a7b988e5ea34911ba7280c97bd3a7673f54d68b4fe"
-dependencies = [
- "cc",
- "libc",
- "ogg-sys",
- "pkg-config",
 ]
 
 [[package]]
@@ -1616,17 +1595,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6951b4e8bf21c8193da321bcce9c9dd2e13c858fe078bf9054a288b419ae5d6e"
 dependencies = [
  "byteorder",
-]
-
-[[package]]
-name = "ogg-sys"
-version = "0.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a95b8c172e17df1a41bf8d666301d3b2c4efeb90d9d0415e2a4dc0668b35fdb2"
-dependencies = [
- "gcc",
- "libc",
- "pkg-config",
 ]
 
 [[package]]
@@ -2491,43 +2459,6 @@ name = "version_check"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fecdca9a5291cc2b8dcf7dc02453fee791a280f3743cb0905f8822ae463b3fe"
-
-[[package]]
-name = "vorbis"
-version = "0.0.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e8a194457075360557b82dac78f7ca2d65bbb6679bccfabae5f7c8c706cc776"
-dependencies = [
- "libc",
- "ogg-sys",
- "vorbis-sys",
- "vorbisfile-sys",
-]
-
-[[package]]
-name = "vorbis-sys"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd9ed6ef5361a85e68ccc005961d995c2d44e31f0816f142025f2ca2383dfbfd"
-dependencies = [
- "cc",
- "libc",
- "ogg-sys",
- "pkg-config",
-]
-
-[[package]]
-name = "vorbisfile-sys"
-version = "0.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f4306d7e1ac4699b55e20de9483750b90c250913188efd7484db6bfbe9042d1"
-dependencies = [
- "gcc",
- "libc",
- "ogg-sys",
- "pkg-config",
- "vorbis-sys",
-]
 
 [[package]]
 name = "walkdir"

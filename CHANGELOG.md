@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - [connect] Removed no-op mixer started/stopped logic (breaking)
+- [playback] Removed `with-vorbis` and `with-tremor` features
 - [playback] `alsamixer`: removed `--mixer-linear-volume` option; use `--volume-ctrl linear` instead
 
 ### Fixed
