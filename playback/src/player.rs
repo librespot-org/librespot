@@ -265,19 +265,7 @@ impl NormalisationData {
         }
 
         debug!("Normalisation Data: {:?}", data);
-        debug!("Normalisation Type: {:?}", config.normalisation_type);
-        debug!(
-            "Normalisation Threshold: {:.1}",
-            ratio_to_db(config.normalisation_threshold)
-        );
-        debug!("Normalisation Method: {:?}", config.normalisation_method);
-        debug!("Normalisation Factor: {}", normalisation_factor);
-
-        if config.normalisation_method == NormalisationMethod::Dynamic {
-            debug!("Normalisation Attack: {:?}", config.normalisation_attack);
-            debug!("Normalisation Release: {:?}", config.normalisation_release);
-            debug!("Normalisation Knee: {:?}", config.normalisation_knee);
-        }
+        debug!("Normalisation Factor: {:.2}%", normalisation_factor * 100.0);
 
         normalisation_factor
     }
@@ -295,6 +283,27 @@ impl Player {
     {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
         let (event_sender, event_receiver) = mpsc::unbounded_channel();
+
+        if config.normalisation {
+            debug!("Normalisation Type: {:?}", config.normalisation_type);
+            debug!(
+                "Normalisation Threshold: {:.1} dBFS",
+                ratio_to_db(config.normalisation_threshold)
+            );
+            debug!("Normalisation Method: {:?}", config.normalisation_method);
+
+            if config.normalisation_method == NormalisationMethod::Dynamic {
+                debug!(
+                    "Normalisation Attack: {:.0} ms",
+                    config.normalisation_attack * 1000.0
+                );
+                debug!(
+                    "Normalisation Release: {:.0} ms",
+                    config.normalisation_release * 1000.0
+                );
+                debug!("Normalisation Knee: {:?}", config.normalisation_knee);
+            }
+        }
 
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
