@@ -687,11 +687,14 @@ async fn main() {
     let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
 
     if setup.enable_discovery {
-        let config = setup.connect_config.clone();
         let device_id = setup.session_config.device_id.clone();
 
         discovery = Some(
-            librespot_connect::discovery::discovery(config, device_id, setup.zeroconf_port)
+            librespot::discovery::Discovery::builder(device_id)
+                .name(setup.connect_config.name.clone())
+                .device_type(setup.connect_config.device_type)
+                .port(setup.zeroconf_port)
+                .launch()
                 .unwrap(),
         );
     }
