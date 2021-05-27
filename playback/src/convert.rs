@@ -42,8 +42,9 @@ impl Converter {
         let int_value = sample * factor as f32 + dither;
 
         // Casting float to integer rounds towards zero by default, i.e. it
-        // truncates, and that generates larger error than rounding half up.
-        int_value.round()
+        // truncates, and that generates larger error than rounding to nearest.
+        // Absolute lowest error is gained from rounding ties to even.
+        math::round::half_to_even(int_value.into(), 0) as f32
     }
 
     // Special case for samples packed in a word of greater bit depth (e.g.

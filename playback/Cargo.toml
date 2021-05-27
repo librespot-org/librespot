@@ -20,6 +20,7 @@ version = "0.2.0"
 [dependencies]
 futures-executor = "0.3"
 futures-util = { version = "0.3", default_features = false, features = ["alloc"] }
+libmath = "0.2"
 log = "0.4"
 byteorder = "1.4"
 shell-words = "1.0.0"
