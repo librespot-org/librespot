@@ -134,7 +134,7 @@ impl SpotifyId {
         Ok(id)
     }
 
-    /// Returns the `SpotifyId` as a base16 (hex) encoded, `SpotifyId::SIZE_BASE62` (22)
+    /// Returns the `SpotifyId` as a base16 (hex) encoded, `SpotifyId::SIZE_BASE16` (32)
     /// character long `String`.
     pub fn to_base16(&self) -> String {
         to_base16(&self.to_raw(), &mut [0u8; SpotifyId::SIZE_BASE16])
