@@ -36,6 +36,10 @@ impl Converter {
         // the reference Vorbis implementation uses: sample * 32768 (for 16 bit)
         let int_value = sample * factor as f32;
 
+        // https://doc.rust-lang.org/nomicon/casts.html: casting float to integer
+        // rounds towards zero, then saturates. Ideally halves should round to even to
+        // prevent any bias, but since it is extremely unlikely that a float has
+        // *exactly* .5 as fraction, this should be more than precise enough.
         match self.ditherer {
             Some(ref mut d) => int_value + d.noise(int_value),
             None => int_value,
@@ -62,10 +66,6 @@ impl Converter {
         int_value
     }
 
-    // https://doc.rust-lang.org/nomicon/casts.html: casting float to integer
-    // rounds towards zero, then saturates. Ideally halves should round to even to
-    // prevent any bias, but since it is extremely unlikely that a float has
-    // *exactly* .5 as fraction, this should be more than precise enough.
     pub fn f32_to_s32(&mut self, samples: &[f32]) -> Vec<i32> {
         samples
             .iter()
