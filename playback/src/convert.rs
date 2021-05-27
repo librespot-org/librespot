@@ -31,13 +31,13 @@ impl Converter {
     }
 
     // Denormalize and dither
-    pub fn scale(&mut self, sample: f32, factor: i64) -> f32 {
+    pub fn scale(&mut self, sample: f64, factor: f64) -> f64 {
         // From the many float to int conversion methods available, match what
         // the reference Vorbis implementation uses: sample * 32768 (for 16 bit)
-        let int_value = sample * factor as f32;
+        let int_value = sample * factor;
 
         match self.ditherer {
-            Some(ref mut d) => int_value + d.noise(int_value),
+            Some(ref mut dither) => int_value + dither.noise(),
             None => int_value,
         }
     }
@@ -47,12 +47,12 @@ impl Converter {
     // byte is zero. Otherwise, dithering may cause an overflow. This is not
     // necessary for other formats, because casting to integer will saturate
     // to the bounds of the primitive.
-    pub fn clamping_scale(&mut self, sample: f32, factor: i64) -> f32 {
+    pub fn clamping_scale(&mut self, sample: f64, factor: f64) -> f64 {
         let int_value = self.scale(sample, factor);
 
         // In two's complement, there are more negative than positive values.
-        let min = -factor as f32;
-        let max = (factor - 1) as f32;
+        let min = -factor;
+        let max = factor - 1.0;
 
         if int_value < min {
             return min;
@@ -62,42 +62,42 @@ impl Converter {
         int_value
     }
 
-    // https://doc.rust-lang.org/nomicon/casts.html: casting float to integer
-    // rounds towards zero, then saturates. Ideally halves should round to even to
-    // prevent any bias, but since it is extremely unlikely that a float has
-    // *exactly* .5 as fraction, this should be more than precise enough.
-    pub fn f32_to_s32(&mut self, samples: &[f32]) -> Vec<i32> {
+    pub fn f64_to_f32(&mut self, samples: &[f64]) -> Vec<f32> {
+        samples.iter().map(|sample| *sample as f32).collect()
+    }
+
+    pub fn f64_to_s32(&mut self, samples: &[f64]) -> Vec<i32> {
         samples
             .iter()
-            .map(|sample| self.scale(*sample, 0x80000000) as i32)
+            .map(|sample| self.scale(*sample, 2147483648.) as i32)
             .collect()
     }
 
     // S24 is 24-bit PCM packed in an upper 32-bit word
-    pub fn f32_to_s24(&mut self, samples: &[f32]) -> Vec<i32> {
+    pub fn f64_to_s24(&mut self, samples: &[f64]) -> Vec<i32> {
         samples
             .iter()
-            .map(|sample| self.clamping_scale(*sample, 0x800000) as i32)
+            .map(|sample| self.clamping_scale(*sample, 8388608.) as i32)
             .collect()
     }
 
     // S24_3 is 24-bit PCM in a 3-byte array
-    pub fn f32_to_s24_3(&mut self, samples: &[f32]) -> Vec<i24> {
+    pub fn f64_to_s24_3(&mut self, samples: &[f64]) -> Vec<i24> {
         samples
             .iter()
             .map(|sample| {
                 // Not as DRY as calling f32_to_s24 first, but this saves iterating
                 // over all samples twice.
-                let int_value = self.clamping_scale(*sample, 0x800000) as i32;
+                let int_value = self.clamping_scale(*sample, 8388608.) as i32;
                 i24::from_s24(int_value)
             })
             .collect()
     }
 
-    pub fn f32_to_s16(&mut self, samples: &[f32]) -> Vec<i16> {
+    pub fn f64_to_s16(&mut self, samples: &[f64]) -> Vec<i16> {
         samples
             .iter()
-            .map(|sample| self.scale(*sample, 0x8000) as i16)
+            .map(|sample| self.scale(*sample, 32768.) as i16)
             .collect()
     }
 }

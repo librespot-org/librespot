@@ -32,7 +32,7 @@ pub trait Ditherer {
     where
         Self: Sized;
     fn name(&self) -> &'static str;
-    fn noise(&mut self, sample: f32) -> f32;
+    fn noise(&mut self) -> f64;
 }
 
 impl fmt::Display for dyn Ditherer {
@@ -48,7 +48,7 @@ impl fmt::Display for dyn Ditherer {
 
 pub struct TriangularDitherer {
     cached_rng: ThreadRng,
-    distribution: Triangular<f32>,
+    distribution: Triangular<f64>,
 }
 
 impl Ditherer for TriangularDitherer {
@@ -64,14 +64,14 @@ impl Ditherer for TriangularDitherer {
         "Triangular"
     }
 
-    fn noise(&mut self, _sample: f32) -> f32 {
+    fn noise(&mut self) -> f64 {
         self.distribution.sample(&mut self.cached_rng)
     }
 }
 
 pub struct GaussianDitherer {
     cached_rng: ThreadRng,
-    distribution: Normal<f32>,
+    distribution: Normal<f64>,
 }
 
 impl Ditherer for GaussianDitherer {
@@ -87,16 +87,16 @@ impl Ditherer for GaussianDitherer {
         "Gaussian"
     }
 
-    fn noise(&mut self, _sample: f32) -> f32 {
+    fn noise(&mut self) -> f64 {
         self.distribution.sample(&mut self.cached_rng)
     }
 }
 
 pub struct HighPassDitherer {
     active_channel: usize,
-    previous_noises: [f32; NUM_CHANNELS],
+    previous_noises: [f64; NUM_CHANNELS],
     cached_rng: ThreadRng,
-    distribution: Uniform<f32>,
+    distribution: Uniform<f64>,
 }
 
 impl Ditherer for HighPassDitherer {
@@ -113,7 +113,7 @@ impl Ditherer for HighPassDitherer {
         "Triangular, High Passed"
     }
 
-    fn noise(&mut self, _sample: f32) -> f32 {
+    fn noise(&mut self) -> f64 {
         let new_noise = self.distribution.sample(&mut self.cached_rng);
         let high_passed_noise = new_noise - self.previous_noises[self.active_channel];
         self.previous_noises[self.active_channel] = new_noise;
