@@ -32,14 +32,18 @@ impl Converter {
 
     // Denormalize and dither
     pub fn scale(&mut self, sample: f32, factor: i64) -> f32 {
+        let dither = match self.ditherer {
+            Some(ref mut d) => d.noise(),
+            None => 0.0,
+        };
+
         // From the many float to int conversion methods available, match what
         // the reference Vorbis implementation uses: sample * 32768 (for 16 bit)
-        let int_value = sample * factor as f32;
+        let int_value = sample * factor as f32 + dither;
 
-        match self.ditherer {
-            Some(ref mut d) => int_value + d.noise(int_value),
-            None => int_value,
-        }
+        // Casting float to integer rounds towards zero by default, i.e. it
+        // truncates, and that generates larger error than rounding half up.
+        int_value.round()
     }
 
     // Special case for samples packed in a word of greater bit depth (e.g.
@@ -62,10 +66,6 @@ impl Converter {
         int_value
     }
 
-    // https://doc.rust-lang.org/nomicon/casts.html: casting float to integer
-    // rounds towards zero, then saturates. Ideally halves should round to even to
-    // prevent any bias, but since it is extremely unlikely that a float has
-    // *exactly* .5 as fraction, this should be more than precise enough.
     pub fn f32_to_s32(&mut self, samples: &[f32]) -> Vec<i32> {
         samples
             .iter()

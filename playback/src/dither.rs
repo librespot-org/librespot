@@ -32,7 +32,7 @@ pub trait Ditherer {
     where
         Self: Sized;
     fn name(&self) -> &'static str;
-    fn noise(&mut self, sample: f32) -> f32;
+    fn noise(&mut self) -> f32;
 }
 
 impl fmt::Display for dyn Ditherer {
@@ -64,7 +64,7 @@ impl Ditherer for TriangularDitherer {
         "Triangular"
     }
 
-    fn noise(&mut self, _sample: f32) -> f32 {
+    fn noise(&mut self) -> f32 {
         self.distribution.sample(&mut self.cached_rng)
     }
 }
@@ -87,7 +87,7 @@ impl Ditherer for GaussianDitherer {
         "Gaussian"
     }
 
-    fn noise(&mut self, _sample: f32) -> f32 {
+    fn noise(&mut self) -> f32 {
         self.distribution.sample(&mut self.cached_rng)
     }
 }
@@ -113,7 +113,7 @@ impl Ditherer for HighPassDitherer {
         "Triangular, High Passed"
     }
 
-    fn noise(&mut self, _sample: f32) -> f32 {
+    fn noise(&mut self) -> f32 {
         let new_noise = self.distribution.sample(&mut self.cached_rng);
         let high_passed_noise = new_noise - self.previous_noises[self.active_channel];
         self.previous_noises[self.active_channel] = new_noise;
