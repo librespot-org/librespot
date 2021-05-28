@@ -180,7 +180,7 @@ impl Default for VolumeCtrl {
 }
 
 impl VolumeCtrl {
-    pub const MAX_VOLUME: u16 = std::u16::MAX;
+    pub const MAX_VOLUME: u16 = u16::MAX;
 
     // Taken from: https://www.dr-lex.be/info-stuff/volumecontrols.html
     pub const DEFAULT_DB_RANGE: f32 = 60.0;
