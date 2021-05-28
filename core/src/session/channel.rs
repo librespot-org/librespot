@@ -13,7 +13,7 @@ use tokio::sync::mpsc;
 use crate::util::SeqGenerator;
 
 component! {
-    ChannelManager : ChannelManagerInner {
+    ChannelManager<'_> : ChannelManagerInner {
         sequence: SeqGenerator<u16> = SeqGenerator::new(0),
         channels: HashMap<u16, mpsc::UnboundedSender<(u8, Bytes)>> = HashMap::new(),
         download_rate_estimate: usize = 0,
@@ -46,7 +46,7 @@ enum ChannelState {
     Closed,
 }
 
-impl ChannelManager {
+impl ChannelManager<'_> {
     pub fn allocate(&self) -> (u16, Channel) {
         let (tx, rx) = mpsc::unbounded_channel();
 
@@ -66,7 +66,7 @@ impl ChannelManager {
         (seq, channel)
     }
 
-    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(super) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         use std::collections::hash_map::Entry;
 
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
@@ -96,7 +96,7 @@ impl ChannelManager {
         self.lock(|inner| inner.download_rate_estimate)
     }
 
-    pub(crate) fn shutdown(&self) {
+    pub(super) fn shutdown(&self) {
         self.lock(|inner| {
             inner.invalid = true;
             // destroy the sending halves of the channels to signal everyone who is waiting for something.

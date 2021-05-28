@@ -1,8 +1,15 @@
+#[macro_use]
+mod component;
+
+pub mod audio_key;
+pub mod channel;
+pub mod mercury;
+
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::task::Context;
 use std::task::Poll;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -11,19 +18,18 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
 use futures_util::{future, ready, StreamExt, TryStreamExt};
-use once_cell::sync::OnceCell;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
+use self::audio_key::{AudioKeyManager, AudioKeyManagerInner};
+use self::channel::{ChannelManager, ChannelManagerInner};
+use self::mercury::{MercuryManager, MercuryManagerInner};
 use crate::apresolve::apresolve;
-use crate::audio_key::AudioKeyManager;
 use crate::authentication::Credentials;
 use crate::cache::Cache;
-use crate::channel::ChannelManager;
 use crate::config::SessionConfig;
 use crate::connection::{self, AuthenticationError};
-use crate::mercury::MercuryManager;
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -46,14 +52,27 @@ struct SessionInternal {
 
     tx_connection: mpsc::UnboundedSender<(u8, Vec<u8>)>,
 
-    audio_key: OnceCell<AudioKeyManager>,
-    channel: OnceCell<ChannelManager>,
-    mercury: OnceCell<MercuryManager>,
+    audio_key: Mutex<AudioKeyManagerInner>,
+    channel: Mutex<ChannelManagerInner>,
+    mercury: Mutex<MercuryManagerInner>,
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
 
     session_id: usize,
+}
+
+impl SessionInternal {
+    fn send_packet(&self, cmd: u8, data: Vec<u8>) {
+        self.tx_connection.send((cmd, data)).unwrap();
+    }
+}
+
+impl_components! {
+    SessionInternal;
+    AudioKeyManagerInner: .audio_key,
+    ChannelManagerInner: .channel,
+    MercuryManagerInner: .mercury
 }
 
 static SESSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -114,9 +133,9 @@ impl Session {
             }),
             tx_connection: sender_tx,
             cache: cache.map(Arc::new),
-            audio_key: OnceCell::new(),
-            channel: OnceCell::new(),
-            mercury: OnceCell::new(),
+            audio_key: Default::default(),
+            channel: Default::default(),
+            mercury: Default::default(),
             handle,
             session_id,
         }));
@@ -137,22 +156,16 @@ impl Session {
         session
     }
 
-    pub fn audio_key(&self) -> &AudioKeyManager {
-        self.0
-            .audio_key
-            .get_or_init(|| AudioKeyManager::new(self.weak()))
+    pub fn audio_key(&self) -> AudioKeyManager<'_> {
+        AudioKeyManager(&self.0)
     }
 
-    pub fn channel(&self) -> &ChannelManager {
-        self.0
-            .channel
-            .get_or_init(|| ChannelManager::new(self.weak()))
+    pub fn channel(&self) -> ChannelManager<'_> {
+        ChannelManager(&self.0)
     }
 
-    pub fn mercury(&self) -> &MercuryManager {
-        self.0
-            .mercury
-            .get_or_init(|| MercuryManager::new(self.weak()))
+    pub fn mercury(&self) -> MercuryManager<'_> {
+        MercuryManager(&self.0)
     }
 
     pub fn time_delta(&self) -> i64 {
@@ -207,7 +220,7 @@ impl Session {
     }
 
     pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
-        self.0.tx_connection.send((cmd, data)).unwrap();
+        self.0.send_packet(cmd, data);
     }
 
     pub fn cache(&self) -> Option<&Arc<Cache>> {
@@ -251,15 +264,11 @@ impl Session {
 }
 
 #[derive(Clone)]
-pub struct SessionWeak(Weak<SessionInternal>);
+struct SessionWeak(Weak<SessionInternal>);
 
 impl SessionWeak {
     fn try_upgrade(&self) -> Option<Session> {
         self.0.upgrade().map(Session)
-    }
-
-    pub(crate) fn upgrade(&self) -> Session {
-        self.try_upgrade().expect("Session died")
     }
 }
 

@@ -20,8 +20,10 @@ pub use self::types::*;
 mod sender;
 pub use self::sender::MercurySender;
 
+type MercuryResult = Result<MercuryResponse, MercuryError>;
+
 component! {
-    MercuryManager : MercuryManagerInner {
+    MercuryManager<'_> : MercuryManagerInner {
         sequence: SeqGenerator<u64> = SeqGenerator::new(0),
         pending: HashMap<Vec<u8>, MercuryPending> = HashMap::new(),
         subscriptions: Vec<(String, mpsc::UnboundedSender<MercuryResponse>)> = Vec::new(),
@@ -29,10 +31,14 @@ component! {
     }
 }
 
+trait MercuryCallback: FnOnce(MercuryManager, MercuryResult) + Send + 'static {}
+
+impl<T> MercuryCallback for T where T: FnOnce(MercuryManager, MercuryResult) + Send + 'static {}
+
 pub struct MercuryPending {
     parts: Vec<Vec<u8>>,
     partial: Option<Vec<u8>>,
-    callback: Option<oneshot::Sender<Result<MercuryResponse, MercuryError>>>,
+    callback: Option<Box<dyn MercuryCallback>>,
 }
 
 pub struct MercuryFuture<T> {
@@ -47,20 +53,18 @@ impl<T> Future for MercuryFuture<T> {
     }
 }
 
-impl MercuryManager {
+impl<'a> MercuryManager<'a> {
     fn next_seq(&self) -> Vec<u8> {
         let mut seq = vec![0u8; 8];
         BigEndian::write_u64(&mut seq, self.lock(|inner| inner.sequence.get()));
         seq
     }
 
-    fn request(&self, req: MercuryRequest) -> MercuryFuture<MercuryResponse> {
-        let (tx, rx) = oneshot::channel();
-
+    fn request_with_cb(&self, req: MercuryRequest, cb: impl MercuryCallback) {
         let pending = MercuryPending {
             parts: Vec::new(),
             partial: None,
-            callback: Some(tx),
+            callback: Some(Box::new(cb)),
         };
 
         let seq = self.next_seq();
@@ -73,7 +77,14 @@ impl MercuryManager {
         let cmd = req.method.command();
         let data = req.encode(&seq);
 
-        self.session().send_packet(cmd, data);
+        self.send_packet(cmd, data);
+    }
+
+    fn request(&self, req: MercuryRequest) -> MercuryFuture<MercuryResponse> {
+        let (tx, rx) = oneshot::channel();
+        self.request_with_cb(req, move |_: MercuryManager<'_>, res| {
+            let _ = tx.send(res);
+        });
         MercuryFuture { receiver: rx }
     }
 
@@ -95,8 +106,8 @@ impl MercuryManager {
         })
     }
 
-    pub fn sender<T: Into<String>>(&self, uri: T) -> MercurySender {
-        MercurySender::new(self.clone(), uri.into())
+    pub fn sender<T: Into<String>>(self, uri: T) -> MercurySender<'a> {
+        MercurySender::new(self, uri.into())
     }
 
     pub fn subscribe<T: Into<String>>(
@@ -104,46 +115,57 @@ impl MercuryManager {
         uri: T,
     ) -> impl Future<Output = Result<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError>> + 'static
     {
+        let (result_tx, result_rx) = oneshot::channel();
+
         let uri = uri.into();
-        let request = self.request(MercuryRequest {
-            method: MercuryMethod::Sub,
-            uri: uri.clone(),
-            content_type: None,
-            payload: Vec::new(),
-        });
 
-        let manager = self.clone();
-        async move {
-            let response = request.await?;
-
-            let (tx, rx) = mpsc::unbounded_channel();
-
-            manager.lock(move |inner| {
-                if !inner.invalid {
-                    debug!("subscribed uri={} count={}", uri, response.payload.len());
-                    if !response.payload.is_empty() {
-                        // Old subscription protocol, watch the provided list of URIs
-                        for sub in response.payload {
-                            let mut sub =
-                                protocol::pubsub::Subscription::parse_from_bytes(&sub).unwrap();
-                            let sub_uri = sub.take_uri();
-
-                            debug!("subscribed sub_uri={}", sub_uri);
-
-                            inner.subscriptions.push((sub_uri, tx.clone()));
-                        }
-                    } else {
-                        // New subscription protocol, watch the requested URI
-                        inner.subscriptions.push((uri, tx));
+        self.request_with_cb(
+            MercuryRequest {
+                method: MercuryMethod::Sub,
+                uri: uri.clone(),
+                content_type: None,
+                payload: Vec::new(),
+            },
+            move |manager: MercuryManager<'_>, response: MercuryResult| {
+                let response = match response {
+                    Ok(res) => res,
+                    Err(e) => {
+                        let _ = result_tx.send(Err(e));
+                        return;
                     }
-                }
-            });
+                };
 
-            Ok(rx)
-        }
+                let (tx, rx) = mpsc::unbounded_channel();
+
+                manager.lock(move |inner| {
+                    if !inner.invalid {
+                        debug!("subscribed uri={} count={}", uri, response.payload.len());
+                        if !response.payload.is_empty() {
+                            // Old subscription protocol, watch the provided list of URIs
+                            for sub in response.payload {
+                                let mut sub =
+                                    protocol::pubsub::Subscription::parse_from_bytes(&sub).unwrap();
+                                let sub_uri = sub.take_uri();
+
+                                debug!("subscribed sub_uri={}", sub_uri);
+
+                                inner.subscriptions.push((sub_uri, tx.clone()));
+                            }
+                        } else {
+                            // New subscription protocol, watch the requested URI
+                            inner.subscriptions.push((uri, tx));
+                        }
+                    }
+                });
+
+                let _ = result_tx.send(Ok(rx));
+            },
+        );
+
+        async move { result_rx.await.map_err(|_| MercuryError)? }
     }
 
-    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(super) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         let seq_len = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
         let seq = data.split_to(seq_len).as_ref().to_owned();
 
@@ -206,7 +228,7 @@ impl MercuryManager {
         } else if response.status_code >= 400 {
             warn!("error {} for uri {}", response.status_code, &response.uri);
             if let Some(cb) = pending.callback {
-                let _ = cb.send(Err(MercuryError));
+                cb(self.clone(), Err(MercuryError));
             }
         } else if cmd == 0xb5 {
             self.lock(|inner| {
@@ -242,11 +264,11 @@ impl MercuryManager {
                 }
             })
         } else if let Some(cb) = pending.callback {
-            let _ = cb.send(Ok(response));
+            cb(self.clone(), Ok(response));
         }
     }
 
-    pub(crate) fn shutdown(&self) {
+    pub(super) fn shutdown(&self) {
         self.lock(|inner| {
             inner.invalid = true;
             // destroy the sending halves of the channels to signal everyone who is waiting for something.
