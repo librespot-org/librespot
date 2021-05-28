@@ -47,7 +47,7 @@ enum ChannelState {
 }
 
 impl ChannelManager<'_> {
-    pub fn allocate(&self) -> (u16, Channel) {
+    pub fn allocate(self) -> (u16, Channel) {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let seq = self.lock(|inner| {
@@ -66,7 +66,7 @@ impl ChannelManager<'_> {
         (seq, channel)
     }
 
-    pub(super) fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(super) fn dispatch(self, cmd: u8, mut data: Bytes) {
         use std::collections::hash_map::Entry;
 
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
@@ -92,11 +92,11 @@ impl ChannelManager<'_> {
         });
     }
 
-    pub fn get_download_rate_estimate(&self) -> usize {
+    pub fn get_download_rate_estimate(self) -> usize {
         self.lock(|inner| inner.download_rate_estimate)
     }
 
-    pub(super) fn shutdown(&self) {
+    pub(super) fn shutdown(self) {
         self.lock(|inner| {
             inner.invalid = true;
             // destroy the sending halves of the channels to signal everyone who is waiting for something.

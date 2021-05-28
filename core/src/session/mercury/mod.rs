@@ -54,13 +54,13 @@ impl<T> Future for MercuryFuture<T> {
 }
 
 impl<'a> MercuryManager<'a> {
-    fn next_seq(&self) -> Vec<u8> {
+    fn next_seq(self) -> Vec<u8> {
         let mut seq = vec![0u8; 8];
         BigEndian::write_u64(&mut seq, self.lock(|inner| inner.sequence.get()));
         seq
     }
 
-    fn request_with_cb(&self, req: MercuryRequest, cb: impl MercuryCallback) {
+    fn request_with_cb(self, req: MercuryRequest, cb: impl MercuryCallback) {
         let pending = MercuryPending {
             parts: Vec::new(),
             partial: None,
@@ -80,7 +80,7 @@ impl<'a> MercuryManager<'a> {
         self.send_packet(cmd, data);
     }
 
-    fn request(&self, req: MercuryRequest) -> MercuryFuture<MercuryResponse> {
+    fn request(self, req: MercuryRequest) -> MercuryFuture<MercuryResponse> {
         let (tx, rx) = oneshot::channel();
         self.request_with_cb(req, move |_: MercuryManager<'_>, res| {
             let _ = tx.send(res);
@@ -88,7 +88,7 @@ impl<'a> MercuryManager<'a> {
         MercuryFuture { receiver: rx }
     }
 
-    pub fn get<T: Into<String>>(&self, uri: T) -> MercuryFuture<MercuryResponse> {
+    pub fn get<T: Into<String>>(self, uri: T) -> MercuryFuture<MercuryResponse> {
         self.request(MercuryRequest {
             method: MercuryMethod::Get,
             uri: uri.into(),
@@ -97,7 +97,7 @@ impl<'a> MercuryManager<'a> {
         })
     }
 
-    pub fn send<T: Into<String>>(&self, uri: T, data: Vec<u8>) -> MercuryFuture<MercuryResponse> {
+    pub fn send<T: Into<String>>(self, uri: T, data: Vec<u8>) -> MercuryFuture<MercuryResponse> {
         self.request(MercuryRequest {
             method: MercuryMethod::Send,
             uri: uri.into(),
@@ -111,7 +111,7 @@ impl<'a> MercuryManager<'a> {
     }
 
     pub fn subscribe<T: Into<String>>(
-        &self,
+        self,
         uri: T,
     ) -> impl Future<Output = Result<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError>> + 'static
     {
@@ -165,7 +165,7 @@ impl<'a> MercuryManager<'a> {
         async move { result_rx.await.map_err(|_| MercuryError)? }
     }
 
-    pub(super) fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(super) fn dispatch(self, cmd: u8, mut data: Bytes) {
         let seq_len = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
         let seq = data.split_to(seq_len).as_ref().to_owned();
 
@@ -213,7 +213,7 @@ impl<'a> MercuryManager<'a> {
         data.split_to(size).as_ref().to_owned()
     }
 
-    fn complete_request(&self, cmd: u8, mut pending: MercuryPending) {
+    fn complete_request(self, cmd: u8, mut pending: MercuryPending) {
         let header_data = pending.parts.remove(0);
         let header = protocol::mercury::Header::parse_from_bytes(&header_data).unwrap();
 
@@ -228,7 +228,7 @@ impl<'a> MercuryManager<'a> {
         } else if response.status_code >= 400 {
             warn!("error {} for uri {}", response.status_code, &response.uri);
             if let Some(cb) = pending.callback {
-                cb(self.clone(), Err(MercuryError));
+                cb(self, Err(MercuryError));
             }
         } else if cmd == 0xb5 {
             self.lock(|inner| {
@@ -264,11 +264,11 @@ impl<'a> MercuryManager<'a> {
                 }
             })
         } else if let Some(cb) = pending.callback {
-            cb(self.clone(), Ok(response));
+            cb(self, Ok(response));
         }
     }
 
-    pub(super) fn shutdown(&self) {
+    pub(super) fn shutdown(self) {
         self.lock(|inner| {
             inner.invalid = true;
             // destroy the sending halves of the channels to signal everyone who is waiting for something.

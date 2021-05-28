@@ -21,7 +21,7 @@ component! {
 }
 
 impl AudioKeyManager<'_> {
-    pub(super) fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(super) fn dispatch(self, cmd: u8, mut data: Bytes) {
         let seq = BigEndian::read_u32(data.split_to(4).as_ref());
 
         let sender = self.lock(|inner| inner.pending.remove(&seq));
@@ -46,7 +46,7 @@ impl AudioKeyManager<'_> {
         }
     }
 
-    pub async fn request(&self, track: SpotifyId, file: FileId) -> Result<AudioKey, AudioKeyError> {
+    pub async fn request(self, track: SpotifyId, file: FileId) -> Result<AudioKey, AudioKeyError> {
         let (tx, rx) = oneshot::channel();
 
         let seq = self.lock(move |inner| {
@@ -59,7 +59,7 @@ impl AudioKeyManager<'_> {
         rx.await.map_err(|_| AudioKeyError)?
     }
 
-    fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) {
+    fn send_key_request(self, seq: u32, track: SpotifyId, file: FileId) {
         let mut data: Vec<u8> = Vec::new();
         data.write(&file.0).unwrap();
         data.write(&track.to_raw()).unwrap();

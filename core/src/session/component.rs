@@ -16,7 +16,7 @@ macro_rules! impl_components {
 
 macro_rules! component {
     ($name:ident<'_> : $inner:ident { $($key:ident : $ty:ty = $value:expr,)* }) => {
-        #[derive(Clone)]
+        #[derive(Copy, Clone)]
         pub struct $name<'a>(pub(in $crate::session) &'a $crate::session::SessionInternal);
 
         impl<'a> $name<'a> {
