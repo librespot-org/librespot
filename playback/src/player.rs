@@ -26,9 +26,7 @@ use crate::decoder::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, 
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
 
-pub const SAMPLE_RATE: u32 = 44100;
-pub const NUM_CHANNELS: u8 = 2;
-pub const SAMPLES_PER_SECOND: u32 = SAMPLE_RATE as u32 * NUM_CHANNELS as u32;
+use crate::{MILLIS, NUM_CHANNELS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f32 = 20.0;
@@ -299,11 +297,11 @@ impl Player {
             if config.normalisation_method == NormalisationMethod::Dynamic {
                 debug!(
                     "Normalisation Attack: {:.0} ms",
-                    config.normalisation_attack * 1000.0
+                    config.normalisation_attack * MILLIS
                 );
                 debug!(
                     "Normalisation Release: {:.0} ms",
-                    config.normalisation_release * 1000.0
+                    config.normalisation_release * MILLIS
                 );
                 debug!("Normalisation Knee: {:?}", config.normalisation_knee);
             }
@@ -978,7 +976,7 @@ impl Future for PlayerInternal {
                                         .as_millis()
                                         as i64
                                         - stream_position_millis as i64;
-                                    lag > 1000
+                                    lag > MILLIS as i64
                                 }
                             };
                             if notify_about_position {

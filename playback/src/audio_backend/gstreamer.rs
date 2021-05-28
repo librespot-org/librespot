@@ -2,7 +2,7 @@ use super::{Open, Sink, SinkAsBytes};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::{NUM_CHANNELS, SAMPLE_RATE};
 
 use gstreamer as gst;
 use gstreamer_app as gst_app;

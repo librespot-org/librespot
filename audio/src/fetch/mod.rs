@@ -83,6 +83,8 @@ const MAX_PREFETCH_REQUESTS: usize = 4;
 // for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
 // pre-fetch request is only sent if less than MAX_PREFETCH_REQUESTS are pending.
 
+const ONE_SECOND_IN_MS: u64 = 1000;
+
 pub enum AudioFile {
     Cached(fs::File),
     Streaming(AudioFileStreaming),
@@ -170,7 +172,7 @@ impl StreamLoaderController {
             {
                 download_status = shared
                     .cond
-                    .wait_timeout(download_status, Duration::from_millis(1000))
+                    .wait_timeout(download_status, Duration::from_millis(ONE_SECOND_IN_MS))
                     .unwrap()
                     .0;
                 if range.length
@@ -368,7 +370,7 @@ impl AudioFileStreaming {
 
         let read_file = write_file.reopen().unwrap();
 
-        //let (seek_tx, seek_rx) = mpsc::unbounded();
+        // let (seek_tx, seek_rx) = mpsc::unbounded();
         let (stream_loader_command_tx, stream_loader_command_rx) =
             mpsc::unbounded_channel::<StreamLoaderCommand>();
 
@@ -405,7 +407,7 @@ impl Read for AudioFileStreaming {
         let length_to_request = match *(self.shared.download_strategy.lock().unwrap()) {
             DownloadStrategy::RandomAccess() => length,
             DownloadStrategy::Streaming() => {
-                // Due to the read-ahead stuff, we potentially request more than the actual reqeust demanded.
+                // Due to the read-ahead stuff, we potentially request more than the actual request demanded.
                 let ping_time_seconds =
                     0.0001 * self.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as f64;
 
@@ -449,7 +451,7 @@ impl Read for AudioFileStreaming {
             download_status = self
                 .shared
                 .cond
-                .wait_timeout(download_status, Duration::from_millis(1000))
+                .wait_timeout(download_status, Duration::from_millis(ONE_SECOND_IN_MS))
                 .unwrap()
                 .0;
         }

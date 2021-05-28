@@ -89,7 +89,8 @@ async fn receive_data(
             let duration = Instant::now() - request_sent_time;
             let duration_ms: u64;
             if 0.001 * (duration.as_millis() as f64) > MAXIMUM_ASSUMED_PING_TIME_SECONDS {
-                duration_ms = (MAXIMUM_ASSUMED_PING_TIME_SECONDS * 1000.0) as u64;
+                duration_ms =
+                    (MAXIMUM_ASSUMED_PING_TIME_SECONDS * super::ONE_SECOND_IN_MS as f64) as u64;
             } else {
                 duration_ms = duration.as_millis() as u64;
             }

@@ -35,7 +35,7 @@ use std::{
     pin::Pin,
 };
 
-const MILLIS: f32 = 1000.0;
+static MILLIS: f32 = 1000.0;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))

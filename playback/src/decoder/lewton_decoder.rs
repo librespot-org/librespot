@@ -23,7 +23,7 @@ where
     R: Read + Seek,
 {
     fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
-        let absgp = ms * 44100 / 1000;
+        let absgp = ms * crate::SAMPLE_RATE as i64 / crate::MILLIS as i64;
         match self.0.seek_absgp_pg(absgp as u64) {
             Ok(_) => Ok(()),
             Err(err) => Err(AudioError::VorbisError(err.into())),

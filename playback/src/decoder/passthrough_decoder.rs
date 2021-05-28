@@ -1,5 +1,6 @@
 // Passthrough decoder for librespot
 use super::{AudioDecoder, AudioError, AudioPacket};
+use crate::{MILLIS, SAMPLE_RATE};
 use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::fmt;
 use std::io::{Read, Seek};
@@ -12,7 +13,7 @@ where
     let pck: Packet = rdr.read_packet_expected()?;
 
     let pkt_type = pck.data[0];
-    debug!("Vorbis header type{}", &pkt_type);
+    debug!("Vorbis header type {}", &pkt_type);
 
     if pkt_type != code {
         return Err(PassthroughError(OggReadError::InvalidData));
@@ -96,7 +97,10 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
         self.stream_serial += 1;
 
         // hard-coded to 44.1 kHz
-        match self.rdr.seek_absgp(None, (ms * 44100 / 1000) as u64) {
+        match self
+            .rdr
+            .seek_absgp(None, (ms * SAMPLE_RATE as i64 / MILLIS as i64) as u64)
+        {
             Ok(_) => {
                 // need to set some offset for next_page()
                 let pck = self.rdr.read_packet().unwrap().unwrap();
