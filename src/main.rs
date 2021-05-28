@@ -405,7 +405,7 @@ fn get_setup(args: &[String]) -> Setup {
 
     let format = matches
         .opt_str("format")
-        .as_ref()
+        .as_deref()
         .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
         .unwrap_or_default();
 
@@ -450,9 +450,9 @@ fn get_setup(args: &[String]) -> Setup {
         }
         let volume_ctrl = matches
             .opt_str("volume-ctrl")
-            .as_ref()
+            .as_deref()
             .map(|volume_ctrl| {
-                VolumeCtrl::from_str_with_range(volume_ctrl, volume_range)
+                VolumeCtrl::try_from_str_with_range(volume_ctrl, volume_range)
                     .expect("Invalid volume control type")
             })
             .unwrap_or_else(|| {
@@ -595,16 +595,16 @@ fn get_setup(args: &[String]) -> Setup {
         let normalisation = matches.opt_present("enable-volume-normalisation");
         let normalisation_method = matches
             .opt_str("normalisation-method")
-            .as_ref()
+            .as_deref()
             .map(|method| {
-                NormalisationMethod::from_str(method).expect("Invalid normalisation method")
+                NormalisationMethod::try_from(method).expect("Invalid normalisation method")
             })
             .unwrap_or_default();
         let normalisation_type = matches
             .opt_str("normalisation-gain-type")
-            .as_ref()
+            .as_deref()
             .map(|gain_type| {
-                NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
+                NormalisationType::try_from(gain_type).expect("Invalid normalisation type")
             })
             .unwrap_or_default();
         let normalisation_pregain = matches
