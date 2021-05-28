@@ -52,7 +52,7 @@ impl Sink for PulseAudioSink {
             return Ok(());
         }
 
-        let device = self.device.as_ref().map(|s| (*s).as_str());
+        let device = self.device.as_deref();
         let result = Simple::new(
             None,                // Use the default server.
             APP_NAME,            // Our application's name.

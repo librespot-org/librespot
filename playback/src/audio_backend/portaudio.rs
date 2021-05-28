@@ -57,7 +57,7 @@ impl<'a> Open for PortAudioSink<'a> {
 
         portaudio_rs::initialize().unwrap();
 
-        let device_idx = match device.as_ref().map(AsRef::as_ref) {
+        let device_idx = match device.as_deref() {
             Some("?") => {
                 list_outputs();
                 exit(0)

@@ -458,7 +458,7 @@ fn get_setup(args: &[String]) -> Setup {
     }
 
     let mixer_name = matches.opt_str(MIXER_NAME);
-    let mixer = mixer::find(mixer_name.as_ref()).expect("Invalid mixer");
+    let mixer = mixer::find(mixer_name.as_deref()).expect("Invalid mixer");
 
     let mixer_config = {
         let card = matches.opt_str(MIXER_CARD).unwrap_or_else(|| {
