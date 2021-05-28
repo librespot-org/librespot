@@ -157,6 +157,8 @@ impl SinkAsBytes for AlsaSink {
 }
 
 impl AlsaSink {
+    pub const NAME: &'static str = "alsa";
+
     fn write_buf(&mut self) {
         let pcm = self.pcm.as_mut().unwrap();
         let io = pcm.io_bytes();

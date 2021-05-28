@@ -80,3 +80,7 @@ impl Sink for JackSink {
         Ok(())
     }
 }
+
+impl JackSink {
+    pub const NAME: &'static str = "jackaudio";
+}

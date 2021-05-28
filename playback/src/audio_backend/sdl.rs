@@ -111,3 +111,7 @@ impl Sink for SdlSink {
         Ok(())
     }
 }
+
+impl SdlSink {
+    pub const NAME: &'static str = "sdl";
+}

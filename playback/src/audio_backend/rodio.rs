@@ -204,3 +204,7 @@ impl Sink for RodioSink {
         Ok(())
     }
 }
+
+impl RodioSink {
+    pub const NAME: &'static str = "rodio";
+}

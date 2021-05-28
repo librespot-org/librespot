@@ -134,3 +134,7 @@ impl SinkAsBytes for GstreamerSink {
         Ok(())
     }
 }
+
+impl GstreamerSink {
+    pub const NAME: &'static str = "gstreamer";
+}

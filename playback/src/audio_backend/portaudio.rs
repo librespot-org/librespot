@@ -177,3 +177,7 @@ impl<'a> Drop for PortAudioSink<'a> {
         portaudio_rs::terminate().unwrap();
     }
 }
+
+impl<'a> PortAudioSink<'a> {
+    pub const NAME: &'static str = "portaudio";
+}

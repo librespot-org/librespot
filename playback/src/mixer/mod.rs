@@ -55,9 +55,9 @@ fn mk_sink<M: Mixer + 'static>(config: MixerConfig) -> Box<dyn Mixer> {
 
 pub fn find<T: AsRef<str>>(name: Option<T>) -> Option<MixerFn> {
     match name.as_ref().map(AsRef::as_ref) {
-        None | Some("softvol") => Some(mk_sink::<SoftMixer>),
+        None | Some(SoftMixer::NAME) => Some(mk_sink::<SoftMixer>),
         #[cfg(feature = "alsa-backend")]
-        Some("alsa") => Some(mk_sink::<AlsaMixer>),
+        Some(AlsaMixer::NAME) => Some(mk_sink::<AlsaMixer>),
         _ => None,
     }
 }

@@ -101,3 +101,7 @@ impl SinkAsBytes for PulseAudioSink {
         }
     }
 }
+
+impl PulseAudioSink {
+    pub const NAME: &'static str = "pulseaudio";
+}

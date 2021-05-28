@@ -42,6 +42,10 @@ impl Mixer for SoftMixer {
     }
 }
 
+impl SoftMixer {
+    pub const NAME: &'static str = "softmixer";
+}
+
 struct SoftVolumeApplier {
     volume: Arc<AtomicU32>,
 }
