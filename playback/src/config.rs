@@ -67,6 +67,8 @@ impl AudioFormat {
     #[allow(dead_code)]
     pub fn size(&self) -> usize {
         match self {
+            Self::F64 => mem::size_of::<f64>(),
+            Self::F32 => mem::size_of::<f32>(),
             Self::S24_3 => mem::size_of::<i24>(),
             Self::S16 => mem::size_of::<i16>(),
             _ => mem::size_of::<i32>(), // S32 and S24 are both stored in i32
