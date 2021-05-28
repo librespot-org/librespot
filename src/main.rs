@@ -29,7 +29,6 @@ use player_event_handler::{emit_sink_event, run_program_on_events};
 use std::convert::TryFrom;
 use std::path::Path;
 use std::process::exit;
-use std::str::FromStr;
 use std::{env, time::Instant};
 use std::{
     io::{stderr, Write},
@@ -630,8 +629,8 @@ fn get_setup(args: &[String]) -> Setup {
     let player_config = {
         let bitrate = matches
             .opt_str(BITRATE)
-            .as_ref()
-            .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
+            .as_deref()
+            .map(|bitrate| Bitrate::try_from(bitrate).expect("Invalid bitrate"))
             .unwrap_or_default();
 
         let gapless = !matches.opt_present(DISABLE_GAPLESS);
@@ -719,8 +718,8 @@ fn get_setup(args: &[String]) -> Setup {
     let connect_config = {
         let device_type = matches
             .opt_str(DEVICE_TYPE)
-            .as_ref()
-            .map(|device_type| DeviceType::from_str(device_type).expect("Invalid device type"))
+            .as_deref()
+            .map(|device_type| DeviceType::try_from(device_type).expect("Invalid device type"))
             .unwrap_or_default();
         let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
         let autoplay = matches.opt_present(AUTOPLAY);

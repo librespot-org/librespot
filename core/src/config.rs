@@ -1,5 +1,5 @@
+use core::convert::TryFrom;
 use std::fmt;
-use std::str::FromStr;
 use url::Url;
 
 #[derive(Clone, Debug)]
@@ -45,9 +45,9 @@ pub enum DeviceType {
     HomeThing = 103,
 }
 
-impl FromStr for DeviceType {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl TryFrom<&str> for DeviceType {
+    type Error = ();
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
         use self::DeviceType::*;
         match s.to_lowercase().as_ref() {
             "computer" => Ok(Computer),

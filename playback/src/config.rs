@@ -13,9 +13,9 @@ pub enum Bitrate {
     Bitrate320,
 }
 
-impl FromStr for Bitrate {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl TryFrom<&str> for Bitrate {
+    type Error = ();
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
         match s {
             "96" => Ok(Self::Bitrate96),
             "160" => Ok(Self::Bitrate160),
