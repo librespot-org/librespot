@@ -30,6 +30,10 @@ impl Converter {
         }
     }
 
+    const SCALE_S32: f64 = 2147483648.;
+    const SCALE_S24: f64 = 8388608.;
+    const SCALE_S16: f64 = 32768.;
+
     // Denormalize and dither
     pub fn scale(&mut self, sample: f64, factor: f64) -> f64 {
         // From the many float to int conversion methods available, match what
@@ -69,7 +73,7 @@ impl Converter {
     pub fn f64_to_s32(&mut self, samples: &[f64]) -> Vec<i32> {
         samples
             .iter()
-            .map(|sample| self.scale(*sample, 2147483648.) as i32)
+            .map(|sample| self.scale(*sample, Self::SCALE_S32) as i32)
             .collect()
     }
 
@@ -77,7 +81,7 @@ impl Converter {
     pub fn f64_to_s24(&mut self, samples: &[f64]) -> Vec<i32> {
         samples
             .iter()
-            .map(|sample| self.clamping_scale(*sample, 8388608.) as i32)
+            .map(|sample| self.clamping_scale(*sample, Self::SCALE_S24) as i32)
             .collect()
     }
 
@@ -88,7 +92,7 @@ impl Converter {
             .map(|sample| {
                 // Not as DRY as calling f32_to_s24 first, but this saves iterating
                 // over all samples twice.
-                let int_value = self.clamping_scale(*sample, 8388608.) as i32;
+                let int_value = self.clamping_scale(*sample, Self::SCALE_S24) as i32;
                 i24::from_s24(int_value)
             })
             .collect()
@@ -97,7 +101,7 @@ impl Converter {
     pub fn f64_to_s16(&mut self, samples: &[f64]) -> Vec<i16> {
         samples
             .iter()
-            .map(|sample| self.scale(*sample, 32768.) as i16)
+            .map(|sample| self.scale(*sample, Self::SCALE_S16) as i16)
             .collect()
     }
 }
