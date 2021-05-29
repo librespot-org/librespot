@@ -17,7 +17,7 @@ impl MappedCtrl for VolumeCtrl {
         // reach zero).
         if volume == 0 {
             return 0.0;
-        } else if volume == 1 {
+        } else if volume == Self::MAX_VOLUME {
             // And limit in case of rounding errors (as is the case for log).
             return 1.0;
         }

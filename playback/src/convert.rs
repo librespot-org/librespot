@@ -40,6 +40,10 @@ impl Converter {
         // the reference Vorbis implementation uses: sample * 32768 (for 16 bit)
         let int_value = sample * factor;
 
+        // https://doc.rust-lang.org/nomicon/casts.html: casting float to integer
+        // rounds towards zero, then saturates. Ideally halves should round to even to
+        // prevent any bias, but since it is extremely unlikely that a float has
+        // *exactly* .5 as fraction, this should be more than precise enough.
         match self.ditherer {
             Some(ref mut dither) => int_value + dither.noise(),
             None => int_value,
