@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add support for dithering with `--dither` for lower requantization error (breaking)
 - [playback] Add `--volume-range` option to set dB range and control `log` and `cubic` volume control curves
 - [playback] `alsamixer`: support for querying dB range from Alsa softvol
+- [playback] Add `--format F64` (supported by Alsa and GStreamer only)
 
 ### Changed
 - [audio, playback] Moved `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `AudioError`, `AudioDecoder` and the `convert` module from `librespot-audio` to `librespot-playback`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly. (breaking)
 - [connect, playback] Moved volume controls from `librespot-connect` to `librespot-playback` crate
 - [connect] Synchronize player volume with mixer volume on playback
+- [playback] Store and pass samples in 64-bit floating point
 - [playback] Make cubic volume control available to all mixers with `--volume-ctrl cubic`
 - [playback] Normalize volumes to `[0.0..1.0]` instead of `[0..65535]` for greater precision and performance (breaking)
 - [playback] `alsamixer`: complete rewrite (breaking)
