@@ -5,6 +5,7 @@ pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
 use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;
+use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
@@ -149,8 +150,8 @@ impl Default for PlayerConfig {
             normalisation_method: NormalisationMethod::default(),
             normalisation_pregain: 0.0,
             normalisation_threshold: db_to_ratio(-1.0),
-            normalisation_attack: 0.005,
-            normalisation_release: 0.1,
+            normalisation_attack: Duration::from_millis(5).as_secs_f32(),
+            normalisation_release: Duration::from_millis(100).as_secs_f32(),
             normalisation_knee: 1.0,
             passthrough: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),

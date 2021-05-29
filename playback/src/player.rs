@@ -26,10 +26,12 @@ use crate::decoder::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, 
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
 
-use crate::{MILLIS, NUM_CHANNELS, SAMPLES_PER_SECOND};
+use crate::{NUM_CHANNELS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f32 = 20.0;
+
+const LAGGING_SECONDS: u64 = 1;
 
 pub struct Player {
     commands: Option<mpsc::UnboundedSender<PlayerCommand>>,
@@ -297,11 +299,11 @@ impl Player {
             if config.normalisation_method == NormalisationMethod::Dynamic {
                 debug!(
                     "Normalisation Attack: {:.0} ms",
-                    config.normalisation_attack * MILLIS
+                    Duration::from_secs_f32(config.normalisation_attack).as_millis()
                 );
                 debug!(
                     "Normalisation Release: {:.0} ms",
-                    config.normalisation_release * MILLIS
+                    Duration::from_secs_f32(config.normalisation_release).as_millis()
                 );
                 debug!("Normalisation Knee: {:?}", config.normalisation_knee);
             }
@@ -971,12 +973,12 @@ impl Future for PlayerInternal {
                             let notify_about_position = match *reported_nominal_start_time {
                                 None => true,
                                 Some(reported_nominal_start_time) => {
-                                    // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we;re actually in time.
+                                    // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we're actually in time.
                                     let lag = (Instant::now() - reported_nominal_start_time)
                                         .as_millis()
                                         as i64
                                         - stream_position_millis as i64;
-                                    lag > MILLIS as i64
+                                    lag > Duration::from_secs(LAGGING_SECONDS).as_millis() as i64
                                 }
                             };
                             if notify_about_position {
@@ -1807,18 +1809,20 @@ impl PlayerInternal {
             // Request our read ahead range
             let request_data_length = max(
                 (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
-                    * (0.001 * stream_loader_controller.ping_time_ms() as f64)
-                    * bytes_per_second as f64) as usize,
-                (READ_AHEAD_DURING_PLAYBACK_SECONDS * bytes_per_second as f64) as usize,
+                    * Duration::from_millis(stream_loader_controller.ping_time_ms() as u64)
+                        .as_secs_f32()
+                    * bytes_per_second as f32) as usize,
+                (READ_AHEAD_DURING_PLAYBACK_SECONDS * bytes_per_second as f32) as usize,
             );
             stream_loader_controller.fetch_next(request_data_length);
 
             // Request the part we want to wait for blocking. This effecively means we wait for the previous request to partially complete.
             let wait_for_data_length = max(
                 (READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS
-                    * (0.001 * stream_loader_controller.ping_time_ms() as f64)
-                    * bytes_per_second as f64) as usize,
-                (READ_AHEAD_BEFORE_PLAYBACK_SECONDS * bytes_per_second as f64) as usize,
+                    * Duration::from_millis(stream_loader_controller.ping_time_ms() as u64)
+                        .as_secs_f32()
+                    * bytes_per_second as f32) as usize,
+                (READ_AHEAD_BEFORE_PLAYBACK_SECONDS * bytes_per_second as f32) as usize,
             );
             stream_loader_controller.fetch_next_blocking(wait_for_data_length);
         }

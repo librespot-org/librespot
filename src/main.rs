@@ -29,13 +29,12 @@ use player_event_handler::{emit_sink_event, run_program_on_events};
 use std::convert::TryFrom;
 use std::path::Path;
 use std::process::exit;
+use std::time::Duration;
 use std::{env, time::Instant};
 use std::{
     io::{stderr, Write},
     pin::Pin,
 };
-
-static MILLIS: f32 = 1000.0;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -666,11 +665,17 @@ fn get_setup(args: &[String]) -> Setup {
             .unwrap_or(PlayerConfig::default().normalisation_threshold);
         let normalisation_attack = matches
             .opt_str(NORMALISATION_ATTACK)
-            .map(|attack| attack.parse::<f32>().expect("Invalid attack float value") / MILLIS)
+            .map(|attack| {
+                Duration::from_millis(attack.parse::<u64>().expect("Invalid attack value"))
+                    .as_secs_f32()
+            })
             .unwrap_or(PlayerConfig::default().normalisation_attack);
         let normalisation_release = matches
             .opt_str(NORMALISATION_RELEASE)
-            .map(|release| release.parse::<f32>().expect("Invalid release float value") / MILLIS)
+            .map(|release| {
+                Duration::from_millis(release.parse::<u64>().expect("Invalid release value"))
+                    .as_secs_f32()
+            })
             .unwrap_or(PlayerConfig::default().normalisation_release);
         let normalisation_knee = matches
             .opt_str(NORMALISATION_KNEE)

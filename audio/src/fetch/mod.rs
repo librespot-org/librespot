@@ -29,19 +29,19 @@ const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 16;
 // read ahead is requested in addition to this amount. If the file is opened to seek to
 // another position, then only this amount is requested on the first request.
 
-const INITIAL_PING_TIME_ESTIMATE_SECONDS: f64 = 0.5;
+const INITIAL_PING_TIME_ESTIMATE_SECONDS: f32 = 0.5;
 // The pig time that is used for calculations before a ping time was actually measured.
 
-const MAXIMUM_ASSUMED_PING_TIME_SECONDS: f64 = 1.5;
+const MAXIMUM_ASSUMED_PING_TIME_SECONDS: f32 = 1.5;
 // If the measured ping time to the Spotify server is larger than this value, it is capped
 // to avoid run-away block sizes and pre-fetching.
 
-pub const READ_AHEAD_BEFORE_PLAYBACK_SECONDS: f64 = 1.0;
+pub const READ_AHEAD_BEFORE_PLAYBACK_SECONDS: f32 = 1.0;
 // Before playback starts, this many seconds of data must be present.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
-pub const READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS: f64 = 2.0;
+pub const READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS: f32 = 2.0;
 // Same as READ_AHEAD_BEFORE_PLAYBACK_SECONDS, but the time is taken as a factor of the ping
 // time to the Spotify server.
 // Both, READ_AHEAD_BEFORE_PLAYBACK_SECONDS and READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS are
@@ -49,25 +49,25 @@ pub const READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS: f64 = 2.0;
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
-pub const READ_AHEAD_DURING_PLAYBACK_SECONDS: f64 = 5.0;
+pub const READ_AHEAD_DURING_PLAYBACK_SECONDS: f32 = 5.0;
 // While playing back, this many seconds of data ahead of the current read position are
 // requested.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
-pub const READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS: f64 = 10.0;
+pub const READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS: f32 = 10.0;
 // Same as READ_AHEAD_DURING_PLAYBACK_SECONDS, but the time is taken as a factor of the ping
 // time to the Spotify server.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
-const PREFETCH_THRESHOLD_FACTOR: f64 = 4.0;
+const PREFETCH_THRESHOLD_FACTOR: f32 = 4.0;
 // If the amount of data that is pending (requested but not received) is less than a certain amount,
 // data is pre-fetched in addition to the read ahead settings above. The threshold for requesting more
 // data is calculated as
 // <pending bytes> < PREFETCH_THRESHOLD_FACTOR * <ping time> * <nominal data rate>
 
-const FAST_PREFETCH_THRESHOLD_FACTOR: f64 = 1.5;
+const FAST_PREFETCH_THRESHOLD_FACTOR: f32 = 1.5;
 // Similar to PREFETCH_THRESHOLD_FACTOR, but it also takes the current download rate into account.
 // The formula used is
 // <pending bytes> < FAST_PREFETCH_THRESHOLD_FACTOR * <ping time> * <measured download rate>
@@ -83,7 +83,7 @@ const MAX_PREFETCH_REQUESTS: usize = 4;
 // for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
 // pre-fetch request is only sent if less than MAX_PREFETCH_REQUESTS are pending.
 
-const ONE_SECOND_IN_MS: u64 = 1000;
+const TIMEOUT_SECONDS: u64 = 1;
 
 pub enum AudioFile {
     Cached(fs::File),
@@ -172,7 +172,7 @@ impl StreamLoaderController {
             {
                 download_status = shared
                     .cond
-                    .wait_timeout(download_status, Duration::from_millis(ONE_SECOND_IN_MS))
+                    .wait_timeout(download_status, Duration::from_secs(TIMEOUT_SECONDS))
                     .unwrap()
                     .0;
                 if range.length
@@ -273,10 +273,10 @@ impl AudioFile {
         let mut initial_data_length = if play_from_beginning {
             INITIAL_DOWNLOAD_SIZE
                 + max(
-                    (READ_AHEAD_DURING_PLAYBACK_SECONDS * bytes_per_second as f64) as usize,
+                    (READ_AHEAD_DURING_PLAYBACK_SECONDS * bytes_per_second as f32) as usize,
                     (INITIAL_PING_TIME_ESTIMATE_SECONDS
                         * READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
-                        * bytes_per_second as f64) as usize,
+                        * bytes_per_second as f32) as usize,
                 )
         } else {
             INITIAL_DOWNLOAD_SIZE
@@ -408,16 +408,18 @@ impl Read for AudioFileStreaming {
             DownloadStrategy::RandomAccess() => length,
             DownloadStrategy::Streaming() => {
                 // Due to the read-ahead stuff, we potentially request more than the actual request demanded.
-                let ping_time_seconds =
-                    0.0001 * self.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as f64;
+                let ping_time_seconds = Duration::from_millis(
+                    self.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as u64,
+                )
+                .as_secs_f32();
 
                 let length_to_request = length
                     + max(
-                        (READ_AHEAD_DURING_PLAYBACK_SECONDS * self.shared.stream_data_rate as f64)
+                        (READ_AHEAD_DURING_PLAYBACK_SECONDS * self.shared.stream_data_rate as f32)
                             as usize,
                         (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
                             * ping_time_seconds
-                            * self.shared.stream_data_rate as f64) as usize,
+                            * self.shared.stream_data_rate as f32) as usize,
                     );
                 min(length_to_request, self.shared.file_size - offset)
             }
@@ -451,7 +453,7 @@ impl Read for AudioFileStreaming {
             download_status = self
                 .shared
                 .cond
-                .wait_timeout(download_status, Duration::from_millis(ONE_SECOND_IN_MS))
+                .wait_timeout(download_status, Duration::from_secs(TIMEOUT_SECONDS))
                 .unwrap()
                 .0;
         }

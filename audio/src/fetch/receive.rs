@@ -1,8 +1,9 @@
 use std::cmp::{max, min};
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::{atomic, Arc};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
+use atomic::Ordering;
 use byteorder::{BigEndian, WriteBytesExt};
 use bytes::Bytes;
 use futures_util::StreamExt;
@@ -74,7 +75,7 @@ async fn receive_data(
 
     let old_number_of_request = shared
         .number_of_open_requests
-        .fetch_add(1, atomic::Ordering::SeqCst);
+        .fetch_add(1, Ordering::SeqCst);
 
     let mut measure_ping_time = old_number_of_request == 0;
 
@@ -87,12 +88,12 @@ async fn receive_data(
 
         if measure_ping_time {
             let duration = Instant::now() - request_sent_time;
-            let duration_ms: u64;
-            if 0.001 * (duration.as_millis() as f64) > MAXIMUM_ASSUMED_PING_TIME_SECONDS {
+            let duration_ms: u128;
+            if duration.as_secs_f32() > MAXIMUM_ASSUMED_PING_TIME_SECONDS {
                 duration_ms =
-                    (MAXIMUM_ASSUMED_PING_TIME_SECONDS * super::ONE_SECOND_IN_MS as f64) as u64;
+                    Duration::from_secs_f32(MAXIMUM_ASSUMED_PING_TIME_SECONDS).as_millis();
             } else {
-                duration_ms = duration.as_millis() as u64;
+                duration_ms = duration.as_millis();
             }
             let _ = file_data_tx.send(ReceivedData::ResponseTimeMs(duration_ms as usize));
             measure_ping_time = false;
@@ -128,7 +129,7 @@ async fn receive_data(
 
     shared
         .number_of_open_requests
-        .fetch_sub(1, atomic::Ordering::SeqCst);
+        .fetch_sub(1, Ordering::SeqCst);
 
     if result.is_err() {
         warn!(
@@ -238,7 +239,7 @@ impl AudioFileFetch {
 
             // download data from after the current read position first
             let mut tail_end = RangeSet::new();
-            let read_position = self.shared.read_position.load(atomic::Ordering::Relaxed);
+            let read_position = self.shared.read_position.load(Ordering::Relaxed);
             tail_end.add_range(&Range::new(
                 read_position,
                 self.shared.file_size - read_position,
@@ -297,7 +298,7 @@ impl AudioFileFetch {
                 // store our new estimate for everyone to see
                 self.shared
                     .ping_time_ms
-                    .store(ping_time_ms, atomic::Ordering::Relaxed);
+                    .store(ping_time_ms, Ordering::Relaxed);
             }
             ReceivedData::Data(data) => {
                 self.output
@@ -409,10 +410,8 @@ pub(super) async fn audio_file_fetch(
         }
 
         if fetch.get_download_strategy() == DownloadStrategy::Streaming() {
-            let number_of_open_requests = fetch
-                .shared
-                .number_of_open_requests
-                .load(atomic::Ordering::SeqCst);
+            let number_of_open_requests =
+                fetch.shared.number_of_open_requests.load(Ordering::SeqCst);
             if number_of_open_requests < MAX_PREFETCH_REQUESTS {
                 let max_requests_to_send = MAX_PREFETCH_REQUESTS - number_of_open_requests;
 
@@ -425,14 +424,15 @@ pub(super) async fn audio_file_fetch(
                 };
 
                 let ping_time_seconds =
-                    0.001 * fetch.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as f64;
+                    Duration::from_millis(fetch.shared.ping_time_ms.load(Ordering::Relaxed) as u64)
+                        .as_secs_f32();
                 let download_rate = fetch.session.channel().get_download_rate_estimate();
 
                 let desired_pending_bytes = max(
                     (PREFETCH_THRESHOLD_FACTOR
                         * ping_time_seconds
-                        * fetch.shared.stream_data_rate as f64) as usize,
-                    (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * download_rate as f64)
+                        * fetch.shared.stream_data_rate as f32) as usize,
+                    (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * download_rate as f32)
                         as usize,
                 );
 
