@@ -266,7 +266,7 @@ impl AudioFileFetch {
     fn handle_file_data(&mut self, data: ReceivedData) -> ControlFlow {
         match data {
             ReceivedData::ResponseTime(response_time) => {
-                trace!("Ping time estimated as: {:?}", response_time);
+                trace!("Ping time estimated as: {}ms", response_time.as_millis());
 
                 // prune old response times. Keep at most two so we can push a third.
                 while self.network_response_times.len() >= 3 {
