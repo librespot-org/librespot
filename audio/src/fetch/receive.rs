@@ -121,7 +121,7 @@ async fn receive_data(
         let missing_range = Range::new(data_offset, request_length);
 
         let mut download_status = shared.download_status.lock().unwrap();
-        download_status.requested.subtract_range(&missing_range);
+        download_status.requested.subtract_range(missing_range);
         shared.cond.notify_all();
     }
 
@@ -192,19 +192,19 @@ impl AudioFileFetch {
         }
 
         let mut ranges_to_request = RangeSet::new();
-        ranges_to_request.add_range(&Range::new(offset, length));
+        ranges_to_request.add_range(Range::new(offset, length));
 
         let mut download_status = self.shared.download_status.lock().unwrap();
 
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
 
-        for range in ranges_to_request.iter() {
+        for range in ranges_to_request {
             let (_headers, data) = request_range(
                 &self.session,
                 self.shared.file_id,
-                range.start,
-                range.length,
+                range.start(),
+                range.len(),
             )
             .split();
 
@@ -214,8 +214,8 @@ impl AudioFileFetch {
                 self.shared.clone(),
                 self.file_data_tx.clone(),
                 data,
-                range.start,
-                range.length,
+                range.start(),
+                range.len(),
                 Instant::now(),
             ));
         }
@@ -228,7 +228,7 @@ impl AudioFileFetch {
         while bytes_to_go > 0 && requests_to_go > 0 {
             // determine what is still missing
             let mut missing_data = RangeSet::new();
-            missing_data.add_range(&Range::new(0, self.shared.file_size));
+            missing_data.add_range(Range::new(0, self.shared.file_size));
             {
                 let download_status = self.shared.download_status.lock().unwrap();
                 missing_data.subtract_range_set(&download_status.downloaded);
@@ -238,24 +238,24 @@ impl AudioFileFetch {
             // download data from after the current read position first
             let mut tail_end = RangeSet::new();
             let read_position = self.shared.read_position.load(atomic::Ordering::Relaxed);
-            tail_end.add_range(&Range::new(
+            tail_end.add_range(Range::new(
                 read_position,
                 self.shared.file_size - read_position,
             ));
             let tail_end = tail_end.intersection(&missing_data);
 
             if !tail_end.is_empty() {
-                let range = tail_end.get_range(0);
-                let offset = range.start;
-                let length = min(range.length, bytes_to_go);
+                let range = tail_end[0];
+                let offset = range.start();
+                let length = min(range.len(), bytes_to_go);
                 self.download_range(offset, length);
                 requests_to_go -= 1;
                 bytes_to_go -= length;
             } else if !missing_data.is_empty() {
                 // ok, the tail is downloaded, download something fom the beginning.
-                let range = missing_data.get_range(0);
-                let offset = range.start;
-                let length = min(range.length, bytes_to_go);
+                let range = missing_data[0];
+                let offset = range.start();
+                let length = min(range.len(), bytes_to_go);
                 self.download_range(offset, length);
                 requests_to_go -= 1;
                 bytes_to_go -= length;
@@ -313,7 +313,7 @@ impl AudioFileFetch {
                 let mut download_status = self.shared.download_status.lock().unwrap();
 
                 let received_range = Range::new(data.offset, data.data.len());
-                download_status.downloaded.add_range(&received_range);
+                download_status.downloaded.add_range(received_range);
                 self.shared.cond.notify_all();
 
                 let full = download_status.downloaded.contained_length_from_value(0)
@@ -333,7 +333,7 @@ impl AudioFileFetch {
     fn handle_stream_loader_command(&mut self, cmd: StreamLoaderCommand) -> ControlFlow {
         match cmd {
             StreamLoaderCommand::Fetch(request) => {
-                self.download_range(request.start, request.length);
+                self.download_range(request.start(), request.len());
             }
             StreamLoaderCommand::RandomAccessMode() => {
                 *(self.shared.download_strategy.lock().unwrap()) = DownloadStrategy::RandomAccess();
@@ -371,7 +371,7 @@ pub(super) async fn audio_file_fetch(
     {
         let requested_range = Range::new(0, initial_data_length);
         let mut download_status = shared.download_status.lock().unwrap();
-        download_status.requested.add_range(&requested_range);
+        download_status.requested.add_range(requested_range);
     }
 
     session.spawn(receive_data(
