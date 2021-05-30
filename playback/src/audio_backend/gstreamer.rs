@@ -35,9 +35,9 @@ impl Open for GstreamerSink {
         let gst_bytes = 2048 * sample_size;
 
         #[cfg(target_endian = "little")]
-        const ENDIANNESS: &'static str = "LE";
+        const ENDIANNESS: &str = "LE";
         #[cfg(target_endian = "big")]
-        const ENDIANNESS: &'static str = "BE";
+        const ENDIANNESS: &str = "BE";
 
         let pipeline_str_preamble = format!(
             "appsrc caps=\"audio/x-raw,format={}{},layout=interleaved,channels={},rate={}\" block=true max-bytes={} name=appsrc0 ",
