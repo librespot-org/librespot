@@ -43,7 +43,7 @@ enum SpircPlayStatus {
 type BoxedFuture<T> = Pin<Box<dyn FusedFuture<Output = T> + Send>>;
 type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
 
-struct SpircTask {
+struct SpircTask<'a> {
     player: Player,
     mixer: Box<dyn Mixer>,
     config: SpircTaskConfig,
@@ -57,12 +57,12 @@ struct SpircTask {
     play_status: SpircPlayStatus,
 
     subscription: BoxedStream<Frame>,
-    sender: MercurySender,
+    sender: &'a mut MercurySender<'a>,
     commands: Option<mpsc::UnboundedReceiver<SpircCommand>>,
     player_events: Option<PlayerEventChannel>,
 
     shutdown: bool,
-    session: Session,
+    session: &'a Session,
     context_fut: BoxedFuture<Result<serde_json::Value, MercuryError>>,
     autoplay_fut: BoxedFuture<Result<String, MercuryError>>,
     context: Option<StationContext>,
@@ -247,8 +247,6 @@ impl Spirc {
                 }),
         );
 
-        let sender = session.mercury().sender(uri);
-
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let initial_volume = config.initial_volume;
@@ -260,45 +258,41 @@ impl Spirc {
 
         let player_events = player.get_player_event_channel();
 
-        let mut task = SpircTask {
-            player,
-            mixer,
-            config: task_config,
+        let task = async move {
+            let mut sender = session.mercury().sender(&uri);
 
-            sequence: SeqGenerator::new(1),
+            SpircTask {
+                player,
+                mixer,
+                config: task_config,
 
-            ident,
+                sequence: SeqGenerator::new(1),
 
-            device,
-            state: initial_state(),
-            play_request_id: None,
-            play_status: SpircPlayStatus::Stopped,
+                ident,
 
-            subscription,
-            sender,
-            commands: Some(cmd_rx),
-            player_events: Some(player_events),
+                device,
+                state: initial_state(),
+                play_request_id: None,
+                play_status: SpircPlayStatus::Stopped,
 
-            shutdown: false,
-            session,
+                subscription,
+                sender: &mut sender,
+                commands: Some(cmd_rx),
+                player_events: Some(player_events),
 
-            context_fut: Box::pin(future::pending()),
-            autoplay_fut: Box::pin(future::pending()),
-            context: None,
+                shutdown: false,
+                session: &session,
+                context_fut: Box::pin(future::pending()),
+                autoplay_fut: Box::pin(future::pending()),
+                context: None,
+            }
+            .run(initial_volume)
+            .await
         };
-
-        if let Some(volume) = initial_volume {
-            task.set_volume(volume);
-        } else {
-            let current_volume = task.mixer.volume();
-            task.set_volume(current_volume);
-        }
 
         let spirc = Spirc { commands: cmd_tx };
 
-        task.hello();
-
-        (spirc, task.run())
+        (spirc, task)
     }
 
     pub fn play(&self) {
@@ -330,8 +324,17 @@ impl Spirc {
     }
 }
 
-impl SpircTask {
-    async fn run(mut self) {
+impl SpircTask<'_> {
+    async fn run(mut self, initial_volume: Option<u16>) {
+        if let Some(volume) = initial_volume {
+            self.set_volume(volume);
+        } else {
+            let current_volume = self.mixer.volume();
+            self.set_volume(current_volume);
+        }
+
+        self.hello();
+
         while !self.session.is_invalid() && !self.shutdown {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
@@ -1233,19 +1236,19 @@ impl SpircTask {
     }
 }
 
-impl Drop for SpircTask {
+impl Drop for SpircTask<'_> {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.session.session_id());
     }
 }
 
-struct CommandSender<'a> {
-    spirc: &'a mut SpircTask,
+struct CommandSender<'a, 'b> {
+    spirc: &'a mut SpircTask<'b>,
     frame: protocol::spirc::Frame,
 }
 
-impl<'a> CommandSender<'a> {
-    fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender {
+impl<'a, 'b> CommandSender<'a, 'b> {
+    fn new(spirc: &'a mut SpircTask<'b>, cmd: MessageType) -> Self {
         let mut frame = protocol::spirc::Frame::new();
         frame.set_version(1);
         frame.set_protocol_version(::std::convert::Into::into("2.0.0"));
@@ -1257,13 +1260,13 @@ impl<'a> CommandSender<'a> {
         CommandSender { spirc, frame }
     }
 
-    fn recipient(mut self, recipient: &'a str) -> CommandSender {
+    fn recipient(mut self, recipient: &str) -> Self {
         self.frame.mut_recipient().push(recipient.to_owned());
         self
     }
 
     #[allow(dead_code)]
-    fn state(mut self, state: protocol::spirc::State) -> CommandSender<'a> {
+    fn state(mut self, state: protocol::spirc::State) -> Self {
         self.frame.set_state(state);
         self
     }

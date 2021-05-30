@@ -1,7 +1,6 @@
 mod codec;
 mod handshake;
 
-pub use self::codec::ApCodec;
 pub use self::handshake::handshake;
 
 use std::io::{self, ErrorKind};
@@ -10,16 +9,21 @@ use std::net::ToSocketAddrs;
 use futures_util::{SinkExt, StreamExt};
 use protobuf::{self, Message, ProtobufError};
 use thiserror::Error;
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
-use tokio_util::codec::Framed;
+use tokio_util::codec::{FramedRead, FramedWrite};
 use url::Url;
 
+use self::codec::{ApDecoder, ApEncoder};
 use crate::authentication::Credentials;
 use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 use crate::proxytunnel;
 use crate::version;
 
-pub type Transport = Framed<TcpStream, ApCodec>;
+pub struct Transport {
+    pub read: FramedRead<OwnedReadHalf, ApDecoder>,
+    pub write: FramedWrite<OwnedWriteHalf, ApEncoder>,
+}
 
 fn login_error_message(code: &ErrorCode) -> &'static str {
     pub use ErrorCode::*;
@@ -103,7 +107,11 @@ pub async fn connect(addr: String, proxy: Option<&Url>) -> io::Result<Transport>
         TcpStream::connect(&socket_addr).await?
     };
 
-    handshake(socket).await
+    let (read, write) = socket.into_split();
+
+    let (read, write) = handshake(read, write).await?;
+
+    Ok(Transport { read, write })
 }
 
 pub async fn authenticate(
@@ -142,8 +150,8 @@ pub async fn authenticate(
     let cmd = 0xab;
     let data = packet.write_to_bytes().unwrap();
 
-    transport.send((cmd, data)).await?;
-    let (cmd, data) = transport.next().await.expect("EOF")?;
+    transport.write.send((cmd, data)).await?;
+    let (cmd, data) = transport.read.next().await.expect("EOF")?;
     match cmd {
         0xac => {
             let welcome_data = APWelcome::parse_from_bytes(data.as_ref())?;

@@ -2,15 +2,15 @@ use std::collections::VecDeque;
 
 use super::*;
 
-pub struct MercurySender {
-    mercury: MercuryManager,
+pub struct MercurySender<'a> {
+    mercury: MercuryManager<'a>,
     uri: String,
     pending: VecDeque<MercuryFuture<MercuryResponse>>,
     buffered_future: Option<MercuryFuture<MercuryResponse>>,
 }
 
-impl MercurySender {
-    pub(crate) fn new(mercury: MercuryManager, uri: String) -> MercurySender {
+impl MercurySender<'_> {
+    pub(super) fn new(mercury: MercuryManager, uri: String) -> MercurySender {
         MercurySender {
             mercury,
             uri,
@@ -38,16 +38,5 @@ impl MercurySender {
             self.buffered_future = self.pending.pop_front();
         }
         Ok(())
-    }
-}
-
-impl Clone for MercurySender {
-    fn clone(&self) -> MercurySender {
-        MercurySender {
-            mercury: self.mercury.clone(),
-            uri: self.uri.clone(),
-            pending: VecDeque::new(),
-            buffered_future: None,
-        }
     }
 }

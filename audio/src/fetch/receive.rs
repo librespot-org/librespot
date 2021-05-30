@@ -3,10 +3,10 @@ use std::io::{Seek, SeekFrom, Write};
 use std::sync::{atomic, Arc};
 use std::time::Instant;
 
-use byteorder::{BigEndian, WriteBytesExt};
 use bytes::Bytes;
 use futures_util::StreamExt;
 use librespot_core::channel::{Channel, ChannelData};
+use librespot_core::packet;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::FileId;
 use tempfile::NamedTempFile;
@@ -34,17 +34,18 @@ pub fn request_range(session: &Session, file: FileId, offset: usize, length: usi
 
     let (id, channel) = session.channel().allocate();
 
-    let mut data: Vec<u8> = Vec::new();
-    data.write_u16::<BigEndian>(id).unwrap();
-    data.write_u8(0).unwrap();
-    data.write_u8(1).unwrap();
-    data.write_u16::<BigEndian>(0x0000).unwrap();
-    data.write_u32::<BigEndian>(0x00000000).unwrap();
-    data.write_u32::<BigEndian>(0x00009C40).unwrap();
-    data.write_u32::<BigEndian>(0x00020000).unwrap();
-    data.write(&file.0).unwrap();
-    data.write_u32::<BigEndian>(start as u32).unwrap();
-    data.write_u32::<BigEndian>(end as u32).unwrap();
+    let data = packet!(
+        (u16) id,
+        (u8) 0,
+        (u8) 1,
+        (u16) 0x0000,
+        (u32) 0x0000_0000,
+        (u32) 0x0000_9C40,
+        (u32) 0x0002_0000,
+        ([u8; 20]) &file.0,
+        (u32) start as u32,
+        (u32) end as u32
+    );
 
     session.send_packet(0x8, data);
 

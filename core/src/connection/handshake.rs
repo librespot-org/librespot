@@ -1,38 +1,40 @@
-use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder};
 use hmac::{Hmac, Mac, NewMac};
 use protobuf::{self, Message};
 use rand::{thread_rng, RngCore};
 use sha1::Sha1;
 use std::io;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio_util::codec::{Decoder, Framed};
 
-use super::codec::ApCodec;
+use super::codec::{ApDecoder, ApEncoder, Decoded, Encoded};
 use crate::diffie_hellman::DhLocalKeys;
 use crate::protocol;
 use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
+use crate::util::Proto;
 
-pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
-    mut connection: T,
-) -> io::Result<Framed<T, ApCodec>> {
+pub async fn handshake<R, W>(mut read: R, mut write: W) -> io::Result<(Decoded<R>, Encoded<W>)>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
     let local_keys = DhLocalKeys::random(&mut thread_rng());
     let gc = local_keys.public_key();
-    let mut accumulator = client_hello(&mut connection, gc).await?;
-    let message: APResponseMessage = recv_packet(&mut connection, &mut accumulator).await?;
+    let mut accumulator = client_hello(&mut write, gc).await?;
+    let message: APResponseMessage = recv_packet(&mut read, &mut accumulator).await?;
     let remote_key = message
         .get_challenge()
         .get_login_crypto_challenge()
         .get_diffie_hellman()
-        .get_gs()
-        .to_owned();
+        .get_gs();
 
-    let shared_secret = local_keys.shared_secret(&remote_key);
+    let shared_secret = local_keys.shared_secret(remote_key);
     let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator);
-    let codec = ApCodec::new(&send_key, &recv_key);
+    let encoder = ApEncoder::new(&send_key);
+    let decoder = ApDecoder::new(&recv_key);
 
-    client_response(&mut connection, challenge).await?;
+    client_response(&mut write, challenge).await?;
 
-    Ok(codec.framed(connection))
+    Ok((Decoded::new(read, decoder), Encoded::new(write, encoder)))
 }
 
 async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>
@@ -64,10 +66,12 @@ where
     packet.set_client_nonce(client_nonce);
     packet.set_padding(vec![0x1e]);
 
-    let mut buffer = vec![0, 4];
-    let size = 2 + 4 + packet.compute_size();
-    <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size).unwrap();
-    packet.write_to_vec(&mut buffer).unwrap();
+    let buffer = crate::packet!(
+        (u8) 0,
+        (u8) 4,
+        (u32) 2 + 4 + packet.compute_size() ,
+        (Proto) &packet
+    );
 
     connection.write_all(&buffer[..]).await?;
     Ok(buffer)
@@ -85,11 +89,10 @@ where
     packet.mut_pow_response();
     packet.mut_crypto_response();
 
-    let mut buffer = vec![];
-    let size = 4 + packet.compute_size();
-    <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size).unwrap();
-    packet.write_to_vec(&mut buffer).unwrap();
-
+    let buffer = crate::packet!(
+        (u32) 4 + packet.compute_size(),
+        (Proto) &packet
+    );
     connection.write_all(&buffer[..]).await?;
     Ok(())
 }

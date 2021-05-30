@@ -1,9 +1,9 @@
-use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use std::collections::HashMap;
-use std::io::Write;
 use tokio::sync::oneshot;
 
+use crate::packet;
 use crate::spotify_id::{FileId, SpotifyId};
 use crate::util::SeqGenerator;
 
@@ -14,14 +14,14 @@ pub struct AudioKey(pub [u8; 16]);
 pub struct AudioKeyError;
 
 component! {
-    AudioKeyManager : AudioKeyManagerInner {
+    AudioKeyManager<'_> : AudioKeyManagerInner {
         sequence: SeqGenerator<u32> = SeqGenerator::new(0),
         pending: HashMap<u32, oneshot::Sender<Result<AudioKey, AudioKeyError>>> = HashMap::new(),
     }
 }
 
-impl AudioKeyManager {
-    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
+impl AudioKeyManager<'_> {
+    pub(super) fn dispatch(self, cmd: u8, mut data: Bytes) {
         let seq = BigEndian::read_u32(data.split_to(4).as_ref());
 
         let sender = self.lock(|inner| inner.pending.remove(&seq));
@@ -46,7 +46,7 @@ impl AudioKeyManager {
         }
     }
 
-    pub async fn request(&self, track: SpotifyId, file: FileId) -> Result<AudioKey, AudioKeyError> {
+    pub async fn request(self, track: SpotifyId, file: FileId) -> Result<AudioKey, AudioKeyError> {
         let (tx, rx) = oneshot::channel();
 
         let seq = self.lock(move |inner| {
@@ -59,13 +59,14 @@ impl AudioKeyManager {
         rx.await.map_err(|_| AudioKeyError)?
     }
 
-    fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) {
-        let mut data: Vec<u8> = Vec::new();
-        data.write(&file.0).unwrap();
-        data.write(&track.to_raw()).unwrap();
-        data.write_u32::<BigEndian>(seq).unwrap();
-        data.write_u16::<BigEndian>(0x0000).unwrap();
+    fn send_key_request(self, seq: u32, track: SpotifyId, file: FileId) {
+        let data = packet!(
+            ([u8; 20]) &file.0,
+            ([u8; 16]) &track.to_raw(),
+            (u32) seq,
+            (u16) 0x0000
+        );
 
-        self.session().send_packet(0xc, data)
+        self.send_packet(0xc, data)
     }
 }
