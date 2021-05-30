@@ -1,5 +1,3 @@
-#![allow(clippy::unused_io_amount)]
-
 #[macro_use]
 extern crate log;
 
@@ -16,6 +14,7 @@ mod proxytunnel;
 pub mod session;
 pub mod spotify_id;
 #[doc(hidden)]
+#[macro_use]
 pub mod util;
 pub mod version;
 

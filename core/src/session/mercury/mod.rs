@@ -55,9 +55,9 @@ impl<T> Future for MercuryFuture<T> {
 
 impl<'a> MercuryManager<'a> {
     fn next_seq(self) -> Vec<u8> {
-        let mut seq = vec![0u8; 8];
-        BigEndian::write_u64(&mut seq, self.lock(|inner| inner.sequence.get()));
-        seq
+        self.lock(|inner| inner.sequence.get())
+            .to_be_bytes()
+            .to_vec()
     }
 
     fn request_with_cb(self, req: MercuryRequest, cb: impl MercuryCallback) {

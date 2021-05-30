@@ -1,9 +1,9 @@
-use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use std::collections::HashMap;
-use std::io::Write;
 use tokio::sync::oneshot;
 
+use crate::packet;
 use crate::spotify_id::{FileId, SpotifyId};
 use crate::util::SeqGenerator;
 
@@ -60,11 +60,12 @@ impl AudioKeyManager<'_> {
     }
 
     fn send_key_request(self, seq: u32, track: SpotifyId, file: FileId) {
-        let mut data: Vec<u8> = Vec::new();
-        data.write(&file.0).unwrap();
-        data.write(&track.to_raw()).unwrap();
-        data.write_u32::<BigEndian>(seq).unwrap();
-        data.write_u16::<BigEndian>(0x0000).unwrap();
+        let data = packet!(
+            ([u8; 20]) &file.0,
+            ([u8; 16]) &track.to_raw(),
+            (u32) seq,
+            (u16) 0x0000
+        );
 
         self.send_packet(0xc, data)
     }

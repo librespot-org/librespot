@@ -1,4 +1,4 @@
-use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
+use byteorder::{BigEndian, ByteOrder};
 use hmac::{Hmac, Mac, NewMac};
 use protobuf::{self, Message};
 use rand::{thread_rng, RngCore};
@@ -10,6 +10,7 @@ use super::codec::{ApDecoder, ApEncoder, Decoded, Encoded};
 use crate::diffie_hellman::DhLocalKeys;
 use crate::protocol;
 use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
+use crate::util::Proto;
 
 pub async fn handshake<R, W>(mut read: R, mut write: W) -> io::Result<(Decoded<R>, Encoded<W>)>
 where
@@ -65,10 +66,12 @@ where
     packet.set_client_nonce(client_nonce);
     packet.set_padding(vec![0x1e]);
 
-    let mut buffer = vec![0, 4];
-    let size = 2 + 4 + packet.compute_size();
-    <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size).unwrap();
-    packet.write_to_vec(&mut buffer).unwrap();
+    let buffer = crate::packet!(
+        (u8) 0,
+        (u8) 4,
+        (u32) 2 + 4 + packet.compute_size() ,
+        (Proto) &packet
+    );
 
     connection.write_all(&buffer[..]).await?;
     Ok(buffer)
@@ -86,11 +89,10 @@ where
     packet.mut_pow_response();
     packet.mut_crypto_response();
 
-    let mut buffer = vec![];
-    let size = 4 + packet.compute_size();
-    <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size).unwrap();
-    packet.write_to_vec(&mut buffer).unwrap();
-
+    let buffer = crate::packet!(
+        (u32) 4 + packet.compute_size(),
+        (Proto) &packet
+    );
     connection.write_all(&buffer[..]).await?;
     Ok(())
 }
