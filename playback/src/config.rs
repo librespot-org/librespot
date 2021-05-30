@@ -2,7 +2,6 @@ use super::player::db_to_ratio;
 use crate::convert::i24;
 pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
 
-use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;
 use std::time::Duration;
@@ -14,9 +13,9 @@ pub enum Bitrate {
     Bitrate320,
 }
 
-impl TryFrom<&str> for Bitrate {
-    type Error = ();
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+impl FromStr for Bitrate {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "96" => Ok(Self::Bitrate96),
             "160" => Ok(Self::Bitrate160),
@@ -41,9 +40,9 @@ pub enum AudioFormat {
     S16,
 }
 
-impl TryFrom<&str> for AudioFormat {
-    type Error = ();
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+impl FromStr for AudioFormat {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_uppercase().as_ref() {
             "F32" => Ok(Self::F32),
             "S32" => Ok(Self::S32),
@@ -80,9 +79,9 @@ pub enum NormalisationType {
     Track,
 }
 
-impl TryFrom<&str> for NormalisationType {
-    type Error = ();
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+impl FromStr for NormalisationType {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_ref() {
             "album" => Ok(Self::Album),
             "track" => Ok(Self::Track),
@@ -103,9 +102,9 @@ pub enum NormalisationMethod {
     Dynamic,
 }
 
-impl TryFrom<&str> for NormalisationMethod {
-    type Error = ();
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
+impl FromStr for NormalisationMethod {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_ref() {
             "basic" => Ok(Self::Basic),
             "dynamic" => Ok(Self::Dynamic),
@@ -171,7 +170,7 @@ pub enum VolumeCtrl {
 impl FromStr for VolumeCtrl {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::try_from_str_with_range(s, Self::DEFAULT_DB_RANGE)
+        Self::from_str_with_range(s, Self::DEFAULT_DB_RANGE)
     }
 }
 
@@ -187,7 +186,7 @@ impl VolumeCtrl {
     // Taken from: https://www.dr-lex.be/info-stuff/volumecontrols.html
     pub const DEFAULT_DB_RANGE: f32 = 60.0;
 
-    pub fn try_from_str_with_range(s: &str, db_range: f32) -> Result<Self, <Self as FromStr>::Err> {
+    pub fn from_str_with_range(s: &str, db_range: f32) -> Result<Self, <Self as FromStr>::Err> {
         use self::VolumeCtrl::*;
         match s.to_lowercase().as_ref() {
             "cubic" => Ok(Cubic(db_range)),

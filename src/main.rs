@@ -26,15 +26,14 @@ use librespot::playback::player::{db_to_ratio, Player};
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
 
-use std::convert::TryFrom;
+use std::env;
+use std::io::{stderr, Write};
 use std::path::Path;
+use std::pin::Pin;
 use std::process::exit;
+use std::str::FromStr;
 use std::time::Duration;
-use std::{env, time::Instant};
-use std::{
-    io::{stderr, Write},
-    pin::Pin,
-};
+use std::time::Instant;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -446,7 +445,7 @@ fn get_setup(args: &[String]) -> Setup {
     let format = matches
         .opt_str(FORMAT)
         .as_deref()
-        .map(|format| AudioFormat::try_from(format).expect("Invalid output format"))
+        .map(|format| AudioFormat::from_str(format).expect("Invalid output format"))
         .unwrap_or_default();
 
     let device = matches.opt_str(DEVICE);
@@ -493,7 +492,7 @@ fn get_setup(args: &[String]) -> Setup {
             .opt_str(VOLUME_CTRL)
             .as_deref()
             .map(|volume_ctrl| {
-                VolumeCtrl::try_from_str_with_range(volume_ctrl, volume_range)
+                VolumeCtrl::from_str_with_range(volume_ctrl, volume_range)
                     .expect("Invalid volume control type")
             })
             .unwrap_or_else(|| {
@@ -629,7 +628,7 @@ fn get_setup(args: &[String]) -> Setup {
         let bitrate = matches
             .opt_str(BITRATE)
             .as_deref()
-            .map(|bitrate| Bitrate::try_from(bitrate).expect("Invalid bitrate"))
+            .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
             .unwrap_or_default();
 
         let gapless = !matches.opt_present(DISABLE_GAPLESS);
@@ -639,14 +638,14 @@ fn get_setup(args: &[String]) -> Setup {
             .opt_str(NORMALISATION_METHOD)
             .as_deref()
             .map(|method| {
-                NormalisationMethod::try_from(method).expect("Invalid normalisation method")
+                NormalisationMethod::from_str(method).expect("Invalid normalisation method")
             })
             .unwrap_or_default();
         let normalisation_type = matches
             .opt_str(NORMALISATION_GAIN_TYPE)
             .as_deref()
             .map(|gain_type| {
-                NormalisationType::try_from(gain_type).expect("Invalid normalisation type")
+                NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
             })
             .unwrap_or_default();
         let normalisation_pregain = matches
@@ -722,7 +721,7 @@ fn get_setup(args: &[String]) -> Setup {
         let device_type = matches
             .opt_str(DEVICE_TYPE)
             .as_deref()
-            .map(|device_type| DeviceType::try_from(device_type).expect("Invalid device type"))
+            .map(|device_type| DeviceType::from_str(device_type).expect("Invalid device type"))
             .unwrap_or_default();
         let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
         let autoplay = matches.opt_present(AUTOPLAY);
