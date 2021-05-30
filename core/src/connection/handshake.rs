@@ -24,10 +24,9 @@ where
         .get_challenge()
         .get_login_crypto_challenge()
         .get_diffie_hellman()
-        .get_gs()
-        .to_owned();
+        .get_gs();
 
-    let shared_secret = local_keys.shared_secret(&remote_key);
+    let shared_secret = local_keys.shared_secret(remote_key);
     let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator);
     let encoder = ApEncoder::new(&send_key);
     let decoder = ApDecoder::new(&recv_key);
