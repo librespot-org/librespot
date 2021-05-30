@@ -34,7 +34,7 @@ use std::{
     pin::Pin,
 };
 
-const MILLIS: f32 = 1000.0;
+const MILLIS: f64 = 1000.0;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -247,7 +247,7 @@ fn get_setup(args: &[String]) -> Setup {
     .optopt(
         "",
         "format",
-        "Output format {F32|S32|S24|S24_3|S16}. Defaults to S16.",
+        "Output format {F64|F32|S32|S24|S24_3|S16}. Defaults to S16.",
         "FORMAT",
     )
     .optopt(
@@ -435,7 +435,7 @@ fn get_setup(args: &[String]) -> Setup {
             .unwrap_or_else(|| String::from("PCM"));
         let mut volume_range = matches
             .opt_str("volume-range")
-            .map(|range| range.parse::<f32>().unwrap())
+            .map(|range| range.parse::<f64>().unwrap())
             .unwrap_or_else(|| match mixer_name.as_ref().map(AsRef::as_ref) {
                 Some("alsa") => 0.0, // let Alsa query the control
                 _ => VolumeCtrl::DEFAULT_DB_RANGE,
@@ -609,29 +609,29 @@ fn get_setup(args: &[String]) -> Setup {
             .unwrap_or_default();
         let normalisation_pregain = matches
             .opt_str("normalisation-pregain")
-            .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
+            .map(|pregain| pregain.parse::<f64>().expect("Invalid pregain float value"))
             .unwrap_or(PlayerConfig::default().normalisation_pregain);
         let normalisation_threshold = matches
             .opt_str("normalisation-threshold")
             .map(|threshold| {
                 db_to_ratio(
                     threshold
-                        .parse::<f32>()
+                        .parse::<f64>()
                         .expect("Invalid threshold float value"),
                 )
             })
             .unwrap_or(PlayerConfig::default().normalisation_threshold);
         let normalisation_attack = matches
             .opt_str("normalisation-attack")
-            .map(|attack| attack.parse::<f32>().expect("Invalid attack float value") / MILLIS)
+            .map(|attack| attack.parse::<f64>().expect("Invalid attack float value") / MILLIS)
             .unwrap_or(PlayerConfig::default().normalisation_attack);
         let normalisation_release = matches
             .opt_str("normalisation-release")
-            .map(|release| release.parse::<f32>().expect("Invalid release float value") / MILLIS)
+            .map(|release| release.parse::<f64>().expect("Invalid release float value") / MILLIS)
             .unwrap_or(PlayerConfig::default().normalisation_release);
         let normalisation_knee = matches
             .opt_str("normalisation-knee")
-            .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
+            .map(|knee| knee.parse::<f64>().expect("Invalid knee float value"))
             .unwrap_or(PlayerConfig::default().normalisation_knee);
 
         let ditherer_name = matches.opt_str("dither");
@@ -640,7 +640,7 @@ fn get_setup(args: &[String]) -> Setup {
             Some("none") => None,
             // explicitly set on command line
             Some(_) => {
-                if format == AudioFormat::F32 {
+                if format == AudioFormat::F64 || format == AudioFormat::F32 {
                     unimplemented!("Dithering is not available on format {:?}", format);
                 }
                 Some(dither::find_ditherer(ditherer_name).expect("Invalid ditherer"))

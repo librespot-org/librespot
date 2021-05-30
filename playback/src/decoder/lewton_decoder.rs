@@ -1,6 +1,7 @@
 use super::{AudioDecoder, AudioError, AudioPacket};
 
 use lewton::inside_ogg::OggStreamReader;
+use lewton::samples::InterleavedSamples;
 
 use std::error;
 use std::fmt;
@@ -35,11 +36,8 @@ where
         use lewton::OggReadError::NoCapturePatternFound;
         use lewton::VorbisError::{BadAudio, OggError};
         loop {
-            match self
-                .0
-                .read_dec_packet_generic::<lewton::samples::InterleavedSamples<f32>>()
-            {
-                Ok(Some(packet)) => return Ok(Some(AudioPacket::Samples(packet.samples))),
+            match self.0.read_dec_packet_generic::<InterleavedSamples<f32>>() {
+                Ok(Some(packet)) => return Ok(Some(AudioPacket::samples_from_f32(packet.samples))),
                 Ok(None) => return Ok(None),
 
                 Err(BadAudio(AudioIsHeader)) => (),

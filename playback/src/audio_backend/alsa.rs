@@ -41,6 +41,7 @@ fn list_outputs() {
 fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box<Error>> {
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
     let alsa_format = match format {
+        AudioFormat::F64 => Format::float64(),
         AudioFormat::F32 => Format::float(),
         AudioFormat::S32 => Format::s32(),
         AudioFormat::S24 => Format::s24(),
