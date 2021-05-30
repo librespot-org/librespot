@@ -268,13 +268,13 @@ impl AudioFileFetch {
             ReceivedData::ResponseTime(response_time) => {
                 trace!("Ping time estimated as: {:?}", response_time);
 
-                // record the response time
-                self.network_response_times.push(response_time);
-
-                // prune old response times. Keep at most three.
-                while self.network_response_times.len() > 3 {
+                // prune old response times. Keep at most two so we can push a third.
+                while self.network_response_times.len() >= 3 {
                     self.network_response_times.remove(0);
                 }
+
+                // record the response time
+                self.network_response_times.push(response_time);
 
                 // stats::median is experimental. So we calculate the median of up to three ourselves.
                 let ping_time = match self.network_response_times.len() {
@@ -385,7 +385,7 @@ pub(super) async fn audio_file_fetch(
 
         file_data_tx,
         complete_tx: Some(complete_tx),
-        network_response_times: Vec::new(),
+        network_response_times: Vec::with_capacity(3),
     };
 
     loop {
