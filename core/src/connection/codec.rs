@@ -2,40 +2,26 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, Bytes, BytesMut};
 use shannon::Shannon;
 use std::io;
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder, FramedRead, FramedWrite};
 
 const HEADER_SIZE: usize = 3;
 const MAC_SIZE: usize = 4;
 
-#[derive(Debug)]
-enum DecodeState {
-    Header,
-    Payload(u8, usize),
-}
-
-pub struct ApCodec {
+pub struct ApEncoder {
     encode_nonce: u32,
     encode_cipher: Shannon,
-
-    decode_nonce: u32,
-    decode_cipher: Shannon,
-    decode_state: DecodeState,
 }
 
-impl ApCodec {
-    pub fn new(send_key: &[u8], recv_key: &[u8]) -> ApCodec {
-        ApCodec {
+impl ApEncoder {
+    pub fn new(send_key: &[u8]) -> Self {
+        Self {
             encode_nonce: 0,
             encode_cipher: Shannon::new(send_key),
-
-            decode_nonce: 0,
-            decode_cipher: Shannon::new(recv_key),
-            decode_state: DecodeState::Header,
         }
     }
 }
 
-impl Encoder<(u8, Vec<u8>)> for ApCodec {
+impl Encoder<(u8, Vec<u8>)> for ApEncoder {
     type Error = io::Error;
 
     fn encode(&mut self, item: (u8, Vec<u8>), buf: &mut BytesMut) -> io::Result<()> {
@@ -60,7 +46,31 @@ impl Encoder<(u8, Vec<u8>)> for ApCodec {
     }
 }
 
-impl Decoder for ApCodec {
+#[derive(Debug)]
+enum DecodeState {
+    Header,
+    Payload(u8, usize),
+}
+
+pub struct ApDecoder {
+    decode_nonce: u32,
+    decode_cipher: Shannon,
+    decode_state: DecodeState,
+}
+
+pub type Decoded<R> = FramedRead<R, ApDecoder>;
+
+impl ApDecoder {
+    pub fn new(recv_key: &[u8]) -> Self {
+        Self {
+            decode_nonce: 0,
+            decode_cipher: Shannon::new(recv_key),
+            decode_state: DecodeState::Header,
+        }
+    }
+}
+
+impl Decoder for ApDecoder {
     type Item = (u8, Bytes);
     type Error = io::Error;
 
@@ -99,3 +109,5 @@ impl Decoder for ApCodec {
         Ok(None)
     }
 }
+
+pub type Encoded<W> = FramedWrite<W, ApEncoder>;

@@ -5,20 +5,21 @@ use rand::{thread_rng, RngCore};
 use sha1::Sha1;
 use std::io;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio_util::codec::{Decoder, Framed};
 
-use super::codec::ApCodec;
+use super::codec::{ApDecoder, ApEncoder, Decoded, Encoded};
 use crate::diffie_hellman::DhLocalKeys;
 use crate::protocol;
 use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
 
-pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
-    mut connection: T,
-) -> io::Result<Framed<T, ApCodec>> {
+pub async fn handshake<R, W>(mut read: R, mut write: W) -> io::Result<(Decoded<R>, Encoded<W>)>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
     let local_keys = DhLocalKeys::random(&mut thread_rng());
     let gc = local_keys.public_key();
-    let mut accumulator = client_hello(&mut connection, gc).await?;
-    let message: APResponseMessage = recv_packet(&mut connection, &mut accumulator).await?;
+    let mut accumulator = client_hello(&mut write, gc).await?;
+    let message: APResponseMessage = recv_packet(&mut read, &mut accumulator).await?;
     let remote_key = message
         .get_challenge()
         .get_login_crypto_challenge()
@@ -28,11 +29,12 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
 
     let shared_secret = local_keys.shared_secret(&remote_key);
     let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator);
-    let codec = ApCodec::new(&send_key, &recv_key);
+    let encoder = ApEncoder::new(&send_key);
+    let decoder = ApDecoder::new(&recv_key);
 
-    client_response(&mut connection, challenge).await?;
+    client_response(&mut write, challenge).await?;
 
-    Ok(codec.framed(connection))
+    Ok((Decoded::new(read, decoder), Encoded::new(write, encoder)))
 }
 
 async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>

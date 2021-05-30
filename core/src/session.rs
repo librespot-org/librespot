@@ -29,7 +29,7 @@ use crate::apresolve::apresolve;
 use crate::authentication::Credentials;
 use crate::cache::Cache;
 use crate::config::SessionConfig;
-use crate::connection::{self, AuthenticationError};
+use crate::connection::{self, AuthenticationError, Transport};
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -110,13 +110,16 @@ impl Session {
     }
 
     fn create(
-        transport: connection::Transport,
+        transport: Transport,
         config: SessionConfig,
         cache: Option<Cache>,
         username: String,
         handle: tokio::runtime::Handle,
     ) -> Session {
-        let (sink, stream) = transport.split();
+        let Transport {
+            read: stream,
+            write: sink,
+        } = transport;
 
         let (sender_tx, sender_rx) = mpsc::unbounded_channel();
         let session_id = SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
