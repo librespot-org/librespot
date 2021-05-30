@@ -15,9 +15,9 @@ pub struct AlsaMixer {
     min: i64,
     max: i64,
     range: i64,
-    min_db: f32,
-    max_db: f32,
-    db_range: f32,
+    min_db: f64,
+    max_db: f64,
+    db_range: f64,
     has_switch: bool,
     is_softvol: bool,
     use_linear_in_db: bool,
@@ -101,9 +101,9 @@ impl Mixer for AlsaMixer {
             (min_millibel, max_millibel)
         };
 
-        let min_db = min_millibel.to_db();
-        let max_db = max_millibel.to_db();
-        let db_range = f32::abs(max_db - min_db);
+        let min_db = min_millibel.to_db() as f64;
+        let max_db = max_millibel.to_db() as f64;
+        let db_range = f64::abs(max_db - min_db);
 
         // Synchronize the volume control dB range with the mixer control,
         // unless it was already set with a command line option.
@@ -157,17 +157,17 @@ impl Mixer for AlsaMixer {
             let raw_volume = simple_element
                 .get_playback_volume(SelemChannelId::mono())
                 .expect("Could not get raw Alsa volume");
-
-            raw_volume as f32 / self.range as f32 - self.min as f32
+            raw_volume as f64 / self.range as f64 - self.min as f64
         } else {
             let db_volume = simple_element
                 .get_playback_vol_db(SelemChannelId::mono())
                 .expect("Could not get Alsa dB volume")
-                .to_db();
+                .to_db() as f64;
 
             if self.use_linear_in_db {
                 (db_volume - self.min_db) / self.db_range
-            } else if f32::abs(db_volume - SND_CTL_TLV_DB_GAIN_MUTE.to_db()) <= f32::EPSILON {
+            } else if f64::abs(db_volume - SND_CTL_TLV_DB_GAIN_MUTE.to_db() as f64) <= f64::EPSILON
+            {
                 0.0
             } else {
                 db_to_ratio(db_volume - self.max_db)
@@ -216,7 +216,7 @@ impl Mixer for AlsaMixer {
         }
 
         if self.is_softvol {
-            let scaled_volume = (self.min as f32 + mapped_volume * self.range as f32) as i64;
+            let scaled_volume = (self.min as f64 + mapped_volume * self.range as f64) as i64;
             debug!("Setting Alsa raw volume to {}", scaled_volume);
             simple_element
                 .set_playback_volume_all(scaled_volume)
@@ -228,14 +228,14 @@ impl Mixer for AlsaMixer {
             self.min_db + mapped_volume * self.db_range
         } else if volume == 0 {
             // prevent ratio_to_db(0.0) from returning -inf
-            SND_CTL_TLV_DB_GAIN_MUTE.to_db()
+            SND_CTL_TLV_DB_GAIN_MUTE.to_db() as f64
         } else {
             ratio_to_db(mapped_volume) + self.max_db
         };
 
         debug!("Setting Alsa volume to {:.2} dB", db_volume);
         simple_element
-            .set_playback_db_all(MilliBel::from_db(db_volume), Round::Floor)
+            .set_playback_db_all(MilliBel::from_db(db_volume as f32), Round::Floor)
             .expect("Could not set Alsa dB volume");
     }
 }

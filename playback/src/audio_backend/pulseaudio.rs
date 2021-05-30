@@ -28,6 +28,9 @@ impl Open for PulseAudioSink {
             AudioFormat::S24 => pulse::sample::Format::S24_32le,
             AudioFormat::S24_3 => pulse::sample::Format::S24le,
             AudioFormat::S16 => pulse::sample::Format::S16le,
+            _ => {
+                unimplemented!("PulseAudio currently does not support {:?} output", format)
+            }
         };
 
         let ss = pulse::sample::Spec {
