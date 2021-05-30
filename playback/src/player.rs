@@ -13,8 +13,8 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
 use crate::audio::{
-    READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
-    READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
+    READ_AHEAD_BEFORE_PLAYBACK, READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK,
+    READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS,
 };
 use crate::audio_backend::Sink;
 use crate::config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig};
@@ -297,14 +297,8 @@ impl Player {
             debug!("Normalisation Method: {:?}", config.normalisation_method);
 
             if config.normalisation_method == NormalisationMethod::Dynamic {
-                debug!(
-                    "Normalisation Attack: {:.0} ms",
-                    Duration::from_secs_f32(config.normalisation_attack).as_millis()
-                );
-                debug!(
-                    "Normalisation Release: {:.0} ms",
-                    Duration::from_secs_f32(config.normalisation_release).as_millis()
-                );
+                debug!("Normalisation Attack: {:?}", config.normalisation_attack);
+                debug!("Normalisation Release: {:?}", config.normalisation_release);
                 debug!("Normalisation Knee: {:?}", config.normalisation_knee);
             }
         }
@@ -1219,6 +1213,11 @@ impl PlayerInternal {
                                                 + shaped_limiter_strength * self.limiter_factor;
                                     };
 
+                                    let normalisation_attack_f32 =
+                                        self.config.normalisation_attack.as_secs_f32();
+                                    let normalisation_release_f32 =
+                                        self.config.normalisation_release.as_secs_f32();
+
                                     // Always check for peaks, even when the limiter is already active.
                                     // There may be even higher peaks than we initially targeted.
                                     // Check against the normalisation factor that would be applied normally.
@@ -1232,10 +1231,10 @@ impl PlayerInternal {
                                             // synchronize with the current release limiter strength.
                                             self.limiter_attack_counter = (((SAMPLES_PER_SECOND
                                                 as f32
-                                                * self.config.normalisation_release)
+                                                * normalisation_release_f32)
                                                 - self.limiter_release_counter as f32)
-                                                / (self.config.normalisation_release
-                                                    / self.config.normalisation_attack))
+                                                / (normalisation_release_f32
+                                                    / normalisation_attack_f32))
                                                 as u32;
                                             self.limiter_release_counter = 0;
                                         }
@@ -1244,7 +1243,7 @@ impl PlayerInternal {
                                             self.limiter_attack_counter.saturating_add(1);
                                         self.limiter_strength = self.limiter_attack_counter as f32
                                             / (SAMPLES_PER_SECOND as f32
-                                                * self.config.normalisation_attack);
+                                                * normalisation_attack_f32);
 
                                         if abs_sample > self.limiter_peak_sample {
                                             self.limiter_peak_sample = abs_sample;
@@ -1260,10 +1259,10 @@ impl PlayerInternal {
                                             // attack limiter strength.
                                             self.limiter_release_counter = (((SAMPLES_PER_SECOND
                                                 as f32
-                                                * self.config.normalisation_attack)
+                                                * normalisation_attack_f32)
                                                 - self.limiter_attack_counter as f32)
-                                                * (self.config.normalisation_release
-                                                    / self.config.normalisation_attack))
+                                                * (normalisation_release_f32
+                                                    / normalisation_attack_f32))
                                                 as u32;
                                             self.limiter_attack_counter = 0;
                                         }
@@ -1273,16 +1272,16 @@ impl PlayerInternal {
 
                                         if self.limiter_release_counter
                                             > (SAMPLES_PER_SECOND as f32
-                                                * self.config.normalisation_release)
+                                                * normalisation_release_f32)
                                                 as u32
                                         {
                                             self.reset_limiter();
                                         } else {
                                             self.limiter_strength = ((SAMPLES_PER_SECOND as f32
-                                                * self.config.normalisation_release)
+                                                * normalisation_release_f32)
                                                 - self.limiter_release_counter as f32)
                                                 / (SAMPLES_PER_SECOND as f32
-                                                    * self.config.normalisation_release);
+                                                    * normalisation_release_f32);
                                         }
                                     }
                                 }
@@ -1809,20 +1808,18 @@ impl PlayerInternal {
             // Request our read ahead range
             let request_data_length = max(
                 (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
-                    * Duration::from_millis(stream_loader_controller.ping_time_ms() as u64)
-                        .as_secs_f32()
+                    * stream_loader_controller.ping_time().as_secs_f32()
                     * bytes_per_second as f32) as usize,
-                (READ_AHEAD_DURING_PLAYBACK_SECONDS * bytes_per_second as f32) as usize,
+                (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
             );
             stream_loader_controller.fetch_next(request_data_length);
 
             // Request the part we want to wait for blocking. This effecively means we wait for the previous request to partially complete.
             let wait_for_data_length = max(
                 (READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS
-                    * Duration::from_millis(stream_loader_controller.ping_time_ms() as u64)
-                        .as_secs_f32()
+                    * stream_loader_controller.ping_time().as_secs_f32()
                     * bytes_per_second as f32) as usize,
-                (READ_AHEAD_BEFORE_PLAYBACK_SECONDS * bytes_per_second as f32) as usize,
+                (READ_AHEAD_BEFORE_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
             );
             stream_loader_controller.fetch_next_blocking(wait_for_data_length);
         }

@@ -29,34 +29,34 @@ const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 16;
 // read ahead is requested in addition to this amount. If the file is opened to seek to
 // another position, then only this amount is requested on the first request.
 
-const INITIAL_PING_TIME_ESTIMATE_SECONDS: f32 = 0.5;
+const INITIAL_PING_TIME_ESTIMATE: Duration = Duration::from_millis(500);
 // The pig time that is used for calculations before a ping time was actually measured.
 
-const MAXIMUM_ASSUMED_PING_TIME_SECONDS: f32 = 1.5;
+const MAXIMUM_ASSUMED_PING_TIME: Duration = Duration::from_millis(1500);
 // If the measured ping time to the Spotify server is larger than this value, it is capped
 // to avoid run-away block sizes and pre-fetching.
 
-pub const READ_AHEAD_BEFORE_PLAYBACK_SECONDS: f32 = 1.0;
+pub const READ_AHEAD_BEFORE_PLAYBACK: Duration = Duration::from_secs(1);
 // Before playback starts, this many seconds of data must be present.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
 pub const READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS: f32 = 2.0;
-// Same as READ_AHEAD_BEFORE_PLAYBACK_SECONDS, but the time is taken as a factor of the ping
+// Same as READ_AHEAD_BEFORE_PLAYBACK, but the time is taken as a factor of the ping
 // time to the Spotify server.
-// Both, READ_AHEAD_BEFORE_PLAYBACK_SECONDS and READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS are
+// Both, READ_AHEAD_BEFORE_PLAYBACK and READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS are
 // obeyed.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
-pub const READ_AHEAD_DURING_PLAYBACK_SECONDS: f32 = 5.0;
+pub const READ_AHEAD_DURING_PLAYBACK: Duration = Duration::from_secs(5);
 // While playing back, this many seconds of data ahead of the current read position are
 // requested.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
 
 pub const READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS: f32 = 10.0;
-// Same as READ_AHEAD_DURING_PLAYBACK_SECONDS, but the time is taken as a factor of the ping
+// Same as READ_AHEAD_DURING_PLAYBACK, but the time is taken as a factor of the ping
 // time to the Spotify server.
 // Note: the calculations are done using the nominal bitrate of the file. The actual amount
 // of audio data may be larger or smaller.
@@ -83,7 +83,7 @@ const MAX_PREFETCH_REQUESTS: usize = 4;
 // for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
 // pre-fetch request is only sent if less than MAX_PREFETCH_REQUESTS are pending.
 
-const TIMEOUT_SECONDS: u64 = 1;
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub enum AudioFile {
     Cached(fs::File),
@@ -133,10 +133,10 @@ impl StreamLoaderController {
         })
     }
 
-    pub fn ping_time_ms(&self) -> usize {
-        self.stream_shared.as_ref().map_or(0, |shared| {
-            shared.ping_time_ms.load(atomic::Ordering::Relaxed)
-        })
+    pub fn ping_time(&self) -> Duration {
+        Duration::from_millis(self.stream_shared.as_ref().map_or(0, |shared| {
+            shared.ping_time_ms.load(atomic::Ordering::Relaxed) as u64
+        }))
     }
 
     fn send_stream_loader_command(&self, command: StreamLoaderCommand) {
@@ -172,7 +172,7 @@ impl StreamLoaderController {
             {
                 download_status = shared
                     .cond
-                    .wait_timeout(download_status, Duration::from_secs(TIMEOUT_SECONDS))
+                    .wait_timeout(download_status, DOWNLOAD_TIMEOUT)
                     .unwrap()
                     .0;
                 if range.length
@@ -273,8 +273,8 @@ impl AudioFile {
         let mut initial_data_length = if play_from_beginning {
             INITIAL_DOWNLOAD_SIZE
                 + max(
-                    (READ_AHEAD_DURING_PLAYBACK_SECONDS * bytes_per_second as f32) as usize,
-                    (INITIAL_PING_TIME_ESTIMATE_SECONDS
+                    (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
+                    (INITIAL_PING_TIME_ESTIMATE.as_secs_f32()
                         * READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
                         * bytes_per_second as f32) as usize,
                 )
@@ -415,8 +415,8 @@ impl Read for AudioFileStreaming {
 
                 let length_to_request = length
                     + max(
-                        (READ_AHEAD_DURING_PLAYBACK_SECONDS * self.shared.stream_data_rate as f32)
-                            as usize,
+                        (READ_AHEAD_DURING_PLAYBACK.as_secs_f32()
+                            * self.shared.stream_data_rate as f32) as usize,
                         (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
                             * ping_time_seconds
                             * self.shared.stream_data_rate as f32) as usize,
@@ -453,7 +453,7 @@ impl Read for AudioFileStreaming {
             download_status = self
                 .shared
                 .cond
-                .wait_timeout(download_status, Duration::from_secs(TIMEOUT_SECONDS))
+                .wait_timeout(download_status, DOWNLOAD_TIMEOUT)
                 .unwrap()
                 .0;
         }

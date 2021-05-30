@@ -131,8 +131,8 @@ pub struct PlayerConfig {
     pub normalisation_method: NormalisationMethod,
     pub normalisation_pregain: f32,
     pub normalisation_threshold: f32,
-    pub normalisation_attack: f32,
-    pub normalisation_release: f32,
+    pub normalisation_attack: Duration,
+    pub normalisation_release: Duration,
     pub normalisation_knee: f32,
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
@@ -150,8 +150,8 @@ impl Default for PlayerConfig {
             normalisation_method: NormalisationMethod::default(),
             normalisation_pregain: 0.0,
             normalisation_threshold: db_to_ratio(-1.0),
-            normalisation_attack: Duration::from_millis(5).as_secs_f32(),
-            normalisation_release: Duration::from_millis(100).as_secs_f32(),
+            normalisation_attack: Duration::from_millis(5),
+            normalisation_release: Duration::from_millis(100),
             normalisation_knee: 1.0,
             passthrough: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),

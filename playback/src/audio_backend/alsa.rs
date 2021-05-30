@@ -10,8 +10,9 @@ use std::cmp::min;
 use std::ffi::CString;
 use std::io;
 use std::process::exit;
+use std::time::Duration;
 
-const BUFFERED_LATENCY: f32 = 0.125; // seconds
+const BUFFERED_LATENCY: Duration = Duration::from_millis(125);
 const BUFFERED_PERIODS: Frames = 4;
 
 pub struct AlsaSink {
@@ -52,7 +53,8 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
     // latency = period_size * periods / (rate * bytes_per_frame)
     // For stereo samples encoded as 32-bit float, one frame has a length of eight bytes.
     let mut period_size = ((SAMPLES_PER_SECOND * format.size() as u32) as f32
-        * (BUFFERED_LATENCY / BUFFERED_PERIODS as f32)) as Frames;
+        * (BUFFERED_LATENCY.as_secs_f32() / BUFFERED_PERIODS as f32))
+        as Frames;
     {
         let hwp = HwParams::any(&pcm)?;
         hwp.set_access(Access::RWInterleaved)?;

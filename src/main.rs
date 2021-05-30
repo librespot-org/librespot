@@ -667,14 +667,12 @@ fn get_setup(args: &[String]) -> Setup {
             .opt_str(NORMALISATION_ATTACK)
             .map(|attack| {
                 Duration::from_millis(attack.parse::<u64>().expect("Invalid attack value"))
-                    .as_secs_f32()
             })
             .unwrap_or(PlayerConfig::default().normalisation_attack);
         let normalisation_release = matches
             .opt_str(NORMALISATION_RELEASE)
             .map(|release| {
                 Duration::from_millis(release.parse::<u64>().expect("Invalid release value"))
-                    .as_secs_f32()
             })
             .unwrap_or(PlayerConfig::default().normalisation_release);
         let normalisation_knee = matches

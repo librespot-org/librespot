@@ -17,7 +17,7 @@ use crate::range_set::{Range, RangeSet};
 
 use super::{AudioFileShared, DownloadStrategy, StreamLoaderCommand};
 use super::{
-    FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME_SECONDS, MAX_PREFETCH_REQUESTS,
+    FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME, MAX_PREFETCH_REQUESTS,
     MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
 };
 
@@ -58,7 +58,7 @@ struct PartialFileData {
 }
 
 enum ReceivedData {
-    ResponseTimeMs(usize),
+    ResponseTime(Duration),
     Data(PartialFileData),
 }
 
@@ -87,15 +87,11 @@ async fn receive_data(
         };
 
         if measure_ping_time {
-            let duration = Instant::now() - request_sent_time;
-            let duration_ms: u128;
-            if duration.as_secs_f32() > MAXIMUM_ASSUMED_PING_TIME_SECONDS {
-                duration_ms =
-                    Duration::from_secs_f32(MAXIMUM_ASSUMED_PING_TIME_SECONDS).as_millis();
-            } else {
-                duration_ms = duration.as_millis();
+            let mut duration = Instant::now() - request_sent_time;
+            if duration > MAXIMUM_ASSUMED_PING_TIME {
+                duration = MAXIMUM_ASSUMED_PING_TIME;
             }
-            let _ = file_data_tx.send(ReceivedData::ResponseTimeMs(duration_ms as usize));
+            let _ = file_data_tx.send(ReceivedData::ResponseTime(duration));
             measure_ping_time = false;
         }
         let data_size = data.len();
@@ -151,7 +147,7 @@ struct AudioFileFetch {
 
     file_data_tx: mpsc::UnboundedSender<ReceivedData>,
     complete_tx: Option<oneshot::Sender<NamedTempFile>>,
-    network_response_times_ms: Vec<usize>,
+    network_response_times: Vec<Duration>,
 }
 
 // Might be replaced by enum from std once stable
@@ -269,26 +265,23 @@ impl AudioFileFetch {
 
     fn handle_file_data(&mut self, data: ReceivedData) -> ControlFlow {
         match data {
-            ReceivedData::ResponseTimeMs(response_time_ms) => {
-                trace!("Ping time estimated as: {} ms.", response_time_ms);
+            ReceivedData::ResponseTime(response_time) => {
+                trace!("Ping time estimated as: {:?}", response_time);
 
                 // record the response time
-                self.network_response_times_ms.push(response_time_ms);
+                self.network_response_times.push(response_time);
 
                 // prune old response times. Keep at most three.
-                while self.network_response_times_ms.len() > 3 {
-                    self.network_response_times_ms.remove(0);
+                while self.network_response_times.len() > 3 {
+                    self.network_response_times.remove(0);
                 }
 
                 // stats::median is experimental. So we calculate the median of up to three ourselves.
-                let ping_time_ms: usize = match self.network_response_times_ms.len() {
-                    1 => self.network_response_times_ms[0] as usize,
-                    2 => {
-                        ((self.network_response_times_ms[0] + self.network_response_times_ms[1])
-                            / 2) as usize
-                    }
+                let ping_time = match self.network_response_times.len() {
+                    1 => self.network_response_times[0],
+                    2 => (self.network_response_times[0] + self.network_response_times[1]) / 2,
                     3 => {
-                        let mut times = self.network_response_times_ms.clone();
+                        let mut times = self.network_response_times.clone();
                         times.sort_unstable();
                         times[1]
                     }
@@ -298,7 +291,7 @@ impl AudioFileFetch {
                 // store our new estimate for everyone to see
                 self.shared
                     .ping_time_ms
-                    .store(ping_time_ms, Ordering::Relaxed);
+                    .store(ping_time.as_millis() as usize, Ordering::Relaxed);
             }
             ReceivedData::Data(data) => {
                 self.output
@@ -392,7 +385,7 @@ pub(super) async fn audio_file_fetch(
 
         file_data_tx,
         complete_tx: Some(complete_tx),
-        network_response_times_ms: Vec::new(),
+        network_response_times: Vec::new(),
     };
 
     loop {

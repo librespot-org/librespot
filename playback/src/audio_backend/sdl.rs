@@ -4,7 +4,8 @@ use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
-use std::{io, thread, time};
+use std::time::Duration;
+use std::{io, thread};
 
 pub enum SdlSink {
     F32(AudioQueue<f32>),
@@ -86,7 +87,7 @@ impl Sink for SdlSink {
             ($queue: expr, $size: expr) => {{
                 // sleep and wait for sdl thread to drain the queue a bit
                 while $queue.size() > (NUM_CHANNELS as u32 * $size as u32 * SAMPLE_RATE) {
-                    thread::sleep(time::Duration::from_millis(10));
+                    thread::sleep(Duration::from_millis(10));
                 }
             }};
         }
