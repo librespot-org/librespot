@@ -23,11 +23,11 @@ impl Open for PulseAudioSink {
 
         // PulseAudio calls S24 and S24_3 different from the rest of the world
         let pulse_format = match format {
-            AudioFormat::F32 => pulse::sample::Format::F32le,
-            AudioFormat::S32 => pulse::sample::Format::S32le,
-            AudioFormat::S24 => pulse::sample::Format::S24_32le,
-            AudioFormat::S24_3 => pulse::sample::Format::S24le,
-            AudioFormat::S16 => pulse::sample::Format::S16le,
+            AudioFormat::F32 => pulse::sample::Format::FLOAT32NE,
+            AudioFormat::S32 => pulse::sample::Format::S32NE,
+            AudioFormat::S24 => pulse::sample::Format::S24_32NE,
+            AudioFormat::S24_3 => pulse::sample::Format::S24NE,
+            AudioFormat::S16 => pulse::sample::Format::S16NE,
             _ => {
                 unimplemented!("PulseAudio currently does not support {:?} output", format)
             }

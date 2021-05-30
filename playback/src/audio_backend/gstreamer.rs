@@ -34,9 +34,14 @@ impl Open for GstreamerSink {
         let sample_size = format.size();
         let gst_bytes = 2048 * sample_size;
 
+        #[cfg(target_endian = "little")]
+        const ENDIANNESS: &str = "LE";
+        #[cfg(target_endian = "big")]
+        const ENDIANNESS: &str = "BE";
+
         let pipeline_str_preamble = format!(
-            "appsrc caps=\"audio/x-raw,format={}LE,layout=interleaved,channels={},rate={}\" block=true max-bytes={} name=appsrc0 ",
-            gst_format, NUM_CHANNELS, SAMPLE_RATE, gst_bytes
+            "appsrc caps=\"audio/x-raw,format={}{},layout=interleaved,channels={},rate={}\" block=true max-bytes={} name=appsrc0 ",
+            gst_format, ENDIANNESS, NUM_CHANNELS, SAMPLE_RATE, gst_bytes
         );
         // no need to dither twice; use librespot dithering instead
         let pipeline_str_rest = r#" ! audioconvert dithering=none ! autoaudiosink"#;

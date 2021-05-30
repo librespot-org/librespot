@@ -45,8 +45,12 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
         AudioFormat::F32 => Format::float(),
         AudioFormat::S32 => Format::s32(),
         AudioFormat::S24 => Format::s24(),
-        AudioFormat::S24_3 => Format::S243LE,
         AudioFormat::S16 => Format::s16(),
+
+        #[cfg(target_endian = "little")]
+        AudioFormat::S24_3 => Format::S243LE,
+        #[cfg(target_endian = "big")]
+        AudioFormat::S24_3 => Format::S243BE,
     };
 
     // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8

@@ -8,8 +8,12 @@ pub struct i24([u8; 3]);
 impl i24 {
     fn from_s24(sample: i32) -> Self {
         // trim the padding in the most significant byte
-        let [a, b, c, _d] = sample.to_le_bytes();
-        i24([a, b, c])
+        #[allow(unused_variables)]
+        let [a, b, c, d] = sample.to_ne_bytes();
+        #[cfg(target_endian = "little")]
+        return Self([a, b, c]);
+        #[cfg(target_endian = "big")]
+        return Self([b, c, d]);
     }
 }
 
