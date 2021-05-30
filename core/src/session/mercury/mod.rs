@@ -113,8 +113,7 @@ impl<'a> MercuryManager<'a> {
     pub fn subscribe<T: Into<String>>(
         self,
         uri: T,
-    ) -> impl Future<Output = Result<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError>> + 'static
-    {
+    ) -> MercuryFuture<mpsc::UnboundedReceiver<MercuryResponse>> {
         let (result_tx, result_rx) = oneshot::channel();
 
         let uri = uri.into();
@@ -162,7 +161,9 @@ impl<'a> MercuryManager<'a> {
             },
         );
 
-        async move { result_rx.await.map_err(|_| MercuryError)? }
+        MercuryFuture {
+            receiver: result_rx,
+        }
     }
 
     pub(super) fn dispatch(self, cmd: u8, mut data: Bytes) {
