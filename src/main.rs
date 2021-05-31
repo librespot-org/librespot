@@ -237,94 +237,94 @@ fn get_setup(args: &[String]) -> Setup {
         CACHE,
         "cache",
         "Path to a directory where files will be cached.",
-        "PATH",
+        "PATH_STRING",
     ).optopt(
         "",
         SYSTEM_CACHE,
         "Path to a directory where system files (credentials, volume) will be cached. Can be different from cache option value.",
-        "PATH",
+        "PATH_STRING",
     ).optopt(
         "",
         CACHE_SIZE_LIMIT,
         "Limits the size of the cache for audio files.",
-        "SIZE"
+        "SIZE_STRING"
     ).optflag("", DISABLE_AUDIO_CACHE, "Disable caching of the audio data.")
-    .optopt("n", NAME, "Device name.", "NAME")
-    .optopt("", DEVICE_TYPE, "Displayed device type.", "TYPE")
+    .optopt("n", NAME, "Device name.", "NAME_STRING")
+    .optopt("", DEVICE_TYPE, "Displayed device type.", "TYPE_STRING")
     .optopt(
         BITRATE,
         "bitrate",
         "Bitrate (kbps) {96|160|320}. Defaults to 160.",
-        "BITRATE",
+        "BITRATE_INTEGER",
     )
     .optopt(
         "",
         ONEVENT,
         "Run PROGRAM when a playback event occurs.",
-        "PROGRAM",
+        "PROGRAM_STRING",
     )
     .optflag("", EMIT_SINK_EVENTS, "Run program set by --onevent before sink is opened and after it is closed.")
     .optflag("v", VERBOSE, "Enable verbose output.")
     .optflag("V", VERSION, "Display librespot version string.")
-    .optopt("u", USERNAME, "Username to sign in with.", "USERNAME")
-    .optopt("p", PASSWORD, "Password", "PASSWORD")
-    .optopt("", PROXY, "HTTP proxy to use when connecting.", "URL")
-    .optopt("", AP_PORT, "Connect to AP with specified port. If no AP with that port are present fallback AP will be used. Available ports are usually 80, 443 and 4070.", "PORT")
+    .optopt("u", USERNAME, "Username to sign in with.", "USERNAME_STRING")
+    .optopt("p", PASSWORD, "Password", "PASSWORD_STRING")
+    .optopt("", PROXY, "HTTP proxy to use when connecting.", "URL_STRING")
+    .optopt("", AP_PORT, "Connect to AP with specified port. If no AP with that port are present fallback AP will be used. Available ports are usually 80, 443 and 4070.", "PORT_INTEGER")
     .optflag("", DISABLE_DISCOVERY, "Disable discovery mode.")
     .optopt(
         "",
         BACKEND,
         "Audio backend to use. Use '?' to list options.",
-        "NAME",
+        "NAME_STRING",
     )
     .optopt(
         "",
         DEVICE,
         "Audio device to use. Use '?' to list options if using alsa, portaudio or rodio.",
-        "NAME",
+        "NAME_STRING",
     )
     .optopt(
         "",
         FORMAT,
         "Output format {F64|F32|S32|S24|S24_3|S16}. Defaults to S16.",
-        "FORMAT",
+        "FORMAT_STRING",
     )
     .optopt(
         "",
         DITHER,
         "Specify the dither algorithm to use - [none, gpdf, tpdf, tpdf_hp]. Defaults to 'tpdf' for formats S16, S24, S24_3 and 'none' for other formats.",
-        "DITHER",
+        "TYPE_STRING",
     )
     .optopt("", "mixer", "Mixer to use {alsa|softvol}.", "MIXER")
     .optopt(
         "m",
         MIXER_NAME,
         "Alsa mixer control, e.g. 'PCM' or 'Master'. Defaults to 'PCM'.",
-        "NAME",
+        "NAME_STRING",
     )
     .optopt(
         "",
         MIXER_CARD,
         "Alsa mixer card, e.g 'hw:0' or similar from `aplay -l`. Defaults to DEVICE if specified, 'default' otherwise.",
-        "MIXER_CARD",
+        "CARD_STRING",
     )
     .optopt(
         "",
         MIXER_INDEX,
         "Alsa index of the cards mixer. Defaults to 0.",
-        "INDEX",
+        "INDEX_INTEGER",
     )
     .optopt(
         "",
         INITIAL_VOLUME,
         "Initial volume in % from 0-100. Default for softvol: '50'. For the Alsa mixer: the current volume.",
-        "VOLUME",
+        "PERCENT_INTEGER",
     )
     .optopt(
         "",
         ZEROCONF_PORT,
         "The port the internal server advertised over zeroconf uses.",
-        "PORT",
+        "PORT_INTEGER",
     )
     .optflag(
         "",
@@ -335,55 +335,55 @@ fn get_setup(args: &[String]) -> Setup {
         "",
         NORMALISATION_METHOD,
         "Specify the normalisation method to use {basic|dynamic}. Defaults to dynamic.",
-        "METHOD",
+        "METHOD_STRING",
     )
     .optopt(
         "",
         NORMALISATION_GAIN_TYPE,
         "Specify the normalisation gain type to use {track|album}. Defaults to album.",
-        "TYPE",
+        "TYPE_STRING",
     )
     .optopt(
         "",
         NORMALISATION_PREGAIN,
         "Pregain (dB) applied by volume normalisation. Defaults to 0.",
-        "PREGAIN",
+        "DB_FLOAT",
     )
     .optopt(
         "",
         NORMALISATION_THRESHOLD,
         "Threshold (dBFS) to prevent clipping. Defaults to -1.0.",
-        "THRESHOLD",
+        "DBFS_FLOAT",
     )
     .optopt(
         "",
         NORMALISATION_ATTACK,
         "Attack time (ms) in which the dynamic limiter is reducing gain. Defaults to 5.",
-        "TIME",
+        "TIME_INTEGER",
     )
     .optopt(
         "",
         NORMALISATION_RELEASE,
         "Release or decay time (ms) in which the dynamic limiter is restoring gain. Defaults to 100.",
-        "TIME",
+        "TIME_INTEGER",
     )
     .optopt(
         "",
         NORMALISATION_KNEE,
         "Knee steepness of the dynamic limiter. Defaults to 1.0.",
-        "KNEE",
+        "STEEPNESS_FLOAT",
     )
     .optopt(
         "",
         VOLUME_CTRL,
         "Volume control type {cubic|fixed|linear|log}. Defaults to log.",
-        "VOLUME_CTRL"
+        "TYPE_STRING"
     )
     .optopt(
         "",
         VOLUME_RANGE,
         "Range of the volume control (dB). Default for softvol: 60. For the Alsa mixer: what the control supports.",
-        "RANGE",
+        "DB_FLOAT",
     )
     .optflag(
         "",
