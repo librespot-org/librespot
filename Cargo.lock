@@ -436,12 +436,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fuchsia-cprng"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
-
-[[package]]
 name = "futures"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1080,15 +1074,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 
 [[package]]
-name = "libmath"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfd3416934a853ae80d5c3b006f632dfcbaf320300c5167e88a469e9ac214502"
-dependencies = [
- "rand 0.3.23",
-]
-
-[[package]]
 name = "libmdns"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1100,7 +1085,7 @@ dependencies = [
  "if-addrs",
  "log",
  "multimap",
- "rand 0.8.3",
+ "rand",
  "socket2",
  "thiserror",
  "tokio",
@@ -1205,7 +1190,7 @@ dependencies = [
  "librespot-protocol",
  "log",
  "protobuf",
- "rand 0.8.3",
+ "rand",
  "serde",
  "serde_json",
  "tokio",
@@ -1238,7 +1223,7 @@ dependencies = [
  "pbkdf2",
  "priority-queue",
  "protobuf",
- "rand 0.8.3",
+ "rand",
  "serde",
  "serde_json",
  "sha-1",
@@ -1269,7 +1254,7 @@ dependencies = [
  "libmdns",
  "librespot-core",
  "log",
- "rand 0.8.3",
+ "rand",
  "serde_json",
  "sha-1",
  "simple_logger",
@@ -1303,7 +1288,6 @@ dependencies = [
  "gstreamer-app",
  "jack 0.7.1",
  "lewton",
- "libmath",
  "libpulse-binding",
  "libpulse-simple-binding",
  "librespot-audio",
@@ -1312,7 +1296,7 @@ dependencies = [
  "log",
  "ogg",
  "portaudio-rs",
- "rand 0.8.3",
+ "rand",
  "rand_distr",
  "rodio",
  "sdl2",
@@ -1504,7 +1488,7 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
- "rand 0.8.3",
+ "rand",
 ]
 
 [[package]]
@@ -1858,36 +1842,13 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.3.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64ac302d8f83c0c1974bf758f6b041c6c8ada916fbb44a609158ca8b064cc76c"
-dependencies = [
- "libc",
- "rand 0.4.6",
-]
-
-[[package]]
-name = "rand"
-version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
-dependencies = [
- "fuchsia-cprng",
- "libc",
- "rand_core 0.3.1",
- "rdrand",
- "winapi",
-]
-
-[[package]]
-name = "rand"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ef9e7e66b4468674bfcb0c81af8b7fa0bb154fa9f28eb840da5c447baeb8d7e"
 dependencies = [
  "libc",
  "rand_chacha",
- "rand_core 0.6.2",
+ "rand_core",
  "rand_hc",
 ]
 
@@ -1898,23 +1859,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e12735cf05c9e10bf21534da50a147b924d555dc7a547c42e6bb2d5b6017ae0d"
 dependencies = [
  "ppv-lite86",
- "rand_core 0.6.2",
+ "rand_core",
 ]
-
-[[package]]
-name = "rand_core"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a6fdeb83b075e8266dcc8762c22776f6877a63111121f5f8c7411e5be7eed4b"
-dependencies = [
- "rand_core 0.4.2",
-]
-
-[[package]]
-name = "rand_core"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c33a3c44ca05fa6f1807d8e6743f3824e8509beca625669633be0acbdf509dc"
 
 [[package]]
 name = "rand_core"
@@ -1932,7 +1878,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da9e8f32ad24fb80d07d2323a9a2ce8b30d68a62b8cb4df88119ff49a698f038"
 dependencies = [
  "num-traits",
- "rand 0.8.3",
+ "rand",
 ]
 
 [[package]]
@@ -1941,16 +1887,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3190ef7066a446f2e7f42e239d161e905420ccab01eb967c9eb27d21b2322a73"
 dependencies = [
- "rand_core 0.6.2",
-]
-
-[[package]]
-name = "rdrand"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "678054eb77286b51581ba43620cc911abf02758c91f93f479767aed0f90458b2"
-dependencies = [
- "rand_core 0.3.1",
+ "rand_core",
 ]
 
 [[package]]
@@ -2275,7 +2212,7 @@ checksum = "dac1c663cfc93810f88aed9b8941d48cabf856a1b111c29a40439018d870eb22"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "rand 0.8.3",
+ "rand",
  "redox_syscall",
  "remove_dir_all",
  "winapi",
