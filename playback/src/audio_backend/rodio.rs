@@ -1,5 +1,6 @@
 use std::process::exit;
-use std::{io, thread, time};
+use std::time::Duration;
+use std::{io, thread};
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
@@ -8,7 +9,7 @@ use super::Sink;
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::{NUM_CHANNELS, SAMPLE_RATE};
 
 #[cfg(all(
     feature = "rodiojack-backend",
@@ -203,8 +204,12 @@ impl Sink for RodioSink {
         // 44100 elements --> about 27 chunks
         while self.rodio_sink.len() > 26 {
             // sleep and wait for rodio to drain a bit
-            thread::sleep(time::Duration::from_millis(10));
+            thread::sleep(Duration::from_millis(10));
         }
         Ok(())
     }
+}
+
+impl RodioSink {
+    pub const NAME: &'static str = "rodio";
 }

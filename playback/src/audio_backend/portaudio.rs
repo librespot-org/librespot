@@ -2,7 +2,7 @@ use super::{Open, Sink};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
 use portaudio_rs::stream::*;
 use std::io;
@@ -57,7 +57,7 @@ impl<'a> Open for PortAudioSink<'a> {
 
         portaudio_rs::initialize().unwrap();
 
-        let device_idx = match device.as_ref().map(AsRef::as_ref) {
+        let device_idx = match device.as_deref() {
             Some("?") => {
                 list_outputs();
                 exit(0)
@@ -177,4 +177,8 @@ impl<'a> Drop for PortAudioSink<'a> {
     fn drop(&mut self) {
         portaudio_rs::terminate().unwrap();
     }
+}
+
+impl<'a> PortAudioSink<'a> {
+    pub const NAME: &'static str = "portaudio";
 }

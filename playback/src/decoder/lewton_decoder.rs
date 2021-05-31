@@ -6,6 +6,7 @@ use lewton::samples::InterleavedSamples;
 use std::error;
 use std::fmt;
 use std::io::{Read, Seek};
+use std::time::Duration;
 
 pub struct VorbisDecoder<R: Read + Seek>(OggStreamReader<R>);
 pub struct VorbisError(lewton::VorbisError);
@@ -24,7 +25,7 @@ where
     R: Read + Seek,
 {
     fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
-        let absgp = ms * 44100 / 1000;
+        let absgp = Duration::from_millis(ms as u64 * crate::SAMPLE_RATE as u64).as_secs();
         match self.0.seek_absgp_pg(absgp as u64) {
             Ok(_) => Ok(()),
             Err(err) => Err(AudioError::VorbisError(err.into())),

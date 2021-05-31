@@ -34,3 +34,7 @@ impl SinkAsBytes for StdoutSink {
         Ok(())
     }
 }
+
+impl StdoutSink {
+    pub const NAME: &'static str = "pipe";
+}

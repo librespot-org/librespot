@@ -62,3 +62,7 @@ impl SinkAsBytes for SubprocessSink {
         Ok(())
     }
 }
+
+impl SubprocessSink {
+    pub const NAME: &'static str = "subprocess";
+}

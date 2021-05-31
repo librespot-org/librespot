@@ -2,9 +2,9 @@ use super::player::db_to_ratio;
 use crate::convert::i24;
 pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
 
-use std::convert::TryFrom;
 use std::mem;
 use std::str::FromStr;
+use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
@@ -41,10 +41,10 @@ pub enum AudioFormat {
     S16,
 }
 
-impl TryFrom<&String> for AudioFormat {
-    type Error = ();
-    fn try_from(s: &String) -> Result<Self, Self::Error> {
-        match s.to_uppercase().as_str() {
+impl FromStr for AudioFormat {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_ref() {
             "F64" => Ok(Self::F64),
             "F32" => Ok(Self::F32),
             "S32" => Ok(Self::S32),
@@ -133,8 +133,8 @@ pub struct PlayerConfig {
     pub normalisation_method: NormalisationMethod,
     pub normalisation_pregain: f64,
     pub normalisation_threshold: f64,
-    pub normalisation_attack: f64,
-    pub normalisation_release: f64,
+    pub normalisation_attack: Duration,
+    pub normalisation_release: Duration,
     pub normalisation_knee: f64,
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
@@ -152,8 +152,8 @@ impl Default for PlayerConfig {
             normalisation_method: NormalisationMethod::default(),
             normalisation_pregain: 0.0,
             normalisation_threshold: db_to_ratio(-1.0),
-            normalisation_attack: 0.005,
-            normalisation_release: 0.1,
+            normalisation_attack: Duration::from_millis(5),
+            normalisation_release: Duration::from_millis(100),
             normalisation_knee: 1.0,
             passthrough: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),
@@ -184,7 +184,7 @@ impl Default for VolumeCtrl {
 }
 
 impl VolumeCtrl {
-    pub const MAX_VOLUME: u16 = std::u16::MAX;
+    pub const MAX_VOLUME: u16 = u16::MAX;
 
     // Taken from: https://www.dr-lex.be/info-stuff/volumecontrols.html
     pub const DEFAULT_DB_RANGE: f64 = 60.0;

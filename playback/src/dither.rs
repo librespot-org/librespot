@@ -61,12 +61,16 @@ impl Ditherer for TriangularDitherer {
     }
 
     fn name(&self) -> &'static str {
-        "Triangular"
+        Self::NAME
     }
 
     fn noise(&mut self) -> f64 {
         self.distribution.sample(&mut self.cached_rng)
     }
+}
+
+impl TriangularDitherer {
+    pub const NAME: &'static str = "tpdf";
 }
 
 pub struct GaussianDitherer {
@@ -84,12 +88,16 @@ impl Ditherer for GaussianDitherer {
     }
 
     fn name(&self) -> &'static str {
-        "Gaussian"
+        Self::NAME
     }
 
     fn noise(&mut self) -> f64 {
         self.distribution.sample(&mut self.cached_rng)
     }
+}
+
+impl GaussianDitherer {
+    pub const NAME: &'static str = "gpdf";
 }
 
 pub struct HighPassDitherer {
@@ -110,7 +118,7 @@ impl Ditherer for HighPassDitherer {
     }
 
     fn name(&self) -> &'static str {
-        "Triangular, High Passed"
+        Self::NAME
     }
 
     fn noise(&mut self) -> f64 {
@@ -122,6 +130,10 @@ impl Ditherer for HighPassDitherer {
     }
 }
 
+impl HighPassDitherer {
+    pub const NAME: &'static str = "tpdf_hp";
+}
+
 pub fn mk_ditherer<D: Ditherer + 'static>() -> Box<dyn Ditherer> {
     Box::new(D::new())
 }
@@ -130,9 +142,9 @@ pub type DithererBuilder = fn() -> Box<dyn Ditherer>;
 
 pub fn find_ditherer(name: Option<String>) -> Option<DithererBuilder> {
     match name.as_deref() {
-        Some("tpdf") => Some(mk_ditherer::<TriangularDitherer>),
-        Some("gpdf") => Some(mk_ditherer::<GaussianDitherer>),
-        Some("tpdf_hp") => Some(mk_ditherer::<HighPassDitherer>),
+        Some(TriangularDitherer::NAME) => Some(mk_ditherer::<TriangularDitherer>),
+        Some(GaussianDitherer::NAME) => Some(mk_ditherer::<GaussianDitherer>),
+        Some(HighPassDitherer::NAME) => Some(mk_ditherer::<HighPassDitherer>),
         _ => None,
     }
 }

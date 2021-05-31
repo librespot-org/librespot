@@ -90,6 +90,8 @@ use self::gstreamer::GstreamerSink;
 
 #[cfg(any(feature = "rodio-backend", feature = "rodiojack-backend"))]
 mod rodio;
+#[cfg(any(feature = "rodio-backend", feature = "rodiojack-backend"))]
+use self::rodio::RodioSink;
 
 #[cfg(feature = "sdl-backend")]
 mod sdl;
@@ -104,23 +106,23 @@ use self::subprocess::SubprocessSink;
 
 pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     #[cfg(feature = "rodio-backend")]
-    ("rodio", rodio::mk_rodio), // default goes first
+    (RodioSink::NAME, rodio::mk_rodio), // default goes first
     #[cfg(feature = "alsa-backend")]
-    ("alsa", mk_sink::<AlsaSink>),
+    (AlsaSink::NAME, mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
-    ("portaudio", mk_sink::<PortAudioSink>),
+    (PortAudioSink::NAME, mk_sink::<PortAudioSink>),
     #[cfg(feature = "pulseaudio-backend")]
-    ("pulseaudio", mk_sink::<PulseAudioSink>),
+    (PulseAudioSink::NAME, mk_sink::<PulseAudioSink>),
     #[cfg(feature = "jackaudio-backend")]
-    ("jackaudio", mk_sink::<JackSink>),
+    (JackSink::NAME, mk_sink::<JackSink>),
     #[cfg(feature = "gstreamer-backend")]
-    ("gstreamer", mk_sink::<GstreamerSink>),
+    (GstreamerSink::NAME, mk_sink::<GstreamerSink>),
     #[cfg(feature = "rodiojack-backend")]
     ("rodiojack", rodio::mk_rodiojack),
     #[cfg(feature = "sdl-backend")]
-    ("sdl", mk_sink::<SdlSink>),
-    ("pipe", mk_sink::<StdoutSink>),
-    ("subprocess", mk_sink::<SubprocessSink>),
+    (SdlSink::NAME, mk_sink::<SdlSink>),
+    (StdoutSink::NAME, mk_sink::<StdoutSink>),
+    (SubprocessSink::NAME, mk_sink::<SubprocessSink>),
 ];
 
 pub fn find(name: Option<String>) -> Option<SinkBuilder> {

@@ -2,7 +2,7 @@ use super::{Open, Sink, SinkAsBytes};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::player::{NUM_CHANNELS, SAMPLES_PER_SECOND, SAMPLE_RATE};
+use crate::{NUM_CHANNELS, SAMPLES_PER_SECOND, SAMPLE_RATE};
 use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, Error, ValueOr};
@@ -10,8 +10,9 @@ use std::cmp::min;
 use std::ffi::CString;
 use std::io;
 use std::process::exit;
+use std::time::Duration;
 
-const BUFFERED_LATENCY: f32 = 0.125; // seconds
+const BUFFERED_LATENCY: Duration = Duration::from_millis(125);
 const BUFFERED_PERIODS: Frames = 4;
 
 pub struct AlsaSink {
@@ -57,7 +58,8 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
     // latency = period_size * periods / (rate * bytes_per_frame)
     // For stereo samples encoded as 32-bit float, one frame has a length of eight bytes.
     let mut period_size = ((SAMPLES_PER_SECOND * format.size() as u32) as f32
-        * (BUFFERED_LATENCY / BUFFERED_PERIODS as f32)) as Frames;
+        * (BUFFERED_LATENCY.as_secs_f32() / BUFFERED_PERIODS as f32))
+        as Frames;
     {
         let hwp = HwParams::any(&pcm)?;
         hwp.set_access(Access::RWInterleaved)?;
@@ -80,7 +82,7 @@ impl Open for AlsaSink {
     fn open(device: Option<String>, format: AudioFormat) -> Self {
         info!("Using Alsa sink with format: {:?}", format);
 
-        let name = match device.as_ref().map(AsRef::as_ref) {
+        let name = match device.as_deref() {
             Some("?") => {
                 println!("Listing available Alsa outputs:");
                 list_outputs();
@@ -162,6 +164,8 @@ impl SinkAsBytes for AlsaSink {
 }
 
 impl AlsaSink {
+    pub const NAME: &'static str = "alsa";
+
     fn write_buf(&mut self) {
         let pcm = self.pcm.as_mut().unwrap();
         let io = pcm.io_bytes();

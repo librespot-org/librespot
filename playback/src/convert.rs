@@ -34,8 +34,21 @@ impl Converter {
         }
     }
 
+    /// To convert PCM samples from floating point normalized as `-1.0..=1.0`
+    /// to 32-bit signed integer, multiply by 2147483648 (0x80000000) and
+    /// saturate at the bounds of `i32`.
     const SCALE_S32: f64 = 2147483648.;
+
+    /// To convert PCM samples from floating point normalized as `-1.0..=1.0`
+    /// to 24-bit signed integer, multiply by 8388608 (0x800000) and saturate
+    /// at the bounds of `i24`.
     const SCALE_S24: f64 = 8388608.;
+
+    /// To convert PCM samples from floating point normalized as `-1.0..=1.0`
+    /// to 16-bit signed integer, multiply by 32768 (0x8000) and saturate at
+    /// the bounds of `i16`. When the samples were encoded using the same
+    /// scaling factor, like the reference Vorbis encoder does, this makes
+    /// conversions transparent.
     const SCALE_S16: f64 = 32768.;
 
     pub fn scale(&mut self, sample: f64, factor: f64) -> f64 {
