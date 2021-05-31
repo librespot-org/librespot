@@ -33,6 +33,7 @@ impl Default for Bitrate {
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum AudioFormat {
+    F64,
     F32,
     S32,
     S24,
@@ -44,6 +45,7 @@ impl FromStr for AudioFormat {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_uppercase().as_ref() {
+            "F64" => Ok(Self::F64),
             "F32" => Ok(Self::F32),
             "S32" => Ok(Self::S32),
             "S24" => Ok(Self::S24),
@@ -65,6 +67,7 @@ impl AudioFormat {
     #[allow(dead_code)]
     pub fn size(&self) -> usize {
         match self {
+            Self::F64 => mem::size_of::<f64>(),
             Self::F32 => mem::size_of::<f32>(),
             Self::S24_3 => mem::size_of::<i24>(),
             Self::S16 => mem::size_of::<i16>(),
@@ -128,11 +131,11 @@ pub struct PlayerConfig {
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
     pub normalisation_method: NormalisationMethod,
-    pub normalisation_pregain: f32,
-    pub normalisation_threshold: f32,
+    pub normalisation_pregain: f64,
+    pub normalisation_threshold: f64,
     pub normalisation_attack: Duration,
     pub normalisation_release: Duration,
-    pub normalisation_knee: f32,
+    pub normalisation_knee: f64,
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
     // (thereby circumventing Send bounds that they might not satisfy)
@@ -161,10 +164,10 @@ impl Default for PlayerConfig {
 // fields are intended for volume control range in dB
 #[derive(Clone, Copy, Debug)]
 pub enum VolumeCtrl {
-    Cubic(f32),
+    Cubic(f64),
     Fixed,
     Linear,
-    Log(f32),
+    Log(f64),
 }
 
 impl FromStr for VolumeCtrl {
@@ -184,9 +187,9 @@ impl VolumeCtrl {
     pub const MAX_VOLUME: u16 = u16::MAX;
 
     // Taken from: https://www.dr-lex.be/info-stuff/volumecontrols.html
-    pub const DEFAULT_DB_RANGE: f32 = 60.0;
+    pub const DEFAULT_DB_RANGE: f64 = 60.0;
 
-    pub fn from_str_with_range(s: &str, db_range: f32) -> Result<Self, <Self as FromStr>::Err> {
+    pub fn from_str_with_range(s: &str, db_range: f64) -> Result<Self, <Self as FromStr>::Err> {
         use self::VolumeCtrl::*;
         match s.to_lowercase().as_ref() {
             "cubic" => Ok(Cubic(db_range)),

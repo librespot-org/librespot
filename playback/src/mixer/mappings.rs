@@ -2,16 +2,16 @@ use super::VolumeCtrl;
 use crate::player::db_to_ratio;
 
 pub trait MappedCtrl {
-    fn to_mapped(&self, volume: u16) -> f32;
-    fn from_mapped(&self, mapped_volume: f32) -> u16;
+    fn to_mapped(&self, volume: u16) -> f64;
+    fn from_mapped(&self, mapped_volume: f64) -> u16;
 
-    fn db_range(&self) -> f32;
-    fn set_db_range(&mut self, new_db_range: f32);
+    fn db_range(&self) -> f64;
+    fn set_db_range(&mut self, new_db_range: f64);
     fn range_ok(&self) -> bool;
 }
 
 impl MappedCtrl for VolumeCtrl {
-    fn to_mapped(&self, volume: u16) -> f32 {
+    fn to_mapped(&self, volume: u16) -> f64 {
         // More than just an optimization, this ensures that zero volume is
         // really mute (both the log and cubic equations would otherwise not
         // reach zero).
@@ -22,7 +22,7 @@ impl MappedCtrl for VolumeCtrl {
             return 1.0;
         }
 
-        let normalized_volume = volume as f32 / Self::MAX_VOLUME as f32;
+        let normalized_volume = volume as f64 / Self::MAX_VOLUME as f64;
         let mapped_volume = if self.range_ok() {
             match *self {
                 Self::Cubic(db_range) => {
@@ -49,13 +49,13 @@ impl MappedCtrl for VolumeCtrl {
         mapped_volume
     }
 
-    fn from_mapped(&self, mapped_volume: f32) -> u16 {
+    fn from_mapped(&self, mapped_volume: f64) -> u16 {
         // More than just an optimization, this ensures that zero mapped volume
         // is unmapped to non-negative real numbers (otherwise the log and cubic
         // equations would respectively return -inf and -1/9.)
-        if f32::abs(mapped_volume - 0.0) <= f32::EPSILON {
+        if f64::abs(mapped_volume - 0.0) <= f64::EPSILON {
             return 0;
-        } else if f32::abs(mapped_volume - 1.0) <= f32::EPSILON {
+        } else if f64::abs(mapped_volume - 1.0) <= f64::EPSILON {
             return Self::MAX_VOLUME;
         }
 
@@ -74,10 +74,10 @@ impl MappedCtrl for VolumeCtrl {
             mapped_volume
         };
 
-        (unmapped_volume * Self::MAX_VOLUME as f32) as u16
+        (unmapped_volume * Self::MAX_VOLUME as f64) as u16
     }
 
-    fn db_range(&self) -> f32 {
+    fn db_range(&self) -> f64 {
         match *self {
             Self::Fixed => 0.0,
             Self::Linear => Self::DEFAULT_DB_RANGE, // arbitrary, could be anything > 0
@@ -85,7 +85,7 @@ impl MappedCtrl for VolumeCtrl {
         }
     }
 
-    fn set_db_range(&mut self, new_db_range: f32) {
+    fn set_db_range(&mut self, new_db_range: f64) {
         match self {
             Self::Cubic(ref mut db_range) | Self::Log(ref mut db_range) => *db_range = new_db_range,
             _ => error!("Invalid to set dB range for volume control type {:?}", self),
@@ -100,8 +100,8 @@ impl MappedCtrl for VolumeCtrl {
 }
 
 pub trait VolumeMapping {
-    fn linear_to_mapped(unmapped_volume: f32, db_range: f32) -> f32;
-    fn mapped_to_linear(mapped_volume: f32, db_range: f32) -> f32;
+    fn linear_to_mapped(unmapped_volume: f64, db_range: f64) -> f64;
+    fn mapped_to_linear(mapped_volume: f64, db_range: f64) -> f64;
 }
 
 // Volume conversion taken from: https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
@@ -110,21 +110,21 @@ pub trait VolumeMapping {
 // mapping results in a near linear loudness experience with the listener.
 pub struct LogMapping {}
 impl VolumeMapping for LogMapping {
-    fn linear_to_mapped(normalized_volume: f32, db_range: f32) -> f32 {
+    fn linear_to_mapped(normalized_volume: f64, db_range: f64) -> f64 {
         let (db_ratio, ideal_factor) = Self::coefficients(db_range);
-        f32::exp(ideal_factor * normalized_volume) / db_ratio
+        f64::exp(ideal_factor * normalized_volume) / db_ratio
     }
 
-    fn mapped_to_linear(mapped_volume: f32, db_range: f32) -> f32 {
+    fn mapped_to_linear(mapped_volume: f64, db_range: f64) -> f64 {
         let (db_ratio, ideal_factor) = Self::coefficients(db_range);
-        f32::ln(db_ratio * mapped_volume) / ideal_factor
+        f64::ln(db_ratio * mapped_volume) / ideal_factor
     }
 }
 
 impl LogMapping {
-    fn coefficients(db_range: f32) -> (f32, f32) {
+    fn coefficients(db_range: f64) -> (f64, f64) {
         let db_ratio = db_to_ratio(db_range);
-        let ideal_factor = f32::ln(db_ratio);
+        let ideal_factor = f64::ln(db_ratio);
         (db_ratio, ideal_factor)
     }
 }
@@ -143,21 +143,21 @@ impl LogMapping {
 // logarithmic mapping, then use that volume control.
 pub struct CubicMapping {}
 impl VolumeMapping for CubicMapping {
-    fn linear_to_mapped(normalized_volume: f32, db_range: f32) -> f32 {
+    fn linear_to_mapped(normalized_volume: f64, db_range: f64) -> f64 {
         let min_norm = Self::min_norm(db_range);
-        f32::powi(normalized_volume * (1.0 - min_norm) + min_norm, 3)
+        f64::powi(normalized_volume * (1.0 - min_norm) + min_norm, 3)
     }
 
-    fn mapped_to_linear(mapped_volume: f32, db_range: f32) -> f32 {
+    fn mapped_to_linear(mapped_volume: f64, db_range: f64) -> f64 {
         let min_norm = Self::min_norm(db_range);
         (mapped_volume.powf(1.0 / 3.0) - min_norm) / (1.0 - min_norm)
     }
 }
 
 impl CubicMapping {
-    fn min_norm(db_range: f32) -> f32 {
+    fn min_norm(db_range: f64) -> f64 {
         // Note that this 60.0 is unrelated to DEFAULT_DB_RANGE.
         // Instead, it's the cubic voltage to dB ratio.
-        f32::powf(10.0, -1.0 * db_range / 60.0)
+        f64::powf(10.0, -1.0 * db_range / 60.0)
     }
 }

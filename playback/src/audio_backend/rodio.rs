@@ -179,12 +179,16 @@ impl Sink for RodioSink {
         let samples = packet.samples();
         match self.format {
             AudioFormat::F32 => {
-                let source =
-                    rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples);
+                let samples_f32: &[f32] = &converter.f64_to_f32(samples);
+                let source = rodio::buffer::SamplesBuffer::new(
+                    NUM_CHANNELS as u16,
+                    SAMPLE_RATE,
+                    samples_f32,
+                );
                 self.rodio_sink.append(source);
             }
             AudioFormat::S16 => {
-                let samples_s16: &[i16] = &converter.f32_to_s16(samples);
+                let samples_s16: &[i16] = &converter.f64_to_s16(samples);
                 let source = rodio::buffer::SamplesBuffer::new(
                     NUM_CHANNELS as u16,
                     SAMPLE_RATE,

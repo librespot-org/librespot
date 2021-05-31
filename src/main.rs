@@ -286,7 +286,7 @@ fn get_setup(args: &[String]) -> Setup {
     .optopt(
         "",
         FORMAT,
-        "Output format {F32|S32|S24|S24_3|S16}. Defaults to S16.",
+        "Output format {F64|F32|S32|S24|S24_3|S16}. Defaults to S16.",
         "FORMAT",
     )
     .optopt(
@@ -474,7 +474,7 @@ fn get_setup(args: &[String]) -> Setup {
             .unwrap_or_else(|| MixerConfig::default().control);
         let mut volume_range = matches
             .opt_str(VOLUME_RANGE)
-            .map(|range| range.parse::<f32>().unwrap())
+            .map(|range| range.parse::<f64>().unwrap())
             .unwrap_or_else(|| match mixer_name.as_deref() {
                 #[cfg(feature = "alsa-backend")]
                 Some(AlsaMixer::NAME) => 0.0, // let Alsa query the control
@@ -650,14 +650,14 @@ fn get_setup(args: &[String]) -> Setup {
             .unwrap_or_default();
         let normalisation_pregain = matches
             .opt_str(NORMALISATION_PREGAIN)
-            .map(|pregain| pregain.parse::<f32>().expect("Invalid pregain float value"))
+            .map(|pregain| pregain.parse::<f64>().expect("Invalid pregain float value"))
             .unwrap_or(PlayerConfig::default().normalisation_pregain);
         let normalisation_threshold = matches
             .opt_str(NORMALISATION_THRESHOLD)
             .map(|threshold| {
                 db_to_ratio(
                     threshold
-                        .parse::<f32>()
+                        .parse::<f64>()
                         .expect("Invalid threshold float value"),
                 )
             })
@@ -676,7 +676,7 @@ fn get_setup(args: &[String]) -> Setup {
             .unwrap_or(PlayerConfig::default().normalisation_release);
         let normalisation_knee = matches
             .opt_str(NORMALISATION_KNEE)
-            .map(|knee| knee.parse::<f32>().expect("Invalid knee float value"))
+            .map(|knee| knee.parse::<f64>().expect("Invalid knee float value"))
             .unwrap_or(PlayerConfig::default().normalisation_knee);
 
         let ditherer_name = matches.opt_str(DITHER);
@@ -685,7 +685,7 @@ fn get_setup(args: &[String]) -> Setup {
             Some("none") => None,
             // explicitly set on command line
             Some(_) => {
-                if format == AudioFormat::F32 {
+                if format == AudioFormat::F64 || format == AudioFormat::F32 {
                     unimplemented!("Dithering is not available on format {:?}", format);
                 }
                 Some(dither::find_ditherer(ditherer_name).expect("Invalid ditherer"))

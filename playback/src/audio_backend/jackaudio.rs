@@ -70,9 +70,10 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    fn write(&mut self, packet: &AudioPacket, _: &mut Converter) -> io::Result<()> {
-        for s in packet.samples().iter() {
-            let res = self.send.send(*s);
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+        let samples_f32: &[f32] = &converter.f64_to_f32(packet.samples());
+        for sample in samples_f32.iter() {
+            let res = self.send.send(*sample);
             if res.is_err() {
                 error!("cannot write to channel");
             }

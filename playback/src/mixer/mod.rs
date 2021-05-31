@@ -17,7 +17,7 @@ pub trait Mixer: Send {
 }
 
 pub trait AudioFilter {
-    fn modify_stream(&self, data: &mut [f32]);
+    fn modify_stream(&self, data: &mut [f64]);
 }
 
 pub mod softmixer;

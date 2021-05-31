@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use super::AudioFilter;
@@ -7,9 +7,9 @@ use super::{Mixer, MixerConfig};
 
 #[derive(Clone)]
 pub struct SoftMixer {
-    // There is no AtomicF32, so we store the f32 as bits in a u32 field.
-    // It's much faster than a Mutex<f32>.
-    volume: Arc<AtomicU32>,
+    // There is no AtomicF64, so we store the f64 as bits in a u64 field.
+    // It's much faster than a Mutex<f64>.
+    volume: Arc<AtomicU64>,
     volume_ctrl: VolumeCtrl,
 }
 
@@ -19,13 +19,13 @@ impl Mixer for SoftMixer {
         info!("Mixing with softvol and volume control: {:?}", volume_ctrl);
 
         Self {
-            volume: Arc::new(AtomicU32::new(f32::to_bits(0.5))),
+            volume: Arc::new(AtomicU64::new(f64::to_bits(0.5))),
             volume_ctrl,
         }
     }
 
     fn volume(&self) -> u16 {
-        let mapped_volume = f32::from_bits(self.volume.load(Ordering::Relaxed));
+        let mapped_volume = f64::from_bits(self.volume.load(Ordering::Relaxed));
         self.volume_ctrl.from_mapped(mapped_volume)
     }
 
@@ -47,15 +47,15 @@ impl SoftMixer {
 }
 
 struct SoftVolumeApplier {
-    volume: Arc<AtomicU32>,
+    volume: Arc<AtomicU64>,
 }
 
 impl AudioFilter for SoftVolumeApplier {
-    fn modify_stream(&self, data: &mut [f32]) {
-        let volume = f32::from_bits(self.volume.load(Ordering::Relaxed));
+    fn modify_stream(&self, data: &mut [f64]) {
+        let volume = f64::from_bits(self.volume.load(Ordering::Relaxed));
         if volume < 1.0 {
             for x in data.iter_mut() {
-                *x = (*x as f64 * volume as f64) as f32;
+                *x *= volume;
             }
         }
     }
