@@ -18,71 +18,69 @@ use tokio::sync::{mpsc, oneshot};
 use self::receive::{audio_file_fetch, request_range};
 use crate::range_set::{Range, RangeSet};
 
+/// The minimum size of a block that is requested from the Spotify servers in one request.
+/// This is the block size that is typically requested while doing a `seek()` on a file.
+/// Note: smaller requests can happen if part of the block is downloaded already.
 const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 16;
-// The minimum size of a block that is requested from the Spotify servers in one request.
-// This is the block size that is typically requested while doing a seek() on a file.
-// Note: smaller requests can happen if part of the block is downloaded already.
 
+/// The amount of data that is requested when initially opening a file.
+/// Note: if the file is opened to play from the beginning, the amount of data to
+/// read ahead is requested in addition to this amount. If the file is opened to seek to
+/// another position, then only this amount is requested on the first request.
 const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 16;
-// The amount of data that is requested when initially opening a file.
-// Note: if the file is opened to play from the beginning, the amount of data to
-// read ahead is requested in addition to this amount. If the file is opened to seek to
-// another position, then only this amount is requested on the first request.
 
+/// The ping time that is used for calculations before a ping time was actually measured.
 const INITIAL_PING_TIME_ESTIMATE: Duration = Duration::from_millis(500);
-// The pig time that is used for calculations before a ping time was actually measured.
 
+/// If the measured ping time to the Spotify server is larger than this value, it is capped
+/// to avoid run-away block sizes and pre-fetching.
 const MAXIMUM_ASSUMED_PING_TIME: Duration = Duration::from_millis(1500);
-// If the measured ping time to the Spotify server is larger than this value, it is capped
-// to avoid run-away block sizes and pre-fetching.
 
+/// Before playback starts, this many seconds of data must be present.
+/// Note: the calculations are done using the nominal bitrate of the file. The actual amount
+/// of audio data may be larger or smaller.
 pub const READ_AHEAD_BEFORE_PLAYBACK: Duration = Duration::from_secs(1);
-// Before playback starts, this many seconds of data must be present.
-// Note: the calculations are done using the nominal bitrate of the file. The actual amount
-// of audio data may be larger or smaller.
 
+/// Same as `READ_AHEAD_BEFORE_PLAYBACK`, but the time is taken as a factor of the ping
+/// time to the Spotify server. Both `READ_AHEAD_BEFORE_PLAYBACK` and
+/// `READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS` are obeyed.
+/// Note: the calculations are done using the nominal bitrate of the file. The actual amount
+/// of audio data may be larger or smaller.
 pub const READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS: f32 = 2.0;
-// Same as READ_AHEAD_BEFORE_PLAYBACK, but the time is taken as a factor of the ping
-// time to the Spotify server.
-// Both, READ_AHEAD_BEFORE_PLAYBACK and READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS are
-// obeyed.
-// Note: the calculations are done using the nominal bitrate of the file. The actual amount
-// of audio data may be larger or smaller.
 
+/// While playing back, this many seconds of data ahead of the current read position are
+/// requested.
+/// Note: the calculations are done using the nominal bitrate of the file. The actual amount
+/// of audio data may be larger or smaller.
 pub const READ_AHEAD_DURING_PLAYBACK: Duration = Duration::from_secs(5);
-// While playing back, this many seconds of data ahead of the current read position are
-// requested.
-// Note: the calculations are done using the nominal bitrate of the file. The actual amount
-// of audio data may be larger or smaller.
 
+/// Same as `READ_AHEAD_DURING_PLAYBACK`, but the time is taken as a factor of the ping
+/// time to the Spotify server.
+/// Note: the calculations are done using the nominal bitrate of the file. The actual amount
+/// of audio data may be larger or smaller.
 pub const READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS: f32 = 10.0;
-// Same as READ_AHEAD_DURING_PLAYBACK, but the time is taken as a factor of the ping
-// time to the Spotify server.
-// Note: the calculations are done using the nominal bitrate of the file. The actual amount
-// of audio data may be larger or smaller.
 
+/// If the amount of data that is pending (requested but not received) is less than a certain amount,
+/// data is pre-fetched in addition to the read ahead settings above. The threshold for requesting more
+/// data is calculated as `<pending bytes> < PREFETCH_THRESHOLD_FACTOR * <ping time> * <nominal data rate>`
 const PREFETCH_THRESHOLD_FACTOR: f32 = 4.0;
-// If the amount of data that is pending (requested but not received) is less than a certain amount,
-// data is pre-fetched in addition to the read ahead settings above. The threshold for requesting more
-// data is calculated as
-// <pending bytes> < PREFETCH_THRESHOLD_FACTOR * <ping time> * <nominal data rate>
 
+/// Similar to `PREFETCH_THRESHOLD_FACTOR`, but it also takes the current download rate into account.
+/// The formula used is `<pending bytes> < FAST_PREFETCH_THRESHOLD_FACTOR * <ping time> * <measured download rate>`
+/// This mechanism allows for fast downloading of the remainder of the file. The number should be larger
+/// than `1.0` so the download rate ramps up until the bandwidth is saturated. The larger the value, the faster
+/// the download rate ramps up. However, this comes at the cost that it might hurt ping time if a seek is
+/// performed while downloading. Values smaller than `1.0` cause the download rate to collapse and effectively
+/// only `PREFETCH_THRESHOLD_FACTOR` is in effect. Thus, set to `0.0` if bandwidth saturation is not wanted.
 const FAST_PREFETCH_THRESHOLD_FACTOR: f32 = 1.5;
-// Similar to PREFETCH_THRESHOLD_FACTOR, but it also takes the current download rate into account.
-// The formula used is
-// <pending bytes> < FAST_PREFETCH_THRESHOLD_FACTOR * <ping time> * <measured download rate>
-// This mechanism allows for fast downloading of the remainder of the file. The number should be larger
-// than 1 so the download rate ramps up until the bandwidth is saturated. The larger the value, the faster
-// the download rate ramps up. However, this comes at the cost that it might hurt ping-time if a seek is
-// performed while downloading. Values smaller than 1 cause the download rate to collapse and effectively
-// only PREFETCH_THRESHOLD_FACTOR is in effect. Thus, set to zero if bandwidth saturation is not wanted.
 
+/// Limit the number of requests that are pending simultaneously before pre-fetching data. Pending
+/// requests share bandwidth. Thus, havint too many requests can lead to the one that is needed next
+/// for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
+/// pre-fetch request is only sent if less than `MAX_PREFETCH_REQUESTS` are pending.
 const MAX_PREFETCH_REQUESTS: usize = 4;
-// Limit the number of requests that are pending simultaneously before pre-fetching data. Pending
-// requests share bandwidth. Thus, havint too many requests can lead to the one that is needed next
-// for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
-// pre-fetch request is only sent if less than MAX_PREFETCH_REQUESTS are pending.
 
+/// The time we will wait to obtain status updates on downloading.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub enum AudioFile {
