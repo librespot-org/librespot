@@ -31,7 +31,6 @@ version = "0.2.0"
 [dependencies.librespot-core]
 path = "core"
 version = "0.2.0"
-features = ["apresolve"]
 
 [dependencies.librespot-discovery]
 path = "discovery"
