@@ -14,9 +14,9 @@ use crate::{NUM_CHANNELS, SAMPLE_RATE};
 
 #[derive(Debug, Error)]
 pub enum CpalError {
-    #[error("Cpal: no device available")]
+    #[error("CPAL: no device available")]
     NoDeviceAvailable,
-    #[error("Cpal: device \"{0}\" is not available")]
+    #[error("CPAL: device \"{0}\" is not available")]
     DeviceNotAvailable(String),
     #[error("Cannot get audio devices: {0}")]
     DevicesError(#[from] cpal::DevicesError),
@@ -36,7 +36,7 @@ fn list_formats(device: &cpal::Device) {
         }
         Err(e) => {
             // Use loglevel debug, since even the output is only debug
-            debug!("Error getting default cpal Sink config: {}", e);
+            debug!("Error getting default cpal::Sink output config: {}", e);
         }
     };
 
@@ -54,7 +54,7 @@ fn list_formats(device: &cpal::Device) {
             }
         }
         Err(e) => {
-            debug!("Error getting supported cpal Sink configs: {}", e);
+            debug!("Error getting supported cpal::Sink configs: {}", e);
         }
     }
 }
@@ -145,18 +145,9 @@ fn data_callback<T: Sample>(
 
 pub fn open(dev: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
     fn open_with_format<T: Sample + Send + 'static>(
-        dev: Option<String>,
+        device: cpal::Device,
         format: AudioFormat,
     ) -> CpalSink<T> {
-        let host = cpal::default_host();
-        info!(
-            "Using cpal sink with format {:?} and host: {}",
-            format,
-            host.id().name()
-        );
-
-        let device = get_device(&host, dev).unwrap();
-
         let (sample_tx, sample_rx) = RingBuffer::new(4 * 4096).split();
 
         let stream = device
@@ -169,9 +160,7 @@ pub fn open(dev: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
                 data_callback(sample_rx),
                 |e| error!("Sink error: {}", e),
             )
-            .unwrap();
-
-        debug!("cpal sink was created");
+            .expect("Could not open output stream with that format");
 
         CpalSink {
             _stream: stream,
@@ -180,10 +169,62 @@ pub fn open(dev: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
         }
     }
 
+    let host = cpal::default_host();
+    info!(
+        "Using CPAL sink with format {:?} and host: {}",
+        format,
+        host.id().name()
+    );
+
+    let device = get_device(&host, dev).expect("Could not open device");
+
+    // Try and see if the requested output format is actually available.
+    // If not, try the default output format. This provides an out-of-the-box
+    // experience, particularly on certain CoreAudio devices that only support
+    // F32 output while librespot defaults to S16.
+    let mut format = format;
+    let mut format_found = false;
+    match device.supported_output_configs() {
+        Ok(cfgs) => {
+            for cfg in cfgs {
+                format_found = match cfg.sample_format() {
+                    cpal::SampleFormat::F32 => format == AudioFormat::F32,
+                    cpal::SampleFormat::I16 => format == AudioFormat::S16,
+                    _ => false,
+                };
+                if format_found {
+                    break;
+                }
+            }
+        }
+        Err(e) => {
+            debug!("Error getting supported cpal::Sink configs: {}", e);
+        }
+    }
+    if !format_found {
+        warn!(
+            "Requested audio format {:?} not supported by device; trying default format",
+            format
+        );
+        let default_output_config = device
+            .default_output_config()
+            .expect("Could not get default output config");
+        let default_sample_format = default_output_config.sample_format();
+        format = match default_sample_format {
+            cpal::SampleFormat::F32 => AudioFormat::F32,
+            cpal::SampleFormat::I16 => AudioFormat::S16,
+            _ => unimplemented!(
+                "Device default sample format {:?} is not implemented",
+                default_sample_format
+            ),
+        };
+        warn!("Changing to default audio format {:?}", format);
+    }
+
     match format {
-        AudioFormat::F32 => Box::new(open_with_format::<f32>(dev, format)),
-        AudioFormat::S16 => Box::new(open_with_format::<i16>(dev, format)),
-        _ => unimplemented!("cpal currently only supports F32 and S16 formats"),
+        AudioFormat::F32 => Box::new(open_with_format::<f32>(device, format)),
+        AudioFormat::S16 => Box::new(open_with_format::<i16>(device, format)),
+        _ => unimplemented!("CPAL currently only supports F32 and S16 formats"),
     }
 }
 
