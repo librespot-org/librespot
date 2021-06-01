@@ -63,8 +63,7 @@ impl Converter {
 
         // Casting float to integer rounds towards zero by default, i.e. it
         // truncates, and that generates larger error than rounding to nearest.
-        // Absolute lowest error is gained from rounding ties to even.
-        math::round::half_to_even(int_value, 0)
+        int_value.round()
     }
 
     // Special case for samples packed in a word of greater bit depth (e.g.
