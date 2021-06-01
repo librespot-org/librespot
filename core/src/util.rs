@@ -31,6 +31,9 @@ impl<T: Seq> SeqGenerator<T> {
 pub trait PacketData: Copy {
     fn write(self, vec: &mut Vec<u8>);
 
+    /// `size_hint` is used to allocate the right amount of memory in advance.
+    /// An incorrect return value will at most lead to a small performance penalty
+    /// or too high memory usage.
     fn size_hint(&self) -> usize;
 }
 
@@ -70,18 +73,17 @@ where
 }
 
 macro_rules! impl_packet_data_num {
-    ( $($t:ty : $n:literal), *) => {
+    ( $($t:ty) *) => {
         $(
             impl PacketData for $t {
                 #[inline]
                 fn size_hint(&self) -> usize {
-                    $n
+                    std::mem::size_of::<$t>()
                 }
 
                 #[inline]
                 fn write(self, vec: &mut Vec<u8>) {
-                    let bytes : [u8; $n] = self.to_be_bytes();
-                    vec.extend_from_slice(&bytes);
+                    vec.extend_from_slice(&self.to_be_bytes());
                 }
             }
 
@@ -98,8 +100,8 @@ macro_rules! impl_packet_data_num {
 }
 
 impl_packet_data_num!(
-    u8: 1, u16: 2, u32: 4, u64: 8, u128: 16,
-    i8: 1, i16: 2, i32: 4, i64: 8, i128: 16
+    u8 u16 u32 u64 u128
+    i8 i16 i32 i64 i128
 );
 
 impl PacketData for &[u8] {

@@ -66,14 +66,16 @@ where
     packet.set_client_nonce(client_nonce);
     packet.set_padding(vec![0x1e]);
 
+    let buffer_size = 1 + 1 + 4 + packet.compute_size();
     let buffer = crate::packet!(
         (u8) 0,
         (u8) 4,
-        (u32) 2 + 4 + packet.compute_size() ,
+        (u32) buffer_size,
         (Proto) &packet
     );
+    assert_eq!(buffer.len(), buffer_size as usize);
 
-    connection.write_all(&buffer[..]).await?;
+    connection.write_all(&buffer).await?;
     Ok(buffer)
 }
 
@@ -89,11 +91,14 @@ where
     packet.mut_pow_response();
     packet.mut_crypto_response();
 
+    let buffer_size = 4 + packet.compute_size();
     let buffer = crate::packet!(
-        (u32) 4 + packet.compute_size(),
+        (u32) buffer_size,
         (Proto) &packet
     );
-    connection.write_all(&buffer[..]).await?;
+    assert_eq!(buffer.len(), buffer_size as usize);
+
+    connection.write_all(&buffer).await?;
     Ok(())
 }
 
