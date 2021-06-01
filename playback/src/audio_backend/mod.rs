@@ -68,6 +68,9 @@ mod alsa;
 #[cfg(feature = "alsa-backend")]
 use self::alsa::AlsaSink;
 
+#[cfg(feature = "cpal-backend")]
+mod cpal;
+
 #[cfg(feature = "portaudio-backend")]
 mod portaudio;
 #[cfg(feature = "portaudio-backend")]
@@ -109,6 +112,8 @@ pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     (RodioSink::NAME, rodio::mk_rodio), // default goes first
     #[cfg(feature = "alsa-backend")]
     (AlsaSink::NAME, mk_sink::<AlsaSink>),
+    #[cfg(feature = "cpal-backend")]
+    ("cpal", cpal::open),
     #[cfg(feature = "portaudio-backend")]
     (PortAudioSink::NAME, mk_sink::<PortAudioSink>),
     #[cfg(feature = "pulseaudio-backend")]
