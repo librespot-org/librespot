@@ -6,9 +6,8 @@ use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use serde::Deserialize;
 use url::Url;
 
-use super::ap_fallback;
-
 const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
+const AP_FALLBACK: &str = "ap.spotify.com";
 
 #[derive(Clone, Debug, Deserialize)]
 struct ApResolveData {
@@ -65,7 +64,7 @@ async fn try_apresolve(
 pub async fn apresolve(proxy: Option<&Url>, ap_port: Option<u16>) -> (String, u16) {
     try_apresolve(proxy, ap_port).await.unwrap_or_else(|e| {
         warn!("Failed to resolve Access Point: {}, using fallback.", e);
-        ap_fallback()
+        (String::from(AP_FALLBACK), 443)
     })
 }
 
