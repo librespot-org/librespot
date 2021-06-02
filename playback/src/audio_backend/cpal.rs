@@ -280,34 +280,34 @@ impl<S: Sample + Default> Sink for CpalSink<S> {
     }
 
     fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
-        macro_rules! write_sink {
-            ($samples: expr) => {
-                let mut write_to = loop {
-                    match self.sample_tx.write_chunk($samples.len()) {
-                        Ok(x) => break x,
-                        Err(_) => thread::sleep(time::Duration::from_millis(10)),
-                    }
-                };
-                (&mut write_to)
-                    .zip($samples.iter())
-                    .for_each(|(to, from)| *to = S::from(from));
-                write_to.commit_iterated();
-            };
-        }
-
         let samples = packet.samples();
         match self.format {
             AudioFormat::F32 => {
                 let samples_f32: &[f32] = &converter.f64_to_f32(samples);
-                write_sink!(samples_f32);
+                self.write_with_format::<f32>(samples_f32);
             }
             AudioFormat::S16 => {
                 let samples_s16: &[i16] = &converter.f64_to_s16(samples);
-                write_sink!(samples_s16);
+                self.write_with_format::<i16>(samples_s16);
             }
             _ => unreachable!(),
         }
 
         Ok(())
+    }
+}
+
+impl<S: Sample + Default> CpalSink<S> {
+    fn write_with_format<T: Sample>(&mut self, samples: &[T]) {
+        let mut write_to = loop {
+            match self.sample_tx.write_chunk(samples.len()) {
+                Ok(x) => break x,
+                Err(_) => thread::sleep(time::Duration::from_millis(10)),
+            }
+        };
+        (&mut write_to)
+            .zip(samples.iter())
+            .for_each(|(to, from)| *to = S::from(from));
+        write_to.commit_iterated();
     }
 }
