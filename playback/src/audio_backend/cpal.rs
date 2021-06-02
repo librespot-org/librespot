@@ -1,7 +1,7 @@
 use std::process::exit;
 use std::{io, thread, time};
 
-use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Sample, StreamConfig};
 use rtrb::{Consumer, RingBuffer};
 use thiserror::Error;
@@ -23,7 +23,7 @@ pub enum CpalError {
 }
 
 pub struct CpalSink<S: Sample> {
-    _stream: cpal::Stream,
+    stream: cpal::Stream,
     format: AudioFormat,
     sample_tx: rtrb::Producer<S>,
 }
@@ -163,7 +163,7 @@ pub fn open(dev: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
             .expect("Could not open output stream with that format");
 
         CpalSink {
-            _stream: stream,
+            stream,
             format,
             sample_tx,
         }
@@ -229,6 +229,27 @@ pub fn open(dev: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
 }
 
 impl<S: Sample + Default> Sink for CpalSink<S> {
+    fn start(&mut self) -> io::Result<()> {
+        let result = self.stream.play();
+        match result {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                error!("CPAL error stream play {}", e);
+                Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "CPAL error: stream play failed",
+                ))
+            }
+        }
+    }
+
+    fn stop(&mut self) -> io::Result<()> {
+        // This method may fail if the device does not support suspending
+        // the stream at the hardware level. That's OK so we ignore it.
+        let _ = self.stream.pause();
+        Ok(())
+    }
+
     fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
         macro_rules! write_sink {
             ($samples: expr) => {
