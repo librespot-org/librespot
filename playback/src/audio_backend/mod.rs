@@ -68,7 +68,7 @@ mod alsa;
 #[cfg(feature = "alsa-backend")]
 use self::alsa::AlsaSink;
 
-#[cfg(feature = "cpal-backend")]
+#[cfg(any(feature = "cpal-backend", feature = "cpaljack-backend"))]
 mod cpal;
 
 #[cfg(feature = "portaudio-backend")]
