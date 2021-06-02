@@ -151,7 +151,8 @@ pub fn open(dev: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
         device: cpal::Device,
         format: AudioFormat,
     ) -> CpalSink<T> {
-        let (sample_tx, sample_rx) = RingBuffer::new(4 * 4096).split();
+        let ring_buffer_size = NUM_CHANNELS as usize * 1024 * format.size();
+        let (sample_tx, sample_rx) = RingBuffer::new(ring_buffer_size).split();
 
         let stream = device
             .build_output_stream::<T, _, _>(
