@@ -137,8 +137,11 @@ fn data_callback<T: Sample>(
                 .zip(&mut chunk)
                 .for_each(|(to, from)| *to = *from);
             chunk.commit_iterated();
-        } else {
-            buf.fill(silence);
+        } else if let Some((last, elements)) = buf.split_last_mut() {
+            for element in elements {
+                element.clone_from(&silence);
+            }
+            *last = silence
         }
     }
 }
