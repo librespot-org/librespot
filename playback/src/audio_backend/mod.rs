@@ -113,7 +113,9 @@ pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     #[cfg(feature = "alsa-backend")]
     (AlsaSink::NAME, mk_sink::<AlsaSink>),
     #[cfg(feature = "cpal-backend")]
-    ("cpal", cpal::open),
+    (cpal::NAME, cpal::mk_cpal),
+    #[cfg(feature = "cpaljack-backend")]
+    (cpal::JACK_NAME, cpal::mk_cpaljack),
     #[cfg(feature = "portaudio-backend")]
     (PortAudioSink::NAME, mk_sink::<PortAudioSink>),
     #[cfg(feature = "pulseaudio-backend")]

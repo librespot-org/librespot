@@ -12,6 +12,12 @@ use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
 
+#[cfg(all(
+    feature = "cpaljack-backend",
+    not(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd"))
+))]
+compile_error!("CPAL JACK Audio backend is currently only supported on Linux.");
+
 #[derive(Debug, Error)]
 pub enum CpalError {
     #[error("CPAL: no device available")]
@@ -27,6 +33,12 @@ pub struct CpalSink<S: Sample> {
     format: AudioFormat,
     sample_tx: rtrb::Producer<S>,
 }
+
+#[cfg(feature = "cpal-backend")]
+pub const NAME: &str = "cpal";
+
+#[cfg(feature = "cpaljack-backend")]
+pub const JACK_NAME: &str = "cpaljack";
 
 fn list_formats(device: &cpal::Device) {
     match device.default_output_config() {
@@ -146,41 +158,54 @@ fn data_callback<T: Sample>(
     }
 }
 
-pub fn open(dev: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
-    fn open_with_format<T: Sample + Send + 'static>(
-        device: cpal::Device,
-        format: AudioFormat,
-    ) -> CpalSink<T> {
-        let ring_buffer_size = NUM_CHANNELS as usize * 1024 * format.size();
-        let (sample_tx, sample_rx) = RingBuffer::new(ring_buffer_size).split();
+#[cfg(feature = "cpal-backend")]
+pub fn mk_cpal(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+    open(cpal::default_host(), device, format)
+}
 
-        let stream = device
-            .build_output_stream::<T, _, _>(
-                &StreamConfig {
-                    buffer_size: cpal::BufferSize::Default,
-                    channels: NUM_CHANNELS as u16,
-                    sample_rate: cpal::SampleRate(SAMPLE_RATE),
-                },
-                data_callback(sample_rx),
-                |e| error!("Sink error: {}", e),
-            )
-            .expect("Could not open output stream with that format");
+#[cfg(feature = "cpaljack-backend")]
+pub fn mk_cpaljack(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+    open(
+        cpal::host_from_id(cpal::HostId::Jack).unwrap(),
+        device,
+        format,
+    )
+}
 
-        CpalSink {
-            stream,
-            format,
-            sample_tx,
-        }
+fn create_sink<T: Sample + Send + 'static>(
+    device: cpal::Device,
+    format: AudioFormat,
+) -> CpalSink<T> {
+    let ring_buffer_size = NUM_CHANNELS as usize * 1024 * format.size();
+    let (sample_tx, sample_rx) = RingBuffer::new(ring_buffer_size).split();
+
+    let stream = device
+        .build_output_stream::<T, _, _>(
+            &StreamConfig {
+                buffer_size: cpal::BufferSize::Default,
+                channels: NUM_CHANNELS as u16,
+                sample_rate: cpal::SampleRate(SAMPLE_RATE),
+            },
+            data_callback(sample_rx),
+            |e| error!("Sink error: {}", e),
+        )
+        .expect("Could not open output stream with that format");
+
+    CpalSink {
+        stream,
+        format,
+        sample_tx,
     }
+}
 
-    let host = cpal::default_host();
+fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
     info!(
         "Using CPAL sink with format {:?} and host: {}",
         format,
         host.id().name()
     );
 
-    let device = get_device(&host, dev).expect("Could not open device");
+    let device = get_device(&host, device).expect("Could not open device");
 
     // Try and see if the requested output format is actually available.
     // If not, try the default output format. This provides an out-of-the-box
@@ -226,8 +251,8 @@ pub fn open(dev: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
     }
 
     match format {
-        AudioFormat::F32 => Box::new(open_with_format::<f32>(device, format)),
-        AudioFormat::S16 => Box::new(open_with_format::<i16>(device, format)),
+        AudioFormat::F32 => Box::new(create_sink::<f32>(device, format)),
+        AudioFormat::S16 => Box::new(create_sink::<i16>(device, format)),
         _ => unimplemented!("CPAL currently only supports F32 and S16 formats"),
     }
 }

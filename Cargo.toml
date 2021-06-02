@@ -66,13 +66,14 @@ sha-1 = "0.9"
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
 cpal-backend = ["librespot-playback/cpal-backend"]
+cpaljack-backend = ["librespot-playback/cpaljack-backend"]
+gstreamer-backend = ["librespot-playback/gstreamer-backend"]
+jackaudio-backend = ["librespot-playback/jackaudio-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
-jackaudio-backend = ["librespot-playback/jackaudio-backend"]
 rodio-backend = ["librespot-playback/rodio-backend"]
 rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
-gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
 with-dns-sd = ["librespot-discovery/with-dns-sd"]
 
