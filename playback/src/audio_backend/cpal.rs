@@ -176,8 +176,7 @@ fn create_sink<T: Sample + Send + 'static>(
     device: cpal::Device,
     format: AudioFormat,
 ) -> CpalSink<T> {
-    let ring_buffer_size = NUM_CHANNELS as usize * 1024 * format.size();
-    let (sample_tx, sample_rx) = RingBuffer::new(ring_buffer_size).split();
+    let (sample_tx, sample_rx) = RingBuffer::new(NUM_CHANNELS as usize * 2048).split();
 
     let stream = device
         .build_output_stream::<T, _, _>(
