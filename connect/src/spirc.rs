@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::context::StationContext;
 use crate::core::config::ConnectConfig;
-use crate::core::mercury::{MercuryError, MercurySender};
+use crate::core::mercury::{MercuryFuture, MercuryResponse, MercuryError};
 use crate::core::session::Session;
 use crate::core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
 use crate::core::util::SeqGenerator;
@@ -15,7 +15,8 @@ use crate::protocol;
 use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
 
 use futures_util::future::{self, FusedFuture};
-use futures_util::stream::FusedStream;
+use futures_util::stream::{FusedStream, FuturesUnordered};
+use futures_util::TryStreamExt;
 use futures_util::{FutureExt, StreamExt};
 use protobuf::{self, Message};
 use rand::seq::SliceRandom;
@@ -43,7 +44,7 @@ enum SpircPlayStatus {
 type BoxedFuture<T> = Pin<Box<dyn FusedFuture<Output = T> + Send>>;
 type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
 
-struct SpircTask<'a> {
+struct SpircTask {
     player: Player,
     mixer: Box<dyn Mixer>,
     config: SpircTaskConfig,
@@ -56,13 +57,14 @@ struct SpircTask<'a> {
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
 
+    uri: String,
     subscription: BoxedStream<Frame>,
-    sender: &'a mut MercurySender<'a>,
+    mercury_pending: FuturesUnordered<MercuryFuture<MercuryResponse>>,
     commands: Option<mpsc::UnboundedReceiver<SpircCommand>>,
     player_events: Option<PlayerEventChannel>,
 
     shutdown: bool,
-    session: &'a Session,
+    session: Session,
     context_fut: BoxedFuture<Result<serde_json::Value, MercuryError>>,
     autoplay_fut: BoxedFuture<Result<String, MercuryError>>,
     context: Option<StationContext>,
@@ -259,8 +261,6 @@ impl Spirc {
         let player_events = player.get_player_event_channel();
 
         let task = async move {
-            let mut sender = session.mercury().sender(&uri);
-
             SpircTask {
                 player,
                 mixer,
@@ -275,13 +275,14 @@ impl Spirc {
                 play_request_id: None,
                 play_status: SpircPlayStatus::Stopped,
 
+                uri,
                 subscription,
-                sender: &mut sender,
+                mercury_pending: FuturesUnordered::new(),
                 commands: Some(cmd_rx),
                 player_events: Some(player_events),
 
                 shutdown: false,
-                session: &session,
+                session,
                 context_fut: Box::pin(future::pending()),
                 autoplay_fut: Box::pin(future::pending()),
                 context: None,
@@ -324,7 +325,7 @@ impl Spirc {
     }
 }
 
-impl SpircTask<'_> {
+impl SpircTask {
     async fn run(mut self, initial_volume: Option<u16>) {
         if let Some(volume) = initial_volume {
             self.set_volume(volume);
@@ -352,7 +353,7 @@ impl SpircTask<'_> {
                 event = async { player_events.unwrap().recv().await }, if player_events.is_some() => if let Some(event) = event {
                     self.handle_player_event(event)
                 },
-                result = self.sender.flush(), if !self.sender.is_flushed() => if result.is_err() {
+                result = self.mercury_pending.try_next(), if !self.mercury_pending.is_terminated() => if result.is_err() {
                     error!("Cannot flush spirc event sender.");
                     break;
                 },
@@ -400,7 +401,11 @@ impl SpircTask<'_> {
             }
         }
 
-        if self.sender.flush().await.is_err() {
+        if (&mut self.mercury_pending)
+            .try_for_each(|_| future::ready(Ok(())))
+            .await
+            .is_err()
+        {
             warn!("Cannot flush spirc event sender.");
         }
     }
@@ -1236,19 +1241,19 @@ impl SpircTask<'_> {
     }
 }
 
-impl Drop for SpircTask<'_> {
+impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.session.session_id());
     }
 }
 
-struct CommandSender<'a, 'b> {
-    spirc: &'a mut SpircTask<'b>,
+struct CommandSender<'a> {
+    spirc: &'a mut SpircTask,
     frame: protocol::spirc::Frame,
 }
 
-impl<'a, 'b> CommandSender<'a, 'b> {
-    fn new(spirc: &'a mut SpircTask<'b>, cmd: MessageType) -> Self {
+impl<'a> CommandSender<'a> {
+    fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> Self {
         let mut frame = protocol::spirc::Frame::new();
         frame.set_version(1);
         frame.set_protocol_version(::std::convert::Into::into("2.0.0"));
@@ -1276,6 +1281,7 @@ impl<'a, 'b> CommandSender<'a, 'b> {
             self.frame.set_state(self.spirc.state.clone());
         }
 
-        self.spirc.sender.send(self.frame.write_to_bytes().unwrap());
+        let fut = self.spirc.session.mercury().send(&self.spirc.uri, self.frame.write_to_bytes().unwrap());
+        self.spirc.mercury_pending.push(fut);
     }
 }

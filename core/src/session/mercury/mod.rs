@@ -17,9 +17,6 @@ use crate::util::SeqGenerator;
 mod types;
 pub use self::types::*;
 
-mod sender;
-pub use self::sender::MercurySender;
-
 type MercuryResult = Result<MercuryResponse, MercuryError>;
 
 component! {
@@ -104,10 +101,6 @@ impl<'a> MercuryManager<'a> {
             content_type: None,
             payload: vec![data],
         })
-    }
-
-    pub fn sender<T: Into<String>>(self, uri: T) -> MercurySender<'a> {
-        MercurySender::new(self, uri.into())
     }
 
     pub fn subscribe<T: Into<String>>(
