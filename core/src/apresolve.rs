@@ -6,9 +6,8 @@ use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use serde::Deserialize;
 use url::Url;
 
-use super::AP_FALLBACK;
-
 const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
+const AP_FALLBACK: &str = "ap.spotify.com:443";
 
 #[derive(Clone, Debug, Deserialize)]
 struct ApResolveData {
