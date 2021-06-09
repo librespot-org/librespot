@@ -24,8 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsamixer`: complete rewrite (breaking)
 - [playback] `alsamixer`: query card dB range for the `log` volume control unless specified otherwise
 - [playback] `alsamixer`: use `--device` name for `--mixer-card` unless specified otherwise
-- [audio_backend, alsa] Deal strictly in period time and number of periods to set ALSA buffer to be sample rate, channel count and format independent in `alsa-backend`
-- [audio_backend, alsa] Use ALSA to calculate the size of internal buffer in `alsa-backend`
 
 ### Deprecated
 - [connect] The `discovery` module was deprecated in favor of the `librespot-discovery` crate
@@ -43,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsamixer`: make `cubic` consistent between cards that report minimum volume as mute, and cards that report some dB value
 - [playback] `alsamixer`: make `--volume-ctrl {linear|log}` work as expected
 - [playback] `alsa`, `gstreamer`, `pulseaudio`: always output in native endianness
-- [audio_backend, alsa] Return to a default buffer of approximately 0.5 secs in `alsa-backend`
+- [playback] `alsa`: revert buffer size to ~500 ms
 
 ## [0.2.0] - 2021-05-04
 
