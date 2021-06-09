@@ -68,6 +68,10 @@ impl<R: Read + Seek> PassthroughDecoder<R> {
             bos: false,
         })
     }
+
+    pub fn set_comment(&mut self, comment: Box<[u8]>) {
+        self.comment = comment;
+    }
 }
 
 impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
