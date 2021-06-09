@@ -67,7 +67,9 @@ impl Session {
         credentials: Credentials,
         cache: Option<Cache>,
     ) -> Result<Session, SessionError> {
-        let ap = apresolve(config.proxy.as_ref(), config.ap_port).await;
+        let ap = apresolve(config.proxy.as_ref(), config.ap_port)
+            .await
+            .accesspoint;
 
         info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
         let mut conn = connection::connect(&ap.0, ap.1, config.proxy.as_ref()).await?;
