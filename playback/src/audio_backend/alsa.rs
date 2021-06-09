@@ -2,9 +2,9 @@ use super::{Open, Sink, SinkAsBytes};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLES_PER_SECOND, SAMPLE_RATE};
+use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use alsa::device_name::HintIter;
-use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
+use alsa::pcm::{Access, Format, HwParams, PCM};
 use alsa::{Direction, Error, ValueOr};
 use std::cmp::min;
 use std::ffi::CString;
@@ -12,14 +12,15 @@ use std::io;
 use std::process::exit;
 use std::time::Duration;
 
-const BUFFERED_LATENCY: Duration = Duration::from_millis(125);
-const BUFFERED_PERIODS: Frames = 4;
+// 125 ms Period time * 4 periods = 0.5 sec buffer.
+const PERIOD_TIME: Duration = Duration::from_millis(125);
+const NUM_PERIODS: u32 = 4;
 
 pub struct AlsaSink {
     pcm: Option<PCM>,
     format: AudioFormat,
     device: String,
-    buffer: Vec<u8>,
+    period_buffer: Vec<u8>,
 }
 
 fn list_outputs() {
@@ -39,7 +40,7 @@ fn list_outputs() {
     }
 }
 
-fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box<Error>> {
+fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Box<Error>> {
     let pcm = PCM::new(dev_name, Direction::Playback, false)?;
     let alsa_format = match format {
         AudioFormat::F64 => Format::float64(),
@@ -54,28 +55,30 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box
         AudioFormat::S24_3 => Format::S243BE,
     };
 
-    // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8
-    // latency = period_size * periods / (rate * bytes_per_frame)
-    // For stereo samples encoded as 32-bit float, one frame has a length of eight bytes.
-    let mut period_size = ((SAMPLES_PER_SECOND * format.size() as u32) as f32
-        * (BUFFERED_LATENCY.as_secs_f32() / BUFFERED_PERIODS as f32))
-        as Frames;
-    {
+    let bytes_per_period = {
         let hwp = HwParams::any(&pcm)?;
         hwp.set_access(Access::RWInterleaved)?;
         hwp.set_format(alsa_format)?;
         hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest)?;
         hwp.set_channels(NUM_CHANNELS as u32)?;
-        period_size = hwp.set_period_size_near(period_size, ValueOr::Greater)?;
-        hwp.set_buffer_size_near(period_size * BUFFERED_PERIODS)?;
+        // Deal strictly in time and periods.
+        hwp.set_periods(NUM_PERIODS, ValueOr::Nearest)?;
+        hwp.set_period_time_near(PERIOD_TIME.as_micros() as u32, ValueOr::Nearest)?;
         pcm.hw_params(&hwp)?;
 
         let swp = pcm.sw_params_current()?;
-        swp.set_start_threshold(hwp.get_buffer_size()? - hwp.get_period_size()?)?;
-        pcm.sw_params(&swp)?;
-    }
+        // Don't assume we got what we wanted.
+        // Ask to make sure.
+        let frames_per_period = hwp.get_period_size()?;
 
-    Ok((pcm, period_size))
+        swp.set_start_threshold(hwp.get_buffer_size()? - frames_per_period)?;
+        pcm.sw_params(&swp)?;
+
+        // Let ALSA do the math for us.
+        pcm.frames_to_bytes(frames_per_period) as usize
+    };
+
+    Ok((pcm, bytes_per_period))
 }
 
 impl Open for AlsaSink {
@@ -97,7 +100,7 @@ impl Open for AlsaSink {
             pcm: None,
             format,
             device: name,
-            buffer: vec![],
+            period_buffer: vec![],
         }
     }
 }
@@ -107,12 +110,9 @@ impl Sink for AlsaSink {
         if self.pcm.is_none() {
             let pcm = open_device(&self.device, self.format);
             match pcm {
-                Ok((p, period_size)) => {
+                Ok((p, bytes_per_period)) => {
                     self.pcm = Some(p);
-                    // Create a buffer for all samples for a full period
-                    self.buffer = Vec::with_capacity(
-                        period_size as usize * BUFFERED_PERIODS as usize * self.format.size(),
-                    );
+                    self.period_buffer = Vec::with_capacity(bytes_per_period);
                 }
                 Err(e) => {
                     error!("Alsa error PCM open {}", e);
@@ -147,15 +147,15 @@ impl SinkAsBytes for AlsaSink {
         let mut processed_data = 0;
         while processed_data < data.len() {
             let data_to_buffer = min(
-                self.buffer.capacity() - self.buffer.len(),
+                self.period_buffer.capacity() - self.period_buffer.len(),
                 data.len() - processed_data,
             );
-            self.buffer
+            self.period_buffer
                 .extend_from_slice(&data[processed_data..processed_data + data_to_buffer]);
             processed_data += data_to_buffer;
-            if self.buffer.len() == self.buffer.capacity() {
+            if self.period_buffer.len() == self.period_buffer.capacity() {
                 self.write_buf();
-                self.buffer.clear();
+                self.period_buffer.clear();
             }
         }
 
@@ -169,7 +169,7 @@ impl AlsaSink {
     fn write_buf(&mut self) {
         let pcm = self.pcm.as_mut().unwrap();
         let io = pcm.io_bytes();
-        match io.writei(&self.buffer) {
+        match io.writei(&self.period_buffer) {
             Ok(_) => (),
             Err(err) => pcm.try_recover(err, false).unwrap(),
         };
