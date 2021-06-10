@@ -20,7 +20,7 @@ const FALLBACK_PORT: u16 = 443;
 
 pub type SocketAddress = (String, u16);
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 struct ApResolveData {
     accesspoint: Vec<String>,
     dealer: Vec<String>,
@@ -34,7 +34,7 @@ pub struct AccessPoints {
     pub spclient: SocketAddress,
 }
 
-fn select_ap(data: Vec<String>, ap_port: Option<u16>) -> Result<SocketAddress, Box<dyn Error>> {
+fn select_ap(data: Vec<String>, fallback: &str, ap_port: Option<u16>) -> SocketAddress {
     let port = ap_port.unwrap_or(FALLBACK_PORT);
 
     let mut aps = data.into_iter().filter_map(|ap| {
@@ -51,10 +51,9 @@ fn select_ap(data: Vec<String>, ap_port: Option<u16>) -> Result<SocketAddress, B
         aps.find(|(_, p)| *p == port)
     } else {
         aps.next()
-    }
-    .ok_or("no valid AP in list")?;
+    };
 
-    Ok(ap)
+    ap.unwrap_or_else(|| (String::from(fallback), port))
 }
 
 async fn try_apresolve(proxy: Option<&Url>) -> Result<ApResolveData, Box<dyn Error>> {
@@ -87,19 +86,12 @@ async fn try_apresolve(proxy: Option<&Url>) -> Result<ApResolveData, Box<dyn Err
 pub async fn apresolve(proxy: Option<&Url>, ap_port: Option<u16>) -> AccessPoints {
     let data = try_apresolve(proxy).await.unwrap_or_else(|e| {
         warn!("Failed to resolve access points: {}, using fallbacks.", e);
-        ApResolveData {
-            accesspoint: vec![],
-            dealer: vec![],
-            spclient: vec![],
-        }
+        ApResolveData::default()
     });
 
-    let accesspoint = select_ap(data.accesspoint, ap_port)
-        .unwrap_or_else(|_| (String::from(AP_FALLBACK), FALLBACK_PORT));
-    let dealer = select_ap(data.dealer, ap_port)
-        .unwrap_or_else(|_| (String::from(DEALER_FALLBACK), FALLBACK_PORT));
-    let spclient = select_ap(data.spclient, ap_port)
-        .unwrap_or_else(|_| (String::from(SPCLIENT_FALLBACK), FALLBACK_PORT));
+    let accesspoint = select_ap(data.accesspoint, AP_FALLBACK, ap_port);
+    let dealer = select_ap(data.dealer, DEALER_FALLBACK, ap_port);
+    let spclient = select_ap(data.spclient, SPCLIENT_FALLBACK, ap_port);
 
     AccessPoints {
         accesspoint,
