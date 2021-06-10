@@ -8,6 +8,7 @@ use librespot_protocol as protocol;
 #[macro_use]
 mod component;
 
+mod apresolve;
 pub mod audio_key;
 pub mod authentication;
 pub mod cache;
@@ -27,17 +28,3 @@ pub mod spotify_id;
 #[doc(hidden)]
 pub mod util;
 pub mod version;
-
-fn ap_fallback() -> (String, u16) {
-    (String::from("ap.spotify.com"), 443)
-}
-
-#[cfg(feature = "apresolve")]
-mod apresolve;
-
-#[cfg(not(feature = "apresolve"))]
-mod apresolve {
-    pub async fn apresolve(_: Option<&url::Url>, _: Option<u16>) -> (String, u16) {
-        super::ap_fallback()
-    }
-}
