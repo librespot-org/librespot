@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsamixer`: make `--volume-ctrl {linear|log}` work as expected
 - [playback] `alsa`, `gstreamer`, `pulseaudio`: always output in native endianness
 - [playback] `alsa`: revert buffer size to ~500 ms
+- [playback] `alsa`: better error handling
+- [playback] `player`: exit of fatal errors
 
 ## [0.2.0] - 2021-05-04
 
