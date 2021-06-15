@@ -7,7 +7,6 @@ use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, HwParams, PCM};
 use alsa::{Direction, ValueOr};
 use std::cmp::min;
-use std::ffi::CString;
 use std::io;
 use std::process::exit;
 use std::time::Duration;
@@ -56,21 +55,31 @@ pub struct AlsaSink {
     period_buffer: Vec<u8>,
 }
 
-fn list_outputs() {
+fn list_outputs() -> io::Result<()> {
+    println!("Listing available Alsa outputs:");
     for t in &["pcm", "ctl", "hwdep"] {
         println!("{} devices:", t);
-        let i = HintIter::new(None, &*CString::new(*t).unwrap()).unwrap();
+        let i = match HintIter::new_str(None, &t) {
+            Ok(i) => i,
+            Err(e) => {
+                return Err(io::Error::new(io::ErrorKind::Other, e));
+            }
+        };
         for a in i {
             if let Some(Direction::Playback) = a.direction {
                 // mimic aplay -L
-                println!(
-                    "{}\n\t{}\n",
-                    a.name.unwrap(),
-                    a.desc.unwrap().replace("\n", "\n\t")
-                );
+                let name = a
+                    .name
+                    .ok_or(io::Error::new(io::ErrorKind::Other, "Could not parse name"))?;
+                let desc = a
+                    .desc
+                    .ok_or(io::Error::new(io::ErrorKind::Other, "Could not parse desc"))?;
+                println!("{}\n\t{}\n", name, desc.replace("\n", "\n\t"));
             }
         }
     }
+
+    Ok(())
 }
 
 fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), AlsaError> {
@@ -162,18 +171,22 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Alsa
 
 impl Open for AlsaSink {
     fn open(device: Option<String>, format: AudioFormat) -> Self {
-        info!("Using Alsa sink with format: {:?}", format);
-
         let name = match device.as_deref() {
-            Some("?") => {
-                println!("Listing available Alsa outputs:");
-                list_outputs();
-                exit(0)
-            }
+            Some("?") => match list_outputs() {
+                Ok(_) => {
+                    exit(0);
+                }
+                Err(err) => {
+                    error!("Error listing Alsa outputs, {}", err);
+                    exit(1);
+                }
+            },
             Some(device) => device,
             None => "default",
         }
         .to_string();
+
+        info!("Using AlsaSink with format: {}", format);
 
         Self {
             pcm: None,
