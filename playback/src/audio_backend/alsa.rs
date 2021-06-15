@@ -17,34 +17,34 @@ const PERIOD_TIME: Duration = Duration::from_millis(125);
 const NUM_PERIODS: u32 = 4;
 
 #[derive(Debug, Error)]
-pub enum AlsaError {
-    #[error("Device {device} may be invalid or busy, {err}")]
+enum AlsaError {
+    #[error("AlsaSink, device {device} may be invalid or busy, {err}")]
     PCMSetUpError { device: String, err: alsa::Error },
-    #[error("Device {device} Unsupported access type: RWInterleaved, {err}")]
+    #[error("AlsaSink, device {device} unsupported access type RWInterleaved, {err}")]
     UnsupportedAccessTypeError { device: String, err: alsa::Error },
-    #[error("Device {device} Unsupported format {format}, {err}")]
+    #[error("AlsaSink, device {device} unsupported format {format}, {err}")]
     UnsupportedFormatError {
         device: String,
         format: AudioFormat,
         err: alsa::Error,
     },
-    #[error("Device {device} Unsupported sample rate {samplerate}, {err}")]
+    #[error("AlsaSink, device {device} unsupported sample rate {samplerate}, {err}")]
     UnsupportedSampleRateError {
         device: String,
         samplerate: u32,
         err: alsa::Error,
     },
-    #[error("Device {device} Unsupported channel count {channel_count}, {err}")]
+    #[error("AlsaSink, device {device} unsupported channel count {channel_count}, {err}")]
     UnsupportedChannelCountError {
         device: String,
         channel_count: u8,
         err: alsa::Error,
     },
-    #[error("Alsa Hardware Parameters Error: {0}")]
+    #[error("AlsaSink Hardware Parameters Error, {0}")]
     HwParamsError(alsa::Error),
-    #[error("Alsa Software Parameters Error: {0}")]
+    #[error("AlsaSink Software Parameters Error, {0}")]
     SwParamsError(alsa::Error),
-    #[error("Alsa PCM Error: {0}")]
+    #[error("AlsaSink PCM Error, {0}")]
     PCMError(alsa::Error),
 }
 
@@ -268,15 +268,23 @@ impl AlsaSink {
             "Error writing from AlsaSink buffer to PCM, PCM is None",
         ))?;
         let io = pcm.io_bytes();
-        match io.writei(&self.period_buffer) {
-            Ok(_) => (),
-            Err(err) => pcm.try_recover(err, false).map_err(|e| {
+        if let Err(err) = io.writei(&self.period_buffer) {
+            // Capture and log the original error as a warning, and then try to recover.
+            // If recovery fails then forward that error back to player.
+            warn!(
+                "Error writing from AlsaSink buffer to PCM, trying to recover {}",
+                err
+            );
+            pcm.try_recover(err, false).map_err(|e| {
                 io::Error::new(
                     io::ErrorKind::Other,
-                    format!("Error writing from AlsaSink buffer to PCM, {}", e),
+                    format!(
+                        "Error writing from AlsaSink buffer to PCM, recovery failed {}",
+                        e
+                    ),
                 )
-            })?,
-        };
+            })?
+        }
 
         Ok(())
     }

@@ -1059,7 +1059,6 @@ impl PlayerInternal {
             match self.sink.start() {
                 Ok(()) => self.sink_status = SinkStatus::Running,
                 Err(err) => {
-                    // Fatal error, time to bail.
                     error!("Fatal error, could not start audio sink: {}", err);
                     exit(1);
                 }
