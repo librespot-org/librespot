@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsamixer`: complete rewrite (breaking)
 - [playback] `alsamixer`: query card dB range for the `log` volume control unless specified otherwise
 - [playback] `alsamixer`: use `--device` name for `--mixer-card` unless specified otherwise
+- [playback] `player`: consider errors in `sink.start`, `sink.stop` and `sink.write` fatal and `exit(1)` (breaking)
 
 ### Deprecated
 - [connect] The `discovery` module was deprecated in favor of the `librespot-discovery` crate
@@ -43,7 +44,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsa`, `gstreamer`, `pulseaudio`: always output in native endianness
 - [playback] `alsa`: revert buffer size to ~500 ms
 - [playback] `alsa`: better error handling
-- [playback] `player`: exit on fatal errors
 
 ## [0.2.0] - 2021-05-04
 
