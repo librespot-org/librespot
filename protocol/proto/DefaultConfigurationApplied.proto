@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DefaultConfigurationApplied {
+    optional string installation_id = 1;
+    optional string configuration_assignment_id = 2;
+    optional string rc_client_id = 3;
+    optional string rc_client_version = 4;
+    optional string platform = 5;
+    optional string fetch_type = 6;
+    optional string reason = 7;
+}

@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.storylines.v1;
+
+option java_multiple_files = true;
+option java_outer_classname = "StorylinesProto";
+option java_package = "com.spotify.storylines.v1.extended_metadata";
+
+message Artist {
+    string uri = 1;
+    string name = 2;
+    string avatar_cdn_url = 3;
+}
+
+message Card {
+    string id = 1;
+    string image_cdn_url = 2;
+    int32 image_width = 3;
+    int32 image_height = 4;
+}
+
+message Storyline {
+    string id = 1;
+    string entity_uri = 2;
+    Artist artist = 3;
+    repeated Card cards = 4;
+}

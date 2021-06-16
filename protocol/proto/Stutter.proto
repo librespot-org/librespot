@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message Stutter {
+    optional bytes file_id = 1;
+    optional bytes playback_id = 2;
+    optional string track = 3;
+    optional int64 buffer_size = 4;
+    optional int64 max_buffer_size = 5;
+    optional int64 file_byte_offset = 6;
+    optional int64 file_byte_total = 7;
+    optional int64 target_buffer = 8;
+    optional string audio_driver = 9;
+}

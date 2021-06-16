@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.podcast_paywalls_cosmos.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PodcastPaywallsShowSubscriptionRequest {
+    string show_uri = 1;
+}
+
+message PodcastPaywallsShowSubscriptionResponse {
+    bool is_user_subscribed = 1;
+}

@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message InstallationEntity {
+    int32 file_format_version = 1;
+    bytes encrypted_part = 2;
+}
+
+message InstallationData {
+    string installation_id = 1;
+    string last_seen_device_id = 2;
+    int64 monotonic_clock_id = 3;
+}

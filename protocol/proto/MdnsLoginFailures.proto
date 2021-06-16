@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message MdnsLoginFailures {
+    optional string device_id = 1;
+    optional int64 error_code = 2;
+    optional string response_body = 3;
+    optional string request = 4;
+    optional int64 esdk_internal_error_code = 5;
+    optional string context = 6;
+}

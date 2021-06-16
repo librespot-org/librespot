@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConfigurationFetchedNonAuth {
+    optional int64 last_rcs_fetch_time = 1;
+    optional string installation_id = 2;
+    optional string configuration_assignment_id = 3;
+    optional string property_set_id = 4;
+    optional string attributes_set_id = 5;
+    optional string rc_client_id = 6;
+    optional string rc_client_version = 7;
+    optional string rc_sdk_version = 8;
+    optional string platform = 9;
+    optional string fetch_type = 10;
+    optional int64 latency = 11;
+    optional int64 payload_size = 12;
+    optional int32 status_code = 13;
+    optional string error_reason = 14;
+    optional string error_message = 15;
+    optional string error_reason_configuration_resolve = 16;
+    optional string error_message_configuration_resolve = 17;
+    optional string error_reason_account_attributes = 18;
+    optional string error_message_account_attributes = 19;
+    optional int32 error_code_account_attributes = 20;
+    optional int32 error_code_configuration_resolve = 21;
+}

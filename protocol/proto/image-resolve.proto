@@ -1,0 +1,33 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.imageresolve.proto;
+
+option java_multiple_files = true;
+option java_outer_classname = "ImageResolveProtos";
+option java_package = "com.spotify.imageresolve.proto";
+
+message Collection {
+    bytes id = 1;
+    
+    repeated Projection projections = 2;
+    message Projection {
+        bytes id = 2;
+        int32 metadata_index = 3;
+        int32 url_template_index = 4;
+    }
+}
+
+message ProjectionMetadata {
+    int32 width = 2;
+    int32 height = 3;
+    bool fetch_online = 4;
+    bool download_for_offline = 5;
+}
+
+message ProjectionMap {
+    repeated string url_templates = 1;
+    repeated ProjectionMetadata projection_metas = 2;
+    repeated Collection collections = 3;
+}

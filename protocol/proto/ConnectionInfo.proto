@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConnectionInfo {
+    optional string ap = 1;
+    optional string proxy = 2;
+    optional bool user_initated_login = 3;
+    optional string reachability_type = 4;
+    optional string web_installer_unique_id = 5;
+    optional string ap_resolve_source = 6;
+    optional string address_type = 7;
+    optional bool ipv6_failed = 8;
+}

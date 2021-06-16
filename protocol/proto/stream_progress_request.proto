@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+import "stream_handle.proto";
+
+option objc_class_prefix = "ESP";
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+message StreamProgressRequest {
+    StreamHandle stream_handle = 1;
+    uint64 current_position = 2;
+    bool is_paused = 3;
+    bool is_playing_video = 4;
+    bool is_overlapping = 5;
+    bool is_background = 6;
+    bool is_fullscreen = 7;
+    bool is_external = 8;
+    double playback_speed = 9;
+}

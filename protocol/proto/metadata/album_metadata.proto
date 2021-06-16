@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.cosmos_util.proto;
+
+import "metadata/image_group.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.proto";
+
+message AlbumArtistMetadata {
+    optional string link = 1;
+    optional string name = 2;
+}
+
+message AlbumMetadata {
+    repeated AlbumArtistMetadata artists = 1;
+    optional string link = 2;
+    optional string name = 3;
+    repeated string copyright = 4;
+    optional ImageGroup covers = 5;
+    optional uint32 year = 6;
+    optional uint32 num_discs = 7;
+    optional uint32 num_tracks = 8;
+    optional bool playability = 9;
+    optional bool is_premium_only = 10;
+}

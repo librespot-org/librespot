@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConnectMdnsPacketParseError {
+    optional string type = 1;
+    optional string buffer = 2;
+    optional string ttl = 3;
+    optional string txt = 4;
+    optional string host = 5;
+    optional string discovery_name = 6;
+    optional string context = 7;
+}

@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.collection_platform.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CollectionPlatformSimpleRequest {
+    CollectionSet set = 1;
+}
+
+message CollectionPlatformItemsRequest {
+    CollectionSet set = 1;
+    repeated string items = 2;
+}
+
+enum CollectionSet {
+    UNKNOWN = 0;
+    SHOW = 1;
+    BAN = 2;
+    LISTENLATER = 3;
+    IGNOREINRECS = 4;
+}

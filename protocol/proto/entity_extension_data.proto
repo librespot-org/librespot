@@ -1,0 +1,39 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.extendedmetadata;
+
+import "google/protobuf/any.proto";
+
+option cc_enable_arenas = true;
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.extendedmetadata.proto";
+
+message EntityExtensionDataHeader {
+    int32 status_code = 1;
+    string etag = 2;
+    string locale = 3;
+    int64 cache_ttl_in_seconds = 4;
+    int64 offline_ttl_in_seconds = 5;
+}
+
+message EntityExtensionData {
+    EntityExtensionDataHeader header = 1;
+    string entity_uri = 2;
+    google.protobuf.Any extension_data = 3;
+}
+
+message PlainListAssoc {
+    repeated string entity_uri = 1;
+}
+
+message AssocHeader {
+    
+}
+
+message Assoc {
+    AssocHeader header = 1;
+    PlainListAssoc plain_list = 2;
+}

@@ -1,4 +1,4 @@
-// extracted 2021-05-09
+// Extracted from: Spotify 1.1.61.583 (Windows)
 
 syntax = "proto2";
 
@@ -34,7 +34,7 @@ message Album {
     optional bytes gid = 1;
     optional string name = 2;
     repeated Artist artist = 3;
-
+    
     optional Type type = 4;
     enum Type {
         ALBUM = 1;
@@ -44,7 +44,7 @@ message Album {
         AUDIOBOOK = 5;
         PODCAST = 6;
     }
-
+    
     optional string label = 5;
     optional Date date = 6;
     optional sint32 popularity = 7;
@@ -95,7 +95,7 @@ message Track {
 message ArtistWithRole {
     optional bytes artist_gid = 1;
     optional string artist_name = 2;
-
+    
     optional ArtistRole role = 3;
     enum ArtistRole {
         ARTIST_ROLE_UNKNOWN = 0;
@@ -122,21 +122,21 @@ message Show {
     repeated Copyright copyright = 71;
     repeated Restriction restriction = 72;
     repeated string keyword = 73;
-
+    
     optional MediaType media_type = 74;
     enum MediaType {
         MIXED = 0;
         AUDIO = 1;
         VIDEO = 2;
     }
-
+    
     optional ConsumptionOrder consumption_order = 75;
     enum ConsumptionOrder {
         SEQUENTIAL = 1;
         EPISODIC = 2;
         RECENT = 3;
     }
-
+    
     repeated Availability availability = 78;
     optional string trailer_uri = 83;
     optional bool music_and_talk = 85;
@@ -164,14 +164,14 @@ message Episode {
     optional bool allow_background_playback = 81;
     repeated Availability availability = 82;
     optional string external_url = 83;
-
+    
     optional EpisodeType type = 87;
     enum EpisodeType {
         FULL = 0;
         TRAILER = 1;
         BONUS = 2;
     }
-
+    
     optional bool music_and_talk = 91;
 }
 
@@ -204,7 +204,7 @@ message Date {
 
 message Image {
     optional bytes file_id = 1;
-
+    
     optional Size size = 2;
     enum Size {
         DEFAULT = 0;
@@ -212,7 +212,7 @@ message Image {
         LARGE = 2;
         XLARGE = 3;
     }
-
+    
     optional sint32 width = 3;
     optional sint32 height = 4;
 }
@@ -239,7 +239,7 @@ message Copyright {
         P = 0;
         C = 1;
     }
-
+    
     optional string text = 2;
 }
 
@@ -252,14 +252,14 @@ message Restriction {
         SHUFFLE = 3;
         COMMERCIAL = 4;
     }
-
+    
     optional Type type = 4;
     enum Type {
         STREAMING = 0;
     }
-
+    
     repeated string catalogue_str = 5;
-
+    
     oneof country_restriction {
         string countries_allowed = 2;
         string countries_forbidden = 3;
@@ -284,7 +284,7 @@ message ExternalId {
 
 message AudioFile {
     optional bytes file_id = 1;
-
+    
     optional Format format = 2;
     enum Format {
         OGG_VORBIS_96 = 0;

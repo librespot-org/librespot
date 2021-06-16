@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message PlayOptions {
+    Reason reason = 1;
+    enum Reason {
+        INTERACTIVE = 0;
+        REMOTE_TRANSFER = 1;
+        LICENSE_CHANGE = 2;
+    }
+    
+    Operation operation = 2;
+    enum Operation {
+        REPLACE = 0;
+        ENQUEUE = 1;
+        PUSH = 2;
+    }
+    
+    Trigger trigger = 3;
+    enum Trigger {
+        IMMEDIATELY = 0;
+        ADVANCED_PAST_TRACK = 1;
+        ADVANCED_PAST_CONTEXT = 2;
+    }
+}

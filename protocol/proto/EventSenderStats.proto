@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message EventSenderStats {
+    map<string, int64> storage_size = 1;
+    map<string, int64> sequence_number_min = 2;
+    map<string, int64> sequence_number_next = 3;
+}

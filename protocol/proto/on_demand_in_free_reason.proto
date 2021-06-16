@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.on_demand_set.proto;
+
+option optimize_for = CODE_SIZE;
+
+enum OnDemandInFreeReason {
+    UNKNOWN = 0;
+    NOT_ON_DEMAND = 1;
+    ON_DEMAND = 2;
+    ON_DEMAND_EPISODES_ONLY = 3;
+}

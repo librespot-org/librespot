@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message TrackNotPlayed {
+    optional bytes playback_id = 1;
+    optional string source_start = 2;
+    optional string reason_start = 3;
+    optional string source_end = 4;
+    optional string reason_end = 5;
+    optional string play_context = 6;
+    optional string play_track = 7;
+    optional string display_track = 8;
+    optional string provider = 9;
+    optional string referer = 10;
+    optional string referrer_version = 11;
+    optional string referrer_vendor = 12;
+    optional string gaia_dev_id = 13;
+    optional string reason_not_played = 14;
+}

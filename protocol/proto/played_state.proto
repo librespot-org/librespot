@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.played_state.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PlayedStateItem {
+    optional string show_uri = 1;
+    optional string episode_uri = 2;
+    optional int32 resume_point = 3;
+    optional int32 last_played_at = 4;
+    optional bool is_latest = 5;
+    optional bool has_been_fully_played = 6;
+    optional bool has_been_synced = 7;
+    optional int32 episode_length = 8;
+}
+
+message PlayedStateItems {
+    repeated PlayedStateItem item = 1;
+    optional uint64 last_server_sync_timestamp = 2;
+}

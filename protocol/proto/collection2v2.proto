@@ -1,0 +1,62 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.collection.proto.v2;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.collection2.v2.proto";
+
+message PageRequest {
+    string username = 1;
+    string set = 2;
+    string pagination_token = 3;
+    int32 limit = 4;
+}
+
+message CollectionItem {
+    string uri = 1;
+    int32 added_at = 2;
+    bool is_removed = 3;
+}
+
+message PageResponse {
+    repeated CollectionItem items = 1;
+    string next_page_token = 2;
+    string sync_token = 3;
+}
+
+message DeltaRequest {
+    string username = 1;
+    string set = 2;
+    string last_sync_token = 3;
+}
+
+message DeltaResponse {
+    bool delta_update_possible = 1;
+    repeated CollectionItem items = 2;
+    string sync_token = 3;
+}
+
+message WriteRequest {
+    string username = 1;
+    string set = 2;
+    repeated CollectionItem items = 3;
+    string client_update_id = 4;
+}
+
+message PubSubUpdate {
+    string username = 1;
+    string set = 2;
+    repeated CollectionItem items = 3;
+    string client_update_id = 4;
+}
+
+message InitializedRequest {
+    string username = 1;
+    string set = 2;
+}
+
+message InitializedResponse {
+    bool initialized = 1;
+}

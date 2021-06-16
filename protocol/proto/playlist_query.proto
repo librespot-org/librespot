@@ -1,0 +1,63 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playlist.esperanto.proto";
+
+message PlaylistRange {
+    int32 start = 1;
+    int32 length = 2;
+}
+
+message PlaylistQuery {
+    repeated BoolPredicate bool_predicates = 1;
+    enum BoolPredicate {
+        NO_FILTER = 0;
+        AVAILABLE = 1;
+        AVAILABLE_OFFLINE = 2;
+        ARTIST_NOT_BANNED = 3;
+        NOT_BANNED = 4;
+        NOT_EXPLICIT = 5;
+        NOT_EPISODE = 6;
+    }
+    
+    string text_filter = 2;
+    
+    SortBy sort_by = 3;
+    enum SortBy {
+        NO_SORT = 0;
+        ALBUM_ARTIST_NAME_ASC = 1;
+        ALBUM_ARTIST_NAME_DESC = 2;
+        TRACK_NUMBER_ASC = 3;
+        TRACK_NUMBER_DESC = 4;
+        DISC_NUMBER_ASC = 5;
+        DISC_NUMBER_DESC = 6;
+        ALBUM_NAME_ASC = 7;
+        ALBUM_NAME_DESC = 8;
+        ARTIST_NAME_ASC = 9;
+        ARTIST_NAME_DESC = 10;
+        NAME_ASC = 11;
+        NAME_DESC = 12;
+        ADD_TIME_ASC = 13;
+        ADD_TIME_DESC = 14;
+    }
+    
+    PlaylistRange range = 4;
+    int32 update_throttling_ms = 5;
+    bool group = 6;
+    PlaylistSourceRestriction source_restriction = 7;
+    bool show_unavailable = 8;
+    bool always_show_windowed = 9;
+    bool load_recommendations = 10;
+}
+
+enum PlaylistSourceRestriction {
+    NO_RESTRICTION = 0;
+    RESTRICT_SOURCE_TO_50 = 1;
+    RESTRICT_SOURCE_TO_500 = 2;
+}

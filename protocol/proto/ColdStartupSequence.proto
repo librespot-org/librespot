@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ColdStartupSequence {
+    optional string terminal_state = 1;
+    map<string, int64> steps = 2;
+    map<string, string> metadata = 3;
+    optional string connection_type = 4;
+    optional string initial_application_state = 5;
+    optional string terminal_application_state = 6;
+    optional string view_load_sequence_id = 7;
+    optional int32 device_year_class = 8;
+    map<string, int64> subdurations = 9;
+}

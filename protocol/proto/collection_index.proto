@@ -1,0 +1,40 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.collection.proto;
+
+option optimize_for = CODE_SIZE;
+
+message IndexRepairerState {
+    bytes last_checked_uri = 1;
+    int64 last_full_check_finished_at = 2;
+}
+
+message CollectionTrackEntry {
+    string track_uri = 1;
+    string track_name = 2;
+    string album_uri = 3;
+    string album_name = 4;
+    int32 disc_number = 5;
+    int32 track_number = 6;
+    string artist_uri = 7;
+    repeated string artist_name = 8;
+    int64 add_time = 9;
+}
+
+message CollectionAlbumEntry {
+    string album_uri = 1;
+    string album_name = 2;
+    string album_image_uri = 3;
+    string artist_uri = 4;
+    string artist_name = 5;
+    int64 add_time = 6;
+}
+
+message CollectionMetadataMigratorState {
+    bytes last_checked_key = 1;
+    bool migrated_tracks = 2;
+    bool migrated_albums = 3;
+    bool migrated_album_tracks = 4;
+}

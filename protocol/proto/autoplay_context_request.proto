@@ -1,0 +1,12 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AutoplayContextRequest {
+    required string context_uri = 1;
+    repeated string recent_track_uri = 2;
+}
