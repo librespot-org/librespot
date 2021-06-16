@@ -1070,14 +1070,21 @@ impl PlayerInternal {
         match self.sink_status {
             SinkStatus::Running => {
                 trace!("== Stopping sink ==");
-                self.sink.stop().unwrap();
-                self.sink_status = if temporarily {
-                    SinkStatus::TemporarilyClosed
-                } else {
-                    SinkStatus::Closed
-                };
-                if let Some(callback) = &mut self.sink_event_callback {
-                    callback(self.sink_status);
+                match self.sink.stop() {
+                    Ok(()) => {
+                        self.sink_status = if temporarily {
+                            SinkStatus::TemporarilyClosed
+                        } else {
+                            SinkStatus::Closed
+                        };
+                        if let Some(callback) = &mut self.sink_event_callback {
+                            callback(self.sink_status);
+                        }
+                    }
+                    Err(err) => {
+                        error!("Fatal error, could not stop audio sink: {}", err);
+                        exit(1);
+                    }
                 }
             }
             SinkStatus::TemporarilyClosed => {
