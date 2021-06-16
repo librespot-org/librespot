@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsa`, `gstreamer`, `pulseaudio`: always output in native endianness
 - [playback] `alsa`: revert buffer size to ~500 ms
 - [playback] `alsa`: better error handling
-- [playback] `player`: exit of fatal errors
+- [playback] `player`: exit on fatal errors
 
 ## [0.2.0] - 2021-05-04
 
