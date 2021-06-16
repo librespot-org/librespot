@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.33.569 (Windows)
+
+syntax = "proto3";
+
+package spotify.login5.v3;
+
+option objc_class_prefix = "SPTLogin5";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.login5.v3.proto";
+
+message ClientInfo {
+    string client_id = 1;
+    string device_id = 2;
+}
