@@ -22,7 +22,7 @@ enum AlsaError {
     PCMSetUpError { device: String, err: alsa::Error },
     #[error("AlsaSink, device {device} unsupported access type RWInterleaved, {err}")]
     UnsupportedAccessTypeError { device: String, err: alsa::Error },
-    #[error("AlsaSink, device {device} unsupported format {format}, {err}")]
+    #[error("AlsaSink, device {device} unsupported format {format:?}, {err}")]
     UnsupportedFormatError {
         device: String,
         format: AudioFormat,
@@ -186,7 +186,7 @@ impl Open for AlsaSink {
         }
         .to_string();
 
-        info!("Using AlsaSink with format: {}", format);
+        info!("Using AlsaSink with format: {:?}", format);
 
         Self {
             pcm: None,
@@ -200,10 +200,9 @@ impl Open for AlsaSink {
 impl Sink for AlsaSink {
     fn start(&mut self) -> io::Result<()> {
         if self.pcm.is_none() {
-            let pcm = open_device(&self.device, self.format);
-            match pcm {
-                Ok((p, bytes_per_period)) => {
-                    self.pcm = Some(p);
+            match open_device(&self.device, self.format) {
+                Ok((pcm, bytes_per_period)) => {
+                    self.pcm = Some(pcm);
                     self.period_buffer = Vec::with_capacity(bytes_per_period);
                 }
                 Err(e) => {

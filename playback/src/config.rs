@@ -2,7 +2,6 @@ use super::player::db_to_ratio;
 use crate::convert::i24;
 pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
 
-use std::fmt;
 use std::mem;
 use std::str::FromStr;
 use std::time::Duration;
@@ -40,19 +39,6 @@ pub enum AudioFormat {
     S24,
     S24_3,
     S16,
-}
-
-impl fmt::Display for AudioFormat {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            AudioFormat::F64 => write!(f, "F64"),
-            AudioFormat::F32 => write!(f, "F32"),
-            AudioFormat::S32 => write!(f, "S32"),
-            AudioFormat::S24 => write!(f, "S24"),
-            AudioFormat::S24_3 => write!(f, "S24_3"),
-            AudioFormat::S16 => write!(f, "S16"),
-        }
-    }
 }
 
 impl FromStr for AudioFormat {
