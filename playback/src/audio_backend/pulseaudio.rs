@@ -12,39 +12,36 @@ const STREAM_NAME: &str = "Spotify endpoint";
 
 pub struct PulseAudioSink {
     s: Option<Simple>,
-    ss: pulse::sample::Spec,
     device: Option<String>,
     format: AudioFormat,
+    pulse_format: pulse::sample::Format,
 }
 
 impl Open for PulseAudioSink {
     fn open(device: Option<String>, format: AudioFormat) -> Self {
-        info!("Using PulseAudio sink with format: {:?}", format);
+        let mut actual_format = format;
+        if actual_format == AudioFormat::F64 {
+            warn!("PulseAudio currently does not support F64 output, falling back to F32");
+            actual_format = AudioFormat::F32;
+        }
 
         // PulseAudio calls S24 and S24_3 different from the rest of the world
-        let pulse_format = match format {
+        let pulse_format = match actual_format {
             AudioFormat::F32 => pulse::sample::Format::FLOAT32NE,
             AudioFormat::S32 => pulse::sample::Format::S32NE,
             AudioFormat::S24 => pulse::sample::Format::S24_32NE,
             AudioFormat::S24_3 => pulse::sample::Format::S24NE,
             AudioFormat::S16 => pulse::sample::Format::S16NE,
-            _ => {
-                unimplemented!("PulseAudio currently does not support {:?} output", format)
-            }
+            _ => unreachable!(),
         };
 
-        let ss = pulse::sample::Spec {
-            format: pulse_format,
-            channels: NUM_CHANNELS,
-            rate: SAMPLE_RATE,
-        };
-        debug_assert!(ss.is_valid());
+        info!("Using PulseAudio sink with format: {:?}", actual_format);
 
         Self {
             s: None,
-            ss,
             device,
-            format,
+            format: actual_format,
+            pulse_format: pulse_format,
         }
     }
 }
@@ -55,6 +52,19 @@ impl Sink for PulseAudioSink {
             return Ok(());
         }
 
+        let ss = pulse::sample::Spec {
+            format: self.pulse_format,
+            channels: NUM_CHANNELS,
+            rate: SAMPLE_RATE,
+        };
+
+        if !ss.is_valid() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Invalid PulseAudio sample spec",
+            ));
+        }
+
         let device = self.device.as_deref();
         let result = Simple::new(
             None,                // Use the default server.
@@ -62,7 +72,7 @@ impl Sink for PulseAudioSink {
             Direction::Playback, // Direction.
             device,              // Our device (sink) name.
             STREAM_NAME,         // Description of our stream.
-            &self.ss,            // Our sample format.
+            &ss,                 // Our sample format.
             None,                // Use default channel map.
             None,                // Use default buffering attributes.
         );
@@ -71,10 +81,7 @@ impl Sink for PulseAudioSink {
                 self.s = Some(s);
                 Ok(())
             }
-            Err(e) => Err(io::Error::new(
-                io::ErrorKind::ConnectionRefused,
-                e.to_string().unwrap(),
-            )),
+            Err(e) => Err(io::Error::new(io::ErrorKind::ConnectionRefused, e)),
         }
     }
 
@@ -91,10 +98,7 @@ impl SinkAsBytes for PulseAudioSink {
         if let Some(s) = &self.s {
             match s.write(data) {
                 Ok(_) => Ok(()),
-                Err(e) => Err(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    e.to_string().unwrap(),
-                )),
+                Err(e) => Err(io::Error::new(io::ErrorKind::BrokenPipe, e)),
             }
         } else {
             Err(io::Error::new(
