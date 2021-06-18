@@ -19,33 +19,33 @@ const NUM_PERIODS: u32 = 4;
 #[derive(Debug, Error)]
 enum AlsaError {
     #[error("AlsaSink, device {device} may be invalid or busy, {err}")]
-    PCMSetUpError { device: String, err: alsa::Error },
+    PcmSetUp { device: String, err: alsa::Error },
     #[error("AlsaSink, device {device} unsupported access type RWInterleaved, {err}")]
-    UnsupportedAccessTypeError { device: String, err: alsa::Error },
+    UnsupportedAccessType { device: String, err: alsa::Error },
     #[error("AlsaSink, device {device} unsupported format {format:?}, {err}")]
-    UnsupportedFormatError {
+    UnsupportedFormat {
         device: String,
         format: AudioFormat,
         err: alsa::Error,
     },
     #[error("AlsaSink, device {device} unsupported sample rate {samplerate}, {err}")]
-    UnsupportedSampleRateError {
+    UnsupportedSampleRate {
         device: String,
         samplerate: u32,
         err: alsa::Error,
     },
     #[error("AlsaSink, device {device} unsupported channel count {channel_count}, {err}")]
-    UnsupportedChannelCountError {
+    UnsupportedChannelCount {
         device: String,
         channel_count: u8,
         err: alsa::Error,
     },
     #[error("AlsaSink Hardware Parameters Error, {0}")]
-    HwParamsError(alsa::Error),
+    HwParams(alsa::Error),
     #[error("AlsaSink Software Parameters Error, {0}")]
-    SwParamsError(alsa::Error),
+    SwParams(alsa::Error),
     #[error("AlsaSink PCM Error, {0}")]
-    PCMError(alsa::Error),
+    Pcm(alsa::Error),
 }
 
 pub struct AlsaSink {
@@ -70,10 +70,10 @@ fn list_outputs() -> io::Result<()> {
                 // mimic aplay -L
                 let name = a
                     .name
-                    .ok_or(io::Error::new(io::ErrorKind::Other, "Could not parse name"))?;
+                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not parse name"))?;
                 let desc = a
                     .desc
-                    .ok_or(io::Error::new(io::ErrorKind::Other, "Could not parse desc"))?;
+                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not parse desc"))?;
                 println!("{}\n\t{}\n", name, desc.replace("\n", "\n\t"));
             }
         }
@@ -83,11 +83,10 @@ fn list_outputs() -> io::Result<()> {
 }
 
 fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), AlsaError> {
-    let pcm =
-        PCM::new(dev_name, Direction::Playback, false).map_err(|e| AlsaError::PCMSetUpError {
-            device: dev_name.to_string(),
-            err: e,
-        })?;
+    let pcm = PCM::new(dev_name, Direction::Playback, false).map_err(|e| AlsaError::PcmSetUp {
+        device: dev_name.to_string(),
+        err: e,
+    })?;
 
     let alsa_format = match format {
         AudioFormat::F64 => Format::float64(),
@@ -103,64 +102,56 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Alsa
     };
 
     let bytes_per_period = {
-        let hwp = HwParams::any(&pcm).map_err(|e| AlsaError::HwParamsError(e))?;
-        hwp.set_access(Access::RWInterleaved).map_err(|e| {
-            AlsaError::UnsupportedAccessTypeError {
+        let hwp = HwParams::any(&pcm).map_err(AlsaError::HwParams)?;
+        hwp.set_access(Access::RWInterleaved)
+            .map_err(|e| AlsaError::UnsupportedAccessType {
                 device: dev_name.to_string(),
                 err: e,
-            }
-        })?;
+            })?;
 
         hwp.set_format(alsa_format)
-            .map_err(|e| AlsaError::UnsupportedFormatError {
+            .map_err(|e| AlsaError::UnsupportedFormat {
                 device: dev_name.to_string(),
-                format: format,
+                format,
                 err: e,
             })?;
 
         hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest).map_err(|e| {
-            AlsaError::UnsupportedSampleRateError {
+            AlsaError::UnsupportedSampleRate {
                 device: dev_name.to_string(),
                 samplerate: SAMPLE_RATE,
                 err: e,
             }
         })?;
 
-        hwp.set_channels(NUM_CHANNELS as u32).map_err(|e| {
-            AlsaError::UnsupportedChannelCountError {
+        hwp.set_channels(NUM_CHANNELS as u32)
+            .map_err(|e| AlsaError::UnsupportedChannelCount {
                 device: dev_name.to_string(),
                 channel_count: NUM_CHANNELS,
                 err: e,
-            }
-        })?;
+            })?;
 
         // Deal strictly in time and periods.
         hwp.set_periods(NUM_PERIODS, ValueOr::Nearest)
-            .map_err(|e| AlsaError::HwParamsError(e))?;
+            .map_err(AlsaError::HwParams)?;
 
         hwp.set_period_time_near(PERIOD_TIME.as_micros() as u32, ValueOr::Nearest)
-            .map_err(|e| AlsaError::HwParamsError(e))?;
+            .map_err(AlsaError::HwParams)?;
 
-        pcm.hw_params(&hwp).map_err(|e| AlsaError::PCMError(e))?;
+        pcm.hw_params(&hwp).map_err(AlsaError::Pcm)?;
 
-        let swp = pcm
-            .sw_params_current()
-            .map_err(|e| AlsaError::PCMError(e))?;
+        let swp = pcm.sw_params_current().map_err(AlsaError::Pcm)?;
 
         // Don't assume we got what we wanted.
         // Ask to make sure.
-        let frames_per_period = hwp
-            .get_period_size()
-            .map_err(|e| AlsaError::HwParamsError(e))?;
+        let frames_per_period = hwp.get_period_size().map_err(AlsaError::HwParams)?;
 
-        let frames_per_buffer = hwp
-            .get_buffer_size()
-            .map_err(|e| AlsaError::HwParamsError(e))?;
+        let frames_per_buffer = hwp.get_buffer_size().map_err(AlsaError::HwParams)?;
 
         swp.set_start_threshold(frames_per_buffer - frames_per_period)
-            .map_err(|e| AlsaError::SwParamsError(e))?;
+            .map_err(AlsaError::SwParams)?;
 
-        pcm.sw_params(&swp).map_err(|e| AlsaError::PCMError(e))?;
+        pcm.sw_params(&swp).map_err(AlsaError::Pcm)?;
 
         // Let ALSA do the math for us.
         pcm.frames_to_bytes(frames_per_period) as usize
@@ -219,10 +210,9 @@ impl Sink for AlsaSink {
             // Write any leftover data in the period buffer
             // before draining the actual buffer
             self.write_bytes(&[])?;
-            let pcm = self.pcm.as_mut().ok_or(io::Error::new(
-                io::ErrorKind::Other,
-                "Error stopping AlsaSink, PCM is None",
-            ))?;
+            let pcm = self.pcm.as_mut().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
+            })?;
             pcm.drain().map_err(|e| {
                 io::Error::new(
                     io::ErrorKind::Other,
@@ -262,10 +252,12 @@ impl AlsaSink {
     pub const NAME: &'static str = "alsa";
 
     fn write_buf(&mut self) -> io::Result<()> {
-        let pcm = self.pcm.as_mut().ok_or(io::Error::new(
-            io::ErrorKind::Other,
-            "Error writing from AlsaSink buffer to PCM, PCM is None",
-        ))?;
+        let pcm = self.pcm.as_mut().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "Error writing from AlsaSink buffer to PCM, PCM is None",
+            )
+        })?;
         let io = pcm.io_bytes();
         if let Err(err) = io.writei(&self.period_buffer) {
             // Capture and log the original error as a warning, and then try to recover.
