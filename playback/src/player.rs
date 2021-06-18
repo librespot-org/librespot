@@ -2,6 +2,7 @@ use std::cmp::max;
 use std::future::Future;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::pin::Pin;
+use std::process::exit;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use std::{mem, thread};
@@ -1057,7 +1058,10 @@ impl PlayerInternal {
             }
             match self.sink.start() {
                 Ok(()) => self.sink_status = SinkStatus::Running,
-                Err(err) => error!("Could not start audio: {}", err),
+                Err(err) => {
+                    error!("Fatal error, could not start audio sink: {}", err);
+                    exit(1);
+                }
             }
         }
     }
@@ -1066,14 +1070,21 @@ impl PlayerInternal {
         match self.sink_status {
             SinkStatus::Running => {
                 trace!("== Stopping sink ==");
-                self.sink.stop().unwrap();
-                self.sink_status = if temporarily {
-                    SinkStatus::TemporarilyClosed
-                } else {
-                    SinkStatus::Closed
-                };
-                if let Some(callback) = &mut self.sink_event_callback {
-                    callback(self.sink_status);
+                match self.sink.stop() {
+                    Ok(()) => {
+                        self.sink_status = if temporarily {
+                            SinkStatus::TemporarilyClosed
+                        } else {
+                            SinkStatus::Closed
+                        };
+                        if let Some(callback) = &mut self.sink_event_callback {
+                            callback(self.sink_status);
+                        }
+                    }
+                    Err(err) => {
+                        error!("Fatal error, could not stop audio sink: {}", err);
+                        exit(1);
+                    }
                 }
             }
             SinkStatus::TemporarilyClosed => {
@@ -1294,8 +1305,8 @@ impl PlayerInternal {
                     }
 
                     if let Err(err) = self.sink.write(&packet, &mut self.converter) {
-                        error!("Could not write audio: {}", err);
-                        self.ensure_sink_stopped(false);
+                        error!("Fatal error, could not write audio to audio sink: {}", err);
+                        exit(1);
                     }
                 }
             }
