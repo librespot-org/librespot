@@ -16,7 +16,7 @@ impl Open for StdoutSink {
         info!("Using pipe sink with format: {:?}", format);
         Self {
             output: None,
-            path: path,
+            path,
             format,
         }
     }
