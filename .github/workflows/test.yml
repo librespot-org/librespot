@@ -11,6 +11,11 @@ on:
         "Cargo.lock",
         "rustfmt.toml",
         ".github/workflows/*",
+        "!**.md",
+        "!contrib/*",
+        "!docs/*",
+        "!LICENSE",
+        "!**.sh",
       ]
   pull_request:
     paths:
@@ -20,6 +25,11 @@ on:
         "Cargo.lock",
         "rustfmt.toml",
         ".github/workflows/*",
+        "!**.md",
+        "!contrib/*",
+        "!docs/*",
+        "!LICENSE",
+        "!**.sh",
       ]
   schedule:
     # Run CI every week
