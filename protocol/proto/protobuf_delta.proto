@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.protobuf_deltas.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.proto";
+
+message Delta {
+    required Type type = 1;
+    enum Type {
+        DELETE = 0;
+        INSERT = 1;
+    }
+    
+    required uint32 index = 2;
+    required uint32 length = 3;
+}

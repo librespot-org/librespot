@@ -1,0 +1,39 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.podcast_segments.cosmos.proto;
+
+import "metadata/episode_metadata.proto";
+import "podcast_segments.proto";
+import "metadata/track_metadata.proto";
+
+option optimize_for = CODE_SIZE;
+
+message SegmentsResponse {
+    bool success = 1;
+    repeated EpisodeSegments episode_segments = 2;
+}
+
+message EpisodeSegments {
+    string episode_uri = 1;
+    repeated DecoratedSegment segments = 2;
+    bool can_upsell = 3;
+    string album_mosaic_uri = 4;
+    repeated string artists = 5;
+    int32 duration_ms = 6;
+}
+
+message DecoratedSegment {
+    string uri = 1;
+    int32 start_ms = 2;
+    int32 stop_ms = 3;
+    cosmos_util.proto.TrackMetadata track_metadata = 4;
+    SegmentType type = 5;
+    string title = 6;
+    string subtitle = 7;
+    string image_url = 8;
+    string action_url = 9;
+    cosmos_util.proto.EpisodeMetadata episode_metadata = 10;
+    bool is_abridged = 11;
+}

@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AudioFileSelection {
+    optional bytes playback_id = 1;
+    optional string strategy_name = 2;
+    optional int64 bitrate = 3;
+    optional bytes predict_id = 4;
+    optional string file_origin = 5;
+    optional int32 target_bitrate = 6;
+}

@@ -1,0 +1,121 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package com.spotify.sessioncontrol.api.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.sessioncontrol.api.v1.proto";
+
+service SessionControlService {
+    rpc GetCurrentSession(GetCurrentSessionRequest) returns (GetCurrentSessionResponse);
+    rpc GetCurrentSessionOrNew(GetCurrentSessionOrNewRequest) returns (GetCurrentSessionOrNewResponse);
+    rpc JoinSession(JoinSessionRequest) returns (JoinSessionResponse);
+    rpc GetSessionInfo(GetSessionInfoRequest) returns (GetSessionInfoResponse);
+    rpc LeaveSession(LeaveSessionRequest) returns (LeaveSessionResponse);
+    rpc EndSession(EndSessionRequest) returns (EndSessionResponse);
+    rpc VerifyCommand(VerifyCommandRequest) returns (VerifyCommandResponse);
+}
+
+message SessionUpdate {
+    Session session = 1;
+    SessionUpdateReason reason = 2;
+    repeated SessionMember updated_session_members = 3;
+}
+
+message GetCurrentSessionRequest {
+    
+}
+
+message GetCurrentSessionResponse {
+    Session session = 1;
+}
+
+message GetCurrentSessionOrNewRequest {
+    string fallback_device_id = 1;
+}
+
+message GetCurrentSessionOrNewResponse {
+    Session session = 1;
+}
+
+message JoinSessionRequest {
+    string join_token = 1;
+    string device_id = 2;
+    Experience experience = 3;
+}
+
+message JoinSessionResponse {
+    Session session = 1;
+}
+
+message GetSessionInfoRequest {
+    string join_token = 1;
+}
+
+message GetSessionInfoResponse {
+    Session session = 1;
+}
+
+message LeaveSessionRequest {
+    
+}
+
+message LeaveSessionResponse {
+    
+}
+
+message EndSessionRequest {
+    string session_id = 1;
+}
+
+message EndSessionResponse {
+    
+}
+
+message VerifyCommandRequest {
+    string session_id = 1;
+    string command = 2;
+}
+
+message VerifyCommandResponse {
+    bool allowed = 1;
+}
+
+message Session {
+    int64 timestamp = 1;
+    string session_id = 2;
+    string join_session_token = 3;
+    string join_session_url = 4;
+    string session_owner_id = 5;
+    repeated SessionMember session_members = 6;
+    string join_session_uri = 7;
+    bool is_session_owner = 8;
+}
+
+message SessionMember {
+    int64 timestamp = 1;
+    string id = 2;
+    string username = 3;
+    string display_name = 4;
+    string image_url = 5;
+    string large_image_url = 6;
+}
+
+enum SessionUpdateReason {
+    UNKNOWN_UPDATE_REASON = 0;
+    NEW_SESSION = 1;
+    USER_JOINED = 2;
+    USER_LEFT = 3;
+    SESSION_DELETED = 4;
+    YOU_LEFT = 5;
+    YOU_WERE_KICKED = 6;
+    YOU_JOINED = 7;
+}
+
+enum Experience {
+    UNKNOWN = 0;
+    BEETHOVEN = 1;
+    BACH = 2;
+}

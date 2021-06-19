@@ -1,0 +1,40 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify_playedstate.proto;
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playedstate.proto";
+
+message PlayedStateItem {
+    optional Type type = 1;
+    optional bytes uri = 2;
+    optional int64 client_timestamp = 3;
+    optional int32 play_position = 4;
+    optional bool played = 5;
+    optional int32 duration = 6;
+}
+
+message PlayedState {
+    optional int64 server_timestamp = 1;
+    optional bool truncated = 2;
+    repeated PlayedStateItem state = 3;
+}
+
+message PlayedStateItemList {
+    repeated PlayedStateItem state = 1;
+}
+
+message ContentId {
+    optional Type type = 1;
+    optional bytes uri = 2;
+}
+
+message ContentIdList {
+    repeated ContentId contentIds = 1;
+}
+
+enum Type {
+    EPISODE = 0;
+}

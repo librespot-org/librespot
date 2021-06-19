@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.techu_core_exercise_cosmos.proto;
+
+option optimize_for = CODE_SIZE;
+
+message TechUCoreExerciseRequest {
+    string a = 1;
+    string b = 2;
+}
+
+message TechUCoreExerciseResponse {
+    string concatenated = 1;
+}

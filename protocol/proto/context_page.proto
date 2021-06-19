@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "context_track.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ContextPage {
+    optional string page_url = 1;
+    optional string next_page_url = 2;
+    map<string, string> metadata = 3;
+    repeated ContextTrack tracks = 4;
+    optional bool loading = 5;
+}

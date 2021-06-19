@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package google.protobuf;
+
+option csharp_namespace = "Google.Protobuf.WellKnownTypes";
+option objc_class_prefix = "GPB";
+option go_package = "google.golang.org/protobuf/types/known/sourcecontextpb";
+option java_multiple_files = true;
+option java_outer_classname = "SourceContextProto";
+option java_package = "com.google.protobuf";
+
+message SourceContext {
+    string file_name = 1;
+}

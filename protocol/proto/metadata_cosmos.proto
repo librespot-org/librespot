@@ -1,0 +1,30 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.metadata_cosmos.proto;
+
+import "metadata.proto";
+
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "MetadataCosmos";
+option java_package = "com.spotify.metadata.cosmos.proto";
+
+message MetadataItem {
+    oneof item {
+        sint32 error = 1;
+        metadata.Artist artist = 2;
+        metadata.Album album = 3;
+        metadata.Track track = 4;
+        metadata.Show show = 5;
+        metadata.Episode episode = 6;
+    }
+}
+
+message MultiResponse {
+    repeated MetadataItem items = 1;
+}
+
+message MultiRequest {
+    repeated string uris = 1;
+}

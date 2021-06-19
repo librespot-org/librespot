@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.listen_later_cosmos.proto;
+
+import "collection/episode_collection_state.proto";
+import "metadata/episode_metadata.proto";
+import "played_state/episode_played_state.proto";
+import "sync/episode_sync_state.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Episode {
+    optional string header = 1;
+    optional cosmos_util.proto.EpisodeMetadata episode_metadata = 2;
+    optional cosmos_util.proto.EpisodeCollectionState episode_collection_state = 3;
+    optional cosmos_util.proto.EpisodeSyncState episode_offline_state = 4;
+    optional cosmos_util.proto.EpisodePlayState episode_played_state = 5;
+}
+
+message EpisodesResponse {
+    optional uint32 unfiltered_length = 1;
+    optional uint32 unranged_length = 2;
+    repeated Episode episode = 3;
+    optional string offline_availability = 5;
+    optional uint32 offline_progress = 6;
+}

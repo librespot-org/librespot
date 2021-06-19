@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.cosmos_util.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.policy.proto";
+
+message AlbumDecorationPolicy {
+    bool link = 1;
+    bool name = 2;
+    bool copyrights = 3;
+    bool covers = 4;
+    bool year = 5;
+    bool num_discs = 6;
+    bool num_tracks = 7;
+    bool playability = 8;
+    bool is_premium_only = 9;
+}

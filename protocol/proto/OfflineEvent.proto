@@ -1,0 +1,12 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message OfflineEvent {
+    optional string event = 1;
+    optional string data = 2;
+}

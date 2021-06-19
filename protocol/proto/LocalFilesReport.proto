@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message LocalFilesReport {
+    optional int64 total_tracks = 1;
+    optional int64 total_size = 2;
+    optional int64 owned_tracks = 3;
+    optional int64 owned_size = 4;
+    optional int64 tracks_not_found = 5;
+    optional int64 tracks_bad_format = 6;
+    optional int64 tracks_drm_protected = 7;
+    optional int64 tracks_unknown_pruned = 8;
+    optional int64 tracks_reallocated_repaired = 9;
+    optional int64 enabled_sources = 10;
+}

@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist_esperanto.proto;
+
+import "modification_request.proto";
+import "response_status.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playlist.esperanto.proto";
+
+message PlaylistModificationRequest {
+    string uri = 1;
+    playlist.cosmos.proto.ModificationRequest request = 2;
+}
+
+message PlaylistModificationResponse {
+    ResponseStatus status = 1;
+}

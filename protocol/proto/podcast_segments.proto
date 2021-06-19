@@ -1,0 +1,47 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.podcast_segments;
+
+option objc_class_prefix = "SPT";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "PodcastSegmentsProto";
+option java_package = "com.spotify.podcastsegments.proto";
+
+message PodcastSegments {
+    string episode_uri = 1;
+    repeated PlaybackSegment playback_segments = 2;
+    repeated EmbeddedSegment embedded_segments = 3;
+    bool can_upsell = 4;
+    string album_mosaic_uri = 5;
+    repeated string artists = 6;
+    int32 duration_ms = 7;
+}
+
+message PlaybackSegment {
+    string uri = 1;
+    int32 start_ms = 2;
+    int32 stop_ms = 3;
+    int32 duration_ms = 4;
+    SegmentType type = 5;
+    string title = 6;
+    string subtitle = 7;
+    string image_url = 8;
+    string action_url = 9;
+    bool is_abridged = 10;
+}
+
+message EmbeddedSegment {
+    string uri = 1;
+    int32 absolute_start_ms = 2;
+    int32 absolute_stop_ms = 3;
+}
+
+enum SegmentType {
+    UNKNOWN = 0;
+    TALK = 1;
+    MUSIC = 2;
+    UPSELL = 3;
+}

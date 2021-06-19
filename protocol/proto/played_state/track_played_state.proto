@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.cosmos_util.proto;
+
+import "played_state/playability_restriction.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.proto";
+
+message TrackPlayState {
+    optional bool is_playable = 1;
+    optional PlayabilityRestriction playability_restriction = 2 [default = UNKNOWN];
+}

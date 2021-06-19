@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "logging_params.proto";
+
+option optimize_for = CODE_SIZE;
+
+message AutoplayNode {
+    map<string, bytes> filler_node = 1;
+    required bool is_playing_filler = 2;
+    required LoggingParams logging_params = 3;
+}

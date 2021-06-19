@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.image.proto;
+
+option optimize_for = CODE_SIZE;
+
+message RequestFailure {
+    optional string request = 1;
+    optional string source = 2;
+    optional string error = 3;
+    optional int64 result = 4;
+}

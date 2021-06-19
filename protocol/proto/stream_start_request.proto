@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+import "format.proto";
+import "media_type.proto";
+import "stream_handle.proto";
+
+option objc_class_prefix = "ESP";
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+message StreamStartRequest {
+    StreamHandle stream_handle = 1;
+    string media_id = 2;
+    MediaType media_type = 3;
+    Format format = 4;
+    uint64 playback_start_time = 5;
+}

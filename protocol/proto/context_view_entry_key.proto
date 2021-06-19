@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.context_view.proto;
+
+import "context_view_entry.proto";
+
+option optimize_for = CODE_SIZE;
+
+message EntryKey {
+    optional Entry.Type type = 1;
+    optional string data = 2;
+}

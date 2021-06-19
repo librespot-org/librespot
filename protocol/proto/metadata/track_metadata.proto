@@ -1,0 +1,55 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.cosmos_util.proto;
+
+import "metadata/image_group.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.proto";
+
+message TrackAlbumArtistMetadata {
+    optional string link = 1;
+    optional string name = 2;
+}
+
+message TrackAlbumMetadata {
+    optional TrackAlbumArtistMetadata artist = 1;
+    optional string link = 2;
+    optional string name = 3;
+    optional ImageGroup covers = 4;
+}
+
+message TrackArtistMetadata {
+    optional string link = 1;
+    optional string name = 2;
+    optional ImageGroup portraits = 3;
+}
+
+message TrackDescriptor {
+    optional string name = 1;
+}
+
+message TrackMetadata {
+    optional TrackAlbumMetadata album = 1;
+    repeated TrackArtistMetadata artist = 2;
+    optional string link = 3;
+    optional string name = 4;
+    optional uint32 length = 5;
+    optional bool playable = 6;
+    optional uint32 disc_number = 7;
+    optional uint32 track_number = 8;
+    optional bool is_explicit = 9;
+    optional string preview_id = 10;
+    optional bool is_local = 11;
+    optional bool playable_local_track = 12;
+    optional bool has_lyrics = 13;
+    optional bool is_premium_only = 14;
+    optional bool locally_playable = 15;
+    optional string playable_track_link = 16;
+    optional uint32 popularity = 17;
+    optional bool is_19_plus_only = 18;
+    repeated TrackDescriptor track_descriptors = 19;
+}

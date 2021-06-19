@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.storage_cosmos.proto;
+
+option optimize_for = CODE_SIZE;
+
+message GetFileCacheRangesResponse {
+    bool byte_size_known = 1;
+    uint64 byte_size = 2;
+    
+    repeated Range ranges = 3;
+    message Range {
+        uint64 from_byte = 1;
+        uint64 to_byte = 2;
+    }
+}

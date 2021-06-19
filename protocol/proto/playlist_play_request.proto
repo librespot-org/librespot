@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist_esperanto.proto;
+
+import "es_context.proto";
+import "es_play_options.proto";
+import "es_logging_params.proto";
+import "es_prepare_play_options.proto";
+import "es_play_origin.proto";
+import "playlist_query.proto";
+import "response_status.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.playlist.esperanto.proto";
+
+message PlaylistPlayRequest {
+    PlaylistQuery playlist_query = 1;
+    player.esperanto.proto.Context context = 2;
+    player.esperanto.proto.PlayOptions play_options = 3;
+    player.esperanto.proto.LoggingParams logging_params = 4;
+    player.esperanto.proto.PreparePlayOptions prepare_play_options = 5;
+    player.esperanto.proto.PlayOrigin play_origin = 6;
+}
+
+message PlaylistPlayResponse {
+    ResponseStatus status = 1;
+}

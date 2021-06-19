@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.podcastvirality.v1;
+
+option objc_class_prefix = "SPT";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "PodcastViralityProto";
+option java_package = "com.spotify.podcastvirality.proto.v1";
+
+message PodcastVirality {
+    bool is_viral = 1;
+}

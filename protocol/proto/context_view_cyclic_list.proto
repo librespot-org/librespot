@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.context_view.cyclic_list.proto;
+
+import "context_view_entry_key.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Instance {
+    optional context_view.proto.EntryKey item = 1;
+    optional int32 iteration = 2;
+}
+
+message Patch {
+    optional int32 start = 1;
+    optional int32 end = 2;
+    repeated Instance instances = 3;
+}
+
+message CyclicEntryKeyList {
+    optional context_view.proto.EntryKey delimiter = 1;
+    repeated context_view.proto.EntryKey items = 2;
+    optional Patch patch = 3;
+}

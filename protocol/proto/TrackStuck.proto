@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message TrackStuck {
+    optional string track = 1;
+    optional bytes playback_id = 2;
+    optional string source_start = 3;
+    optional string reason_start = 4;
+    optional bool offline = 5;
+    optional int64 position = 6;
+    optional int64 count = 7;
+    optional string audio_driver = 8;
+}

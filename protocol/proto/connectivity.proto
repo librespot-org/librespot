@@ -1,0 +1,43 @@
+// Extracted from: Spotify 1.1.33.569 (Windows)
+
+syntax = "proto3";
+
+package spotify.clienttoken.data.v0;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.clienttoken.data.v0";
+
+message ConnectivitySdkData {
+    PlatformSpecificData platform_specific_data = 1;
+    string device_id = 2;
+}
+
+message PlatformSpecificData {
+    oneof data {
+        NativeAndroidData android = 1;
+        NativeIOSData ios = 2;
+    }
+}
+
+message NativeAndroidData {
+    int32 major_sdk_version = 1;
+    int32 minor_sdk_version = 2;
+    int32 patch_sdk_version = 3;
+    uint32 api_version = 4;
+    Screen screen_dimensions = 5;
+}
+
+message NativeIOSData {
+    int32 user_interface_idiom = 1;
+    bool target_iphone_simulator = 2;
+    string hw_machine = 3;
+    string system_version = 4;
+    string simulator_model_identifier = 5;
+}
+
+message Screen {
+    int32 width = 1;
+    int32 height = 2;
+    int32 density = 3;
+}

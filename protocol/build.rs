@@ -16,10 +16,11 @@ fn compile() {
     let proto_dir = Path::new(&env::var("CARGO_MANIFEST_DIR").expect("env")).join("proto");
 
     let files = &[
+        proto_dir.join("metadata.proto"),
+        // TODO: remove these legacy protobufs when we are on the new API completely
         proto_dir.join("authentication.proto"),
         proto_dir.join("keyexchange.proto"),
         proto_dir.join("mercury.proto"),
-        proto_dir.join("metadata.proto"),
         proto_dir.join("playlist4changes.proto"),
         proto_dir.join("playlist4content.proto"),
         proto_dir.join("playlist4issues.proto"),

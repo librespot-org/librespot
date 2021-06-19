@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.podcast_segments.playback;
+
+import "podcast_segments.proto";
+
+option objc_class_prefix = "SPT";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "PlaybackSegmentsProto";
+option java_package = "com.spotify.podcastsegments.playback.proto";
+
+message PlaybackSegments {
+    repeated PlaybackSegment playback_segments = 1;
+}
