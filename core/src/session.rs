@@ -24,6 +24,7 @@ use crate::channel::ChannelManager;
 use crate::config::SessionConfig;
 use crate::connection::{self, AuthenticationError};
 use crate::mercury::MercuryManager;
+use crate::token::TokenProvider;
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -49,6 +50,7 @@ struct SessionInternal {
     audio_key: OnceCell<AudioKeyManager>,
     channel: OnceCell<ChannelManager>,
     mercury: OnceCell<MercuryManager>,
+    token_provider: OnceCell<TokenProvider>,
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
@@ -119,6 +121,7 @@ impl Session {
             audio_key: OnceCell::new(),
             channel: OnceCell::new(),
             mercury: OnceCell::new(),
+            token_provider: OnceCell::new(),
             handle,
             session_id,
         }));
@@ -157,6 +160,12 @@ impl Session {
             .get_or_init(|| MercuryManager::new(self.weak()))
     }
 
+    pub fn token_provider(&self) -> &TokenProvider {
+        self.0
+            .token_provider
+            .get_or_init(|| TokenProvider::new(self.weak()))
+    }
+
     pub fn time_delta(&self) -> i64 {
         self.0.data.read().unwrap().time_delta
     }
@@ -181,6 +190,7 @@ impl Session {
     #[allow(clippy::match_same_arms)]
     fn dispatch(&self, cmd: u8, data: Bytes) {
         match cmd {
+            // TODO: add command types
             0x4 => {
                 let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
                 let timestamp = match SystemTime::now().duration_since(UNIX_EPOCH) {

@@ -25,6 +25,7 @@ mod proxytunnel;
 pub mod session;
 mod socket;
 pub mod spotify_id;
+mod token;
 #[doc(hidden)]
 pub mod util;
 pub mod version;
