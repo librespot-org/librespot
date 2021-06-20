@@ -3,12 +3,29 @@ use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
-use libpulse_binding::{self as pulse, stream::Direction};
+use libpulse_binding::{self as pulse, error::PAErr, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::io;
+use thiserror::Error;
 
 const APP_NAME: &str = "librespot";
 const STREAM_NAME: &str = "Spotify endpoint";
+
+#[derive(Debug, Error)]
+enum PulseError {
+    #[error("Error starting PulseAudioSink, invalid PulseAudio sample spec")]
+    InvalidSampleSpec,
+    #[error("Error starting PulseAudioSink, could not connect to PulseAudio server, {0}")]
+    ConnectionRefused(PAErr),
+    #[error("Error stopping PulseAudioSink, failed to drain PulseAudio server buffer, {0}")]
+    DrainFailure(PAErr),
+    #[error("Error stopping PulseAudioSink, Not connected to PulseAudio server")]
+    NotConnectedOnStop,
+    #[error("Error writing from PulseAudioSink to PulseAudio, Not connected to PulseAudio server")]
+    NotConnectedOnWrite,
+    #[error("Error writing from PulseAudioSink to PulseAudio server, {0}")]
+    OnWrite(PAErr),
+}
 
 pub struct PulseAudioSink {
     s: Option<Simple>,
@@ -60,7 +77,7 @@ impl Sink for PulseAudioSink {
         if !ss.is_valid() {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                "Error starting PulseAudioSink, invalid PulseAudio sample spec",
+                PulseError::InvalidSampleSpec,
             ));
         }
 
@@ -82,10 +99,7 @@ impl Sink for PulseAudioSink {
             Err(e) => {
                 return Err(io::Error::new(
                     io::ErrorKind::ConnectionRefused,
-                    format!(
-                        "Error starting PulseAudioSink, could not connect to PulseAudio server, {}",
-                        e
-                    ),
+                    PulseError::ConnectionRefused(e),
                 ));
             }
         }
@@ -97,13 +111,16 @@ impl Sink for PulseAudioSink {
         match &self.s {
             Some(s) => {
                 if let Err(e) = s.drain() {
-                    return Err(io::Error::new(io::ErrorKind::Other, format!("Error stopping PulseAudioSink, failed to drain PulseAudio server buffer, {}", e)));
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        PulseError::DrainFailure(e),
+                    ));
                 }
             }
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotConnected,
-                    "Error stopping PulseAudioSink, Not connected to PulseAudio server",
+                    PulseError::NotConnectedOnStop,
                 ));
             }
         }
@@ -122,17 +139,14 @@ impl SinkAsBytes for PulseAudioSink {
                 if let Err(e) = s.write(data) {
                     return Err(io::Error::new(
                         io::ErrorKind::BrokenPipe,
-                        format!(
-                            "Error writing from PulseAudioSink to PulseAudio server, {}",
-                            e
-                        ),
+                        PulseError::OnWrite(e),
                     ));
                 }
             }
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotConnected,
-                    "Error writing from PulseAudioSink to PulseAudio, Not connected to PulseAudio server",
+                    PulseError::NotConnectedOnWrite,
                 ));
             }
         }
