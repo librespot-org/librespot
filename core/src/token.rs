@@ -1,5 +1,13 @@
 // Ported from librespot-java. Relicensed under MIT with permission.
 
+// Known tokens:
+//   ugc-image-upload, playlist-read-collaborative, playlist-modify-private,
+//   playlist-modify-public, playlist-read-private, user-read-playback-position,
+//   user-read-recently-played, user-top-read, user-modify-playback-state,
+//   user-read-currently-playing, user-read-playback-state, user-read-private, user-read-email,
+//   user-library-modify, user-library-read, user-follow-modify, user-follow-read, streaming,
+//   app-remote-control
+
 use crate::mercury::MercuryError;
 
 use serde::Deserialize;
