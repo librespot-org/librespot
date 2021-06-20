@@ -18,34 +18,46 @@ const NUM_PERIODS: u32 = 4;
 
 #[derive(Debug, Error)]
 enum AlsaError {
-    #[error("AlsaSink, device {device} may be invalid or busy, {err}")]
+    #[error("AlsaSink, device '{device}' may be invalid or busy, {err}")]
     PcmSetUp { device: String, err: alsa::Error },
-    #[error("AlsaSink, device {device} unsupported access type RWInterleaved, {err}")]
+    #[error("AlsaSink, device '{device}' unsupported access type RWInterleaved, {err}")]
     UnsupportedAccessType { device: String, err: alsa::Error },
-    #[error("AlsaSink, device {device} unsupported format {format:?}, {err}")]
+    #[error("AlsaSink, device '{device}' unsupported format {format:?}, {err}")]
     UnsupportedFormat {
         device: String,
         format: AudioFormat,
         err: alsa::Error,
     },
-    #[error("AlsaSink, device {device} unsupported sample rate {samplerate}, {err}")]
+    #[error("AlsaSink, device '{device}' unsupported sample rate {samplerate}, {err}")]
     UnsupportedSampleRate {
         device: String,
         samplerate: u32,
         err: alsa::Error,
     },
-    #[error("AlsaSink, device {device} unsupported channel count {channel_count}, {err}")]
+    #[error("AlsaSink, device '{device}' unsupported channel count {channel_count}, {err}")]
     UnsupportedChannelCount {
         device: String,
         channel_count: u8,
         err: alsa::Error,
     },
+    #[error("Error stopping AlsaSink, failed to drain PCM buffer, {0}")]
+    DrainFailure(alsa::Error),
+    #[error("Error writing from AlsaSink buffer to PCM, recovery failed, {0}")]
+    RecoveryFailure(alsa::Error),
     #[error("AlsaSink Hardware Parameters Error, {0}")]
     HwParams(alsa::Error),
     #[error("AlsaSink Software Parameters Error, {0}")]
     SwParams(alsa::Error),
     #[error("AlsaSink PCM Error, {0}")]
     Pcm(alsa::Error),
+    #[error("Could not parse name")]
+    ParsingName,
+    #[error("Could not parse desc")]
+    ParsingDesc,
+    #[error("Error stopping AlsaSink, PCM is None")]
+    PcmNoneOnStop,
+    #[error("Error writing from AlsaSink buffer to PCM, PCM is None")]
+    PcmNoneOnWrite,
 }
 
 pub struct AlsaSink {
@@ -70,10 +82,10 @@ fn list_outputs() -> io::Result<()> {
                 // mimic aplay -L
                 let name = a
                     .name
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not parse name"))?;
+                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, AlsaError::ParsingName))?;
                 let desc = a
                     .desc
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not parse desc"))?;
+                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, AlsaError::ParsingDesc))?;
                 println!("{}\n\t{}\n", name, desc.replace("\n", "\n\t"));
             }
         }
@@ -206,20 +218,21 @@ impl Sink for AlsaSink {
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        {
-            // Write any leftover data in the period buffer
-            // before draining the actual buffer
-            self.write_bytes(&[])?;
-            let pcm = self.pcm.as_mut().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
-            })?;
-            pcm.drain().map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Error stopping AlsaSink {}", e),
-                )
-            })?
-        }
+        // Write any leftover data in the period buffer
+        // before draining the actual buffer
+        self.write_bytes(&[])?;
+        match self.pcm.as_mut() {
+            Some(pcm) => pcm
+                .drain()
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, AlsaError::DrainFailure(e)))?,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    AlsaError::PcmNoneOnStop,
+                ))
+            }
+        };
+
         self.pcm = None;
         Ok(())
     }
@@ -252,30 +265,27 @@ impl AlsaSink {
     pub const NAME: &'static str = "alsa";
 
     fn write_buf(&mut self) -> io::Result<()> {
-        let pcm = self.pcm.as_mut().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                "Error writing from AlsaSink buffer to PCM, PCM is None",
-            )
-        })?;
-        let io = pcm.io_bytes();
-        if let Err(err) = io.writei(&self.period_buffer) {
-            // Capture and log the original error as a warning, and then try to recover.
-            // If recovery fails then forward that error back to player.
-            warn!(
-                "Error writing from AlsaSink buffer to PCM, trying to recover {}",
-                err
-            );
-            pcm.try_recover(err, false).map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!(
-                        "Error writing from AlsaSink buffer to PCM, recovery failed {}",
-                        e
-                    ),
-                )
-            })?
-        }
+        match self.pcm.as_mut() {
+            Some(pcm) => {
+                if let Err(err) = pcm.io_bytes().writei(&self.period_buffer) {
+                    // Capture and log the original error as a warning, and then try to recover.
+                    // If recovery fails then forward that error back to player.
+                    warn!(
+                        "Error writing from AlsaSink buffer to PCM, trying to recover, {}",
+                        err
+                    );
+                    pcm.try_recover(err, false).map_err(|e| {
+                        io::Error::new(io::ErrorKind::Other, AlsaError::RecoveryFailure(e))
+                    })?
+                }
+            }
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    AlsaError::PcmNoneOnWrite,
+                ));
+            }
+        };
 
         Ok(())
     }
