@@ -78,20 +78,15 @@ impl TokenProvider {
         );
         let request = self.session().mercury().get(query_uri);
         let response = request.await?;
-
-        if response.status_code == 200 {
-            let data = response
-                .payload
-                .first()
-                .expect("No tokens received")
-                .to_vec();
-            let token = Token::new(String::from_utf8(data).unwrap()).map_err(|_| MercuryError)?;
-            trace!("Got token: {:?}", token);
-            self.lock(|inner| inner.tokens.push(token.clone()));
-            Ok(token)
-        } else {
-            Err(MercuryError)
-        }
+        let data = response
+            .payload
+            .first()
+            .expect("No tokens received")
+            .to_vec();
+        let token = Token::new(String::from_utf8(data).unwrap()).map_err(|_| MercuryError)?;
+        trace!("Got token: {:?}", token);
+        self.lock(|inner| inner.tokens.push(token.clone()));
+        Ok(token)
     }
 }
 
