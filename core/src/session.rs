@@ -23,6 +23,7 @@ use crate::cache::Cache;
 use crate::channel::ChannelManager;
 use crate::config::SessionConfig;
 use crate::connection::{self, AuthenticationError};
+use crate::http_client::HttpClient;
 use crate::mercury::MercuryManager;
 use crate::token::TokenProvider;
 
@@ -45,6 +46,7 @@ struct SessionInternal {
     config: SessionConfig,
     data: RwLock<SessionData>,
 
+    http_client: HttpClient,
     tx_connection: mpsc::UnboundedSender<(u8, Vec<u8>)>,
 
     audio_key: OnceCell<AudioKeyManager>,
@@ -69,22 +71,22 @@ impl Session {
         credentials: Credentials,
         cache: Option<Cache>,
     ) -> Result<Session, SessionError> {
-        let ap = apresolve(config.proxy.as_ref(), config.ap_port)
-            .await
-            .accesspoint;
+        let http_client = HttpClient::new(config.proxy.as_ref());
+        let ap = apresolve(&http_client, config.ap_port).await.accesspoint;
 
         info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
-        let mut conn = connection::connect(&ap.0, ap.1, config.proxy.as_ref()).await?;
+        let mut transport = connection::connect(&ap.0, ap.1, config.proxy.as_ref()).await?;
 
         let reusable_credentials =
-            connection::authenticate(&mut conn, credentials, &config.device_id).await?;
+            connection::authenticate(&mut transport, credentials, &config.device_id).await?;
         info!("Authenticated as \"{}\" !", reusable_credentials.username);
         if let Some(cache) = &cache {
             cache.save_credentials(&reusable_credentials);
         }
 
         let session = Session::create(
-            conn,
+            transport,
+            http_client,
             config,
             cache,
             reusable_credentials.username,
@@ -96,6 +98,7 @@ impl Session {
 
     fn create(
         transport: connection::Transport,
+        http_client: HttpClient,
         config: SessionConfig,
         cache: Option<Cache>,
         username: String,
@@ -116,6 +119,7 @@ impl Session {
                 invalid: false,
                 time_delta: 0,
             }),
+            http_client,
             tx_connection: sender_tx,
             cache: cache.map(Arc::new),
             audio_key: OnceCell::new(),

@@ -1,10 +1,7 @@
-use std::error::Error;
-
-use hyper::client::HttpConnector;
-use hyper::{Body, Client, Request};
-use hyper_proxy::{Intercept, Proxy, ProxyConnector};
+use crate::http_client::HttpClient;
+use hyper::{Body, Request};
 use serde::Deserialize;
-use url::Url;
+use std::error::Error;
 
 const APRESOLVE_ENDPOINT: &str =
     "http://apresolve.spotify.com/?type=accesspoint&type=dealer&type=spclient";
@@ -56,35 +53,21 @@ fn select_ap(data: Vec<String>, fallback: &str, ap_port: Option<u16>) -> SocketA
     ap.unwrap_or_else(|| (String::from(fallback), port))
 }
 
-async fn try_apresolve(proxy: Option<&Url>) -> Result<ApResolveData, Box<dyn Error>> {
+async fn try_apresolve(http_client: &HttpClient) -> Result<ApResolveData, Box<dyn Error>> {
     let req = Request::builder()
         .method("GET")
         .uri(APRESOLVE_ENDPOINT)
         .body(Body::empty())
         .unwrap();
 
-    let response = if let Some(url) = proxy {
-        // Panic safety: all URLs are valid URIs
-        let uri = url.to_string().parse().unwrap();
-        let proxy = Proxy::new(Intercept::All, uri);
-        let connector = HttpConnector::new();
-        let proxy_connector = ProxyConnector::from_proxy_unsecured(connector, proxy);
-        Client::builder()
-            .build(proxy_connector)
-            .request(req)
-            .await?
-    } else {
-        Client::new().request(req).await?
-    };
-
-    let body = hyper::body::to_bytes(response.into_body()).await?;
+    let body = http_client.request_body(req).await?;
     let data: ApResolveData = serde_json::from_slice(body.as_ref())?;
 
     Ok(data)
 }
 
-pub async fn apresolve(proxy: Option<&Url>, ap_port: Option<u16>) -> AccessPoints {
-    let data = try_apresolve(proxy).await.unwrap_or_else(|e| {
+pub async fn apresolve(http_client: &HttpClient, ap_port: Option<u16>) -> AccessPoints {
+    let data = try_apresolve(http_client).await.unwrap_or_else(|e| {
         warn!("Failed to resolve access points: {}, using fallbacks.", e);
         ApResolveData::default()
     });
@@ -105,10 +88,12 @@ mod test {
     use std::net::ToSocketAddrs;
 
     use super::apresolve;
+    use crate::http_client::HttpClient;
 
     #[tokio::test]
     async fn test_apresolve() {
-        let aps = apresolve(None, None).await;
+        let http_client = HttpClient::new(None);
+        let aps = apresolve(&http_client, None).await;
 
         // Assert that the result contains a valid host and port
         aps.accesspoint.to_socket_addrs().unwrap().next().unwrap();
@@ -118,7 +103,8 @@ mod test {
 
     #[tokio::test]
     async fn test_apresolve_port_443() {
-        let aps = apresolve(None, Some(443)).await;
+        let http_client = HttpClient::new(None);
+        let aps = apresolve(&http_client, Some(443)).await;
 
         let port = aps
             .accesspoint
