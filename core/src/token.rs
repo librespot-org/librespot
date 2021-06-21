@@ -23,8 +23,9 @@ component! {
 
 #[derive(Clone, Debug)]
 pub struct Token {
-    expires_in: Duration,
     access_token: String,
+    expires_in: Duration,
+    token_type: String,
     scopes: Vec<String>,
     timestamp: Instant,
 }
@@ -32,15 +33,16 @@ pub struct Token {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TokenData {
-    expires_in: u64,
     access_token: String,
+    expires_in: u64,
+    token_type: String,
     scope: Vec<String>,
 }
 
 impl TokenProvider {
     const KEYMASTER_CLIENT_ID: &'static str = "65b708073fc0480ea92a077233ca87bd";
 
-    fn find_token(&self, scopes: Vec<String>) -> Option<usize> {
+    fn find_token(&self, scopes: Vec<&str>) -> Option<usize> {
         self.lock(|inner| {
             for i in 0..inner.tokens.len() {
                 if inner.tokens[i].in_scopes(scopes.clone()) {
@@ -51,12 +53,13 @@ impl TokenProvider {
         })
     }
 
-    pub async fn get_token(&self, scopes: Vec<String>) -> Result<Token, MercuryError> {
+    // scopes must be comma-separated
+    pub async fn get_token(&self, scopes: &str) -> Result<Token, MercuryError> {
         if scopes.is_empty() {
             return Err(MercuryError);
         }
 
-        if let Some(index) = self.find_token(scopes.clone()) {
+        if let Some(index) = self.find_token(scopes.split(',').collect()) {
             let cached_token = self.lock(|inner| inner.tokens[index].clone());
             if cached_token.is_expired() {
                 self.lock(|inner| inner.tokens.remove(index));
@@ -72,7 +75,7 @@ impl TokenProvider {
 
         let query_uri = format!(
             "hm://keymaster/token/authenticated?scope={}&client_id={}&device_id={}",
-            scopes.join(","),
+            scopes,
             Self::KEYMASTER_CLIENT_ID,
             self.session().device_id()
         );
@@ -96,8 +99,9 @@ impl Token {
     pub fn new(body: String) -> Result<Self, Box<dyn Error>> {
         let data: TokenData = serde_json::from_slice(body.as_ref())?;
         Ok(Self {
-            expires_in: Duration::from_secs(data.expires_in),
             access_token: data.access_token,
+            expires_in: Duration::from_secs(data.expires_in),
+            token_type: data.token_type,
             scopes: data.scope,
             timestamp: Instant::now(),
         })
@@ -107,7 +111,7 @@ impl Token {
         self.timestamp + (self.expires_in - Self::EXPIRY_THRESHOLD) < Instant::now()
     }
 
-    pub fn in_scope(&self, scope: String) -> bool {
+    pub fn in_scope(&self, scope: &str) -> bool {
         for s in &self.scopes {
             if *s == scope {
                 return true;
@@ -116,7 +120,7 @@ impl Token {
         false
     }
 
-    pub fn in_scopes(&self, scopes: Vec<String>) -> bool {
+    pub fn in_scopes(&self, scopes: Vec<&str>) -> bool {
         for s in scopes {
             if !self.in_scope(s) {
                 return false;
