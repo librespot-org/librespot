@@ -1,118 +1,124 @@
-use crate::http_client::HttpClient;
 use hyper::{Body, Request};
 use serde::Deserialize;
 use std::error::Error;
 
-const APRESOLVE_ENDPOINT: &str =
-    "http://apresolve.spotify.com/?type=accesspoint&type=dealer&type=spclient";
-
-// These addresses probably do some geo-location based traffic management or at least DNS-based
-// load balancing. They are known to fail when the normal resolvers are up, so that's why they
-// should only be used as fallback.
-const AP_FALLBACK: &str = "ap.spotify.com";
-const DEALER_FALLBACK: &str = "dealer.spotify.com";
-const SPCLIENT_FALLBACK: &str = "spclient.wg.spotify.com";
-
-const FALLBACK_PORT: u16 = 443;
-
 pub type SocketAddress = (String, u16);
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Default)]
+struct AccessPoints {
+    accesspoint: Vec<SocketAddress>,
+    dealer: Vec<SocketAddress>,
+    spclient: Vec<SocketAddress>,
+}
+
+#[derive(Deserialize)]
 struct ApResolveData {
     accesspoint: Vec<String>,
     dealer: Vec<String>,
     spclient: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct AccessPoints {
-    pub accesspoint: SocketAddress,
-    pub dealer: SocketAddress,
-    pub spclient: SocketAddress,
-}
-
-fn select_ap(data: Vec<String>, fallback: &str, ap_port: Option<u16>) -> SocketAddress {
-    let port = ap_port.unwrap_or(FALLBACK_PORT);
-
-    let mut aps = data.into_iter().filter_map(|ap| {
-        let mut split = ap.rsplitn(2, ':');
-        let port = split
-            .next()
-            .expect("rsplitn should not return empty iterator");
-        let host = split.next()?.to_owned();
-        let port: u16 = port.parse().ok()?;
-        Some((host, port))
-    });
-
-    let ap = if ap_port.is_some() {
-        aps.find(|(_, p)| *p == port)
-    } else {
-        aps.next()
-    };
-
-    ap.unwrap_or_else(|| (String::from(fallback), port))
-}
-
-async fn try_apresolve(http_client: &HttpClient) -> Result<ApResolveData, Box<dyn Error>> {
-    let req = Request::builder()
-        .method("GET")
-        .uri(APRESOLVE_ENDPOINT)
-        .body(Body::empty())
-        .unwrap();
-
-    let body = http_client.request_body(req).await?;
-    let data: ApResolveData = serde_json::from_slice(body.as_ref())?;
-
-    Ok(data)
-}
-
-pub async fn apresolve(http_client: &HttpClient, ap_port: Option<u16>) -> AccessPoints {
-    let data = try_apresolve(http_client).await.unwrap_or_else(|e| {
-        warn!("Failed to resolve access points: {}, using fallbacks.", e);
-        ApResolveData::default()
-    });
-
-    let accesspoint = select_ap(data.accesspoint, AP_FALLBACK, ap_port);
-    let dealer = select_ap(data.dealer, DEALER_FALLBACK, ap_port);
-    let spclient = select_ap(data.spclient, SPCLIENT_FALLBACK, ap_port);
-
-    AccessPoints {
-        accesspoint,
-        dealer,
-        spclient,
+// These addresses probably do some geo-location based traffic management or at least DNS-based
+// load balancing. They are known to fail when the normal resolvers are up, so that's why they
+// should only be used as fallback.
+impl Default for ApResolveData {
+    fn default() -> Self {
+        Self {
+            accesspoint: vec![String::from("ap.spotify.com:443")],
+            dealer: vec![String::from("dealer.spotify.com:443")],
+            spclient: vec![String::from("spclient.wg.spotify.com:443")],
+        }
     }
 }
 
-#[cfg(test)]
-mod test {
-    use std::net::ToSocketAddrs;
+component! {
+    ApResolver : ApResolverInner {
+        data: AccessPoints = AccessPoints::default(),
+    }
+}
 
-    use super::apresolve;
-    use crate::http_client::HttpClient;
-
-    #[tokio::test]
-    async fn test_apresolve() {
-        let http_client = HttpClient::new(None);
-        let aps = apresolve(&http_client, None).await;
-
-        // Assert that the result contains a valid host and port
-        aps.accesspoint.to_socket_addrs().unwrap().next().unwrap();
-        aps.dealer.to_socket_addrs().unwrap().next().unwrap();
-        aps.spclient.to_socket_addrs().unwrap().next().unwrap();
+impl ApResolver {
+    fn split_aps(data: Vec<String>) -> Vec<SocketAddress> {
+        data.into_iter()
+            .filter_map(|ap| {
+                let mut split = ap.rsplitn(2, ':');
+                let port = split
+                    .next()
+                    .expect("rsplitn should not return empty iterator");
+                let host = split.next()?.to_owned();
+                let port: u16 = port.parse().ok()?;
+                Some((host, port))
+            })
+            .collect()
     }
 
-    #[tokio::test]
-    async fn test_apresolve_port_443() {
-        let http_client = HttpClient::new(None);
-        let aps = apresolve(&http_client, Some(443)).await;
+    fn find_ap(&self, data: &[SocketAddress]) -> usize {
+        match self.session().config().proxy {
+            Some(_) => data
+                .iter()
+                .position(|(_, port)| *port == self.session().config().ap_port.unwrap_or(443))
+                .expect("No access points available with that proxy port."),
+            None => 0, // just pick the first one
+        }
+    }
 
-        let port = aps
-            .accesspoint
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .unwrap()
-            .port();
-        assert_eq!(port, 443);
+    async fn try_apresolve(&self) -> Result<ApResolveData, Box<dyn Error>> {
+        let req = Request::builder()
+            .method("GET")
+            .uri("http://apresolve.spotify.com/?type=accesspoint&type=dealer&type=spclient")
+            .body(Body::empty())
+            .unwrap();
+
+        let body = self.session().http_client().request_body(req).await?;
+        let data: ApResolveData = serde_json::from_slice(body.as_ref())?;
+
+        Ok(data)
+    }
+
+    async fn apresolve(&self) {
+        let result = self.try_apresolve().await;
+        self.lock(|inner| {
+            let data = match result {
+                Ok(data) => data,
+                Err(e) => {
+                    warn!("Failed to resolve access points, using fallbacks: {}", e);
+                    ApResolveData::default()
+                }
+            };
+
+            inner.data.accesspoint = Self::split_aps(data.accesspoint);
+            inner.data.dealer = Self::split_aps(data.dealer);
+            inner.data.spclient = Self::split_aps(data.spclient);
+        })
+    }
+
+    fn is_empty(&self) -> bool {
+        self.lock(|inner| {
+            inner.data.accesspoint.is_empty()
+                || inner.data.dealer.is_empty()
+                || inner.data.spclient.is_empty()
+        })
+    }
+
+    pub async fn resolve(&self, endpoint: &str) -> SocketAddress {
+        if self.is_empty() {
+            self.apresolve().await;
+        }
+
+        self.lock(|inner| match endpoint {
+            "accesspoint" => {
+                let pos = self.find_ap(&inner.data.accesspoint);
+                inner.data.accesspoint.remove(pos)
+            }
+            "dealer" => {
+                let pos = self.find_ap(&inner.data.dealer);
+                inner.data.dealer.remove(pos)
+            }
+            "spclient" => {
+                let pos = self.find_ap(&inner.data.spclient);
+                inner.data.spclient.remove(pos)
+            }
+            _ => unimplemented!(),
+        })
     }
 }

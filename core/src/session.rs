@@ -16,7 +16,7 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::apresolve::apresolve;
+use crate::apresolve::ApResolver;
 use crate::audio_key::AudioKeyManager;
 use crate::authentication::Credentials;
 use crate::cache::Cache;
@@ -49,6 +49,7 @@ struct SessionInternal {
     http_client: HttpClient,
     tx_connection: mpsc::UnboundedSender<(u8, Vec<u8>)>,
 
+    apresolver: OnceCell<ApResolver>,
     audio_key: OnceCell<AudioKeyManager>,
     channel: OnceCell<ChannelManager>,
     mercury: OnceCell<MercuryManager>,
@@ -72,40 +73,6 @@ impl Session {
         cache: Option<Cache>,
     ) -> Result<Session, SessionError> {
         let http_client = HttpClient::new(config.proxy.as_ref());
-        let ap = apresolve(&http_client, config.ap_port).await.accesspoint;
-
-        info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
-        let mut transport = connection::connect(&ap.0, ap.1, config.proxy.as_ref()).await?;
-
-        let reusable_credentials =
-            connection::authenticate(&mut transport, credentials, &config.device_id).await?;
-        info!("Authenticated as \"{}\" !", reusable_credentials.username);
-        if let Some(cache) = &cache {
-            cache.save_credentials(&reusable_credentials);
-        }
-
-        let session = Session::create(
-            transport,
-            http_client,
-            config,
-            cache,
-            reusable_credentials.username,
-            tokio::runtime::Handle::current(),
-        );
-
-        Ok(session)
-    }
-
-    fn create(
-        transport: connection::Transport,
-        http_client: HttpClient,
-        config: SessionConfig,
-        cache: Option<Cache>,
-        username: String,
-        handle: tokio::runtime::Handle,
-    ) -> Session {
-        let (sink, stream) = transport.split();
-
         let (sender_tx, sender_rx) = mpsc::unbounded_channel();
         let session_id = SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
 
@@ -115,21 +82,37 @@ impl Session {
             config,
             data: RwLock::new(SessionData {
                 country: String::new(),
-                canonical_username: username,
+                canonical_username: String::new(),
                 invalid: false,
                 time_delta: 0,
             }),
             http_client,
             tx_connection: sender_tx,
             cache: cache.map(Arc::new),
+            apresolver: OnceCell::new(),
             audio_key: OnceCell::new(),
             channel: OnceCell::new(),
             mercury: OnceCell::new(),
             token_provider: OnceCell::new(),
-            handle,
+            handle: tokio::runtime::Handle::current(),
             session_id,
         }));
 
+        let ap = session.apresolver().resolve("accesspoint").await;
+        info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
+        let mut transport =
+            connection::connect(&ap.0, ap.1, session.config().proxy.as_ref()).await?;
+
+        let reusable_credentials =
+            connection::authenticate(&mut transport, credentials, &session.config().device_id)
+                .await?;
+        info!("Authenticated as \"{}\" !", reusable_credentials.username);
+        session.0.data.write().unwrap().canonical_username = reusable_credentials.username.clone();
+        if let Some(cache) = session.cache() {
+            cache.save_credentials(&reusable_credentials);
+        }
+
+        let (sink, stream) = transport.split();
         let sender_task = UnboundedReceiverStream::new(sender_rx)
             .map(Ok)
             .forward(sink);
@@ -143,7 +126,13 @@ impl Session {
             }
         });
 
-        session
+        Ok(session)
+    }
+
+    pub fn apresolver(&self) -> &ApResolver {
+        self.0
+            .apresolver
+            .get_or_init(|| ApResolver::new(self.weak()))
     }
 
     pub fn audio_key(&self) -> &AudioKeyManager {
@@ -156,6 +145,10 @@ impl Session {
         self.0
             .channel
             .get_or_init(|| ChannelManager::new(self.weak()))
+    }
+
+    pub fn http_client(&self) -> &HttpClient {
+        &self.0.http_client
     }
 
     pub fn mercury(&self) -> &MercuryManager {
@@ -230,7 +223,7 @@ impl Session {
         self.0.cache.as_ref()
     }
 
-    fn config(&self) -> &SessionConfig {
+    pub fn config(&self) -> &SessionConfig {
         &self.0.config
     }
 
