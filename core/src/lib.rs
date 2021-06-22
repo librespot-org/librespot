@@ -20,7 +20,6 @@ mod dealer;
 #[doc(hidden)]
 pub mod diffie_hellman;
 mod http_client;
-pub mod keymaster;
 pub mod mercury;
 mod proxytunnel;
 pub mod session;
