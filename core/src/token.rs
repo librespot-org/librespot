@@ -1,6 +1,6 @@
 // Ported from librespot-java. Relicensed under MIT with permission.
 
-// Known tokens:
+// Known scopes:
 //   ugc-image-upload, playlist-read-collaborative, playlist-modify-private,
 //   playlist-modify-public, playlist-read-private, user-read-playback-position,
 //   user-read-recently-played, user-top-read, user-modify-playback-state,
