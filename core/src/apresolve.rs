@@ -1,6 +1,8 @@
 use hyper::{Body, Request};
 use serde::Deserialize;
 use std::error::Error;
+use std::hint;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub type SocketAddress = (String, u16);
 
@@ -34,11 +36,22 @@ impl Default for ApResolveData {
 component! {
     ApResolver : ApResolverInner {
         data: AccessPoints = AccessPoints::default(),
+        spinlock: AtomicUsize = AtomicUsize::new(0),
     }
 }
 
 impl ApResolver {
-    fn split_aps(data: Vec<String>) -> Vec<SocketAddress> {
+    // return a port if a proxy URL and/or a proxy port was specified. This is useful even when
+    // there is no proxy, but firewalls only allow certain ports (e.g. 443 and not 4070).
+    fn port_config(&self) -> Option<u16> {
+        if self.session().config().proxy.is_some() || self.session().config().ap_port.is_some() {
+            Some(self.session().config().ap_port.unwrap_or(443))
+        } else {
+            None
+        }
+    }
+
+    fn process_data(&self, data: Vec<String>) -> Vec<SocketAddress> {
         data.into_iter()
             .filter_map(|ap| {
                 let mut split = ap.rsplitn(2, ':');
@@ -47,19 +60,14 @@ impl ApResolver {
                     .expect("rsplitn should not return empty iterator");
                 let host = split.next()?.to_owned();
                 let port: u16 = port.parse().ok()?;
+                if let Some(p) = self.port_config() {
+                    if p != port {
+                        return None;
+                    }
+                }
                 Some((host, port))
             })
             .collect()
-    }
-
-    fn find_ap(&self, data: &[SocketAddress]) -> usize {
-        match self.session().config().proxy {
-            Some(_) => data
-                .iter()
-                .position(|(_, port)| *port == self.session().config().ap_port.unwrap_or(443))
-                .expect("No access points available with that proxy port."),
-            None => 0, // just pick the first one
-        }
     }
 
     async fn try_apresolve(&self) -> Result<ApResolveData, Box<dyn Error>> {
@@ -77,6 +85,7 @@ impl ApResolver {
 
     async fn apresolve(&self) {
         let result = self.try_apresolve().await;
+
         self.lock(|inner| {
             let data = match result {
                 Ok(data) => data,
@@ -86,9 +95,9 @@ impl ApResolver {
                 }
             };
 
-            inner.data.accesspoint = Self::split_aps(data.accesspoint);
-            inner.data.dealer = Self::split_aps(data.dealer);
-            inner.data.spclient = Self::split_aps(data.spclient);
+            inner.data.accesspoint = self.process_data(data.accesspoint);
+            inner.data.dealer = self.process_data(data.dealer);
+            inner.data.spclient = self.process_data(data.spclient);
         })
     }
 
@@ -101,24 +110,32 @@ impl ApResolver {
     }
 
     pub async fn resolve(&self, endpoint: &str) -> SocketAddress {
+        // Use a spinlock to make this function atomic. Otherwise, various race conditions may
+        // occur, e.g. when the session is created, multiple components are launched almost in
+        // parallel and they will all call this function, while resolving is still in progress.
+        self.lock(|inner| {
+            while inner.spinlock.load(Ordering::SeqCst) != 0 {
+                hint::spin_loop()
+            }
+            inner.spinlock.store(1, Ordering::SeqCst);
+        });
+
         if self.is_empty() {
             self.apresolve().await;
         }
 
-        self.lock(|inner| match endpoint {
-            "accesspoint" => {
-                let pos = self.find_ap(&inner.data.accesspoint);
-                inner.data.accesspoint.remove(pos)
-            }
-            "dealer" => {
-                let pos = self.find_ap(&inner.data.dealer);
-                inner.data.dealer.remove(pos)
-            }
-            "spclient" => {
-                let pos = self.find_ap(&inner.data.spclient);
-                inner.data.spclient.remove(pos)
-            }
-            _ => unimplemented!(),
+        self.lock(|inner| {
+            let access_point = match endpoint {
+                // take the first position instead of the last with `pop`, because Spotify returns
+                // access points with ports 4070, 443 and 80 in order of preference from highest
+                // to lowest.
+                "accesspoint" => inner.data.accesspoint.remove(0),
+                "dealer" => inner.data.dealer.remove(0),
+                "spclient" => inner.data.spclient.remove(0),
+                _ => unimplemented!(),
+            };
+            inner.spinlock.store(0, Ordering::SeqCst);
+            access_point
         })
     }
 }
