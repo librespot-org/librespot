@@ -1,7 +1,6 @@
 use hyper::{Body, Request};
 use serde::Deserialize;
 use std::error::Error;
-use std::hint;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub type SocketAddress = (String, u16);
@@ -115,7 +114,8 @@ impl ApResolver {
         // parallel and they will all call this function, while resolving is still in progress.
         self.lock(|inner| {
             while inner.spinlock.load(Ordering::SeqCst) != 0 {
-                hint::spin_loop()
+                #[allow(deprecated)]
+                std::sync::atomic::spin_loop_hint()
             }
             inner.spinlock.store(1, Ordering::SeqCst);
         });
