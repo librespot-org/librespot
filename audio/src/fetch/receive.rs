@@ -7,6 +7,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use bytes::Bytes;
 use futures_util::StreamExt;
 use librespot_core::channel::{Channel, ChannelData};
+use librespot_core::packet::PacketType;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::FileId;
 use tempfile::NamedTempFile;
@@ -46,7 +47,7 @@ pub fn request_range(session: &Session, file: FileId, offset: usize, length: usi
     data.write_u32::<BigEndian>(start as u32).unwrap();
     data.write_u32::<BigEndian>(end as u32).unwrap();
 
-    session.send_packet(0x8, data);
+    session.send_packet(PacketType::StreamChunk, data);
 
     channel
 }

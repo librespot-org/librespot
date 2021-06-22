@@ -7,6 +7,7 @@ pub use self::handshake::handshake;
 use std::io::{self, ErrorKind};
 
 use futures_util::{SinkExt, StreamExt};
+use num_traits::FromPrimitive;
 use protobuf::{self, Message, ProtobufError};
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -14,6 +15,7 @@ use tokio_util::codec::Framed;
 use url::Url;
 
 use crate::authentication::Credentials;
+use crate::packet::PacketType;
 use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 use crate::version;
 
@@ -95,13 +97,14 @@ pub async fn authenticate(
         .set_device_id(device_id.to_string());
     packet.set_version_string(version::VERSION_STRING.to_string());
 
-    let cmd = 0xab;
+    let cmd = PacketType::Login;
     let data = packet.write_to_bytes().unwrap();
 
-    transport.send((cmd, data)).await?;
+    transport.send((cmd as u8, data)).await?;
     let (cmd, data) = transport.next().await.expect("EOF")?;
-    match cmd {
-        0xac => {
+    let packet_type = FromPrimitive::from_u8(cmd);
+    match packet_type {
+        Some(PacketType::APWelcome) => {
             let welcome_data = APWelcome::parse_from_bytes(data.as_ref())?;
 
             let reusable_credentials = Credentials {
@@ -112,7 +115,7 @@ pub async fn authenticate(
 
             Ok(reusable_credentials)
         }
-        0xad => {
+        Some(PacketType::AuthFailure) => {
             let error_data = APLoginFailed::parse_from_bytes(data.as_ref())?;
             Err(error_data.into())
         }

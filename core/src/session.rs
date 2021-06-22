@@ -11,6 +11,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
 use futures_util::{future, ready, StreamExt, TryStreamExt};
+use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -25,6 +26,7 @@ use crate::config::SessionConfig;
 use crate::connection::{self, AuthenticationError};
 use crate::http_client::HttpClient;
 use crate::mercury::MercuryManager;
+use crate::packet::PacketType;
 use crate::token::TokenProvider;
 
 #[derive(Debug, Error)]
@@ -184,11 +186,11 @@ impl Session {
         );
     }
 
-    #[allow(clippy::match_same_arms)]
     fn dispatch(&self, cmd: u8, data: Bytes) {
-        match cmd {
-            // TODO: add command types
-            0x4 => {
+        use PacketType::*;
+        let packet_type = FromPrimitive::from_u8(cmd);
+        match packet_type {
+            Some(Ping) => {
                 let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
                 let timestamp = match SystemTime::now().duration_since(UNIX_EPOCH) {
                     Ok(dur) => dur,
@@ -199,24 +201,36 @@ impl Session {
                 self.0.data.write().unwrap().time_delta = server_timestamp - timestamp;
 
                 self.debug_info();
-                self.send_packet(0x49, vec![0, 0, 0, 0]);
+                self.send_packet(Pong, vec![0, 0, 0, 0]);
             }
-            0x4a => (),
-            0x1b => {
+            Some(PongAck) => {}
+            Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned()).unwrap();
                 info!("Country: {:?}", country);
                 self.0.data.write().unwrap().country = country;
             }
 
-            0x9 | 0xa => self.channel().dispatch(cmd, data),
-            0xd | 0xe => self.audio_key().dispatch(cmd, data),
-            0xb2..=0xb6 => self.mercury().dispatch(cmd, data),
-            _ => (),
+            Some(StreamChunkRes) | Some(ChannelError) => {
+                self.channel().dispatch(packet_type.unwrap(), data)
+            }
+            Some(AesKey) | Some(AesKeyError) => {
+                self.audio_key().dispatch(packet_type.unwrap(), data)
+            }
+            Some(MercuryReq) | Some(MercurySub) | Some(MercuryUnsub) | Some(MercuryEvent) => {
+                self.mercury().dispatch(packet_type.unwrap(), data)
+            }
+            _ => {
+                if let Some(packet_type) = PacketType::from_u8(cmd) {
+                    trace!("Ignoring {:?} packet", packet_type);
+                } else {
+                    trace!("Ignoring unknown packet {:x}", cmd);
+                }
+            }
         }
     }
 
-    pub fn send_packet(&self, cmd: u8, data: Vec<u8>) {
-        self.0.tx_connection.send((cmd, data)).unwrap();
+    pub fn send_packet(&self, cmd: PacketType, data: Vec<u8>) {
+        self.0.tx_connection.send((cmd as u8, data)).unwrap();
     }
 
     pub fn cache(&self) -> Option<&Arc<Cache>> {

@@ -2,6 +2,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use protobuf::Message;
 use std::io::Write;
 
+use crate::packet::PacketType;
 use crate::protocol;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -43,11 +44,12 @@ impl ToString for MercuryMethod {
 }
 
 impl MercuryMethod {
-    pub fn command(&self) -> u8 {
+    pub fn command(&self) -> PacketType {
+        use PacketType::*;
         match *self {
-            MercuryMethod::Get | MercuryMethod::Send => 0xb2,
-            MercuryMethod::Sub => 0xb3,
-            MercuryMethod::Unsub => 0xb4,
+            MercuryMethod::Get | MercuryMethod::Send => MercuryReq,
+            MercuryMethod::Sub => MercurySub,
+            MercuryMethod::Unsub => MercuryUnsub,
         }
     }
 }

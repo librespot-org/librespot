@@ -8,8 +8,10 @@ use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::lock::BiLock;
 use futures_util::{ready, StreamExt};
+use num_traits::FromPrimitive;
 use tokio::sync::mpsc;
 
+use crate::packet::PacketType;
 use crate::util::SeqGenerator;
 
 component! {
@@ -66,7 +68,7 @@ impl ChannelManager {
         (seq, channel)
     }
 
-    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: PacketType, mut data: Bytes) {
         use std::collections::hash_map::Entry;
 
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
@@ -87,7 +89,7 @@ impl ChannelManager {
             inner.download_measurement_bytes += data.len();
 
             if let Entry::Occupied(entry) = inner.channels.entry(id) {
-                let _ = entry.get().send((cmd, data));
+                let _ = entry.get().send((cmd as u8, data));
             }
         });
     }
@@ -109,7 +111,8 @@ impl Channel {
     fn recv_packet(&mut self, cx: &mut Context<'_>) -> Poll<Result<Bytes, ChannelError>> {
         let (cmd, packet) = ready!(self.receiver.poll_recv(cx)).ok_or(ChannelError)?;
 
-        if cmd == 0xa {
+        let packet_type = FromPrimitive::from_u8(cmd);
+        if let Some(PacketType::ChannelError) = packet_type {
             let code = BigEndian::read_u16(&packet.as_ref()[..2]);
             error!("channel error: {} {}", packet.len(), code);
 

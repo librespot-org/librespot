@@ -2,6 +2,7 @@
 
 #[macro_use]
 extern crate log;
+extern crate num_derive;
 
 use librespot_protocol as protocol;
 
@@ -21,6 +22,7 @@ mod dealer;
 pub mod diffie_hellman;
 mod http_client;
 pub mod mercury;
+pub mod packet;
 mod proxytunnel;
 pub mod session;
 mod socket;
