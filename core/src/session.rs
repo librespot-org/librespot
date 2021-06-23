@@ -203,25 +203,29 @@ impl Session {
                 self.debug_info();
                 self.send_packet(Pong, vec![0, 0, 0, 0]);
             }
-            Some(PongAck) => {}
             Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned()).unwrap();
                 info!("Country: {:?}", country);
                 self.0.data.write().unwrap().country = country;
             }
-
             Some(StreamChunkRes) | Some(ChannelError) => {
-                self.channel().dispatch(packet_type.unwrap(), data)
+                self.channel().dispatch(packet_type.unwrap(), data);
             }
             Some(AesKey) | Some(AesKeyError) => {
-                self.audio_key().dispatch(packet_type.unwrap(), data)
+                self.audio_key().dispatch(packet_type.unwrap(), data);
             }
             Some(MercuryReq) | Some(MercurySub) | Some(MercuryUnsub) | Some(MercuryEvent) => {
-                self.mercury().dispatch(packet_type.unwrap(), data)
+                self.mercury().dispatch(packet_type.unwrap(), data);
             }
+            Some(PongAck)
+            | Some(SecretBlock)
+            | Some(LegacyWelcome)
+            | Some(UnknownDataAllZeros)
+            | Some(ProductInfo)
+            | Some(LicenseVersion) => {}
             _ => {
                 if let Some(packet_type) = PacketType::from_u8(cmd) {
-                    trace!("Ignoring {:?} packet", packet_type);
+                    trace!("Ignoring {:?} packet with data {:?}", packet_type, data);
                 } else {
                     trace!("Ignoring unknown packet {:x}", cmd);
                 }
