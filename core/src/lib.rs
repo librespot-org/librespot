@@ -1,5 +1,3 @@
-#![allow(clippy::unused_io_amount)]
-
 #[macro_use]
 extern crate log;
 extern crate num_derive;
