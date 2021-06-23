@@ -194,7 +194,9 @@ impl Sink for AlsaSink {
             match open_device(&self.device, self.format) {
                 Ok((pcm, bytes_per_period)) => {
                     self.pcm = Some(pcm);
-                    self.period_buffer = Vec::with_capacity(bytes_per_period);
+                    if self.period_buffer.capacity() != bytes_per_period {
+                        self.period_buffer = Vec::with_capacity(bytes_per_period);
+                    }
                 }
                 Err(e) => {
                     return Err(io::Error::new(io::ErrorKind::Other, e));
@@ -209,7 +211,7 @@ impl Sink for AlsaSink {
         {
             // Write any leftover data in the period buffer
             // before draining the actual buffer
-            self.write_bytes(&[])?;
+            self.write_buf()?;
             let pcm = self.pcm.as_mut().ok_or_else(|| {
                 io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
             })?;
@@ -240,7 +242,6 @@ impl SinkAsBytes for AlsaSink {
             processed_data += data_to_buffer;
             if self.period_buffer.len() == self.period_buffer.capacity() {
                 self.write_buf()?;
-                self.period_buffer.clear();
             }
         }
 
@@ -276,6 +277,7 @@ impl AlsaSink {
                 )
             })?
         }
+        self.period_buffer.clear();
 
         Ok(())
     }
