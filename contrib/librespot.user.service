@@ -2,15 +2,11 @@
 Description=Librespot (an open source Spotify client)
 Documentation=https://github.com/librespot-org/librespot
 Documentation=https://github.com/librespot-org/librespot/wiki/Options
-Requires=network-online.target
-After=network-online.target
 
 [Service]
-User=nobody
-Group=audio
 Restart=always
 RestartSec=10
-ExecStart=/usr/bin/librespot --name "%p@%H"
+ExecStart=/usr/bin/librespot --name "%u@%H"
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

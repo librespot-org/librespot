@@ -25,6 +25,8 @@ component! {
     }
 }
 
+const ONE_SECOND_IN_MS: usize = 1000;
+
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct ChannelError;
 
@@ -76,8 +78,11 @@ impl ChannelManager {
         self.lock(|inner| {
             let current_time = Instant::now();
             if let Some(download_measurement_start) = inner.download_measurement_start {
-                if (current_time - download_measurement_start).as_millis() > 1000 {
-                    inner.download_rate_estimate = 1000 * inner.download_measurement_bytes
+                if (current_time - download_measurement_start).as_millis()
+                    > ONE_SECOND_IN_MS as u128
+                {
+                    inner.download_rate_estimate = ONE_SECOND_IN_MS
+                        * inner.download_measurement_bytes
                         / (current_time - download_measurement_start).as_millis() as usize;
                     inner.download_measurement_start = Some(current_time);
                     inner.download_measurement_bytes = 0;

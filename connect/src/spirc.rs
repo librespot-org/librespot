@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::context::StationContext;
-use crate::core::config::{ConnectConfig, VolumeCtrl};
+use crate::core::config::ConnectConfig;
 use crate::core::mercury::{MercuryError, MercurySender};
 use crate::core::session::Session;
 use crate::core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
@@ -54,7 +54,6 @@ struct SpircTask {
     device: DeviceState,
     state: State,
     play_request_id: Option<u64>,
-    mixer_started: bool,
     play_status: SpircPlayStatus,
 
     subscription: BoxedStream<Frame>,
@@ -82,12 +81,14 @@ pub enum SpircCommand {
 }
 
 struct SpircTaskConfig {
-    volume_ctrl: VolumeCtrl,
     autoplay: bool,
 }
 
 const CONTEXT_TRACKS_HISTORY: usize = 10;
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
+
+const VOLUME_STEPS: i64 = 64;
+const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
 
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
@@ -163,10 +164,10 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
                 msg.set_typ(protocol::spirc::CapabilityType::kVolumeSteps);
                 {
                     let repeated = msg.mut_intValue();
-                    if let VolumeCtrl::Fixed = config.volume_ctrl {
-                        repeated.push(0)
+                    if config.has_volume_ctrl {
+                        repeated.push(VOLUME_STEPS)
                     } else {
-                        repeated.push(64)
+                        repeated.push(0)
                     }
                 };
                 msg
@@ -214,36 +215,6 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
     }
 }
 
-fn calc_logarithmic_volume(volume: u16) -> u16 {
-    // Volume conversion taken from https://www.dr-lex.be/info-stuff/volumecontrols.html#ideal2
-    // Convert the given volume [0..0xffff] to a dB gain
-    // We assume a dB range of 60dB.
-    // Use the equation: a * exp(b * x)
-    // in which a = IDEAL_FACTOR, b = 1/1000
-    const IDEAL_FACTOR: f64 = 6.908;
-    let normalized_volume = volume as f64 / std::u16::MAX as f64; // To get a value between 0 and 1
-
-    let mut val = std::u16::MAX;
-    // Prevent val > std::u16::MAX due to rounding errors
-    if normalized_volume < 0.999 {
-        let new_volume = (normalized_volume * IDEAL_FACTOR).exp() / 1000.0;
-        val = (new_volume * std::u16::MAX as f64) as u16;
-    }
-
-    debug!("input volume:{} to mixer: {}", volume, val);
-
-    // return the scale factor (0..0xffff) (equivalent to a voltage multiplier).
-    val
-}
-
-fn volume_to_mixer(volume: u16, volume_ctrl: &VolumeCtrl) -> u16 {
-    match volume_ctrl {
-        VolumeCtrl::Linear => volume,
-        VolumeCtrl::Log => calc_logarithmic_volume(volume),
-        VolumeCtrl::Fixed => volume,
-    }
-}
-
 fn url_encode(bytes: impl AsRef<[u8]>) -> String {
     form_urlencoded::byte_serialize(bytes.as_ref()).collect()
 }
@@ -280,9 +251,8 @@ impl Spirc {
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
-        let volume = config.volume;
+        let initial_volume = config.initial_volume;
         let task_config = SpircTaskConfig {
-            volume_ctrl: config.volume_ctrl.to_owned(),
             autoplay: config.autoplay,
         };
 
@@ -302,7 +272,6 @@ impl Spirc {
             device,
             state: initial_state(),
             play_request_id: None,
-            mixer_started: false,
             play_status: SpircPlayStatus::Stopped,
 
             subscription,
@@ -318,7 +287,12 @@ impl Spirc {
             context: None,
         };
 
-        task.set_volume(volume);
+        if let Some(volume) = initial_volume {
+            task.set_volume(volume);
+        } else {
+            let current_volume = task.mixer.volume();
+            task.set_volume(current_volume);
+        }
 
         let spirc = Spirc { commands: cmd_tx };
 
@@ -435,20 +409,6 @@ impl SpircTask {
         };
 
         dur.as_millis() as i64 + 1000 * self.session.time_delta()
-    }
-
-    fn ensure_mixer_started(&mut self) {
-        if !self.mixer_started {
-            self.mixer.start();
-            self.mixer_started = true;
-        }
-    }
-
-    fn ensure_mixer_stopped(&mut self) {
-        if self.mixer_started {
-            self.mixer.stop();
-            self.mixer_started = false;
-        }
     }
 
     fn update_state_position(&mut self, position_ms: u32) {
@@ -600,7 +560,6 @@ impl SpircTask {
                         _ => {
                             warn!("The player has stopped unexpectedly.");
                             self.state.set_status(PlayStatus::kPlayStatusStop);
-                            self.ensure_mixer_stopped();
                             self.notify(None, true);
                             self.play_status = SpircPlayStatus::Stopped;
                         }
@@ -659,7 +618,6 @@ impl SpircTask {
                     info!("No more tracks left in queue");
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
-                    self.mixer.stop();
                     self.play_status = SpircPlayStatus::Stopped;
                 }
 
@@ -767,7 +725,6 @@ impl SpircTask {
                     self.device.set_is_active(false);
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
-                    self.ensure_mixer_stopped();
                     self.play_status = SpircPlayStatus::Stopped;
                 }
             }
@@ -782,7 +739,11 @@ impl SpircTask {
                 position_ms,
                 preloading_of_next_track_triggered,
             } => {
-                self.ensure_mixer_started();
+                // Synchronize the volume from the mixer. This is useful on
+                // systems that can switch sources from and back to librespot.
+                let current_volume = self.mixer.volume();
+                self.set_volume(current_volume);
+
                 self.player.play();
                 self.state.set_status(PlayStatus::kPlayStatusPlay);
                 self.update_state_position(position_ms);
@@ -792,7 +753,6 @@ impl SpircTask {
                 };
             }
             SpircPlayStatus::LoadingPause { position_ms } => {
-                self.ensure_mixer_started();
                 self.player.play();
                 self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
             }
@@ -962,7 +922,6 @@ impl SpircTask {
             self.state.set_playing_track_index(0);
             self.state.set_status(PlayStatus::kPlayStatusStop);
             self.player.stop();
-            self.ensure_mixer_stopped();
             self.play_status = SpircPlayStatus::Stopped;
         }
     }
@@ -1007,19 +966,13 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let mut volume: u32 = self.device.get_volume() as u32 + 4096;
-        if volume > 0xFFFF {
-            volume = 0xFFFF;
-        }
-        self.set_volume(volume as u16);
+        let volume = (self.device.get_volume() as u16).saturating_add(VOLUME_STEP_SIZE);
+        self.set_volume(volume);
     }
 
     fn handle_volume_down(&mut self) {
-        let mut volume: i32 = self.device.get_volume() as i32 - 4096;
-        if volume < 0 {
-            volume = 0;
-        }
-        self.set_volume(volume as u16);
+        let volume = (self.device.get_volume() as u16).saturating_sub(VOLUME_STEP_SIZE);
+        self.set_volume(volume);
     }
 
     fn handle_end_of_track(&mut self) {
@@ -1243,7 +1196,6 @@ impl SpircTask {
             None => {
                 self.state.set_status(PlayStatus::kPlayStatusStop);
                 self.player.stop();
-                self.ensure_mixer_stopped();
                 self.play_status = SpircPlayStatus::Stopped;
             }
         }
@@ -1273,8 +1225,7 @@ impl SpircTask {
 
     fn set_volume(&mut self, volume: u16) {
         self.device.set_volume(volume as u32);
-        self.mixer
-            .set_volume(volume_to_mixer(volume, &self.config.volume_ctrl));
+        self.mixer.set_volume(volume);
         if let Some(cache) = self.session.cache() {
             cache.save_volume(volume)
         }

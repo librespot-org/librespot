@@ -1,95 +1,189 @@
 use super::{Open, Sink, SinkAsBytes};
 use crate::config::AudioFormat;
+use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::player::{NUM_CHANNELS, SAMPLES_PER_SECOND, SAMPLE_RATE};
+use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use alsa::device_name::HintIter;
-use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
-use alsa::{Direction, Error, ValueOr};
+use alsa::pcm::{Access, Format, HwParams, PCM};
+use alsa::{Direction, ValueOr};
 use std::cmp::min;
-use std::ffi::CString;
 use std::io;
 use std::process::exit;
+use std::time::Duration;
+use thiserror::Error;
 
-const BUFFERED_LATENCY: f32 = 0.125; // seconds
-const BUFFERED_PERIODS: Frames = 4;
+// 125 ms Period time * 4 periods = 0.5 sec buffer.
+const PERIOD_TIME: Duration = Duration::from_millis(125);
+const NUM_PERIODS: u32 = 4;
+
+#[derive(Debug, Error)]
+enum AlsaError {
+    #[error("AlsaSink, device {device} may be invalid or busy, {err}")]
+    PcmSetUp { device: String, err: alsa::Error },
+    #[error("AlsaSink, device {device} unsupported access type RWInterleaved, {err}")]
+    UnsupportedAccessType { device: String, err: alsa::Error },
+    #[error("AlsaSink, device {device} unsupported format {format:?}, {err}")]
+    UnsupportedFormat {
+        device: String,
+        format: AudioFormat,
+        err: alsa::Error,
+    },
+    #[error("AlsaSink, device {device} unsupported sample rate {samplerate}, {err}")]
+    UnsupportedSampleRate {
+        device: String,
+        samplerate: u32,
+        err: alsa::Error,
+    },
+    #[error("AlsaSink, device {device} unsupported channel count {channel_count}, {err}")]
+    UnsupportedChannelCount {
+        device: String,
+        channel_count: u8,
+        err: alsa::Error,
+    },
+    #[error("AlsaSink Hardware Parameters Error, {0}")]
+    HwParams(alsa::Error),
+    #[error("AlsaSink Software Parameters Error, {0}")]
+    SwParams(alsa::Error),
+    #[error("AlsaSink PCM Error, {0}")]
+    Pcm(alsa::Error),
+}
 
 pub struct AlsaSink {
     pcm: Option<PCM>,
     format: AudioFormat,
     device: String,
-    buffer: Vec<u8>,
+    period_buffer: Vec<u8>,
 }
 
-fn list_outputs() {
+fn list_outputs() -> io::Result<()> {
+    println!("Listing available Alsa outputs:");
     for t in &["pcm", "ctl", "hwdep"] {
         println!("{} devices:", t);
-        let i = HintIter::new(None, &*CString::new(*t).unwrap()).unwrap();
+        let i = match HintIter::new_str(None, &t) {
+            Ok(i) => i,
+            Err(e) => {
+                return Err(io::Error::new(io::ErrorKind::Other, e));
+            }
+        };
         for a in i {
             if let Some(Direction::Playback) = a.direction {
                 // mimic aplay -L
-                println!(
-                    "{}\n\t{}\n",
-                    a.name.unwrap(),
-                    a.desc.unwrap().replace("\n", "\n\t")
-                );
+                let name = a
+                    .name
+                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not parse name"))?;
+                let desc = a
+                    .desc
+                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not parse desc"))?;
+                println!("{}\n\t{}\n", name, desc.replace("\n", "\n\t"));
             }
         }
     }
+
+    Ok(())
 }
 
-fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, Frames), Box<Error>> {
-    let pcm = PCM::new(dev_name, Direction::Playback, false)?;
+fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), AlsaError> {
+    let pcm = PCM::new(dev_name, Direction::Playback, false).map_err(|e| AlsaError::PcmSetUp {
+        device: dev_name.to_string(),
+        err: e,
+    })?;
+
     let alsa_format = match format {
+        AudioFormat::F64 => Format::float64(),
         AudioFormat::F32 => Format::float(),
         AudioFormat::S32 => Format::s32(),
         AudioFormat::S24 => Format::s24(),
-        AudioFormat::S24_3 => Format::S243LE,
         AudioFormat::S16 => Format::s16(),
+
+        #[cfg(target_endian = "little")]
+        AudioFormat::S24_3 => Format::S243LE,
+        #[cfg(target_endian = "big")]
+        AudioFormat::S24_3 => Format::S243BE,
     };
 
-    // http://www.linuxjournal.com/article/6735?page=0,1#N0x19ab2890.0x19ba78d8
-    // latency = period_size * periods / (rate * bytes_per_frame)
-    // For stereo samples encoded as 32-bit float, one frame has a length of eight bytes.
-    let mut period_size = ((SAMPLES_PER_SECOND * format.size() as u32) as f32
-        * (BUFFERED_LATENCY / BUFFERED_PERIODS as f32)) as Frames;
-    {
-        let hwp = HwParams::any(&pcm)?;
-        hwp.set_access(Access::RWInterleaved)?;
-        hwp.set_format(alsa_format)?;
-        hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest)?;
-        hwp.set_channels(NUM_CHANNELS as u32)?;
-        period_size = hwp.set_period_size_near(period_size, ValueOr::Greater)?;
-        hwp.set_buffer_size_near(period_size * BUFFERED_PERIODS)?;
-        pcm.hw_params(&hwp)?;
+    let bytes_per_period = {
+        let hwp = HwParams::any(&pcm).map_err(AlsaError::HwParams)?;
+        hwp.set_access(Access::RWInterleaved)
+            .map_err(|e| AlsaError::UnsupportedAccessType {
+                device: dev_name.to_string(),
+                err: e,
+            })?;
 
-        let swp = pcm.sw_params_current()?;
-        swp.set_start_threshold(hwp.get_buffer_size()? - hwp.get_period_size()?)?;
-        pcm.sw_params(&swp)?;
-    }
+        hwp.set_format(alsa_format)
+            .map_err(|e| AlsaError::UnsupportedFormat {
+                device: dev_name.to_string(),
+                format,
+                err: e,
+            })?;
 
-    Ok((pcm, period_size))
+        hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest).map_err(|e| {
+            AlsaError::UnsupportedSampleRate {
+                device: dev_name.to_string(),
+                samplerate: SAMPLE_RATE,
+                err: e,
+            }
+        })?;
+
+        hwp.set_channels(NUM_CHANNELS as u32)
+            .map_err(|e| AlsaError::UnsupportedChannelCount {
+                device: dev_name.to_string(),
+                channel_count: NUM_CHANNELS,
+                err: e,
+            })?;
+
+        // Deal strictly in time and periods.
+        hwp.set_periods(NUM_PERIODS, ValueOr::Nearest)
+            .map_err(AlsaError::HwParams)?;
+
+        hwp.set_period_time_near(PERIOD_TIME.as_micros() as u32, ValueOr::Nearest)
+            .map_err(AlsaError::HwParams)?;
+
+        pcm.hw_params(&hwp).map_err(AlsaError::Pcm)?;
+
+        let swp = pcm.sw_params_current().map_err(AlsaError::Pcm)?;
+
+        // Don't assume we got what we wanted.
+        // Ask to make sure.
+        let frames_per_period = hwp.get_period_size().map_err(AlsaError::HwParams)?;
+
+        let frames_per_buffer = hwp.get_buffer_size().map_err(AlsaError::HwParams)?;
+
+        swp.set_start_threshold(frames_per_buffer - frames_per_period)
+            .map_err(AlsaError::SwParams)?;
+
+        pcm.sw_params(&swp).map_err(AlsaError::Pcm)?;
+
+        // Let ALSA do the math for us.
+        pcm.frames_to_bytes(frames_per_period) as usize
+    };
+
+    Ok((pcm, bytes_per_period))
 }
 
 impl Open for AlsaSink {
     fn open(device: Option<String>, format: AudioFormat) -> Self {
-        info!("Using Alsa sink with format: {:?}", format);
-
-        let name = match device.as_ref().map(AsRef::as_ref) {
-            Some("?") => {
-                println!("Listing available Alsa outputs:");
-                list_outputs();
-                exit(0)
-            }
+        let name = match device.as_deref() {
+            Some("?") => match list_outputs() {
+                Ok(_) => {
+                    exit(0);
+                }
+                Err(err) => {
+                    error!("Error listing Alsa outputs, {}", err);
+                    exit(1);
+                }
+            },
             Some(device) => device,
             None => "default",
         }
         .to_string();
 
+        info!("Using AlsaSink with format: {:?}", format);
+
         Self {
             pcm: None,
             format,
             device: name,
-            buffer: vec![],
+            period_buffer: vec![],
         }
     }
 }
@@ -97,21 +191,13 @@ impl Open for AlsaSink {
 impl Sink for AlsaSink {
     fn start(&mut self) -> io::Result<()> {
         if self.pcm.is_none() {
-            let pcm = open_device(&self.device, self.format);
-            match pcm {
-                Ok((p, period_size)) => {
-                    self.pcm = Some(p);
-                    // Create a buffer for all samples for a full period
-                    self.buffer = Vec::with_capacity(
-                        period_size as usize * BUFFERED_PERIODS as usize * self.format.size(),
-                    );
+            match open_device(&self.device, self.format) {
+                Ok((pcm, bytes_per_period)) => {
+                    self.pcm = Some(pcm);
+                    self.period_buffer = Vec::with_capacity(bytes_per_period);
                 }
                 Err(e) => {
-                    error!("Alsa error PCM open {}", e);
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        "Alsa error: PCM open failed",
-                    ));
+                    return Err(io::Error::new(io::ErrorKind::Other, e));
                 }
             }
         }
@@ -123,9 +209,16 @@ impl Sink for AlsaSink {
         {
             // Write any leftover data in the period buffer
             // before draining the actual buffer
-            self.write_bytes(&[]).expect("could not flush buffer");
-            let pcm = self.pcm.as_mut().unwrap();
-            pcm.drain().unwrap();
+            self.write_bytes(&[])?;
+            let pcm = self.pcm.as_mut().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
+            })?;
+            pcm.drain().map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Error stopping AlsaSink {}", e),
+                )
+            })?
         }
         self.pcm = None;
         Ok(())
@@ -139,15 +232,15 @@ impl SinkAsBytes for AlsaSink {
         let mut processed_data = 0;
         while processed_data < data.len() {
             let data_to_buffer = min(
-                self.buffer.capacity() - self.buffer.len(),
+                self.period_buffer.capacity() - self.period_buffer.len(),
                 data.len() - processed_data,
             );
-            self.buffer
+            self.period_buffer
                 .extend_from_slice(&data[processed_data..processed_data + data_to_buffer]);
             processed_data += data_to_buffer;
-            if self.buffer.len() == self.buffer.capacity() {
-                self.write_buf();
-                self.buffer.clear();
+            if self.period_buffer.len() == self.period_buffer.capacity() {
+                self.write_buf()?;
+                self.period_buffer.clear();
             }
         }
 
@@ -156,12 +249,34 @@ impl SinkAsBytes for AlsaSink {
 }
 
 impl AlsaSink {
-    fn write_buf(&mut self) {
-        let pcm = self.pcm.as_mut().unwrap();
+    pub const NAME: &'static str = "alsa";
+
+    fn write_buf(&mut self) -> io::Result<()> {
+        let pcm = self.pcm.as_mut().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "Error writing from AlsaSink buffer to PCM, PCM is None",
+            )
+        })?;
         let io = pcm.io_bytes();
-        match io.writei(&self.buffer) {
-            Ok(_) => (),
-            Err(err) => pcm.try_recover(err, false).unwrap(),
-        };
+        if let Err(err) = io.writei(&self.period_buffer) {
+            // Capture and log the original error as a warning, and then try to recover.
+            // If recovery fails then forward that error back to player.
+            warn!(
+                "Error writing from AlsaSink buffer to PCM, trying to recover {}",
+                err
+            );
+            pcm.try_recover(err, false).map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "Error writing from AlsaSink buffer to PCM, recovery failed {}",
+                        e
+                    ),
+                )
+            })?
+        }
+
+        Ok(())
     }
 }
