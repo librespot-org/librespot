@@ -15,6 +15,8 @@ use thiserror::Error;
 // 0.5 sec buffer.
 const PERIOD_TIME: Duration = Duration::from_millis(100);
 const BUFFER_TIME: Duration = Duration::from_millis(500);
+const KIB: usize = 1024;
+const TWO_KIB: usize = 2048;
 
 #[derive(Debug, Error)]
 enum AlsaError {
@@ -251,9 +253,9 @@ impl AlsaSink {
         self.bytes_per_period = bytes_per_period;
         // As noted above Vec growth strategies are not guaranteed
         // so we over allocate initially so that our Vec will never
-        // actaully reach full capacity thus (hopefully) avoiding future reallocations.
-        // Nearest (truncated) KiB + 2 KiB.
-        let over_allocation = ((bytes_per_period / 1024) * 1024) + 2048;
+        // actually reach full capacity thus (hopefully) avoiding
+        // future reallocations. Nearest (truncated) KiB + 2 KiB.
+        let over_allocation = ((bytes_per_period / KIB) * KIB) + TWO_KIB;
         // If the capacity is greater than we want try to shrink it
         // to it's current len (which should be zero) before trying
         // to set the capacity with reserve_exact.
@@ -282,9 +284,14 @@ impl AlsaSink {
     }
 
     fn drain_period_buffer(&mut self) -> io::Result<()> {
-        // Always give the PCM a periods worth of audio
-        // even when draining the buffer.
-        self.period_buffer.resize(self.bytes_per_period, 0);
+        // Always give the PCM a period's worth of audio
+        // even when draining the buffer. This makes for
+        // more consistent stop to start latency
+        // (pause to play, manually changing tracks)
+        // and helps to prevent jarring, "chopped off" sounding
+        // transitions when changing tracks manually.
+        // Overall resulting in a slightly smoother user experience.
+        self.period_buffer.resize(self.bytes_per_period, u8::MIN);
         self.write_buf()?;
         Ok(())
     }
