@@ -12,9 +12,9 @@ use std::process::exit;
 use std::time::Duration;
 use thiserror::Error;
 
-// 125 ms Period time * 4 periods = 0.5 sec buffer.
-const PERIOD_TIME: Duration = Duration::from_millis(125);
-const NUM_PERIODS: u32 = 4;
+// 0.5 sec buffer.
+const PERIOD_TIME: Duration = Duration::from_millis(100);
+const BUFFER_TIME: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Error)]
 enum AlsaError {
@@ -132,8 +132,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Alsa
                 err: e,
             })?;
 
-        // Deal strictly in time and periods.
-        hwp.set_periods(NUM_PERIODS, ValueOr::Nearest)
+        hwp.set_buffer_time_near(BUFFER_TIME.as_micros() as u32, ValueOr::Nearest)
             .map_err(AlsaError::HwParams)?;
 
         hwp.set_period_time_near(PERIOD_TIME.as_micros() as u32, ValueOr::Nearest)
