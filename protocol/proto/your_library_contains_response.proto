@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.your_library.proto;
+
+option optimize_for = CODE_SIZE;
+
+message YourLibraryContainsResponseHeader {
+    bool is_loading = 2;
+}
+
+message YourLibraryContainsResponseEntity {
+    string uri = 1;
+    bool is_in_library = 2;
+}
+
+message YourLibraryContainsResponse {
+    YourLibraryContainsResponseHeader header = 1;
+    repeated YourLibraryContainsResponseEntity entity = 2;
+    string error = 99;
+}

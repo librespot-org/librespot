@@ -652,12 +652,9 @@ impl PlayerTrackLoader {
             FileFormat::MP3_160 => 20 * 1024,
             FileFormat::MP3_96 => 12 * 1024,
             FileFormat::MP3_160_ENC => 20 * 1024,
-            FileFormat::MP4_128_DUAL => 16 * 1024,
-            FileFormat::OTHER3 => 40 * 1024, // better some high guess than nothing
-            FileFormat::AAC_160 => 20 * 1024,
-            FileFormat::AAC_320 => 40 * 1024,
-            FileFormat::MP4_128 => 16 * 1024,
-            FileFormat::OTHER5 => 40 * 1024, // better some high guess than nothing
+            FileFormat::AAC_24 => 3 * 1024,
+            FileFormat::AAC_48 => 6 * 1024,
+            FileFormat::FLAC_FLAC => 112 * 1024, // assume 900 kbps on average
         }
     }
 

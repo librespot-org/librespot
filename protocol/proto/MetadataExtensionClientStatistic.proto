@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message MetadataExtensionClientStatistic {
+    optional bytes task_id = 1;
+    optional string feature_id = 2;
+    optional bool is_online_param = 3;
+    optional int32 num_extensions_with_etags = 4;
+    optional int32 num_extensions_requested = 5;
+    optional int32 num_extensions_needed = 6;
+    optional int32 num_uris_requested = 7;
+    optional int32 num_uris_needed = 8;
+    optional int32 num_prepared_requests = 9;
+    optional int32 num_sent_requests = 10;
+}

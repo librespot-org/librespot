@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.playlist.cosmos.proto;
+
+import "policy/artist_decoration_policy.proto";
+import "policy/track_decoration_policy.proto";
+import "policy/playlist_album_decoration_policy.proto";
+import "policy/user_decoration_policy.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.policy.proto";
+
+message PlaylistTrackDecorationPolicy {
+    cosmos_util.proto.TrackDecorationPolicy track = 1;
+    bool row_id = 2;
+    bool add_time = 3;
+    bool in_collection = 4;
+    bool can_add_to_collection = 5;
+    bool is_banned = 6;
+    bool can_ban = 7;
+    bool local_file = 8;
+    bool offline = 9;
+    bool format_list_attributes = 10;
+    bool display_covers = 11;
+    UserDecorationPolicy added_by = 12;
+    PlaylistAlbumDecorationPolicy album = 13;
+    cosmos_util.proto.ArtistDecorationPolicy artist = 14;
+}

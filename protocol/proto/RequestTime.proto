@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message RequestTime {
+    optional string type = 1;
+    optional int64 first_byte = 2;
+    optional int64 last_byte = 3;
+    optional int64 size = 4;
+    optional int64 size_sent = 5;
+    optional bool error = 6;
+    optional string url = 7;
+    optional string verb = 8;
+    optional int64 payload_size_sent = 9;
+    optional int32 connection_reuse = 10;
+    optional double sampling_probability = 11;
+    optional bool cached = 12;
+}

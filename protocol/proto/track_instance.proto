@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "context_index.proto";
+import "context_track.proto";
+import "seek_to_position.proto";
+
+option optimize_for = CODE_SIZE;
+
+message TrackInstance {
+    optional ContextTrack track = 1;
+    optional uint64 id = 2;
+    optional SeekToPosition seek_to_position = 7;
+    optional bool initially_paused = 4;
+    optional ContextIndex index = 5;
+    optional string provider = 6;
+    
+    reserved 3;
+}

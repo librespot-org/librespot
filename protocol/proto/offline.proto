@@ -1,0 +1,83 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.offline.proto;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Capacity {
+    double total_space = 1;
+    double free_space = 2;
+    double offline_space = 3;
+    uint64 track_count = 4;
+    uint64 episode_count = 5;
+}
+
+message Device {
+    string device_id = 1;
+    string cache_id = 2;
+    string name = 3;
+    int32 type = 4;
+    int32 platform = 5;
+    bool offline_enabled = 6;
+    Capacity capacity = 7;
+    google.protobuf.Timestamp updated_at = 9;
+    google.protobuf.Timestamp last_seen_at = 10;
+    bool removal_pending = 11;
+}
+
+message Restrictions {
+    google.protobuf.Duration allowed_duration_tracks = 1;
+    uint64 max_tracks = 2;
+    google.protobuf.Duration allowed_duration_episodes = 3;
+    uint64 max_episodes = 4;
+}
+
+message Resource {
+    string uri = 1;
+    ResourceState state = 2;
+    int32 progress = 3;
+    google.protobuf.Timestamp updated_at = 4;
+    string failure_message = 5;
+}
+
+message DeviceKey {
+    string user_id = 1;
+    string device_id = 2;
+    string cache_id = 3;
+}
+
+message ResourceForDevice {
+    string device_id = 1;
+    string cache_id = 2;
+    Resource resource = 3;
+}
+
+message ResourceOperation {
+    Operation operation = 2;
+    enum Operation {
+        INVALID = 0;
+        ADD = 1;
+        REMOVE = 2;
+    }
+    
+    string uri = 3;
+}
+
+message ResourceHistoryItem {
+    repeated ResourceOperation operations = 1;
+    google.protobuf.Timestamp server_time = 2;
+}
+
+enum ResourceState {
+    UNSPECIFIED = 0;
+    REQUESTED = 1;
+    PENDING = 2;
+    DOWNLOADING = 3;
+    DOWNLOADED = 4;
+    FAILURE = 5;
+}

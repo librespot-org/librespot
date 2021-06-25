@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.remote_config.ucs.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AccountAttribute {
+    oneof value {
+        bool bool_value = 2;
+        int64 long_value = 3;
+        string string_value = 4;
+    }
+}

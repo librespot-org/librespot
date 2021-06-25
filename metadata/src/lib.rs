@@ -359,7 +359,7 @@ impl Metadata for Episode {
         let country = session.country();
 
         let files = msg
-            .get_file()
+            .get_audio()
             .iter()
             .filter(|file| file.has_file_id())
             .map(|file| {
@@ -370,7 +370,7 @@ impl Metadata for Episode {
             .collect();
 
         let covers = msg
-            .get_covers()
+            .get_cover_image()
             .get_image()
             .iter()
             .filter(|image| image.has_file_id())
@@ -412,7 +412,7 @@ impl Metadata for Show {
             .collect::<Vec<_>>();
 
         let covers = msg
-            .get_covers()
+            .get_cover_image()
             .get_image()
             .iter()
             .filter(|image| image.has_file_id())

@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.explicit_content.proto;
+
+option optimize_for = CODE_SIZE;
+
+message KeyValuePair {
+    required string key = 1;
+    required string value = 2;
+}
+
+message UserAttributesUpdate {
+    repeated KeyValuePair pairs = 1;
+}

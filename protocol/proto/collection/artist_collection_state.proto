@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.cosmos_util.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.proto";
+
+message ArtistCollectionState {
+    optional string collection_link = 1;
+    optional bool followed = 2;
+    optional uint32 num_tracks_in_collection = 3;
+    optional uint32 num_albums_in_collection = 4;
+    optional bool is_banned = 5;
+    optional bool can_ban = 6;
+}

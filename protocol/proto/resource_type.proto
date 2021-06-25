@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.offline.proto;
+
+option optimize_for = CODE_SIZE;
+
+enum ResourceType {
+    OTHER = 0;
+    AUDIO = 1;
+    DRM = 2;
+    IMAGE = 3;
+    VIDEO = 4;
+}

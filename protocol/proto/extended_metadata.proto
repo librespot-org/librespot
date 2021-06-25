@@ -1,0 +1,62 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.extendedmetadata;
+
+import "extension_kind.proto";
+import "entity_extension_data.proto";
+
+option cc_enable_arenas = true;
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.extendedmetadata.proto";
+
+message ExtensionQuery {
+    ExtensionKind extension_kind = 1;
+    string etag = 2;
+}
+
+message EntityRequest {
+    string entity_uri = 1;
+    repeated ExtensionQuery query = 2;
+}
+
+message BatchedEntityRequestHeader {
+    string country = 1;
+    string catalogue = 2;
+    bytes task_id = 3;
+}
+
+message BatchedEntityRequest {
+    BatchedEntityRequestHeader header = 1;
+    repeated EntityRequest entity_request = 2;
+}
+
+message EntityExtensionDataArrayHeader {
+    int32 provider_error_status = 1;
+    int64 cache_ttl_in_seconds = 2;
+    int64 offline_ttl_in_seconds = 3;
+    ExtensionType extension_type = 4;
+}
+
+message EntityExtensionDataArray {
+    EntityExtensionDataArrayHeader header = 1;
+    ExtensionKind extension_kind = 2;
+    repeated EntityExtensionData extension_data = 3;
+}
+
+message BatchedExtensionResponseHeader {
+    
+}
+
+message BatchedExtensionResponse {
+    BatchedExtensionResponseHeader header = 1;
+    repeated EntityExtensionDataArray extended_metadata = 2;
+}
+
+enum ExtensionType {
+    UNKNOWN = 0;
+    GENERIC = 1;
+    ASSOC = 2;
+}

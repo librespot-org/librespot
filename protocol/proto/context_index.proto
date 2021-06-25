@@ -1,0 +1,12 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ContextIndex {
+    optional uint32 page = 1;
+    optional uint32 track = 2;
+}

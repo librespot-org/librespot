@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "logging_params.proto";
+
+option optimize_for = CODE_SIZE;
+
+message PlayerModel {
+    optional bool is_paused = 1;
+    optional uint64 hash = 2;
+    optional LoggingParams logging_params = 3;
+    
+    optional StartReason start_reason = 4;
+    enum StartReason {
+        REMOTE_TRANSFER = 0;
+        COMEBACK = 1;
+        PLAY_CONTEXT = 2;
+        PLAY_SPECIFIC_TRACK = 3;
+        TRACK_FINISHED = 4;
+        SKIP_TO_NEXT_TRACK = 5;
+        SKIP_TO_PREV_TRACK = 6;
+        ERROR = 7;
+        IGNORED = 8;
+        UNKNOWN = 9;
+    }
+}

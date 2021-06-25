@@ -1,0 +1,40 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+import "es_context_player_options.proto";
+import "es_optional.proto";
+import "es_skip_to_track.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message PreparePlayOptions {
+    bytes playback_id = 1;
+    bool always_play_something = 2;
+    SkipToTrack skip_to = 3;
+    OptionalInt64 seek_to = 4;
+    bool initially_paused = 5;
+    bool system_initiated = 6;
+    ContextPlayerOptionOverrides player_options_override = 7;
+    repeated string suppressions = 8;
+    
+    PrefetchLevel prefetch_level = 9;
+    enum PrefetchLevel {
+        NONE = 0;
+        MEDIA = 1;
+    }
+    
+    AudioStream audio_stream = 10;
+    enum AudioStream {
+        DEFAULT = 0;
+        ALARM = 1;
+    }
+    
+    string session_id = 11;
+    string license = 12;
+    map<string, string> configuration_override = 13;
+}

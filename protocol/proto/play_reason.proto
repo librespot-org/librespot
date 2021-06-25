@@ -1,0 +1,33 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+enum PlayReason {
+    REASON_UNSET = 0;
+    REASON_APP_LOAD = 1;
+    REASON_BACK_BTN = 2;
+    REASON_CLICK_ROW = 3;
+    REASON_CLICK_SIDE = 4;
+    REASON_END_PLAY = 5;
+    REASON_FWD_BTN = 6;
+    REASON_INTERRUPTED = 7;
+    REASON_LOGOUT = 8;
+    REASON_PLAY_BTN = 9;
+    REASON_POPUP = 10;
+    REASON_REMOTE = 11;
+    REASON_SONG_DONE = 12;
+    REASON_TRACK_DONE = 13;
+    REASON_TRACK_ERROR = 14;
+    REASON_PREVIEW = 15;
+    REASON_PLAY_REASON_UNKNOWN = 16;
+    REASON_URI_OPEN = 17;
+    REASON_BACKGROUNDED = 18;
+    REASON_OFFLINE = 19;
+    REASON_UNEXPECTED_EXIT = 20;
+    REASON_UNEXPECTED_EXIT_WHILE_PAUSED = 21;
+}

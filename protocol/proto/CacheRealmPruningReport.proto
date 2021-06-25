@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CacheRealmPruningReport {
+    optional bytes cache_id = 1;
+    optional int64 realm_id = 2;
+    optional int64 num_entries_pruned = 3;
+    optional int64 num_entries_pruned_expired = 4;
+    optional int64 size_entries_pruned_expired_kb = 5;
+    optional int64 num_entries_pruned_limit = 6;
+    optional int64 size_pruned_limit_kb = 7;
+    optional int64 num_entries_pruned_never_used = 8;
+    optional int64 size_pruned_never_used_kb = 9;
+    optional int64 num_entries_pruned_max_realm_size = 10;
+    optional int64 size_pruned_max_realm_size_kb = 11;
+    optional int64 num_entries_pruned_min_free_space = 12;
+    optional int64 size_pruned_min_free_space_kb = 13;
+}

@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "track_instance.proto";
+import "track_instantiator.proto";
+
+option optimize_for = CODE_SIZE;
+
+message TransferNode {
+    optional TrackInstance instance = 1;
+    optional TrackInstantiator instantiator = 2;
+}

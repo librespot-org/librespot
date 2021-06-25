@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message TierFeatureFlags {
+    optional bool ads = 1;
+    optional bool high_quality = 2;
+    optional bool offline = 3;
+    optional bool on_demand = 4;
+    optional string max_album_plays_consecutive = 5;
+    optional string max_album_plays_per_hour = 6;
+    optional string max_skips_per_hour = 7;
+    optional string max_track_plays_per_hour = 8;
+}

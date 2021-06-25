@@ -1,0 +1,56 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.remote_config.ucs.proto;
+
+import "resolve.proto";
+import "useraccount.proto";
+
+option optimize_for = CODE_SIZE;
+
+message UcsRequest {
+    CallerInfo caller_info = 1;
+    message CallerInfo {
+        string request_origin_id = 1;
+        string request_orgin_version = 2;
+        string reason = 3;
+    }
+    
+    ResolveRequest resolve_request = 2;
+    
+    AccountAttributesRequest account_attributes_request = 3;
+    message AccountAttributesRequest {
+        
+    }
+}
+
+message UcsResponseWrapper {
+    oneof result {
+        UcsResponse success = 1;
+        Error error = 2;
+    }
+    
+    message UcsResponse {
+        int64 fetch_time_millis = 5;
+        
+        oneof resolve_result {
+            ResolveResponse resolve_success = 1;
+            Error resolve_error = 2;
+        }
+        
+        oneof account_attributes_result {
+            AccountAttributesResponse account_attributes_success = 3;
+            Error account_attributes_error = 4;
+        }
+    }
+    
+    message AccountAttributesResponse {
+        map<string, AccountAttribute> account_attributes = 1;
+    }
+    
+    message Error {
+        int32 error_code = 1;
+        string error_message = 2;
+    }
+}

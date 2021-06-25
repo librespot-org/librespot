@@ -1,0 +1,11 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.tags_info_request.proto;
+
+option optimize_for = CODE_SIZE;
+
+message Response {
+    bool is_synced = 1;
+}

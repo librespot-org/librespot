@@ -1,0 +1,74 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.your_library.proto;
+
+option optimize_for = CODE_SIZE;
+
+message YourLibraryRequestEntityInfo {
+    
+}
+
+message YourLibraryRequestAlbumExtraInfo {
+    
+}
+
+message YourLibraryRequestArtistExtraInfo {
+    
+}
+
+message YourLibraryRequestPlaylistExtraInfo {
+    
+}
+
+message YourLibraryRequestShowExtraInfo {
+    
+}
+
+message YourLibraryRequestFolderExtraInfo {
+    
+}
+
+message YourLibraryLabelAndImage {
+    string label = 1;
+    string image = 2;
+}
+
+message YourLibraryRequestLikedSongsExtraInfo {
+    YourLibraryLabelAndImage label_and_image = 101;
+}
+
+message YourLibraryRequestYourEpisodesExtraInfo {
+    YourLibraryLabelAndImage label_and_image = 101;
+}
+
+message YourLibraryRequestNewEpisodesExtraInfo {
+    YourLibraryLabelAndImage label_and_image = 101;
+}
+
+message YourLibraryRequestLocalFilesExtraInfo {
+    YourLibraryLabelAndImage label_and_image = 101;
+}
+
+message YourLibraryRequestEntity {
+    YourLibraryRequestEntityInfo entityInfo = 1;
+    YourLibraryRequestAlbumExtraInfo album = 2;
+    YourLibraryRequestArtistExtraInfo artist = 3;
+    YourLibraryRequestPlaylistExtraInfo playlist = 4;
+    YourLibraryRequestShowExtraInfo show = 5;
+    YourLibraryRequestFolderExtraInfo folder = 6;
+    YourLibraryRequestLikedSongsExtraInfo liked_songs = 8;
+    YourLibraryRequestYourEpisodesExtraInfo your_episodes = 9;
+    YourLibraryRequestNewEpisodesExtraInfo new_episodes = 10;
+    YourLibraryRequestLocalFilesExtraInfo local_files = 11;
+}
+
+message YourLibraryRequestHeader {
+    bool remaining_entities = 9;
+}
+
+message YourLibraryRequest {
+    YourLibraryRequestHeader header = 1;
+    YourLibraryRequestEntity entity = 2;
+}

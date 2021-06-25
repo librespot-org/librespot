@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConnectDeviceDiscovered {
+    optional string device_id = 1;
+    optional string discover_method = 2;
+    optional string discovered_device_id = 3;
+    optional string discovered_device_type = 4;
+    optional string discovered_library_version = 5;
+    optional string discovered_brand_display_name = 6;
+    optional string discovered_model_display_name = 7;
+    optional string discovered_client_id = 8;
+    optional string discovered_product_id = 9;
+    optional string discovered_device_availablilty = 10;
+    optional string discovered_device_public_key = 11;
+    optional bool capabilities_resolved = 12;
+}
