@@ -19,10 +19,8 @@ enum PulseError {
     ConnectionRefused(PAErr),
     #[error("Error stopping PulseAudioSink, failed to drain PulseAudio server buffer, {0}")]
     DrainFailure(PAErr),
-    #[error("Error stopping PulseAudioSink, Not connected to PulseAudio server")]
-    NotConnectedOnStop,
-    #[error("Error writing from PulseAudioSink to PulseAudio, Not connected to PulseAudio server")]
-    NotConnectedOnWrite,
+    #[error("Error in PulseAudioSink, Not connected to PulseAudio server")]
+    ServerNone,
     #[error("Error writing from PulseAudioSink to PulseAudio server, {0}")]
     OnWrite(PAErr),
 }
@@ -120,7 +118,7 @@ impl Sink for PulseAudioSink {
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotConnected,
-                    PulseError::NotConnectedOnStop,
+                    PulseError::ServerNone,
                 ));
             }
         }
@@ -146,7 +144,7 @@ impl SinkAsBytes for PulseAudioSink {
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotConnected,
-                    PulseError::NotConnectedOnWrite,
+                    PulseError::ServerNone,
                 ));
             }
         }
