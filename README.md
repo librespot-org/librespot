@@ -89,7 +89,6 @@ The above command will create a receiver named ```Librespot```, with bitrate set
 A full list of runtime options are available [here](https://github.com/librespot-org/librespot/wiki/Options)
 
 _Please Note: When using the cache feature, an authentication blob is stored for your account in the cache directory. For security purposes, we recommend that you set directory permissions on the cache directory to `700`._
-
 ## Contact
 Come and hang out on gitter if you need help or want to offer some.
 https://gitter.im/librespot-org/spotify-connect-resources

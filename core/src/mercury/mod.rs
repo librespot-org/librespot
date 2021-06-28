@@ -11,7 +11,6 @@ use futures_util::FutureExt;
 use protobuf::Message;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::packet::PacketType;
 use crate::protocol;
 use crate::util::SeqGenerator;
 
@@ -144,7 +143,7 @@ impl MercuryManager {
         }
     }
 
-    pub(crate) fn dispatch(&self, cmd: PacketType, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         let seq_len = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
         let seq = data.split_to(seq_len).as_ref().to_owned();
 
@@ -155,17 +154,14 @@ impl MercuryManager {
 
         let mut pending = match pending {
             Some(pending) => pending,
+            None if cmd == 0xb5 => MercuryPending {
+                parts: Vec::new(),
+                partial: None,
+                callback: None,
+            },
             None => {
-                if let PacketType::MercuryEvent = cmd {
-                    MercuryPending {
-                        parts: Vec::new(),
-                        partial: None,
-                        callback: None,
-                    }
-                } else {
-                    warn!("Ignore seq {:?} cmd {:x}", seq, cmd as u8);
-                    return;
-                }
+                warn!("Ignore seq {:?} cmd {:x}", seq, cmd);
+                return;
             }
         };
 
@@ -195,7 +191,7 @@ impl MercuryManager {
         data.split_to(size).as_ref().to_owned()
     }
 
-    fn complete_request(&self, cmd: PacketType, mut pending: MercuryPending) {
+    fn complete_request(&self, cmd: u8, mut pending: MercuryPending) {
         let header_data = pending.parts.remove(0);
         let header = protocol::mercury::Header::parse_from_bytes(&header_data).unwrap();
 
@@ -212,7 +208,7 @@ impl MercuryManager {
             if let Some(cb) = pending.callback {
                 let _ = cb.send(Err(MercuryError));
             }
-        } else if let PacketType::MercuryEvent = cmd {
+        } else if cmd == 0xb5 {
             self.lock(|inner| {
                 let mut found = false;
 

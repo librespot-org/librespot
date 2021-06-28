@@ -1,15 +1,14 @@
 use std::process::exit;
-use std::time::Duration;
-use std::{io, thread};
+use std::{io, thread, time};
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
 use super::Sink;
 use crate::config::AudioFormat;
-use crate::convert::Converter;
+use crate::convert;
 use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 
 #[cfg(all(
     feature = "rodiojack-backend",
@@ -175,20 +174,18 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
 }
 
 impl Sink for RodioSink {
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+    start_stop_noop!();
+
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         let samples = packet.samples();
         match self.format {
             AudioFormat::F32 => {
-                let samples_f32: &[f32] = &converter.f64_to_f32(samples);
-                let source = rodio::buffer::SamplesBuffer::new(
-                    NUM_CHANNELS as u16,
-                    SAMPLE_RATE,
-                    samples_f32,
-                );
+                let source =
+                    rodio::buffer::SamplesBuffer::new(NUM_CHANNELS as u16, SAMPLE_RATE, samples);
                 self.rodio_sink.append(source);
             }
             AudioFormat::S16 => {
-                let samples_s16: &[i16] = &converter.f64_to_s16(samples);
+                let samples_s16: &[i16] = &convert::to_s16(samples);
                 let source = rodio::buffer::SamplesBuffer::new(
                     NUM_CHANNELS as u16,
                     SAMPLE_RATE,
@@ -204,12 +201,8 @@ impl Sink for RodioSink {
         // 44100 elements --> about 27 chunks
         while self.rodio_sink.len() > 26 {
             // sleep and wait for rodio to drain a bit
-            thread::sleep(Duration::from_millis(10));
+            thread::sleep(time::Duration::from_millis(10));
         }
         Ok(())
     }
-}
-
-impl RodioSink {
-    pub const NAME: &'static str = "rodio";
 }

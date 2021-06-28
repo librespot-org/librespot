@@ -32,10 +32,6 @@ version = "0.2.0"
 path = "core"
 version = "0.2.0"
 
-[dependencies.librespot-discovery]
-path = "discovery"
-version = "0.2.0"
-
 [dependencies.librespot-metadata]
 path = "metadata"
 version = "0.2.0"
@@ -72,7 +68,10 @@ rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
-with-dns-sd = ["librespot-discovery/with-dns-sd"]
+with-tremor = ["librespot-playback/with-tremor"]
+with-vorbis = ["librespot-playback/with-vorbis"]
+
+with-dns-sd = ["librespot-connect/with-dns-sd"]
 
 default = ["rodio-backend"]
 
@@ -90,6 +89,5 @@ section = "sound"
 priority = "optional"
 assets = [
     ["target/release/librespot", "usr/bin/", "755"],
-    ["contrib/librespot.service", "lib/systemd/system/", "644"],
-    ["contrib/librespot.user.service", "lib/systemd/user/", "644"]
+    ["contrib/librespot.service", "lib/systemd/system/", "644"]
 ]

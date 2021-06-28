@@ -26,9 +26,7 @@ http = "0.2"
 hyper = { version = "0.14", features = ["client", "tcp", "http1"] }
 hyper-proxy = { version = "0.9.1", default-features = false }
 log = "0.4"
-num = "0.4"
 num-bigint = { version = "0.4", features = ["rand"] }
-num-derive = "0.3"
 num-integer = "0.1"
 num-traits = "0.2"
 once_cell = "1.5.2"

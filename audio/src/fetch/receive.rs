@@ -1,14 +1,12 @@
 use std::cmp::{max, min};
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::{atomic, Arc};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use atomic::Ordering;
 use byteorder::{BigEndian, WriteBytesExt};
 use bytes::Bytes;
 use futures_util::StreamExt;
 use librespot_core::channel::{Channel, ChannelData};
-use librespot_core::packet::PacketType;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::FileId;
 use tempfile::NamedTempFile;
@@ -18,7 +16,7 @@ use crate::range_set::{Range, RangeSet};
 
 use super::{AudioFileShared, DownloadStrategy, StreamLoaderCommand};
 use super::{
-    FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME, MAX_PREFETCH_REQUESTS,
+    FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME_SECONDS, MAX_PREFETCH_REQUESTS,
     MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
 };
 
@@ -48,7 +46,7 @@ pub fn request_range(session: &Session, file: FileId, offset: usize, length: usi
     data.write_u32::<BigEndian>(start as u32).unwrap();
     data.write_u32::<BigEndian>(end as u32).unwrap();
 
-    session.send_packet(PacketType::StreamChunk, data);
+    session.send_packet(0x8, data);
 
     channel
 }
@@ -59,7 +57,7 @@ struct PartialFileData {
 }
 
 enum ReceivedData {
-    ResponseTime(Duration),
+    ResponseTimeMs(usize),
     Data(PartialFileData),
 }
 
@@ -76,7 +74,7 @@ async fn receive_data(
 
     let old_number_of_request = shared
         .number_of_open_requests
-        .fetch_add(1, Ordering::SeqCst);
+        .fetch_add(1, atomic::Ordering::SeqCst);
 
     let mut measure_ping_time = old_number_of_request == 0;
 
@@ -88,11 +86,14 @@ async fn receive_data(
         };
 
         if measure_ping_time {
-            let mut duration = Instant::now() - request_sent_time;
-            if duration > MAXIMUM_ASSUMED_PING_TIME {
-                duration = MAXIMUM_ASSUMED_PING_TIME;
+            let duration = Instant::now() - request_sent_time;
+            let duration_ms: u64;
+            if 0.001 * (duration.as_millis() as f64) > MAXIMUM_ASSUMED_PING_TIME_SECONDS {
+                duration_ms = (MAXIMUM_ASSUMED_PING_TIME_SECONDS * 1000.0) as u64;
+            } else {
+                duration_ms = duration.as_millis() as u64;
             }
-            let _ = file_data_tx.send(ReceivedData::ResponseTime(duration));
+            let _ = file_data_tx.send(ReceivedData::ResponseTimeMs(duration_ms as usize));
             measure_ping_time = false;
         }
         let data_size = data.len();
@@ -126,7 +127,7 @@ async fn receive_data(
 
     shared
         .number_of_open_requests
-        .fetch_sub(1, Ordering::SeqCst);
+        .fetch_sub(1, atomic::Ordering::SeqCst);
 
     if result.is_err() {
         warn!(
@@ -148,7 +149,7 @@ struct AudioFileFetch {
 
     file_data_tx: mpsc::UnboundedSender<ReceivedData>,
     complete_tx: Option<oneshot::Sender<NamedTempFile>>,
-    network_response_times: Vec<Duration>,
+    network_response_times_ms: Vec<usize>,
 }
 
 // Might be replaced by enum from std once stable
@@ -236,7 +237,7 @@ impl AudioFileFetch {
 
             // download data from after the current read position first
             let mut tail_end = RangeSet::new();
-            let read_position = self.shared.read_position.load(Ordering::Relaxed);
+            let read_position = self.shared.read_position.load(atomic::Ordering::Relaxed);
             tail_end.add_range(&Range::new(
                 read_position,
                 self.shared.file_size - read_position,
@@ -266,23 +267,26 @@ impl AudioFileFetch {
 
     fn handle_file_data(&mut self, data: ReceivedData) -> ControlFlow {
         match data {
-            ReceivedData::ResponseTime(response_time) => {
-                trace!("Ping time estimated as: {}ms", response_time.as_millis());
-
-                // prune old response times. Keep at most two so we can push a third.
-                while self.network_response_times.len() >= 3 {
-                    self.network_response_times.remove(0);
-                }
+            ReceivedData::ResponseTimeMs(response_time_ms) => {
+                trace!("Ping time estimated as: {} ms.", response_time_ms);
 
                 // record the response time
-                self.network_response_times.push(response_time);
+                self.network_response_times_ms.push(response_time_ms);
+
+                // prune old response times. Keep at most three.
+                while self.network_response_times_ms.len() > 3 {
+                    self.network_response_times_ms.remove(0);
+                }
 
                 // stats::median is experimental. So we calculate the median of up to three ourselves.
-                let ping_time = match self.network_response_times.len() {
-                    1 => self.network_response_times[0],
-                    2 => (self.network_response_times[0] + self.network_response_times[1]) / 2,
+                let ping_time_ms: usize = match self.network_response_times_ms.len() {
+                    1 => self.network_response_times_ms[0] as usize,
+                    2 => {
+                        ((self.network_response_times_ms[0] + self.network_response_times_ms[1])
+                            / 2) as usize
+                    }
                     3 => {
-                        let mut times = self.network_response_times.clone();
+                        let mut times = self.network_response_times_ms.clone();
                         times.sort_unstable();
                         times[1]
                     }
@@ -292,7 +296,7 @@ impl AudioFileFetch {
                 // store our new estimate for everyone to see
                 self.shared
                     .ping_time_ms
-                    .store(ping_time.as_millis() as usize, Ordering::Relaxed);
+                    .store(ping_time_ms, atomic::Ordering::Relaxed);
             }
             ReceivedData::Data(data) => {
                 self.output
@@ -386,7 +390,7 @@ pub(super) async fn audio_file_fetch(
 
         file_data_tx,
         complete_tx: Some(complete_tx),
-        network_response_times: Vec::with_capacity(3),
+        network_response_times_ms: Vec::new(),
     };
 
     loop {
@@ -404,8 +408,10 @@ pub(super) async fn audio_file_fetch(
         }
 
         if fetch.get_download_strategy() == DownloadStrategy::Streaming() {
-            let number_of_open_requests =
-                fetch.shared.number_of_open_requests.load(Ordering::SeqCst);
+            let number_of_open_requests = fetch
+                .shared
+                .number_of_open_requests
+                .load(atomic::Ordering::SeqCst);
             if number_of_open_requests < MAX_PREFETCH_REQUESTS {
                 let max_requests_to_send = MAX_PREFETCH_REQUESTS - number_of_open_requests;
 
@@ -418,15 +424,14 @@ pub(super) async fn audio_file_fetch(
                 };
 
                 let ping_time_seconds =
-                    Duration::from_millis(fetch.shared.ping_time_ms.load(Ordering::Relaxed) as u64)
-                        .as_secs_f32();
+                    0.001 * fetch.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as f64;
                 let download_rate = fetch.session.channel().get_download_rate_estimate();
 
                 let desired_pending_bytes = max(
                     (PREFETCH_THRESHOLD_FACTOR
                         * ping_time_seconds
-                        * fetch.shared.stream_data_rate as f32) as usize,
-                    (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * download_rate as f32)
+                        * fetch.shared.stream_data_rate as f64) as usize,
+                    (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * download_rate as f64)
                         as usize,
                 );
 

@@ -1,8 +1,7 @@
 use super::{Open, Sink};
 use crate::config::AudioFormat;
-use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::NUM_CHANNELS;
+use crate::player::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
@@ -70,18 +69,15 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
-        let samples_f32: &[f32] = &converter.f64_to_f32(packet.samples());
-        for sample in samples_f32.iter() {
-            let res = self.send.send(*sample);
+    start_stop_noop!();
+
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
+        for s in packet.samples().iter() {
+            let res = self.send.send(*s);
             if res.is_err() {
                 error!("cannot write to channel");
             }
         }
         Ok(())
     }
-}
-
-impl JackSink {
-    pub const NAME: &'static str = "jackaudio";
 }

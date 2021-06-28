@@ -2,7 +2,6 @@ use std::cmp::max;
 use std::future::Future;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::pin::Pin;
-use std::process::exit;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 use std::{mem, thread};
@@ -14,12 +13,11 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
 use crate::audio::{
-    READ_AHEAD_BEFORE_PLAYBACK, READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK,
-    READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS,
+    READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_BEFORE_PLAYBACK_SECONDS,
+    READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK_SECONDS,
 };
 use crate::audio_backend::Sink;
 use crate::config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig};
-use crate::convert::Converter;
 use crate::core::session::Session;
 use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
@@ -27,10 +25,12 @@ use crate::decoder::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, 
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
 
-use crate::{NUM_CHANNELS, SAMPLES_PER_SECOND};
+pub const SAMPLE_RATE: u32 = 44100;
+pub const NUM_CHANNELS: u8 = 2;
+pub const SAMPLES_PER_SECOND: u32 = SAMPLE_RATE as u32 * NUM_CHANNELS as u32;
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
-pub const DB_VOLTAGE_RATIO: f64 = 20.0;
+const DB_VOLTAGE_RATIO: f32 = 20.0;
 
 pub struct Player {
     commands: Option<mpsc::UnboundedSender<PlayerCommand>>,
@@ -59,14 +59,13 @@ struct PlayerInternal {
     sink_event_callback: Option<SinkEventCallback>,
     audio_filter: Option<Box<dyn AudioFilter + Send>>,
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
-    converter: Converter,
 
     limiter_active: bool,
     limiter_attack_counter: u32,
     limiter_release_counter: u32,
-    limiter_peak_sample: f64,
-    limiter_factor: f64,
-    limiter_strength: f64,
+    limiter_peak_sample: f32,
+    limiter_factor: f32,
+    limiter_strength: f32,
 }
 
 enum PlayerCommand {
@@ -197,14 +196,6 @@ impl PlayerEvent {
 
 pub type PlayerEventChannel = mpsc::UnboundedReceiver<PlayerEvent>;
 
-pub fn db_to_ratio(db: f64) -> f64 {
-    f64::powf(10.0, db / DB_VOLTAGE_RATIO)
-}
-
-pub fn ratio_to_db(ratio: f64) -> f64 {
-    ratio.log10() * DB_VOLTAGE_RATIO
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct NormalisationData {
     track_gain_db: f32,
@@ -214,6 +205,14 @@ pub struct NormalisationData {
 }
 
 impl NormalisationData {
+    pub fn db_to_ratio(db: f32) -> f32 {
+        f32::powf(10.0, db / DB_VOLTAGE_RATIO)
+    }
+
+    pub fn ratio_to_db(ratio: f32) -> f32 {
+        ratio.log10() * DB_VOLTAGE_RATIO
+    }
+
     fn parse_from_file<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
         file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
@@ -233,7 +232,7 @@ impl NormalisationData {
         Ok(r)
     }
 
-    fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f64 {
+    fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f32 {
         if !config.normalisation {
             return 1.0;
         }
@@ -243,12 +242,12 @@ impl NormalisationData {
             NormalisationType::Track => [data.track_gain_db, data.track_peak],
         };
 
-        let normalisation_power = gain_db as f64 + config.normalisation_pregain;
-        let mut normalisation_factor = db_to_ratio(normalisation_power);
+        let normalisation_power = gain_db + config.normalisation_pregain;
+        let mut normalisation_factor = Self::db_to_ratio(normalisation_power);
 
-        if normalisation_factor * gain_peak as f64 > config.normalisation_threshold {
-            let limited_normalisation_factor = config.normalisation_threshold / gain_peak as f64;
-            let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
+        if normalisation_factor * gain_peak > config.normalisation_threshold {
+            let limited_normalisation_factor = config.normalisation_threshold / gain_peak;
+            let limited_normalisation_power = Self::ratio_to_db(limited_normalisation_factor);
 
             if config.normalisation_method == NormalisationMethod::Basic {
                 warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
@@ -264,9 +263,21 @@ impl NormalisationData {
         }
 
         debug!("Normalisation Data: {:?}", data);
-        debug!("Normalisation Factor: {:.2}%", normalisation_factor * 100.0);
+        debug!("Normalisation Type: {:?}", config.normalisation_type);
+        debug!(
+            "Normalisation Threshold: {:.1}",
+            Self::ratio_to_db(config.normalisation_threshold)
+        );
+        debug!("Normalisation Method: {:?}", config.normalisation_method);
+        debug!("Normalisation Factor: {}", normalisation_factor);
 
-        normalisation_factor as f64
+        if config.normalisation_method == NormalisationMethod::Dynamic {
+            debug!("Normalisation Attack: {:?}", config.normalisation_attack);
+            debug!("Normalisation Release: {:?}", config.normalisation_release);
+            debug!("Normalisation Knee: {:?}", config.normalisation_knee);
+        }
+
+        normalisation_factor
     }
 }
 
@@ -283,29 +294,8 @@ impl Player {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
         let (event_sender, event_receiver) = mpsc::unbounded_channel();
 
-        if config.normalisation {
-            debug!("Normalisation Type: {:?}", config.normalisation_type);
-            debug!(
-                "Normalisation Pregain: {:.1} dB",
-                config.normalisation_pregain
-            );
-            debug!(
-                "Normalisation Threshold: {:.1} dBFS",
-                ratio_to_db(config.normalisation_threshold)
-            );
-            debug!("Normalisation Method: {:?}", config.normalisation_method);
-
-            if config.normalisation_method == NormalisationMethod::Dynamic {
-                debug!("Normalisation Attack: {:?}", config.normalisation_attack);
-                debug!("Normalisation Release: {:?}", config.normalisation_release);
-                debug!("Normalisation Knee: {:?}", config.normalisation_knee);
-            }
-        }
-
         let handle = thread::spawn(move || {
             debug!("new Player[{}]", session.session_id());
-
-            let converter = Converter::new(config.ditherer);
 
             let internal = PlayerInternal {
                 session,
@@ -319,7 +309,6 @@ impl Player {
                 sink_event_callback: None,
                 audio_filter,
                 event_senders: [event_sender].to_vec(),
-                converter,
 
                 limiter_active: false,
                 limiter_attack_counter: 0,
@@ -423,7 +412,7 @@ impl Drop for Player {
 
 struct PlayerLoadedTrackData {
     decoder: Decoder,
-    normalisation_factor: f64,
+    normalisation_factor: f32,
     stream_loader_controller: StreamLoaderController,
     bytes_per_second: usize,
     duration_ms: u32,
@@ -456,7 +445,7 @@ enum PlayerState {
         track_id: SpotifyId,
         play_request_id: u64,
         decoder: Decoder,
-        normalisation_factor: f64,
+        normalisation_factor: f32,
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
         duration_ms: u32,
@@ -467,7 +456,7 @@ enum PlayerState {
         track_id: SpotifyId,
         play_request_id: u64,
         decoder: Decoder,
-        normalisation_factor: f64,
+        normalisation_factor: f32,
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
         duration_ms: u32,
@@ -779,7 +768,7 @@ impl PlayerTrackLoader {
                 }
                 Err(_) => {
                     warn!("Unable to extract normalisation data, using default value.");
-                    1.0
+                    1.0_f32
                 }
             };
 
@@ -963,12 +952,12 @@ impl Future for PlayerInternal {
                             let notify_about_position = match *reported_nominal_start_time {
                                 None => true,
                                 Some(reported_nominal_start_time) => {
-                                    // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we're actually in time.
+                                    // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we;re actually in time.
                                     let lag = (Instant::now() - reported_nominal_start_time)
                                         .as_millis()
                                         as i64
                                         - stream_position_millis as i64;
-                                    lag > Duration::from_secs(1).as_millis() as i64
+                                    lag > 1000
                                 }
                             };
                             if notify_about_position {
@@ -1055,10 +1044,7 @@ impl PlayerInternal {
             }
             match self.sink.start() {
                 Ok(()) => self.sink_status = SinkStatus::Running,
-                Err(err) => {
-                    error!("Fatal error, could not start audio sink: {}", err);
-                    exit(1);
-                }
+                Err(err) => error!("Could not start audio: {}", err),
             }
         }
     }
@@ -1067,21 +1053,14 @@ impl PlayerInternal {
         match self.sink_status {
             SinkStatus::Running => {
                 trace!("== Stopping sink ==");
-                match self.sink.stop() {
-                    Ok(()) => {
-                        self.sink_status = if temporarily {
-                            SinkStatus::TemporarilyClosed
-                        } else {
-                            SinkStatus::Closed
-                        };
-                        if let Some(callback) = &mut self.sink_event_callback {
-                            callback(self.sink_status);
-                        }
-                    }
-                    Err(err) => {
-                        error!("Fatal error, could not stop audio sink: {}", err);
-                        exit(1);
-                    }
+                self.sink.stop().unwrap();
+                self.sink_status = if temporarily {
+                    SinkStatus::TemporarilyClosed
+                } else {
+                    SinkStatus::Closed
+                };
+                if let Some(callback) = &mut self.sink_event_callback {
+                    callback(self.sink_status);
                 }
             }
             SinkStatus::TemporarilyClosed => {
@@ -1178,7 +1157,7 @@ impl PlayerInternal {
         }
     }
 
-    fn handle_packet(&mut self, packet: Option<AudioPacket>, normalisation_factor: f64) {
+    fn handle_packet(&mut self, packet: Option<AudioPacket>, normalisation_factor: f32) {
         match packet {
             Some(mut packet) => {
                 if !packet.is_empty() {
@@ -1188,7 +1167,7 @@ impl PlayerInternal {
                         }
 
                         if self.config.normalisation
-                            && !(f64::abs(normalisation_factor - 1.0) <= f64::EPSILON
+                            && !(f32::abs(normalisation_factor - 1.0) <= f32::EPSILON
                                 && self.config.normalisation_method == NormalisationMethod::Basic)
                         {
                             for sample in data.iter_mut() {
@@ -1208,10 +1187,10 @@ impl PlayerInternal {
                                         {
                                             shaped_limiter_strength = 1.0
                                                 / (1.0
-                                                    + f64::powf(
+                                                    + f32::powf(
                                                         shaped_limiter_strength
                                                             / (1.0 - shaped_limiter_strength),
-                                                        -self.config.normalisation_knee,
+                                                        -1.0 * self.config.normalisation_knee,
                                                     ));
                                         }
                                         actual_normalisation_factor =
@@ -1219,38 +1198,32 @@ impl PlayerInternal {
                                                 + shaped_limiter_strength * self.limiter_factor;
                                     };
 
-                                    // Cast the fields here for better readability
-                                    let normalisation_attack =
-                                        self.config.normalisation_attack.as_secs_f64();
-                                    let normalisation_release =
-                                        self.config.normalisation_release.as_secs_f64();
-                                    let limiter_release_counter =
-                                        self.limiter_release_counter as f64;
-                                    let limiter_attack_counter = self.limiter_attack_counter as f64;
-                                    let samples_per_second = SAMPLES_PER_SECOND as f64;
-
                                     // Always check for peaks, even when the limiter is already active.
                                     // There may be even higher peaks than we initially targeted.
                                     // Check against the normalisation factor that would be applied normally.
-                                    let abs_sample = f64::abs(*sample * normalisation_factor);
+                                    let abs_sample =
+                                        ((*sample as f64 * normalisation_factor as f64) as f32)
+                                            .abs();
                                     if abs_sample > self.config.normalisation_threshold {
                                         self.limiter_active = true;
                                         if self.limiter_release_counter > 0 {
                                             // A peak was encountered while releasing the limiter;
                                             // synchronize with the current release limiter strength.
-                                            self.limiter_attack_counter = (((samples_per_second
-                                                * normalisation_release)
-                                                - limiter_release_counter)
-                                                / (normalisation_release / normalisation_attack))
+                                            self.limiter_attack_counter = (((SAMPLES_PER_SECOND
+                                                as f32
+                                                * self.config.normalisation_release)
+                                                - self.limiter_release_counter as f32)
+                                                / (self.config.normalisation_release
+                                                    / self.config.normalisation_attack))
                                                 as u32;
                                             self.limiter_release_counter = 0;
                                         }
 
                                         self.limiter_attack_counter =
                                             self.limiter_attack_counter.saturating_add(1);
-
-                                        self.limiter_strength = limiter_attack_counter
-                                            / (samples_per_second * normalisation_attack);
+                                        self.limiter_strength = self.limiter_attack_counter as f32
+                                            / (SAMPLES_PER_SECOND as f32
+                                                * self.config.normalisation_attack);
 
                                         if abs_sample > self.limiter_peak_sample {
                                             self.limiter_peak_sample = abs_sample;
@@ -1264,10 +1237,12 @@ impl PlayerInternal {
                                             // the limiter reached full strength. For that reason
                                             // start the release by synchronizing with the current
                                             // attack limiter strength.
-                                            self.limiter_release_counter = (((samples_per_second
-                                                * normalisation_attack)
-                                                - limiter_attack_counter)
-                                                * (normalisation_release / normalisation_attack))
+                                            self.limiter_release_counter = (((SAMPLES_PER_SECOND
+                                                as f32
+                                                * self.config.normalisation_attack)
+                                                - self.limiter_attack_counter as f32)
+                                                * (self.config.normalisation_release
+                                                    / self.config.normalisation_attack))
                                                 as u32;
                                             self.limiter_attack_counter = 0;
                                         }
@@ -1276,19 +1251,23 @@ impl PlayerInternal {
                                             self.limiter_release_counter.saturating_add(1);
 
                                         if self.limiter_release_counter
-                                            > (samples_per_second * normalisation_release) as u32
+                                            > (SAMPLES_PER_SECOND as f32
+                                                * self.config.normalisation_release)
+                                                as u32
                                         {
                                             self.reset_limiter();
                                         } else {
-                                            self.limiter_strength = ((samples_per_second
-                                                * normalisation_release)
-                                                - limiter_release_counter)
-                                                / (samples_per_second * normalisation_release);
+                                            self.limiter_strength = ((SAMPLES_PER_SECOND as f32
+                                                * self.config.normalisation_release)
+                                                - self.limiter_release_counter as f32)
+                                                / (SAMPLES_PER_SECOND as f32
+                                                    * self.config.normalisation_release);
                                         }
                                     }
                                 }
 
-                                *sample *= actual_normalisation_factor;
+                                *sample =
+                                    (*sample as f64 * actual_normalisation_factor as f64) as f32;
 
                                 // Extremely sharp attacks, however unlikely, *may* still clip and provide
                                 // undefined results, so strictly enforce output within [-1.0, 1.0].
@@ -1301,9 +1280,9 @@ impl PlayerInternal {
                         }
                     }
 
-                    if let Err(err) = self.sink.write(&packet, &mut self.converter) {
-                        error!("Fatal error, could not write audio to audio sink: {}", err);
-                        exit(1);
+                    if let Err(err) = self.sink.write(&packet) {
+                        error!("Could not write audio: {}", err);
+                        self.ensure_sink_stopped(false);
                     }
                 }
             }
@@ -1809,18 +1788,18 @@ impl PlayerInternal {
             // Request our read ahead range
             let request_data_length = max(
                 (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
-                    * stream_loader_controller.ping_time().as_secs_f32()
-                    * bytes_per_second as f32) as usize,
-                (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
+                    * (0.001 * stream_loader_controller.ping_time_ms() as f64)
+                    * bytes_per_second as f64) as usize,
+                (READ_AHEAD_DURING_PLAYBACK_SECONDS * bytes_per_second as f64) as usize,
             );
             stream_loader_controller.fetch_next(request_data_length);
 
             // Request the part we want to wait for blocking. This effecively means we wait for the previous request to partially complete.
             let wait_for_data_length = max(
                 (READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS
-                    * stream_loader_controller.ping_time().as_secs_f32()
-                    * bytes_per_second as f32) as usize,
-                (READ_AHEAD_BEFORE_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
+                    * (0.001 * stream_loader_controller.ping_time_ms() as f64)
+                    * bytes_per_second as f64) as usize,
+                (READ_AHEAD_BEFORE_PLAYBACK_SECONDS * bytes_per_second as f64) as usize,
             );
             stream_loader_controller.fetch_next_blocking(wait_for_data_length);
         }
