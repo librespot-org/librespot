@@ -1,10 +1,12 @@
 use super::{AudioDecoder, AudioError, AudioPacket};
 
 use lewton::inside_ogg::OggStreamReader;
+use lewton::samples::InterleavedSamples;
 
 use std::error;
 use std::fmt;
 use std::io::{Read, Seek};
+use std::time::Duration;
 
 pub struct VorbisDecoder<R: Read + Seek>(OggStreamReader<R>);
 pub struct VorbisError(lewton::VorbisError);
@@ -23,7 +25,7 @@ where
     R: Read + Seek,
 {
     fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
-        let absgp = ms * 44100 / 1000;
+        let absgp = Duration::from_millis(ms as u64 * crate::SAMPLE_RATE as u64).as_secs();
         match self.0.seek_absgp_pg(absgp as u64) {
             Ok(_) => Ok(()),
             Err(err) => Err(AudioError::VorbisError(err.into())),
@@ -35,11 +37,8 @@ where
         use lewton::OggReadError::NoCapturePatternFound;
         use lewton::VorbisError::{BadAudio, OggError};
         loop {
-            match self
-                .0
-                .read_dec_packet_generic::<lewton::samples::InterleavedSamples<f32>>()
-            {
-                Ok(Some(packet)) => return Ok(Some(AudioPacket::Samples(packet.samples))),
+            match self.0.read_dec_packet_generic::<InterleavedSamples<f32>>() {
+                Ok(Some(packet)) => return Ok(Some(AudioPacket::samples_from_f32(packet.samples))),
                 Ok(None) => return Ok(None),
 
                 Err(BadAudio(AudioIsHeader)) => (),

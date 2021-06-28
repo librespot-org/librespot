@@ -1,27 +1,23 @@
 use std::fmt;
 
-use cfg_if::cfg_if;
-
-cfg_if! {
-    if #[cfg(any(feature = "with-tremor", feature = "with-vorbis"))] {
-        mod libvorbis_decoder;
-        pub use libvorbis_decoder::{VorbisDecoder, VorbisError};
-    } else {
-        mod lewton_decoder;
-        pub use lewton_decoder::{VorbisDecoder, VorbisError};
-    }
-}
+mod lewton_decoder;
+pub use lewton_decoder::{VorbisDecoder, VorbisError};
 
 mod passthrough_decoder;
 pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
 
 pub enum AudioPacket {
-    Samples(Vec<f32>),
+    Samples(Vec<f64>),
     OggData(Vec<u8>),
 }
 
 impl AudioPacket {
-    pub fn samples(&self) -> &[f32] {
+    pub fn samples_from_f32(f32_samples: Vec<f32>) -> Self {
+        let f64_samples = f32_samples.iter().map(|sample| *sample as f64).collect();
+        AudioPacket::Samples(f64_samples)
+    }
+
+    pub fn samples(&self) -> &[f64] {
         match self {
             AudioPacket::Samples(s) => s,
             AudioPacket::OggData(_) => panic!("can't return OggData on samples"),
