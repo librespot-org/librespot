@@ -15,8 +15,6 @@ use thiserror::Error;
 // 0.5 sec buffer.
 const PERIOD_TIME: Duration = Duration::from_millis(100);
 const BUFFER_TIME: Duration = Duration::from_millis(500);
-const KIB: usize = 1024;
-const TWO_KIB: usize = 2048;
 
 #[derive(Debug, Error)]
 enum AlsaError {
@@ -54,7 +52,6 @@ pub struct AlsaSink {
     pcm: Option<PCM>,
     format: AudioFormat,
     device: String,
-    bytes_per_period: usize,
     period_buffer: Vec<u8>,
 }
 
@@ -185,7 +182,6 @@ impl Open for AlsaSink {
             pcm: None,
             format,
             device: name,
-            bytes_per_period: 0,
             period_buffer: vec![],
         }
     }
@@ -197,7 +193,7 @@ impl Sink for AlsaSink {
             match open_device(&self.device, self.format) {
                 Ok((pcm, bytes_per_period)) => {
                     self.pcm = Some(pcm);
-                    self.configure_period_buffer(bytes_per_period);
+                    self.period_buffer = Vec::with_capacity(bytes_per_period);
                 }
                 Err(e) => {
                     return Err(io::Error::new(io::ErrorKind::Other, e));
@@ -209,23 +205,21 @@ impl Sink for AlsaSink {
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        // Write any leftover data in the period buffer
-        // before draining the actual buffer
-        self.drain_period_buffer()?;
-        match self.pcm.as_mut() {
-            Some(pcm) => pcm.drain().map_err(|e| {
+        {
+            // Write any leftover data in the period buffer
+            // before draining the actual buffer
+            self.period_buffer.resize(self.period_buffer.capacity(), 0);
+            self.write_buf()?;
+            let pcm = self.pcm.as_mut().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
+            })?;
+            pcm.drain().map_err(|e| {
                 io::Error::new(
                     io::ErrorKind::Other,
                     format!("Error stopping AlsaSink {}", e),
                 )
-            })?,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Error stopping AlsaSink, PCM is None",
-                ))
-            }
-        };
+            })?
+        }
 
         self.pcm = None;
         Ok(())
@@ -236,94 +230,51 @@ impl Sink for AlsaSink {
 
 impl SinkAsBytes for AlsaSink {
     fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
-        self.process_bytes(data, 0)?;
-        Ok(())
+        let mut start_index = 0;
+        loop {
+            let space_left = self.period_buffer.capacity() - self.period_buffer.len();
+            let end_index = min(data.len(), space_left);
+            self.period_buffer
+                .extend_from_slice(&data[start_index..end_index]);
+            if self.period_buffer.len() == self.period_buffer.capacity() {
+                self.write_buf()?;
+            }
+            if end_index == data.len() {
+                break Ok(());
+            }
+            start_index = end_index;
+        }
     }
 }
 
 impl AlsaSink {
     pub const NAME: &'static str = "alsa";
 
-    fn configure_period_buffer(&mut self, bytes_per_period: usize) {
-        // Vec growth strategies can and have changed.
-        // Capacity may not always be trustworthy in the future.
-        // Use bytes_per_period to make sure that no matter what
-        // we give the PCM a period's worth of audio.
-        // Don't depend on len == capacity.
-        self.bytes_per_period = bytes_per_period;
-        // As noted above Vec growth strategies are not guaranteed
-        // so we over allocate initially so that our Vec will never
-        // actually reach full capacity thus (hopefully) avoiding
-        // future reallocations. Nearest (truncated) KiB + 2 KiB.
-        let over_allocation = ((bytes_per_period / KIB) * KIB) + TWO_KIB;
-        // If the capacity is greater than we want try to shrink it
-        // to it's current len (which should be zero) before trying
-        // to set the capacity with reserve_exact.
-        if self.period_buffer.capacity() > over_allocation {
-            self.period_buffer.shrink_to_fit();
-        }
-        // This does nothing if the capacity is already sufficient.
-        // Len should always be zero, but for the sake of being thorough...
-        self.period_buffer
-            .reserve_exact(over_allocation - self.period_buffer.len());
-    }
-
-    fn process_bytes(&mut self, data: &[u8], start_index: usize) -> io::Result<()> {
-        let space_left = self.bytes_per_period - self.period_buffer.len();
-        let data_size = data.len();
-        let end_index = min(space_left, data_size);
-        self.period_buffer
-            .extend_from_slice(&data[start_index..end_index]);
-        if self.period_buffer.len() == self.bytes_per_period {
-            self.write_buf()?;
-        }
-        if end_index < data_size {
-            self.process_bytes(data, end_index)?;
-        }
-        Ok(())
-    }
-
-    fn drain_period_buffer(&mut self) -> io::Result<()> {
-        // Always give the PCM a period's worth of audio
-        // even when draining the buffer. This makes for
-        // more consistent stop to start latency
-        // (pause to play, manually changing tracks)
-        // and helps to prevent jarring, "chopped off" sounding
-        // transitions when changing tracks manually.
-        // Overall resulting in a slightly smoother user experience.
-        self.period_buffer.resize(self.bytes_per_period, u8::MIN);
-        self.write_buf()?;
-        Ok(())
-    }
-
     fn write_buf(&mut self) -> io::Result<()> {
-        match self.pcm.as_mut() {
-            Some(pcm) => {
-                if let Err(err) = pcm.io_bytes().writei(&self.period_buffer) {
-                    // Capture and log the original error as a warning, and then try to recover.
-                    // If recovery fails then forward that error back to player.
-                    warn!(
-                        "Error writing from AlsaSink buffer to PCM, trying to recover, {}",
-                        err
-                    );
-                    pcm.try_recover(err, false).map_err(|e| {
-                        io::Error::new(
-                            io::ErrorKind::Other,
-                            format!(
-                                "Error writing from AlsaSink buffer to PCM, recovery failed {}",
-                                e
-                            ),
-                        )
-                    })?
-                }
-            }
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "Error writing from AlsaSink buffer to PCM, PCM is None",
-                ));
-            }
-        };
+        let pcm = self.pcm.as_mut().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "Error writing from AlsaSink buffer to PCM, PCM is None",
+            )
+        })?;
+        let io = pcm.io_bytes();
+        if let Err(err) = io.writei(&self.period_buffer) {
+            // Capture and log the original error as a warning, and then try to recover.
+            // If recovery fails then forward that error back to player.
+            warn!(
+                "Error writing from AlsaSink buffer to PCM, trying to recover {}",
+                err
+            );
+            pcm.try_recover(err, false).map_err(|e| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!(
+                        "Error writing from AlsaSink buffer to PCM, recovery failed {}",
+                        e
+                    ),
+                )
+            })?
+        }
 
         self.period_buffer.clear();
         Ok(())
