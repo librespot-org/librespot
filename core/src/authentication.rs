@@ -42,7 +42,11 @@ impl Credentials {
         }
     }
 
-    pub fn with_blob(username: String, encrypted_blob: &str, device_id: &str) -> Credentials {
+    pub fn with_blob(
+        username: impl Into<String>,
+        encrypted_blob: impl AsRef<[u8]>,
+        device_id: impl AsRef<[u8]>,
+    ) -> Credentials {
         fn read_u8<R: Read>(stream: &mut R) -> io::Result<u8> {
             let mut data = [0u8];
             stream.read_exact(&mut data)?;
@@ -67,7 +71,9 @@ impl Credentials {
             Ok(data)
         }
 
-        let secret = Sha1::digest(device_id.as_bytes());
+        let username = username.into();
+
+        let secret = Sha1::digest(device_id.as_ref());
 
         let key = {
             let mut key = [0u8; 24];
@@ -88,9 +94,9 @@ impl Credentials {
             let mut data = base64::decode(encrypted_blob).unwrap();
             let cipher = Aes192::new(GenericArray::from_slice(&key));
             let block_size = <Aes192 as BlockCipher>::BlockSize::to_usize();
+
             assert_eq!(data.len() % block_size, 0);
-            // replace to chunks_exact_mut with MSRV bump to 1.31
-            for chunk in data.chunks_mut(block_size) {
+            for chunk in data.chunks_exact_mut(block_size) {
                 cipher.decrypt_block(GenericArray::from_mut_slice(chunk));
             }
 
@@ -102,7 +108,7 @@ impl Credentials {
             data
         };
 
-        let mut cursor = io::Cursor::new(&blob);
+        let mut cursor = io::Cursor::new(blob.as_slice());
         read_u8(&mut cursor).unwrap();
         read_bytes(&mut cursor).unwrap();
         read_u8(&mut cursor).unwrap();
