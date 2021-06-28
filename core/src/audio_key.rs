@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::io::Write;
 use tokio::sync::oneshot;
 
-use crate::packet::PacketType;
 use crate::spotify_id::{FileId, SpotifyId};
 use crate::util::SeqGenerator;
 
@@ -22,19 +21,19 @@ component! {
 }
 
 impl AudioKeyManager {
-    pub(crate) fn dispatch(&self, cmd: PacketType, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         let seq = BigEndian::read_u32(data.split_to(4).as_ref());
 
         let sender = self.lock(|inner| inner.pending.remove(&seq));
 
         if let Some(sender) = sender {
             match cmd {
-                PacketType::AesKey => {
+                0xd => {
                     let mut key = [0u8; 16];
                     key.copy_from_slice(data.as_ref());
                     let _ = sender.send(Ok(AudioKey(key)));
                 }
-                PacketType::AesKeyError => {
+                0xe => {
                     warn!(
                         "error audio key {:x} {:x}",
                         data.as_ref()[0],
@@ -62,11 +61,11 @@ impl AudioKeyManager {
 
     fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) {
         let mut data: Vec<u8> = Vec::new();
-        data.write_all(&file.0).unwrap();
-        data.write_all(&track.to_raw()).unwrap();
+        data.write(&file.0).unwrap();
+        data.write(&track.to_raw()).unwrap();
         data.write_u32::<BigEndian>(seq).unwrap();
         data.write_u16::<BigEndian>(0x0000).unwrap();
 
-        self.session().send_packet(PacketType::RequestKey, data)
+        self.session().send_packet(0xc, data)
     }
 }

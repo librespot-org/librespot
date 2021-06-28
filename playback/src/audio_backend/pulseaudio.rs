@@ -1,8 +1,7 @@
 use super::{Open, Sink, SinkAsBytes};
 use crate::config::AudioFormat;
-use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use libpulse_binding::{self as pulse, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::io;
@@ -23,14 +22,11 @@ impl Open for PulseAudioSink {
 
         // PulseAudio calls S24 and S24_3 different from the rest of the world
         let pulse_format = match format {
-            AudioFormat::F32 => pulse::sample::Format::FLOAT32NE,
-            AudioFormat::S32 => pulse::sample::Format::S32NE,
-            AudioFormat::S24 => pulse::sample::Format::S24_32NE,
-            AudioFormat::S24_3 => pulse::sample::Format::S24NE,
-            AudioFormat::S16 => pulse::sample::Format::S16NE,
-            _ => {
-                unimplemented!("PulseAudio currently does not support {:?} output", format)
-            }
+            AudioFormat::F32 => pulse::sample::Format::F32le,
+            AudioFormat::S32 => pulse::sample::Format::S32le,
+            AudioFormat::S24 => pulse::sample::Format::S24_32le,
+            AudioFormat::S24_3 => pulse::sample::Format::S24le,
+            AudioFormat::S16 => pulse::sample::Format::S16le,
         };
 
         let ss = pulse::sample::Spec {
@@ -55,7 +51,7 @@ impl Sink for PulseAudioSink {
             return Ok(());
         }
 
-        let device = self.device.as_deref();
+        let device = self.device.as_ref().map(|s| (*s).as_str());
         let result = Simple::new(
             None,                // Use the default server.
             APP_NAME,            // Our application's name.
@@ -103,8 +99,4 @@ impl SinkAsBytes for PulseAudioSink {
             ))
         }
     }
-}
-
-impl PulseAudioSink {
-    pub const NAME: &'static str = "pulseaudio";
 }

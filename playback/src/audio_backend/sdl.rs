@@ -1,11 +1,10 @@
 use super::{Open, Sink};
 use crate::config::AudioFormat;
-use crate::convert::Converter;
+use crate::convert;
 use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::player::{NUM_CHANNELS, SAMPLE_RATE};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
-use std::time::Duration;
-use std::{io, thread};
+use std::{io, thread, time};
 
 pub enum SdlSink {
     F32(AudioQueue<f32>),
@@ -82,12 +81,12 @@ impl Sink for SdlSink {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket) -> io::Result<()> {
         macro_rules! drain_sink {
             ($queue: expr, $size: expr) => {{
                 // sleep and wait for sdl thread to drain the queue a bit
                 while $queue.size() > (NUM_CHANNELS as u32 * $size as u32 * SAMPLE_RATE) {
-                    thread::sleep(Duration::from_millis(10));
+                    thread::sleep(time::Duration::from_millis(10));
                 }
             }};
         }
@@ -95,25 +94,20 @@ impl Sink for SdlSink {
         let samples = packet.samples();
         match self {
             Self::F32(queue) => {
-                let samples_f32: &[f32] = &converter.f64_to_f32(samples);
                 drain_sink!(queue, AudioFormat::F32.size());
-                queue.queue(samples_f32)
+                queue.queue(samples)
             }
             Self::S32(queue) => {
-                let samples_s32: &[i32] = &converter.f64_to_s32(samples);
+                let samples_s32: &[i32] = &convert::to_s32(samples);
                 drain_sink!(queue, AudioFormat::S32.size());
                 queue.queue(samples_s32)
             }
             Self::S16(queue) => {
-                let samples_s16: &[i16] = &converter.f64_to_s16(samples);
+                let samples_s16: &[i16] = &convert::to_s16(samples);
                 drain_sink!(queue, AudioFormat::S16.size());
                 queue.queue(samples_s16)
             }
         };
         Ok(())
     }
-}
-
-impl SdlSink {
-    pub const NAME: &'static str = "sdl";
 }

@@ -8,10 +8,8 @@ use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::lock::BiLock;
 use futures_util::{ready, StreamExt};
-use num_traits::FromPrimitive;
 use tokio::sync::mpsc;
 
-use crate::packet::PacketType;
 use crate::util::SeqGenerator;
 
 component! {
@@ -24,8 +22,6 @@ component! {
         invalid: bool = false,
     }
 }
-
-const ONE_SECOND_IN_MS: usize = 1000;
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct ChannelError;
@@ -70,7 +66,7 @@ impl ChannelManager {
         (seq, channel)
     }
 
-    pub(crate) fn dispatch(&self, cmd: PacketType, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: u8, mut data: Bytes) {
         use std::collections::hash_map::Entry;
 
         let id: u16 = BigEndian::read_u16(data.split_to(2).as_ref());
@@ -78,11 +74,8 @@ impl ChannelManager {
         self.lock(|inner| {
             let current_time = Instant::now();
             if let Some(download_measurement_start) = inner.download_measurement_start {
-                if (current_time - download_measurement_start).as_millis()
-                    > ONE_SECOND_IN_MS as u128
-                {
-                    inner.download_rate_estimate = ONE_SECOND_IN_MS
-                        * inner.download_measurement_bytes
+                if (current_time - download_measurement_start).as_millis() > 1000 {
+                    inner.download_rate_estimate = 1000 * inner.download_measurement_bytes
                         / (current_time - download_measurement_start).as_millis() as usize;
                     inner.download_measurement_start = Some(current_time);
                     inner.download_measurement_bytes = 0;
@@ -94,7 +87,7 @@ impl ChannelManager {
             inner.download_measurement_bytes += data.len();
 
             if let Entry::Occupied(entry) = inner.channels.entry(id) {
-                let _ = entry.get().send((cmd as u8, data));
+                let _ = entry.get().send((cmd, data));
             }
         });
     }
@@ -116,8 +109,7 @@ impl Channel {
     fn recv_packet(&mut self, cx: &mut Context<'_>) -> Poll<Result<Bytes, ChannelError>> {
         let (cmd, packet) = ready!(self.receiver.poll_recv(cx)).ok_or(ChannelError)?;
 
-        let packet_type = FromPrimitive::from_u8(cmd);
-        if let Some(PacketType::ChannelError) = packet_type {
+        if cmd == 0xa {
             let code = BigEndian::read_u16(&packet.as_ref()[..2]);
             error!("channel error: {} {}", packet.len(), code);
 

@@ -116,25 +116,22 @@ impl SpotifyId {
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
     pub fn from_uri(src: &str) -> Result<SpotifyId, SpotifyIdError> {
-        let src = src.strip_prefix("spotify:").ok_or(SpotifyIdError)?;
-
-        if src.len() <= SpotifyId::SIZE_BASE62 {
+        // We expect the ID to be the last colon-delimited item in the URI.
+        let b = src.as_bytes();
+        let id_i = b.len() - SpotifyId::SIZE_BASE62;
+        if b[id_i - 1] != b':' {
             return Err(SpotifyIdError);
         }
 
-        let colon_index = src.len() - SpotifyId::SIZE_BASE62 - 1;
+        let mut id = SpotifyId::from_base62(&src[id_i..])?;
 
-        if src.as_bytes()[colon_index] != b':' {
-            return Err(SpotifyIdError);
-        }
-
-        let mut id = SpotifyId::from_base62(&src[colon_index + 1..])?;
-        id.audio_type = src[..colon_index].into();
+        // Slice offset by 8 as we are skipping the "spotify:" prefix.
+        id.audio_type = src[8..id_i - 1].into();
 
         Ok(id)
     }
 
-    /// Returns the `SpotifyId` as a base16 (hex) encoded, `SpotifyId::SIZE_BASE16` (32)
+    /// Returns the `SpotifyId` as a base16 (hex) encoded, `SpotifyId::SIZE_BASE62` (22)
     /// character long `String`.
     pub fn to_base16(&self) -> String {
         to_base16(&self.to_raw(), &mut [0u8; SpotifyId::SIZE_BASE16])
@@ -308,7 +305,7 @@ mod tests {
         },
     ];
 
-    static CONV_INVALID: [ConversionCase; 3] = [
+    static CONV_INVALID: [ConversionCase; 2] = [
         ConversionCase {
             id: 0,
             kind: SpotifyAudioType::NonPlayable,
@@ -326,18 +323,6 @@ mod tests {
             kind: SpotifyAudioType::NonPlayable,
             // Missing colon between ID and type.
             uri: "spotify:arbitrarywhatever5sWHDYs0csV6RS48xBl0tH",
-            base16: "--------------------",
-            base62: "....................",
-            raw: &[
-                // Invalid length.
-                154, 27, 28, 251,
-            ],
-        },
-        ConversionCase {
-            id: 0,
-            kind: SpotifyAudioType::NonPlayable,
-            // Uri too short
-            uri: "spotify:azb:aRS48xBl0tH",
             base16: "--------------------",
             base62: "....................",
             raw: &[
