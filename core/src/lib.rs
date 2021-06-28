@@ -1,7 +1,6 @@
-#![allow(clippy::unused_io_amount)]
-
 #[macro_use]
 extern crate log;
+extern crate num_derive;
 
 use librespot_protocol as protocol;
 
@@ -19,12 +18,15 @@ mod connection;
 mod dealer;
 #[doc(hidden)]
 pub mod diffie_hellman;
-pub mod keymaster;
+mod http_client;
 pub mod mercury;
+pub mod packet;
 mod proxytunnel;
 pub mod session;
 mod socket;
+mod spclient;
 pub mod spotify_id;
+mod token;
 #[doc(hidden)]
 pub mod util;
 pub mod version;

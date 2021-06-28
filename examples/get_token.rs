@@ -2,7 +2,6 @@ use std::env;
 
 use librespot::core::authentication::Credentials;
 use librespot::core::config::SessionConfig;
-use librespot::core::keymaster;
 use librespot::core::session::Session;
 
 const SCOPES: &str =
@@ -13,8 +12,8 @@ async fn main() {
     let session_config = SessionConfig::default();
 
     let args: Vec<_> = env::args().collect();
-    if args.len() != 4 {
-        eprintln!("Usage: {} USERNAME PASSWORD CLIENT_ID", args[0]);
+    if args.len() != 3 {
+        eprintln!("Usage: {} USERNAME PASSWORD", args[0]);
         return;
     }
 
@@ -26,8 +25,6 @@ async fn main() {
 
     println!(
         "Token: {:#?}",
-        keymaster::get_token(&session, &args[3], SCOPES)
-            .await
-            .unwrap()
+        session.token_provider().get_token(SCOPES).await.unwrap()
     );
 }
