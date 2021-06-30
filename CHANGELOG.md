@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsamixer`: query card dB range for the `log` volume control unless specified otherwise
 - [playback] `alsamixer`: use `--device` name for `--mixer-card` unless specified otherwise
 - [playback] `player`: consider errors in `sink.start`, `sink.stop` and `sink.write` fatal and `exit(1)` (breaking)
-- [playback] make `convert` and `decoder` public so you can implement your own `Sink`
+- [playback] `player`: make `convert` and `decoder` public so you can implement your own `Sink`
 
 ### Deprecated
 - [connect] The `discovery` module was deprecated in favor of the `librespot-discovery` crate
