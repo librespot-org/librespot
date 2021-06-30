@@ -205,21 +205,21 @@ impl Sink for AlsaSink {
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        {
-            // Write any leftover data in the period buffer
-            // before draining the actual buffer
-            self.period_buffer.resize(self.period_buffer.capacity(), 0);
-            self.write_buf()?;
-            let pcm = self.pcm.as_mut().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
-            })?;
-            pcm.drain().map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Error stopping AlsaSink {}", e),
-                )
-            })?
-        }
+        // Zero fill the remainder of the period buffer and
+        // write any leftover data before draining the actual PCM buffer.
+        self.period_buffer.resize(self.period_buffer.capacity(), 0);
+        self.write_buf()?;
+
+        let pcm = self.pcm.as_mut().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
+        })?;
+
+        pcm.drain().map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Error stopping AlsaSink {}", e),
+            )
+        })?;
 
         self.pcm = None;
         Ok(())
