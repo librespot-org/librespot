@@ -20,7 +20,7 @@ enum PulseError {
     #[error("Error stopping PulseAudioSink, failed to drain PulseAudio server buffer, {0}")]
     DrainFailure(PAErr),
     #[error("Error in PulseAudioSink, Not connected to PulseAudio server")]
-    ServerNone,
+    NotConnected,
     #[error("Error writing from PulseAudioSink to PulseAudio server, {0}")]
     OnWrite(PAErr),
 }
@@ -106,22 +106,13 @@ impl Sink for PulseAudioSink {
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        match &self.s {
-            Some(s) => {
-                if let Err(e) = s.drain() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        PulseError::DrainFailure(e),
-                    ));
-                }
-            }
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotConnected,
-                    PulseError::ServerNone,
-                ));
-            }
-        }
+        let s = self
+            .s
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, PulseError::NotConnected))?;
+
+        s.drain()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, PulseError::DrainFailure(e)))?;
 
         self.s = None;
         Ok(())
@@ -132,22 +123,13 @@ impl Sink for PulseAudioSink {
 
 impl SinkAsBytes for PulseAudioSink {
     fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
-        match &self.s {
-            Some(s) => {
-                if let Err(e) = s.write(data) {
-                    return Err(io::Error::new(
-                        io::ErrorKind::BrokenPipe,
-                        PulseError::OnWrite(e),
-                    ));
-                }
-            }
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotConnected,
-                    PulseError::ServerNone,
-                ));
-            }
-        }
+        let s = self
+            .s
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, PulseError::NotConnected))?;
+
+        s.write(data)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, PulseError::OnWrite(e)))?;
 
         Ok(())
     }
