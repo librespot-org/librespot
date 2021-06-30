@@ -53,7 +53,7 @@ rand_distr = "0.4"
 [features]
 alsa-backend = ["alsa", "thiserror"]
 portaudio-backend = ["portaudio-rs"]
-pulseaudio-backend = ["libpulse-binding", "libpulse-simple-binding"]
+pulseaudio-backend = ["libpulse-binding", "libpulse-simple-binding", "thiserror"]
 jackaudio-backend = ["jack"]
 rodio-backend = ["rodio", "cpal", "thiserror"]
 rodiojack-backend = ["rodio", "cpal/jack", "thiserror"]

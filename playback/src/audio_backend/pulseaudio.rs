@@ -3,48 +3,49 @@ use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
-use libpulse_binding::{self as pulse, stream::Direction};
+use libpulse_binding::{self as pulse, error::PAErr, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::io;
+use thiserror::Error;
 
 const APP_NAME: &str = "librespot";
 const STREAM_NAME: &str = "Spotify endpoint";
 
+#[derive(Debug, Error)]
+enum PulseError {
+    #[error("Error starting PulseAudioSink, invalid PulseAudio sample spec")]
+    InvalidSampleSpec,
+    #[error("Error starting PulseAudioSink, could not connect to PulseAudio server, {0}")]
+    ConnectionRefused(PAErr),
+    #[error("Error stopping PulseAudioSink, failed to drain PulseAudio server buffer, {0}")]
+    DrainFailure(PAErr),
+    #[error("Error in PulseAudioSink, Not connected to PulseAudio server")]
+    NotConnected,
+    #[error("Error writing from PulseAudioSink to PulseAudio server, {0}")]
+    OnWrite(PAErr),
+}
+
 pub struct PulseAudioSink {
     s: Option<Simple>,
-    ss: pulse::sample::Spec,
     device: Option<String>,
     format: AudioFormat,
 }
 
 impl Open for PulseAudioSink {
     fn open(device: Option<String>, format: AudioFormat) -> Self {
-        info!("Using PulseAudio sink with format: {:?}", format);
+        let mut actual_format = format;
 
-        // PulseAudio calls S24 and S24_3 different from the rest of the world
-        let pulse_format = match format {
-            AudioFormat::F32 => pulse::sample::Format::FLOAT32NE,
-            AudioFormat::S32 => pulse::sample::Format::S32NE,
-            AudioFormat::S24 => pulse::sample::Format::S24_32NE,
-            AudioFormat::S24_3 => pulse::sample::Format::S24NE,
-            AudioFormat::S16 => pulse::sample::Format::S16NE,
-            _ => {
-                unimplemented!("PulseAudio currently does not support {:?} output", format)
-            }
-        };
+        if actual_format == AudioFormat::F64 {
+            warn!("PulseAudio currently does not support F64 output");
+            actual_format = AudioFormat::F32;
+        }
 
-        let ss = pulse::sample::Spec {
-            format: pulse_format,
-            channels: NUM_CHANNELS,
-            rate: SAMPLE_RATE,
-        };
-        debug_assert!(ss.is_valid());
+        info!("Using PulseAudioSink with format: {:?}", actual_format);
 
         Self {
             s: None,
-            ss,
             device,
-            format,
+            format: actual_format,
         }
     }
 }
@@ -55,30 +56,64 @@ impl Sink for PulseAudioSink {
             return Ok(());
         }
 
-        let device = self.device.as_deref();
+        // PulseAudio calls S24 and S24_3 different from the rest of the world
+        let pulse_format = match self.format {
+            AudioFormat::F32 => pulse::sample::Format::FLOAT32NE,
+            AudioFormat::S32 => pulse::sample::Format::S32NE,
+            AudioFormat::S24 => pulse::sample::Format::S24_32NE,
+            AudioFormat::S24_3 => pulse::sample::Format::S24NE,
+            AudioFormat::S16 => pulse::sample::Format::S16NE,
+            _ => unreachable!(),
+        };
+
+        let ss = pulse::sample::Spec {
+            format: pulse_format,
+            channels: NUM_CHANNELS,
+            rate: SAMPLE_RATE,
+        };
+
+        if !ss.is_valid() {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                PulseError::InvalidSampleSpec,
+            ));
+        }
+
         let result = Simple::new(
-            None,                // Use the default server.
-            APP_NAME,            // Our application's name.
-            Direction::Playback, // Direction.
-            device,              // Our device (sink) name.
-            STREAM_NAME,         // Description of our stream.
-            &self.ss,            // Our sample format.
-            None,                // Use default channel map.
-            None,                // Use default buffering attributes.
+            None,                   // Use the default server.
+            APP_NAME,               // Our application's name.
+            Direction::Playback,    // Direction.
+            self.device.as_deref(), // Our device (sink) name.
+            STREAM_NAME,            // Description of our stream.
+            &ss,                    // Our sample format.
+            None,                   // Use default channel map.
+            None,                   // Use default buffering attributes.
         );
+
         match result {
             Ok(s) => {
                 self.s = Some(s);
-                Ok(())
             }
-            Err(e) => Err(io::Error::new(
-                io::ErrorKind::ConnectionRefused,
-                e.to_string().unwrap(),
-            )),
+            Err(e) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::ConnectionRefused,
+                    PulseError::ConnectionRefused(e),
+                ));
+            }
         }
+
+        Ok(())
     }
 
     fn stop(&mut self) -> io::Result<()> {
+        let s = self
+            .s
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, PulseError::NotConnected))?;
+
+        s.drain()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, PulseError::DrainFailure(e)))?;
+
         self.s = None;
         Ok(())
     }
@@ -88,20 +123,15 @@ impl Sink for PulseAudioSink {
 
 impl SinkAsBytes for PulseAudioSink {
     fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
-        if let Some(s) = &self.s {
-            match s.write(data) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    e.to_string().unwrap(),
-                )),
-            }
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::NotConnected,
-                "Not connected to PulseAudio",
-            ))
-        }
+        let s = self
+            .s
+            .as_mut()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, PulseError::NotConnected))?;
+
+        s.write(data)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, PulseError::OnWrite(e)))?;
+
+        Ok(())
     }
 }
 
