@@ -152,9 +152,14 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Alsa
 
         pcm.sw_params(&swp).map_err(AlsaError::Pcm)?;
 
+        debug!("Frames per Buffer: {:?}", frames_per_buffer);
+        debug!("Frames per Period: {:?}", frames_per_period);
+
         // Let ALSA do the math for us.
         pcm.frames_to_bytes(frames_per_period) as usize
     };
+
+    debug!("Period Buffer size in bytes: {:?}", bytes_per_period);
 
     Ok((pcm, bytes_per_period))
 }
@@ -231,15 +236,19 @@ impl Sink for AlsaSink {
 impl SinkAsBytes for AlsaSink {
     fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
         let mut start_index = 0;
+        let data_len = data.len();
+        let capacity = self.period_buffer.capacity();
         loop {
-            let space_left = self.period_buffer.capacity() - self.period_buffer.len();
-            let end_index = min(data.len(), space_left);
+            let data_left = data_len - start_index;
+            let space_left = capacity - self.period_buffer.len();
+            let data_to_buffer = min(data_left, space_left);
+            let end_index = start_index + data_to_buffer;
             self.period_buffer
                 .extend_from_slice(&data[start_index..end_index]);
-            if self.period_buffer.len() == self.period_buffer.capacity() {
+            if self.period_buffer.len() == capacity {
                 self.write_buf()?;
             }
-            if end_index == data.len() {
+            if end_index == data_len {
                 break Ok(());
             }
             start_index = end_index;
