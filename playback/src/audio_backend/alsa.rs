@@ -198,7 +198,22 @@ impl Sink for AlsaSink {
             match open_device(&self.device, self.format) {
                 Ok((pcm, bytes_per_period)) => {
                     self.pcm = Some(pcm);
-                    self.period_buffer = Vec::with_capacity(bytes_per_period);
+                    // If the capacity is greater than we want shrink it
+                    // to it's current len (which should be zero) before
+                    // setting the capacity with reserve_exact.
+                    if self.period_buffer.capacity() > bytes_per_period {
+                        self.period_buffer.shrink_to_fit();
+                    }
+                    // This does nothing if the capacity is already sufficient.
+                    // Len should always be zero, but for the sake of being thorough...
+                    self.period_buffer
+                        .reserve_exact(bytes_per_period - self.period_buffer.len());
+
+                    // Should always match the "Period Buffer size in bytes: " debug! message.
+                    debug!(
+                        "Period Buffer capacity: {:?}",
+                        self.period_buffer.capacity()
+                    );
                 }
                 Err(e) => {
                     return Err(io::Error::new(io::ErrorKind::Other, e));
