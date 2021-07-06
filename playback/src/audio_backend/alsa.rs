@@ -152,9 +152,14 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Alsa
 
         pcm.sw_params(&swp).map_err(AlsaError::Pcm)?;
 
+        trace!("Frames per Buffer: {:?}", frames_per_buffer);
+        trace!("Frames per Period: {:?}", frames_per_period);
+
         // Let ALSA do the math for us.
         pcm.frames_to_bytes(frames_per_period) as usize
     };
+
+    trace!("Period Buffer size in bytes: {:?}", bytes_per_period);
 
     Ok((pcm, bytes_per_period))
 }
@@ -193,7 +198,22 @@ impl Sink for AlsaSink {
             match open_device(&self.device, self.format) {
                 Ok((pcm, bytes_per_period)) => {
                     self.pcm = Some(pcm);
-                    self.period_buffer = Vec::with_capacity(bytes_per_period);
+                    // If the capacity is greater than we want shrink it
+                    // to it's current len (which should be zero) before
+                    // setting the capacity with reserve_exact.
+                    if self.period_buffer.capacity() > bytes_per_period {
+                        self.period_buffer.shrink_to_fit();
+                    }
+                    // This does nothing if the capacity is already sufficient.
+                    // Len should always be zero, but for the sake of being thorough...
+                    self.period_buffer
+                        .reserve_exact(bytes_per_period - self.period_buffer.len());
+
+                    // Should always match the "Period Buffer size in bytes: " trace! message.
+                    trace!(
+                        "Period Buffer capacity: {:?}",
+                        self.period_buffer.capacity()
+                    );
                 }
                 Err(e) => {
                     return Err(io::Error::new(io::ErrorKind::Other, e));
@@ -205,20 +225,22 @@ impl Sink for AlsaSink {
     }
 
     fn stop(&mut self) -> io::Result<()> {
-        {
-            // Write any leftover data in the period buffer
-            // before draining the actual buffer
-            self.write_bytes(&[])?;
-            let pcm = self.pcm.as_mut().ok_or_else(|| {
-                io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
-            })?;
-            pcm.drain().map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Error stopping AlsaSink {}", e),
-                )
-            })?
-        }
+        // Zero fill the remainder of the period buffer and
+        // write any leftover data before draining the actual PCM buffer.
+        self.period_buffer.resize(self.period_buffer.capacity(), 0);
+        self.write_buf()?;
+
+        let pcm = self.pcm.as_mut().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "Error stopping AlsaSink, PCM is None")
+        })?;
+
+        pcm.drain().map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                format!("Error stopping AlsaSink {}", e),
+            )
+        })?;
+
         self.pcm = None;
         Ok(())
     }
@@ -228,22 +250,24 @@ impl Sink for AlsaSink {
 
 impl SinkAsBytes for AlsaSink {
     fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
-        let mut processed_data = 0;
-        while processed_data < data.len() {
-            let data_to_buffer = min(
-                self.period_buffer.capacity() - self.period_buffer.len(),
-                data.len() - processed_data,
-            );
+        let mut start_index = 0;
+        let data_len = data.len();
+        let capacity = self.period_buffer.capacity();
+        loop {
+            let data_left = data_len - start_index;
+            let space_left = capacity - self.period_buffer.len();
+            let data_to_buffer = min(data_left, space_left);
+            let end_index = start_index + data_to_buffer;
             self.period_buffer
-                .extend_from_slice(&data[processed_data..processed_data + data_to_buffer]);
-            processed_data += data_to_buffer;
-            if self.period_buffer.len() == self.period_buffer.capacity() {
+                .extend_from_slice(&data[start_index..end_index]);
+            if self.period_buffer.len() == capacity {
                 self.write_buf()?;
-                self.period_buffer.clear();
             }
+            if end_index == data_len {
+                break Ok(());
+            }
+            start_index = end_index;
         }
-
-        Ok(())
     }
 }
 
@@ -276,6 +300,7 @@ impl AlsaSink {
             })?
         }
 
+        self.period_buffer.clear();
         Ok(())
     }
 }
