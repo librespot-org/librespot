@@ -152,14 +152,14 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Alsa
 
         pcm.sw_params(&swp).map_err(AlsaError::Pcm)?;
 
-        debug!("Frames per Buffer: {:?}", frames_per_buffer);
-        debug!("Frames per Period: {:?}", frames_per_period);
+        trace!("Frames per Buffer: {:?}", frames_per_buffer);
+        trace!("Frames per Period: {:?}", frames_per_period);
 
         // Let ALSA do the math for us.
         pcm.frames_to_bytes(frames_per_period) as usize
     };
 
-    debug!("Period Buffer size in bytes: {:?}", bytes_per_period);
+    trace!("Period Buffer size in bytes: {:?}", bytes_per_period);
 
     Ok((pcm, bytes_per_period))
 }
@@ -209,8 +209,8 @@ impl Sink for AlsaSink {
                     self.period_buffer
                         .reserve_exact(bytes_per_period - self.period_buffer.len());
 
-                    // Should always match the "Period Buffer size in bytes: " debug! message.
-                    debug!(
+                    // Should always match the "Period Buffer size in bytes: " trace! message.
+                    trace!(
                         "Period Buffer capacity: {:?}",
                         self.period_buffer.capacity()
                     );
