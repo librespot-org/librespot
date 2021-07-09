@@ -5,20 +5,15 @@
 In order to compile librespot, you will first need to set up a suitable Rust build environment, with the necessary dependencies installed. You will need to have a C compiler, Rust, and the development libraries for the audio backend(s) you want installed. These instructions will walk you through setting up a simple build environment.
 
 ### Install Rust
-The easiest, and recommended way to get Rust is to use [rustup](https://rustup.rs). On Unix/MacOS You can install `rustup` with this command:
-
-```bash
-curl https://sh.rustup.rs -sSf | sh
-```
-
-Follow any prompts it gives you to install Rust. Once that’s done, Rust's standard tools should be setup and ready to use.
+The easiest, and recommended way to get Rust is to use [rustup](https://rustup.rs). Once that’s installed, Rust's standard tools should be set up and ready to use.
 
 *Note: The current minimum required Rust version at the time of writing is 1.48, you can find the current minimum version specified in the `.github/workflow/test.yml` file.*
 
 #### Additional Rust tools - `rustfmt`
-To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-lang/rustfmt), which is installed by default with `rustup` these days, else it can be installed manually with:
+To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-lang/rustfmt) and [`clippy`](https://github.com/rust-lang/rust-clippy), which are installed by default with `rustup` these days, else they can be installed manually with:
 ```bash
 rustup component add rustfmt
+rustup component add clippy
 ```
 Using `rustfmt` is not optional, as our CI checks against this repo's rules.
 
@@ -43,12 +38,13 @@ Depending on the chosen backend, specific development libraries are required.
 |--------------------|------------------------------|-----------------------------------|-------------|
 |Rodio (default)     | `libasound2-dev`             | `alsa-lib-devel`                  |             |
 |ALSA                | `libasound2-dev, pkg-config` | `alsa-lib-devel`                  |             |
+|GStreamer | `gstreamer1.0-plugins-base libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-good libgstreamer-plugins-good1.0-dev` | `gstreamer1 gstreamer1-devel gstreamer1-plugins-base-devel gstreamer1-plugins-good` | `gstreamer gst-devtools gst-plugins-base gst-plugins-good` |
 |PortAudio           | `portaudio19-dev`            | `portaudio-devel`                 | `portaudio` |
 |PulseAudio          | `libpulse-dev`               | `pulseaudio-libs-devel`           |             |
-|JACK                | `libjack-dev`                | `jack-audio-connection-kit-devel` |             |
-|JACK over Rodio     | `libjack-dev`                | `jack-audio-connection-kit-devel` |  -          |
-|SDL                 | `libsdl2-dev`                | `SDL2-devel`                      |             |
-|Pipe                |  -                           |  -                                |  -          |
+|JACK                | `libjack-dev`                | `jack-audio-connection-kit-devel` |  `jack`     |
+|JACK over Rodio     | `libjack-dev`                | `jack-audio-connection-kit-devel` |  `jack`     |
+|SDL                 | `libsdl2-dev`                | `SDL2-devel`                      |  `sdl2`     |
+|Pipe & subprocess   |  -                           |  -                                |  -          |
 
 ###### For example, to build an ALSA based backend, you would need to run the following to install the required dependencies:
 
@@ -68,7 +64,6 @@ The recommended method is to first fork the repo, so that you have a copy that y
 
 ```bash
 git clone git@github.com:YOURUSERNAME/librespot.git
-cd librespot
 ```
 
 ## Compiling & Running
@@ -109,7 +104,9 @@ cargo build --no-default-features --features "alsa-backend"
 Assuming you just compiled a ```debug``` build, you can run librespot with the following command:
 
 ```bash
-./target/debug/librespot -n Librespot
+./target/debug/librespot
 ```
 
 There are various runtime options, documented in the wiki, and visible by running librespot with the ```-h``` argument.
+
+Note that debug builds may cause buffer underruns and choppy audio when dithering is enabled (which it is by default). You can disable dithering with ```--dither none```.
