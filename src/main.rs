@@ -205,6 +205,7 @@ fn get_setup(args: &[String]) -> Setup {
     const FORMAT: &str = "format";
     const HELP: &str = "h";
     const INITIAL_VOLUME: &str = "initial-volume";
+    const MIXER_TYPE: &str = "mixer";
     const MIXER_CARD: &str = "mixer-card";
     const MIXER_INDEX: &str = "mixer-index";
     const MIXER_NAME: &str = "mixer-name";
@@ -295,7 +296,7 @@ fn get_setup(args: &[String]) -> Setup {
         "Specify the dither algorithm to use - [none, gpdf, tpdf, tpdf_hp]. Defaults to 'tpdf' for formats S16, S24, S24_3 and 'none' for other formats.",
         "DITHER",
     )
-    .optopt("", "mixer", "Mixer to use {alsa|softvol}.", "MIXER")
+    .optopt("", MIXER_TYPE, "Mixer to use {alsa|softvol}.", "MIXER")
     .optopt(
         "m",
         MIXER_NAME,
@@ -454,8 +455,8 @@ fn get_setup(args: &[String]) -> Setup {
         exit(0);
     }
 
-    let mixer_name = matches.opt_str(MIXER_NAME);
-    let mixer = mixer::find(mixer_name.as_deref()).expect("Invalid mixer");
+    let mixer_type = matches.opt_str(MIXER_TYPE);
+    let mixer = mixer::find(mixer_type.as_deref()).expect("Invalid mixer");
 
     let mixer_config = {
         let card = matches.opt_str(MIXER_CARD).unwrap_or_else(|| {
@@ -475,7 +476,7 @@ fn get_setup(args: &[String]) -> Setup {
         let mut volume_range = matches
             .opt_str(VOLUME_RANGE)
             .map(|range| range.parse::<f64>().unwrap())
-            .unwrap_or_else(|| match mixer_name.as_deref() {
+            .unwrap_or_else(|| match mixer_type.as_deref() {
                 #[cfg(feature = "alsa-backend")]
                 Some(AlsaMixer::NAME) => 0.0, // let Alsa query the control
                 _ => VolumeCtrl::DEFAULT_DB_RANGE,
@@ -563,7 +564,7 @@ fn get_setup(args: &[String]) -> Setup {
             }
             (volume as f32 / 100.0 * VolumeCtrl::MAX_VOLUME as f32) as u16
         })
-        .or_else(|| match mixer_name.as_deref() {
+        .or_else(|| match mixer_type.as_deref() {
             #[cfg(feature = "alsa-backend")]
             Some(AlsaMixer::NAME) => None,
             _ => cache.as_ref().and_then(Cache::volume),

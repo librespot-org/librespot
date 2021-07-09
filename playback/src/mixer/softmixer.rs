@@ -43,7 +43,7 @@ impl Mixer for SoftMixer {
 }
 
 impl SoftMixer {
-    pub const NAME: &'static str = "softmixer";
+    pub const NAME: &'static str = "softvol";
 }
 
 struct SoftVolumeApplier {
