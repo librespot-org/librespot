@@ -1,11 +1,11 @@
 use std::process::exit;
+use std::thread;
 use std::time::Duration;
-use std::{io, thread};
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
-use super::Sink;
+use super::{Sink, SinkError};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -175,7 +175,7 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
 }
 
 impl Sink for RodioSink {
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> Result<(), SinkError> {
         let samples = packet.samples();
         match self.format {
             AudioFormat::F32 => {

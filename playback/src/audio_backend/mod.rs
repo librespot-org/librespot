@@ -1,26 +1,38 @@
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use std::io;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum SinkError {
+    #[error("SinkError NotConnected: {0}")]
+    NotConnected(String),
+    #[error("SinkError ConnectionRefused: {0}")]
+    ConnectionRefused(String),
+    #[error("SinkError OnWrite: {0}")]
+    OnWrite(String),
+    #[error("SinkError InvalidParams: {0}")]
+    InvalidParams(String),
+}
 
 pub trait Open {
     fn open(_: Option<String>, format: AudioFormat) -> Self;
 }
 
 pub trait Sink {
-    fn start(&mut self) -> io::Result<()> {
+    fn start(&mut self) -> Result<(), SinkError> {
         Ok(())
     }
-    fn stop(&mut self) -> io::Result<()> {
+    fn stop(&mut self) -> Result<(), SinkError> {
         Ok(())
     }
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()>;
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> Result<(), SinkError>;
 }
 
 pub type SinkBuilder = fn(Option<String>, AudioFormat) -> Box<dyn Sink>;
 
 pub trait SinkAsBytes {
-    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()>;
+    fn write_bytes(&mut self, data: &[u8]) -> Result<(), SinkError>;
 }
 
 fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
@@ -30,7 +42,11 @@ fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat
 // reuse code for various backends
 macro_rules! sink_as_bytes {
     () => {
-        fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+        fn write(
+            &mut self,
+            packet: &AudioPacket,
+            converter: &mut Converter,
+        ) -> Result<(), SinkError> {
             use crate::convert::i24;
             use zerocopy::AsBytes;
             match packet {

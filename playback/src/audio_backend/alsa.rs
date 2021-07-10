@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkAsBytes};
+use super::{Open, Sink, SinkAsBytes, SinkError};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -7,7 +7,6 @@ use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, HwParams, PCM};
 use alsa::{Direction, ValueOr};
 use std::cmp::min;
-use std::io;
 use std::process::exit;
 use std::time::Duration;
 use thiserror::Error;
@@ -67,15 +66,15 @@ enum AlsaError {
     NotConnected,
 }
 
-impl From<AlsaError> for io::Error {
-    fn from(e: AlsaError) -> io::Error {
+impl From<AlsaError> for SinkError {
+    fn from(e: AlsaError) -> SinkError {
         use AlsaError::*;
-
+        let es = e.to_string();
         match e {
-            DrainFailure(_) | OnWrite(_) => io::Error::new(io::ErrorKind::BrokenPipe, e),
-            PcmSetUp { .. } => io::Error::new(io::ErrorKind::ConnectionRefused, e),
-            NotConnected => io::Error::new(io::ErrorKind::NotConnected, e),
-            _ => io::Error::new(io::ErrorKind::InvalidInput, e),
+            DrainFailure(_) | OnWrite(_) => SinkError::OnWrite(es),
+            PcmSetUp { .. } => SinkError::ConnectionRefused(es),
+            NotConnected => SinkError::NotConnected(es),
+            _ => SinkError::InvalidParams(es),
         }
     }
 }
@@ -219,7 +218,7 @@ impl Open for AlsaSink {
 }
 
 impl Sink for AlsaSink {
-    fn start(&mut self) -> io::Result<()> {
+    fn start(&mut self) -> Result<(), SinkError> {
         if self.pcm.is_none() {
             let (pcm, bytes_per_period) = open_device(&self.device, self.format)?;
             self.pcm = Some(pcm);
@@ -244,7 +243,7 @@ impl Sink for AlsaSink {
         Ok(())
     }
 
-    fn stop(&mut self) -> io::Result<()> {
+    fn stop(&mut self) -> Result<(), SinkError> {
         // Zero fill the remainder of the period buffer and
         // write any leftover data before draining the actual PCM buffer.
         self.period_buffer.resize(self.period_buffer.capacity(), 0);
@@ -262,7 +261,7 @@ impl Sink for AlsaSink {
 }
 
 impl SinkAsBytes for AlsaSink {
-    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
+    fn write_bytes(&mut self, data: &[u8]) -> Result<(), SinkError> {
         let mut start_index = 0;
         let data_len = data.len();
         let capacity = self.period_buffer.capacity();
