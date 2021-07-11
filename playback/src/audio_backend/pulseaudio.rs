@@ -12,15 +12,23 @@ const STREAM_NAME: &str = "Spotify endpoint";
 
 #[derive(Debug, Error)]
 enum PulseError {
-    #[error("Error starting PulseAudioSink, invalid PulseAudio sample spec")]
-    InvalidSampleSpec,
-    #[error("Error starting PulseAudioSink, could not connect to PulseAudio server, {0}")]
+    #[error("<PulseAudioSink> Unsupported Pulseaudio Sample Spec, Format \"{format:?}\", Channels \"{channels}\", Rate \"{rate}\"")]
+    InvalidSampleSpec {
+        format: pulse::sample::Format,
+        channels: u8,
+        rate: u32,
+    },
+
+    #[error("<PulseAudioSink> {0}")]
     ConnectionRefused(PAErr),
-    #[error("Error stopping PulseAudioSink, failed to drain PulseAudio server buffer, {0}")]
+
+    #[error("<PulseAudioSink> Failed to Drain Pulseaudio Buffer, {0}")]
     DrainFailure(PAErr),
-    #[error("Error in PulseAudioSink, Not connected to PulseAudio server")]
+
+    #[error("<PulseAudioSink>")]
     NotConnected,
-    #[error("Error writing from PulseAudioSink to PulseAudio server, {0}")]
+
+    #[error("<PulseAudioSink> {0}")]
     OnWrite(PAErr),
 }
 
@@ -32,7 +40,7 @@ impl From<PulseError> for SinkError {
             DrainFailure(_) | OnWrite(_) => SinkError::OnWrite(es),
             ConnectionRefused(_) => SinkError::ConnectionRefused(es),
             NotConnected => SinkError::NotConnected(es),
-            InvalidSampleSpec => SinkError::InvalidParams(es),
+            InvalidSampleSpec { .. } => SinkError::InvalidParams(es),
         }
     }
 }
@@ -82,7 +90,13 @@ impl Sink for PulseAudioSink {
             };
 
             if !ss.is_valid() {
-                return Err(SinkError::from(PulseError::InvalidSampleSpec));
+                let pulse_error = PulseError::InvalidSampleSpec {
+                    format: pulse_format,
+                    channels: NUM_CHANNELS,
+                    rate: SAMPLE_RATE,
+                };
+
+                return Err(SinkError::from(pulse_error));
             }
 
             let s = Simple::new(

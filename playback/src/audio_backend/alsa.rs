@@ -17,52 +17,52 @@ const BUFFER_TIME: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Error)]
 enum AlsaError {
-    #[error("AlsaSink, device \"{device}\" unsupported channel count {channel_count}, {e}")]
+    #[error("<AlsaSink> Device \"{device}\" Unsupported Channel Count \"{channel_count}\", {e}")]
     UnsupportedChannelCount {
         device: String,
         channel_count: u8,
         e: alsa::Error,
     },
 
-    #[error("AlsaSink, device \"{device}\" unsupported sample rate {samplerate}, {e}")]
+    #[error("<AlsaSink> Device \"{device}\" Unsupported Sample Rate \"{samplerate}\", {e}")]
     UnsupportedSampleRate {
         device: String,
         samplerate: u32,
         e: alsa::Error,
     },
 
-    #[error("AlsaSink, device \"{device}\" unsupported format {format:?}, {e}")]
+    #[error("<AlsaSink> Device \"{device}\" Unsupported Format \"{format:?}\", {e}")]
     UnsupportedFormat {
         device: String,
-        format: AudioFormat,
+        format: Format,
         e: alsa::Error,
     },
 
-    #[error("AlsaSink, device \"{device}\" unsupported access type RWInterleaved, {e}")]
+    #[error("<AlsaSink> Device \"{device}\" Unsupported Access Type \"RWInterleaved\", {e}")]
     UnsupportedAccessType { device: String, e: alsa::Error },
 
-    #[error("AlsaSink, device \"{device}\" may be invalid or busy, {e}")]
+    #[error("<AlsaSink> Device \"{device}\" May be Invalid, Busy, or Already in Use, {e}")]
     PcmSetUp { device: String, e: alsa::Error },
 
-    #[error("Error stopping AlsaSink, failed to drain PCM buffer, {0}")]
+    #[error("<AlsaSink> Failed to Drain PCM Buffer, {0}")]
     DrainFailure(alsa::Error),
 
-    #[error("Error writing from AlsaSink buffer to PCM, {0}")]
+    #[error("<AlsaSink> {0}")]
     OnWrite(alsa::Error),
 
-    #[error("AlsaSink Hardware Parameters Error, {0}")]
+    #[error("<AlsaSink> Hardware, {0}")]
     HwParams(alsa::Error),
 
-    #[error("AlsaSink Software Parameters Error, {0}")]
+    #[error("<AlsaSink> Software, {0}")]
     SwParams(alsa::Error),
 
-    #[error("AlsaSink PCM Error, {0}")]
+    #[error("<AlsaSink> PCM, {0}")]
     Pcm(alsa::Error),
 
-    #[error("Could not parse Alsa ouput name(s) and/or description(s)")]
+    #[error("<AlsaSink> Could Not Parse Ouput Name(s) and/or Description(s)")]
     Parsing,
 
-    #[error("Error in AlsaSink, PCM is None")]
+    #[error("<AlsaSink>")]
     NotConnected,
 }
 
@@ -138,7 +138,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Alsa
         hwp.set_format(alsa_format)
             .map_err(|e| AlsaError::UnsupportedFormat {
                 device: dev_name.to_string(),
-                format,
+                format: alsa_format,
                 e,
             })?;
 

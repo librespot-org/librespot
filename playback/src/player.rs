@@ -1059,7 +1059,7 @@ impl PlayerInternal {
             match self.sink.start() {
                 Ok(()) => self.sink_status = SinkStatus::Running,
                 Err(err) => {
-                    error!("Fatal error, could not start audio sink: {}", err);
+                    error!("{}", err);
                     exit(1);
                 }
             }
@@ -1082,7 +1082,7 @@ impl PlayerInternal {
                         }
                     }
                     Err(err) => {
-                        error!("Fatal error, could not stop audio sink: {}", err);
+                        error!("{}", err);
                         exit(1);
                     }
                 }
@@ -1305,7 +1305,7 @@ impl PlayerInternal {
                     }
 
                     if let Err(err) = self.sink.write(&packet, &mut self.converter) {
-                        error!("Fatal error, could not write audio to audio sink: {}", err);
+                        error!("{}", err);
                         exit(1);
                     }
                 }

@@ -5,13 +5,13 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum SinkError {
-    #[error("SinkError NotConnected: {0}")]
+    #[error("Audio Sink Error Not Connected: {0}")]
     NotConnected(String),
-    #[error("SinkError ConnectionRefused: {0}")]
+    #[error("Audio Sink Error Connection Refused: {0}")]
     ConnectionRefused(String),
-    #[error("SinkError OnWrite: {0}")]
+    #[error("Audio Sink Error On Write: {0}")]
     OnWrite(String),
-    #[error("SinkError InvalidParams: {0}")]
+    #[error("Audio Sink Error Invalid Parameters: {0}")]
     InvalidParams(String),
 }
 
