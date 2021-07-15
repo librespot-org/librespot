@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkError};
+use super::{Open, Sink, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -69,7 +69,7 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> Result<(), SinkError> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         let samples_f32: &[f32] = &converter.f64_to_f32(packet.samples());
         for sample in samples_f32.iter() {
             let res = self.send.send(*sample);

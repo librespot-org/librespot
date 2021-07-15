@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkAsBytes, SinkError};
+use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -17,31 +17,32 @@ const BUFFER_TIME: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Error)]
 enum AlsaError {
-    #[error("<AlsaSink> Device \"{device}\" Unsupported Channel Count \"{channel_count}\", {e}")]
+    #[error("<AlsaSink> Device {device} Unsupported Format {alsa_format:?} ({format:?}), {e}")]
+    UnsupportedFormat {
+        device: String,
+        alsa_format: Format,
+        format: AudioFormat,
+        e: alsa::Error,
+    },
+
+    #[error("<AlsaSink> Device {device} Unsupported Channel Count {channel_count}, {e}")]
     UnsupportedChannelCount {
         device: String,
         channel_count: u8,
         e: alsa::Error,
     },
 
-    #[error("<AlsaSink> Device \"{device}\" Unsupported Sample Rate \"{samplerate}\", {e}")]
+    #[error("<AlsaSink> Device {device} Unsupported Sample Rate {samplerate}, {e}")]
     UnsupportedSampleRate {
         device: String,
         samplerate: u32,
         e: alsa::Error,
     },
 
-    #[error("<AlsaSink> Device \"{device}\" Unsupported Format \"{format:?}\", {e}")]
-    UnsupportedFormat {
-        device: String,
-        format: Format,
-        e: alsa::Error,
-    },
-
-    #[error("<AlsaSink> Device \"{device}\" Unsupported Access Type \"RWInterleaved\", {e}")]
+    #[error("<AlsaSink> Device {device} Unsupported Access Type RWInterleaved, {e}")]
     UnsupportedAccessType { device: String, e: alsa::Error },
 
-    #[error("<AlsaSink> Device \"{device}\" May be Invalid, Busy, or Already in Use, {e}")]
+    #[error("<AlsaSink> Device {device} May be Invalid, Busy, or Already in Use, {e}")]
     PcmSetUp { device: String, e: alsa::Error },
 
     #[error("<AlsaSink> Failed to Drain PCM Buffer, {0}")]
@@ -86,7 +87,7 @@ pub struct AlsaSink {
     period_buffer: Vec<u8>,
 }
 
-fn list_outputs() -> Result<(), AlsaError> {
+fn list_outputs() -> SinkResult<()> {
     println!("Listing available Alsa outputs:");
     for t in &["pcm", "ctl", "hwdep"] {
         println!("{} devices:", t);
@@ -107,7 +108,7 @@ fn list_outputs() -> Result<(), AlsaError> {
     Ok(())
 }
 
-fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), AlsaError> {
+fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> {
     let pcm = PCM::new(dev_name, Direction::Playback, false).map_err(|e| AlsaError::PcmSetUp {
         device: dev_name.to_string(),
         e,
@@ -138,7 +139,8 @@ fn open_device(dev_name: &str, format: AudioFormat) -> Result<(PCM, usize), Alsa
         hwp.set_format(alsa_format)
             .map_err(|e| AlsaError::UnsupportedFormat {
                 device: dev_name.to_string(),
-                format: alsa_format,
+                alsa_format,
+                format,
                 e,
             })?;
 
@@ -218,7 +220,7 @@ impl Open for AlsaSink {
 }
 
 impl Sink for AlsaSink {
-    fn start(&mut self) -> Result<(), SinkError> {
+    fn start(&mut self) -> SinkResult<()> {
         if self.pcm.is_none() {
             let (pcm, bytes_per_period) = open_device(&self.device, self.format)?;
             self.pcm = Some(pcm);
@@ -243,7 +245,7 @@ impl Sink for AlsaSink {
         Ok(())
     }
 
-    fn stop(&mut self) -> Result<(), SinkError> {
+    fn stop(&mut self) -> SinkResult<()> {
         // Zero fill the remainder of the period buffer and
         // write any leftover data before draining the actual PCM buffer.
         self.period_buffer.resize(self.period_buffer.capacity(), 0);
@@ -261,7 +263,7 @@ impl Sink for AlsaSink {
 }
 
 impl SinkAsBytes for AlsaSink {
-    fn write_bytes(&mut self, data: &[u8]) -> Result<(), SinkError> {
+    fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         let mut start_index = 0;
         let data_len = data.len();
         let capacity = self.period_buffer.capacity();
@@ -291,7 +293,7 @@ impl SinkAsBytes for AlsaSink {
 impl AlsaSink {
     pub const NAME: &'static str = "alsa";
 
-    fn write_buf(&mut self) -> Result<(), AlsaError> {
+    fn write_buf(&mut self) -> SinkResult<()> {
         let pcm = self.pcm.as_mut().ok_or(AlsaError::NotConnected)?;
 
         if let Err(e) = pcm.io_bytes().writei(&self.period_buffer) {

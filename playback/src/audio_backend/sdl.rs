@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkError};
+use super::{Open, Sink, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -52,7 +52,7 @@ impl Open for SdlSink {
 }
 
 impl Sink for SdlSink {
-    fn start(&mut self) -> Result<(), SinkError> {
+    fn start(&mut self) -> SinkResult<()> {
         macro_rules! start_sink {
             ($queue: expr) => {{
                 $queue.clear();
@@ -67,7 +67,7 @@ impl Sink for SdlSink {
         Ok(())
     }
 
-    fn stop(&mut self) -> Result<(), SinkError> {
+    fn stop(&mut self) -> SinkResult<()> {
         macro_rules! stop_sink {
             ($queue: expr) => {{
                 $queue.pause();
@@ -82,7 +82,7 @@ impl Sink for SdlSink {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> Result<(), SinkError> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         macro_rules! drain_sink {
             ($queue: expr, $size: expr) => {{
                 // sleep and wait for sdl thread to drain the queue a bit

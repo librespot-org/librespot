@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkAsBytes, SinkError};
+use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -23,7 +23,7 @@ impl Open for StdoutSink {
 }
 
 impl Sink for StdoutSink {
-    fn start(&mut self) -> Result<(), SinkError> {
+    fn start(&mut self) -> SinkResult<()> {
         if self.output.is_none() {
             let output: Box<dyn Write> = match self.path.as_deref() {
                 Some(path) => {
@@ -46,7 +46,7 @@ impl Sink for StdoutSink {
 }
 
 impl SinkAsBytes for StdoutSink {
-    fn write_bytes(&mut self, data: &[u8]) -> Result<(), SinkError> {
+    fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         match self.output.as_deref_mut() {
             Some(output) => {
                 output

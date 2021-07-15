@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkAsBytes, SinkError};
+use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -30,7 +30,7 @@ impl Open for SubprocessSink {
 }
 
 impl Sink for SubprocessSink {
-    fn start(&mut self) -> Result<(), SinkError> {
+    fn start(&mut self) -> SinkResult<()> {
         let args = split(&self.shell_command).unwrap();
         let child = Command::new(&args[0])
             .args(&args[1..])
@@ -41,7 +41,7 @@ impl Sink for SubprocessSink {
         Ok(())
     }
 
-    fn stop(&mut self) -> Result<(), SinkError> {
+    fn stop(&mut self) -> SinkResult<()> {
         if let Some(child) = &mut self.child.take() {
             child
                 .kill()
@@ -57,7 +57,7 @@ impl Sink for SubprocessSink {
 }
 
 impl SinkAsBytes for SubprocessSink {
-    fn write_bytes(&mut self, data: &[u8]) -> Result<(), SinkError> {
+    fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         if let Some(child) = &mut self.child {
             let child_stdin = child
                 .stdin

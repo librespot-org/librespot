@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkError};
+use super::{Open, Sink, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -95,7 +95,7 @@ impl<'a> Open for PortAudioSink<'a> {
 }
 
 impl<'a> Sink for PortAudioSink<'a> {
-    fn start(&mut self) -> Result<(), SinkError> {
+    fn start(&mut self) -> SinkResult<()> {
         macro_rules! start_sink {
             (ref mut $stream: ident, ref $parameters: ident) => {{
                 if $stream.is_none() {
@@ -124,7 +124,7 @@ impl<'a> Sink for PortAudioSink<'a> {
         Ok(())
     }
 
-    fn stop(&mut self) -> Result<(), SinkError> {
+    fn stop(&mut self) -> SinkResult<()> {
         macro_rules! stop_sink {
             (ref mut $stream: ident) => {{
                 $stream.as_mut().unwrap().stop().unwrap();
@@ -140,7 +140,7 @@ impl<'a> Sink for PortAudioSink<'a> {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> Result<(), SinkError> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         macro_rules! write_sink {
             (ref mut $stream: expr, $samples: expr) => {
                 $stream.as_mut().unwrap().write($samples)

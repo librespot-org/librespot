@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkAsBytes, SinkError};
+use super::{Open, Sink, SinkAsBytes, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -131,7 +131,7 @@ impl Sink for GstreamerSink {
 }
 
 impl SinkAsBytes for GstreamerSink {
-    fn write_bytes(&mut self, data: &[u8]) -> Result<(), SinkError> {
+    fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         // Copy expensively (in to_vec()) to avoid thread synchronization
         self.tx
             .send(data.to_vec())

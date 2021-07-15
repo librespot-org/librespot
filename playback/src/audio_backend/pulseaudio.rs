@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkAsBytes, SinkError};
+use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -12,9 +12,10 @@ const STREAM_NAME: &str = "Spotify endpoint";
 
 #[derive(Debug, Error)]
 enum PulseError {
-    #[error("<PulseAudioSink> Unsupported Pulseaudio Sample Spec, Format \"{format:?}\", Channels \"{channels}\", Rate \"{rate}\"")]
+    #[error("<PulseAudioSink> Unsupported Pulseaudio Sample Spec, Format {pulse_format:?} ({format:?}), Channels {channels}, Rate {rate}")]
     InvalidSampleSpec {
-        format: pulse::sample::Format,
+        pulse_format: pulse::sample::Format,
+        format: AudioFormat,
         channels: u8,
         rate: u32,
     },
@@ -71,7 +72,7 @@ impl Open for PulseAudioSink {
 }
 
 impl Sink for PulseAudioSink {
-    fn start(&mut self) -> Result<(), SinkError> {
+    fn start(&mut self) -> SinkResult<()> {
         if self.s.is_none() {
             // PulseAudio calls S24 and S24_3 different from the rest of the world
             let pulse_format = match self.format {
@@ -91,7 +92,8 @@ impl Sink for PulseAudioSink {
 
             if !ss.is_valid() {
                 let pulse_error = PulseError::InvalidSampleSpec {
-                    format: pulse_format,
+                    pulse_format,
+                    format: self.format,
                     channels: NUM_CHANNELS,
                     rate: SAMPLE_RATE,
                 };
@@ -117,7 +119,7 @@ impl Sink for PulseAudioSink {
         Ok(())
     }
 
-    fn stop(&mut self) -> Result<(), SinkError> {
+    fn stop(&mut self) -> SinkResult<()> {
         let s = self.s.as_mut().ok_or(PulseError::NotConnected)?;
 
         s.drain().map_err(PulseError::DrainFailure)?;
@@ -130,7 +132,7 @@ impl Sink for PulseAudioSink {
 }
 
 impl SinkAsBytes for PulseAudioSink {
-    fn write_bytes(&mut self, data: &[u8]) -> Result<(), SinkError> {
+    fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         let s = self.s.as_mut().ok_or(PulseError::NotConnected)?;
 
         s.write(data).map_err(PulseError::OnWrite)?;
