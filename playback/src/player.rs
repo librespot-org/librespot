@@ -27,7 +27,7 @@ use crate::decoder::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, 
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
 
-use crate::{NUM_CHANNELS, SAMPLES_PER_SECOND};
+use crate::{MS_PER_SAMPLE, NUM_CHANNELS, SAMPLES_PER_MS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
@@ -1043,11 +1043,11 @@ impl Future for PlayerInternal {
 
 impl PlayerInternal {
     fn position_pcm_to_ms(position_pcm: u64) -> u32 {
-        (position_pcm * 10 / 441) as u32
+        (position_pcm as f64 * MS_PER_SAMPLE).round() as u32
     }
 
     fn position_ms_to_pcm(position_ms: u32) -> u64 {
-        position_ms as u64 * 441 / 10
+        (position_ms as f64 * SAMPLES_PER_MS).round() as u64
     }
 
     fn ensure_sink_running(&mut self) {

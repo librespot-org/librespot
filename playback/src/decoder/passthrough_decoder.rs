@@ -1,10 +1,9 @@
 // Passthrough decoder for librespot
 use super::{AudioDecoder, AudioError, AudioPacket};
-use crate::SAMPLE_RATE;
+use crate::SAMPLES_PER_MS;
 use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::fmt;
 use std::io::{Read, Seek};
-use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn get_header<T>(code: u8, rdr: &mut PacketReader<T>) -> Result<Box<[u8]>, PassthroughError>
@@ -98,10 +97,10 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
         self.stream_serial += 1;
 
         // hard-coded to 44.1 kHz
-        match self.rdr.seek_absgp(
-            None,
-            Duration::from_millis(ms as u64 * SAMPLE_RATE as u64).as_secs(),
-        ) {
+
+        let absgp = (ms as f64 * SAMPLES_PER_MS).round() as u64;
+
+        match self.rdr.seek_absgp(None, absgp) {
             Ok(_) => {
                 // need to set some offset for next_page()
                 let pck = self.rdr.read_packet().unwrap().unwrap();
