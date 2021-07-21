@@ -67,6 +67,6 @@ impl From<PassthroughError> for AudioError {
 }
 
 pub trait AudioDecoder {
-    fn seek(&mut self, ms: i64) -> Result<(), AudioError>;
+    fn seek(&mut self, absgp: u64) -> Result<(), AudioError>;
     fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError>;
 }

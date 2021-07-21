@@ -1,5 +1,4 @@
 use super::{AudioDecoder, AudioError, AudioPacket};
-use crate::SAMPLES_PER_MS;
 
 use lewton::inside_ogg::OggStreamReader;
 use lewton::samples::InterleavedSamples;
@@ -24,8 +23,7 @@ impl<R> AudioDecoder for VorbisDecoder<R>
 where
     R: Read + Seek,
 {
-    fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
-        let absgp = (ms as f64 * SAMPLES_PER_MS).round() as u64;
+    fn seek(&mut self, absgp: u64) -> Result<(), AudioError> {
         self.0
             .seek_absgp_pg(absgp)
             .map_err(|e| AudioError::VorbisError(e.into()))?;

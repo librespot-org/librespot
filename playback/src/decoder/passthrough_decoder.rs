@@ -1,6 +1,5 @@
 // Passthrough decoder for librespot
 use super::{AudioDecoder, AudioError, AudioPacket};
-use crate::SAMPLES_PER_MS;
 use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::fmt;
 use std::io::{Read, Seek};
@@ -70,9 +69,7 @@ impl<R: Read + Seek> PassthroughDecoder<R> {
 }
 
 impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
-    fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
-        info!("Seeking to {}", ms);
-
+    fn seek(&mut self, absgp: u64) -> Result<(), AudioError> {
         // add an eos to previous stream if missing
         if self.bos && !self.eos {
             match self.rdr.read_packet() {
@@ -95,10 +92,6 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
         self.bos = false;
         self.ofsgp_page = 0;
         self.stream_serial += 1;
-
-        // hard-coded to 44.1 kHz
-
-        let absgp = (ms as f64 * SAMPLES_PER_MS).round() as u64;
 
         match self.rdr.seek_absgp(None, absgp) {
             Ok(_) => {
