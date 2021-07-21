@@ -346,7 +346,11 @@ impl Player {
     }
 
     fn command(&self, cmd: PlayerCommand) {
-        self.commands.as_ref().unwrap().send(cmd).unwrap();
+        if let Some(commands) = self.commands.as_ref() {
+            if let Err(e) = commands.send(cmd) {
+                error!("Player Commands Error: {}", e);
+            }
+        }
     }
 
     pub fn load(&mut self, track_id: SpotifyId, start_playing: bool, position_ms: u32) -> u64 {
@@ -415,7 +419,7 @@ impl Drop for Player {
         if let Some(handle) = self.thread_handle.take() {
             match handle.join() {
                 Ok(_) => (),
-                Err(_) => error!("Player thread panicked!"),
+                Err(e) => error!("Player thread Error: {:?}", e),
             }
         }
     }
@@ -489,7 +493,10 @@ impl PlayerState {
         match *self {
             Stopped | EndOfTrack { .. } | Paused { .. } | Loading { .. } => false,
             Playing { .. } => true,
-            Invalid => panic!("invalid state"),
+            Invalid => {
+                error!("PlayerState is_playing: invalid state");
+                exit(1);
+            }
         }
     }
 
@@ -514,7 +521,10 @@ impl PlayerState {
             | Playing {
                 ref mut decoder, ..
             } => Some(decoder),
-            Invalid => panic!("invalid state"),
+            Invalid => {
+                error!("PlayerState decoder: invalid state");
+                exit(1);
+            }
         }
     }
 
@@ -530,7 +540,10 @@ impl PlayerState {
                 ref mut stream_loader_controller,
                 ..
             } => Some(stream_loader_controller),
-            Invalid => panic!("invalid state"),
+            Invalid => {
+                error!("PlayerState stream_loader_controller: invalid state");
+                exit(1);
+            }
         }
     }
 
@@ -561,7 +574,10 @@ impl PlayerState {
                     },
                 };
             }
-            _ => panic!("Called playing_to_end_of_track in non-playing state."),
+            _ => {
+                error!("Called playing_to_end_of_track in non-playing state.");
+                exit(1);
+            }
         }
     }
 
@@ -592,7 +608,10 @@ impl PlayerState {
                     suggested_to_preload_next_track,
                 };
             }
-            _ => panic!("invalid state"),
+            _ => {
+                error!("PlayerState paused_to_playing: invalid state");
+                exit(1);
+            }
         }
     }
 
@@ -623,7 +642,10 @@ impl PlayerState {
                     suggested_to_preload_next_track,
                 };
             }
-            _ => panic!("invalid state"),
+            _ => {
+                error!("PlayerState playing_to_paused: invalid state");
+                exit(1);
+            }
         }
     }
 }
@@ -679,8 +701,8 @@ impl PlayerTrackLoader {
     ) -> Option<PlayerLoadedTrackData> {
         let audio = match AudioItem::get_audio_item(&self.session, spotify_id).await {
             Ok(audio) => audio,
-            Err(_) => {
-                error!("Unable to load audio item.");
+            Err(e) => {
+                error!("Unable to load audio item: {:?}", e);
                 return None;
             }
         };
@@ -748,8 +770,8 @@ impl PlayerTrackLoader {
 
             let encrypted_file = match encrypted_file.await {
                 Ok(encrypted_file) => encrypted_file,
-                Err(_) => {
-                    error!("Unable to load encrypted file.");
+                Err(e) => {
+                    error!("Unable to load encrypted file: {:?}", e);
                     return None;
                 }
             };
@@ -767,8 +789,8 @@ impl PlayerTrackLoader {
 
             let key = match self.session.audio_key().request(spotify_id, file_id).await {
                 Ok(key) => key,
-                Err(_) => {
-                    error!("Unable to load decryption key");
+                Err(e) => {
+                    error!("Unable to load decryption key: {:?}", e);
                     return None;
                 }
             };
@@ -890,7 +912,8 @@ impl Future for PlayerInternal {
                             start_playback,
                         );
                         if let PlayerState::Loading { .. } = self.state {
-                            panic!("The state wasn't changed by start_playback()");
+                            error!("The state wasn't changed by start_playback()");
+                            exit(1);
                         }
                     }
                     Poll::Ready(Err(_)) => {
@@ -1129,7 +1152,10 @@ impl PlayerInternal {
                 self.state = PlayerState::Stopped;
             }
             PlayerState::Stopped => (),
-            PlayerState::Invalid => panic!("invalid state"),
+            PlayerState::Invalid => {
+                error!("PlayerInternal handle_player_stop: invalid state");
+                exit(1);
+            }
         }
     }
 
@@ -1432,7 +1458,10 @@ impl PlayerInternal {
                 play_request_id,
                 position_ms,
             }),
-            PlayerState::Invalid { .. } => panic!("Player is in an invalid state."),
+            PlayerState::Invalid { .. } => {
+                error!("PlayerInternal handle_command_load: invalid state");
+                exit(1);
+            }
         }
 
         // Now we check at different positions whether we already have a pre-loaded version
@@ -1465,7 +1494,8 @@ impl PlayerInternal {
                 self.preload = PlayerPreload::None;
                 self.start_playback(track_id, play_request_id, loaded_track, play);
                 if let PlayerState::Invalid = self.state {
-                    panic!("start_playback() hasn't set a valid player state.");
+                    error!("start_playback() hasn't set a valid player state.");
+                    exit(1);
                 }
                 return;
             }
@@ -1532,7 +1562,8 @@ impl PlayerInternal {
                     self.start_playback(track_id, play_request_id, loaded_track, play);
 
                     if let PlayerState::Invalid = self.state {
-                        panic!("start_playback() hasn't set a valid player state.");
+                        error!("start_playback() hasn't set a valid player state.");
+                        exit(1);
                     }
 
                     return;
@@ -1685,7 +1716,7 @@ impl PlayerInternal {
                         *stream_position_pcm = Self::position_ms_to_pcm(position_ms);
                     }
                 }
-                Err(err) => error!("Vorbis error: {:?}", err),
+                Err(err) => error!("Vorbis Error: {:?}", err),
             }
         } else {
             warn!("Player::seek called from invalid state");
@@ -1920,7 +1951,9 @@ struct Subfile<T: Read + Seek> {
 
 impl<T: Read + Seek> Subfile<T> {
     pub fn new(mut stream: T, offset: u64) -> Subfile<T> {
-        stream.seek(SeekFrom::Start(offset)).unwrap();
+        if let Err(e) = stream.seek(SeekFrom::Start(offset)) {
+            error!("Subfile new Error: {}", e);
+        }
         Subfile { stream, offset }
     }
 }
