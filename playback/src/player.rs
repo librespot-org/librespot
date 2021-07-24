@@ -813,12 +813,12 @@ impl PlayerTrackLoader {
             let result = if self.config.passthrough {
                 match PassthroughDecoder::new(audio_file) {
                     Ok(result) => Ok(Box::new(result) as Decoder),
-                    Err(e) => Err(AudioError::PassthroughError(e)),
+                    Err(e) => Err(AudioError::PassthroughDecoder(e.to_string())),
                 }
             } else {
                 match VorbisDecoder::new(audio_file) {
                     Ok(result) => Ok(Box::new(result) as Decoder),
-                    Err(e) => Err(AudioError::VorbisError(e)),
+                    Err(e) => Err(AudioError::LewtonDecoder(e.to_string())),
                 }
             };
 
@@ -986,35 +986,46 @@ impl Future for PlayerInternal {
                         Ok(packet) => {
                             if !passthrough {
                                 if let Some(ref packet) = packet {
-                                    *stream_position_pcm +=
-                                        (packet.samples().len() / NUM_CHANNELS as usize) as u64;
-                                    let stream_position_millis =
-                                        Self::position_pcm_to_ms(*stream_position_pcm);
+                                    match packet.samples() {
+                                        Ok(samples) => {
+                                            *stream_position_pcm +=
+                                                (samples.len() / NUM_CHANNELS as usize) as u64;
+                                            let stream_position_millis =
+                                                Self::position_pcm_to_ms(*stream_position_pcm);
 
-                                    let notify_about_position = match *reported_nominal_start_time {
-                                        None => true,
-                                        Some(reported_nominal_start_time) => {
-                                            // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we're actually in time.
-                                            let lag = (Instant::now() - reported_nominal_start_time)
-                                                .as_millis()
-                                                as i64
-                                                - stream_position_millis as i64;
-                                            lag > Duration::from_secs(1).as_millis() as i64
+                                            let notify_about_position =
+                                                match *reported_nominal_start_time {
+                                                    None => true,
+                                                    Some(reported_nominal_start_time) => {
+                                                        // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we're actually in time.
+                                                        let lag = (Instant::now()
+                                                            - reported_nominal_start_time)
+                                                            .as_millis()
+                                                            as i64
+                                                            - stream_position_millis as i64;
+                                                        lag > Duration::from_secs(1).as_millis()
+                                                            as i64
+                                                    }
+                                                };
+                                            if notify_about_position {
+                                                *reported_nominal_start_time = Some(
+                                                    Instant::now()
+                                                        - Duration::from_millis(
+                                                            stream_position_millis as u64,
+                                                        ),
+                                                );
+                                                self.send_event(PlayerEvent::Playing {
+                                                    track_id,
+                                                    play_request_id,
+                                                    position_ms: stream_position_millis as u32,
+                                                    duration_ms,
+                                                });
+                                            }
                                         }
-                                    };
-                                    if notify_about_position {
-                                        *reported_nominal_start_time = Some(
-                                            Instant::now()
-                                                - Duration::from_millis(
-                                                    stream_position_millis as u64,
-                                                ),
-                                        );
-                                        self.send_event(PlayerEvent::Playing {
-                                            track_id,
-                                            play_request_id,
-                                            position_ms: stream_position_millis as u32,
-                                            duration_ms,
-                                        });
+                                        Err(e) => {
+                                            error!("PlayerInternal poll: {}", e);
+                                            exit(1);
+                                        }
                                     }
                                 }
                             } else {
