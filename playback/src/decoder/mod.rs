@@ -14,7 +14,7 @@ pub enum AudioError {
     PassthroughDecoder(String),
     #[error("Decoder OggData Error: Can't return OggData on Samples")]
     OggData,
-    #[error("Decoder Sample Error: Can't return Samples on OggData")]
+    #[error("Decoder Samples Error: Can't return Samples on OggData")]
     Samples,
 }
 

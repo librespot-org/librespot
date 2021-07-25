@@ -1,7 +1,10 @@
 use super::{AudioDecoder, AudioError, AudioPacket, DecoderResult};
 
+use lewton::audio::AudioReadError::AudioIsHeader;
 use lewton::inside_ogg::OggStreamReader;
 use lewton::samples::InterleavedSamples;
+use lewton::OggReadError::NoCapturePatternFound;
+use lewton::VorbisError::{BadAudio, OggError};
 
 use std::io::{Read, Seek};
 
@@ -30,17 +33,10 @@ where
     }
 
     fn next_packet(&mut self) -> DecoderResult<Option<AudioPacket>> {
-        use lewton::audio::AudioReadError::AudioIsHeader;
-        use lewton::OggReadError::NoCapturePatternFound;
-        use lewton::VorbisError::{BadAudio, OggError};
         loop {
             match self.0.read_dec_packet_generic::<InterleavedSamples<f32>>() {
-                Ok(Some(packet)) => {
-                    let samples = AudioPacket::samples_from_f32(packet.samples);
-                    return Ok(Some(samples));
-                }
+                Ok(Some(packet)) => return Ok(Some(AudioPacket::samples_from_f32(packet.samples))),
                 Ok(None) => return Ok(None),
-
                 Err(BadAudio(AudioIsHeader)) => (),
                 Err(OggError(NoCapturePatternFound)) => (),
                 Err(e) => return Err(AudioError::LewtonDecoder(e.to_string())),

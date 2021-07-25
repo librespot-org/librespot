@@ -855,8 +855,8 @@ impl PlayerTrackLoader {
             let position_pcm = PlayerInternal::position_ms_to_pcm(position_ms);
 
             if position_pcm != 0 {
-                if let Err(err) = decoder.seek(position_pcm) {
-                    error!("Vorbis error: {}", err);
+                if let Err(e) = decoder.seek(position_pcm) {
+                    error!("PlayerTrackLoader load_track: {}", e);
                 }
                 stream_loader_controller.set_stream_mode();
             }
@@ -1041,7 +1041,8 @@ impl Future for PlayerInternal {
                         }
                     }
                 } else {
-                    unreachable!();
+                    error!("PlayerInternal poll: Invalid PlayerState");
+                    exit(1);
                 };
             }
 
@@ -1105,8 +1106,8 @@ impl PlayerInternal {
             }
             match self.sink.start() {
                 Ok(()) => self.sink_status = SinkStatus::Running,
-                Err(err) => {
-                    error!("Fatal error, could not start audio sink: {}", err);
+                Err(e) => {
+                    error!("{}", e);
                     exit(1);
                 }
             }
@@ -1128,8 +1129,8 @@ impl PlayerInternal {
                             callback(self.sink_status);
                         }
                     }
-                    Err(err) => {
-                        error!("Fatal error, could not stop audio sink: {}", err);
+                    Err(e) => {
+                        error!("{}", e);
                         exit(1);
                     }
                 }
@@ -1354,8 +1355,8 @@ impl PlayerInternal {
                         }
                     }
 
-                    if let Err(err) = self.sink.write(&packet, &mut self.converter) {
-                        error!("Fatal error, could not write audio to audio sink: {}", err);
+                    if let Err(e) = self.sink.write(&packet, &mut self.converter) {
+                        error!("{}", e);
                         exit(1);
                     }
                 }
@@ -1374,7 +1375,8 @@ impl PlayerInternal {
                         play_request_id,
                     })
                 } else {
-                    unreachable!();
+                    error!("PlayerInternal handle_packet: Invalid PlayerState");
+                    exit(1);
                 }
             }
         }
@@ -1501,7 +1503,10 @@ impl PlayerInternal {
             if previous_track_id == track_id {
                 let mut loaded_track = match mem::replace(&mut self.state, PlayerState::Invalid) {
                     PlayerState::EndOfTrack { loaded_track, .. } => loaded_track,
-                    _ => unreachable!(),
+                    _ => {
+                        error!("PlayerInternal handle_command_load: Invalid PlayerState");
+                        exit(1);
+                    }
                 };
 
                 let position_pcm = Self::position_ms_to_pcm(position_ms);
@@ -1510,10 +1515,10 @@ impl PlayerInternal {
                     loaded_track
                         .stream_loader_controller
                         .set_random_access_mode();
-                    let _ = loaded_track.decoder.seek(position_pcm); // This may be blocking.
-                                                                     // But most likely the track is fully
-                                                                     // loaded already because we played
-                                                                     // to the end of it.
+                    if let Err(e) = loaded_track.decoder.seek(position_pcm) {
+                        // This may be blocking.
+                        error!("PlayerInternal handle_command_load: {}", e);
+                    }
                     loaded_track.stream_loader_controller.set_stream_mode();
                     loaded_track.stream_position_pcm = position_pcm;
                 }
@@ -1549,7 +1554,10 @@ impl PlayerInternal {
 
                 if position_pcm != *stream_position_pcm {
                     stream_loader_controller.set_random_access_mode();
-                    let _ = decoder.seek(position_pcm); // This may be blocking.
+                    if let Err(e) = decoder.seek(position_pcm) {
+                        // This may be blocking.
+                        error!("PlayerInternal handle_command_load: {}", e);
+                    }
                     stream_loader_controller.set_stream_mode();
                     *stream_position_pcm = position_pcm;
                 }
@@ -1596,7 +1604,8 @@ impl PlayerInternal {
 
                     return;
                 } else {
-                    unreachable!();
+                    error!("PlayerInternal handle_command_load: Invalid PlayerState");
+                    exit(1);
                 }
             }
         }
@@ -1620,13 +1629,17 @@ impl PlayerInternal {
                         loaded_track
                             .stream_loader_controller
                             .set_random_access_mode();
-                        let _ = loaded_track.decoder.seek(position_pcm); // This may be blocking
+                        if let Err(e) = loaded_track.decoder.seek(position_pcm) {
+                            // This may be blocking
+                            error!("PlayerInternal handle_command_load: {}", e);
+                        }
                         loaded_track.stream_loader_controller.set_stream_mode();
                     }
                     self.start_playback(track_id, play_request_id, *loaded_track, play);
                     return;
                 } else {
-                    unreachable!();
+                    error!("PlayerInternal handle_command_load: Invalid PlayerState");
+                    exit(1);
                 }
             }
         }
@@ -1748,7 +1761,7 @@ impl PlayerInternal {
                         *stream_position_pcm = position_pcm;
                     }
                 }
-                Err(err) => error!("Vorbis Error: {:?}", err),
+                Err(e) => error!("PlayerInternal handle_command_seek: {}", e),
             }
         } else {
             warn!("Player::seek called from invalid state");
