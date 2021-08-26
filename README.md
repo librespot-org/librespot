@@ -2,17 +2,17 @@
 [![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/librespot-org/spotify-connect-resources)
 [![Crates.io](https://img.shields.io/crates/v/librespot.svg)](https://crates.io/crates/librespot)
 
-Current maintainer is [@awiouy](https://github.com/awiouy) folks.
+Current maintainers are [listed on GitHub](https://github.com/orgs/librespot-org/people).
 
 # librespot
 *librespot* is an open source client library for Spotify. It enables applications to use Spotify's service to control and play music via various backends, and to act as a Spotify Connect receiver. It is an alternative to the official and [now deprecated](https://pyspotify.mopidy.com/en/latest/#libspotify-s-deprecation) closed-source `libspotify`. Additionally, it will provide extra features which are not available in the official library.
 
-_Note: librespot only works with Spotify Premium. This will remain the case for the foreseeable future, as we are unlikely to work on implementing the features such as limited skips and adverts that would be required to make librespot compliant with free accounts._
+_Note: librespot only works with Spotify Premium. This will remain the case. We will not any support features to make librespot compatible with free accounts, such as limited skips and adverts._
 
 ## Quick start
 We're available on [crates.io](https://crates.io/crates/librespot) as the _librespot_ package. Simply run `cargo install librespot` to install librespot on your system. Check the wiki for more info and possible [usage options](https://github.com/librespot-org/librespot/wiki/Options).
 
-After installation, you can run librespot from the CLI using a command such as `librespot -n "Librespot Speaker" -b 160` to create a speaker called _Librespot Speaker_ serving 160kbps audio.
+After installation, you can run librespot from the CLI using a command such as `librespot -n "Librespot Speaker" -b 160` to create a speaker called _Librespot Speaker_ serving 160 kbps audio.
 
 ## This fork
 As the origin by [plietar](https://github.com/plietar/) is no longer actively maintained, this organisation and repository have been set up so that the project may be maintained and upgraded in the future.
@@ -53,12 +53,14 @@ librespot currently offers the following selection of [audio backends](https://g
 ```
 Rodio (default)
 ALSA
+GStreamer
 PortAudio
 PulseAudio
 JACK
 JACK over Rodio
 SDL
 Pipe
+Subprocess
 ```
 Please check the corresponding [compiling entry](https://github.com/librespot-org/librespot/wiki/Compiling#general-dependencies) for backend specific dependencies.
 
@@ -84,9 +86,9 @@ The above is a minimal example. Here is a more fully fledged one:
 ```shell
 target/release/librespot -n "Librespot" -b 320 -c ./cache --enable-volume-normalisation --initial-volume 75 --device-type avr
 ```
-The above command will create a receiver named ```Librespot```, with bitrate set to 320kbps, initial volume at 75%, with volume normalisation enabled, and the device displayed in the app as an Audio/Video Receiver. A folder named ```cache``` will be created/used in the current directory, and be used to cache audio data and credentials.
+The above command will create a receiver named ```Librespot```, with bitrate set to 320 kbps, initial volume at 75%, with volume normalisation enabled, and the device displayed in the app as an Audio/Video Receiver. A folder named ```cache``` will be created/used in the current directory, and be used to cache audio data and credentials.
 
-A full list of runtime options are available [here](https://github.com/librespot-org/librespot/wiki/Options)
+A full list of runtime options is available [here](https://github.com/librespot-org/librespot/wiki/Options).
 
 _Please Note: When using the cache feature, an authentication blob is stored for your account in the cache directory. For security purposes, we recommend that you set directory permissions on the cache directory to `700`._
 
