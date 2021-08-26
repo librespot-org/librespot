@@ -29,11 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 - [connect] The `discovery` module was deprecated in favor of the `librespot-discovery` crate
+- [playback] `alsamixer`: renamed `mixer-card` to `alsa-mixer-device`
+- [playback] `alsamixer`: renamed `mixer-name` to `alsa-mixer-control`
+- [playback] `alsamixer`: renamed `mixer-index` to `alsa-mixer-index`
 
 ### Removed
 - [connect] Removed no-op mixer started/stopped logic (breaking)
 - [playback] Removed `with-vorbis` and `with-tremor` features
-- [playback] `alsamixer`: removed `--mixer-linear-volume` option; use `--volume-ctrl linear` instead
+- [playback] `alsamixer`: removed `--mixer-linear-volume` option, now that `--volume-ctrl {linear|log}` work as expected on Alsa
 
 ### Fixed
 - [connect] Fix step size on volume up/down events
