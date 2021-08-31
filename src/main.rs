@@ -205,9 +205,10 @@ fn get_setup(args: &[String]) -> Setup {
     const FORMAT: &str = "format";
     const HELP: &str = "h";
     const INITIAL_VOLUME: &str = "initial-volume";
-    const MIXER_CARD: &str = "mixer-card";
-    const MIXER_INDEX: &str = "mixer-index";
-    const MIXER_NAME: &str = "mixer-name";
+    const MIXER_TYPE: &str = "mixer";
+    const ALSA_MIXER_DEVICE: &str = "alsa-mixer-device";
+    const ALSA_MIXER_INDEX: &str = "alsa-mixer-index";
+    const ALSA_MIXER_CONTROL: &str = "alsa-mixer-control";
     const NAME: &str = "name";
     const NORMALISATION_ATTACK: &str = "normalisation-attack";
     const NORMALISATION_GAIN_TYPE: &str = "normalisation-gain-type";
@@ -295,24 +296,42 @@ fn get_setup(args: &[String]) -> Setup {
         "Specify the dither algorithm to use - [none, gpdf, tpdf, tpdf_hp]. Defaults to 'tpdf' for formats S16, S24, S24_3 and 'none' for other formats.",
         "DITHER",
     )
-    .optopt("", "mixer", "Mixer to use {alsa|softvol}.", "MIXER")
+    .optopt("m", MIXER_TYPE, "Mixer to use {alsa|softvol}.", "MIXER")
     .optopt(
-        "m",
-        MIXER_NAME,
+        "",
+        "mixer-name", // deprecated
+        "",
+        "",
+    )
+    .optopt(
+        "",
+        ALSA_MIXER_CONTROL,
         "Alsa mixer control, e.g. 'PCM' or 'Master'. Defaults to 'PCM'.",
         "NAME",
     )
     .optopt(
         "",
-        MIXER_CARD,
-        "Alsa mixer card, e.g 'hw:0' or similar from `aplay -l`. Defaults to DEVICE if specified, 'default' otherwise.",
-        "MIXER_CARD",
+        "mixer-card", // deprecated
+        "",
+        "",
     )
     .optopt(
         "",
-        MIXER_INDEX,
+        ALSA_MIXER_DEVICE,
+        "Alsa mixer device, e.g 'hw:0' or similar from `aplay -l`. Defaults to `--device` if specified, 'default' otherwise.",
+        "DEVICE",
+    )
+    .optopt(
+        "",
+        "mixer-index", // deprecated
+        "",
+        "",
+    )
+    .optopt(
+        "",
+        ALSA_MIXER_INDEX,
         "Alsa index of the cards mixer. Defaults to 0.",
-        "INDEX",
+        "NUMBER",
     )
     .optopt(
         "",
@@ -454,28 +473,58 @@ fn get_setup(args: &[String]) -> Setup {
         exit(0);
     }
 
-    let mixer_name = matches.opt_str(MIXER_NAME);
-    let mixer = mixer::find(mixer_name.as_deref()).expect("Invalid mixer");
+    let mixer_type = matches.opt_str(MIXER_TYPE);
+    let mixer = mixer::find(mixer_type.as_deref()).expect("Invalid mixer");
 
     let mixer_config = {
-        let card = matches.opt_str(MIXER_CARD).unwrap_or_else(|| {
-            if let Some(ref device_name) = device {
-                device_name.to_string()
-            } else {
-                MixerConfig::default().card
+        let mixer_device = match matches.opt_str("mixer-card") {
+            Some(card) => {
+                warn!("--mixer-card is deprecated and will be removed in a future release.");
+                warn!("Please use --alsa-mixer-device instead.");
+                card
             }
-        });
-        let index = matches
-            .opt_str(MIXER_INDEX)
-            .map(|index| index.parse::<u32>().unwrap())
-            .unwrap_or(0);
-        let control = matches
-            .opt_str(MIXER_NAME)
-            .unwrap_or_else(|| MixerConfig::default().control);
+            None => matches.opt_str(ALSA_MIXER_DEVICE).unwrap_or_else(|| {
+                if let Some(ref device_name) = device {
+                    device_name.to_string()
+                } else {
+                    MixerConfig::default().device
+                }
+            }),
+        };
+
+        let index = match matches.opt_str("mixer-index") {
+            Some(index) => {
+                warn!("--mixer-index is deprecated and will be removed in a future release.");
+                warn!("Please use --alsa-mixer-index instead.");
+                index
+                    .parse::<u32>()
+                    .expect("Mixer index is not a valid number")
+            }
+            None => matches
+                .opt_str(ALSA_MIXER_INDEX)
+                .map(|index| {
+                    index
+                        .parse::<u32>()
+                        .expect("Alsa mixer index is not a valid number")
+                })
+                .unwrap_or(0),
+        };
+
+        let control = match matches.opt_str("mixer-name") {
+            Some(name) => {
+                warn!("--mixer-name is deprecated and will be removed in a future release.");
+                warn!("Please use --alsa-mixer-control instead.");
+                name
+            }
+            None => matches
+                .opt_str(ALSA_MIXER_CONTROL)
+                .unwrap_or_else(|| MixerConfig::default().control),
+        };
+
         let mut volume_range = matches
             .opt_str(VOLUME_RANGE)
             .map(|range| range.parse::<f64>().unwrap())
-            .unwrap_or_else(|| match mixer_name.as_deref() {
+            .unwrap_or_else(|| match mixer_type.as_deref() {
                 #[cfg(feature = "alsa-backend")]
                 Some(AlsaMixer::NAME) => 0.0, // let Alsa query the control
                 _ => VolumeCtrl::DEFAULT_DB_RANGE,
@@ -502,7 +551,7 @@ fn get_setup(args: &[String]) -> Setup {
             });
 
         MixerConfig {
-            card,
+            device: mixer_device,
             control,
             index,
             volume_ctrl,
@@ -563,7 +612,7 @@ fn get_setup(args: &[String]) -> Setup {
             }
             (volume as f32 / 100.0 * VolumeCtrl::MAX_VOLUME as f32) as u16
         })
-        .or_else(|| match mixer_name.as_deref() {
+        .or_else(|| match mixer_type.as_deref() {
             #[cfg(feature = "alsa-backend")]
             Some(AlsaMixer::NAME) => None,
             _ => cache.as_ref().and_then(Cache::volume),
