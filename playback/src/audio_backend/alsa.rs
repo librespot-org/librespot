@@ -59,7 +59,7 @@ fn list_outputs() -> io::Result<()> {
     println!("Listing available Alsa outputs:");
     for t in &["pcm", "ctl", "hwdep"] {
         println!("{} devices:", t);
-        let i = match HintIter::new_str(None, &t) {
+        let i = match HintIter::new_str(None, t) {
             Ok(i) => i,
             Err(e) => {
                 return Err(io::Error::new(io::ErrorKind::Other, e));

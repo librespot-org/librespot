@@ -126,7 +126,7 @@ pub trait Metadata: Send + Sized + 'static {
         let data = response.payload.first().expect("Empty payload");
         let msg = Self::Message::parse_from_bytes(data).unwrap();
 
-        Ok(Self::parse(&msg, &session))
+        Ok(Self::parse(&msg, session))
     }
 }
 
