@@ -1286,16 +1286,7 @@ impl PlayerInternal {
                                         }
                                     }
                                 }
-
                                 *sample *= actual_normalisation_factor;
-
-                                // Extremely sharp attacks, however unlikely, *may* still clip and provide
-                                // undefined results, so strictly enforce output within [-1.0, 1.0].
-                                if *sample < -1.0 {
-                                    *sample = -1.0;
-                                } else if *sample > 1.0 {
-                                    *sample = 1.0;
-                                }
                             }
                         }
 
