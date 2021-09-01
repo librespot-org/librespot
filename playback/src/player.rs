@@ -1186,10 +1186,6 @@ impl PlayerInternal {
             Some(mut packet) => {
                 if !packet.is_empty() {
                     if let AudioPacket::Samples(ref mut data) = packet {
-                        if let Some(ref editor) = self.audio_filter {
-                            editor.modify_stream(data)
-                        }
-
                         if self.config.normalisation
                             && !(f64::abs(normalisation_factor - 1.0) <= f64::EPSILON
                                 && self.config.normalisation_method == NormalisationMethod::Basic)
@@ -1301,6 +1297,10 @@ impl PlayerInternal {
                                     *sample = 1.0;
                                 }
                             }
+                        }
+
+                        if let Some(ref editor) = self.audio_filter {
+                            editor.modify_stream(data)
                         }
                     }
 
