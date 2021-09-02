@@ -151,7 +151,7 @@ impl Default for PlayerConfig {
             normalisation_type: NormalisationType::default(),
             normalisation_method: NormalisationMethod::default(),
             normalisation_pregain: 0.0,
-            normalisation_threshold: db_to_ratio(-1.0),
+            normalisation_threshold: db_to_ratio(-2.0),
             normalisation_attack: Duration::from_millis(5),
             normalisation_release: Duration::from_millis(100),
             normalisation_knee: 1.0,

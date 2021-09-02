@@ -371,7 +371,7 @@ fn get_setup(args: &[String]) -> Setup {
     .optopt(
         "",
         NORMALISATION_THRESHOLD,
-        "Threshold (dBFS) to prevent clipping. Defaults to -1.0.",
+        "Threshold (dBFS) to prevent clipping. Defaults to -2.0.",
         "THRESHOLD",
     )
     .optopt(
