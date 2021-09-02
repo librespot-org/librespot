@@ -31,7 +31,7 @@ In order to prepare for a PR, you will need to do a couple of things first:
 
 Make any changes that you are going to make to the code, but do not commit yet.
 
-Unless your changes are negligible, please add an entry in the "Unreleased" section of `CHANGELOG.md`. Refer to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) for instructions on how this entry should look like.
+Unless your changes are negligible, please add an entry in the "Unreleased" section of `CHANGELOG.md`. Refer to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) for instructions on how this entry should look like. If your changes break the API such that downstream packages that depend on librespot need to update their source to still compile, you should mark your changes as `(breaking)`.
 
 Make sure that the code is correctly formatted by running:
 ```bash
