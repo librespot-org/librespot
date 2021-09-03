@@ -907,6 +907,7 @@ impl SpircTask {
             // Note: This doesn't seem to reflect in the UI
             // the additional tracks in the frame don't show up as with station view
             debug!("Extending playlist <{}>", context_uri);
+            self.player.set_auto_normalise_as_album(false);
             self.update_tracks_from_context();
         }
         if new_index >= tracks_len {
@@ -1083,6 +1084,9 @@ impl SpircTask {
             // Get autoplay_station_uri for regular playlists
             self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
         }
+
+        self.player
+            .set_auto_normalise_as_album(context_uri.starts_with("spotify:album:"));
 
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.iter().cloned().collect());

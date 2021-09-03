@@ -67,6 +67,8 @@ struct PlayerInternal {
     limiter_peak_sample: f64,
     limiter_factor: f64,
     limiter_strength: f64,
+
+    auto_normalise_as_album: bool,
 }
 
 enum PlayerCommand {
@@ -86,6 +88,7 @@ enum PlayerCommand {
     AddEventSender(mpsc::UnboundedSender<PlayerEvent>),
     SetSinkEventCallback(Option<SinkEventCallback>),
     EmitVolumeSetEvent(u16),
+    SetAutoNormaliseAsAlbum(bool),
 }
 
 #[derive(Debug, Clone)]
@@ -238,9 +241,10 @@ impl NormalisationData {
             return 1.0;
         }
 
-        let [gain_db, gain_peak] = match config.normalisation_type {
-            NormalisationType::Album => [data.album_gain_db, data.album_peak],
-            NormalisationType::Track => [data.track_gain_db, data.track_peak],
+        let [gain_db, gain_peak] = if config.normalisation_type == NormalisationType::Album {
+            [data.album_gain_db, data.album_peak]
+        } else {
+            [data.track_gain_db, data.track_peak]
         };
 
         let normalisation_power = gain_db as f64 + config.normalisation_pregain;
@@ -327,6 +331,8 @@ impl Player {
                 limiter_peak_sample: 0.0,
                 limiter_factor: 1.0,
                 limiter_strength: 0.0,
+
+                auto_normalise_as_album: false,
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -405,6 +411,10 @@ impl Player {
 
     pub fn emit_volume_set_event(&self, volume: u16) {
         self.command(PlayerCommand::EmitVolumeSetEvent(volume));
+    }
+
+    pub fn set_auto_normalise_as_album(&self, setting: bool) {
+        self.command(PlayerCommand::SetAutoNormaliseAsAlbum(setting));
     }
 }
 
@@ -676,6 +686,7 @@ impl PlayerTrackLoader {
         &self,
         spotify_id: SpotifyId,
         position_ms: u32,
+        auto_normalise_as_album: bool,
     ) -> Option<PlayerLoadedTrackData> {
         let audio = match AudioItem::get_audio_item(&self.session, spotify_id).await {
             Ok(audio) => audio,
@@ -778,7 +789,17 @@ impl PlayerTrackLoader {
             let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file)
             {
                 Ok(normalisation_data) => {
-                    NormalisationData::get_factor(&self.config, normalisation_data)
+                    let mut config = self.config.clone();
+                    if config.normalisation_type == NormalisationType::Auto {
+                        if auto_normalise_as_album {
+                            debug!("Auto normalisation data: album");
+                            config.normalisation_type = NormalisationType::Album;
+                        } else {
+                            debug!("Auto normalisation data: track");
+                            config.normalisation_type = NormalisationType::Track;
+                        }
+                    };
+                    NormalisationData::get_factor(&config, normalisation_data)
                 }
                 Err(_) => {
                     warn!("Unable to extract normalisation data, using default value.");
@@ -1750,6 +1771,10 @@ impl PlayerInternal {
             PlayerCommand::EmitVolumeSetEvent(volume) => {
                 self.send_event(PlayerEvent::VolumeSet { volume })
             }
+
+            PlayerCommand::SetAutoNormaliseAsAlbum(setting) => {
+                self.auto_normalise_as_album = setting
+            }
         }
     }
 
@@ -1781,10 +1806,16 @@ impl PlayerInternal {
             config: self.config.clone(),
         };
 
+        let auto_normalise_as_album = self.auto_normalise_as_album;
+
         let (result_tx, result_rx) = oneshot::channel();
 
         std::thread::spawn(move || {
-            let data = futures_executor::block_on(loader.load_track(spotify_id, position_ms));
+            let data = futures_executor::block_on(loader.load_track(
+                spotify_id,
+                position_ms,
+                auto_normalise_as_album,
+            ));
             if let Some(data) = data {
                 let _ = result_tx.send(data);
             }
@@ -1855,6 +1886,10 @@ impl ::std::fmt::Debug for PlayerCommand {
             PlayerCommand::EmitVolumeSetEvent(volume) => {
                 f.debug_tuple("VolumeSet").field(&volume).finish()
             }
+            PlayerCommand::SetAutoNormaliseAsAlbum(setting) => f
+                .debug_tuple("SetAutoNormaliseAsAlbum")
+                .field(&setting)
+                .finish(),
         }
     }
 }
