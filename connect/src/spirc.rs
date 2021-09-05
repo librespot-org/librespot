@@ -902,12 +902,12 @@ impl SpircTask {
             self.context_fut = self.resolve_station(&context_uri);
             self.update_tracks_from_context();
         }
-        if self.config.autoplay && new_index == tracks_len - 1 {
+        let last_track = new_index == tracks_len - 1;
+        if self.config.autoplay && last_track {
             // Extend the playlist
             // Note: This doesn't seem to reflect in the UI
             // the additional tracks in the frame don't show up as with station view
             debug!("Extending playlist <{}>", context_uri);
-            self.player.set_auto_normalise_as_album(false);
             self.update_tracks_from_context();
         }
         if new_index >= tracks_len {
@@ -918,6 +918,11 @@ impl SpircTask {
         if tracks_len > 0 {
             self.state.set_playing_track_index(new_index);
             self.load_track(continue_playing, 0);
+            if self.config.autoplay && last_track {
+                // If we're now playing the last track of an album, then
+                // switch to track normalisation mode for the autoplay to come.
+                self.player.set_auto_normalise_as_album(false);
+            }
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
             self.state.set_playing_track_index(0);

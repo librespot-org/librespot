@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add `--volume-range` option to set dB range and control `log` and `cubic` volume control curves
 - [playback] `alsamixer`: support for querying dB range from Alsa softvol
 - [playback] Add `--format F64` (supported by Alsa and GStreamer only)
-- [playback] Add `--normalisation-type auto` that switches between album and track automatically
+- [playback] Add `--normalisation-type auto` that switches between album and track automatically (breaking)
 
 ### Changed
 - [audio, playback] Moved `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `AudioError`, `AudioDecoder` and the `convert` module from `librespot-audio` to `librespot-playback`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly. (breaking)

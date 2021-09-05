@@ -235,43 +235,6 @@ impl NormalisationData {
 
         Ok(r)
     }
-
-    fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f64 {
-        if !config.normalisation {
-            return 1.0;
-        }
-
-        let [gain_db, gain_peak] = if config.normalisation_type == NormalisationType::Album {
-            [data.album_gain_db, data.album_peak]
-        } else {
-            [data.track_gain_db, data.track_peak]
-        };
-
-        let normalisation_power = gain_db as f64 + config.normalisation_pregain;
-        let mut normalisation_factor = db_to_ratio(normalisation_power);
-
-        if normalisation_factor * gain_peak as f64 > config.normalisation_threshold {
-            let limited_normalisation_factor = config.normalisation_threshold / gain_peak as f64;
-            let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
-
-            if config.normalisation_method == NormalisationMethod::Basic {
-                warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
-                normalisation_factor = limited_normalisation_factor;
-            } else {
-                warn!(
-                    "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
-                    normalisation_power - limited_normalisation_power
-                );
-            }
-
-            warn!("Please lower pregain to avoid.");
-        }
-
-        debug!("Normalisation Data: {:?}", data);
-        debug!("Normalisation Factor: {:.2}%", normalisation_factor * 100.0);
-
-        normalisation_factor as f64
-    }
 }
 
 impl Player {
@@ -433,7 +396,7 @@ impl Drop for Player {
 
 struct PlayerLoadedTrackData {
     decoder: Decoder,
-    normalisation_factor: f64,
+    normalisation_data: NormalisationData,
     stream_loader_controller: StreamLoaderController,
     bytes_per_second: usize,
     duration_ms: u32,
@@ -466,6 +429,7 @@ enum PlayerState {
         track_id: SpotifyId,
         play_request_id: u64,
         decoder: Decoder,
+        normalisation_data: NormalisationData,
         normalisation_factor: f64,
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
@@ -477,6 +441,7 @@ enum PlayerState {
         track_id: SpotifyId,
         play_request_id: u64,
         decoder: Decoder,
+        normalisation_data: NormalisationData,
         normalisation_factor: f64,
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
@@ -553,7 +518,7 @@ impl PlayerState {
                 decoder,
                 duration_ms,
                 bytes_per_second,
-                normalisation_factor,
+                normalisation_data,
                 stream_loader_controller,
                 stream_position_pcm,
                 ..
@@ -563,7 +528,7 @@ impl PlayerState {
                     play_request_id,
                     loaded_track: PlayerLoadedTrackData {
                         decoder,
-                        normalisation_factor,
+                        normalisation_data,
                         stream_loader_controller,
                         bytes_per_second,
                         duration_ms,
@@ -582,6 +547,7 @@ impl PlayerState {
                 track_id,
                 play_request_id,
                 decoder,
+                normalisation_data,
                 normalisation_factor,
                 stream_loader_controller,
                 duration_ms,
@@ -593,6 +559,7 @@ impl PlayerState {
                     track_id,
                     play_request_id,
                     decoder,
+                    normalisation_data,
                     normalisation_factor,
                     stream_loader_controller,
                     duration_ms,
@@ -613,6 +580,7 @@ impl PlayerState {
                 track_id,
                 play_request_id,
                 decoder,
+                normalisation_data,
                 normalisation_factor,
                 stream_loader_controller,
                 duration_ms,
@@ -625,6 +593,7 @@ impl PlayerState {
                     track_id,
                     play_request_id,
                     decoder,
+                    normalisation_data,
                     normalisation_factor,
                     stream_loader_controller,
                     duration_ms,
@@ -686,7 +655,6 @@ impl PlayerTrackLoader {
         &self,
         spotify_id: SpotifyId,
         position_ms: u32,
-        auto_normalise_as_album: bool,
     ) -> Option<PlayerLoadedTrackData> {
         let audio = match AudioItem::get_audio_item(&self.session, spotify_id).await {
             Ok(audio) => audio,
@@ -786,24 +754,16 @@ impl PlayerTrackLoader {
 
             let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
-            let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file)
-            {
-                Ok(normalisation_data) => {
-                    let mut config = self.config.clone();
-                    if config.normalisation_type == NormalisationType::Auto {
-                        if auto_normalise_as_album {
-                            debug!("Auto normalisation data: album");
-                            config.normalisation_type = NormalisationType::Album;
-                        } else {
-                            debug!("Auto normalisation data: track");
-                            config.normalisation_type = NormalisationType::Track;
-                        }
-                    };
-                    NormalisationData::get_factor(&config, normalisation_data)
-                }
+            let normalisation_data = match NormalisationData::parse_from_file(&mut decrypted_file) {
+                Ok(data) => data,
                 Err(_) => {
                     warn!("Unable to extract normalisation data, using default value.");
-                    1.0
+                    NormalisationData {
+                        track_gain_db: 0.0,
+                        track_peak: 1.0,
+                        album_gain_db: 0.0,
+                        album_peak: 1.0,
+                    }
                 }
             };
 
@@ -859,7 +819,7 @@ impl PlayerTrackLoader {
 
             return Some(PlayerLoadedTrackData {
                 decoder,
-                normalisation_factor,
+                normalisation_data,
                 stream_loader_controller,
                 bytes_per_second,
                 duration_ms,
@@ -1351,6 +1311,47 @@ impl PlayerInternal {
         self.limiter_strength = 0.0;
     }
 
+    fn get_normalisation_factor(config: &PlayerConfig, data: NormalisationData) -> f64 {
+        if !config.normalisation {
+            return 1.0;
+        }
+
+        let [gain_db, gain_peak] = if config.normalisation_type == NormalisationType::Album {
+            [data.album_gain_db, data.album_peak]
+        } else {
+            [data.track_gain_db, data.track_peak]
+        };
+
+        let normalisation_power = gain_db as f64 + config.normalisation_pregain;
+        let mut normalisation_factor = db_to_ratio(normalisation_power);
+
+        if normalisation_factor * gain_peak as f64 > config.normalisation_threshold {
+            let limited_normalisation_factor = config.normalisation_threshold / gain_peak as f64;
+            let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
+
+            if config.normalisation_method == NormalisationMethod::Basic {
+                warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
+                normalisation_factor = limited_normalisation_factor;
+            } else {
+                warn!(
+                    "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
+                    normalisation_power - limited_normalisation_power
+                );
+            }
+
+            warn!("Please lower pregain to avoid.");
+        }
+
+        debug!("Normalisation Data: {:?}", data);
+        debug!(
+            "Calculated Normalisation Factor for {:?}: {:.2}%",
+            config.normalisation_type,
+            normalisation_factor * 100.0
+        );
+
+        normalisation_factor as f64
+    }
+
     fn start_playback(
         &mut self,
         track_id: SpotifyId,
@@ -1359,6 +1360,17 @@ impl PlayerInternal {
         start_playback: bool,
     ) {
         let position_ms = Self::position_pcm_to_ms(loaded_track.stream_position_pcm);
+
+        let mut config = self.config.clone();
+        if config.normalisation_type == NormalisationType::Auto {
+            if self.auto_normalise_as_album {
+                config.normalisation_type = NormalisationType::Album;
+            } else {
+                config.normalisation_type = NormalisationType::Track;
+            }
+        };
+        let normalisation_factor =
+            Self::get_normalisation_factor(&config, loaded_track.normalisation_data);
 
         if start_playback {
             self.ensure_sink_running();
@@ -1374,7 +1386,8 @@ impl PlayerInternal {
                 track_id,
                 play_request_id,
                 decoder: loaded_track.decoder,
-                normalisation_factor: loaded_track.normalisation_factor,
+                normalisation_data: loaded_track.normalisation_data,
+                normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
@@ -1391,7 +1404,8 @@ impl PlayerInternal {
                 track_id,
                 play_request_id,
                 decoder: loaded_track.decoder,
-                normalisation_factor: loaded_track.normalisation_factor,
+                normalisation_data: loaded_track.normalisation_data,
+                normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
@@ -1518,7 +1532,7 @@ impl PlayerInternal {
                     stream_loader_controller,
                     bytes_per_second,
                     duration_ms,
-                    normalisation_factor,
+                    normalisation_data,
                     ..
                 }
                 | PlayerState::Paused {
@@ -1527,13 +1541,13 @@ impl PlayerInternal {
                     stream_loader_controller,
                     bytes_per_second,
                     duration_ms,
-                    normalisation_factor,
+                    normalisation_data,
                     ..
                 } = old_state
                 {
                     let loaded_track = PlayerLoadedTrackData {
                         decoder,
-                        normalisation_factor,
+                        normalisation_data,
                         stream_loader_controller,
                         bytes_per_second,
                         duration_ms,
@@ -1806,16 +1820,10 @@ impl PlayerInternal {
             config: self.config.clone(),
         };
 
-        let auto_normalise_as_album = self.auto_normalise_as_album;
-
         let (result_tx, result_rx) = oneshot::channel();
 
         std::thread::spawn(move || {
-            let data = futures_executor::block_on(loader.load_track(
-                spotify_id,
-                position_ms,
-                auto_normalise_as_album,
-            ));
+            let data = futures_executor::block_on(loader.load_track(spotify_id, position_ms));
             if let Some(data) = data {
                 let _ = result_tx.send(data);
             }
