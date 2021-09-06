@@ -235,6 +235,47 @@ impl NormalisationData {
 
         Ok(r)
     }
+
+    fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f64 {
+        if !config.normalisation {
+            return 1.0;
+        }
+
+        let [gain_db, gain_peak] = if config.normalisation_type == NormalisationType::Album {
+            [data.album_gain_db, data.album_peak]
+        } else {
+            [data.track_gain_db, data.track_peak]
+        };
+
+        let normalisation_power = gain_db as f64 + config.normalisation_pregain;
+        let mut normalisation_factor = db_to_ratio(normalisation_power);
+
+        if normalisation_factor * gain_peak as f64 > config.normalisation_threshold {
+            let limited_normalisation_factor = config.normalisation_threshold / gain_peak as f64;
+            let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
+
+            if config.normalisation_method == NormalisationMethod::Basic {
+                warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
+                normalisation_factor = limited_normalisation_factor;
+            } else {
+                warn!(
+                    "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
+                    normalisation_power - limited_normalisation_power
+                );
+            }
+
+            warn!("Please lower pregain to avoid.");
+        }
+
+        debug!("Normalisation Data: {:?}", data);
+        debug!(
+            "Calculated Normalisation Factor for {:?}: {:.2}%",
+            config.normalisation_type,
+            normalisation_factor * 100.0
+        );
+
+        normalisation_factor as f64
+    }
 }
 
 impl Player {
@@ -1311,47 +1352,6 @@ impl PlayerInternal {
         self.limiter_strength = 0.0;
     }
 
-    fn get_normalisation_factor(config: &PlayerConfig, data: NormalisationData) -> f64 {
-        if !config.normalisation {
-            return 1.0;
-        }
-
-        let [gain_db, gain_peak] = if config.normalisation_type == NormalisationType::Album {
-            [data.album_gain_db, data.album_peak]
-        } else {
-            [data.track_gain_db, data.track_peak]
-        };
-
-        let normalisation_power = gain_db as f64 + config.normalisation_pregain;
-        let mut normalisation_factor = db_to_ratio(normalisation_power);
-
-        if normalisation_factor * gain_peak as f64 > config.normalisation_threshold {
-            let limited_normalisation_factor = config.normalisation_threshold / gain_peak as f64;
-            let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
-
-            if config.normalisation_method == NormalisationMethod::Basic {
-                warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
-                normalisation_factor = limited_normalisation_factor;
-            } else {
-                warn!(
-                    "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
-                    normalisation_power - limited_normalisation_power
-                );
-            }
-
-            warn!("Please lower pregain to avoid.");
-        }
-
-        debug!("Normalisation Data: {:?}", data);
-        debug!(
-            "Calculated Normalisation Factor for {:?}: {:.2}%",
-            config.normalisation_type,
-            normalisation_factor * 100.0
-        );
-
-        normalisation_factor as f64
-    }
-
     fn start_playback(
         &mut self,
         track_id: SpotifyId,
@@ -1370,7 +1370,7 @@ impl PlayerInternal {
             }
         };
         let normalisation_factor =
-            Self::get_normalisation_factor(&config, loaded_track.normalisation_data);
+            NormalisationData::get_factor(&config, loaded_track.normalisation_data);
 
         if start_playback {
             self.ensure_sink_running();
