@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsa`, `gstreamer`, `pulseaudio`: always output in native endianness
 - [playback] `alsa`: revert buffer size to ~500 ms
 - [playback] `alsa`, `pipe`, `pulseaudio`: better error handling
+- [metadata] Skip tracks on Playlist parsing when `SpotifyId::from_base62` retunrs `Err()` instead of using `unwrap()`
 
 ## [0.2.0] - 2021-05-04
 
