@@ -124,7 +124,7 @@ fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<
     let mut data = Vec::with_capacity(0x64);
     for i in 1..6 {
         let mut mac =
-            HmacSha1::new_from_slice(&shared_secret).expect("HMAC can take key of any size");
+            HmacSha1::new_from_slice(shared_secret).expect("HMAC can take key of any size");
         mac.update(packets);
         mac.update(&[i]);
         data.extend_from_slice(&mac.finalize().into_bytes());
