@@ -1,4 +1,4 @@
-use super::{AudioDecoder, AudioError, AudioPacket, DecoderResult};
+use super::{AudioDecoder, DecoderError, AudioPacket, DecoderResult};
 
 use lewton::audio::AudioReadError::AudioIsHeader;
 use lewton::inside_ogg::OggStreamReader;
@@ -16,7 +16,7 @@ where
 {
     pub fn new(input: R) -> DecoderResult<VorbisDecoder<R>> {
         let reader =
-            OggStreamReader::new(input).map_err(|e| AudioError::LewtonDecoder(e.to_string()))?;
+            OggStreamReader::new(input).map_err(|e| DecoderError::LewtonDecoder(e.to_string()))?;
         Ok(VorbisDecoder(reader))
     }
 }
@@ -28,7 +28,7 @@ where
     fn seek(&mut self, absgp: u64) -> DecoderResult<()> {
         self.0
             .seek_absgp_pg(absgp)
-            .map_err(|e| AudioError::LewtonDecoder(e.to_string()))?;
+            .map_err(|e| DecoderError::LewtonDecoder(e.to_string()))?;
         Ok(())
     }
 
@@ -39,7 +39,7 @@ where
                 Ok(None) => return Ok(None),
                 Err(BadAudio(AudioIsHeader)) => (),
                 Err(OggError(NoCapturePatternFound)) => (),
-                Err(e) => return Err(AudioError::LewtonDecoder(e.to_string())),
+                Err(e) => return Err(DecoderError::LewtonDecoder(e.to_string())),
             }
         }
     }

@@ -23,7 +23,7 @@ use crate::convert::Converter;
 use crate::core::session::Session;
 use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
-use crate::decoder::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, VorbisDecoder};
+use crate::decoder::{AudioDecoder, DecoderError, AudioPacket, PassthroughDecoder, VorbisDecoder};
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
 
@@ -813,12 +813,12 @@ impl PlayerTrackLoader {
             let result = if self.config.passthrough {
                 match PassthroughDecoder::new(audio_file) {
                     Ok(result) => Ok(Box::new(result) as Decoder),
-                    Err(e) => Err(AudioError::PassthroughDecoder(e.to_string())),
+                    Err(e) => Err(DecoderError::PassthroughDecoder(e.to_string())),
                 }
             } else {
                 match VorbisDecoder::new(audio_file) {
                     Ok(result) => Ok(Box::new(result) as Decoder),
-                    Err(e) => Err(AudioError::LewtonDecoder(e.to_string())),
+                    Err(e) => Err(DecoderError::LewtonDecoder(e.to_string())),
                 }
             };
 

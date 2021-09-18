@@ -1,5 +1,5 @@
 // Passthrough decoder for librespot
-use super::{AudioDecoder, AudioError, AudioPacket, DecoderResult};
+use super::{AudioDecoder, DecoderError, AudioPacket, DecoderResult};
 use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::io::{Read, Seek};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -10,13 +10,13 @@ where
 {
     let pck: Packet = rdr
         .read_packet_expected()
-        .map_err(|e| AudioError::PassthroughDecoder(e.to_string()))?;
+        .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
 
     let pkt_type = pck.data[0];
     debug!("Vorbis header type {}", &pkt_type);
 
     if pkt_type != code {
-        return Err(AudioError::PassthroughDecoder("Invalid Data".to_string()));
+        return Err(DecoderError::PassthroughDecoder("Invalid Data".to_string()));
     }
 
     Ok(pck.data.into_boxed_slice())
@@ -40,7 +40,7 @@ impl<R: Read + Seek> PassthroughDecoder<R> {
         let mut rdr = PacketReader::new(rdr);
         let since_epoch = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|e| AudioError::PassthroughDecoder(e.to_string()))?;
+            .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
         let stream_serial = since_epoch.as_millis() as u32;
 
         info!("Starting passthrough track with serial {}", stream_serial);
@@ -81,7 +81,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                             PacketWriteEndInfo::EndStream,
                             absgp_page,
                         )
-                        .map_err(|e| AudioError::PassthroughDecoder(e.to_string()))?;
+                        .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
                 }
                 _ => warn! {"Cannot write EoS after seeking"},
             };
@@ -98,17 +98,17 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                 let pck = self
                     .rdr
                     .read_packet()
-                    .map_err(|e| AudioError::PassthroughDecoder(e.to_string()))?;
+                    .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
                 match pck {
                     Some(pck) => {
                         self.ofsgp_page = pck.absgp_page();
                         debug!("Seek to offset page {}", self.ofsgp_page);
                         Ok(())
                     }
-                    None => Err(AudioError::PassthroughDecoder("Packet is None".to_string())),
+                    None => Err(DecoderError::PassthroughDecoder("Packet is None".to_string())),
                 }
             }
-            Err(e) => Err(AudioError::PassthroughDecoder(e.to_string())),
+            Err(e) => Err(DecoderError::PassthroughDecoder(e.to_string())),
         }
     }
 
@@ -122,7 +122,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                     PacketWriteEndInfo::EndPage,
                     0,
                 )
-                .map_err(|e| AudioError::PassthroughDecoder(e.to_string()))?;
+                .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
             self.wtr
                 .write_packet(
                     self.comment.clone(),
@@ -130,7 +130,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                     PacketWriteEndInfo::NormalPacket,
                     0,
                 )
-                .map_err(|e| AudioError::PassthroughDecoder(e.to_string()))?;
+                .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
             self.wtr
                 .write_packet(
                     self.setup.clone(),
@@ -138,7 +138,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                     PacketWriteEndInfo::EndPage,
                     0,
                 )
-                .map_err(|e| AudioError::PassthroughDecoder(e.to_string()))?;
+                .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
             self.bos = true;
             debug!("Wrote Ogg headers");
         }
@@ -150,7 +150,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                     info!("end of streaming");
                     return Ok(None);
                 }
-                Err(e) => return Err(AudioError::PassthroughDecoder(e.to_string())),
+                Err(e) => return Err(DecoderError::PassthroughDecoder(e.to_string())),
             };
 
             let pckgp_page = pck.absgp_page();
@@ -177,7 +177,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                     inf,
                     pckgp_page - self.ofsgp_page,
                 )
-                .map_err(|e| AudioError::PassthroughDecoder(e.to_string()))?;
+                .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
 
             let data = self.wtr.inner_mut();
 

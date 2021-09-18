@@ -7,7 +7,7 @@ mod passthrough_decoder;
 pub use passthrough_decoder::PassthroughDecoder;
 
 #[derive(Error, Debug)]
-pub enum AudioError {
+pub enum DecoderError {
     #[error("Lewton Decoder Error: {0}")]
     LewtonDecoder(String),
     #[error("Passthrough Decoder Error: {0}")]
@@ -18,7 +18,7 @@ pub enum AudioError {
     Samples,
 }
 
-pub type DecoderResult<T> = Result<T, AudioError>;
+pub type DecoderResult<T> = Result<T, DecoderError>;
 
 pub enum AudioPacket {
     Samples(Vec<f64>),
@@ -34,14 +34,14 @@ impl AudioPacket {
     pub fn samples(&self) -> DecoderResult<&[f64]> {
         match self {
             AudioPacket::Samples(s) => Ok(s),
-            AudioPacket::OggData(_) => Err(AudioError::OggData),
+            AudioPacket::OggData(_) => Err(DecoderError::OggData),
         }
     }
 
     pub fn oggdata(&self) -> DecoderResult<&[u8]> {
         match self {
             AudioPacket::OggData(d) => Ok(d),
-            AudioPacket::Samples(_) => Err(AudioError::Samples),
+            AudioPacket::Samples(_) => Err(DecoderError::Samples),
         }
     }
 
