@@ -30,7 +30,7 @@ use self::alsamixer::AlsaMixer;
 
 #[derive(Debug, Clone)]
 pub struct MixerConfig {
-    pub card: String,
+    pub device: String,
     pub control: String,
     pub index: u32,
     pub volume_ctrl: VolumeCtrl,
@@ -39,7 +39,7 @@ pub struct MixerConfig {
 impl Default for MixerConfig {
     fn default() -> MixerConfig {
         MixerConfig {
-            card: String::from("default"),
+            device: String::from("default"),
             control: String::from("PCM"),
             index: 0,
             volume_ctrl: VolumeCtrl::default(),

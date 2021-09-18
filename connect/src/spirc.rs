@@ -1033,7 +1033,7 @@ impl SpircTask {
                     .payload
                     .first()
                     .expect("Empty payload on context uri");
-                let response: serde_json::Value = serde_json::from_slice(&data).unwrap();
+                let response: serde_json::Value = serde_json::from_slice(data).unwrap();
 
                 Ok(response)
             }
@@ -1051,7 +1051,7 @@ impl SpircTask {
             if let Some(head) = track_vec.len().checked_sub(CONTEXT_TRACKS_HISTORY) {
                 track_vec.drain(0..head);
             }
-            track_vec.extend_from_slice(&new_tracks);
+            track_vec.extend_from_slice(new_tracks);
             self.state
                 .set_track(protobuf::RepeatedField::from_vec(track_vec));
 
@@ -1218,7 +1218,7 @@ impl SpircTask {
         trace!("Sending status to server: [{}]", status_string);
         let mut cs = CommandSender::new(self, MessageType::kMessageTypeNotify);
         if let Some(s) = recipient {
-            cs = cs.recipient(&s);
+            cs = cs.recipient(s);
         }
         cs.send();
     }
