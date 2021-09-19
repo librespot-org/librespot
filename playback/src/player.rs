@@ -23,7 +23,7 @@ use crate::convert::Converter;
 use crate::core::session::Session;
 use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
-use crate::decoder::{AudioDecoder, DecoderError, AudioPacket, PassthroughDecoder, VorbisDecoder};
+use crate::decoder::{AudioDecoder, AudioPacket, DecoderError, PassthroughDecoder, VorbisDecoder};
 use crate::metadata::{AudioItem, FileFormat};
 use crate::mixer::AudioFilter;
 

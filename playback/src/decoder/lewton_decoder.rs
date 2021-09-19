@@ -1,4 +1,4 @@
-use super::{AudioDecoder, DecoderError, AudioPacket, DecoderResult};
+use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 
 use lewton::audio::AudioReadError::AudioIsHeader;
 use lewton::inside_ogg::OggStreamReader;

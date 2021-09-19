@@ -12,13 +12,19 @@ pub enum DecoderError {
     LewtonDecoder(String),
     #[error("Passthrough Decoder Error: {0}")]
     PassthroughDecoder(String),
+}
+
+pub type DecoderResult<T> = Result<T, DecoderError>;
+
+#[derive(Error, Debug)]
+pub enum AudioPacketError {
     #[error("Decoder OggData Error: Can't return OggData on Samples")]
     OggData,
     #[error("Decoder Samples Error: Can't return Samples on OggData")]
     Samples,
 }
 
-pub type DecoderResult<T> = Result<T, DecoderError>;
+pub type AudioPacketResult<T> = Result<T, AudioPacketError>;
 
 pub enum AudioPacket {
     Samples(Vec<f64>),
@@ -31,17 +37,17 @@ impl AudioPacket {
         AudioPacket::Samples(f64_samples)
     }
 
-    pub fn samples(&self) -> DecoderResult<&[f64]> {
+    pub fn samples(&self) -> AudioPacketResult<&[f64]> {
         match self {
             AudioPacket::Samples(s) => Ok(s),
-            AudioPacket::OggData(_) => Err(DecoderError::OggData),
+            AudioPacket::OggData(_) => Err(AudioPacketError::OggData),
         }
     }
 
-    pub fn oggdata(&self) -> DecoderResult<&[u8]> {
+    pub fn oggdata(&self) -> AudioPacketResult<&[u8]> {
         match self {
             AudioPacket::OggData(d) => Ok(d),
-            AudioPacket::Samples(_) => Err(DecoderError::Samples),
+            AudioPacket::Samples(_) => Err(AudioPacketError::Samples),
         }
     }
 

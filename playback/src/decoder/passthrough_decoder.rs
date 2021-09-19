@@ -1,5 +1,5 @@
 // Passthrough decoder for librespot
-use super::{AudioDecoder, DecoderError, AudioPacket, DecoderResult};
+use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::io::{Read, Seek};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -105,7 +105,9 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                         debug!("Seek to offset page {}", self.ofsgp_page);
                         Ok(())
                     }
-                    None => Err(DecoderError::PassthroughDecoder("Packet is None".to_string())),
+                    None => Err(DecoderError::PassthroughDecoder(
+                        "Packet is None".to_string(),
+                    )),
                 }
             }
             Err(e) => Err(DecoderError::PassthroughDecoder(e.to_string())),
