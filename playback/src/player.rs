@@ -67,6 +67,8 @@ struct PlayerInternal {
     limiter_peak_sample: f64,
     limiter_factor: f64,
     limiter_strength: f64,
+
+    auto_normalise_as_album: bool,
 }
 
 enum PlayerCommand {
@@ -86,6 +88,7 @@ enum PlayerCommand {
     AddEventSender(mpsc::UnboundedSender<PlayerEvent>),
     SetSinkEventCallback(Option<SinkEventCallback>),
     EmitVolumeSetEvent(u16),
+    SetAutoNormaliseAsAlbum(bool),
 }
 
 #[derive(Debug, Clone)]
@@ -238,9 +241,10 @@ impl NormalisationData {
             return 1.0;
         }
 
-        let [gain_db, gain_peak] = match config.normalisation_type {
-            NormalisationType::Album => [data.album_gain_db, data.album_peak],
-            NormalisationType::Track => [data.track_gain_db, data.track_peak],
+        let [gain_db, gain_peak] = if config.normalisation_type == NormalisationType::Album {
+            [data.album_gain_db, data.album_peak]
+        } else {
+            [data.track_gain_db, data.track_peak]
         };
 
         let normalisation_power = gain_db as f64 + config.normalisation_pregain;
@@ -264,7 +268,11 @@ impl NormalisationData {
         }
 
         debug!("Normalisation Data: {:?}", data);
-        debug!("Normalisation Factor: {:.2}%", normalisation_factor * 100.0);
+        debug!(
+            "Calculated Normalisation Factor for {:?}: {:.2}%",
+            config.normalisation_type,
+            normalisation_factor * 100.0
+        );
 
         normalisation_factor as f64
     }
@@ -327,6 +335,8 @@ impl Player {
                 limiter_peak_sample: 0.0,
                 limiter_factor: 1.0,
                 limiter_strength: 0.0,
+
+                auto_normalise_as_album: false,
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -406,6 +416,10 @@ impl Player {
     pub fn emit_volume_set_event(&self, volume: u16) {
         self.command(PlayerCommand::EmitVolumeSetEvent(volume));
     }
+
+    pub fn set_auto_normalise_as_album(&self, setting: bool) {
+        self.command(PlayerCommand::SetAutoNormaliseAsAlbum(setting));
+    }
 }
 
 impl Drop for Player {
@@ -423,7 +437,7 @@ impl Drop for Player {
 
 struct PlayerLoadedTrackData {
     decoder: Decoder,
-    normalisation_factor: f64,
+    normalisation_data: NormalisationData,
     stream_loader_controller: StreamLoaderController,
     bytes_per_second: usize,
     duration_ms: u32,
@@ -456,6 +470,7 @@ enum PlayerState {
         track_id: SpotifyId,
         play_request_id: u64,
         decoder: Decoder,
+        normalisation_data: NormalisationData,
         normalisation_factor: f64,
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
@@ -467,6 +482,7 @@ enum PlayerState {
         track_id: SpotifyId,
         play_request_id: u64,
         decoder: Decoder,
+        normalisation_data: NormalisationData,
         normalisation_factor: f64,
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
@@ -543,7 +559,7 @@ impl PlayerState {
                 decoder,
                 duration_ms,
                 bytes_per_second,
-                normalisation_factor,
+                normalisation_data,
                 stream_loader_controller,
                 stream_position_pcm,
                 ..
@@ -553,7 +569,7 @@ impl PlayerState {
                     play_request_id,
                     loaded_track: PlayerLoadedTrackData {
                         decoder,
-                        normalisation_factor,
+                        normalisation_data,
                         stream_loader_controller,
                         bytes_per_second,
                         duration_ms,
@@ -572,6 +588,7 @@ impl PlayerState {
                 track_id,
                 play_request_id,
                 decoder,
+                normalisation_data,
                 normalisation_factor,
                 stream_loader_controller,
                 duration_ms,
@@ -583,6 +600,7 @@ impl PlayerState {
                     track_id,
                     play_request_id,
                     decoder,
+                    normalisation_data,
                     normalisation_factor,
                     stream_loader_controller,
                     duration_ms,
@@ -603,6 +621,7 @@ impl PlayerState {
                 track_id,
                 play_request_id,
                 decoder,
+                normalisation_data,
                 normalisation_factor,
                 stream_loader_controller,
                 duration_ms,
@@ -615,6 +634,7 @@ impl PlayerState {
                     track_id,
                     play_request_id,
                     decoder,
+                    normalisation_data,
                     normalisation_factor,
                     stream_loader_controller,
                     duration_ms,
@@ -775,14 +795,16 @@ impl PlayerTrackLoader {
 
             let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
-            let normalisation_factor = match NormalisationData::parse_from_file(&mut decrypted_file)
-            {
-                Ok(normalisation_data) => {
-                    NormalisationData::get_factor(&self.config, normalisation_data)
-                }
+            let normalisation_data = match NormalisationData::parse_from_file(&mut decrypted_file) {
+                Ok(data) => data,
                 Err(_) => {
                     warn!("Unable to extract normalisation data, using default value.");
-                    1.0
+                    NormalisationData {
+                        track_gain_db: 0.0,
+                        track_peak: 1.0,
+                        album_gain_db: 0.0,
+                        album_peak: 1.0,
+                    }
                 }
             };
 
@@ -838,7 +860,7 @@ impl PlayerTrackLoader {
 
             return Some(PlayerLoadedTrackData {
                 decoder,
-                normalisation_factor,
+                normalisation_data,
                 stream_loader_controller,
                 bytes_per_second,
                 duration_ms,
@@ -1339,6 +1361,17 @@ impl PlayerInternal {
     ) {
         let position_ms = Self::position_pcm_to_ms(loaded_track.stream_position_pcm);
 
+        let mut config = self.config.clone();
+        if config.normalisation_type == NormalisationType::Auto {
+            if self.auto_normalise_as_album {
+                config.normalisation_type = NormalisationType::Album;
+            } else {
+                config.normalisation_type = NormalisationType::Track;
+            }
+        };
+        let normalisation_factor =
+            NormalisationData::get_factor(&config, loaded_track.normalisation_data);
+
         if start_playback {
             self.ensure_sink_running();
 
@@ -1353,7 +1386,8 @@ impl PlayerInternal {
                 track_id,
                 play_request_id,
                 decoder: loaded_track.decoder,
-                normalisation_factor: loaded_track.normalisation_factor,
+                normalisation_data: loaded_track.normalisation_data,
+                normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
@@ -1370,7 +1404,8 @@ impl PlayerInternal {
                 track_id,
                 play_request_id,
                 decoder: loaded_track.decoder,
-                normalisation_factor: loaded_track.normalisation_factor,
+                normalisation_data: loaded_track.normalisation_data,
+                normalisation_factor,
                 stream_loader_controller: loaded_track.stream_loader_controller,
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
@@ -1497,7 +1532,7 @@ impl PlayerInternal {
                     stream_loader_controller,
                     bytes_per_second,
                     duration_ms,
-                    normalisation_factor,
+                    normalisation_data,
                     ..
                 }
                 | PlayerState::Paused {
@@ -1506,13 +1541,13 @@ impl PlayerInternal {
                     stream_loader_controller,
                     bytes_per_second,
                     duration_ms,
-                    normalisation_factor,
+                    normalisation_data,
                     ..
                 } = old_state
                 {
                     let loaded_track = PlayerLoadedTrackData {
                         decoder,
-                        normalisation_factor,
+                        normalisation_data,
                         stream_loader_controller,
                         bytes_per_second,
                         duration_ms,
@@ -1750,6 +1785,10 @@ impl PlayerInternal {
             PlayerCommand::EmitVolumeSetEvent(volume) => {
                 self.send_event(PlayerEvent::VolumeSet { volume })
             }
+
+            PlayerCommand::SetAutoNormaliseAsAlbum(setting) => {
+                self.auto_normalise_as_album = setting
+            }
         }
     }
 
@@ -1855,6 +1894,10 @@ impl ::std::fmt::Debug for PlayerCommand {
             PlayerCommand::EmitVolumeSetEvent(volume) => {
                 f.debug_tuple("VolumeSet").field(&volume).finish()
             }
+            PlayerCommand::SetAutoNormaliseAsAlbum(setting) => f
+                .debug_tuple("SetAutoNormaliseAsAlbum")
+                .field(&setting)
+                .finish(),
         }
     }
 }

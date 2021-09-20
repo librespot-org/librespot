@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add `--volume-range` option to set dB range and control `log` and `cubic` volume control curves
 - [playback] `alsamixer`: support for querying dB range from Alsa softvol
 - [playback] Add `--format F64` (supported by Alsa and GStreamer only)
+- [playback] Add `--normalisation-type auto` that switches between album and track automatically
 
 ### Changed
 - [audio, playback] Moved `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `AudioError`, `AudioDecoder` and the `convert` module from `librespot-audio` to `librespot-playback`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly. (breaking)
@@ -26,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsamixer`: use `--device` name for `--mixer-card` unless specified otherwise
 - [playback] `player`: consider errors in `sink.start`, `sink.stop` and `sink.write` fatal and `exit(1)` (breaking)
 - [playback] `player`: make `convert` and `decoder` public so you can implement your own `Sink`
-- [playback] Updated default normalisation threshold to -2 dBFS
+- [playback] `player`: update default normalisation threshold to -2 dBFS
+- [playback] `player`: default normalisation type is now `auto`
 
 ### Deprecated
 - [connect] The `discovery` module was deprecated in favor of the `librespot-discovery` crate

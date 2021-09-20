@@ -76,10 +76,11 @@ impl AudioFormat {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NormalisationType {
     Album,
     Track,
+    Auto,
 }
 
 impl FromStr for NormalisationType {
@@ -88,6 +89,7 @@ impl FromStr for NormalisationType {
         match s.to_lowercase().as_ref() {
             "album" => Ok(Self::Album),
             "track" => Ok(Self::Track),
+            "auto" => Ok(Self::Auto),
             _ => Err(()),
         }
     }
@@ -95,7 +97,7 @@ impl FromStr for NormalisationType {
 
 impl Default for NormalisationType {
     fn default() -> Self {
-        Self::Album
+        Self::Auto
     }
 }
 
