@@ -92,7 +92,9 @@ impl Sink for SdlSink {
             }};
         }
 
-        let samples = packet.samples();
+        let samples = packet
+            .samples()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         match self {
             Self::F32(queue) => {
                 let samples_f32: &[f32] = &converter.f64_to_f32(samples);

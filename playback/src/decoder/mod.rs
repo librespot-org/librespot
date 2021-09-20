@@ -1,10 +1,30 @@
-use std::fmt;
+use thiserror::Error;
 
 mod lewton_decoder;
-pub use lewton_decoder::{VorbisDecoder, VorbisError};
+pub use lewton_decoder::VorbisDecoder;
 
 mod passthrough_decoder;
-pub use passthrough_decoder::{PassthroughDecoder, PassthroughError};
+pub use passthrough_decoder::PassthroughDecoder;
+
+#[derive(Error, Debug)]
+pub enum DecoderError {
+    #[error("Lewton Decoder Error: {0}")]
+    LewtonDecoder(String),
+    #[error("Passthrough Decoder Error: {0}")]
+    PassthroughDecoder(String),
+}
+
+pub type DecoderResult<T> = Result<T, DecoderError>;
+
+#[derive(Error, Debug)]
+pub enum AudioPacketError {
+    #[error("Decoder OggData Error: Can't return OggData on Samples")]
+    OggData,
+    #[error("Decoder Samples Error: Can't return Samples on OggData")]
+    Samples,
+}
+
+pub type AudioPacketResult<T> = Result<T, AudioPacketError>;
 
 pub enum AudioPacket {
     Samples(Vec<f64>),
@@ -17,17 +37,17 @@ impl AudioPacket {
         AudioPacket::Samples(f64_samples)
     }
 
-    pub fn samples(&self) -> &[f64] {
+    pub fn samples(&self) -> AudioPacketResult<&[f64]> {
         match self {
-            AudioPacket::Samples(s) => s,
-            AudioPacket::OggData(_) => panic!("can't return OggData on samples"),
+            AudioPacket::Samples(s) => Ok(s),
+            AudioPacket::OggData(_) => Err(AudioPacketError::OggData),
         }
     }
 
-    pub fn oggdata(&self) -> &[u8] {
+    pub fn oggdata(&self) -> AudioPacketResult<&[u8]> {
         match self {
-            AudioPacket::Samples(_) => panic!("can't return samples on OggData"),
-            AudioPacket::OggData(d) => d,
+            AudioPacket::OggData(d) => Ok(d),
+            AudioPacket::Samples(_) => Err(AudioPacketError::Samples),
         }
     }
 
@@ -39,34 +59,7 @@ impl AudioPacket {
     }
 }
 
-#[derive(Debug)]
-pub enum AudioError {
-    PassthroughError(PassthroughError),
-    VorbisError(VorbisError),
-}
-
-impl fmt::Display for AudioError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AudioError::PassthroughError(err) => write!(f, "PassthroughError({})", err),
-            AudioError::VorbisError(err) => write!(f, "VorbisError({})", err),
-        }
-    }
-}
-
-impl From<VorbisError> for AudioError {
-    fn from(err: VorbisError) -> AudioError {
-        AudioError::VorbisError(err)
-    }
-}
-
-impl From<PassthroughError> for AudioError {
-    fn from(err: PassthroughError) -> AudioError {
-        AudioError::PassthroughError(err)
-    }
-}
-
 pub trait AudioDecoder {
-    fn seek(&mut self, ms: i64) -> Result<(), AudioError>;
-    fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError>;
+    fn seek(&mut self, absgp: u64) -> DecoderResult<()>;
+    fn next_packet(&mut self) -> DecoderResult<Option<AudioPacket>>;
 }

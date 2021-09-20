@@ -12,9 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add `--volume-range` option to set dB range and control `log` and `cubic` volume control curves
 - [playback] `alsamixer`: support for querying dB range from Alsa softvol
 - [playback] Add `--format F64` (supported by Alsa and GStreamer only)
+- [playback] Add `--normalisation-type auto` that switches between album and track automatically
 
 ### Changed
-- [audio, playback] Moved `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `AudioError`, `AudioDecoder` and the `convert` module from `librespot-audio` to `librespot-playback`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly. (breaking)
+- [audio, playback] Moved `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `DecoderError`, `AudioDecoder` and the `convert` module from `librespot-audio` to `librespot-playback`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly. (breaking)
 - [audio, playback] Use `Duration` for time constants and functions (breaking)
 - [connect, playback] Moved volume controls from `librespot-connect` to `librespot-playback` crate
 - [connect] Synchronize player volume with mixer volume on playback
@@ -26,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsamixer`: use `--device` name for `--mixer-card` unless specified otherwise
 - [playback] `player`: consider errors in `sink.start`, `sink.stop` and `sink.write` fatal and `exit(1)` (breaking)
 - [playback] `player`: make `convert` and `decoder` public so you can implement your own `Sink`
-- [playback] Updated default normalisation threshold to -2 dBFS
+- [playback] `player`: update default normalisation threshold to -2 dBFS
+- [playback] `player`: default normalisation type is now `auto`
 
 ### Deprecated
 - [connect] The `discovery` module was deprecated in favor of the `librespot-discovery` crate
@@ -49,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsa`, `gstreamer`, `pulseaudio`: always output in native endianness
 - [playback] `alsa`: revert buffer size to ~500 ms
 - [playback] `alsa`, `pipe`, `pulseaudio`: better error handling
+- [metadata] Skip tracks whose Spotify ID's can't be found (e.g. local files, which aren't supported)
 
 ## [0.2.0] - 2021-05-04
 
