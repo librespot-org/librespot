@@ -176,7 +176,9 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
 
 impl Sink for RodioSink {
     fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
-        let samples = packet.samples();
+        let samples = packet
+            .samples()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
         match self.format {
             AudioFormat::F32 => {
                 let samples_f32: &[f32] = &converter.f64_to_f32(samples);
