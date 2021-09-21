@@ -52,6 +52,7 @@ message LoginRequest {
         credentials.ParentChildCredential parent_child_credential = 105;
         credentials.AppleSignInCredential apple_sign_in_credential = 106;
         credentials.SamsungSignInCredential samsung_sign_in_credential = 107;
+        credentials.GoogleSignInCredential google_sign_in_credential = 108;
     }
 }
 
