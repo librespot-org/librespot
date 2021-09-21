@@ -18,7 +18,14 @@ message AudioFile {
         MP3_160_ENC = 7;
         AAC_24 = 8;
         AAC_48 = 9;
+        MP4_128 = 10;
+        MP4_128_DUAL = 11;
+        MP4_128_CBCS = 12;
+        MP4_256 = 13;
+        MP4_256_DUAL = 14;
+        MP4_256_CBCS = 15;
         FLAC_FLAC = 16;
+        MP4_FLAC = 17;
     }
 }
 
