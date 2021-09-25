@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkResult};
+use super::{Open, Sink, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -149,7 +149,7 @@ impl<'a> Sink for PortAudioSink<'a> {
 
         let samples = packet
             .samples()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
 
         let result = match self {
             Self::F32(stream, _parameters) => {
