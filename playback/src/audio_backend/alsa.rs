@@ -224,16 +224,16 @@ impl Sink for AlsaSink {
         if self.pcm.is_none() {
             let (pcm, bytes_per_period) = open_device(&self.device, self.format)?;
             self.pcm = Some(pcm);
-            // If the capacity is greater than we want shrink it
-            // to it's current len (which should be zero) before
-            // setting the capacity with reserve_exact.
-            if self.period_buffer.capacity() > bytes_per_period {
+
+            let current_capacity = self.period_buffer.capacity();
+
+            if current_capacity > bytes_per_period {
+                self.period_buffer.truncate(bytes_per_period);
                 self.period_buffer.shrink_to_fit();
+            } else if current_capacity < bytes_per_period {
+                let extra = bytes_per_period - self.period_buffer.len();
+                self.period_buffer.reserve_exact(extra);
             }
-            // This does nothing if the capacity is already sufficient.
-            // Len should always be zero, but for the sake of being thorough...
-            self.period_buffer
-                .reserve_exact(bytes_per_period - self.period_buffer.len());
 
             // Should always match the "Period Buffer size in bytes: " trace! message.
             trace!(
