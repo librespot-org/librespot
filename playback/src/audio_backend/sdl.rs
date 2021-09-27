@@ -1,11 +1,11 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
+use std::thread;
 use std::time::Duration;
-use std::{io, thread};
 
 pub enum SdlSink {
     F32(AudioQueue<f32>),
@@ -52,7 +52,7 @@ impl Open for SdlSink {
 }
 
 impl Sink for SdlSink {
-    fn start(&mut self) -> io::Result<()> {
+    fn start(&mut self) -> SinkResult<()> {
         macro_rules! start_sink {
             ($queue: expr) => {{
                 $queue.clear();
@@ -67,7 +67,7 @@ impl Sink for SdlSink {
         Ok(())
     }
 
-    fn stop(&mut self) -> io::Result<()> {
+    fn stop(&mut self) -> SinkResult<()> {
         macro_rules! stop_sink {
             ($queue: expr) => {{
                 $queue.pause();
@@ -82,7 +82,7 @@ impl Sink for SdlSink {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         macro_rules! drain_sink {
             ($queue: expr, $size: expr) => {{
                 // sleep and wait for sdl thread to drain the queue a bit
@@ -94,7 +94,7 @@ impl Sink for SdlSink {
 
         let samples = packet
             .samples()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
         match self {
             Self::F32(queue) => {
                 let samples_f32: &[f32] = &converter.f64_to_f32(samples);

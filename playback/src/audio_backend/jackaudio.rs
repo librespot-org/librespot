@@ -1,4 +1,4 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -6,7 +6,6 @@ use crate::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
-use std::io;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 pub struct JackSink {
@@ -70,10 +69,11 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         let samples = packet
             .samples()
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+
         let samples_f32: &[f32] = &converter.f64_to_f32(samples);
         for sample in samples_f32.iter() {
             let res = self.send.send(*sample);
