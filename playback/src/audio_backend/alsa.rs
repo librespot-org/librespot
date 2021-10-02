@@ -7,6 +7,7 @@ use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, HwParams, PCM};
 use alsa::{Direction, ValueOr};
 use std::cmp::min;
+use std::cmp::Ordering;
 use std::process::exit;
 use std::time::Duration;
 use thiserror::Error;
@@ -225,14 +226,16 @@ impl Sink for AlsaSink {
             let (pcm, bytes_per_period) = open_device(&self.device, self.format)?;
             self.pcm = Some(pcm);
 
-            let current_capacity = self.period_buffer.capacity();
-
-            if current_capacity > bytes_per_period {
-                self.period_buffer.truncate(bytes_per_period);
-                self.period_buffer.shrink_to_fit();
-            } else if current_capacity < bytes_per_period {
-                let extra = bytes_per_period - self.period_buffer.len();
-                self.period_buffer.reserve_exact(extra);
+            match self.period_buffer.capacity().cmp(&bytes_per_period) {
+                Ordering::Greater => {
+                    self.period_buffer.truncate(bytes_per_period);
+                    self.period_buffer.shrink_to_fit();
+                }
+                Ordering::Less => {
+                    let extra = bytes_per_period - self.period_buffer.len();
+                    self.period_buffer.reserve_exact(extra);
+                }
+                Ordering::Equal => (),
             }
 
             // Should always match the "Period Buffer size in bytes: " trace! message.
