@@ -93,7 +93,7 @@ fn list_outputs() -> SinkResult<()> {
     for t in &["pcm", "ctl", "hwdep"] {
         println!("{} devices:", t);
 
-        let i = HintIter::new_str(None, &t).map_err(|_| AlsaError::Parsing)?;
+        let i = HintIter::new_str(None, t).map_err(|_| AlsaError::Parsing)?;
 
         for a in i {
             if let Some(Direction::Playback) = a.direction {
@@ -254,11 +254,10 @@ impl Sink for AlsaSink {
         self.period_buffer.resize(self.period_buffer.capacity(), 0);
         self.write_buf()?;
 
-        let pcm = self.pcm.as_mut().ok_or(AlsaError::NotConnected)?;
+        let pcm = self.pcm.take().ok_or(AlsaError::NotConnected)?;
 
         pcm.drain().map_err(AlsaError::DrainFailure)?;
 
-        self.pcm = None;
         Ok(())
     }
 
