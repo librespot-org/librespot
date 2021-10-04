@@ -7,6 +7,7 @@ use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, HwParams, PCM};
 use alsa::{Direction, ValueOr};
 use std::cmp::min;
+use std::cmp::Ordering;
 use std::process::exit;
 use std::time::Duration;
 use thiserror::Error;
@@ -92,7 +93,7 @@ fn list_outputs() -> SinkResult<()> {
     for t in &["pcm", "ctl", "hwdep"] {
         println!("{} devices:", t);
 
-        let i = HintIter::new_str(None, &t).map_err(|_| AlsaError::Parsing)?;
+        let i = HintIter::new_str(None, t).map_err(|_| AlsaError::Parsing)?;
 
         for a in i {
             if let Some(Direction::Playback) = a.direction {
@@ -225,14 +226,16 @@ impl Sink for AlsaSink {
             let (pcm, bytes_per_period) = open_device(&self.device, self.format)?;
             self.pcm = Some(pcm);
 
-            let current_capacity = self.period_buffer.capacity();
-
-            if current_capacity > bytes_per_period {
-                self.period_buffer.truncate(bytes_per_period);
-                self.period_buffer.shrink_to_fit();
-            } else if current_capacity < bytes_per_period {
-                let extra = bytes_per_period - self.period_buffer.len();
-                self.period_buffer.reserve_exact(extra);
+            match self.period_buffer.capacity().cmp(&bytes_per_period) {
+                Ordering::Greater => {
+                    self.period_buffer.truncate(bytes_per_period);
+                    self.period_buffer.shrink_to_fit();
+                }
+                Ordering::Less => {
+                    let extra = bytes_per_period - self.period_buffer.len();
+                    self.period_buffer.reserve_exact(extra);
+                }
+                Ordering::Equal => (),
             }
 
             // Should always match the "Period Buffer size in bytes: " trace! message.
@@ -251,11 +254,10 @@ impl Sink for AlsaSink {
         self.period_buffer.resize(self.period_buffer.capacity(), 0);
         self.write_buf()?;
 
-        let pcm = self.pcm.as_mut().ok_or(AlsaError::NotConnected)?;
+        let pcm = self.pcm.take().ok_or(AlsaError::NotConnected)?;
 
         pcm.drain().map_err(AlsaError::DrainFailure)?;
 
-        self.pcm = None;
         Ok(())
     }
 
