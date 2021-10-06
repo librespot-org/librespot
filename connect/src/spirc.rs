@@ -84,6 +84,7 @@ struct SpircTaskConfig {
     autoplay: bool,
 }
 
+const CONTEXT_TRACKS_HISTORY: usize = 10;
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
 
 const VOLUME_STEPS: i64 = 64;
@@ -1051,9 +1052,21 @@ impl SpircTask {
             let new_tracks = &context.tracks;
             debug!("Adding {:?} tracks from context to frame", new_tracks.len());
             let mut track_vec = self.state.take_track().into_vec();
+            if let Some(head) = track_vec.len().checked_sub(CONTEXT_TRACKS_HISTORY) {
+                track_vec.drain(0..head);
+            }
             track_vec.extend_from_slice(new_tracks);
             self.state
                 .set_track(protobuf::RepeatedField::from_vec(track_vec));
+
+            // Update playing index
+            if let Some(new_index) = self
+                .state
+                .get_playing_track_index()
+                .checked_sub(CONTEXT_TRACKS_HISTORY as u32)
+            {
+                self.state.set_playing_track_index(new_index);
+            }
         } else {
             warn!("No context to update from!");
         }
