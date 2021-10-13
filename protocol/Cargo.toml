@@ -1,6 +1,6 @@
 [package]
 name = "librespot-protocol"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Paul Liétar <paul@lietar.net>"]
 build = "build.rs"
 description = "The protobuf logic for communicating with Spotify servers"
