@@ -887,8 +887,8 @@ impl SpircTask {
         let tracks_len = self.state.get_track().len() as u32;
         debug!(
             "At track {:?} of {:?} <{:?}> update [{}]",
-            new_index,
-            self.state.get_track().len(),
+            new_index + 1,
+            tracks_len,
             self.state.get_context_uri(),
             tracks_len - new_index < CONTEXT_FETCH_THRESHOLD
         );
@@ -902,27 +902,25 @@ impl SpircTask {
             self.context_fut = self.resolve_station(&context_uri);
             self.update_tracks_from_context();
         }
-        let last_track = new_index == tracks_len - 1;
-        if self.config.autoplay && last_track {
-            // Extend the playlist
-            // Note: This doesn't seem to reflect in the UI
-            // the additional tracks in the frame don't show up as with station view
-            debug!("Extending playlist <{}>", context_uri);
-            self.update_tracks_from_context();
-        }
         if new_index >= tracks_len {
-            new_index = 0; // Loop around back to start
-            continue_playing = self.state.get_repeat();
+            if self.config.autoplay {
+                // Extend the playlist
+                debug!("Extending playlist <{}>", context_uri);
+                self.update_tracks_from_context();
+                self.player.set_auto_normalise_as_album(false);
+            } else {
+                new_index = 0;
+                continue_playing = self.state.get_repeat();
+                debug!(
+                    "Looping around back to start, repeat is {}",
+                    continue_playing
+                );
+            }
         }
 
         if tracks_len > 0 {
             self.state.set_playing_track_index(new_index);
             self.load_track(continue_playing, 0);
-            if self.config.autoplay && last_track {
-                // If we're now playing the last track of an album, then
-                // switch to track normalisation mode for the autoplay to come.
-                self.player.set_auto_normalise_as_album(false);
-            }
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
             self.state.set_playing_track_index(0);
