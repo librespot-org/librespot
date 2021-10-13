@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - YYYY-MM-DD
+### Fixed
+- [connect] Partly fix behavior after last track of an album/playlist
+
+## [0.3.0] - 2021-10-13
 
 ### Added
 - [discovery] The crate `librespot-discovery` for discovery in LAN was created. Its functionality was previously part of `librespot-connect`.
