@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Include build profile in the displayed version information
+
 ### Fixed
 - [connect] Partly fix behavior after last track of an album/playlist
 

@@ -160,14 +160,20 @@ pub fn parse_file_size(input: &str) -> Result<u64, ParseFileSizeError> {
     Ok((num * base.pow(exponent) as f64) as u64)
 }
 
-fn print_version() {
-    println!(
-        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
+fn get_version_string() -> String {
+    #[cfg(debug_assertions)]
+    const BUILD_PROFILE: &str = "debug";
+    #[cfg(not(debug_assertions))]
+    const BUILD_PROFILE: &str = "release";
+
+    format!(
+        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id}, Profile: {build_profile})",
         semver = version::SEMVER,
         sha = version::SHA_SHORT,
         build_date = version::BUILD_DATE,
-        build_id = version::BUILD_ID
-    );
+        build_id = version::BUILD_ID,
+        build_profile = BUILD_PROFILE
+    )
 }
 
 struct Setup {
@@ -438,20 +444,14 @@ fn get_setup(args: &[String]) -> Setup {
     }
 
     if matches.opt_present(VERSION) {
-        print_version();
+        println!("{}", get_version_string());
         exit(0);
     }
 
     let verbose = matches.opt_present(VERBOSE);
     setup_logging(verbose);
 
-    info!(
-        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
-        semver = version::SEMVER,
-        sha = version::SHA_SHORT,
-        build_date = version::BUILD_DATE,
-        build_id = version::BUILD_ID
-    );
+    info!("{}", get_version_string());
 
     let backend_name = matches.opt_str(BACKEND);
     if backend_name == Some("?".into()) {
