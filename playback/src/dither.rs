@@ -1,4 +1,3 @@
-use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rand_distr::{Distribution, Normal, Triangular, Uniform};
 use std::fmt;
@@ -42,13 +41,22 @@ impl fmt::Display for dyn Ditherer {
     }
 }
 
-fn create_rng() -> SmallRng {
-    SmallRng::from_rng(rand::thread_rng())
-        .expect("Could not seed random number generator for dithering")
+// `SmallRng` defaults to `Xoshiro256PlusPlus` on 64-bit platforms and
+// `Xoshiro128PlusPlus` on 32-bit platforms. These are excellent for the
+// general case. In our case of just 64-bit floating points, we can make
+// some optimizations. On 64-bit platforms, this improves performance by
+// another 15%. See: https://prng.di.unimi.it
+#[cfg(target_pointer_width = "64")]
+type Rng = rand_xoshiro::Xoshiro256Plus;
+#[cfg(not(target_pointer_width = "64"))]
+type Rng = rand_xoshiro::Xoshiro128PlusPlus;
+
+fn create_rng() -> Rng {
+    Rng::from_entropy()
 }
 
 pub struct TriangularDitherer {
-    cached_rng: SmallRng,
+    cached_rng: Rng,
     distribution: Triangular<f64>,
 }
 
@@ -75,7 +83,7 @@ impl TriangularDitherer {
 }
 
 pub struct GaussianDitherer {
-    cached_rng: SmallRng,
+    cached_rng: Rng,
     distribution: Normal<f64>,
 }
 
@@ -104,7 +112,7 @@ impl GaussianDitherer {
 pub struct HighPassDitherer {
     active_channel: usize,
     previous_noises: [f64; NUM_CHANNELS],
-    cached_rng: SmallRng,
+    cached_rng: Rng,
     distribution: Uniform<f64>,
 }
 
