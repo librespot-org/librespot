@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Include build profile in the displayed version information
+- [playback] Improve dithering CPU usage by about 33%
 
 ### Fixed
 - [connect] Partly fix behavior after last track of an album/playlist

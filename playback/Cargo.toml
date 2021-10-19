@@ -49,6 +49,7 @@ ogg = "0.8"
 # Dithering
 rand = "0.8"
 rand_distr = "0.4"
+rand_xoshiro = "0.6"
 
 [features]
 alsa-backend = ["alsa"]

@@ -1,4 +1,4 @@
-use rand::rngs::ThreadRng;
+use rand::SeedableRng;
 use rand_distr::{Distribution, Normal, Triangular, Uniform};
 use std::fmt;
 
@@ -41,20 +41,36 @@ impl fmt::Display for dyn Ditherer {
     }
 }
 
-// Implementation note: we save the handle to ThreadRng so it doesn't require
-// a lookup on each call (which is on each sample!). This is ~2.5x as fast.
-// Downside is that it is not Send so we cannot move it around player threads.
+// `SmallRng` is 33% faster than `ThreadRng`, but we can do even better.
+// `SmallRng` defaults to `Xoshiro256PlusPlus` on 64-bit platforms and
+// `Xoshiro128PlusPlus` on 32-bit platforms. These are excellent for the
+// general case. In our case of just 64-bit floating points, we can make
+// some optimizations. Compared to `SmallRng`, these hand-picked generators
+// improve performance by another 9% on 64-bit platforms and 2% on 32-bit
+// platforms.
 //
+// For reference, see https://prng.di.unimi.it. Note that we do not use
+// `Xoroshiro128Plus` or `Xoshiro128Plus` because they display low linear
+// complexity in the lower four bits, which is not what we want:
+// linearization is the very point of dithering.
+#[cfg(target_pointer_width = "64")]
+type Rng = rand_xoshiro::Xoshiro256Plus;
+#[cfg(not(target_pointer_width = "64"))]
+type Rng = rand_xoshiro::Xoshiro128StarStar;
+
+fn create_rng() -> Rng {
+    Rng::from_entropy()
+}
 
 pub struct TriangularDitherer {
-    cached_rng: ThreadRng,
+    cached_rng: Rng,
     distribution: Triangular<f64>,
 }
 
 impl Ditherer for TriangularDitherer {
     fn new() -> Self {
         Self {
-            cached_rng: rand::thread_rng(),
+            cached_rng: create_rng(),
             // 2 LSB peak-to-peak needed to linearize the response:
             distribution: Triangular::new(-1.0, 1.0, 0.0).unwrap(),
         }
@@ -74,14 +90,14 @@ impl TriangularDitherer {
 }
 
 pub struct GaussianDitherer {
-    cached_rng: ThreadRng,
+    cached_rng: Rng,
     distribution: Normal<f64>,
 }
 
 impl Ditherer for GaussianDitherer {
     fn new() -> Self {
         Self {
-            cached_rng: rand::thread_rng(),
+            cached_rng: create_rng(),
             // 1/2 LSB RMS needed to linearize the response:
             distribution: Normal::new(0.0, 0.5).unwrap(),
         }
@@ -103,7 +119,7 @@ impl GaussianDitherer {
 pub struct HighPassDitherer {
     active_channel: usize,
     previous_noises: [f64; NUM_CHANNELS],
-    cached_rng: ThreadRng,
+    cached_rng: Rng,
     distribution: Uniform<f64>,
 }
 
@@ -112,7 +128,7 @@ impl Ditherer for HighPassDitherer {
         Self {
             active_channel: 0,
             previous_noises: [0.0; NUM_CHANNELS],
-            cached_rng: rand::thread_rng(),
+            cached_rng: create_rng(),
             distribution: Uniform::new_inclusive(-0.5, 0.5), // 1 LSB +/- 1 LSB (previous) = 2 LSB
         }
     }
