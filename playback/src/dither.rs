@@ -41,15 +41,22 @@ impl fmt::Display for dyn Ditherer {
     }
 }
 
+// `SmallRng` is 33% faster than `ThreadRng`, but we can do even better.
 // `SmallRng` defaults to `Xoshiro256PlusPlus` on 64-bit platforms and
 // `Xoshiro128PlusPlus` on 32-bit platforms. These are excellent for the
 // general case. In our case of just 64-bit floating points, we can make
-// some optimizations. On 64-bit platforms, this improves performance by
-// another 15%. See: https://prng.di.unimi.it
+// some optimizations. Compared to `SmallRng`, these hand-picked generators
+// improve performance by another 9% on 64-bit platforms and 2% on 32-bit
+// platforms.
+//
+// For reference, see https://prng.di.unimi.it. Note that we do not use
+// `Xoroshiro128Plus` or `Xoshiro128Plus` because they display low linear
+// complexity in the lower four bits, which is not what we want:
+// linearization is the very point of dithering.
 #[cfg(target_pointer_width = "64")]
 type Rng = rand_xoshiro::Xoshiro256Plus;
 #[cfg(not(target_pointer_width = "64"))]
-type Rng = rand_xoshiro::Xoshiro128PlusPlus;
+type Rng = rand_xoshiro::Xoshiro128StarStar;
 
 fn create_rng() -> Rng {
     Rng::from_entropy()
