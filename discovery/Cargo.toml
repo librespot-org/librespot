@@ -1,6 +1,6 @@
 [package]
 name = "librespot-discovery"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The discovery logic for librespot"
 license = "MIT"
@@ -28,7 +28,7 @@ dns-sd = { version = "0.1.3", optional = true }
 [dependencies.librespot-core]
 path = "../core"
 default_features = false
-version = "0.3.0"
+version = "0.3.1"
 
 [dev-dependencies]
 futures = "0.3"

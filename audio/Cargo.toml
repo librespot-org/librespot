@@ -1,6 +1,6 @@
 [package]
 name = "librespot-audio"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description="The audio fetching and processing logic for librespot"
 license="MIT"
@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.3.0"
+version = "0.3.1"
 
 [dependencies]
 aes-ctr = "0.6"
