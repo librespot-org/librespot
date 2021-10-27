@@ -116,3 +116,4 @@ functionality.
 - [librespot-java](https://github.com/devgianlu/librespot-java) - A Java port of librespot.
 - [ncspot](https://github.com/hrkfdn/ncspot) - Cross-platform ncurses Spotify client.
 - [ansible-role-librespot](https://github.com/xMordax/ansible-role-librespot/tree/master) - Ansible role that will build, install and configure Librespot.
+- [Spot](https://github.com/xou816/spot) - Gtk/Rust native Spotify client for the GNOME desktop. 
