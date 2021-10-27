@@ -238,28 +238,28 @@ pub struct RemoveFileError(());
 
 impl Cache {
     pub fn new<P: AsRef<Path>>(
-        credentials: Option<P>,
-        volume: Option<P>,
-        audio: Option<P>,
+        credentials_path: Option<P>,
+        volume_path: Option<P>,
+        audio_path: Option<P>,
         size_limit: Option<u64>,
     ) -> io::Result<Self> {
         let mut size_limiter = None;
 
-        if let Some(location) = &credentials {
+        if let Some(location) = &credentials_path {
             fs::create_dir_all(location)?;
         }
 
-        let credentials_location = credentials
+        let credentials_location = credentials_path
             .as_ref()
             .map(|p| p.as_ref().join("credentials.json"));
 
-        if let Some(location) = &volume {
+        if let Some(location) = &volume_path {
             fs::create_dir_all(location)?;
         }
 
-        let volume_location = volume.as_ref().map(|p| p.as_ref().join("volume"));
+        let volume_location = volume_path.as_ref().map(|p| p.as_ref().join("volume"));
 
-        if let Some(location) = &audio {
+        if let Some(location) = &audio_path {
             fs::create_dir_all(location)?;
 
             if let Some(limit) = size_limit {
@@ -269,7 +269,7 @@ impl Cache {
             }
         }
 
-        let audio_location = audio.map(|p| p.as_ref().to_owned());
+        let audio_location = audio_path.map(|p| p.as_ref().to_owned());
 
         let cache = Cache {
             credentials_location,
