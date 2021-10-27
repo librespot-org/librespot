@@ -561,31 +561,25 @@ fn get_setup(args: &[String]) -> Setup {
     };
 
     let cache = {
-        let audio_dir;
-        let cred_dir;
-        let volume_dir;
-        if matches.opt_present(DISABLE_AUDIO_CACHE) {
-            audio_dir = None;
-            volume_dir = matches
-                .opt_str(SYSTEM_CACHE)
-                .or_else(|| matches.opt_str(CACHE))
-                .map(|p| p.into());
-        } else {
-            let cache_dir = matches.opt_str(CACHE);
-            audio_dir = cache_dir
-                .as_ref()
-                .map(|p| AsRef::<Path>::as_ref(p).join("files"));
-            volume_dir = matches
-                .opt_str(SYSTEM_CACHE)
-                .or(cache_dir)
-                .map(|p| p.into());
-        }
+        let volume_dir = matches
+            .opt_str(SYSTEM_CACHE)
+            .or_else(|| matches.opt_str(CACHE))
+            .map(|p| p.into());
 
-        if matches.opt_present(DISABLE_CREDENTIAL_CACHE) {
-            cred_dir = None;
+        let cred_dir = if matches.opt_present(DISABLE_CREDENTIAL_CACHE) {
+            None
         } else {
-            cred_dir = volume_dir.clone();
-        }
+            volume_dir.clone()
+        };
+
+        let audio_dir = if matches.opt_present(DISABLE_AUDIO_CACHE) {
+            None
+        } else {
+            matches
+                .opt_str(CACHE)
+                .as_ref()
+                .map(|p| AsRef::<Path>::as_ref(p).join("files"))
+        };
 
         let limit = if audio_dir.is_some() {
             matches
