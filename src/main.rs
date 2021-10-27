@@ -203,6 +203,7 @@ fn get_setup(args: &[String]) -> Setup {
     const DEVICE: &str = "device";
     const DEVICE_TYPE: &str = "device-type";
     const DISABLE_AUDIO_CACHE: &str = "disable-audio-cache";
+    const DISABLE_CREDENTIAL_CACHE: &str = "disable-credential-cache";
     const DISABLE_DISCOVERY: &str = "disable-discovery";
     const DISABLE_GAPLESS: &str = "disable-gapless";
     const DITHER: &str = "dither";
@@ -256,6 +257,7 @@ fn get_setup(args: &[String]) -> Setup {
         "Limits the size of the cache for audio files.",
         "SIZE"
     ).optflag("", DISABLE_AUDIO_CACHE, "Disable caching of the audio data.")
+    .optflag("", DISABLE_CREDENTIAL_CACHE, "Disable caching of credentials.")
     .optopt("n", NAME, "Device name.", "NAME")
     .optopt("", DEVICE_TYPE, "Displayed device type. Defaults to 'Speaker'.", "TYPE")
     .optopt(
@@ -560,10 +562,11 @@ fn get_setup(args: &[String]) -> Setup {
 
     let cache = {
         let audio_dir;
-        let system_dir;
+        let cred_dir;
+        let volume_dir;
         if matches.opt_present(DISABLE_AUDIO_CACHE) {
             audio_dir = None;
-            system_dir = matches
+            volume_dir = matches
                 .opt_str(SYSTEM_CACHE)
                 .or_else(|| matches.opt_str(CACHE))
                 .map(|p| p.into());
@@ -572,10 +575,16 @@ fn get_setup(args: &[String]) -> Setup {
             audio_dir = cache_dir
                 .as_ref()
                 .map(|p| AsRef::<Path>::as_ref(p).join("files"));
-            system_dir = matches
+            volume_dir = matches
                 .opt_str(SYSTEM_CACHE)
                 .or(cache_dir)
                 .map(|p| p.into());
+        }
+
+        if matches.opt_present(DISABLE_CREDENTIAL_CACHE) {
+            cred_dir = None;
+        } else {
+            cred_dir = volume_dir.clone();
         }
 
         let limit = if audio_dir.is_some() {
@@ -593,7 +602,7 @@ fn get_setup(args: &[String]) -> Setup {
             None
         };
 
-        match Cache::new(system_dir, audio_dir, limit) {
+        match Cache::new(cred_dir, volume_dir, audio_dir, limit) {
             Ok(cache) => Some(cache),
             Err(e) => {
                 warn!("Cannot create cache: {}", e);
