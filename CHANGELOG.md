@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- [cache] Add `disable-credential-cache` flag (breaking).
+
 ## [0.3.1] - 2021-10-24
 
 ### Changed
