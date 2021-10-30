@@ -647,6 +647,11 @@ fn get_setup(args: &[String]) -> Setup {
         )
     };
 
+    if credentials.is_none() && matches.opt_present(DISABLE_DISCOVERY) {
+        error!("Credentials are required if discovery is disabled.");
+        exit(1);
+    }
+
     let session_config = {
         let device_id = device_id(&name);
 
@@ -923,7 +928,8 @@ async fn main() {
                     player_event_channel = Some(event_channel);
                 },
                 Err(e) => {
-                    warn!("Connection failed: {}", e);
+                    error!("Connection failed: {}", e);
+                    exit(1);
                 }
             },
             _ = async { spirc_task.as_mut().unwrap().await }, if spirc_task.is_some() => {

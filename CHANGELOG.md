@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
 
+### Fixed
+- [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
+
 ## [0.3.1] - 2021-10-24
 
 ### Changed
