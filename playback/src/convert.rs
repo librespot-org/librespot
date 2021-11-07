@@ -72,18 +72,8 @@ impl Converter {
     // necessary for other formats, because casting to integer will saturate
     // to the bounds of the primitive.
     pub fn clamping_scale(&mut self, sample: f64, factor: f64) -> f64 {
-        let int_value = self.scale(sample, factor);
-
         // In two's complement, there are more negative than positive values.
-        let min = -factor;
-        let max = factor - 1.0;
-
-        if int_value < min {
-            return min;
-        } else if int_value > max {
-            return max;
-        }
-        int_value
+        self.scale(sample, factor).clamp(-factor, factor - 1.0)
     }
 
     pub fn f64_to_f32(&mut self, samples: &[f64]) -> Vec<f32> {
