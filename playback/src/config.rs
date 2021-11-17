@@ -76,7 +76,7 @@ impl AudioFormat {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NormalisationType {
     Album,
     Track,
@@ -101,7 +101,7 @@ impl Default for NormalisationType {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NormalisationMethod {
     Basic,
     Dynamic,

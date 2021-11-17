@@ -53,11 +53,19 @@ fn mk_sink<M: Mixer + 'static>(config: MixerConfig) -> Box<dyn Mixer> {
     Box::new(M::open(config))
 }
 
+pub const MIXERS: &[(&str, MixerFn)] = &[
+    (SoftMixer::NAME, mk_sink::<SoftMixer>), // default goes first
+    #[cfg(feature = "alsa-backend")]
+    (AlsaMixer::NAME, mk_sink::<AlsaMixer>),
+];
+
 pub fn find(name: Option<&str>) -> Option<MixerFn> {
-    match name {
-        None | Some(SoftMixer::NAME) => Some(mk_sink::<SoftMixer>),
-        #[cfg(feature = "alsa-backend")]
-        Some(AlsaMixer::NAME) => Some(mk_sink::<AlsaMixer>),
-        _ => None,
+    if let Some(name) = name {
+        MIXERS
+            .iter()
+            .find(|mixer| name == mixer.0)
+            .map(|mixer| mixer.1)
+    } else {
+        MIXERS.first().map(|mixer| mixer.1)
     }
 }
