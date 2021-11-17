@@ -1868,6 +1868,10 @@ impl PlayerInternal {
         }
     }
 
+    fn notify_kodi(&mut self, event: String) {
+        eprintln!("@{}", event);
+    }
+
     fn send_event(&mut self, event: PlayerEvent) {
         let mut index = 0;
         while index < self.event_senders.len() {
@@ -1876,6 +1880,16 @@ impl PlayerInternal {
                 Err(_) => {
                     self.event_senders.remove(index);
                 }
+            }
+        }
+        if self.config.notify_kodi {
+            use PlayerEvent::*;
+            match event {
+                Playing {track_id, .. } => self.notify_kodi(["Playing",
+                                               &track_id.audio_type.to_string(),
+                                               &track_id.to_base62()].join(" ")),
+                Stopped { .. } => self.notify_kodi("Stopped".to_string()),
+                _ => ()
             }
         }
     }

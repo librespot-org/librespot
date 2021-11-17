@@ -10,6 +10,12 @@ pub enum SpotifyAudioType {
     NonPlayable,
 }
 
+impl fmt::Display for SpotifyAudioType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl From<&str> for SpotifyAudioType {
     fn from(v: &str) -> Self {
         match v {

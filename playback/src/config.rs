@@ -138,6 +138,7 @@ pub struct PlayerConfig {
     pub normalisation_attack: Duration,
     pub normalisation_release: Duration,
     pub normalisation_knee: f64,
+    pub notify_kodi: bool,
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
     // (thereby circumventing Send bounds that they might not satisfy)
@@ -159,6 +160,7 @@ impl Default for PlayerConfig {
             normalisation_knee: 1.0,
             passthrough: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),
+            notify_kodi: false,
         }
     }
 }

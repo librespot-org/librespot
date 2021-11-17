@@ -577,6 +577,11 @@ fn get_setup(args: &[String]) -> Setup {
         AP_PORT,
         "Connect to an AP with a specified port 1 - 65535. If no AP with that port is present a fallback AP will be used. Available ports are usually 80, 443 and 4070.",
         "PORT",
+    )
+    .optflag(
+        "",
+       "notify-kodi",
+        "Notify Kodi",
     );
 
     let matches = match opts.parse(&args[1..]) {
@@ -1386,6 +1391,8 @@ fn get_setup(args: &[String]) -> Setup {
 
         let passthrough = matches.opt_present(PASSTHROUGH);
 
+        let notify_kodi = matches.opt_present("notify-kodi");
+
         PlayerConfig {
             bitrate,
             gapless,
@@ -1399,6 +1406,7 @@ fn get_setup(args: &[String]) -> Setup {
             normalisation_release,
             normalisation_knee,
             ditherer,
+            notify_kodi,
         }
     };
 
