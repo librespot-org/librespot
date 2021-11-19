@@ -80,6 +80,23 @@ impl From<AlsaError> for SinkError {
     }
 }
 
+impl From<AudioFormat> for Format {
+    fn from(f: AudioFormat) -> Format {
+        use AudioFormat::*;
+        match f {
+            F64 => Format::float64(),
+            F32 => Format::float(),
+            S32 => Format::s32(),
+            S24 => Format::s24(),
+            S16 => Format::s16(),
+            #[cfg(target_endian = "little")]
+            S24_3 => Format::S243LE,
+            #[cfg(target_endian = "big")]
+            S24_3 => Format::S243BE,
+        }
+    }
+}
+
 pub struct AlsaSink {
     pcm: Option<PCM>,
     format: AudioFormat,
@@ -87,20 +104,50 @@ pub struct AlsaSink {
     period_buffer: Vec<u8>,
 }
 
-fn list_outputs() -> SinkResult<()> {
-    println!("Listing available Alsa outputs:");
-    for t in &["pcm", "ctl", "hwdep"] {
-        println!("{} devices:", t);
+fn list_compatible_devices() -> SinkResult<()> {
+    println!("\n\n\tCompatible alsa device(s):\n");
+    println!("\t------------------------------------------------------\n");
 
-        let i = HintIter::new_str(None, t).map_err(|_| AlsaError::Parsing)?;
+    let i = HintIter::new_str(None, "pcm").map_err(|_| AlsaError::Parsing)?;
 
-        for a in i {
-            if let Some(Direction::Playback) = a.direction {
-                // mimic aplay -L
-                let name = a.name.ok_or(AlsaError::Parsing)?;
-                let desc = a.desc.ok_or(AlsaError::Parsing)?;
+    for a in i {
+        if let Some(Direction::Playback) = a.direction {
+            let name = a.name.ok_or(AlsaError::Parsing)?;
+            let desc = a.desc.ok_or(AlsaError::Parsing)?;
 
-                println!("{}\n\t{}\n", name, desc.replace("\n", "\n\t"));
+            if let Ok(pcm) = PCM::new(&name, Direction::Playback, false) {
+                if let Ok(hwp) = HwParams::any(&pcm) {
+                    // Only show devices that support
+                    // 2 ch 44.1 Interleaved.
+                    if hwp.set_access(Access::RWInterleaved).is_ok()
+                        && hwp.set_rate(SAMPLE_RATE, ValueOr::Nearest).is_ok()
+                        && hwp.set_channels(NUM_CHANNELS as u32).is_ok()
+                    {
+                        println!("\tDevice:\n\n\t\t{}\n", name);
+                        println!("\tDescription:\n\n\t\t{}\n", desc.replace("\n", "\n\t\t"));
+
+                        let mut supported_formats = vec![];
+
+                        for f in &[
+                            AudioFormat::S16,
+                            AudioFormat::S24,
+                            AudioFormat::S24_3,
+                            AudioFormat::S32,
+                            AudioFormat::F32,
+                            AudioFormat::F64,
+                        ] {
+                            if hwp.test_format(Format::from(*f)).is_ok() {
+                                supported_formats.push(format!("{:?}", f));
+                            }
+                        }
+
+                        println!(
+                            "\tSupported Format(s):\n\n\t\t{}\n",
+                            supported_formats.join(" ")
+                        );
+                        println!("\t------------------------------------------------------\n");
+                    }
+                };
             }
         }
     }
@@ -114,19 +161,6 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
         e,
     })?;
 
-    let alsa_format = match format {
-        AudioFormat::F64 => Format::float64(),
-        AudioFormat::F32 => Format::float(),
-        AudioFormat::S32 => Format::s32(),
-        AudioFormat::S24 => Format::s24(),
-        AudioFormat::S16 => Format::s16(),
-
-        #[cfg(target_endian = "little")]
-        AudioFormat::S24_3 => Format::S243LE,
-        #[cfg(target_endian = "big")]
-        AudioFormat::S24_3 => Format::S243BE,
-    };
-
     let bytes_per_period = {
         let hwp = HwParams::any(&pcm).map_err(AlsaError::HwParams)?;
 
@@ -135,6 +169,8 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                 device: dev_name.to_string(),
                 e,
             })?;
+
+        let alsa_format = Format::from(format);
 
         hwp.set_format(alsa_format)
             .map_err(|e| AlsaError::UnsupportedFormat {
@@ -194,7 +230,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
 impl Open for AlsaSink {
     fn open(device: Option<String>, format: AudioFormat) -> Self {
         let name = match device.as_deref() {
-            Some("?") => match list_outputs() {
+            Some("?") => match list_compatible_devices() {
                 Ok(_) => {
                     exit(0);
                 }
