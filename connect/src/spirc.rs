@@ -1140,6 +1140,14 @@ impl SpircTask {
     fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
         let tracks_len = self.state.get_track().len();
 
+        // Guard against tracks_len being zero to prevent
+        // 'index out of bounds: the len is 0 but the index is 0'
+        // https://github.com/librespot-org/librespot/issues/226#issuecomment-971642037
+        if tracks_len == 0 {
+            warn!("No playable track found in state: {:?}", self.state);
+            return None;
+        }
+
         let mut new_playlist_index = index as usize;
 
         if new_playlist_index >= tracks_len {

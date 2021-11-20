@@ -7,11 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- [main] Enforce reasonable ranges for option values (breaking).
+- [main] Don't evaluate options that would otherwise have no effect.
+
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
+- [main] Use different option descriptions and error messages based on what backends are enabled at build time.
+- [main] Add a `-q`, `--quiet` option that changes the logging level to warn.
+- [main] Add a short name for every flag and option.
 
 ### Fixed
 - [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
+- [main] Don't panic when parsing options. Instead list valid values and exit.
+
+### Removed
+- [playback] `alsamixer`: previously deprecated option `mixer-card` has been removed.
+- [playback] `alsamixer`: previously deprecated option `mixer-name` has been removed.
+- [playback] `alsamixer`: previously deprecated option `mixer-index` has been removed.
 
 ## [0.3.1] - 2021-10-24
 
