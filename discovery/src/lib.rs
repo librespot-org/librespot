@@ -10,9 +10,10 @@
 #![warn(clippy::all, missing_docs, rust_2018_idioms)]
 
 mod server;
+#[cfg(not(feature = "with-dns-sd"))]
+use std::io;
 
 use std::borrow::Cow;
-use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -52,8 +53,15 @@ pub struct Builder {
 #[derive(Debug, Error)]
 pub enum Error {
     /// Setting up service discovery via DNS-SD failed.
+    #[cfg(feature = "with-dns-sd")]
     #[error("Setting up dns-sd failed: {0}")]
-    DnsSdError(#[from] io::Error),
+    #[cfg(feature = "with-dns-sd")]
+    DnsSdError(#[from] dns_sd::DNSError),
+    /// Setting up service discovery via libmdns failed.
+    #[cfg(not(feature = "with-dns-sd"))]
+    #[error("Setting up libmdns failed: {0}")]
+    #[cfg(not(feature = "with-dns-sd"))]
+    LibmDNSError(#[from] io::Error),
     /// Setting up the http server failed.
     #[error("Setting up the http server failed: {0}")]
     HttpServerError(#[from] hyper::Error),
@@ -111,8 +119,7 @@ impl Builder {
                     None,
                     port,
                     &["VERSION=1.0", "CPath=/"],
-                )
-                .unwrap();
+                )?;
 
             } else {
                 let responder = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?;
