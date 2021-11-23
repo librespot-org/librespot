@@ -10,12 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - [main] Enforce reasonable ranges for option values (breaking).
 - [main] Don't evaluate options that would otherwise have no effect.
+- [playback] `alsa`: Improve `--device ?` functionality for the alsa backend.
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
 - [main] Use different option descriptions and error messages based on what backends are enabled at build time.
 - [main] Add a `-q`, `--quiet` option that changes the logging level to warn.
 - [main] Add a short name for every flag and option.
+- [main] Add the ability to parse environment variables.
 
 ### Fixed
 - [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
