@@ -4,8 +4,7 @@ Documentation=https://github.com/librespot-org/librespot
 Documentation=https://github.com/librespot-org/librespot/wiki/Options
 
 [Service]
-Restart=always
-RestartSec=10
+Restart=on-failure
 ExecStart=/usr/bin/librespot --name "%u@%H"
 
 [Install]

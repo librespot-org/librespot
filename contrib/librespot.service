@@ -6,10 +6,9 @@ Requires=network-online.target
 After=network-online.target
 
 [Service]
-User=nobody
-Group=audio
-Restart=always
-RestartSec=10
+DynamicUser=yes
+SupplementaryGroups=audio
+Restart=on-failure
 ExecStart=/usr/bin/librespot --name "%p@%H"
 
 [Install]
