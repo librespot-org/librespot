@@ -27,6 +27,7 @@ use crate::connection::{self, AuthenticationError};
 use crate::http_client::HttpClient;
 use crate::mercury::MercuryManager;
 use crate::packet::PacketType;
+use crate::spclient::SpClient;
 use crate::token::TokenProvider;
 
 #[derive(Debug, Error)]
@@ -55,6 +56,7 @@ struct SessionInternal {
     audio_key: OnceCell<AudioKeyManager>,
     channel: OnceCell<ChannelManager>,
     mercury: OnceCell<MercuryManager>,
+    spclient: OnceCell<SpClient>,
     token_provider: OnceCell<TokenProvider>,
     cache: Option<Arc<Cache>>,
 
@@ -95,6 +97,7 @@ impl Session {
             audio_key: OnceCell::new(),
             channel: OnceCell::new(),
             mercury: OnceCell::new(),
+            spclient: OnceCell::new(),
             token_provider: OnceCell::new(),
             handle: tokio::runtime::Handle::current(),
             session_id,
@@ -157,6 +160,10 @@ impl Session {
         self.0
             .mercury
             .get_or_init(|| MercuryManager::new(self.weak()))
+    }
+
+    pub fn spclient(&self) -> &SpClient {
+        self.0.spclient.get_or_init(|| SpClient::new(self.weak()))
     }
 
     pub fn token_provider(&self) -> &TokenProvider {

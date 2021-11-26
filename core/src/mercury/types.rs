@@ -1,6 +1,8 @@
 use byteorder::{BigEndian, WriteBytesExt};
 use protobuf::Message;
+use std::fmt;
 use std::io::Write;
+use thiserror::Error;
 
 use crate::packet::PacketType;
 use crate::protocol;
@@ -28,8 +30,14 @@ pub struct MercuryResponse {
     pub payload: Vec<Vec<u8>>,
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, Error, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct MercuryError;
+
+impl fmt::Display for MercuryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Mercury error")
+    }
+}
 
 impl ToString for MercuryMethod {
     fn to_string(&self) -> String {
@@ -55,6 +63,7 @@ impl MercuryMethod {
 }
 
 impl MercuryRequest {
+    // TODO: change into Result and remove unwraps
     pub fn encode(&self, seq: &[u8]) -> Vec<u8> {
         let mut packet = Vec::new();
         packet.write_u16::<BigEndian>(seq.len() as u16).unwrap();

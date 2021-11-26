@@ -23,11 +23,11 @@ component! {
 
 #[derive(Clone, Debug)]
 pub struct Token {
-    access_token: String,
-    expires_in: Duration,
-    token_type: String,
-    scopes: Vec<String>,
-    timestamp: Instant,
+    pub access_token: String,
+    pub expires_in: Duration,
+    pub token_type: String,
+    pub scopes: Vec<String>,
+    pub timestamp: Instant,
 }
 
 #[derive(Deserialize)]

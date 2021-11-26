@@ -7,7 +7,7 @@ use librespot_protocol as protocol;
 #[macro_use]
 mod component;
 
-mod apresolve;
+pub mod apresolve;
 pub mod audio_key;
 pub mod authentication;
 pub mod cache;
@@ -24,9 +24,10 @@ pub mod packet;
 mod proxytunnel;
 pub mod session;
 mod socket;
-mod spclient;
+#[allow(dead_code)]
+pub mod spclient;
 pub mod spotify_id;
-mod token;
+pub mod token;
 #[doc(hidden)]
 pub mod util;
 pub mod version;

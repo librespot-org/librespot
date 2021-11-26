@@ -401,7 +401,7 @@ async fn connect(
 
     // Spawn a task that will forward messages from the channel to the websocket.
     let send_task = {
-        let shared = Arc::clone(&shared);
+        let shared = Arc::clone(shared);
 
         tokio::spawn(async move {
             let result = loop {
@@ -450,7 +450,7 @@ async fn connect(
         })
     };
 
-    let shared = Arc::clone(&shared);
+    let shared = Arc::clone(shared);
 
     // A task that receives messages from the web socket.
     let receive_task = tokio::spawn(async {

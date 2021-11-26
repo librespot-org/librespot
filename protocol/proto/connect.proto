@@ -70,7 +70,7 @@ message DeviceInfo {
     Capabilities capabilities = 4;
     repeated DeviceMetadata metadata = 5;
     string device_software_version = 6;
-    devices.DeviceType device_type = 7;
+    spotify.connectstate.devices.DeviceType device_type = 7;
     string spirc_version = 9;
     string device_id = 10;
     bool is_private_session = 11;
@@ -82,7 +82,7 @@ message DeviceInfo {
     string product_id = 17;
     string deduplication_id = 18;
     uint32 selected_alias_id = 19;
-    map<uint32, devices.DeviceAlias> device_aliases = 20;
+    map<uint32, spotify.connectstate.devices.DeviceAlias> device_aliases = 20;
     bool is_offline = 21;
     string public_ip = 22;
     string license = 23;
@@ -134,7 +134,7 @@ message Capabilities {
     bool supports_set_options_command = 25;
     CapabilitySupportDetails supports_hifi = 26;
     
-    reserved 1, 4, 24, "supported_contexts", "supports_lossless_audio";
+	// reserved 1, 4, 24, "supported_contexts", "supports_lossless_audio";
 }
 
 message CapabilitySupportDetails {

@@ -606,15 +606,11 @@ fn get_setup(args: &[String]) -> Setup {
                     match Url::parse(&s) {
                         Ok(url) => {
                             if url.host().is_none() || url.port_or_known_default().is_none() {
-                                panic!("Invalid proxy url, only URLs on the format \"http://host:port\" are allowed");
-                            }
-
-                            if url.scheme() != "http" {
-                                panic!("Only unsecure http:// proxies are supported");
+                                panic!("Invalid proxy url, only URLs on the format \"http(s)://host:port\" are allowed");
                             }
                             url
                         },
-                        Err(err) => panic!("Invalid proxy URL: {}, only URLs in the format \"http://host:port\" are allowed", err)
+                        Err(err) => panic!("Invalid proxy URL: {}, only URLs in the format \"http(s)://host:port\" are allowed", err)
                     }
                 },
             ),

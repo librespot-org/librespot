@@ -6,14 +6,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub type SocketAddress = (String, u16);
 
 #[derive(Default)]
-struct AccessPoints {
+pub struct AccessPoints {
     accesspoint: Vec<SocketAddress>,
     dealer: Vec<SocketAddress>,
     spclient: Vec<SocketAddress>,
 }
 
 #[derive(Deserialize)]
-struct ApResolveData {
+pub struct ApResolveData {
     accesspoint: Vec<String>,
     dealer: Vec<String>,
     spclient: Vec<String>,
@@ -42,7 +42,7 @@ component! {
 impl ApResolver {
     // return a port if a proxy URL and/or a proxy port was specified. This is useful even when
     // there is no proxy, but firewalls only allow certain ports (e.g. 443 and not 4070).
-    fn port_config(&self) -> Option<u16> {
+    pub fn port_config(&self) -> Option<u16> {
         if self.session().config().proxy.is_some() || self.session().config().ap_port.is_some() {
             Some(self.session().config().ap_port.unwrap_or(443))
         } else {
@@ -54,9 +54,7 @@ impl ApResolver {
         data.into_iter()
             .filter_map(|ap| {
                 let mut split = ap.rsplitn(2, ':');
-                let port = split
-                    .next()
-                    .expect("rsplitn should not return empty iterator");
+                let port = split.next()?;
                 let host = split.next()?.to_owned();
                 let port: u16 = port.parse().ok()?;
                 if let Some(p) = self.port_config() {
@@ -69,12 +67,11 @@ impl ApResolver {
             .collect()
     }
 
-    async fn try_apresolve(&self) -> Result<ApResolveData, Box<dyn Error>> {
+    pub async fn try_apresolve(&self) -> Result<ApResolveData, Box<dyn Error>> {
         let req = Request::builder()
             .method("GET")
             .uri("http://apresolve.spotify.com/?type=accesspoint&type=dealer&type=spclient")
-            .body(Body::empty())
-            .unwrap();
+            .body(Body::empty())?;
 
         let body = self.session().http_client().request_body(req).await?;
         let data: ApResolveData = serde_json::from_slice(body.as_ref())?;

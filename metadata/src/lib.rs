@@ -12,9 +12,12 @@ use std::collections::HashMap;
 
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
+use librespot_core::spclient::SpClientError;
 use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId};
 use librespot_protocol as protocol;
-use protobuf::Message;
+use protobuf::{Message, ProtobufError};
+
+use thiserror::Error;
 
 pub use crate::protocol::metadata::AudioFile_Format as FileFormat;
 
@@ -48,9 +51,8 @@ where
         }
     }
 
-    (has_forbidden || has_allowed)
-        && (!has_forbidden || !countrylist_contains(forbidden.as_str(), country))
-        && (!has_allowed || countrylist_contains(allowed.as_str(), country))
+    !(has_forbidden && countrylist_contains(forbidden.as_str(), country)
+        || has_allowed && !countrylist_contains(allowed.as_str(), country))
 }
 
 // A wrapper with fields the player needs
@@ -66,24 +68,34 @@ pub struct AudioItem {
 }
 
 impl AudioItem {
-    pub async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<Self, MercuryError> {
+    pub async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<Self, MetadataError> {
         match id.audio_type {
             SpotifyAudioType::Track => Track::get_audio_item(session, id).await,
             SpotifyAudioType::Podcast => Episode::get_audio_item(session, id).await,
-            SpotifyAudioType::NonPlayable => Err(MercuryError),
+            SpotifyAudioType::NonPlayable => Err(MetadataError::NonPlayable),
         }
     }
 }
 
+pub type AudioItemResult = Result<AudioItem, MetadataError>;
+
 #[async_trait]
 trait AudioFiles {
-    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError>;
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> AudioItemResult;
 }
 
 #[async_trait]
 impl AudioFiles for Track {
-    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError> {
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> AudioItemResult {
         let item = Self::get(session, id).await?;
+        let alternatives = {
+            if item.alternatives.is_empty() {
+                None
+            } else {
+                Some(item.alternatives)
+            }
+        };
+
         Ok(AudioItem {
             id,
             uri: format!("spotify:track:{}", id.to_base62()),
@@ -91,14 +103,14 @@ impl AudioFiles for Track {
             name: item.name,
             duration: item.duration,
             available: item.available,
-            alternatives: Some(item.alternatives),
+            alternatives,
         })
     }
 }
 
 #[async_trait]
 impl AudioFiles for Episode {
-    async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError> {
+    async fn get_audio_item(session: &Session, id: SpotifyId) -> AudioItemResult {
         let item = Self::get(session, id).await?;
 
         Ok(AudioItem {
@@ -113,22 +125,37 @@ impl AudioFiles for Episode {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum MetadataError {
+    #[error("could not get metadata over HTTP: {0}")]
+    Http(#[from] SpClientError),
+    #[error("could not get metadata over Mercury: {0}")]
+    Mercury(#[from] MercuryError),
+    #[error("could not parse metadata: {0}")]
+    Parsing(#[from] ProtobufError),
+    #[error("response was empty")]
+    Empty,
+    #[error("audio item is non-playable")]
+    NonPlayable,
+}
+
+pub type MetadataResult = Result<bytes::Bytes, MetadataError>;
+
 #[async_trait]
 pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::Message;
 
-    fn request_url(id: SpotifyId) -> String;
+    async fn request(session: &Session, id: SpotifyId) -> MetadataResult;
     fn parse(msg: &Self::Message, session: &Session) -> Self;
 
-    async fn get(session: &Session, id: SpotifyId) -> Result<Self, MercuryError> {
-        let uri = Self::request_url(id);
-        let response = session.mercury().get(uri).await?;
-        let data = response.payload.first().expect("Empty payload");
-        let msg = Self::Message::parse_from_bytes(data).unwrap();
-
-        Ok(Self::parse(&msg, &session))
+    async fn get(session: &Session, id: SpotifyId) -> Result<Self, MetadataError> {
+        let response = Self::request(session, id).await?;
+        let msg = Self::Message::parse_from_bytes(&response)?;
+        Ok(Self::parse(&msg, session))
     }
 }
+
+// TODO: expose more fields available in the protobufs
 
 #[derive(Debug, Clone)]
 pub struct Track {
@@ -189,14 +216,20 @@ pub struct Artist {
     pub top_tracks: Vec<SpotifyId>,
 }
 
+#[async_trait]
 impl Metadata for Track {
     type Message = protocol::metadata::Track;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/track/{}", id.to_base16())
+    async fn request(session: &Session, track_id: SpotifyId) -> MetadataResult {
+        session
+            .spclient()
+            .get_track_metadata(track_id)
+            .await
+            .map_err(MetadataError::Http)
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
+        debug!("MESSAGE: {:?}", msg);
         let country = session.country();
 
         let artists = msg
@@ -234,11 +267,16 @@ impl Metadata for Track {
     }
 }
 
+#[async_trait]
 impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/album/{}", id.to_base16())
+    async fn request(session: &Session, album_id: SpotifyId) -> MetadataResult {
+        session
+            .spclient()
+            .get_album_metadata(album_id)
+            .await
+            .map_err(MetadataError::Http)
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
@@ -279,11 +317,20 @@ impl Metadata for Album {
     }
 }
 
+#[async_trait]
 impl Metadata for Playlist {
     type Message = protocol::playlist4changes::SelectedListContent;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!("hm://playlist/v2/playlist/{}", id.to_base62())
+    // TODO:
+    // * Add PlaylistAnnotate3 annotations.
+    // * Find spclient endpoint and upgrade to that.
+    async fn request(session: &Session, playlist_id: SpotifyId) -> MetadataResult {
+        let uri = format!("hm://playlist/v2/playlist/{}", playlist_id.to_base62());
+        let response = session.mercury().get(uri).await?;
+        match response.payload.first() {
+            Some(data) => Ok(data.to_vec().into()),
+            None => Err(MetadataError::Empty),
+        }
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
@@ -315,11 +362,16 @@ impl Metadata for Playlist {
     }
 }
 
+#[async_trait]
 impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/artist/{}", id.to_base16())
+    async fn request(session: &Session, artist_id: SpotifyId) -> MetadataResult {
+        session
+            .spclient()
+            .get_artist_metadata(artist_id)
+            .await
+            .map_err(MetadataError::Http)
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
@@ -348,11 +400,16 @@ impl Metadata for Artist {
 }
 
 // Podcast
+#[async_trait]
 impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/episode/{}", id.to_base16())
+    async fn request(session: &Session, episode_id: SpotifyId) -> MetadataResult {
+        session
+            .spclient()
+            .get_album_metadata(episode_id)
+            .await
+            .map_err(MetadataError::Http)
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
@@ -396,11 +453,16 @@ impl Metadata for Episode {
     }
 }
 
+#[async_trait]
 impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/show/{}", id.to_base16())
+    async fn request(session: &Session, show_id: SpotifyId) -> MetadataResult {
+        session
+            .spclient()
+            .get_show_metadata(show_id)
+            .await
+            .map_err(MetadataError::Http)
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
