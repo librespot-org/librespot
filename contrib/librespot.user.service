@@ -2,6 +2,8 @@
 Description=Librespot (an open source Spotify client)
 Documentation=https://github.com/librespot-org/librespot
 Documentation=https://github.com/librespot-org/librespot/wiki/Options
+Wants=network.target sound.target
+After=network.target sound.target
 
 [Service]
 Restart=always

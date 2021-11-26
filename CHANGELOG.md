@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - [main] Enforce reasonable ranges for option values (breaking).
 - [main] Don't evaluate options that would otherwise have no effect.
+- [playback] `alsa`: Improve `--device ?` functionality for the alsa backend.
+- [contrib] Hardened security of the systemd service units
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
