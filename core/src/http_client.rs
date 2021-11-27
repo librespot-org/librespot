@@ -1,3 +1,7 @@
+use bytes::Bytes;
+use http::header::HeaderValue;
+use http::uri::InvalidUri;
+use hyper::header::InvalidHeaderValue;
 use hyper::{Body, Client, Request, Response, StatusCode};
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::HttpsConnector;
@@ -11,13 +15,25 @@ pub struct HttpClient {
 #[derive(Error, Debug)]
 pub enum HttpClientError {
     #[error("could not parse request: {0}")]
-    Parsing(#[from] http::uri::InvalidUri),
+    Parsing(#[from] http::Error),
     #[error("could not send request: {0}")]
     Request(hyper::Error),
     #[error("could not read response: {0}")]
     Response(hyper::Error),
     #[error("could not build proxy connector: {0}")]
     ProxyBuilder(#[from] std::io::Error),
+}
+
+impl From<InvalidHeaderValue> for HttpClientError {
+    fn from(err: InvalidHeaderValue) -> Self {
+        Self::Parsing(err.into())
+    }
+}
+
+impl From<InvalidUri> for HttpClientError {
+    fn from(err: InvalidUri) -> Self {
+        Self::Parsing(err.into())
+    }
 }
 
 impl HttpClient {
@@ -27,9 +43,16 @@ impl HttpClient {
         }
     }
 
-    pub async fn request(&self, req: Request<Body>) -> Result<Response<Body>, HttpClientError> {
+    pub async fn request(&self, mut req: Request<Body>) -> Result<Response<Body>, HttpClientError> {
         let connector = HttpsConnector::with_native_roots();
         let uri = req.uri().clone();
+
+        let headers_mut = req.headers_mut();
+        headers_mut.insert(
+            "User-Agent",
+            // Some features like lyrics are version-gated and require a "real" version string.
+            HeaderValue::from_str("Spotify/8.6.80 iOS/13.5 (iPhone11,2)")?,
+        );
 
         let response = if let Some(url) = &self.proxy {
             let uri = url.to_string().parse()?;
@@ -58,7 +81,7 @@ impl HttpClient {
         response
     }
 
-    pub async fn request_body(&self, req: Request<Body>) -> Result<bytes::Bytes, HttpClientError> {
+    pub async fn request_body(&self, req: Request<Body>) -> Result<Bytes, HttpClientError> {
         let response = self.request(req).await?;
         hyper::body::to_bytes(response.into_body())
             .await

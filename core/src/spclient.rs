@@ -1,11 +1,16 @@
 use crate::apresolve::SocketAddress;
 use crate::http_client::HttpClientError;
 use crate::mercury::MercuryError;
-use crate::protocol;
-use crate::spotify_id::SpotifyId;
+use crate::protocol::canvaz::EntityCanvazRequest;
+use crate::protocol::connect::PutStateRequest;
+use crate::protocol::extended_metadata::BatchedEntityRequest;
+use crate::spotify_id::{FileId, SpotifyId};
 
+use bytes::Bytes;
+use http::header::HeaderValue;
 use hyper::header::InvalidHeaderValue;
 use hyper::{Body, HeaderMap, Request};
+use protobuf::Message;
 use rand::Rng;
 use std::time::Duration;
 use thiserror::Error;
@@ -17,7 +22,7 @@ component! {
     }
 }
 
-pub type SpClientResult = Result<bytes::Bytes, SpClientError>;
+pub type SpClientResult = Result<Bytes, SpClientError>;
 
 #[derive(Error, Debug)]
 pub enum SpClientError {
@@ -83,7 +88,7 @@ impl SpClient {
         method: &str,
         endpoint: &str,
         headers: Option<HeaderMap>,
-        message: &dyn protobuf::Message,
+        message: &dyn Message,
     ) -> SpClientResult {
         let body = protobuf::text_format::print_to_string(message);
 
@@ -126,7 +131,7 @@ impl SpClient {
             }
             headers_mut.insert(
                 "Authorization",
-                http::header::HeaderValue::from_str(&format!(
+                HeaderValue::from_str(&format!(
                     "Bearer {}",
                     self.session()
                         .token_provider()
@@ -186,7 +191,7 @@ impl SpClient {
     pub async fn put_connect_state(
         &self,
         connection_id: String,
-        state: protocol::connect::PutStateRequest,
+        state: PutStateRequest,
     ) -> SpClientResult {
         let endpoint = format!("/connect-state/v1/devices/{}", self.session().device_id());
 
@@ -223,10 +228,12 @@ impl SpClient {
     }
 
     // TODO: Not working at the moment, always returns 400.
-    pub async fn get_lyrics(&self, track_id: SpotifyId) -> SpClientResult {
-        // /color-lyrics/v2/track/22L7bfCiAkJo5xGSQgmiIO/image/spotify:image:ab67616d0000b273d9194aa18fa4c9362b47464f?clientLanguage=en
-        // https://spclient.wg.spotify.com/color-lyrics/v2/track/{track_id}/image/spotify:image:{image_id}?clientLanguage=en
-        let endpoint = format!("/color-lyrics/v2/track/{}", track_id.to_base16());
+    pub async fn get_lyrics(&self, track_id: SpotifyId, image_id: FileId) -> SpClientResult {
+        let endpoint = format!(
+            "/color-lyrics/v2/track/{}/image/spotify:image:{}",
+            track_id.to_base16(),
+            image_id
+        );
 
         let mut headers = HeaderMap::new();
         headers.insert("Content-Type", "application/json".parse()?);
@@ -235,19 +242,13 @@ impl SpClient {
     }
 
     // TODO: Find endpoint for newer canvas.proto and upgrade to that.
-    pub async fn get_canvases(
-        &self,
-        request: protocol::canvaz::EntityCanvazRequest,
-    ) -> SpClientResult {
+    pub async fn get_canvases(&self, request: EntityCanvazRequest) -> SpClientResult {
         let endpoint = "/canvaz-cache/v0/canvases";
         self.protobuf_request("POST", endpoint, None, &request)
             .await
     }
 
-    pub async fn get_extended_metadata(
-        &self,
-        request: protocol::extended_metadata::BatchedEntityRequest,
-    ) -> SpClientResult {
+    pub async fn get_extended_metadata(&self, request: BatchedEntityRequest) -> SpClientResult {
         let endpoint = "/extended-metadata/v0/extended-metadata";
         self.protobuf_request("POST", endpoint, None, &request)
             .await
