@@ -23,7 +23,7 @@ futures-util = { version = "0.3", default_features = false, features = ["alloc"]
 log = "0.4"
 byteorder = "1.4"
 shell-words = "1.0.0"
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync"] }
 zerocopy = { version = "0.3" }
 
 # Backends
