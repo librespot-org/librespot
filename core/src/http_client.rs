@@ -20,6 +20,8 @@ pub enum HttpClientError {
     Request(hyper::Error),
     #[error("could not read response: {0}")]
     Response(hyper::Error),
+    #[error("status code: {0}")]
+    NotOK(u16),
     #[error("could not build proxy connector: {0}")]
     ProxyBuilder(#[from] std::io::Error),
 }
@@ -44,19 +46,20 @@ impl HttpClient {
     }
 
     pub async fn request(&self, mut req: Request<Body>) -> Result<Response<Body>, HttpClientError> {
+        trace!("Requesting {:?}", req.uri().to_string());
+
         let connector = HttpsConnector::with_native_roots();
-        let uri = req.uri().clone();
 
         let headers_mut = req.headers_mut();
         headers_mut.insert(
             "User-Agent",
-            // Some features like lyrics are version-gated and require a "real" version string.
+            // Some features like lyrics are version-gated and require an official version string.
             HeaderValue::from_str("Spotify/8.6.80 iOS/13.5 (iPhone11,2)")?,
         );
 
         let response = if let Some(url) = &self.proxy {
-            let uri = url.to_string().parse()?;
-            let proxy = Proxy::new(Intercept::All, uri);
+            let proxy_uri = url.to_string().parse()?;
+            let proxy = Proxy::new(Intercept::All, proxy_uri);
             let proxy_connector = ProxyConnector::from_proxy(connector, proxy)?;
 
             Client::builder()
@@ -73,8 +76,9 @@ impl HttpClient {
         };
 
         if let Ok(response) = &response {
-            if response.status() != StatusCode::OK {
-                debug!("{} returned status {}", uri, response.status());
+            let status = response.status();
+            if status != StatusCode::OK {
+                return Err(HttpClientError::NotOK(status.into()));
             }
         }
 
