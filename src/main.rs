@@ -1,6 +1,6 @@
 use futures_util::{future, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -631,6 +631,60 @@ fn get_setup(args: &[String]) -> Setup {
     setup_logging(opt_present(QUIET), opt_present(VERBOSE));
 
     info!("{}", get_version_string());
+
+    let librespot_env_vars: Vec<String> = env::vars_os()
+        .filter_map(|(k, v)| {
+            let mut env_var = None;
+            if let Ok(key) = k.into_string() {
+                if key.starts_with("LIBRESPOT_") {
+                    if matches!(key.as_str(), "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME") {
+                        // Don't log creds.
+                        env_var = Some(format!("\t\t{}=XXXXXXXX", key));
+                    } else if let Ok(value) = v.into_string() {
+                        env_var = Some(format!("\t\t{}={}", key, value));
+                    }
+                }
+            }
+
+            env_var
+        })
+        .collect();
+
+    if !librespot_env_vars.is_empty() {
+        trace!("Environment variable(s):");
+
+        for kv in librespot_env_vars {
+            trace!("{}", kv);
+        }
+    }
+
+    let cmd_args = &args[1..];
+
+    let cmd_args_len = cmd_args.len();
+
+    if cmd_args_len > 0 {
+        trace!("Command line argument(s):");
+
+        for (index, key) in cmd_args.iter().enumerate() {
+            if key.starts_with('-') || key.starts_with("--") {
+                if matches!(key.as_str(), "--password" | "-p" | "--username" | "-u") {
+                    // Don't log creds.
+                    trace!("\t\t{} XXXXXXXX", key);
+                } else {
+                    let mut value = "".to_string();
+                    let next = index + 1;
+                    if next < cmd_args_len {
+                        let next_key = cmd_args[next].clone();
+                        if !next_key.starts_with('-') && !next_key.starts_with("--") {
+                            value = next_key;
+                        }
+                    }
+
+                    trace!("\t\t{} {}", key, value);
+                }
+            }
+        }
+    }
 
     #[cfg(not(feature = "alsa-backend"))]
     for a in &[
