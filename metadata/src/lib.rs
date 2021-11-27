@@ -202,6 +202,21 @@ pub struct Show {
 }
 
 #[derive(Debug, Clone)]
+pub struct TranscodedPicture {
+    pub target_name: String,
+    pub uri: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PlaylistAnnotation {
+    pub description: String,
+    pub picture: String,
+    pub transcoded_pictures: Vec<TranscodedPicture>,
+    pub abuse_reporting: bool,
+    pub taken_down: bool,
+}
+
+#[derive(Debug, Clone)]
 pub struct Playlist {
     pub revision: Vec<u8>,
     pub user: String,
@@ -250,7 +265,7 @@ impl Metadata for Track {
             })
             .collect();
 
-        Track {
+        Self {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             duration: msg.get_duration(),
@@ -307,7 +322,7 @@ impl Metadata for Album {
             })
             .collect::<Vec<_>>();
 
-        Album {
+        Self {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             artists,
@@ -318,12 +333,73 @@ impl Metadata for Album {
 }
 
 #[async_trait]
-impl Metadata for Playlist {
-    type Message = protocol::playlist4changes::SelectedListContent;
+impl Metadata for PlaylistAnnotation {
+    type Message = protocol::playlist_annotate3::PlaylistAnnotation;
 
-    // TODO:
-    // * Add PlaylistAnnotate3 annotations.
-    // * Find spclient endpoint and upgrade to that.
+    async fn request(session: &Session, playlist_id: SpotifyId) -> MetadataResult {
+        let current_user = session.username();
+        Self::request_for_user(session, current_user, playlist_id).await
+    }
+
+    fn parse(msg: &Self::Message, _: &Session) -> Self {
+        let transcoded_pictures = msg
+            .get_transcoded_picture()
+            .iter()
+            .map(|picture| TranscodedPicture {
+                target_name: picture.get_target_name().to_string(),
+                uri: picture.get_uri().to_string(),
+            })
+            .collect::<Vec<_>>();
+
+        let taken_down = !matches!(
+            msg.get_abuse_report_state(),
+            protocol::playlist_annotate3::AbuseReportState::OK
+        );
+
+        Self {
+            description: msg.get_description().to_string(),
+            picture: msg.get_picture().to_string(),
+            transcoded_pictures,
+            abuse_reporting: msg.get_is_abuse_reporting_enabled(),
+            taken_down,
+        }
+    }
+}
+
+impl PlaylistAnnotation {
+    async fn request_for_user(
+        session: &Session,
+        username: String,
+        playlist_id: SpotifyId,
+    ) -> MetadataResult {
+        let uri = format!(
+            "hm://playlist-annotate/v1/annotation/user/{}/playlist/{}",
+            username,
+            playlist_id.to_base62()
+        );
+        let response = session.mercury().get(uri).await?;
+        match response.payload.first() {
+            Some(data) => Ok(data.to_vec().into()),
+            None => Err(MetadataError::Empty),
+        }
+    }
+
+    #[allow(dead_code)]
+    async fn get_for_user(
+        session: &Session,
+        username: String,
+        playlist_id: SpotifyId,
+    ) -> Result<Self, MetadataError> {
+        let response = Self::request_for_user(session, username, playlist_id).await?;
+        let msg = <Self as Metadata>::Message::parse_from_bytes(&response)?;
+        Ok(Self::parse(&msg, session))
+    }
+}
+
+#[async_trait]
+impl Metadata for Playlist {
+    type Message = protocol::playlist4_external::SelectedListContent;
+
     async fn request(session: &Session, playlist_id: SpotifyId) -> MetadataResult {
         let uri = format!("hm://playlist/v2/playlist/{}", playlist_id.to_base62());
         let response = session.mercury().get(uri).await?;
@@ -353,12 +429,57 @@ impl Metadata for Playlist {
             );
         }
 
-        Playlist {
+        Self {
             revision: msg.get_revision().to_vec(),
             name: msg.get_attributes().get_name().to_owned(),
             tracks,
             user: msg.get_owner_username().to_string(),
         }
+    }
+}
+
+impl Playlist {
+    async fn request_for_user(
+        session: &Session,
+        username: String,
+        playlist_id: SpotifyId,
+    ) -> MetadataResult {
+        let uri = format!(
+            "hm://playlist/user/{}/playlist/{}",
+            username,
+            playlist_id.to_base62()
+        );
+        let response = session.mercury().get(uri).await?;
+        match response.payload.first() {
+            Some(data) => Ok(data.to_vec().into()),
+            None => Err(MetadataError::Empty),
+        }
+    }
+
+    async fn request_root_for_user(session: &Session, username: String) -> MetadataResult {
+        let uri = format!("hm://playlist/user/{}/rootlist", username);
+        let response = session.mercury().get(uri).await?;
+        match response.payload.first() {
+            Some(data) => Ok(data.to_vec().into()),
+            None => Err(MetadataError::Empty),
+        }
+    }
+    #[allow(dead_code)]
+    async fn get_for_user(
+        session: &Session,
+        username: String,
+        playlist_id: SpotifyId,
+    ) -> Result<Self, MetadataError> {
+        let response = Self::request_for_user(session, username, playlist_id).await?;
+        let msg = <Self as Metadata>::Message::parse_from_bytes(&response)?;
+        Ok(Self::parse(&msg, session))
+    }
+
+    #[allow(dead_code)]
+    async fn get_root_for_user(session: &Session, username: String) -> Result<Self, MetadataError> {
+        let response = Self::request_root_for_user(session, username).await?;
+        let msg = <Self as Metadata>::Message::parse_from_bytes(&response)?;
+        Ok(Self::parse(&msg, session))
     }
 }
 
@@ -391,7 +512,7 @@ impl Metadata for Artist {
             None => Vec::new(),
         };
 
-        Artist {
+        Self {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             top_tracks,
@@ -438,7 +559,7 @@ impl Metadata for Episode {
             })
             .collect::<Vec<_>>();
 
-        Episode {
+        Self {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             external_url: msg.get_external_url().to_owned(),
@@ -485,7 +606,7 @@ impl Metadata for Show {
             })
             .collect::<Vec<_>>();
 
-        Show {
+        Self {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             publisher: msg.get_publisher().to_owned(),
