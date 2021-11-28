@@ -635,12 +635,12 @@ fn get_setup(args: &[String]) -> Setup {
     let librespot_env_vars: Vec<String> = env::vars_os()
         .filter_map(|(k, v)| {
             let mut env_var = None;
-            if let Ok(key) = k.into_string() {
+            if let Some(key) = k.to_str() {
                 if key.starts_with("LIBRESPOT_") {
-                    if matches!(key.as_str(), "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME") {
+                    if matches!(key, "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME") {
                         // Don't log creds.
                         env_var = Some(format!("\t\t{}=XXXXXXXX", key));
-                    } else if let Ok(value) = v.into_string() {
+                    } else if let Some(value) = v.to_str() {
                         env_var = Some(format!("\t\t{}={}", key, value));
                     }
                 }
