@@ -12,12 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [main] Don't evaluate options that would otherwise have no effect.
 - [playback] `alsa`: Improve `--device ?` functionality for the alsa backend.
 - [contrib] Hardened security of the systemd service units
+- [main] Verbose logging mode (`-v`, `--verbose`) now logs all parsed environment variables and command line arguments (credentials are redacted).
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
 - [main] Use different option descriptions and error messages based on what backends are enabled at build time.
 - [main] Add a `-q`, `--quiet` option that changes the logging level to warn.
 - [main] Add a short name for every flag and option.
+- [main] Add the ability to parse environment variables.
 
 ### Fixed
 - [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
