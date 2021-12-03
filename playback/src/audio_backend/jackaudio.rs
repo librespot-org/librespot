@@ -24,15 +24,12 @@ pub struct JackData {
 impl ProcessHandler for JackData {
     fn process(&mut self, _: &Client, ps: &ProcessScope) -> Control {
         // get output port buffers
-        let mut out_r = self.port_r.as_mut_slice(ps);
-        let mut out_l = self.port_l.as_mut_slice(ps);
-        let buf_r: &mut [f32] = &mut out_r;
-        let buf_l: &mut [f32] = &mut out_l;
+        let buf_r: &mut [f32] = self.port_r.as_mut_slice(ps);
+        let buf_l: &mut [f32] = self.port_l.as_mut_slice(ps);
         // get queue iterator
         let mut queue_iter = self.rec.try_iter();
 
-        let buf_size = buf_r.len();
-        for i in 0..buf_size {
+        for i in 0..buf_r.len() {
             buf_r[i] = queue_iter.next().unwrap_or(0.0);
             buf_l[i] = queue_iter.next().unwrap_or(0.0);
         }

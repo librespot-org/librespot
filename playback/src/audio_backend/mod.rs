@@ -104,7 +104,7 @@ use self::gstreamer::GstreamerSink;
 
 #[cfg(any(feature = "rodio-backend", feature = "rodiojack-backend"))]
 mod rodio;
-#[cfg(any(feature = "rodio-backend", feature = "rodiojack-backend"))]
+#[cfg(feature = "rodio-backend")]
 use self::rodio::RodioSink;
 
 #[cfg(feature = "sdl-backend")]
