@@ -29,8 +29,15 @@ pub mod track;
 mod util;
 pub mod video;
 
-use error::MetadataError;
+pub use error::MetadataError;
 use request::RequestResult;
+
+pub use album::Album;
+pub use artist::Artist;
+pub use episode::Episode;
+pub use playlist::Playlist;
+pub use show::Show;
+pub use track::Track;
 
 #[async_trait]
 pub trait Metadata: Send + Sized + 'static {
