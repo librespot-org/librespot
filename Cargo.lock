@@ -1350,11 +1350,13 @@ dependencies = [
  "async-trait",
  "byteorder",
  "bytes",
+ "chrono",
  "librespot-core",
  "librespot-protocol",
  "log",
  "protobuf",
  "thiserror",
+ "uuid",
 ]
 
 [[package]]

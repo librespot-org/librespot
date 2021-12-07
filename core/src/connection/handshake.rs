@@ -49,7 +49,7 @@ where
     packet
         .mut_build_info()
         .set_platform(protocol::keyexchange::Platform::PLATFORM_LINUX_X86);
-    packet.mut_build_info().set_version(109800078);
+    packet.mut_build_info().set_version(999999999);
     packet
         .mut_cryptosuites_supported()
         .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);

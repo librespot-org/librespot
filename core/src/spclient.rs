@@ -227,7 +227,6 @@ impl SpClient {
         self.get_metadata("show", show_id).await
     }
 
-    // TODO: Not working at the moment, always returns 400.
     pub async fn get_lyrics(&self, track_id: SpotifyId, image_id: FileId) -> SpClientResult {
         let endpoint = format!(
             "/color-lyrics/v2/track/{}/image/spotify:image:{}",

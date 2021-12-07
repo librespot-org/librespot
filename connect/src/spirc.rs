@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::future::Future;
 use std::pin::Pin;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -6,7 +7,7 @@ use crate::context::StationContext;
 use crate::core::config::ConnectConfig;
 use crate::core::mercury::{MercuryError, MercurySender};
 use crate::core::session::Session;
-use crate::core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
+use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
 use crate::core::version;
 use crate::playback::mixer::Mixer;
@@ -1099,15 +1100,6 @@ impl SpircTask {
         }
     }
 
-    // should this be a method of SpotifyId directly?
-    fn get_spotify_id_for_track(&self, track_ref: &TrackRef) -> Result<SpotifyId, SpotifyIdError> {
-        SpotifyId::from_raw(track_ref.get_gid()).or_else(|_| {
-            let uri = track_ref.get_uri();
-            debug!("Malformed or no gid, attempting to parse URI <{}>", uri);
-            SpotifyId::from_uri(uri)
-        })
-    }
-
     // Helper to find corresponding index(s) for track_id
     fn get_track_index_for_spotify_id(
         &self,
@@ -1146,11 +1138,8 @@ impl SpircTask {
         // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
 
         let mut track_ref = self.state.get_track()[new_playlist_index].clone();
-        let mut track_id = self.get_spotify_id_for_track(&track_ref);
-        while self.track_ref_is_unavailable(&track_ref)
-            || track_id.is_err()
-            || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
-        {
+        let mut track_id = SpotifyId::try_from(&track_ref);
+        while self.track_ref_is_unavailable(&track_ref) || track_id.is_err() {
             warn!(
                 "Skipping track <{:?}> at position [{}] of {}",
                 track_ref, new_playlist_index, tracks_len
@@ -1166,7 +1155,7 @@ impl SpircTask {
                 return None;
             }
             track_ref = self.state.get_track()[new_playlist_index].clone();
-            track_id = self.get_spotify_id_for_track(&track_ref);
+            track_id = SpotifyId::try_from(&track_ref);
         }
 
         match track_id {

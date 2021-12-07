@@ -24,7 +24,7 @@ use crate::core::session::Session;
 use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
 use crate::decoder::{AudioDecoder, AudioError, AudioPacket, PassthroughDecoder, VorbisDecoder};
-use crate::metadata::{AudioItem, FileFormat};
+use crate::metadata::audio::{AudioFileFormat, AudioItem};
 use crate::mixer::AudioFilter;
 
 use crate::{NUM_CHANNELS, SAMPLES_PER_SECOND};
@@ -639,17 +639,17 @@ struct PlayerTrackLoader {
 
 impl PlayerTrackLoader {
     async fn find_available_alternative(&self, audio: AudioItem) -> Option<AudioItem> {
-        if audio.available {
+        if audio.availability.is_ok() {
             Some(audio)
         } else if let Some(alternatives) = &audio.alternatives {
             let alternatives: FuturesUnordered<_> = alternatives
                 .iter()
-                .map(|alt_id| AudioItem::get_audio_item(&self.session, *alt_id))
+                .map(|alt_id| AudioItem::get_file(&self.session, *alt_id))
                 .collect();
 
             alternatives
                 .filter_map(|x| future::ready(x.ok()))
-                .filter(|x| future::ready(x.available))
+                .filter(|x| future::ready(x.availability.is_ok()))
                 .next()
                 .await
         } else {
@@ -657,19 +657,19 @@ impl PlayerTrackLoader {
         }
     }
 
-    fn stream_data_rate(&self, format: FileFormat) -> usize {
+    fn stream_data_rate(&self, format: AudioFileFormat) -> usize {
         match format {
-            FileFormat::OGG_VORBIS_96 => 12 * 1024,
-            FileFormat::OGG_VORBIS_160 => 20 * 1024,
-            FileFormat::OGG_VORBIS_320 => 40 * 1024,
-            FileFormat::MP3_256 => 32 * 1024,
-            FileFormat::MP3_320 => 40 * 1024,
-            FileFormat::MP3_160 => 20 * 1024,
-            FileFormat::MP3_96 => 12 * 1024,
-            FileFormat::MP3_160_ENC => 20 * 1024,
-            FileFormat::AAC_24 => 3 * 1024,
-            FileFormat::AAC_48 => 6 * 1024,
-            FileFormat::FLAC_FLAC => 112 * 1024, // assume 900 kbps on average
+            AudioFileFormat::OGG_VORBIS_96 => 12 * 1024,
+            AudioFileFormat::OGG_VORBIS_160 => 20 * 1024,
+            AudioFileFormat::OGG_VORBIS_320 => 40 * 1024,
+            AudioFileFormat::MP3_256 => 32 * 1024,
+            AudioFileFormat::MP3_320 => 40 * 1024,
+            AudioFileFormat::MP3_160 => 20 * 1024,
+            AudioFileFormat::MP3_96 => 12 * 1024,
+            AudioFileFormat::MP3_160_ENC => 20 * 1024,
+            AudioFileFormat::AAC_24 => 3 * 1024,
+            AudioFileFormat::AAC_48 => 6 * 1024,
+            AudioFileFormat::FLAC_FLAC => 112 * 1024, // assume 900 kbps on average
         }
     }
 
@@ -678,7 +678,7 @@ impl PlayerTrackLoader {
         spotify_id: SpotifyId,
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
-        let audio = match AudioItem::get_audio_item(&self.session, spotify_id).await {
+        let audio = match AudioItem::get_file(&self.session, spotify_id).await {
             Ok(audio) => audio,
             Err(_) => {
                 error!("Unable to load audio item.");
@@ -686,7 +686,10 @@ impl PlayerTrackLoader {
             }
         };
 
-        info!("Loading <{}> with Spotify URI <{}>", audio.name, audio.uri);
+        info!(
+            "Loading <{}> with Spotify URI <{}>",
+            audio.name, audio.spotify_uri
+        );
 
         let audio = match self.find_available_alternative(audio).await {
             Some(audio) => audio,
@@ -699,22 +702,23 @@ impl PlayerTrackLoader {
         assert!(audio.duration >= 0);
         let duration_ms = audio.duration as u32;
 
-        // (Most) podcasts seem to support only 96 bit Vorbis, so fall back to it
+        // (Most) podcasts seem to support only 96 kbps Vorbis, so fall back to it
+        // TODO: update this logic once we also support MP3 and/or FLAC
         let formats = match self.config.bitrate {
             Bitrate::Bitrate96 => [
-                FileFormat::OGG_VORBIS_96,
-                FileFormat::OGG_VORBIS_160,
-                FileFormat::OGG_VORBIS_320,
+                AudioFileFormat::OGG_VORBIS_96,
+                AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::OGG_VORBIS_320,
             ],
             Bitrate::Bitrate160 => [
-                FileFormat::OGG_VORBIS_160,
-                FileFormat::OGG_VORBIS_96,
-                FileFormat::OGG_VORBIS_320,
+                AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::OGG_VORBIS_96,
+                AudioFileFormat::OGG_VORBIS_320,
             ],
             Bitrate::Bitrate320 => [
-                FileFormat::OGG_VORBIS_320,
-                FileFormat::OGG_VORBIS_160,
-                FileFormat::OGG_VORBIS_96,
+                AudioFileFormat::OGG_VORBIS_320,
+                AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::OGG_VORBIS_96,
             ],
         };
 
