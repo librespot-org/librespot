@@ -1,22 +1,23 @@
-use super::{AudioDecoder, AudioError, AudioPacket};
+use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 
+use lewton::audio::AudioReadError::AudioIsHeader;
 use lewton::inside_ogg::OggStreamReader;
 use lewton::samples::InterleavedSamples;
+use lewton::OggReadError::NoCapturePatternFound;
+use lewton::VorbisError::{BadAudio, OggError};
 
-use std::error;
-use std::fmt;
 use std::io::{Read, Seek};
-use std::time::Duration;
 
 pub struct VorbisDecoder<R: Read + Seek>(OggStreamReader<R>);
-pub struct VorbisError(lewton::VorbisError);
 
 impl<R> VorbisDecoder<R>
 where
     R: Read + Seek,
 {
-    pub fn new(input: R) -> Result<VorbisDecoder<R>, VorbisError> {
-        Ok(VorbisDecoder(OggStreamReader::new(input)?))
+    pub fn new(input: R) -> DecoderResult<VorbisDecoder<R>> {
+        let reader =
+            OggStreamReader::new(input).map_err(|e| DecoderError::LewtonDecoder(e.to_string()))?;
+        Ok(VorbisDecoder(reader))
     }
 }
 
@@ -24,51 +25,22 @@ impl<R> AudioDecoder for VorbisDecoder<R>
 where
     R: Read + Seek,
 {
-    fn seek(&mut self, ms: i64) -> Result<(), AudioError> {
-        let absgp = Duration::from_millis(ms as u64 * crate::SAMPLE_RATE as u64).as_secs();
-        match self.0.seek_absgp_pg(absgp as u64) {
-            Ok(_) => Ok(()),
-            Err(err) => Err(AudioError::VorbisError(err.into())),
-        }
+    fn seek(&mut self, absgp: u64) -> DecoderResult<()> {
+        self.0
+            .seek_absgp_pg(absgp)
+            .map_err(|e| DecoderError::LewtonDecoder(e.to_string()))?;
+        Ok(())
     }
 
-    fn next_packet(&mut self) -> Result<Option<AudioPacket>, AudioError> {
-        use lewton::audio::AudioReadError::AudioIsHeader;
-        use lewton::OggReadError::NoCapturePatternFound;
-        use lewton::VorbisError::{BadAudio, OggError};
+    fn next_packet(&mut self) -> DecoderResult<Option<AudioPacket>> {
         loop {
             match self.0.read_dec_packet_generic::<InterleavedSamples<f32>>() {
                 Ok(Some(packet)) => return Ok(Some(AudioPacket::samples_from_f32(packet.samples))),
                 Ok(None) => return Ok(None),
-
                 Err(BadAudio(AudioIsHeader)) => (),
                 Err(OggError(NoCapturePatternFound)) => (),
-                Err(err) => return Err(AudioError::VorbisError(err.into())),
+                Err(e) => return Err(DecoderError::LewtonDecoder(e.to_string())),
             }
         }
-    }
-}
-
-impl From<lewton::VorbisError> for VorbisError {
-    fn from(err: lewton::VorbisError) -> VorbisError {
-        VorbisError(err)
-    }
-}
-
-impl fmt::Debug for VorbisError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
-}
-
-impl fmt::Display for VorbisError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
-
-impl error::Error for VorbisError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        error::Error::source(&self.0)
     }
 }

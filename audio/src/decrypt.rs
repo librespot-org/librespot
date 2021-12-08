@@ -18,8 +18,8 @@ pub struct AudioDecrypt<T: io::Read> {
 impl<T: io::Read> AudioDecrypt<T> {
     pub fn new(key: AudioKey, reader: T) -> AudioDecrypt<T> {
         let cipher = Aes128Ctr::new(
-            &GenericArray::from_slice(&key.0),
-            &GenericArray::from_slice(&AUDIO_AESIV),
+            GenericArray::from_slice(&key.0),
+            GenericArray::from_slice(&AUDIO_AESIV),
         );
         AudioDecrypt { cipher, reader }
     }

@@ -129,11 +129,10 @@ impl RequestHandler {
                 GenericArray::from_slice(iv),
             );
             cipher.apply_keystream(&mut data);
-            String::from_utf8(data).unwrap()
+            data
         };
 
-        let credentials =
-            Credentials::with_blob(username.to_string(), &decrypted, &self.config.device_id);
+        let credentials = Credentials::with_blob(username, &decrypted, &self.config.device_id);
 
         self.tx.send(credentials).unwrap();
 

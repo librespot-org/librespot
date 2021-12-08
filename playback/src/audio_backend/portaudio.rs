@@ -1,11 +1,10 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
 use portaudio_rs::stream::*;
-use std::io;
 use std::process::exit;
 use std::time::Duration;
 
@@ -96,7 +95,7 @@ impl<'a> Open for PortAudioSink<'a> {
 }
 
 impl<'a> Sink for PortAudioSink<'a> {
-    fn start(&mut self) -> io::Result<()> {
+    fn start(&mut self) -> SinkResult<()> {
         macro_rules! start_sink {
             (ref mut $stream: ident, ref $parameters: ident) => {{
                 if $stream.is_none() {
@@ -125,7 +124,7 @@ impl<'a> Sink for PortAudioSink<'a> {
         Ok(())
     }
 
-    fn stop(&mut self) -> io::Result<()> {
+    fn stop(&mut self) -> SinkResult<()> {
         macro_rules! stop_sink {
             (ref mut $stream: ident) => {{
                 $stream.as_mut().unwrap().stop().unwrap();
@@ -141,14 +140,17 @@ impl<'a> Sink for PortAudioSink<'a> {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         macro_rules! write_sink {
             (ref mut $stream: expr, $samples: expr) => {
                 $stream.as_mut().unwrap().write($samples)
             };
         }
 
-        let samples = packet.samples();
+        let samples = packet
+            .samples()
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+
         let result = match self {
             Self::F32(stream, _parameters) => {
                 let samples_f32: &[f32] = &converter.f64_to_f32(samples);

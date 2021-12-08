@@ -46,6 +46,7 @@ pub struct TrackContext {
     // pub metadata: MetadataContext,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtistContext {
@@ -54,6 +55,7 @@ pub struct ArtistContext {
     image_uri: String,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct MetadataContext {
     album_title: String,

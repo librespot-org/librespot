@@ -125,3 +125,15 @@ pub struct ConnectConfig {
     pub has_volume_ctrl: bool,
     pub autoplay: bool,
 }
+
+impl Default for ConnectConfig {
+    fn default() -> ConnectConfig {
+        ConnectConfig {
+            name: "Librespot".to_string(),
+            device_type: DeviceType::default(),
+            initial_volume: Some(50),
+            has_volume_ctrl: true,
+            autoplay: false,
+        }
+    }
+}

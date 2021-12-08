@@ -888,8 +888,8 @@ impl SpircTask {
         let tracks_len = self.state.get_track().len() as u32;
         debug!(
             "At track {:?} of {:?} <{:?}> update [{}]",
-            new_index,
-            self.state.get_track().len(),
+            new_index + 1,
+            tracks_len,
             self.state.get_context_uri(),
             tracks_len - new_index < CONTEXT_FETCH_THRESHOLD
         );
@@ -903,16 +903,20 @@ impl SpircTask {
             self.context_fut = self.resolve_station(&context_uri);
             self.update_tracks_from_context();
         }
-        if self.config.autoplay && new_index == tracks_len - 1 {
-            // Extend the playlist
-            // Note: This doesn't seem to reflect in the UI
-            // the additional tracks in the frame don't show up as with station view
-            debug!("Extending playlist <{}>", context_uri);
-            self.update_tracks_from_context();
-        }
         if new_index >= tracks_len {
-            new_index = 0; // Loop around back to start
-            continue_playing = self.state.get_repeat();
+            if self.config.autoplay {
+                // Extend the playlist
+                debug!("Extending playlist <{}>", context_uri);
+                self.update_tracks_from_context();
+                self.player.set_auto_normalise_as_album(false);
+            } else {
+                new_index = 0;
+                continue_playing = self.state.get_repeat();
+                debug!(
+                    "Looping around back to start, repeat is {}",
+                    continue_playing
+                );
+            }
         }
 
         if tracks_len > 0 {
@@ -1034,7 +1038,7 @@ impl SpircTask {
                     .payload
                     .first()
                     .expect("Empty payload on context uri");
-                let response: serde_json::Value = serde_json::from_slice(&data).unwrap();
+                let response: serde_json::Value = serde_json::from_slice(data).unwrap();
 
                 Ok(response)
             }
@@ -1052,7 +1056,7 @@ impl SpircTask {
             if let Some(head) = track_vec.len().checked_sub(CONTEXT_TRACKS_HISTORY) {
                 track_vec.drain(0..head);
             }
-            track_vec.extend_from_slice(&new_tracks);
+            track_vec.extend_from_slice(new_tracks);
             self.state
                 .set_track(protobuf::RepeatedField::from_vec(track_vec));
 
@@ -1084,6 +1088,9 @@ impl SpircTask {
             // Get autoplay_station_uri for regular playlists
             self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
         }
+
+        self.player
+            .set_auto_normalise_as_album(context_uri.starts_with("spotify:album:"));
 
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.iter().cloned().collect());
@@ -1124,6 +1131,14 @@ impl SpircTask {
 
     fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
         let tracks_len = self.state.get_track().len();
+
+        // Guard against tracks_len being zero to prevent
+        // 'index out of bounds: the len is 0 but the index is 0'
+        // https://github.com/librespot-org/librespot/issues/226#issuecomment-971642037
+        if tracks_len == 0 {
+            warn!("No playable track found in state: {:?}", self.state);
+            return None;
+        }
 
         let mut new_playlist_index = index as usize;
 
@@ -1207,7 +1222,7 @@ impl SpircTask {
         trace!("Sending status to server: [{}]", status_string);
         let mut cs = CommandSender::new(self, MessageType::kMessageTypeNotify);
         if let Some(s) = recipient {
-            cs = cs.recipient(&s);
+            cs = cs.recipient(s);
         }
         cs.send();
     }

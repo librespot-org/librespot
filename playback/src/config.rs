@@ -76,10 +76,11 @@ impl AudioFormat {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NormalisationType {
     Album,
     Track,
+    Auto,
 }
 
 impl FromStr for NormalisationType {
@@ -88,6 +89,7 @@ impl FromStr for NormalisationType {
         match s.to_lowercase().as_ref() {
             "album" => Ok(Self::Album),
             "track" => Ok(Self::Track),
+            "auto" => Ok(Self::Auto),
             _ => Err(()),
         }
     }
@@ -95,11 +97,11 @@ impl FromStr for NormalisationType {
 
 impl Default for NormalisationType {
     fn default() -> Self {
-        Self::Album
+        Self::Auto
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NormalisationMethod {
     Basic,
     Dynamic,
@@ -151,7 +153,7 @@ impl Default for PlayerConfig {
             normalisation_type: NormalisationType::default(),
             normalisation_method: NormalisationMethod::default(),
             normalisation_pregain: 0.0,
-            normalisation_threshold: db_to_ratio(-1.0),
+            normalisation_threshold: db_to_ratio(-2.0),
             normalisation_attack: Duration::from_millis(5),
             normalisation_release: Duration::from_millis(100),
             normalisation_knee: 1.0,

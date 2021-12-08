@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkAsBytes};
+use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -23,14 +23,14 @@ impl Open for StdoutSink {
 }
 
 impl Sink for StdoutSink {
-    fn start(&mut self) -> io::Result<()> {
+    fn start(&mut self) -> SinkResult<()> {
         if self.output.is_none() {
             let output: Box<dyn Write> = match self.path.as_deref() {
                 Some(path) => {
                     let open_op = OpenOptions::new()
                         .write(true)
                         .open(path)
-                        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+                        .map_err(|e| SinkError::ConnectionRefused(e.to_string()))?;
                     Box::new(open_op)
                 }
                 None => Box::new(io::stdout()),
@@ -46,14 +46,18 @@ impl Sink for StdoutSink {
 }
 
 impl SinkAsBytes for StdoutSink {
-    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
+    fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         match self.output.as_deref_mut() {
             Some(output) => {
-                output.write_all(data)?;
-                output.flush()?;
+                output
+                    .write_all(data)
+                    .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+                output
+                    .flush()
+                    .map_err(|e| SinkError::OnWrite(e.to_string()))?;
             }
             None => {
-                return Err(io::Error::new(io::ErrorKind::Other, "Output is None"));
+                return Err(SinkError::NotConnected("Output is None".to_string()));
             }
         }
 
