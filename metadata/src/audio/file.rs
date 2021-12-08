@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use librespot_core::spotify_id::FileId;
+use librespot_core::file_id::FileId;
 use librespot_protocol as protocol;
 
 use protocol::metadata::AudioFile as AudioFileMessage;

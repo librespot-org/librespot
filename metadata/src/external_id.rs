@@ -10,7 +10,7 @@ use protocol::metadata::ExternalId as ExternalIdMessage;
 #[derive(Debug, Clone)]
 pub struct ExternalId {
     pub external_type: String,
-    pub id: String,
+    pub id: String, // this can be anything from a URL to a ISRC, EAN or UPC
 }
 
 #[derive(Debug, Clone)]

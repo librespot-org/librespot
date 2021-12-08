@@ -18,6 +18,7 @@ mod connection;
 mod dealer;
 #[doc(hidden)]
 pub mod diffie_hellman;
+pub mod file_id;
 mod http_client;
 pub mod mercury;
 pub mod packet;

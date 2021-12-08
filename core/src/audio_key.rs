@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use std::io::Write;
 use tokio::sync::oneshot;
 
+use crate::file_id::FileId;
 use crate::packet::PacketType;
-use crate::spotify_id::{FileId, SpotifyId};
+use crate::spotify_id::SpotifyId;
 use crate::util::SeqGenerator;
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]

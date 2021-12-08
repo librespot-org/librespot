@@ -1,10 +1,11 @@
 use crate::apresolve::SocketAddress;
+use crate::file_id::FileId;
 use crate::http_client::HttpClientError;
 use crate::mercury::MercuryError;
 use crate::protocol::canvaz::EntityCanvazRequest;
 use crate::protocol::connect::PutStateRequest;
 use crate::protocol::extended_metadata::BatchedEntityRequest;
-use crate::spotify_id::{FileId, SpotifyId};
+use crate::spotify_id::SpotifyId;
 
 use bytes::Bytes;
 use http::header::HeaderValue;

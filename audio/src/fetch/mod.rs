@@ -9,13 +9,15 @@ use std::time::{Duration, Instant};
 
 use byteorder::{BigEndian, ByteOrder};
 use futures_util::{future, StreamExt, TryFutureExt, TryStreamExt};
-use librespot_core::channel::{ChannelData, ChannelError, ChannelHeaders};
-use librespot_core::session::Session;
-use librespot_core::spotify_id::FileId;
 use tempfile::NamedTempFile;
 use tokio::sync::{mpsc, oneshot};
 
+use librespot_core::channel::{ChannelData, ChannelError, ChannelHeaders};
+use librespot_core::file_id::FileId;
+use librespot_core::session::Session;
+
 use self::receive::{audio_file_fetch, request_range};
+
 use crate::range_set::{Range, RangeSet};
 
 /// The minimum size of a block that is requested from the Spotify servers in one request.

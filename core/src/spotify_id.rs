@@ -6,6 +6,9 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::ops::Deref;
 
+// re-export FileId for historic reasons, when it was part of this mod
+pub use crate::file_id::FileId;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpotifyItemType {
     Album,
@@ -45,7 +48,7 @@ impl From<SpotifyItemType> for &str {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SpotifyId {
     pub id: u128,
     pub item_type: SpotifyItemType,
@@ -258,7 +261,19 @@ impl SpotifyId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+impl fmt::Debug for SpotifyId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("SpotifyId").field(&self.to_uri()).finish()
+    }
+}
+
+impl fmt::Display for SpotifyId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.to_uri())
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct NamedSpotifyId {
     pub inner_id: SpotifyId,
     pub username: String,
@@ -311,6 +326,20 @@ impl Deref for NamedSpotifyId {
     type Target = SpotifyId;
     fn deref(&self) -> &Self::Target {
         &self.inner_id
+    }
+}
+
+impl fmt::Debug for NamedSpotifyId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("NamedSpotifyId")
+            .field(&self.inner_id.to_uri())
+            .finish()
+    }
+}
+
+impl fmt::Display for NamedSpotifyId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.inner_id.to_uri())
     }
 }
 
@@ -456,58 +485,7 @@ impl TryFrom<&protocol::playlist_annotate3::TranscodedPicture> for SpotifyId {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FileId(pub [u8; 20]);
-
-impl FileId {
-    pub fn from_raw(src: &[u8]) -> FileId {
-        let mut dst = [0u8; 20];
-        dst.clone_from_slice(src);
-        FileId(dst)
-    }
-
-    pub fn to_base16(&self) -> String {
-        to_base16(&self.0, &mut [0u8; 40])
-    }
-}
-
-impl fmt::Debug for FileId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_tuple("FileId").field(&self.to_base16()).finish()
-    }
-}
-
-impl fmt::Display for FileId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.to_base16())
-    }
-}
-
-impl From<&[u8]> for FileId {
-    fn from(src: &[u8]) -> Self {
-        Self::from_raw(src)
-    }
-}
-impl From<&protocol::metadata::Image> for FileId {
-    fn from(image: &protocol::metadata::Image) -> Self {
-        Self::from(image.get_file_id())
-    }
-}
-
-impl From<&protocol::metadata::AudioFile> for FileId {
-    fn from(file: &protocol::metadata::AudioFile) -> Self {
-        Self::from(file.get_file_id())
-    }
-}
-
-impl From<&protocol::metadata::VideoFile> for FileId {
-    fn from(video: &protocol::metadata::VideoFile) -> Self {
-        Self::from(video.get_file_id())
-    }
-}
-
-#[inline]
-fn to_base16(src: &[u8], buf: &mut [u8]) -> String {
+pub fn to_base16(src: &[u8], buf: &mut [u8]) -> String {
     let mut i = 0;
     for v in src {
         buf[i] = BASE16_DIGITS[(v >> 4) as usize];

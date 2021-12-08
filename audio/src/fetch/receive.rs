@@ -7,12 +7,13 @@ use atomic::Ordering;
 use byteorder::{BigEndian, WriteBytesExt};
 use bytes::Bytes;
 use futures_util::StreamExt;
-use librespot_core::channel::{Channel, ChannelData};
-use librespot_core::packet::PacketType;
-use librespot_core::session::Session;
-use librespot_core::spotify_id::FileId;
 use tempfile::NamedTempFile;
 use tokio::sync::{mpsc, oneshot};
+
+use librespot_core::channel::{Channel, ChannelData};
+use librespot_core::file_id::FileId;
+use librespot_core::packet::PacketType;
+use librespot_core::session::Session;
 
 use crate::range_set::{Range, RangeSet};
 

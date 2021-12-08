@@ -7,7 +7,8 @@ use crate::{
     util::{from_repeated_message, try_from_repeated_message},
 };
 
-use librespot_core::spotify_id::{FileId, SpotifyId};
+use librespot_core::file_id::FileId;
+use librespot_core::spotify_id::SpotifyId;
 use librespot_protocol as protocol;
 
 use protocol::metadata::Image as ImageMessage;

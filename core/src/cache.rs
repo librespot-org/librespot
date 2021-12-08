@@ -9,7 +9,7 @@ use std::time::SystemTime;
 use priority_queue::PriorityQueue;
 
 use crate::authentication::Credentials;
-use crate::spotify_id::FileId;
+use crate::file_id::FileId;
 
 /// Some kind of data structure that holds some paths, the size of these files and a timestamp.
 /// It keeps track of the file sizes and is able to pop the path with the oldest timestamp if
