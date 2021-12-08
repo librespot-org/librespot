@@ -84,7 +84,7 @@ impl SpClient {
         format!("https://{}:{}", ap.0, ap.1)
     }
 
-    pub async fn protobuf_request(
+    pub async fn request_with_protobuf(
         &self,
         method: &str,
         endpoint: &str,
@@ -98,6 +98,19 @@ impl SpClient {
 
         self.request(method, endpoint, Some(headers), Some(body))
             .await
+    }
+
+    pub async fn request_as_json(
+        &self,
+        method: &str,
+        endpoint: &str,
+        headers: Option<HeaderMap>,
+        body: Option<String>,
+    ) -> SpClientResult {
+        let mut headers = headers.unwrap_or_else(HeaderMap::new);
+        headers.insert("Accept", "application/json".parse()?);
+
+        self.request(method, endpoint, Some(headers), body).await
     }
 
     pub async fn request(
@@ -199,7 +212,7 @@ impl SpClient {
         let mut headers = HeaderMap::new();
         headers.insert("X-Spotify-Connection-Id", connection_id.parse()?);
 
-        self.protobuf_request("PUT", &endpoint, Some(headers), &state)
+        self.request_with_protobuf("PUT", &endpoint, Some(headers), &state)
             .await
     }
 
@@ -228,29 +241,36 @@ impl SpClient {
         self.get_metadata("show", show_id).await
     }
 
-    pub async fn get_lyrics(&self, track_id: SpotifyId, image_id: FileId) -> SpClientResult {
+    pub async fn get_lyrics(&self, track_id: SpotifyId) -> SpClientResult {
+        let endpoint = format!("/color-lyrics/v1/track/{}", track_id.to_base62(),);
+
+        self.request_as_json("GET", &endpoint, None, None).await
+    }
+
+    pub async fn get_lyrics_for_image(
+        &self,
+        track_id: SpotifyId,
+        image_id: FileId,
+    ) -> SpClientResult {
         let endpoint = format!(
             "/color-lyrics/v2/track/{}/image/spotify:image:{}",
-            track_id.to_base16(),
+            track_id.to_base62(),
             image_id
         );
 
-        let mut headers = HeaderMap::new();
-        headers.insert("Content-Type", "application/json".parse()?);
-
-        self.request("GET", &endpoint, Some(headers), None).await
+        self.request_as_json("GET", &endpoint, None, None).await
     }
 
     // TODO: Find endpoint for newer canvas.proto and upgrade to that.
     pub async fn get_canvases(&self, request: EntityCanvazRequest) -> SpClientResult {
         let endpoint = "/canvaz-cache/v0/canvases";
-        self.protobuf_request("POST", endpoint, None, &request)
+        self.request_with_protobuf("POST", endpoint, None, &request)
             .await
     }
 
     pub async fn get_extended_metadata(&self, request: BatchedEntityRequest) -> SpClientResult {
         let endpoint = "/extended-metadata/v0/extended-metadata";
-        self.protobuf_request("POST", endpoint, None, &request)
+        self.request_with_protobuf("POST", endpoint, None, &request)
             .await
     }
 }
