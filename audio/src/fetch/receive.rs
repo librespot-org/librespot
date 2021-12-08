@@ -17,7 +17,7 @@ use librespot_core::session::Session;
 
 use crate::range_set::{Range, RangeSet};
 
-use super::{AudioFileShared, DownloadStrategy, StreamLoaderCommand};
+use super::{AudioFileShared, DownloadStrategy, InitialData, StreamLoaderCommand};
 use super::{
     FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME, MAX_PREFETCH_REQUESTS,
     MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
@@ -45,7 +45,7 @@ pub fn request_range(session: &Session, file: FileId, offset: usize, length: usi
     data.write_u32::<BigEndian>(0x00000000).unwrap();
     data.write_u32::<BigEndian>(0x00009C40).unwrap();
     data.write_u32::<BigEndian>(0x00020000).unwrap();
-    data.write(&file.0).unwrap();
+    data.write_all(&file.0).unwrap();
     data.write_u32::<BigEndian>(start as u32).unwrap();
     data.write_u32::<BigEndian>(end as u32).unwrap();
 
@@ -356,10 +356,7 @@ impl AudioFileFetch {
 pub(super) async fn audio_file_fetch(
     session: Session,
     shared: Arc<AudioFileShared>,
-    initial_data_rx: ChannelData,
-    initial_request_sent_time: Instant,
-    initial_data_length: usize,
-
+    initial_data: InitialData,
     output: NamedTempFile,
     mut stream_loader_command_rx: mpsc::UnboundedReceiver<StreamLoaderCommand>,
     complete_tx: oneshot::Sender<NamedTempFile>,
@@ -367,7 +364,7 @@ pub(super) async fn audio_file_fetch(
     let (file_data_tx, mut file_data_rx) = mpsc::unbounded_channel();
 
     {
-        let requested_range = Range::new(0, initial_data_length);
+        let requested_range = Range::new(0, initial_data.length);
         let mut download_status = shared.download_status.lock().unwrap();
         download_status.requested.add_range(&requested_range);
     }
@@ -375,10 +372,10 @@ pub(super) async fn audio_file_fetch(
     session.spawn(receive_data(
         shared.clone(),
         file_data_tx.clone(),
-        initial_data_rx,
+        initial_data.rx,
         0,
-        initial_data_length,
-        initial_request_sent_time,
+        initial_data.length,
+        initial_data.request_sent_time,
     ));
 
     let mut fetch = AudioFileFetch {

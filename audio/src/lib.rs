@@ -1,5 +1,3 @@
-#![allow(clippy::unused_io_amount, clippy::too_many_arguments)]
-
 #[macro_use]
 extern crate log;
 

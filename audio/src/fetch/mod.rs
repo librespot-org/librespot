@@ -255,6 +255,12 @@ struct AudioFileShared {
     read_position: AtomicUsize,
 }
 
+pub struct InitialData {
+    rx: ChannelData,
+    length: usize,
+    request_sent_time: Instant,
+}
+
 impl AudioFile {
     pub async fn open(
         session: &Session,
@@ -270,7 +276,7 @@ impl AudioFile {
         debug!("Downloading file {}", file_id);
 
         let (complete_tx, complete_rx) = oneshot::channel();
-        let mut initial_data_length = if play_from_beginning {
+        let mut length = if play_from_beginning {
             INITIAL_DOWNLOAD_SIZE
                 + max(
                     (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
@@ -281,16 +287,20 @@ impl AudioFile {
         } else {
             INITIAL_DOWNLOAD_SIZE
         };
-        if initial_data_length % 4 != 0 {
-            initial_data_length += 4 - (initial_data_length % 4);
+        if length % 4 != 0 {
+            length += 4 - (length % 4);
         }
-        let (headers, data) = request_range(session, file_id, 0, initial_data_length).split();
+        let (headers, rx) = request_range(session, file_id, 0, length).split();
+
+        let initial_data = InitialData {
+            rx,
+            length,
+            request_sent_time: Instant::now(),
+        };
 
         let streaming = AudioFileStreaming::open(
             session.clone(),
-            data,
-            initial_data_length,
-            Instant::now(),
+            initial_data,
             headers,
             file_id,
             complete_tx,
@@ -333,9 +343,7 @@ impl AudioFile {
 impl AudioFileStreaming {
     pub async fn open(
         session: Session,
-        initial_data_rx: ChannelData,
-        initial_data_length: usize,
-        initial_request_sent_time: Instant,
+        initial_data: InitialData,
         headers: ChannelHeaders,
         file_id: FileId,
         complete_tx: oneshot::Sender<NamedTempFile>,
@@ -377,9 +385,7 @@ impl AudioFileStreaming {
         session.spawn(audio_file_fetch(
             session.clone(),
             shared.clone(),
-            initial_data_rx,
-            initial_request_sent_time,
-            initial_data_length,
+            initial_data,
             write_file,
             stream_loader_command_rx,
             complete_tx,
