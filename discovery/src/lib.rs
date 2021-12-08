@@ -7,8 +7,6 @@
 //! This library uses mDNS and DNS-SD so that other devices can find it,
 //! and spawns an http server to answer requests of Spotify clients.
 
-#![warn(clippy::all, missing_docs, rust_2018_idioms)]
-
 mod server;
 
 use std::borrow::Cow;
