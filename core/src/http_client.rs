@@ -5,8 +5,11 @@ use hyper::header::InvalidHeaderValue;
 use hyper::{Body, Client, Request, Response, StatusCode};
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::HttpsConnector;
+use std::env::consts::OS;
 use thiserror::Error;
 use url::Url;
+
+use crate::version;
 
 pub struct HttpClient {
     proxy: Option<Url>,
@@ -50,11 +53,29 @@ impl HttpClient {
 
         let connector = HttpsConnector::with_native_roots();
 
+        let spotify_version = match OS {
+            "android" | "ios" => "8.6.84",
+            _ => "117300517",
+        };
+
+        let spotify_platform = match OS {
+            "android" => "Android/31",
+            "ios" => "iOS/15.1.1",
+            "macos" => "OSX/0",
+            "windows" => "Win32/0",
+            _ => "Linux/0",
+        };
+
         let headers_mut = req.headers_mut();
         headers_mut.insert(
             "User-Agent",
             // Some features like lyrics are version-gated and require an official version string.
-            HeaderValue::from_str("Spotify/8.6.80 iOS/13.5 (iPhone11,2)")?,
+            HeaderValue::from_str(&format!(
+                "Spotify/{} {} ({})",
+                spotify_version,
+                spotify_platform,
+                version::VERSION_STRING
+            ))?,
         );
 
         let response = if let Some(url) = &self.proxy {

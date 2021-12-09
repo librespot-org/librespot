@@ -3,6 +3,7 @@ use hmac::{Hmac, Mac, NewMac};
 use protobuf::{self, Message};
 use rand::{thread_rng, RngCore};
 use sha1::Sha1;
+use std::env::consts::ARCH;
 use std::io;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::{Decoder, Framed};
@@ -10,7 +11,9 @@ use tokio_util::codec::{Decoder, Framed};
 use super::codec::ApCodec;
 use crate::diffie_hellman::DhLocalKeys;
 use crate::protocol;
-use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
+use crate::protocol::keyexchange::{
+    APResponseMessage, ClientHello, ClientResponsePlaintext, Platform, ProductFlags,
+};
 
 pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     mut connection: T,
@@ -42,13 +45,51 @@ where
     let mut client_nonce = vec![0; 0x10];
     thread_rng().fill_bytes(&mut client_nonce);
 
+    let platform = match std::env::consts::OS {
+        "android" => Platform::PLATFORM_ANDROID_ARM,
+        "freebsd" | "netbsd" | "openbsd" => match ARCH {
+            "x86_64" => Platform::PLATFORM_FREEBSD_X86_64,
+            _ => Platform::PLATFORM_FREEBSD_X86,
+        },
+        "ios" => match ARCH {
+            "arm64" => Platform::PLATFORM_IPHONE_ARM64,
+            _ => Platform::PLATFORM_IPHONE_ARM,
+        },
+        "linux" => match ARCH {
+            "arm" | "arm64" => Platform::PLATFORM_LINUX_ARM,
+            "blackfin" => Platform::PLATFORM_LINUX_BLACKFIN,
+            "mips" => Platform::PLATFORM_LINUX_MIPS,
+            "sh" => Platform::PLATFORM_LINUX_SH,
+            "x86_64" => Platform::PLATFORM_LINUX_X86_64,
+            _ => Platform::PLATFORM_LINUX_X86,
+        },
+        "macos" => match ARCH {
+            "ppc" | "ppc64" => Platform::PLATFORM_OSX_PPC,
+            "x86_64" => Platform::PLATFORM_OSX_X86_64,
+            _ => Platform::PLATFORM_OSX_X86,
+        },
+        "windows" => match ARCH {
+            "arm" => Platform::PLATFORM_WINDOWS_CE_ARM,
+            "x86_64" => Platform::PLATFORM_WIN32_X86_64,
+            _ => Platform::PLATFORM_WIN32_X86,
+        },
+        _ => Platform::PLATFORM_LINUX_X86,
+    };
+
+    #[cfg(debug_assertions)]
+    const PRODUCT_FLAGS: ProductFlags = ProductFlags::PRODUCT_FLAG_DEV_BUILD;
+    #[cfg(not(debug_assertions))]
+    const PRODUCT_FLAGS: ProductFlags = ProductFlags::PRODUCT_FLAG_NONE;
+
     let mut packet = ClientHello::new();
     packet
         .mut_build_info()
-        .set_product(protocol::keyexchange::Product::PRODUCT_PARTNER);
+        .set_product(protocol::keyexchange::Product::PRODUCT_LIBSPOTIFY);
     packet
         .mut_build_info()
-        .set_platform(protocol::keyexchange::Platform::PLATFORM_LINUX_X86);
+        .mut_product_flags()
+        .push(PRODUCT_FLAGS);
+    packet.mut_build_info().set_platform(platform);
     packet.mut_build_info().set_version(999999999);
     packet
         .mut_cryptosuites_supported()

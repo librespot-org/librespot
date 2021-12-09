@@ -71,6 +71,29 @@ pub async fn authenticate(
 ) -> Result<Credentials, AuthenticationError> {
     use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
 
+    let cpu_family = match std::env::consts::ARCH {
+        "blackfin" => CpuFamily::CPU_BLACKFIN,
+        "arm" | "arm64" => CpuFamily::CPU_ARM,
+        "ia64" => CpuFamily::CPU_IA64,
+        "mips" => CpuFamily::CPU_MIPS,
+        "ppc" => CpuFamily::CPU_PPC,
+        "ppc64" => CpuFamily::CPU_PPC_64,
+        "sh" => CpuFamily::CPU_SH,
+        "x86" => CpuFamily::CPU_X86,
+        "x86_64" => CpuFamily::CPU_X86_64,
+        _ => CpuFamily::CPU_UNKNOWN,
+    };
+
+    let os = match std::env::consts::OS {
+        "android" => Os::OS_ANDROID,
+        "freebsd" | "netbsd" | "openbsd" => Os::OS_FREEBSD,
+        "ios" => Os::OS_IPHONE,
+        "linux" => Os::OS_LINUX,
+        "macos" => Os::OS_OSX,
+        "windows" => Os::OS_WINDOWS,
+        _ => Os::OS_UNKNOWN,
+    };
+
     let mut packet = ClientResponseEncrypted::new();
     packet
         .mut_login_credentials()
@@ -81,21 +104,19 @@ pub async fn authenticate(
     packet
         .mut_login_credentials()
         .set_auth_data(credentials.auth_data);
-    packet
-        .mut_system_info()
-        .set_cpu_family(CpuFamily::CPU_UNKNOWN);
-    packet.mut_system_info().set_os(Os::OS_UNKNOWN);
+    packet.mut_system_info().set_cpu_family(cpu_family);
+    packet.mut_system_info().set_os(os);
     packet
         .mut_system_info()
         .set_system_information_string(format!(
-            "librespot_{}_{}",
+            "librespot-{}-{}",
             version::SHA_SHORT,
             version::BUILD_ID
         ));
     packet
         .mut_system_info()
         .set_device_id(device_id.to_string());
-    packet.set_version_string(version::VERSION_STRING.to_string());
+    packet.set_version_string(format!("librespot {}", version::SEMVER));
 
     let cmd = PacketType::Login;
     let data = packet.write_to_bytes().unwrap();

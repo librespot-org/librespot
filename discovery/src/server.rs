@@ -57,7 +57,7 @@ impl RequestHandler {
             "status": 101,
             "statusString": "ERROR-OK",
             "spotifyError": 0,
-            "version": "2.7.1",
+            "version": crate::core::version::SEMVER,
             "deviceID": (self.config.device_id),
             "remoteName": (self.config.name),
             "activeUser": "",
