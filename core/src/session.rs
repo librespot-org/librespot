@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
@@ -13,6 +14,7 @@ use futures_core::TryStream;
 use futures_util::{future, ready, StreamExt, TryStreamExt};
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
+use quick_xml::events::Event;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -38,11 +40,14 @@ pub enum SessionError {
     IoError(#[from] io::Error),
 }
 
+pub type UserAttributes = HashMap<String, String>;
+
 struct SessionData {
     country: String,
     time_delta: i64,
     canonical_username: String,
     invalid: bool,
+    user_attributes: UserAttributes,
 }
 
 struct SessionInternal {
@@ -89,6 +94,7 @@ impl Session {
                 canonical_username: String::new(),
                 invalid: false,
                 time_delta: 0,
+                user_attributes: HashMap::new(),
             }),
             http_client,
             tx_connection: sender_tx,
@@ -224,11 +230,48 @@ impl Session {
             Some(MercuryReq) | Some(MercurySub) | Some(MercuryUnsub) | Some(MercuryEvent) => {
                 self.mercury().dispatch(packet_type.unwrap(), data);
             }
+            Some(ProductInfo) => {
+                let data = std::str::from_utf8(&data).unwrap();
+                let mut reader = quick_xml::Reader::from_str(data);
+
+                let mut buf = Vec::new();
+                let mut current_element = String::new();
+                let mut user_attributes: UserAttributes = HashMap::new();
+
+                loop {
+                    match reader.read_event(&mut buf) {
+                        Ok(Event::Start(ref element)) => {
+                            current_element =
+                                std::str::from_utf8(element.name()).unwrap().to_owned()
+                        }
+                        Ok(Event::End(_)) => {
+                            current_element = String::new();
+                        }
+                        Ok(Event::Text(ref value)) => {
+                            if !current_element.is_empty() {
+                                let _ = user_attributes.insert(
+                                    current_element.clone(),
+                                    value.unescape_and_decode(&reader).unwrap(),
+                                );
+                            }
+                        }
+                        Ok(Event::Eof) => break,
+                        Ok(_) => (),
+                        Err(e) => error!(
+                            "Error parsing XML at position {}: {:?}",
+                            reader.buffer_position(),
+                            e
+                        ),
+                    }
+                }
+
+                trace!("Received product info: {:?}", user_attributes);
+                self.0.data.write().unwrap().user_attributes = user_attributes;
+            }
             Some(PongAck)
             | Some(SecretBlock)
             | Some(LegacyWelcome)
             | Some(UnknownDataAllZeros)
-            | Some(ProductInfo)
             | Some(LicenseVersion) => {}
             _ => {
                 if let Some(packet_type) = PacketType::from_u8(cmd) {
@@ -262,6 +305,38 @@ impl Session {
 
     pub fn device_id(&self) -> &str {
         &self.config().device_id
+    }
+
+    pub fn user_attribute(&self, key: &str) -> Option<String> {
+        self.0
+            .data
+            .read()
+            .unwrap()
+            .user_attributes
+            .get(key)
+            .map(|value| value.to_owned())
+    }
+
+    pub fn user_attributes(&self) -> UserAttributes {
+        self.0.data.read().unwrap().user_attributes.clone()
+    }
+
+    pub fn set_user_attribute(&self, key: &str, value: &str) -> Option<String> {
+        self.0
+            .data
+            .write()
+            .unwrap()
+            .user_attributes
+            .insert(key.to_owned(), value.to_owned())
+    }
+
+    pub fn set_user_attributes(&self, attributes: UserAttributes) {
+        self.0
+            .data
+            .write()
+            .unwrap()
+            .user_attributes
+            .extend(attributes)
     }
 
     fn weak(&self) -> SessionWeak {

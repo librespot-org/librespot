@@ -6,14 +6,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::context::StationContext;
 use crate::core::config::ConnectConfig;
 use crate::core::mercury::{MercuryError, MercurySender};
-use crate::core::session::Session;
+use crate::core::session::{Session, UserAttributes};
 use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
 use crate::core::version;
 use crate::playback::mixer::Mixer;
 use crate::playback::player::{Player, PlayerEvent, PlayerEventChannel};
+
 use crate::protocol;
+use crate::protocol::explicit_content_pubsub::UserAttributesUpdate;
 use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
+use crate::protocol::user_attributes::UserAttributesMutation;
 
 use futures_util::future::{self, FusedFuture};
 use futures_util::stream::FusedStream;
@@ -58,6 +61,8 @@ struct SpircTask {
     play_status: SpircPlayStatus,
 
     subscription: BoxedStream<Frame>,
+    user_attributes_update: BoxedStream<UserAttributesUpdate>,
+    user_attributes_mutation: BoxedStream<UserAttributesMutation>,
     sender: MercurySender,
     commands: Option<mpsc::UnboundedReceiver<SpircCommand>>,
     player_events: Option<PlayerEventChannel>,
@@ -248,6 +253,30 @@ impl Spirc {
                 }),
         );
 
+        let user_attributes_update = Box::pin(
+            session
+                .mercury()
+                .listen_for("spotify:user:attributes:update")
+                .map(UnboundedReceiverStream::new)
+                .flatten_stream()
+                .map(|response| -> UserAttributesUpdate {
+                    let data = response.payload.first().unwrap();
+                    UserAttributesUpdate::parse_from_bytes(data).unwrap()
+                }),
+        );
+
+        let user_attributes_mutation = Box::pin(
+            session
+                .mercury()
+                .listen_for("spotify:user:attributes:mutated")
+                .map(UnboundedReceiverStream::new)
+                .flatten_stream()
+                .map(|response| -> UserAttributesMutation {
+                    let data = response.payload.first().unwrap();
+                    UserAttributesMutation::parse_from_bytes(data).unwrap()
+                }),
+        );
+
         let sender = session.mercury().sender(uri);
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
@@ -276,6 +305,8 @@ impl Spirc {
             play_status: SpircPlayStatus::Stopped,
 
             subscription,
+            user_attributes_update,
+            user_attributes_mutation,
             sender,
             commands: Some(cmd_rx),
             player_events: Some(player_events),
@@ -341,6 +372,20 @@ impl SpircTask {
                     Some(frame) => self.handle_frame(frame),
                     None => {
                         error!("subscription terminated");
+                        break;
+                    }
+                },
+                user_attributes_update = self.user_attributes_update.next() => match user_attributes_update {
+                    Some(attributes) => self.handle_user_attributes_update(attributes),
+                    None => {
+                        error!("user attributes update selected, but none received");
+                        break;
+                    }
+                },
+                user_attributes_mutation = self.user_attributes_mutation.next() => match user_attributes_mutation {
+                    Some(attributes) => self.handle_user_attributes_mutation(attributes),
+                    None => {
+                        error!("user attributes mutation selected, but none received");
                         break;
                     }
                 },
@@ -569,6 +614,41 @@ impl SpircTask {
                     PlayerEvent::Unavailable { track_id, .. } => self.handle_unavailable(track_id),
                     _ => (),
                 }
+            }
+        }
+    }
+
+    fn handle_user_attributes_update(&mut self, update: UserAttributesUpdate) {
+        trace!("Received attributes update: {:?}", update);
+        let attributes: UserAttributes = update
+            .get_pairs()
+            .iter()
+            .map(|pair| (pair.get_key().to_owned(), pair.get_value().to_owned()))
+            .collect();
+        let _ = self.session.set_user_attributes(attributes);
+    }
+
+    fn handle_user_attributes_mutation(&mut self, mutation: UserAttributesMutation) {
+        for attribute in mutation.get_fields().iter() {
+            let key = attribute.get_name();
+            if let Some(old_value) = self.session.user_attribute(key) {
+                let new_value = match old_value.as_ref() {
+                    "0" => "1",
+                    "1" => "0",
+                    _ => &old_value,
+                };
+                self.session.set_user_attribute(key, new_value);
+                trace!(
+                    "Received attribute mutation, {} was {} is now {}",
+                    key,
+                    old_value,
+                    new_value
+                );
+            } else {
+                trace!(
+                    "Received attribute mutation for {} but key was not found!",
+                    key
+                );
             }
         }
     }

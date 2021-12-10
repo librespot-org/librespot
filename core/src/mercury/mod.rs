@@ -144,6 +144,27 @@ impl MercuryManager {
         }
     }
 
+    pub fn listen_for<T: Into<String>>(
+        &self,
+        uri: T,
+    ) -> impl Future<Output = mpsc::UnboundedReceiver<MercuryResponse>> + 'static {
+        let uri = uri.into();
+
+        let manager = self.clone();
+        async move {
+            let (tx, rx) = mpsc::unbounded_channel();
+
+            manager.lock(move |inner| {
+                if !inner.invalid {
+                    debug!("listening to uri={}", uri);
+                    inner.subscriptions.push((uri, tx));
+                }
+            });
+
+            rx
+        }
+    }
+
     pub(crate) fn dispatch(&self, cmd: PacketType, mut data: Bytes) {
         let seq_len = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
         let seq = data.split_to(seq_len).as_ref().to_owned();
