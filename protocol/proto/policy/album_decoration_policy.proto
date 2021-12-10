@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
@@ -18,4 +18,16 @@ message AlbumDecorationPolicy {
     bool num_tracks = 7;
     bool playability = 8;
     bool is_premium_only = 9;
+}
+
+message AlbumCollectionDecorationPolicy {
+    bool collection_link = 1;
+    bool num_tracks_in_collection = 2;
+    bool complete = 3;
+}
+
+message AlbumSyncDecorationPolicy {
+    bool inferred_offline = 1;
+    bool offline_state = 2;
+    bool sync_progress = 3;
 }

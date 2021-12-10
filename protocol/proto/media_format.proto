@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+enum MediaFormat {
+    FORMAT_UNKNOWN = 0;
+    FORMAT_OGG_VORBIS_96 = 1;
+    FORMAT_OGG_VORBIS_160 = 2;
+    FORMAT_OGG_VORBIS_320 = 3;
+    FORMAT_MP3_256 = 4;
+    FORMAT_MP3_320 = 5;
+    FORMAT_MP3_160 = 6;
+    FORMAT_MP3_96 = 7;
+    FORMAT_MP3_160_ENCRYPTED = 8;
+    FORMAT_AAC_24 = 9;
+    FORMAT_AAC_48 = 10;
+    FORMAT_MP4_128 = 11;
+    FORMAT_MP4_128_DUAL = 12;
+    FORMAT_MP4_128_CBCS = 13;
+    FORMAT_MP4_256 = 14;
+    FORMAT_MP4_256_DUAL = 15;
+    FORMAT_MP4_256_CBCS = 16;
+    FORMAT_FLAC_FLAC = 17;
+    FORMAT_MP4_FLAC = 18;
+    FORMAT_MP4_Unknown = 19;
+    FORMAT_MP3_Unknown = 20;
+}

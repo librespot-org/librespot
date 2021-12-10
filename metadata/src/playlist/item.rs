@@ -9,6 +9,8 @@ use super::attribute::{PlaylistAttributes, PlaylistItemAttributes};
 use librespot_core::spotify_id::SpotifyId;
 use librespot_protocol as protocol;
 
+use super::permission::Capabilities;
+
 use protocol::playlist4_external::Item as PlaylistItemMessage;
 use protocol::playlist4_external::ListItems as PlaylistItemsMessage;
 use protocol::playlist4_external::MetaItem as PlaylistMetaItemMessage;
@@ -44,6 +46,8 @@ pub struct PlaylistMetaItem {
     pub length: i32,
     pub timestamp: Date,
     pub owner_username: String,
+    pub has_abuse_reporting: bool,
+    pub capabilities: Capabilities,
 }
 
 #[derive(Debug, Clone)]
@@ -89,6 +93,8 @@ impl TryFrom<&PlaylistMetaItemMessage> for PlaylistMetaItem {
             length: item.get_length(),
             timestamp: item.get_timestamp().try_into()?,
             owner_username: item.get_owner_username().to_owned(),
+            has_abuse_reporting: item.get_abuse_reporting_enabled(),
+            capabilities: item.get_capabilities().into(),
         })
     }
 }

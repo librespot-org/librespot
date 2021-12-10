@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
@@ -50,4 +50,6 @@ message Download {
     optional int64 reqs_from_cdn = 41;
     optional int64 error_from_cdn = 42;
     optional string file_origin = 43;
+    optional string initial_disk_state = 44;
+    optional bool locked = 45;
 }

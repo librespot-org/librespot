@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// No longer present in Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
@@ -37,11 +37,6 @@ message GetDeviceResponse {
 message RemoveDeviceRequest {
     DeviceKey key = 1;
     bool is_force_remove = 2;
-}
-
-message RemoveDeviceResponse {
-    bool pending = 1;
-    Device device = 2;
 }
 
 message OfflineEnableDeviceResponse {

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
@@ -15,4 +15,11 @@ message SeekToRequest {
     CommandOptions options = 1;
     LoggingParams logging_params = 2;
     int64 position = 3;
+    
+    Relative relative = 4;
+    enum Relative {
+        BEGINNING = 0;
+        END = 1;
+        CURRENT = 2;
+    }
 }

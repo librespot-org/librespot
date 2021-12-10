@@ -1,0 +1,88 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.storage.esperanto.proto;
+
+import "google/protobuf/empty.proto";
+
+option objc_class_prefix = "ESP";
+option java_package = "com.spotify.storage.esperanto.proto";
+
+service Storage {
+    rpc GetCacheSizeLimit(GetCacheSizeLimitParams) returns (CacheSizeLimit);
+    rpc SetCacheSizeLimit(SetCacheSizeLimitParams) returns (google.protobuf.Empty);
+    rpc DeleteExpiredItems(DeleteExpiredItemsParams) returns (google.protobuf.Empty);
+    rpc DeleteUnlockedItems(DeleteUnlockedItemsParams) returns (google.protobuf.Empty);
+    rpc GetStats(GetStatsParams) returns (Stats);
+    rpc GetFileRanges(GetFileRangesParams) returns (FileRanges);
+}
+
+message CacheSizeLimit {
+    int64 size = 1;
+}
+
+message GetCacheSizeLimitParams {
+    
+}
+
+message SetCacheSizeLimitParams {
+    CacheSizeLimit limit = 1;
+}
+
+message DeleteExpiredItemsParams {
+    
+}
+
+message DeleteUnlockedItemsParams {
+    
+}
+
+message RealmStats {
+    Realm realm = 1;
+    int64 size = 2;
+    int64 num_entries = 3;
+    int64 num_complete_entries = 4;
+}
+
+message Stats {
+    string cache_id = 1;
+    int64 creation_date_sec = 2;
+    int64 max_cache_size = 3;
+    int64 current_size = 4;
+    int64 current_locked_size = 5;
+    int64 free_space = 6;
+    int64 total_space = 7;
+    int64 current_numfiles = 8;
+    repeated RealmStats realm_stats = 9;
+}
+
+message GetStatsParams {
+    
+}
+
+message FileRanges {
+    bool byte_size_known = 1;
+    uint64 byte_size = 2;
+    
+    repeated Range ranges = 3;
+    message Range {
+        uint64 from_byte = 1;
+        uint64 to_byte = 2;
+    }
+}
+
+message GetFileRangesParams {
+    Realm realm = 1;
+    string file_id = 2;
+}
+
+enum Realm {
+    STREAM = 0;
+    COVER_ART = 1;
+    PLAYLIST = 4;
+    AUDIO_SHOW = 5;
+    HEAD_FILES = 7;
+    EXTERNAL_AUDIO_SHOW = 8;
+    KARAOKE_MASK = 9;
+}

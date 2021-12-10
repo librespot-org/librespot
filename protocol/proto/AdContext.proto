@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AdContext {
+    optional string preceding_content_uri = 1;
+    optional string preceding_playback_id = 2;
+    optional int32 preceding_end_position = 3;
+    repeated string ad_ids = 4;
+    optional string ad_request_id = 5;
+    optional string succeeding_content_uri = 6;
+    optional string succeeding_playback_id = 7;
+    optional int32 succeeding_start_position = 8;
+    optional int32 preceding_duration = 9;
+}

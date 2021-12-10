@@ -1,0 +1,33 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "state_restore/ads_rules_inject_tracks.proto";
+import "state_restore/behavior_metadata_rules.proto";
+import "state_restore/circuit_breaker_rules.proto";
+import "state_restore/explicit_content_rules.proto";
+import "state_restore/explicit_request_rules.proto";
+import "state_restore/mft_rules_core.proto";
+import "state_restore/mod_rules_interruptions.proto";
+import "state_restore/music_injection_rules.proto";
+import "state_restore/remove_banned_tracks_rules.proto";
+import "state_restore/resume_points_rules.proto";
+import "state_restore/track_error_rules.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ContextPlayerRulesBase {
+    optional BehaviorMetadataRules behavior_metadata_rules = 1;
+    optional CircuitBreakerRules circuit_breaker_rules = 2;
+    optional ExplicitContentRules explicit_content_rules = 3;
+    optional ExplicitRequestRules explicit_request_rules = 4;
+    optional MusicInjectionRules music_injection_rules = 5;
+    optional RemoveBannedTracksRules remove_banned_tracks_rules = 6;
+    optional ResumePointsRules resume_points_rules = 7;
+    optional TrackErrorRules track_error_rules = 8;
+    optional AdsRulesInjectTracks ads_rules_inject_tracks = 9;
+    optional MftRulesCore mft_rules_core = 10;
+    optional ModRulesInterruptions mod_rules_interruptions = 11;
+}

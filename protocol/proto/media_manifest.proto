@@ -1,8 +1,8 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
-package spotify.media_manifest;
+package spotify.media_manifest.proto;
 
 option optimize_for = CODE_SIZE;
 
@@ -33,9 +33,12 @@ message File {
     
     message ExternalFile {
         string method = 1;
-        string url = 2;
-        bytes body = 3;
-        bool is_webgate_endpoint = 4;
+        bytes body = 4;
+        
+        oneof endpoint {
+            string url = 2;
+            string service = 3;
+        }
     }
     
     message FileIdFile {

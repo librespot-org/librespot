@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.proto;
+
+import "status.proto";
+
+option optimize_for = CODE_SIZE;
+
+message CollectionAddRemoveItemsRequest {
+    repeated string item = 1;
+}
+
+message CollectionAddRemoveItemsResponse {
+    Status status = 1;
+}

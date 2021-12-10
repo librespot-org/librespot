@@ -24,11 +24,13 @@ fn compile() {
         proto_dir.join("metadata.proto"),
         proto_dir.join("player.proto"),
         proto_dir.join("playlist_annotate3.proto"),
+        proto_dir.join("playlist_permission.proto"),
         proto_dir.join("playlist4_external.proto"),
         // TODO: remove these legacy protobufs when we are on the new API completely
         proto_dir.join("authentication.proto"),
         proto_dir.join("canvaz.proto"),
         proto_dir.join("canvaz-meta.proto"),
+        proto_dir.join("explicit_content_pubsub.proto"),
         proto_dir.join("keyexchange.proto"),
         proto_dir.join("mercury.proto"),
         proto_dir.join("pubsub.proto"),

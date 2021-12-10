@@ -31,6 +31,7 @@ pub struct Show {
     pub availability: Availabilities,
     pub trailer_uri: SpotifyId,
     pub has_music_and_talk: bool,
+    pub is_audiobook: bool,
 }
 
 #[async_trait]
@@ -70,6 +71,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Show {
             availability: show.get_availability().into(),
             trailer_uri: SpotifyId::from_uri(show.get_trailer_uri())?,
             has_music_and_talk: show.get_music_and_talk(),
+            is_audiobook: show.get_is_audiobook(),
         })
     }
 }

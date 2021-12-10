@@ -1,9 +1,10 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
 package spotify.extendedmetadata;
 
+option objc_class_prefix = "SPTExtendedMetadata";
 option cc_enable_arenas = true;
 option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
@@ -43,4 +44,11 @@ enum ExtensionKind {
     SHOW_ACCESS = 31;
     PODCAST_QNA = 32;
     CLIPS = 33;
+    PODCAST_CTA_CARDS = 36;
+    PODCAST_RATING = 37;
+    DISPLAY_SEGMENTS = 38;
+    GREENROOM = 39;
+    USER_CREATED = 40;
+    CLIENT_CONFIG = 48;
+    AUDIOBOOK_SPECIFICS = 52;
 }

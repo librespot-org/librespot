@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
@@ -11,10 +11,13 @@ option java_outer_classname = "ShowAccessProto";
 option java_package = "com.spotify.podcast.access.proto";
 
 message ShowAccess {
+    AccountLinkPrompt prompt = 5;
+    
     oneof explanation {
         NoExplanation none = 1;
         LegacyExplanation legacy = 2;
         BasicExplanation basic = 3;
+        UpsellLinkExplanation upsellLink = 4;
     }
 }
 
@@ -30,4 +33,18 @@ message LegacyExplanation {
 
 message NoExplanation {
     
+}
+
+message UpsellLinkExplanation {
+    string title = 1;
+    string body = 2;
+    string cta = 3;
+    string url = 4;
+}
+
+message AccountLinkPrompt {
+    string title = 1;
+    string body = 2;
+    string cta = 3;
+    string url = 4;
 }

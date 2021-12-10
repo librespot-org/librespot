@@ -8,6 +8,7 @@ use crate::{
         item::{AudioItem, AudioItemResult, InnerAudioItem},
     },
     availability::Availabilities,
+    content_rating::ContentRatings,
     date::Date,
     error::{MetadataError, RequestError},
     image::Images,
@@ -48,6 +49,8 @@ pub struct Episode {
     pub external_url: String,
     pub episode_type: EpisodeType,
     pub has_music_and_talk: bool,
+    pub content_rating: ContentRatings,
+    pub is_audiobook_chapter: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +128,8 @@ impl TryFrom<&<Self as Metadata>::Message> for Episode {
             external_url: episode.get_external_url().to_owned(),
             episode_type: episode.get_field_type(),
             has_music_and_talk: episode.get_music_and_talk(),
+            content_rating: episode.get_content_rating().into(),
+            is_audiobook_chapter: episode.get_is_audiobook_chapter(),
         })
     }
 }

@@ -1,0 +1,33 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.proto;
+
+import "policy/track_decoration_policy.proto";
+import "policy/artist_decoration_policy.proto";
+import "metadata/track_metadata.proto";
+import "metadata/artist_metadata.proto";
+import "status.proto";
+
+option objc_class_prefix = "SPTCollectionCosmos";
+option optimize_for = CODE_SIZE;
+
+message CollectionGetBansRequest {
+    cosmos_util.proto.TrackDecorationPolicy track_policy = 1;
+    cosmos_util.proto.ArtistDecorationPolicy artist_policy = 2;
+    string sort = 3;
+    bool timestamp = 4;
+    uint32 update_throttling = 5;
+}
+
+message Item {
+    uint32 add_time = 1;
+    cosmos_util.proto.TrackMetadata track_metadata = 2;
+    cosmos_util.proto.ArtistMetadata artist_metadata = 3;
+}
+
+message CollectionGetBansResponse {
+    Status status = 1;
+    repeated Item item = 2;
+}

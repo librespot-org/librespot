@@ -1,0 +1,90 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.playback_platform.proto;
+
+import "media_manifest.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Media {
+    string id = 1;
+    int32 start_position = 6;
+    int32 stop_position = 7;
+    
+    oneof source {
+        string audio_id = 2;
+        string episode_id = 3;
+        string track_id = 4;
+        media_manifest.proto.Files files = 5;
+    }
+}
+
+message Annotation {
+    map<string, string> metadata = 2;
+}
+
+message PlaybackControl {
+    
+}
+
+message Context {
+    string id = 2;
+    string type = 3;
+    
+    reserved 1;
+}
+
+message Timeline {
+    repeated MediaTrack media_tracks = 1;
+    message MediaTrack {
+        repeated Item items = 1;
+        message Item {
+            repeated Annotation annotations = 3;
+            repeated PlaybackControl controls = 4;
+            
+            oneof content {
+                Context context = 1;
+                Media media = 2;
+            }
+        }
+    }
+}
+
+message PageId {
+    Context context = 1;
+    int32 index = 2;
+}
+
+message PagePath {
+    repeated PageId segments = 1;
+}
+
+message Page {
+    Header header = 1;
+    message Header {
+        int32 status_code = 1;
+        int32 num_pages = 2;
+    }
+    
+    PageId page_id = 2;
+    Timeline timeline = 3;
+}
+
+message PageList {
+    repeated Page pages = 1;
+}
+
+message PageMultiGetRequest {
+    repeated PageId page_ids = 1;
+}
+
+message PageMultiGetResponse {
+    repeated Page pages = 1;
+}
+
+message ContextPagePathState {
+    PagePath path = 1;
+    repeated int32 media_track_item_index = 3;
+}

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
@@ -8,6 +8,8 @@ option optimize_for = CODE_SIZE;
 
 message CacheReport {
     optional bytes cache_id = 1;
+    optional string cache_path = 21;
+    optional string volatile_path = 22;
     optional int64 max_cache_size = 2;
     optional int64 free_space = 3;
     optional int64 total_space = 4;

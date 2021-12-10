@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
@@ -6,18 +6,11 @@ package spotify.your_library.proto;
 
 option optimize_for = CODE_SIZE;
 
-message YourLibraryArtistEntity {
-    string uri = 1;
-    string name = 2;
-    string image_uri = 3;
-    int64 add_time = 4;
-}
-
 message YourLibraryRootlistPlaylist {
     string image_uri = 1;
-    bool is_on_demand_in_free = 2;
     bool is_loading = 3;
     int32 rootlist_index = 4;
+    bool can_view = 5;
 }
 
 message YourLibraryRootlistFolder {
@@ -47,14 +40,4 @@ message YourLibraryRootlistEntity {
         YourLibraryRootlistFolder folder = 6;
         YourLibraryRootlistCollection collection = 7;
     }
-}
-
-message YourLibraryShowEntity {
-    string uri = 1;
-    string name = 2;
-    string creator_name = 3;
-    string image_uri = 4;
-    int64 add_time = 5;
-    bool is_music_and_talk = 6;
-    int64 publish_date = 7;
 }

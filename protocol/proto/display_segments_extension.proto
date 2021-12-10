@@ -1,0 +1,54 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.displaysegments.v1;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "DisplaySegmentsExtensionProto";
+option java_package = "com.spotify.displaysegments.v1.proto";
+
+message DisplaySegmentsExtension {
+    string episode_uri = 1;
+    repeated DisplaySegment segments = 2;
+    int32 duration_ms = 3;
+    
+    oneof decoration {
+        MusicAndTalkDecoration music_and_talk_decoration = 4;
+    }
+}
+
+message DisplaySegment {
+    string uri = 1;
+    SegmentType type = 2;
+    int32 duration_ms = 3;
+    int32 seek_start_ms = 4;
+    int32 seek_stop_ms = 5;
+    
+    oneof _title {
+        string title = 6;
+    }
+    
+    oneof _subtitle {
+        string subtitle = 7;
+    }
+    
+    oneof _image_url {
+        string image_url = 8;
+    }
+    
+    oneof _is_preview {
+        bool is_preview = 9;
+    }
+}
+
+message MusicAndTalkDecoration {
+    bool can_upsell = 1;
+}
+
+enum SegmentType {
+    SEGMENT_TYPE_UNSPECIFIED = 0;
+    SEGMENT_TYPE_TALK = 1;
+    SEGMENT_TYPE_MUSIC = 2;
+}

@@ -25,7 +25,7 @@ message PropertyDefinition {
         EnumSpec enum_spec = 7;
     }
     
-    reserved 2, "hash";
+    //reserved 2, "hash";
     
     message BoolSpec {
         bool default = 1;

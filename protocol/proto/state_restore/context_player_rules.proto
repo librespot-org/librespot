@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "state_restore/context_player_rules_base.proto";
+import "state_restore/mft_rules.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ContextPlayerRules {
+    optional ContextPlayerRulesBase base = 1;
+    optional MftRules mft_rules = 2;
+    map<string, ContextPlayerRulesBase> sub_rules = 3;
+}

@@ -8,15 +8,30 @@ use crate::{
     date::Date,
     error::MetadataError,
     request::{MercuryRequest, RequestResult},
-    util::try_from_repeated_message,
+    util::{from_repeated_enum, try_from_repeated_message},
     Metadata,
 };
 
-use super::{attribute::PlaylistAttributes, diff::PlaylistDiff, item::PlaylistItemList};
+use super::{
+    attribute::PlaylistAttributes, diff::PlaylistDiff, item::PlaylistItemList,
+    permission::Capabilities,
+};
 
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{NamedSpotifyId, SpotifyId};
 use librespot_protocol as protocol;
+
+use protocol::playlist4_external::GeoblockBlockingType as Geoblock;
+
+#[derive(Debug, Clone)]
+pub struct Geoblocks(Vec<Geoblock>);
+
+impl Deref for Geoblocks {
+    type Target = Vec<Geoblock>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Playlist {
@@ -33,6 +48,8 @@ pub struct Playlist {
     pub nonces: Vec<i64>,
     pub timestamp: Date,
     pub has_abuse_reporting: bool,
+    pub capabilities: Capabilities,
+    pub geoblocks: Geoblocks,
 }
 
 #[derive(Debug, Clone)]
@@ -70,6 +87,8 @@ pub struct SelectedListContent {
     pub timestamp: Date,
     pub owner_username: String,
     pub has_abuse_reporting: bool,
+    pub capabilities: Capabilities,
+    pub geoblocks: Geoblocks,
 }
 
 impl Playlist {
@@ -153,6 +172,8 @@ impl Metadata for Playlist {
             nonces: playlist.nonces,
             timestamp: playlist.timestamp,
             has_abuse_reporting: playlist.has_abuse_reporting,
+            capabilities: playlist.capabilities,
+            geoblocks: playlist.geoblocks,
         })
     }
 }
@@ -194,8 +215,11 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
             timestamp: playlist.get_timestamp().try_into()?,
             owner_username: playlist.get_owner_username().to_owned(),
             has_abuse_reporting: playlist.get_abuse_reporting_enabled(),
+            capabilities: playlist.get_capabilities().into(),
+            geoblocks: playlist.get_geoblock().into(),
         })
     }
 }
 
+from_repeated_enum!(Geoblock, Geoblocks);
 try_from_repeated_message!(Vec<u8>, Playlists);

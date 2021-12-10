@@ -1,0 +1,105 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.your_library.proto;
+
+option optimize_for = CODE_SIZE;
+
+message YourLibraryEntityInfo {
+    string key = 1;
+    string name = 2;
+    string uri = 3;
+    string group_label = 5;
+    string image_uri = 6;
+    bool pinned = 7;
+    
+    Pinnable pinnable = 8;
+    enum Pinnable {
+        YES = 0;
+        NO_IN_FOLDER = 1;
+    }
+    
+    Offline.Availability offline_availability = 9;
+}
+
+message Offline {
+    enum Availability {
+        UNKNOWN = 0;
+        NO = 1;
+        YES = 2;
+        DOWNLOADING = 3;
+        WAITING = 4;
+    }
+}
+
+message YourLibraryAlbumExtraInfo {
+    string artist_name = 1;
+}
+
+message YourLibraryArtistExtraInfo {
+    
+}
+
+message YourLibraryPlaylistExtraInfo {
+    string creator_name = 1;
+    bool is_loading = 5;
+    bool can_view = 6;
+}
+
+message YourLibraryShowExtraInfo {
+    string creator_name = 1;
+    int64 publish_date = 4;
+    bool is_music_and_talk = 5;
+    int32 number_of_downloaded_episodes = 6;
+}
+
+message YourLibraryFolderExtraInfo {
+    int32 number_of_playlists = 2;
+    int32 number_of_folders = 3;
+}
+
+message YourLibraryLikedSongsExtraInfo {
+    int32 number_of_songs = 3;
+}
+
+message YourLibraryYourEpisodesExtraInfo {
+    int32 number_of_downloaded_episodes = 4;
+}
+
+message YourLibraryNewEpisodesExtraInfo {
+    int64 publish_date = 1;
+}
+
+message YourLibraryLocalFilesExtraInfo {
+    int32 number_of_files = 1;
+}
+
+message YourLibraryBookExtraInfo {
+    string author_name = 1;
+}
+
+message YourLibraryDecoratedEntity {
+    YourLibraryEntityInfo entity_info = 1;
+    
+    oneof entity {
+        YourLibraryAlbumExtraInfo album = 2;
+        YourLibraryArtistExtraInfo artist = 3;
+        YourLibraryPlaylistExtraInfo playlist = 4;
+        YourLibraryShowExtraInfo show = 5;
+        YourLibraryFolderExtraInfo folder = 6;
+        YourLibraryLikedSongsExtraInfo liked_songs = 8;
+        YourLibraryYourEpisodesExtraInfo your_episodes = 9;
+        YourLibraryNewEpisodesExtraInfo new_episodes = 10;
+        YourLibraryLocalFilesExtraInfo local_files = 11;
+        YourLibraryBookExtraInfo book = 12;
+    }
+}
+
+message YourLibraryAvailableEntityTypes {
+    bool albums = 1;
+    bool artists = 2;
+    bool playlists = 3;
+    bool shows = 4;
+    bool books = 5;
+}

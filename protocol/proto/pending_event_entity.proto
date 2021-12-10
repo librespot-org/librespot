@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.pending_events.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PendingEventEntity {
+    string event_name = 1;
+    bytes payload = 2;
+    string username = 3;
+}

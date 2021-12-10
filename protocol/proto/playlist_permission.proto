@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
@@ -19,6 +19,7 @@ message Capabilities {
     repeated PermissionLevel grantable_level = 3;
     optional bool can_edit_metadata = 4;
     optional bool can_edit_items = 5;
+    optional bool can_cancel_membership = 6;
 }
 
 message CapabilitiesMultiRequest {
@@ -52,6 +53,10 @@ message SetPermissionResponse {
     optional Permission resulting_permission = 1;
 }
 
+message GetMemberPermissionsResponse {
+    map<string, Permission> member_permissions = 1;
+}
+
 message Permissions {
     optional Permission base_permission = 1;
 }
@@ -65,6 +70,21 @@ message PermissionState {
 
 message PermissionStatePub {
     optional PermissionState permission_state = 1;
+}
+
+message PermissionGrantOptions {
+    optional Permission permission = 1;
+    optional int64 ttl_ms = 2;
+}
+
+message PermissionGrant {
+    optional string token = 1;
+    optional PermissionGrantOptions permission_grant_options = 2;
+}
+
+message ClaimPermissionGrantResponse {
+    optional Permission user_permission = 1;
+    optional Capabilities capabilities = 2;
 }
 
 message ResponseStatus {

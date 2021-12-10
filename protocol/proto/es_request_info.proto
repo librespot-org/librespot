@@ -1,0 +1,27 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.connectivity.netstat.esperanto.proto;
+
+option java_package = "com.spotify.connectivity.netstat.esperanto.proto";
+
+message RepeatedRequestInfo {
+    repeated RequestInfo infos = 1;
+}
+
+message RequestInfo {
+    string uri = 1;
+    string verb = 2;
+    string source_identifier = 3;
+    int32 downloaded = 4;
+    int32 uploaded = 5;
+    int32 payload_size = 6;
+    bool connection_reuse = 7;
+    int64 event_started = 8;
+    int64 event_connected = 9;
+    int64 event_request_sent = 10;
+    int64 event_first_byte_received = 11;
+    int64 event_last_byte_received = 12;
+    int64 event_ended = 13;
+}
