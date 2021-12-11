@@ -67,10 +67,10 @@ impl Deref for Episodes {
 impl InnerAudioItem for Episode {
     async fn get_audio_item(session: &Session, id: SpotifyId) -> AudioItemResult {
         let episode = Self::get(session, id).await?;
-        let availability = Self::available_in_country(
+        let availability = Self::available_for_user(
+            &session.user_data(),
             &episode.availability,
             &episode.restrictions,
-            &session.country(),
         );
 
         Ok(AudioItem {

@@ -33,6 +33,8 @@ pub enum UnavailabilityReason {
     Blacklisted,
     #[error("available date is in the future")]
     Embargo,
+    #[error("required data was not present")]
+    NoData,
     #[error("whitelist present and country not on it")]
     NotWhitelisted,
 }

@@ -81,7 +81,11 @@ impl InnerAudioItem for Track {
         let availability = if Local::now() < track.earliest_live_timestamp.as_utc() {
             Err(UnavailabilityReason::Embargo)
         } else {
-            Self::available_in_country(&track.availability, &track.restrictions, &session.country())
+            Self::available_for_user(
+                &session.user_data(),
+                &track.availability,
+                &track.restrictions,
+            )
         };
 
         Ok(AudioItem {

@@ -12,7 +12,7 @@ use crate::{
 
 use super::file::AudioFiles;
 
-use librespot_core::session::Session;
+use librespot_core::session::{Session, UserData};
 use librespot_core::spotify_id::{SpotifyId, SpotifyItemType};
 
 pub type AudioItemResult = Result<AudioItem, MetadataError>;
@@ -43,18 +43,27 @@ impl AudioItem {
 pub trait InnerAudioItem {
     async fn get_audio_item(session: &Session, id: SpotifyId) -> AudioItemResult;
 
-    fn allowed_in_country(restrictions: &Restrictions, country: &str) -> AudioItemAvailability {
+    fn allowed_for_user(
+        user_data: &UserData,
+        restrictions: &Restrictions,
+    ) -> AudioItemAvailability {
+        let country = &user_data.country;
+        let user_catalogue = match user_data.attributes.get("catalogue") {
+            Some(catalogue) => catalogue,
+            None => "premium",
+        };
+
         for premium_restriction in restrictions.iter().filter(|restriction| {
             restriction
                 .catalogue_strs
                 .iter()
-                .any(|catalogue| *catalogue == "premium")
+                .any(|restricted_catalogue| restricted_catalogue == user_catalogue)
         }) {
             if let Some(allowed_countries) = &premium_restriction.countries_allowed {
                 // A restriction will specify either a whitelast *or* a blacklist,
                 // but not both. So restrict availability if there is a whitelist
                 // and the country isn't on it.
-                if allowed_countries.iter().any(|allowed| country == *allowed) {
+                if allowed_countries.iter().any(|allowed| country == allowed) {
                     return Ok(());
                 } else {
                     return Err(UnavailabilityReason::NotWhitelisted);
@@ -64,7 +73,7 @@ pub trait InnerAudioItem {
             if let Some(forbidden_countries) = &premium_restriction.countries_forbidden {
                 if forbidden_countries
                     .iter()
-                    .any(|forbidden| country == *forbidden)
+                    .any(|forbidden| country == forbidden)
                 {
                     return Err(UnavailabilityReason::Blacklisted);
                 } else {
@@ -92,13 +101,13 @@ pub trait InnerAudioItem {
         Ok(())
     }
 
-    fn available_in_country(
+    fn available_for_user(
+        user_data: &UserData,
         availability: &Availabilities,
         restrictions: &Restrictions,
-        country: &str,
     ) -> AudioItemAvailability {
         Self::available(availability)?;
-        Self::allowed_in_country(restrictions, country)?;
+        Self::allowed_for_user(user_data, restrictions)?;
         Ok(())
     }
 }

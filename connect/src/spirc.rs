@@ -237,8 +237,9 @@ impl Spirc {
         let ident = session.device_id().to_owned();
 
         // Uri updated in response to issue #288
-        debug!("canonical_username: {}", &session.username());
-        let uri = format!("hm://remote/user/{}/", url_encode(&session.username()));
+        let canonical_username = &session.username();
+        debug!("canonical_username: {}", canonical_username);
+        let uri = format!("hm://remote/user/{}/", url_encode(canonical_username));
 
         let subscription = Box::pin(
             session
@@ -631,11 +632,11 @@ impl SpircTask {
     fn handle_user_attributes_mutation(&mut self, mutation: UserAttributesMutation) {
         for attribute in mutation.get_fields().iter() {
             let key = attribute.get_name();
-            if let Some(old_value) = self.session.user_attribute(key) {
+            if let Some(old_value) = self.session.user_data().attributes.get(key) {
                 let new_value = match old_value.as_ref() {
                     "0" => "1",
                     "1" => "0",
-                    _ => &old_value,
+                    _ => old_value,
                 };
                 self.session.set_user_attribute(key, new_value);
                 trace!(

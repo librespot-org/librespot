@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
+use std::process::exit;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock, Weak};
 use std::task::Context;
@@ -42,12 +43,18 @@ pub enum SessionError {
 
 pub type UserAttributes = HashMap<String, String>;
 
+#[derive(Debug, Clone, Default)]
+pub struct UserData {
+    pub country: String,
+    pub canonical_username: String,
+    pub attributes: UserAttributes,
+}
+
+#[derive(Debug, Clone, Default)]
 struct SessionData {
-    country: String,
     time_delta: i64,
-    canonical_username: String,
     invalid: bool,
-    user_attributes: UserAttributes,
+    user_data: UserData,
 }
 
 struct SessionInternal {
@@ -89,13 +96,7 @@ impl Session {
 
         let session = Session(Arc::new(SessionInternal {
             config,
-            data: RwLock::new(SessionData {
-                country: String::new(),
-                canonical_username: String::new(),
-                invalid: false,
-                time_delta: 0,
-                user_attributes: HashMap::new(),
-            }),
+            data: RwLock::new(SessionData::default()),
             http_client,
             tx_connection: sender_tx,
             cache: cache.map(Arc::new),
@@ -118,7 +119,8 @@ impl Session {
             connection::authenticate(&mut transport, credentials, &session.config().device_id)
                 .await?;
         info!("Authenticated as \"{}\" !", reusable_credentials.username);
-        session.0.data.write().unwrap().canonical_username = reusable_credentials.username.clone();
+        session.0.data.write().unwrap().user_data.canonical_username =
+            reusable_credentials.username.clone();
         if let Some(cache) = session.cache() {
             cache.save_credentials(&reusable_credentials);
         }
@@ -199,6 +201,18 @@ impl Session {
         );
     }
 
+    fn check_catalogue(attributes: &UserAttributes) {
+        if let Some(account_type) = attributes.get("type") {
+            if account_type != "premium" {
+                error!("librespot does not support {:?} accounts.", account_type);
+                info!("Please support Spotify and your artists and sign up for a premium account.");
+
+                // TODO: logout instead of exiting
+                exit(1);
+            }
+        }
+    }
+
     fn dispatch(&self, cmd: u8, data: Bytes) {
         use PacketType::*;
         let packet_type = FromPrimitive::from_u8(cmd);
@@ -219,7 +233,7 @@ impl Session {
             Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned()).unwrap();
                 info!("Country: {:?}", country);
-                self.0.data.write().unwrap().country = country;
+                self.0.data.write().unwrap().user_data.country = country;
             }
             Some(StreamChunkRes) | Some(ChannelError) => {
                 self.channel().dispatch(packet_type.unwrap(), data);
@@ -266,7 +280,9 @@ impl Session {
                 }
 
                 trace!("Received product info: {:?}", user_attributes);
-                self.0.data.write().unwrap().user_attributes = user_attributes;
+                Self::check_catalogue(&user_attributes);
+
+                self.0.data.write().unwrap().user_data.attributes = user_attributes;
             }
             Some(PongAck)
             | Some(SecretBlock)
@@ -295,47 +311,47 @@ impl Session {
         &self.0.config
     }
 
-    pub fn username(&self) -> String {
-        self.0.data.read().unwrap().canonical_username.clone()
-    }
-
-    pub fn country(&self) -> String {
-        self.0.data.read().unwrap().country.clone()
+    pub fn user_data(&self) -> UserData {
+        self.0.data.read().unwrap().user_data.clone()
     }
 
     pub fn device_id(&self) -> &str {
         &self.config().device_id
     }
 
-    pub fn user_attribute(&self, key: &str) -> Option<String> {
+    pub fn username(&self) -> String {
         self.0
             .data
             .read()
             .unwrap()
-            .user_attributes
-            .get(key)
-            .map(|value| value.to_owned())
-    }
-
-    pub fn user_attributes(&self) -> UserAttributes {
-        self.0.data.read().unwrap().user_attributes.clone()
+            .user_data
+            .canonical_username
+            .clone()
     }
 
     pub fn set_user_attribute(&self, key: &str, value: &str) -> Option<String> {
+        let mut dummy_attributes = UserAttributes::new();
+        dummy_attributes.insert(key.to_owned(), value.to_owned());
+        Self::check_catalogue(&dummy_attributes);
+
         self.0
             .data
             .write()
             .unwrap()
-            .user_attributes
+            .user_data
+            .attributes
             .insert(key.to_owned(), value.to_owned())
     }
 
     pub fn set_user_attributes(&self, attributes: UserAttributes) {
+        Self::check_catalogue(&attributes);
+
         self.0
             .data
             .write()
             .unwrap()
-            .user_attributes
+            .user_data
+            .attributes
             .extend(attributes)
     }
 
