@@ -737,7 +737,14 @@ impl PlayerTrackLoader {
             }
         };
 
-        assert!(audio.duration >= 0);
+        if audio.duration < 0 {
+            error!(
+                "Track duration for <{}> cannot be {}",
+                spotify_id.to_uri(),
+                audio.duration
+            );
+            return None;
+        }
         let duration_ms = audio.duration as u32;
 
         // (Most) podcasts seem to support only 96 bit Vorbis, so fall back to it
@@ -945,7 +952,7 @@ impl Future for PlayerInternal {
                     }
                     Poll::Ready(Err(_)) => {
                         warn!("Unable to load <{:?}>\nSkipping to next track", track_id);
-                        assert!(self.state.is_loading());
+                        debug_assert!(self.state.is_loading());
                         self.send_event(PlayerEvent::EndOfTrack {
                             track_id,
                             play_request_id,
@@ -1045,8 +1052,11 @@ impl Future for PlayerInternal {
                                             }
                                         }
                                         Err(e) => {
-                                            error!("PlayerInternal poll: {}", e);
-                                            exit(1);
+                                            warn!("Unable to decode samples for track <{:?}: {:?}>\nSkipping to next track", track_id, e);
+                                            self.send_event(PlayerEvent::EndOfTrack {
+                                                track_id,
+                                                play_request_id,
+                                            })
                                         }
                                     }
                                 }
@@ -1058,8 +1068,15 @@ impl Future for PlayerInternal {
                             self.handle_packet(packet, normalisation_factor);
                         }
                         Err(e) => {
-                            error!("PlayerInternal poll: {}", e);
-                            exit(1);
+                            warn!(
+                                "Unable to get packet for track <{:?}: {:?}>\nSkipping to next track",
+								e,
+                                track_id
+                            );
+                            self.send_event(PlayerEvent::EndOfTrack {
+                                track_id,
+                                play_request_id,
+                            })
                         }
                     }
                 } else {
