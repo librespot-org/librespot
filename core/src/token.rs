@@ -87,7 +87,7 @@ impl TokenProvider {
             .expect("No tokens received")
             .to_vec();
         let token = Token::new(String::from_utf8(data).unwrap()).map_err(|_| MercuryError)?;
-        trace!("Got token: {:?}", token);
+        trace!("Got token: {:#?}", token);
         self.lock(|inner| inner.tokens.push(token.clone()));
         Ok(token)
     }

@@ -279,7 +279,7 @@ impl Session {
                     }
                 }
 
-                trace!("Received product info: {:?}", user_attributes);
+                trace!("Received product info: {:#?}", user_attributes);
                 Self::check_catalogue(&user_attributes);
 
                 self.0.data.write().unwrap().user_data.attributes = user_attributes;
@@ -291,7 +291,7 @@ impl Session {
             | Some(LicenseVersion) => {}
             _ => {
                 if let Some(packet_type) = PacketType::from_u8(cmd) {
-                    trace!("Ignoring {:?} packet with data {:?}", packet_type, data);
+                    trace!("Ignoring {:?} packet with data {:#?}", packet_type, data);
                 } else {
                     trace!("Ignoring unknown packet {:x}", cmd);
                 }

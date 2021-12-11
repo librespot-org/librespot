@@ -620,7 +620,7 @@ impl SpircTask {
     }
 
     fn handle_user_attributes_update(&mut self, update: UserAttributesUpdate) {
-        trace!("Received attributes update: {:?}", update);
+        trace!("Received attributes update: {:#?}", update);
         let attributes: UserAttributes = update
             .get_pairs()
             .iter()

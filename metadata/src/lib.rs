@@ -50,7 +50,7 @@ pub trait Metadata: Send + Sized + 'static {
     async fn get(session: &Session, id: SpotifyId) -> Result<Self, MetadataError> {
         let response = Self::request(session, id).await?;
         let msg = Self::Message::parse_from_bytes(&response)?;
-        trace!("Received metadata: {:?}", msg);
+        trace!("Received metadata: {:#?}", msg);
         Self::parse(&msg, id)
     }
 
