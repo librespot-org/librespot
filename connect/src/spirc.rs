@@ -61,6 +61,7 @@ struct SpircTask {
     play_status: SpircPlayStatus,
 
     subscription: BoxedStream<Frame>,
+    connection_id_update: BoxedStream<String>,
     user_attributes_update: BoxedStream<UserAttributesUpdate>,
     user_attributes_mutation: BoxedStream<UserAttributesMutation>,
     sender: MercurySender,
@@ -254,6 +255,21 @@ impl Spirc {
                 }),
         );
 
+        let connection_id_update = Box::pin(
+            session
+                .mercury()
+                .listen_for("hm://pusher/v1/connections/")
+                .map(UnboundedReceiverStream::new)
+                .flatten_stream()
+                .map(|response| -> String {
+                    response
+                        .uri
+                        .strip_prefix("hm://pusher/v1/connections/")
+                        .unwrap_or("")
+                        .to_owned()
+                }),
+        );
+
         let user_attributes_update = Box::pin(
             session
                 .mercury()
@@ -306,6 +322,7 @@ impl Spirc {
             play_status: SpircPlayStatus::Stopped,
 
             subscription,
+            connection_id_update,
             user_attributes_update,
             user_attributes_mutation,
             sender,
@@ -387,6 +404,13 @@ impl SpircTask {
                     Some(attributes) => self.handle_user_attributes_mutation(attributes),
                     None => {
                         error!("user attributes mutation selected, but none received");
+                        break;
+                    }
+                },
+                connection_id_update = self.connection_id_update.next() => match connection_id_update {
+                    Some(connection_id) => self.handle_connection_id_update(connection_id),
+                    None => {
+                        error!("connection ID update selected, but none received");
                         break;
                     }
                 },
@@ -617,6 +641,11 @@ impl SpircTask {
                 }
             }
         }
+    }
+
+    fn handle_connection_id_update(&mut self, connection_id: String) {
+        trace!("Received connection ID update: {:?}", connection_id);
+        self.session.set_connection_id(connection_id);
     }
 
     fn handle_user_attributes_update(&mut self, update: UserAttributesUpdate) {

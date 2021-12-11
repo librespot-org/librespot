@@ -264,6 +264,7 @@ impl MercuryManager {
 
                 if !found {
                     debug!("unknown subscription uri={}", response.uri);
+                    trace!("response pushed over Mercury: {:?}", response);
                 }
             })
         } else if let Some(cb) = pending.callback {

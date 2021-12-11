@@ -52,6 +52,7 @@ pub struct UserData {
 
 #[derive(Debug, Clone, Default)]
 struct SessionData {
+    connection_id: String,
     time_delta: i64,
     invalid: bool,
     user_data: UserData,
@@ -317,6 +318,14 @@ impl Session {
 
     pub fn device_id(&self) -> &str {
         &self.config().device_id
+    }
+
+    pub fn connection_id(&self) -> String {
+        self.0.data.read().unwrap().connection_id.clone()
+    }
+
+    pub fn set_connection_id(&self, connection_id: String) {
+        self.0.data.write().unwrap().connection_id = connection_id;
     }
 
     pub fn username(&self) -> String {
