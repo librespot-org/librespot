@@ -14,6 +14,7 @@ use crate::protocol;
 use crate::protocol::keyexchange::{
     APResponseMessage, ClientHello, ClientResponsePlaintext, Platform, ProductFlags,
 };
+use crate::version;
 
 pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     mut connection: T,
@@ -84,13 +85,17 @@ where
     let mut packet = ClientHello::new();
     packet
         .mut_build_info()
-        .set_product(protocol::keyexchange::Product::PRODUCT_LIBSPOTIFY);
+        // ProductInfo won't push autoplay and perhaps other settings
+        // when set to anything else than PRODUCT_CLIENT
+        .set_product(protocol::keyexchange::Product::PRODUCT_CLIENT);
     packet
         .mut_build_info()
         .mut_product_flags()
         .push(PRODUCT_FLAGS);
     packet.mut_build_info().set_platform(platform);
-    packet.mut_build_info().set_version(999999999);
+    packet
+        .mut_build_info()
+        .set_version(version::SPOTIFY_VERSION);
     packet
         .mut_cryptosuites_supported()
         .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);

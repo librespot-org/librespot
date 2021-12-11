@@ -9,7 +9,7 @@ use std::env::consts::OS;
 use thiserror::Error;
 use url::Url;
 
-use crate::version;
+use crate::version::{SPOTIFY_MOBILE_VERSION, SPOTIFY_VERSION, VERSION_STRING};
 
 pub struct HttpClient {
     proxy: Option<Url>,
@@ -54,8 +54,8 @@ impl HttpClient {
         let connector = HttpsConnector::with_native_roots();
 
         let spotify_version = match OS {
-            "android" | "ios" => "8.6.84",
-            _ => "117300517",
+            "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
+            _ => SPOTIFY_VERSION.to_string(),
         };
 
         let spotify_platform = match OS {
@@ -72,9 +72,7 @@ impl HttpClient {
             // Some features like lyrics are version-gated and require an official version string.
             HeaderValue::from_str(&format!(
                 "Spotify/{} {} ({})",
-                spotify_version,
-                spotify_platform,
-                version::VERSION_STRING
+                spotify_version, spotify_platform, VERSION_STRING
             ))?,
         );
 

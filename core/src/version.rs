@@ -15,3 +15,9 @@ pub const SEMVER: &str = env!("CARGO_PKG_VERSION");
 
 /// A random build id.
 pub const BUILD_ID: &str = env!("LIBRESPOT_BUILD_ID");
+
+/// The protocol version of the Spotify desktop client.
+pub const SPOTIFY_VERSION: u64 = 117300517;
+
+/// The protocol version of the Spotify mobile app.
+pub const SPOTIFY_MOBILE_VERSION: &str = "8.6.84";
