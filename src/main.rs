@@ -590,30 +590,23 @@ fn get_setup() -> Setup {
             .to_lowercase()
     };
 
-    let env_vars: Vec<_> = env::vars_os().filter_map(|(k, v)| {
-        let mut env_var = None;
-        if let Ok(key) = k.into_string() {
-            if key.starts_with("LIBRESPOT_") {
-                let stripped_key = stripped_env_key(&key);
-                // Only match against long option/flag names.
-                // Something like LIBRESPOT_V for example is
-                // not valid because there are both -v and -V flags
-                // but env vars are assumed to be all uppercase.
-                let len = stripped_key.chars().count();
-                if len > 1 && matches.opt_defined(&stripped_key) {
-                    match v.into_string() {
-                        Ok(value) => {
-                            env_var = Some((key, value));
-                        },
-                        Err(s) => {
-                            eprintln!("Environment variable was not valid Unicode and will not be evaluated: {}={:?}", key, s);
-                        }
+    let env_vars: Vec<_> = env::vars_os().filter_map(|(k, v)| match k.into_string() {
+        Ok(key) if key.starts_with("LIBRESPOT_") => {
+            let stripped_key = stripped_env_key(&key);
+            // We only care about long option/flag names.
+            if stripped_key.chars().count() > 1 && matches.opt_defined(&stripped_key) {
+                match v.into_string() {
+                    Ok(value) => Some((key, value)),
+                    Err(s) => {
+                        eprintln!("Environment variable was not valid Unicode and will not be evaluated: {}={:?}", key, s);
+                        None
                     }
                 }
+            } else {
+                None
             }
-        }
-
-        env_var
+        },
+        _ => None
     })
     .collect();
 
@@ -706,13 +699,33 @@ fn get_setup() -> Setup {
         exit(0);
     }
 
+    let invalid_error_msg =
+        |long: &str, short: &str, invalid: &str, valid_values: &str, default_value: &str| {
+            error!("Invalid `--{}` / `-{}`: \"{}\"", long, short, invalid);
+
+            if !valid_values.is_empty() {
+                println!("Valid `--{}` / `-{}` values: {}", long, short, valid_values);
+            }
+
+            if !default_value.is_empty() {
+                println!("Default: {}", default_value);
+            }
+        };
+
+    let empty_string_error_msg = |long: &str, short: &str| {
+        error!("`--{}` / `-{}` can not be an empty string", long, short);
+        exit(1);
+    };
+
     let backend = audio_backend::find(backend_name).unwrap_or_else(|| {
-        error!(
-            "Invalid `--{}` / `-{}`: \"{}\"",
+        invalid_error_msg(
             BACKEND,
             BACKEND_SHORT,
-            opt_str(BACKEND).unwrap_or_default()
+            &opt_str(BACKEND).unwrap_or_default(),
+            "",
+            "",
         );
+
         list_backends();
         exit(1);
     });
@@ -721,15 +734,15 @@ fn get_setup() -> Setup {
         .as_deref()
         .map(|format| {
             AudioFormat::from_str(format).unwrap_or_else(|_| {
-                error!(
-                    "Invalid `--{}` / `-{}`: \"{}\"",
-                    FORMAT, FORMAT_SHORT, format
+                let default_value = &format!("{:?}", AudioFormat::default());
+                invalid_error_msg(
+                    FORMAT,
+                    FORMAT_SHORT,
+                    format,
+                    "F64, F32, S32, S24, S24_3, S16",
+                    default_value,
                 );
-                println!(
-                    "Valid `--{}` / `-{}` values: F64, F32, S32, S24, S24_3, S16",
-                    FORMAT, FORMAT_SHORT
-                );
-                println!("Default: {:?}", AudioFormat::default());
+
                 exit(1);
             })
         })
@@ -752,11 +765,7 @@ fn get_setup() -> Setup {
             backend(device, format);
             exit(0);
         } else if value.is_empty() {
-            error!(
-                "`--{}` / `-{}` can not be an empty string",
-                DEVICE, DEVICE_SHORT
-            );
-            exit(1);
+            empty_string_error_msg(DEVICE, DEVICE_SHORT);
         }
     }
 
@@ -785,17 +794,14 @@ fn get_setup() -> Setup {
     let mixer_type: Option<String> = None;
 
     let mixer = mixer::find(mixer_type.as_deref()).unwrap_or_else(|| {
-        error!(
-            "Invalid `--{}` / `-{}`: \"{}\"",
+        invalid_error_msg(
             MIXER_TYPE,
             MIXER_TYPE_SHORT,
-            opt_str(MIXER_TYPE).unwrap_or_default()
+            &opt_str(MIXER_TYPE).unwrap_or_default(),
+            "alsa, softvol",
+            "softvol",
         );
-        println!(
-            "Valid `--{}` / `-{}` values: alsa, softvol",
-            MIXER_TYPE, MIXER_TYPE_SHORT
-        );
-        println!("Default: softvol");
+
         exit(1);
     });
 
@@ -818,11 +824,14 @@ fn get_setup() -> Setup {
         let index = opt_str(ALSA_MIXER_INDEX)
             .map(|index| {
                 index.parse::<u32>().unwrap_or_else(|_| {
-                    error!(
-                        "Invalid `--{}` / `-{}`: \"{}\"",
-                        ALSA_MIXER_INDEX, ALSA_MIXER_INDEX_SHORT, index
+                    invalid_error_msg(
+                        ALSA_MIXER_INDEX,
+                        ALSA_MIXER_INDEX_SHORT,
+                        &index,
+                        "",
+                        &mixer_default_config.index.to_string(),
                     );
-                    println!("Default: {}", mixer_default_config.index);
+
                     exit(1);
                 })
             })
@@ -836,11 +845,7 @@ fn get_setup() -> Setup {
 
         #[cfg(feature = "alsa-backend")]
         if control.is_empty() {
-            error!(
-                "`--{}` / `-{}` can not be an empty string",
-                ALSA_MIXER_CONTROL, ALSA_MIXER_CONTROL_SHORT
-            );
-            exit(1);
+            empty_string_error_msg(ALSA_MIXER_CONTROL, ALSA_MIXER_CONTROL_SHORT);
         }
 
         #[cfg(not(feature = "alsa-backend"))]
@@ -849,24 +854,28 @@ fn get_setup() -> Setup {
         let volume_range = opt_str(VOLUME_RANGE)
             .map(|range| {
                 let on_error = || {
-                    error!(
-                        "Invalid `--{}` / `-{}`: \"{}\"",
-                        VOLUME_RANGE, VOLUME_RANGE_SHORT, range
-                    );
-                    println!(
-                        "Valid `--{}` / `-{}` values: {} - {}",
-                        VOLUME_RANGE,
-                        VOLUME_RANGE_SHORT,
+                    let valid_values = &format!(
+                        "{} - {}",
                         VALID_VOLUME_RANGE.start(),
                         VALID_VOLUME_RANGE.end()
                     );
+
                     #[cfg(feature = "alsa-backend")]
-                    println!(
-                        "Default: softvol - {}, alsa - what the control supports",
+                    let default_value = &format!(
+                        "softvol - {}, alsa - what the control supports",
                         VolumeCtrl::DEFAULT_DB_RANGE
                     );
+
                     #[cfg(not(feature = "alsa-backend"))]
-                    println!("Default: {}", VolumeCtrl::DEFAULT_DB_RANGE);
+                    let default_value = &VolumeCtrl::DEFAULT_DB_RANGE.to_string();
+
+                    invalid_error_msg(
+                        VOLUME_RANGE,
+                        VOLUME_RANGE_SHORT,
+                        &range,
+                        valid_values,
+                        default_value,
+                    );
                 };
 
                 let range = range.parse::<f64>().unwrap_or_else(|_| {
@@ -891,15 +900,14 @@ fn get_setup() -> Setup {
             .as_deref()
             .map(|volume_ctrl| {
                 VolumeCtrl::from_str_with_range(volume_ctrl, volume_range).unwrap_or_else(|_| {
-                    error!(
-                        "Invalid `--{}` / `-{}`: \"{}\"",
-                        VOLUME_CTRL, VOLUME_CTRL_SHORT, volume_ctrl
+                    invalid_error_msg(
+                        VOLUME_CTRL,
+                        VOLUME_CTRL_SHORT,
+                        volume_ctrl,
+                        "cubic, fixed, linear, log",
+                        "log",
                     );
-                    println!(
-                        "Valid `--{}` / `-{}` values: cubic, fixed, linear, log",
-                        VOLUME_CTRL, VOLUME_CTRL
-                    );
-                    println!("Default: log");
+
                     exit(1);
                 })
             })
@@ -938,10 +946,14 @@ fn get_setup() -> Setup {
                 .map(parse_file_size)
                 .map(|e| {
                     e.unwrap_or_else(|e| {
-                        error!(
-                            "Invalid `--{}` / `-{}`: \"{}\"",
-                            CACHE_SIZE_LIMIT, CACHE_SIZE_LIMIT_SHORT, e
+                        invalid_error_msg(
+                            CACHE_SIZE_LIMIT,
+                            CACHE_SIZE_LIMIT_SHORT,
+                            &e.to_string(),
+                            "",
+                            "",
                         );
+
                         exit(1);
                     })
                 })
@@ -970,19 +982,11 @@ fn get_setup() -> Setup {
 
         if let Some(username) = opt_str(USERNAME) {
             if username.is_empty() {
-                error!(
-                    "`--{}` / `-{}` can not be an empty string",
-                    USERNAME, USERNAME_SHORT
-                );
-                exit(1);
+                empty_string_error_msg(USERNAME, USERNAME_SHORT);
             }
             if let Some(password) = opt_str(PASSWORD) {
                 if password.is_empty() {
-                    error!(
-                        "`--{}` / `-{}` can not be an empty string",
-                        PASSWORD, PASSWORD_SHORT
-                    );
-                    exit(1);
+                    empty_string_error_msg(PASSWORD, PASSWORD_SHORT);
                 }
                 Some(Credentials::with_password(username, password))
             } else {
@@ -990,7 +994,6 @@ fn get_setup() -> Setup {
                     Some(creds) if username == creds.username => Some(creds),
                     _ => {
                         let prompt = &format!("Password for {}: ", username);
-
                         match rpassword::prompt_password_stderr(prompt) {
                             Ok(password) => {
                                 if !password.is_empty() {
@@ -1015,6 +1018,9 @@ fn get_setup() -> Setup {
                 }
             }
         } else {
+            if cached_creds.is_some() {
+                trace!("Using cached credentials.");
+            }
             cached_creds
         }
     };
@@ -1037,16 +1043,8 @@ fn get_setup() -> Setup {
         opt_str(ZEROCONF_PORT)
             .map(|port| {
                 let on_error = || {
-                    error!(
-                        "Invalid `--{}` / `-{}`: \"{}\"",
-                        ZEROCONF_PORT, ZEROCONF_PORT_SHORT, port
-                    );
-                    println!(
-                        "Valid `--{}` / `-{}` values: 1 - {}",
-                        ZEROCONF_PORT,
-                        ZEROCONF_PORT_SHORT,
-                        u16::MAX
-                    );
+                    let valid_values = &format!("1 - {}", u16::MAX);
+                    invalid_error_msg(ZEROCONF_PORT, ZEROCONF_PORT_SHORT, &port, valid_values, "");
                 };
 
                 let port = port.parse::<u16>().unwrap_or_else(|_| {
@@ -1072,36 +1070,37 @@ fn get_setup() -> Setup {
         let name = opt_str(NAME).unwrap_or_else(|| connect_default_config.name.clone());
 
         if name.is_empty() {
-            error!(
-                "`--{}` / `-{}` can not be an empty string",
-                NAME, NAME_SHORT
-            );
+            empty_string_error_msg(NAME, NAME_SHORT);
             exit(1);
         }
 
         let initial_volume = opt_str(INITIAL_VOLUME)
             .map(|initial_volume| {
                 let on_error = || {
-                    error!(
-                        "Invalid `--{}` / `-{}`: \"{}\"",
-                        INITIAL_VOLUME, INITIAL_VOLUME_SHORT, initial_volume
-                    );
-                    println!(
-                        "Valid `--{}` / `-{}` values: {} - {}",
-                        INITIAL_VOLUME,
-                        INITIAL_VOLUME_SHORT,
+                    let valid_values = &format!(
+                        "{} - {}",
                         VALID_INITIAL_VOLUME_RANGE.start(),
                         VALID_INITIAL_VOLUME_RANGE.end()
                     );
+
                     #[cfg(feature = "alsa-backend")]
-                    println!(
-                        "Default: {}, or the current value when the alsa mixer is used.",
+                    let default_value = &format!(
+                        "{}, or the current value when the alsa mixer is used.",
                         connect_default_config.initial_volume.unwrap_or_default()
                     );
+
                     #[cfg(not(feature = "alsa-backend"))]
-                    println!(
-                        "Default: {}",
-                        connect_default_config.initial_volume.unwrap_or_default()
+                    let default_value = &connect_default_config
+                        .initial_volume
+                        .unwrap_or_default()
+                        .to_string();
+
+                    invalid_error_msg(
+                        INITIAL_VOLUME,
+                        INITIAL_VOLUME_SHORT,
+                        &initial_volume,
+                        valid_values,
+                        default_value,
                     );
                 };
 
@@ -1127,12 +1126,18 @@ fn get_setup() -> Setup {
             .as_deref()
             .map(|device_type| {
                 DeviceType::from_str(device_type).unwrap_or_else(|_| {
-                    error!("Invalid `--{}` / `-{}`: \"{}\"", DEVICE_TYPE, DEVICE_TYPE_SHORT, device_type);
-                    println!("Valid `--{}` / `-{}` values: computer, tablet, smartphone, speaker, tv, avr, stb, audiodongle, \
-                        gameconsole, castaudio, castvideo, automobile, smartwatch, chromebook, carthing, homething",
-                        DEVICE_TYPE, DEVICE_TYPE_SHORT
+                    invalid_error_msg(
+                        DEVICE_TYPE,
+                        DEVICE_TYPE_SHORT,
+                        device_type,
+                        "computer, tablet, smartphone, \
+                        speaker, tv, avr, stb, audiodongle, \
+                        gameconsole, castaudio, castvideo, \
+                        automobile, smartwatch, chromebook, \
+                        carthing, homething",
+                        "speaker",
                     );
-                    println!("Default: speaker");
+
                     exit(1);
                 })
             })
@@ -1178,8 +1183,8 @@ fn get_setup() -> Setup {
         ),
         ap_port: opt_str(AP_PORT).map(|port| {
             let on_error = || {
-                error!("Invalid `--{}` / `-{}`: \"{}\"", AP_PORT, AP_PORT_SHORT, port);
-                println!("Valid `--{}` / `-{}` values: 1 - {}", AP_PORT, AP_PORT_SHORT, u16::MAX);
+                let valid_values = &format!("1 - {}", u16::MAX);
+                invalid_error_msg(AP_PORT, AP_PORT_SHORT, &port, valid_values, "");
             };
 
             let port = port.parse::<u16>().unwrap_or_else(|_| {
@@ -1203,15 +1208,7 @@ fn get_setup() -> Setup {
             .as_deref()
             .map(|bitrate| {
                 Bitrate::from_str(bitrate).unwrap_or_else(|_| {
-                    error!(
-                        "Invalid `--{}` / `-{}`: \"{}\"",
-                        BITRATE, BITRATE_SHORT, bitrate
-                    );
-                    println!(
-                        "Valid `--{}` / `-{}` values: 96, 160, 320",
-                        BITRATE, BITRATE_SHORT
-                    );
-                    println!("Default: 160");
+                    invalid_error_msg(BITRATE, BITRATE_SHORT, bitrate, "96, 160, 320", "160");
                     exit(1);
                 })
             })
@@ -1265,15 +1262,14 @@ fn get_setup() -> Setup {
                     );
 
                     let method = NormalisationMethod::from_str(method).unwrap_or_else(|_| {
-                        error!(
-                            "Invalid `--{}` / `-{}`: \"{}\"",
-                            NORMALISATION_METHOD, NORMALISATION_METHOD_SHORT, method
+                        invalid_error_msg(
+                            NORMALISATION_METHOD,
+                            NORMALISATION_METHOD_SHORT,
+                            method,
+                            "basic, dynamic",
+                            &format!("{:?}", player_default_config.normalisation_method),
                         );
-                        println!(
-                            "Valid `--{}` / `-{}` values: basic, dynamic",
-                            NORMALISATION_METHOD, NORMALISATION_METHOD_SHORT
-                        );
-                        println!("Default: {:?}", player_default_config.normalisation_method);
+
                         exit(1);
                     });
 
@@ -1292,15 +1288,14 @@ fn get_setup() -> Setup {
                 .as_deref()
                 .map(|gain_type| {
                     NormalisationType::from_str(gain_type).unwrap_or_else(|_| {
-                        error!(
-                            "Invalid `--{}` / `-{}`: \"{}\"",
-                            NORMALISATION_GAIN_TYPE, NORMALISATION_GAIN_TYPE_SHORT, gain_type
+                        invalid_error_msg(
+                            NORMALISATION_GAIN_TYPE,
+                            NORMALISATION_GAIN_TYPE_SHORT,
+                            gain_type,
+                            "track, album, auto",
+                            &format!("{:?}", player_default_config.normalisation_type),
                         );
-                        println!(
-                            "Valid `--{}` / `-{}` values: track, album, auto",
-                            NORMALISATION_GAIN_TYPE, NORMALISATION_GAIN_TYPE_SHORT,
-                        );
-                        println!("Default: {:?}", player_default_config.normalisation_type);
+
                         exit(1);
                     })
                 })
@@ -1309,18 +1304,19 @@ fn get_setup() -> Setup {
             normalisation_pregain = opt_str(NORMALISATION_PREGAIN)
                 .map(|pregain| {
                     let on_error = || {
-                        error!(
-                            "Invalid `--{}` / `-{}`: \"{}\"",
-                            NORMALISATION_PREGAIN, NORMALISATION_PREGAIN_SHORT, pregain
-                        );
-                        println!(
-                            "Valid `--{}` / `-{}` values: {} - {}",
-                            NORMALISATION_PREGAIN,
-                            NORMALISATION_PREGAIN_SHORT,
+                        let valid_values = &format!(
+                            "{} - {}",
                             VALID_NORMALISATION_PREGAIN_RANGE.start(),
                             VALID_NORMALISATION_PREGAIN_RANGE.end()
                         );
-                        println!("Default: {}", player_default_config.normalisation_pregain);
+
+                        invalid_error_msg(
+                            NORMALISATION_PREGAIN,
+                            NORMALISATION_PREGAIN_SHORT,
+                            &pregain,
+                            valid_values,
+                            &player_default_config.normalisation_pregain.to_string(),
+                        );
                     };
 
                     let pregain = pregain.parse::<f64>().unwrap_or_else(|_| {
@@ -1340,20 +1336,18 @@ fn get_setup() -> Setup {
             normalisation_threshold = opt_str(NORMALISATION_THRESHOLD)
                 .map(|threshold| {
                     let on_error = || {
-                        error!(
-                            "Invalid `--{}` / `-{}`: \"{}\"",
-                            NORMALISATION_THRESHOLD, NORMALISATION_THRESHOLD_SHORT, threshold
-                        );
-                        println!(
-                            "Valid `--{}` / `-{}` values: {} - {}",
-                            NORMALISATION_THRESHOLD,
-                            NORMALISATION_THRESHOLD_SHORT,
+                        let valid_values = &format!(
+                            "{} - {}",
                             VALID_NORMALISATION_THRESHOLD_RANGE.start(),
                             VALID_NORMALISATION_THRESHOLD_RANGE.end()
                         );
-                        println!(
-                            "Default: {}",
-                            ratio_to_db(player_default_config.normalisation_threshold)
+
+                        invalid_error_msg(
+                            NORMALISATION_THRESHOLD,
+                            NORMALISATION_THRESHOLD_SHORT,
+                            &threshold,
+                            valid_values,
+                            &ratio_to_db(player_default_config.normalisation_threshold).to_string(),
                         );
                     };
 
@@ -1374,20 +1368,21 @@ fn get_setup() -> Setup {
             normalisation_attack = opt_str(NORMALISATION_ATTACK)
                 .map(|attack| {
                     let on_error = || {
-                        error!(
-                            "Invalid `--{}` / `-{}`: \"{}\"",
-                            NORMALISATION_ATTACK, NORMALISATION_ATTACK_SHORT, attack
-                        );
-                        println!(
-                            "Valid `--{}` / `-{}` values: {} - {}",
-                            NORMALISATION_ATTACK,
-                            NORMALISATION_ATTACK_SHORT,
+                        let valid_values = &format!(
+                            "{} - {}",
                             VALID_NORMALISATION_ATTACK_RANGE.start(),
                             VALID_NORMALISATION_ATTACK_RANGE.end()
                         );
-                        println!(
-                            "Default: {}",
-                            player_default_config.normalisation_attack.as_millis()
+
+                        invalid_error_msg(
+                            NORMALISATION_ATTACK,
+                            NORMALISATION_ATTACK_SHORT,
+                            &attack,
+                            valid_values,
+                            &player_default_config
+                                .normalisation_attack
+                                .as_millis()
+                                .to_string(),
                         );
                     };
 
@@ -1408,20 +1403,21 @@ fn get_setup() -> Setup {
             normalisation_release = opt_str(NORMALISATION_RELEASE)
                 .map(|release| {
                     let on_error = || {
-                        error!(
-                            "Invalid `--{}` / `-{}`: \"{}\"",
-                            NORMALISATION_RELEASE, NORMALISATION_RELEASE_SHORT, release
-                        );
-                        println!(
-                            "Valid `--{}` / `-{}` values: {} - {}",
-                            NORMALISATION_RELEASE,
-                            NORMALISATION_RELEASE_SHORT,
+                        let valid_values = &format!(
+                            "{} - {}",
                             VALID_NORMALISATION_RELEASE_RANGE.start(),
                             VALID_NORMALISATION_RELEASE_RANGE.end()
                         );
-                        println!(
-                            "Default: {}",
-                            player_default_config.normalisation_release.as_millis()
+
+                        invalid_error_msg(
+                            NORMALISATION_RELEASE,
+                            NORMALISATION_RELEASE_SHORT,
+                            &release,
+                            valid_values,
+                            &player_default_config
+                                .normalisation_release
+                                .as_millis()
+                                .to_string(),
                         );
                     };
 
@@ -1442,18 +1438,19 @@ fn get_setup() -> Setup {
             normalisation_knee = opt_str(NORMALISATION_KNEE)
                 .map(|knee| {
                     let on_error = || {
-                        error!(
-                            "Invalid `--{}` / `-{}`: \"{}\"",
-                            NORMALISATION_KNEE, NORMALISATION_KNEE_SHORT, knee
-                        );
-                        println!(
-                            "Valid `--{}` / `-{}` values: {} - {}",
-                            NORMALISATION_KNEE,
-                            NORMALISATION_KNEE_SHORT,
+                        let valid_values = &format!(
+                            "{} - {}",
                             VALID_NORMALISATION_KNEE_RANGE.start(),
                             VALID_NORMALISATION_KNEE_RANGE.end()
                         );
-                        println!("Default: {}", player_default_config.normalisation_knee);
+
+                        invalid_error_msg(
+                            NORMALISATION_KNEE,
+                            NORMALISATION_KNEE_SHORT,
+                            &knee,
+                            valid_values,
+                            &player_default_config.normalisation_knee.to_string(),
+                        );
                     };
 
                     let knee = knee.parse::<f64>().unwrap_or_else(|_| {
@@ -1483,19 +1480,14 @@ fn get_setup() -> Setup {
                 }
 
                 Some(dither::find_ditherer(ditherer_name).unwrap_or_else(|| {
-                    error!(
-                        "Invalid `--{}` / `-{}`: \"{}\"",
+                    invalid_error_msg(
                         DITHER,
                         DITHER_SHORT,
-                        opt_str(DITHER).unwrap_or_default()
+                        &opt_str(DITHER).unwrap_or_default(),
+                        "none, gpdf, tpdf, tpdf_hp",
+                        "tpdf for formats S16, S24, S24_3 and none for other formats",
                     );
-                    println!(
-                        "Valid `--{}` / `-{}` values: none, gpdf, tpdf, tpdf_hp",
-                        DITHER, DITHER_SHORT
-                    );
-                    println!(
-                        "Default: tpdf for formats S16, S24, S24_3 and none for other formats"
-                    );
+
                     exit(1);
                 }))
             }
