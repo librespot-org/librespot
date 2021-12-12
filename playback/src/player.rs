@@ -950,8 +950,11 @@ impl Future for PlayerInternal {
                             exit(1);
                         }
                     }
-                    Poll::Ready(Err(_)) => {
-                        warn!("Unable to load <{:?}>\nSkipping to next track", track_id);
+                    Poll::Ready(Err(e)) => {
+                        warn!(
+                            "Skipping to next track, unable to load track <{:?}>: {:?}",
+                            track_id, e
+                        );
                         debug_assert!(self.state.is_loading());
                         self.send_event(PlayerEvent::EndOfTrack {
                             track_id,
@@ -1052,7 +1055,7 @@ impl Future for PlayerInternal {
                                             }
                                         }
                                         Err(e) => {
-                                            warn!("Unable to decode samples for track <{:?}: {:?}>\nSkipping to next track", track_id, e);
+                                            warn!("Skipping to next track, unable to decode samples for track <{:?}>: {:?}", track_id, e);
                                             self.send_event(PlayerEvent::EndOfTrack {
                                                 track_id,
                                                 play_request_id,
@@ -1068,11 +1071,7 @@ impl Future for PlayerInternal {
                             self.handle_packet(packet, normalisation_factor);
                         }
                         Err(e) => {
-                            warn!(
-                                "Unable to get packet for track <{:?}: {:?}>\nSkipping to next track",
-								e,
-                                track_id
-                            );
+                            warn!("Skipping to next track, unable to get next packet for track <{:?}>: {:?}", track_id, e);
                             self.send_event(PlayerEvent::EndOfTrack {
                                 track_id,
                                 play_request_id,
