@@ -852,8 +852,9 @@ fn get_setup() -> Setup {
         let control = mixer_default_config.control;
 
         let volume_range = opt_str(VOLUME_RANGE)
-            .map(|range| {
-                let on_error = || {
+            .map(|range| match range.parse::<f64>() {
+                Ok(value) if (VALID_VOLUME_RANGE).contains(&value) => value,
+                _ => {
                     let valid_values = &format!(
                         "{} - {}",
                         VALID_VOLUME_RANGE.start(),
@@ -876,19 +877,9 @@ fn get_setup() -> Setup {
                         valid_values,
                         default_value,
                     );
-                };
 
-                let range = range.parse::<f64>().unwrap_or_else(|_| {
-                    on_error();
-                    exit(1);
-                });
-
-                if !(VALID_VOLUME_RANGE).contains(&range) {
-                    on_error();
                     exit(1);
                 }
-
-                range
             })
             .unwrap_or_else(|| match mixer_type.as_deref() {
                 #[cfg(feature = "alsa-backend")]
@@ -1041,23 +1032,14 @@ fn get_setup() -> Setup {
 
     let zeroconf_port = if enable_discovery {
         opt_str(ZEROCONF_PORT)
-            .map(|port| {
-                let on_error = || {
+            .map(|port| match port.parse::<u16>() {
+                Ok(value) if value != 0 => value,
+                _ => {
                     let valid_values = &format!("1 - {}", u16::MAX);
                     invalid_error_msg(ZEROCONF_PORT, ZEROCONF_PORT_SHORT, &port, valid_values, "");
-                };
 
-                let port = port.parse::<u16>().unwrap_or_else(|_| {
-                    on_error();
-                    exit(1);
-                });
-
-                if port == 0 {
-                    on_error();
                     exit(1);
                 }
-
-                port
             })
             .unwrap_or(0)
     } else {
@@ -1076,43 +1058,38 @@ fn get_setup() -> Setup {
 
         let initial_volume = opt_str(INITIAL_VOLUME)
             .map(|initial_volume| {
-                let on_error = || {
-                    let valid_values = &format!(
-                        "{} - {}",
-                        VALID_INITIAL_VOLUME_RANGE.start(),
-                        VALID_INITIAL_VOLUME_RANGE.end()
-                    );
+                let volume = match initial_volume.parse::<u16>() {
+                    Ok(value) if (VALID_INITIAL_VOLUME_RANGE).contains(&value) => value,
+                    _ => {
+                        let valid_values = &format!(
+                            "{} - {}",
+                            VALID_INITIAL_VOLUME_RANGE.start(),
+                            VALID_INITIAL_VOLUME_RANGE.end()
+                        );
 
-                    #[cfg(feature = "alsa-backend")]
-                    let default_value = &format!(
-                        "{}, or the current value when the alsa mixer is used.",
-                        connect_default_config.initial_volume.unwrap_or_default()
-                    );
+                        #[cfg(feature = "alsa-backend")]
+                        let default_value = &format!(
+                            "{}, or the current value when the alsa mixer is used.",
+                            connect_default_config.initial_volume.unwrap_or_default()
+                        );
 
-                    #[cfg(not(feature = "alsa-backend"))]
-                    let default_value = &connect_default_config
-                        .initial_volume
-                        .unwrap_or_default()
-                        .to_string();
+                        #[cfg(not(feature = "alsa-backend"))]
+                        let default_value = &connect_default_config
+                            .initial_volume
+                            .unwrap_or_default()
+                            .to_string();
 
-                    invalid_error_msg(
-                        INITIAL_VOLUME,
-                        INITIAL_VOLUME_SHORT,
-                        &initial_volume,
-                        valid_values,
-                        default_value,
-                    );
+                        invalid_error_msg(
+                            INITIAL_VOLUME,
+                            INITIAL_VOLUME_SHORT,
+                            &initial_volume,
+                            valid_values,
+                            default_value,
+                        );
+
+                        exit(1);
+                    }
                 };
-
-                let volume = initial_volume.parse::<u16>().unwrap_or_else(|_| {
-                    on_error();
-                    exit(1);
-                });
-
-                if !(VALID_INITIAL_VOLUME_RANGE).contains(&volume) {
-                    on_error();
-                    exit(1);
-                }
 
                 (volume as f32 / 100.0 * VolumeCtrl::MAX_VOLUME as f32) as u16
             })
@@ -1135,7 +1112,7 @@ fn get_setup() -> Setup {
                         gameconsole, castaudio, castvideo, \
                         automobile, smartwatch, chromebook, \
                         carthing, homething",
-                        "speaker",
+                        DeviceType::default().into(),
                     );
 
                     exit(1);
@@ -1181,23 +1158,14 @@ fn get_setup() -> Setup {
                 }
             },
         ),
-        ap_port: opt_str(AP_PORT).map(|port| {
-            let on_error = || {
+        ap_port: opt_str(AP_PORT).map(|port| match port.parse::<u16>() {
+            Ok(value) if value != 0 => value,
+            _ => {
                 let valid_values = &format!("1 - {}", u16::MAX);
                 invalid_error_msg(AP_PORT, AP_PORT_SHORT, &port, valid_values, "");
-            };
 
-            let port = port.parse::<u16>().unwrap_or_else(|_| {
-                on_error();
-                exit(1);
-            });
-
-            if port == 0 {
-                on_error();
                 exit(1);
             }
-
-            port
         }),
     };
 
@@ -1302,8 +1270,9 @@ fn get_setup() -> Setup {
                 .unwrap_or(player_default_config.normalisation_type);
 
             normalisation_pregain = opt_str(NORMALISATION_PREGAIN)
-                .map(|pregain| {
-                    let on_error = || {
+                .map(|pregain| match pregain.parse::<f64>() {
+                    Ok(value) if (VALID_NORMALISATION_PREGAIN_RANGE).contains(&value) => value,
+                    _ => {
                         let valid_values = &format!(
                             "{} - {}",
                             VALID_NORMALISATION_PREGAIN_RANGE.start(),
@@ -1317,25 +1286,18 @@ fn get_setup() -> Setup {
                             valid_values,
                             &player_default_config.normalisation_pregain.to_string(),
                         );
-                    };
 
-                    let pregain = pregain.parse::<f64>().unwrap_or_else(|_| {
-                        on_error();
-                        exit(1);
-                    });
-
-                    if !(VALID_NORMALISATION_PREGAIN_RANGE).contains(&pregain) {
-                        on_error();
                         exit(1);
                     }
-
-                    pregain
                 })
                 .unwrap_or(player_default_config.normalisation_pregain);
 
             normalisation_threshold = opt_str(NORMALISATION_THRESHOLD)
-                .map(|threshold| {
-                    let on_error = || {
+                .map(|threshold| match threshold.parse::<f64>() {
+                    Ok(value) if (VALID_NORMALISATION_THRESHOLD_RANGE).contains(&value) => {
+                        db_to_ratio(value)
+                    }
+                    _ => {
                         let valid_values = &format!(
                             "{} - {}",
                             VALID_NORMALISATION_THRESHOLD_RANGE.start(),
@@ -1349,25 +1311,18 @@ fn get_setup() -> Setup {
                             valid_values,
                             &ratio_to_db(player_default_config.normalisation_threshold).to_string(),
                         );
-                    };
 
-                    let threshold = threshold.parse::<f64>().unwrap_or_else(|_| {
-                        on_error();
-                        exit(1);
-                    });
-
-                    if !(VALID_NORMALISATION_THRESHOLD_RANGE).contains(&threshold) {
-                        on_error();
                         exit(1);
                     }
-
-                    db_to_ratio(threshold)
                 })
                 .unwrap_or(player_default_config.normalisation_threshold);
 
             normalisation_attack = opt_str(NORMALISATION_ATTACK)
-                .map(|attack| {
-                    let on_error = || {
+                .map(|attack| match attack.parse::<u64>() {
+                    Ok(value) if (VALID_NORMALISATION_ATTACK_RANGE).contains(&value) => {
+                        Duration::from_millis(value)
+                    }
+                    _ => {
                         let valid_values = &format!(
                             "{} - {}",
                             VALID_NORMALISATION_ATTACK_RANGE.start(),
@@ -1384,25 +1339,18 @@ fn get_setup() -> Setup {
                                 .as_millis()
                                 .to_string(),
                         );
-                    };
 
-                    let attack = attack.parse::<u64>().unwrap_or_else(|_| {
-                        on_error();
-                        exit(1);
-                    });
-
-                    if !(VALID_NORMALISATION_ATTACK_RANGE).contains(&attack) {
-                        on_error();
                         exit(1);
                     }
-
-                    Duration::from_millis(attack)
                 })
                 .unwrap_or(player_default_config.normalisation_attack);
 
             normalisation_release = opt_str(NORMALISATION_RELEASE)
-                .map(|release| {
-                    let on_error = || {
+                .map(|release| match release.parse::<u64>() {
+                    Ok(value) if (VALID_NORMALISATION_RELEASE_RANGE).contains(&value) => {
+                        Duration::from_millis(value)
+                    }
+                    _ => {
                         let valid_values = &format!(
                             "{} - {}",
                             VALID_NORMALISATION_RELEASE_RANGE.start(),
@@ -1419,25 +1367,16 @@ fn get_setup() -> Setup {
                                 .as_millis()
                                 .to_string(),
                         );
-                    };
 
-                    let release = release.parse::<u64>().unwrap_or_else(|_| {
-                        on_error();
-                        exit(1);
-                    });
-
-                    if !(VALID_NORMALISATION_RELEASE_RANGE).contains(&release) {
-                        on_error();
                         exit(1);
                     }
-
-                    Duration::from_millis(release)
                 })
                 .unwrap_or(player_default_config.normalisation_release);
 
             normalisation_knee = opt_str(NORMALISATION_KNEE)
-                .map(|knee| {
-                    let on_error = || {
+                .map(|knee| match knee.parse::<f64>() {
+                    Ok(value) if (VALID_NORMALISATION_KNEE_RANGE).contains(&value) => value,
+                    _ => {
                         let valid_values = &format!(
                             "{} - {}",
                             VALID_NORMALISATION_KNEE_RANGE.start(),
@@ -1451,47 +1390,35 @@ fn get_setup() -> Setup {
                             valid_values,
                             &player_default_config.normalisation_knee.to_string(),
                         );
-                    };
 
-                    let knee = knee.parse::<f64>().unwrap_or_else(|_| {
-                        on_error();
-                        exit(1);
-                    });
-
-                    if !(VALID_NORMALISATION_KNEE_RANGE).contains(&knee) {
-                        on_error();
                         exit(1);
                     }
-
-                    knee
                 })
                 .unwrap_or(player_default_config.normalisation_knee);
         }
 
         let ditherer_name = opt_str(DITHER);
         let ditherer = match ditherer_name.as_deref() {
-            // explicitly disabled on command line
-            Some("none") => None,
-            // explicitly set on command line
-            Some(_) => {
-                if matches!(format, AudioFormat::F64 | AudioFormat::F32) {
-                    error!("Dithering is not available with format: {:?}.", format);
-                    exit(1);
-                }
+            Some(value) => match value {
+                "none" => None,
+                _ => match format {
+                    AudioFormat::F64 | AudioFormat::F32 => {
+                        error!("Dithering is not available with format: {:?}.", format);
+                        exit(1);
+                    }
+                    _ => Some(dither::find_ditherer(ditherer_name).unwrap_or_else(|| {
+                        invalid_error_msg(
+                            DITHER,
+                            DITHER_SHORT,
+                            &opt_str(DITHER).unwrap_or_default(),
+                            "none, gpdf, tpdf, tpdf_hp for formats S16, S24, S24_3, S32, none for formats F32, F64",
+                            "tpdf for formats S16, S24, S24_3 and none for formats S32, F32, F64",
+                        );
 
-                Some(dither::find_ditherer(ditherer_name).unwrap_or_else(|| {
-                    invalid_error_msg(
-                        DITHER,
-                        DITHER_SHORT,
-                        &opt_str(DITHER).unwrap_or_default(),
-                        "none, gpdf, tpdf, tpdf_hp",
-                        "tpdf for formats S16, S24, S24_3 and none for other formats",
-                    );
-
-                    exit(1);
-                }))
-            }
-            // nothing set on command line => use default
+                        exit(1);
+                    })),
+                },
+            },
             None => match format {
                 AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
                     player_default_config.ditherer
