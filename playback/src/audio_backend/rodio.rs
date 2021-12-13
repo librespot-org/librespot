@@ -227,5 +227,6 @@ impl Sink for RodioSink {
 }
 
 impl RodioSink {
+    #[allow(dead_code)]
     pub const NAME: &'static str = "rodio";
 }

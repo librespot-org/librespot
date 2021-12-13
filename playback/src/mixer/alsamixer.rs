@@ -10,6 +10,7 @@ use alsa::{Ctl, Round};
 use std::ffi::CString;
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct AlsaMixer {
     config: MixerConfig,
     min: i64,

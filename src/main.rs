@@ -1,6 +1,6 @@
 use futures_util::{future, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -42,6 +42,23 @@ fn device_id(name: &str) -> String {
 fn usage(program: &str, opts: &getopts::Options) -> String {
     let brief = format!("Usage: {} [options]", program);
     opts.usage(&brief)
+}
+
+fn arg_to_var(arg: &str) -> String {
+    // To avoid name collisions environment variables must be prepended
+    // with `LIBRESPOT_` so option/flag `foo-bar` becomes `LIBRESPOT_FOO_BAR`.
+    format!("LIBRESPOT_{}", arg.to_uppercase().replace("-", "_"))
+}
+
+fn env_var_present(arg: &str) -> bool {
+    env::var(arg_to_var(arg)).is_ok()
+}
+
+fn env_var_opt_str(option: &str) -> Option<String> {
+    match env::var(arg_to_var(option)) {
+        Ok(value) => Some(value),
+        Err(_) => None,
+    }
 }
 
 fn setup_logging(quiet: bool, verbose: bool) {
@@ -591,19 +608,83 @@ fn get_setup(args: &[String]) -> Setup {
         }
     };
 
-    if matches.opt_present(HELP) {
+    let opt_present = |opt| matches.opt_present(opt) || env_var_present(opt);
+
+    let opt_str = |opt| {
+        if matches.opt_present(opt) {
+            matches.opt_str(opt)
+        } else {
+            env_var_opt_str(opt)
+        }
+    };
+
+    if opt_present(HELP) {
         println!("{}", usage(&args[0], &opts));
         exit(0);
     }
 
-    if matches.opt_present(VERSION) {
+    if opt_present(VERSION) {
         println!("{}", get_version_string());
         exit(0);
     }
 
-    setup_logging(matches.opt_present(QUIET), matches.opt_present(VERBOSE));
+    setup_logging(opt_present(QUIET), opt_present(VERBOSE));
 
     info!("{}", get_version_string());
+
+    let librespot_env_vars: Vec<String> = env::vars_os()
+        .filter_map(|(k, v)| {
+            let mut env_var = None;
+            if let Some(key) = k.to_str() {
+                if key.starts_with("LIBRESPOT_") {
+                    if matches!(key, "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME") {
+                        // Don't log creds.
+                        env_var = Some(format!("\t\t{}=XXXXXXXX", key));
+                    } else if let Some(value) = v.to_str() {
+                        env_var = Some(format!("\t\t{}={}", key, value));
+                    }
+                }
+            }
+
+            env_var
+        })
+        .collect();
+
+    if !librespot_env_vars.is_empty() {
+        trace!("Environment variable(s):");
+
+        for kv in librespot_env_vars {
+            trace!("{}", kv);
+        }
+    }
+
+    let cmd_args = &args[1..];
+
+    let cmd_args_len = cmd_args.len();
+
+    if cmd_args_len > 0 {
+        trace!("Command line argument(s):");
+
+        for (index, key) in cmd_args.iter().enumerate() {
+            if key.starts_with('-') || key.starts_with("--") {
+                if matches!(key.as_str(), "--password" | "-p" | "--username" | "-u") {
+                    // Don't log creds.
+                    trace!("\t\t{} XXXXXXXX", key);
+                } else {
+                    let mut value = "".to_string();
+                    let next = index + 1;
+                    if next < cmd_args_len {
+                        let next_key = cmd_args[next].clone();
+                        if !next_key.starts_with('-') && !next_key.starts_with("--") {
+                            value = next_key;
+                        }
+                    }
+
+                    trace!("\t\t{} {}", key, value);
+                }
+            }
+        }
+    }
 
     #[cfg(not(feature = "alsa-backend"))]
     for a in &[
@@ -612,13 +693,13 @@ fn get_setup(args: &[String]) -> Setup {
         ALSA_MIXER_INDEX,
         ALSA_MIXER_CONTROL,
     ] {
-        if matches.opt_present(a) {
+        if opt_present(a) {
             warn!("Alsa specific options have no effect if the alsa backend is not enabled at build time.");
             break;
         }
     }
 
-    let backend_name = matches.opt_str(BACKEND);
+    let backend_name = opt_str(BACKEND);
     if backend_name == Some("?".into()) {
         list_backends();
         exit(0);
@@ -629,14 +710,13 @@ fn get_setup(args: &[String]) -> Setup {
             "Invalid `--{}` / `-{}`: {}",
             BACKEND,
             BACKEND_SHORT,
-            matches.opt_str(BACKEND).unwrap_or_default()
+            opt_str(BACKEND).unwrap_or_default()
         );
         list_backends();
         exit(1);
     });
 
-    let format = matches
-        .opt_str(FORMAT)
+    let format = opt_str(FORMAT)
         .as_deref()
         .map(|format| {
             AudioFormat::from_str(format).unwrap_or_else(|_| {
@@ -656,7 +736,7 @@ fn get_setup(args: &[String]) -> Setup {
         feature = "rodio-backend",
         feature = "portaudio-backend"
     ))]
-    let device = matches.opt_str(DEVICE);
+    let device = opt_str(DEVICE);
 
     #[cfg(any(
         feature = "alsa-backend",
@@ -680,7 +760,7 @@ fn get_setup(args: &[String]) -> Setup {
         feature = "rodio-backend",
         feature = "portaudio-backend"
     )))]
-    if matches.opt_present(DEVICE) {
+    if opt_present(DEVICE) {
         warn!(
             "The `--{}` / `-{}` option is not supported by the included audio backend(s), and has no effect.",
             DEVICE, DEVICE_SHORT,
@@ -688,7 +768,7 @@ fn get_setup(args: &[String]) -> Setup {
     }
 
     #[cfg(feature = "alsa-backend")]
-    let mixer_type = matches.opt_str(MIXER_TYPE);
+    let mixer_type = opt_str(MIXER_TYPE);
     #[cfg(not(feature = "alsa-backend"))]
     let mixer_type: Option<String> = None;
 
@@ -697,7 +777,7 @@ fn get_setup(args: &[String]) -> Setup {
             "Invalid `--{}` / `-{}`: {}",
             MIXER_TYPE,
             MIXER_TYPE_SHORT,
-            matches.opt_str(MIXER_TYPE).unwrap_or_default()
+            opt_str(MIXER_TYPE).unwrap_or_default()
         );
         println!(
             "Valid `--{}` / `-{}` values: alsa, softvol",
@@ -711,7 +791,7 @@ fn get_setup(args: &[String]) -> Setup {
         let mixer_default_config = MixerConfig::default();
 
         #[cfg(feature = "alsa-backend")]
-        let device = matches.opt_str(ALSA_MIXER_DEVICE).unwrap_or_else(|| {
+        let device = opt_str(ALSA_MIXER_DEVICE).unwrap_or_else(|| {
             if let Some(ref device_name) = device {
                 device_name.to_string()
             } else {
@@ -723,8 +803,7 @@ fn get_setup(args: &[String]) -> Setup {
         let device = mixer_default_config.device;
 
         #[cfg(feature = "alsa-backend")]
-        let index = matches
-            .opt_str(ALSA_MIXER_INDEX)
+        let index = opt_str(ALSA_MIXER_INDEX)
             .map(|index| {
                 index.parse::<u32>().unwrap_or_else(|_| {
                     error!(
@@ -741,15 +820,12 @@ fn get_setup(args: &[String]) -> Setup {
         let index = mixer_default_config.index;
 
         #[cfg(feature = "alsa-backend")]
-        let control = matches
-            .opt_str(ALSA_MIXER_CONTROL)
-            .unwrap_or(mixer_default_config.control);
+        let control = opt_str(ALSA_MIXER_CONTROL).unwrap_or(mixer_default_config.control);
 
         #[cfg(not(feature = "alsa-backend"))]
         let control = mixer_default_config.control;
 
-        let volume_range = matches
-            .opt_str(VOLUME_RANGE)
+        let volume_range = opt_str(VOLUME_RANGE)
             .map(|range| {
                 let on_error = || {
                     error!(
@@ -790,8 +866,7 @@ fn get_setup(args: &[String]) -> Setup {
                 _ => VolumeCtrl::DEFAULT_DB_RANGE,
             });
 
-        let volume_ctrl = matches
-            .opt_str(VOLUME_CTRL)
+        let volume_ctrl = opt_str(VOLUME_CTRL)
             .as_deref()
             .map(|volume_ctrl| {
                 VolumeCtrl::from_str_with_range(volume_ctrl, volume_range).unwrap_or_else(|_| {
@@ -818,29 +893,26 @@ fn get_setup(args: &[String]) -> Setup {
     };
 
     let cache = {
-        let volume_dir = matches
-            .opt_str(SYSTEM_CACHE)
-            .or_else(|| matches.opt_str(CACHE))
+        let volume_dir = opt_str(SYSTEM_CACHE)
+            .or_else(|| opt_str(CACHE))
             .map(|p| p.into());
 
-        let cred_dir = if matches.opt_present(DISABLE_CREDENTIAL_CACHE) {
+        let cred_dir = if opt_present(DISABLE_CREDENTIAL_CACHE) {
             None
         } else {
             volume_dir.clone()
         };
 
-        let audio_dir = if matches.opt_present(DISABLE_AUDIO_CACHE) {
+        let audio_dir = if opt_present(DISABLE_AUDIO_CACHE) {
             None
         } else {
-            matches
-                .opt_str(CACHE)
+            opt_str(CACHE)
                 .as_ref()
                 .map(|p| AsRef::<Path>::as_ref(p).join("files"))
         };
 
         let limit = if audio_dir.is_some() {
-            matches
-                .opt_str(CACHE_SIZE_LIMIT)
+            opt_str(CACHE_SIZE_LIMIT)
                 .as_deref()
                 .map(parse_file_size)
                 .map(|e| {
@@ -856,7 +928,7 @@ fn get_setup(args: &[String]) -> Setup {
             None
         };
 
-        if audio_dir.is_none() && matches.opt_present(CACHE_SIZE_LIMIT) {
+        if audio_dir.is_none() && opt_present(CACHE_SIZE_LIMIT) {
             warn!(
                 "Without a `--{}` / `-{}` path, and/or if the `--{}` / `-{}` flag is set, `--{}` / `-{}` has no effect.",
                 CACHE, CACHE_SHORT, DISABLE_AUDIO_CACHE, DISABLE_AUDIO_CACHE_SHORT, CACHE_SIZE_LIMIT, CACHE_SIZE_LIMIT_SHORT
@@ -882,21 +954,21 @@ fn get_setup(args: &[String]) -> Setup {
         };
 
         get_credentials(
-            matches.opt_str(USERNAME),
-            matches.opt_str(PASSWORD),
+            opt_str(USERNAME),
+            opt_str(PASSWORD),
             cached_credentials,
             password,
         )
     };
 
-    let enable_discovery = !matches.opt_present(DISABLE_DISCOVERY);
+    let enable_discovery = !opt_present(DISABLE_DISCOVERY);
 
     if credentials.is_none() && !enable_discovery {
         error!("Credentials are required if discovery is disabled.");
         exit(1);
     }
 
-    if !enable_discovery && matches.opt_present(ZEROCONF_PORT) {
+    if !enable_discovery && opt_present(ZEROCONF_PORT) {
         warn!(
             "With the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
             DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
@@ -904,8 +976,7 @@ fn get_setup(args: &[String]) -> Setup {
     }
 
     let zeroconf_port = if enable_discovery {
-        matches
-            .opt_str(ZEROCONF_PORT)
+        opt_str(ZEROCONF_PORT)
             .map(|port| {
                 let on_error = || {
                     error!(
@@ -938,12 +1009,9 @@ fn get_setup(args: &[String]) -> Setup {
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
-        let name = matches
-            .opt_str(NAME)
-            .unwrap_or_else(|| connect_default_config.name.clone());
+        let name = opt_str(NAME).unwrap_or_else(|| connect_default_config.name.clone());
 
-        let initial_volume = matches
-            .opt_str(INITIAL_VOLUME)
+        let initial_volume = opt_str(INITIAL_VOLUME)
             .map(|initial_volume| {
                 let on_error = || {
                     error!(
@@ -984,8 +1052,7 @@ fn get_setup(args: &[String]) -> Setup {
                 _ => cache.as_ref().and_then(Cache::volume),
             });
 
-        let device_type = matches
-            .opt_str(DEVICE_TYPE)
+        let device_type = opt_str(DEVICE_TYPE)
             .as_deref()
             .map(|device_type| {
                 DeviceType::from_str(device_type).unwrap_or_else(|_| {
@@ -1001,7 +1068,7 @@ fn get_setup(args: &[String]) -> Setup {
             .unwrap_or_default();
 
         let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
-        let autoplay = matches.opt_present(AUTOPLAY);
+        let autoplay = opt_present(AUTOPLAY);
 
         ConnectConfig {
             name,
@@ -1018,7 +1085,7 @@ fn get_setup(args: &[String]) -> Setup {
         SessionConfig {
             user_agent: version::VERSION_STRING.to_string(),
             device_id,
-            proxy: matches.opt_str(PROXY).or_else(|| std::env::var("http_proxy").ok()).map(
+            proxy: opt_str(PROXY).or_else(|| std::env::var("http_proxy").ok()).map(
                 |s| {
                     match Url::parse(&s) {
                         Ok(url) => {
@@ -1041,8 +1108,7 @@ fn get_setup(args: &[String]) -> Setup {
                     }
                 },
             ),
-            ap_port: matches
-                .opt_str(AP_PORT)
+            ap_port: opt_str(AP_PORT)
                 .map(|port| {
                     let on_error = || {
                         error!("Invalid `--{}` / `-{}`: {}", AP_PORT, AP_PORT_SHORT, port);
@@ -1067,8 +1133,7 @@ fn get_setup(args: &[String]) -> Setup {
     let player_config = {
         let player_default_config = PlayerConfig::default();
 
-        let bitrate = matches
-            .opt_str(BITRATE)
+        let bitrate = opt_str(BITRATE)
             .as_deref()
             .map(|bitrate| {
                 Bitrate::from_str(bitrate).unwrap_or_else(|_| {
@@ -1086,9 +1151,9 @@ fn get_setup(args: &[String]) -> Setup {
             })
             .unwrap_or(player_default_config.bitrate);
 
-        let gapless = !matches.opt_present(DISABLE_GAPLESS);
+        let gapless = !opt_present(DISABLE_GAPLESS);
 
-        let normalisation = matches.opt_present(ENABLE_VOLUME_NORMALISATION);
+        let normalisation = opt_present(ENABLE_VOLUME_NORMALISATION);
 
         let normalisation_method;
         let normalisation_type;
@@ -1108,7 +1173,7 @@ fn get_setup(args: &[String]) -> Setup {
                 NORMALISATION_RELEASE,
                 NORMALISATION_KNEE,
             ] {
-                if matches.opt_present(a) {
+                if opt_present(a) {
                     warn!(
                         "Without the `--{}` / `-{}` flag normalisation options have no effect.",
                         ENABLE_VOLUME_NORMALISATION, ENABLE_VOLUME_NORMALISATION_SHORT,
@@ -1125,8 +1190,7 @@ fn get_setup(args: &[String]) -> Setup {
             normalisation_release = player_default_config.normalisation_release;
             normalisation_knee = player_default_config.normalisation_knee;
         } else {
-            normalisation_method = matches
-                .opt_str(NORMALISATION_METHOD)
+            normalisation_method = opt_str(NORMALISATION_METHOD)
                 .as_deref()
                 .map(|method| {
                     warn!(
@@ -1158,8 +1222,7 @@ fn get_setup(args: &[String]) -> Setup {
                 })
                 .unwrap_or(player_default_config.normalisation_method);
 
-            normalisation_type = matches
-                .opt_str(NORMALISATION_GAIN_TYPE)
+            normalisation_type = opt_str(NORMALISATION_GAIN_TYPE)
                 .as_deref()
                 .map(|gain_type| {
                     NormalisationType::from_str(gain_type).unwrap_or_else(|_| {
@@ -1177,8 +1240,7 @@ fn get_setup(args: &[String]) -> Setup {
                 })
                 .unwrap_or(player_default_config.normalisation_type);
 
-            normalisation_pregain = matches
-                .opt_str(NORMALISATION_PREGAIN)
+            normalisation_pregain = opt_str(NORMALISATION_PREGAIN)
                 .map(|pregain| {
                     let on_error = || {
                         error!(
@@ -1209,8 +1271,7 @@ fn get_setup(args: &[String]) -> Setup {
                 })
                 .unwrap_or(player_default_config.normalisation_pregain);
 
-            normalisation_threshold = matches
-                .opt_str(NORMALISATION_THRESHOLD)
+            normalisation_threshold = opt_str(NORMALISATION_THRESHOLD)
                 .map(|threshold| {
                     let on_error = || {
                         error!(
@@ -1244,8 +1305,7 @@ fn get_setup(args: &[String]) -> Setup {
                 })
                 .unwrap_or(player_default_config.normalisation_threshold);
 
-            normalisation_attack = matches
-                .opt_str(NORMALISATION_ATTACK)
+            normalisation_attack = opt_str(NORMALISATION_ATTACK)
                 .map(|attack| {
                     let on_error = || {
                         error!(
@@ -1279,8 +1339,7 @@ fn get_setup(args: &[String]) -> Setup {
                 })
                 .unwrap_or(player_default_config.normalisation_attack);
 
-            normalisation_release = matches
-                .opt_str(NORMALISATION_RELEASE)
+            normalisation_release = opt_str(NORMALISATION_RELEASE)
                 .map(|release| {
                     let on_error = || {
                         error!(
@@ -1314,8 +1373,7 @@ fn get_setup(args: &[String]) -> Setup {
                 })
                 .unwrap_or(player_default_config.normalisation_release);
 
-            normalisation_knee = matches
-                .opt_str(NORMALISATION_KNEE)
+            normalisation_knee = opt_str(NORMALISATION_KNEE)
                 .map(|knee| {
                     let on_error = || {
                         error!(
@@ -1347,7 +1405,7 @@ fn get_setup(args: &[String]) -> Setup {
                 .unwrap_or(player_default_config.normalisation_knee);
         }
 
-        let ditherer_name = matches.opt_str(DITHER);
+        let ditherer_name = opt_str(DITHER);
         let ditherer = match ditherer_name.as_deref() {
             // explicitly disabled on command line
             Some("none") => None,
@@ -1363,7 +1421,7 @@ fn get_setup(args: &[String]) -> Setup {
                         "Invalid `--{}` / `-{}`: {}",
                         DITHER,
                         DITHER_SHORT,
-                        matches.opt_str(DITHER).unwrap_or_default()
+                        opt_str(DITHER).unwrap_or_default()
                     );
                     println!(
                         "Valid `--{}` / `-{}` values: none, gpdf, tpdf, tpdf_hp",
@@ -1384,7 +1442,7 @@ fn get_setup(args: &[String]) -> Setup {
             },
         };
 
-        let passthrough = matches.opt_present(PASSTHROUGH);
+        let passthrough = opt_present(PASSTHROUGH);
 
         PlayerConfig {
             bitrate,
@@ -1402,8 +1460,8 @@ fn get_setup(args: &[String]) -> Setup {
         }
     };
 
-    let player_event_program = matches.opt_str(ONEVENT);
-    let emit_sink_events = matches.opt_present(EMIT_SINK_EVENTS);
+    let player_event_program = opt_str(ONEVENT);
+    let emit_sink_events = opt_present(EMIT_SINK_EVENTS);
 
     Setup {
         format,
