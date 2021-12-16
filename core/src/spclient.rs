@@ -8,9 +8,11 @@ use crate::protocol::extended_metadata::BatchedEntityRequest;
 use crate::spotify_id::SpotifyId;
 
 use bytes::Bytes;
+use futures_util::future::IntoStream;
 use http::header::HeaderValue;
-use hyper::header::InvalidHeaderValue;
-use hyper::{Body, HeaderMap, Request};
+use hyper::client::ResponseFuture;
+use hyper::header::{InvalidHeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE};
+use hyper::{Body, HeaderMap, Method, Request};
 use protobuf::Message;
 use rand::Rng;
 use std::time::Duration;
@@ -86,7 +88,7 @@ impl SpClient {
 
     pub async fn request_with_protobuf(
         &self,
-        method: &str,
+        method: &Method,
         endpoint: &str,
         headers: Option<HeaderMap>,
         message: &dyn Message,
@@ -94,7 +96,7 @@ impl SpClient {
         let body = protobuf::text_format::print_to_string(message);
 
         let mut headers = headers.unwrap_or_else(HeaderMap::new);
-        headers.insert("Content-Type", "application/protobuf".parse()?);
+        headers.insert(CONTENT_TYPE, "application/protobuf".parse()?);
 
         self.request(method, endpoint, Some(headers), Some(body))
             .await
@@ -102,20 +104,20 @@ impl SpClient {
 
     pub async fn request_as_json(
         &self,
-        method: &str,
+        method: &Method,
         endpoint: &str,
         headers: Option<HeaderMap>,
         body: Option<String>,
     ) -> SpClientResult {
         let mut headers = headers.unwrap_or_else(HeaderMap::new);
-        headers.insert("Accept", "application/json".parse()?);
+        headers.insert(ACCEPT, "application/json".parse()?);
 
         self.request(method, endpoint, Some(headers), body).await
     }
 
     pub async fn request(
         &self,
-        method: &str,
+        method: &Method,
         endpoint: &str,
         headers: Option<HeaderMap>,
         body: Option<String>,
@@ -130,12 +132,12 @@ impl SpClient {
 
             // Reconnection logic: retrieve the endpoint every iteration, so we can try
             // another access point when we are experiencing network issues (see below).
-            let mut uri = self.base_url().await;
-            uri.push_str(endpoint);
+            let mut url = self.base_url().await;
+            url.push_str(endpoint);
 
             let mut request = Request::builder()
                 .method(method)
-                .uri(uri)
+                .uri(url)
                 .body(Body::from(body.clone()))?;
 
             // Reconnection logic: keep getting (cached) tokens because they might have expired.
@@ -144,7 +146,7 @@ impl SpClient {
                 *headers_mut = hdrs.clone();
             }
             headers_mut.insert(
-                "Authorization",
+                AUTHORIZATION,
                 HeaderValue::from_str(&format!(
                     "Bearer {}",
                     self.session()
@@ -212,13 +214,13 @@ impl SpClient {
         let mut headers = HeaderMap::new();
         headers.insert("X-Spotify-Connection-Id", connection_id.parse()?);
 
-        self.request_with_protobuf("PUT", &endpoint, Some(headers), &state)
+        self.request_with_protobuf(&Method::PUT, &endpoint, Some(headers), &state)
             .await
     }
 
     pub async fn get_metadata(&self, scope: &str, id: SpotifyId) -> SpClientResult {
         let endpoint = format!("/metadata/4/{}/{}", scope, id.to_base16());
-        self.request("GET", &endpoint, None, None).await
+        self.request(&Method::GET, &endpoint, None, None).await
     }
 
     pub async fn get_track_metadata(&self, track_id: SpotifyId) -> SpClientResult {
@@ -244,7 +246,8 @@ impl SpClient {
     pub async fn get_lyrics(&self, track_id: SpotifyId) -> SpClientResult {
         let endpoint = format!("/color-lyrics/v1/track/{}", track_id.to_base62(),);
 
-        self.request_as_json("GET", &endpoint, None, None).await
+        self.request_as_json(&Method::GET, &endpoint, None, None)
+            .await
     }
 
     pub async fn get_lyrics_for_image(
@@ -258,19 +261,48 @@ impl SpClient {
             image_id
         );
 
-        self.request_as_json("GET", &endpoint, None, None).await
+        self.request_as_json(&Method::GET, &endpoint, None, None)
+            .await
     }
 
     // TODO: Find endpoint for newer canvas.proto and upgrade to that.
     pub async fn get_canvases(&self, request: EntityCanvazRequest) -> SpClientResult {
         let endpoint = "/canvaz-cache/v0/canvases";
-        self.request_with_protobuf("POST", endpoint, None, &request)
+        self.request_with_protobuf(&Method::POST, endpoint, None, &request)
             .await
     }
 
     pub async fn get_extended_metadata(&self, request: BatchedEntityRequest) -> SpClientResult {
         let endpoint = "/extended-metadata/v0/extended-metadata";
-        self.request_with_protobuf("POST", endpoint, None, &request)
+        self.request_with_protobuf(&Method::POST, endpoint, None, &request)
             .await
+    }
+
+    pub async fn get_audio_urls(&self, file_id: FileId) -> SpClientResult {
+        let endpoint = format!(
+            "/storage-resolve/files/audio/interactive/{}",
+            file_id.to_base16()
+        );
+        self.request(&Method::GET, &endpoint, None, None).await
+    }
+
+    pub fn stream_file(
+        &self,
+        url: &str,
+        offset: usize,
+        length: usize,
+    ) -> Result<IntoStream<ResponseFuture>, SpClientError> {
+        let req = Request::builder()
+            .method(&Method::GET)
+            .uri(url)
+            .header(
+                RANGE,
+                HeaderValue::from_str(&format!("bytes={}-{}", offset, offset + length - 1))?,
+            )
+            .body(Body::empty())?;
+
+        let stream = self.session().http_client().request_stream(req)?;
+
+        Ok(stream)
     }
 }

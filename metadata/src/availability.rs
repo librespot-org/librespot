@@ -3,8 +3,9 @@ use std::ops::Deref;
 
 use thiserror::Error;
 
-use crate::{date::Date, util::from_repeated_message};
+use crate::util::from_repeated_message;
 
+use librespot_core::date::Date;
 use librespot_protocol as protocol;
 
 use protocol::metadata::Availability as AvailabilityMessage;

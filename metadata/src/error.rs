@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use protobuf::ProtobufError;
 
+use librespot_core::date::DateError;
 use librespot_core::mercury::MercuryError;
 use librespot_core::spclient::SpClientError;
 use librespot_core::spotify_id::SpotifyIdError;
@@ -22,7 +23,7 @@ pub enum MetadataError {
     #[error("{0}")]
     InvalidSpotifyId(#[from] SpotifyIdError),
     #[error("item has invalid date")]
-    InvalidTimestamp,
+    InvalidTimestamp(#[from] DateError),
     #[error("audio item is non-playable")]
     NonPlayable,
     #[error("could not parse protobuf: {0}")]

@@ -5,7 +5,6 @@ use std::ops::Deref;
 use protobuf::Message;
 
 use crate::{
-    date::Date,
     error::MetadataError,
     request::{MercuryRequest, RequestResult},
     util::{from_repeated_enum, try_from_repeated_message},
@@ -17,6 +16,7 @@ use super::{
     permission::Capabilities,
 };
 
+use librespot_core::date::Date;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::{NamedSpotifyId, SpotifyId};
 use librespot_protocol as protocol;

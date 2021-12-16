@@ -3,8 +3,9 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use crate::{date::Date, error::MetadataError, image::PictureSizes, util::from_repeated_enum};
+use crate::{error::MetadataError, image::PictureSizes, util::from_repeated_enum};
 
+use librespot_core::date::Date;
 use librespot_core::spotify_id::SpotifyId;
 use librespot_protocol as protocol;
 

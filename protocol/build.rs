@@ -26,6 +26,7 @@ fn compile() {
         proto_dir.join("playlist_annotate3.proto"),
         proto_dir.join("playlist_permission.proto"),
         proto_dir.join("playlist4_external.proto"),
+        proto_dir.join("storage-resolve.proto"),
         proto_dir.join("user_attributes.proto"),
         // TODO: remove these legacy protobufs when we are on the new API completely
         proto_dir.join("authentication.proto"),

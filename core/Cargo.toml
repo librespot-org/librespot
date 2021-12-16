@@ -17,6 +17,7 @@ aes = "0.6"
 base64 = "0.13"
 byteorder = "1.4"
 bytes = "1"
+chrono = "0.4"
 form_urlencoded = "1.0"
 futures-core = { version = "0.3", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["alloc", "bilock", "unstable", "sink"] }
@@ -38,11 +39,13 @@ priority-queue = "1.1"
 protobuf = "2.14.0"
 quick-xml = { version = "0.22", features = [ "serialize" ] }
 rand = "0.8"
+rustls = "0.19"
+rustls-native-certs = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha-1 = "0.9"
 shannon = "0.2.0"
-thiserror = "1.0.7"
+thiserror = "1.0"
 tokio = { version = "1.5", features = ["io-util", "macros", "net", "rt", "time", "sync"] }
 tokio-stream = "0.1.1"
 tokio-tungstenite = { version = "0.14", default-features = false, features = ["rustls-tls"] }

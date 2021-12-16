@@ -7,36 +7,55 @@ use std::sync::atomic::{self, AtomicUsize};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use byteorder::{BigEndian, ByteOrder};
-use futures_util::{future, StreamExt, TryFutureExt, TryStreamExt};
+use futures_util::future::IntoStream;
+use futures_util::{StreamExt, TryFutureExt};
+use hyper::client::ResponseFuture;
+use hyper::header::CONTENT_RANGE;
+use hyper::Body;
 use tempfile::NamedTempFile;
+use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
-use librespot_core::channel::{ChannelData, ChannelError, ChannelHeaders};
+use librespot_core::cdn_url::{CdnUrl, CdnUrlError};
 use librespot_core::file_id::FileId;
 use librespot_core::session::Session;
+use librespot_core::spclient::SpClientError;
 
-use self::receive::{audio_file_fetch, request_range};
+use self::receive::audio_file_fetch;
 
 use crate::range_set::{Range, RangeSet};
+
+#[derive(Error, Debug)]
+pub enum AudioFileError {
+    #[error("could not complete CDN request: {0}")]
+    Cdn(hyper::Error),
+    #[error("empty response")]
+    Empty,
+    #[error("error parsing response")]
+    Parsing,
+    #[error("could not complete API request: {0}")]
+    SpClient(#[from] SpClientError),
+    #[error("could not get CDN URL: {0}")]
+    Url(#[from] CdnUrlError),
+}
 
 /// The minimum size of a block that is requested from the Spotify servers in one request.
 /// This is the block size that is typically requested while doing a `seek()` on a file.
 /// Note: smaller requests can happen if part of the block is downloaded already.
-const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 16;
+pub const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 256;
 
 /// The amount of data that is requested when initially opening a file.
 /// Note: if the file is opened to play from the beginning, the amount of data to
 /// read ahead is requested in addition to this amount. If the file is opened to seek to
 /// another position, then only this amount is requested on the first request.
-const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 16;
+pub const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 128;
 
 /// The ping time that is used for calculations before a ping time was actually measured.
-const INITIAL_PING_TIME_ESTIMATE: Duration = Duration::from_millis(500);
+pub const INITIAL_PING_TIME_ESTIMATE: Duration = Duration::from_millis(500);
 
 /// If the measured ping time to the Spotify server is larger than this value, it is capped
 /// to avoid run-away block sizes and pre-fetching.
-const MAXIMUM_ASSUMED_PING_TIME: Duration = Duration::from_millis(1500);
+pub const MAXIMUM_ASSUMED_PING_TIME: Duration = Duration::from_millis(1500);
 
 /// Before playback starts, this many seconds of data must be present.
 /// Note: the calculations are done using the nominal bitrate of the file. The actual amount
@@ -65,7 +84,7 @@ pub const READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS: f32 = 10.0;
 /// If the amount of data that is pending (requested but not received) is less than a certain amount,
 /// data is pre-fetched in addition to the read ahead settings above. The threshold for requesting more
 /// data is calculated as `<pending bytes> < PREFETCH_THRESHOLD_FACTOR * <ping time> * <nominal data rate>`
-const PREFETCH_THRESHOLD_FACTOR: f32 = 4.0;
+pub const PREFETCH_THRESHOLD_FACTOR: f32 = 4.0;
 
 /// Similar to `PREFETCH_THRESHOLD_FACTOR`, but it also takes the current download rate into account.
 /// The formula used is `<pending bytes> < FAST_PREFETCH_THRESHOLD_FACTOR * <ping time> * <measured download rate>`
@@ -74,16 +93,16 @@ const PREFETCH_THRESHOLD_FACTOR: f32 = 4.0;
 /// the download rate ramps up. However, this comes at the cost that it might hurt ping time if a seek is
 /// performed while downloading. Values smaller than `1.0` cause the download rate to collapse and effectively
 /// only `PREFETCH_THRESHOLD_FACTOR` is in effect. Thus, set to `0.0` if bandwidth saturation is not wanted.
-const FAST_PREFETCH_THRESHOLD_FACTOR: f32 = 1.5;
+pub const FAST_PREFETCH_THRESHOLD_FACTOR: f32 = 1.5;
 
 /// Limit the number of requests that are pending simultaneously before pre-fetching data. Pending
-/// requests share bandwidth. Thus, havint too many requests can lead to the one that is needed next
+/// requests share bandwidth. Thus, having too many requests can lead to the one that is needed next
 /// for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
 /// pre-fetch request is only sent if less than `MAX_PREFETCH_REQUESTS` are pending.
-const MAX_PREFETCH_REQUESTS: usize = 4;
+pub const MAX_PREFETCH_REQUESTS: usize = 4;
 
 /// The time we will wait to obtain status updates on downloading.
-const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(1);
+pub const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub enum AudioFile {
     Cached(fs::File),
@@ -91,7 +110,16 @@ pub enum AudioFile {
 }
 
 #[derive(Debug)]
-enum StreamLoaderCommand {
+pub struct StreamingRequest {
+    streamer: IntoStream<ResponseFuture>,
+    initial_body: Option<Body>,
+    offset: usize,
+    length: usize,
+    request_time: Instant,
+}
+
+#[derive(Debug)]
+pub enum StreamLoaderCommand {
     Fetch(Range),       // signal the stream loader to fetch a range of the file
     RandomAccessMode(), // optimise download strategy for random access
     StreamMode(),       // optimise download strategy for streaming
@@ -244,9 +272,9 @@ enum DownloadStrategy {
 }
 
 struct AudioFileShared {
-    file_id: FileId,
+    cdn_url: CdnUrl,
     file_size: usize,
-    stream_data_rate: usize,
+    bytes_per_second: usize,
     cond: Condvar,
     download_status: Mutex<AudioFileDownloadStatus>,
     download_strategy: Mutex<DownloadStrategy>,
@@ -255,19 +283,13 @@ struct AudioFileShared {
     read_position: AtomicUsize,
 }
 
-pub struct InitialData {
-    rx: ChannelData,
-    length: usize,
-    request_sent_time: Instant,
-}
-
 impl AudioFile {
     pub async fn open(
         session: &Session,
         file_id: FileId,
         bytes_per_second: usize,
         play_from_beginning: bool,
-    ) -> Result<AudioFile, ChannelError> {
+    ) -> Result<AudioFile, AudioFileError> {
         if let Some(file) = session.cache().and_then(|cache| cache.file(file_id)) {
             debug!("File {} already in cache", file_id);
             return Ok(AudioFile::Cached(file));
@@ -276,35 +298,13 @@ impl AudioFile {
         debug!("Downloading file {}", file_id);
 
         let (complete_tx, complete_rx) = oneshot::channel();
-        let mut length = if play_from_beginning {
-            INITIAL_DOWNLOAD_SIZE
-                + max(
-                    (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
-                    (INITIAL_PING_TIME_ESTIMATE.as_secs_f32()
-                        * READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
-                        * bytes_per_second as f32) as usize,
-                )
-        } else {
-            INITIAL_DOWNLOAD_SIZE
-        };
-        if length % 4 != 0 {
-            length += 4 - (length % 4);
-        }
-        let (headers, rx) = request_range(session, file_id, 0, length).split();
-
-        let initial_data = InitialData {
-            rx,
-            length,
-            request_sent_time: Instant::now(),
-        };
 
         let streaming = AudioFileStreaming::open(
             session.clone(),
-            initial_data,
-            headers,
             file_id,
             complete_tx,
             bytes_per_second,
+            play_from_beginning,
         );
 
         let session_ = session.clone();
@@ -343,24 +343,58 @@ impl AudioFile {
 impl AudioFileStreaming {
     pub async fn open(
         session: Session,
-        initial_data: InitialData,
-        headers: ChannelHeaders,
         file_id: FileId,
         complete_tx: oneshot::Sender<NamedTempFile>,
-        streaming_data_rate: usize,
-    ) -> Result<AudioFileStreaming, ChannelError> {
-        let (_, data) = headers
-            .try_filter(|(id, _)| future::ready(*id == 0x3))
-            .next()
-            .await
-            .unwrap()?;
+        bytes_per_second: usize,
+        play_from_beginning: bool,
+    ) -> Result<AudioFileStreaming, AudioFileError> {
+        let download_size = if play_from_beginning {
+            INITIAL_DOWNLOAD_SIZE
+                + max(
+                    (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
+                    (INITIAL_PING_TIME_ESTIMATE.as_secs_f32()
+                        * READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
+                        * bytes_per_second as f32) as usize,
+                )
+        } else {
+            INITIAL_DOWNLOAD_SIZE
+        };
 
-        let size = BigEndian::read_u32(&data) as usize * 4;
+        let mut cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
+        let url = cdn_url.get_url()?;
+
+        let mut streamer = session.spclient().stream_file(url, 0, download_size)?;
+        let request_time = Instant::now();
+
+        // Get the first chunk with the headers to get the file size.
+        // The remainder of that chunk with possibly also a response body is then
+        // further processed in `audio_file_fetch`.
+        let response = match streamer.next().await {
+            Some(Ok(data)) => data,
+            Some(Err(e)) => return Err(AudioFileError::Cdn(e)),
+            None => return Err(AudioFileError::Empty),
+        };
+        let header_value = response
+            .headers()
+            .get(CONTENT_RANGE)
+            .ok_or(AudioFileError::Parsing)?;
+
+        let str_value = header_value.to_str().map_err(|_| AudioFileError::Parsing)?;
+        let file_size_str = str_value.split('/').last().ok_or(AudioFileError::Parsing)?;
+        let file_size = file_size_str.parse().map_err(|_| AudioFileError::Parsing)?;
+
+        let initial_request = StreamingRequest {
+            streamer,
+            initial_body: Some(response.into_body()),
+            offset: 0,
+            length: download_size,
+            request_time,
+        };
 
         let shared = Arc::new(AudioFileShared {
-            file_id,
-            file_size: size,
-            stream_data_rate: streaming_data_rate,
+            cdn_url,
+            file_size,
+            bytes_per_second,
             cond: Condvar::new(),
             download_status: Mutex::new(AudioFileDownloadStatus {
                 requested: RangeSet::new(),
@@ -372,20 +406,17 @@ impl AudioFileStreaming {
             read_position: AtomicUsize::new(0),
         });
 
-        let mut write_file = NamedTempFile::new().unwrap();
-        write_file.as_file().set_len(size as u64).unwrap();
-        write_file.seek(SeekFrom::Start(0)).unwrap();
-
+        // TODO : use new_in() to store securely in librespot directory
+        let write_file = NamedTempFile::new().unwrap();
         let read_file = write_file.reopen().unwrap();
 
-        // let (seek_tx, seek_rx) = mpsc::unbounded();
         let (stream_loader_command_tx, stream_loader_command_rx) =
             mpsc::unbounded_channel::<StreamLoaderCommand>();
 
         session.spawn(audio_file_fetch(
             session.clone(),
             shared.clone(),
-            initial_data,
+            initial_request,
             write_file,
             stream_loader_command_rx,
             complete_tx,
@@ -422,10 +453,10 @@ impl Read for AudioFileStreaming {
                 let length_to_request = length
                     + max(
                         (READ_AHEAD_DURING_PLAYBACK.as_secs_f32()
-                            * self.shared.stream_data_rate as f32) as usize,
+                            * self.shared.bytes_per_second as f32) as usize,
                         (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
                             * ping_time_seconds
-                            * self.shared.stream_data_rate as f32) as usize,
+                            * self.shared.bytes_per_second as f32) as usize,
                     );
                 min(length_to_request, self.shared.file_size - offset)
             }

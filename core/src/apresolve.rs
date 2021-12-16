@@ -1,4 +1,4 @@
-use hyper::{Body, Request};
+use hyper::{Body, Method, Request};
 use serde::Deserialize;
 use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -69,7 +69,7 @@ impl ApResolver {
 
     pub async fn try_apresolve(&self) -> Result<ApResolveData, Box<dyn Error>> {
         let req = Request::builder()
-            .method("GET")
+            .method(Method::GET)
             .uri("http://apresolve.spotify.com/?type=accesspoint&type=dealer&type=spclient")
             .body(Body::empty())?;
 

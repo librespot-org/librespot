@@ -11,9 +11,11 @@ pub mod apresolve;
 pub mod audio_key;
 pub mod authentication;
 pub mod cache;
+pub mod cdn_url;
 pub mod channel;
 pub mod config;
 mod connection;
+pub mod date;
 #[allow(dead_code)]
 mod dealer;
 #[doc(hidden)]

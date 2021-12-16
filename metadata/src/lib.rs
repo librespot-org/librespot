@@ -15,7 +15,6 @@ pub mod audio;
 pub mod availability;
 pub mod content_rating;
 pub mod copyright;
-pub mod date;
 pub mod episode;
 pub mod error;
 pub mod external_id;

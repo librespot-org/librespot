@@ -6,7 +6,6 @@ use crate::{
     artist::Artists,
     availability::Availabilities,
     copyright::Copyrights,
-    date::Date,
     error::{MetadataError, RequestError},
     external_id::ExternalIds,
     image::Images,
@@ -18,6 +17,7 @@ use crate::{
     Metadata,
 };
 
+use librespot_core::date::Date;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::SpotifyId;
 use librespot_protocol as protocol;

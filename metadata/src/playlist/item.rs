@@ -2,10 +2,11 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use crate::{date::Date, error::MetadataError, util::try_from_repeated_message};
+use crate::{error::MetadataError, util::try_from_repeated_message};
 
 use super::attribute::{PlaylistAttributes, PlaylistItemAttributes};
 
+use librespot_core::date::Date;
 use librespot_core::spotify_id::SpotifyId;
 use librespot_protocol as protocol;
 

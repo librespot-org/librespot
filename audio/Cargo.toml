@@ -14,7 +14,11 @@ version = "0.3.1"
 aes-ctr = "0.6"
 byteorder = "1.4"
 bytes = "1.0"
-log = "0.4"
+futures-core = { version = "0.3", default-features = false }
+futures-executor = "0.3"
 futures-util = { version = "0.3", default_features = false }
+hyper = { version = "0.14", features = ["client"] }
+log = "0.4"
 tempfile = "3.1"
+thiserror = "1.0"
 tokio = { version = "1", features = ["sync", "macros"] }

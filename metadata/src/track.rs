@@ -13,7 +13,6 @@ use crate::{
     },
     availability::{Availabilities, UnavailabilityReason},
     content_rating::ContentRatings,
-    date::Date,
     error::RequestError,
     external_id::ExternalIds,
     restriction::Restrictions,
@@ -22,6 +21,7 @@ use crate::{
     Metadata, MetadataError, RequestResult,
 };
 
+use librespot_core::date::Date;
 use librespot_core::session::Session;
 use librespot_core::spotify_id::SpotifyId;
 use librespot_protocol as protocol;

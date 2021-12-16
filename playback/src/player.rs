@@ -341,8 +341,6 @@ impl Player {
 
             // While PlayerInternal is written as a future, it still contains blocking code.
             // It must be run by using block_on() in a dedicated thread.
-            //            futures_executor::block_on(internal);
-
             let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
             runtime.block_on(internal);
 
@@ -1904,7 +1902,7 @@ impl PlayerInternal {
         let (result_tx, result_rx) = oneshot::channel();
 
         let handle = tokio::runtime::Handle::current();
-        std::thread::spawn(move || {
+        thread::spawn(move || {
             let data = handle.block_on(loader.load_track(spotify_id, position_ms));
             if let Some(data) = data {
                 let _ = result_tx.send(data);
