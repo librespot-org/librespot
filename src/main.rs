@@ -805,40 +805,135 @@ fn get_setup() -> Setup {
         exit(1);
     });
 
+    let is_alsa_mixer = match mixer_type.as_deref() {
+        #[cfg(feature = "alsa-backend")]
+        Some(AlsaMixer::NAME) => true,
+        _ => false,
+    };
+
+    #[cfg(feature = "alsa-backend")]
+    if !is_alsa_mixer {
+        for a in &[ALSA_MIXER_DEVICE, ALSA_MIXER_INDEX, ALSA_MIXER_CONTROL] {
+            if opt_present(a) {
+                warn!("Alsa specific mixer options have no effect if not using the alsa mixer.");
+                break;
+            }
+        }
+    }
+
     let mixer_config = {
         let mixer_default_config = MixerConfig::default();
 
         #[cfg(feature = "alsa-backend")]
-        let device = opt_str(ALSA_MIXER_DEVICE).unwrap_or_else(|| {
-            if let Some(ref device_name) = device {
-                device_name.to_string()
-            } else {
-                mixer_default_config.device.clone()
-            }
-        });
+        let index = if !is_alsa_mixer {
+            mixer_default_config.index
+        } else {
+            opt_str(ALSA_MIXER_INDEX)
+                .map(|index| {
+                    index.parse::<u32>().unwrap_or_else(|_| {
+                        invalid_error_msg(
+                            ALSA_MIXER_INDEX,
+                            ALSA_MIXER_INDEX_SHORT,
+                            &index,
+                            "",
+                            &mixer_default_config.index.to_string(),
+                        );
 
-        #[cfg(not(feature = "alsa-backend"))]
-        let device = mixer_default_config.device;
-
-        #[cfg(feature = "alsa-backend")]
-        let index = opt_str(ALSA_MIXER_INDEX)
-            .map(|index| {
-                index.parse::<u32>().unwrap_or_else(|_| {
-                    invalid_error_msg(
-                        ALSA_MIXER_INDEX,
-                        ALSA_MIXER_INDEX_SHORT,
-                        &index,
-                        "",
-                        &mixer_default_config.index.to_string(),
-                    );
-
-                    exit(1);
+                        exit(1);
+                    })
                 })
-            })
-            .unwrap_or_else(|| mixer_default_config.index);
+                .unwrap_or_else(|| match device {
+                    // Look for the dev index portion of --device.
+                    // Specifically <dev index> when --device is <something>:CARD=<card name>,DEV=<dev index>
+                    // or <something>:<card index>,<dev index>.
+
+                    // If --device does not contain a ',' it does not contain a dev index.
+                    // In the case that the dev index is omitted it is assumed to be 0 (mixer_default_config.index).
+                    // Malformed --device values will also fallback to mixer_default_config.index.
+                    Some(ref device_name) if device_name.contains(',') => {
+                        // Turn <something>:CARD=<card name>,DEV=<dev index> or <something>:<card index>,<dev index>
+                        // into DEV=<dev index> or <dev index>.
+                        let dev = &device_name[device_name.find(',').unwrap_or_default()..]
+                            .trim_start_matches(',');
+
+                        // Turn DEV=<dev index> into <dev index> (noop if it's already <dev index>)
+                        // and then parse <dev index>.
+                        // Malformed --device values will fail the parse and fallback to mixer_default_config.index.
+                        dev[dev.find('=').unwrap_or_default()..]
+                            .trim_start_matches('=')
+                            .parse::<u32>()
+                            .unwrap_or(mixer_default_config.index)
+                    }
+                    _ => mixer_default_config.index,
+                })
+        };
 
         #[cfg(not(feature = "alsa-backend"))]
         let index = mixer_default_config.index;
+
+        #[cfg(feature = "alsa-backend")]
+        let device = if !is_alsa_mixer {
+            mixer_default_config.device
+        } else {
+            match opt_str(ALSA_MIXER_DEVICE) {
+                Some(mixer_device) => {
+                    if mixer_device.is_empty() {
+                        empty_string_error_msg(ALSA_MIXER_DEVICE, ALSA_MIXER_DEVICE_SHORT);
+                    }
+
+                    mixer_device
+                }
+                None => match device {
+                    Some(ref device_name) => {
+                        // Look for the card name or card index portion of --device.
+                        // Specifically <card name> when --device is <something>:CARD=<card name>,DEV=<dev index>
+                        // or card index when --device is <something>:<card index>,<dev index>.
+                        // --device values like `pulse`, `default`, `jack` may be valid but there is no way to
+                        // infer automatically what the mixer should be so they fail auto fallback
+                        // so --alsa-mixer-device must be manually specified in those situations.
+                        let start_index = device_name.find(':').unwrap_or_default();
+
+                        let end_index = match device_name.find(',') {
+                            Some(index) if index > start_index => index,
+                            _ => device_name.len(),
+                        };
+
+                        let card = &device_name[start_index..end_index];
+
+                        if card.starts_with(':') {
+                            // mixers are assumed to be hw:CARD=<card name> or hw:<card index>.
+                            "hw".to_owned() + card
+                        } else {
+                            error!(
+                                "Could not find an alsa mixer for \"{}\", it must be specified with `--{}` / `-{}`",
+                                &device.unwrap_or_default(),
+                                ALSA_MIXER_DEVICE,
+                                ALSA_MIXER_DEVICE_SHORT
+                            );
+
+                            exit(1);
+                        }
+                    }
+                    None => {
+                        error!(
+                            "`--{}` / `-{}` or `--{}` / `-{}` \
+                            must be specified when `--{}` / `-{}` is set to \"alsa\"",
+                            DEVICE,
+                            DEVICE_SHORT,
+                            ALSA_MIXER_DEVICE,
+                            ALSA_MIXER_DEVICE_SHORT,
+                            MIXER_TYPE,
+                            MIXER_TYPE_SHORT
+                        );
+
+                        exit(1);
+                    }
+                },
+            }
+        };
+
+        #[cfg(not(feature = "alsa-backend"))]
+        let device = mixer_default_config.device;
 
         #[cfg(feature = "alsa-backend")]
         let control = opt_str(ALSA_MIXER_CONTROL).unwrap_or(mixer_default_config.control);
@@ -881,10 +976,12 @@ fn get_setup() -> Setup {
                     exit(1);
                 }
             })
-            .unwrap_or_else(|| match mixer_type.as_deref() {
-                #[cfg(feature = "alsa-backend")]
-                Some(AlsaMixer::NAME) => 0.0, // let alsa query the control
-                _ => VolumeCtrl::DEFAULT_DB_RANGE,
+            .unwrap_or_else(|| {
+                if is_alsa_mixer {
+                    0.0
+                } else {
+                    VolumeCtrl::DEFAULT_DB_RANGE
+                }
             });
 
         let volume_ctrl = opt_str(VOLUME_CTRL)
@@ -1093,10 +1190,12 @@ fn get_setup() -> Setup {
 
                 (volume as f32 / 100.0 * VolumeCtrl::MAX_VOLUME as f32) as u16
             })
-            .or_else(|| match mixer_type.as_deref() {
-                #[cfg(feature = "alsa-backend")]
-                Some(AlsaMixer::NAME) => None,
-                _ => cache.as_ref().and_then(Cache::volume),
+            .or_else(|| {
+                if is_alsa_mixer {
+                    None
+                } else {
+                    cache.as_ref().and_then(Cache::volume)
+                }
             });
 
         let device_type = opt_str(DEVICE_TYPE)
