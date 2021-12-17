@@ -26,8 +26,9 @@ mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
 
 use std::env;
+use std::fs::create_dir_all;
 use std::ops::RangeInclusive;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::exit;
 use std::str::FromStr;
@@ -228,6 +229,7 @@ fn get_setup() -> Setup {
     const PROXY: &str = "proxy";
     const QUIET: &str = "quiet";
     const SYSTEM_CACHE: &str = "system-cache";
+    const TEMP_DIR: &str = "tmp";
     const USERNAME: &str = "username";
     const VERBOSE: &str = "verbose";
     const VERSION: &str = "version";
@@ -266,6 +268,7 @@ fn get_setup() -> Setup {
     const ALSA_MIXER_DEVICE_SHORT: &str = "S";
     const ALSA_MIXER_INDEX_SHORT: &str = "s";
     const ALSA_MIXER_CONTROL_SHORT: &str = "T";
+    const TEMP_DIR_SHORT: &str = "t";
     const NORMALISATION_ATTACK_SHORT: &str = "U";
     const USERNAME_SHORT: &str = "u";
     const VERSION_SHORT: &str = "V";
@@ -279,7 +282,7 @@ fn get_setup() -> Setup {
     const NORMALISATION_THRESHOLD_SHORT: &str = "Z";
     const ZEROCONF_PORT_SHORT: &str = "z";
 
-    // Options that have different desc's
+    // Options that have different descriptions
     // depending on what backends were enabled at build time.
     #[cfg(feature = "alsa-backend")]
     const MIXER_TYPE_DESC: &str = "Mixer to use {alsa|softvol}. Defaults to softvol.";
@@ -412,9 +415,15 @@ fn get_setup() -> Setup {
         "TYPE",
     )
     .optopt(
+        TEMP_DIR_SHORT,
+        TEMP_DIR,
+        "Path to a directory where files will be temporarily stored while downloading.",
+        "PATH",
+    )
+    .optopt(
         CACHE_SHORT,
         CACHE,
-        "Path to a directory where files will be cached.",
+        "Path to a directory where files will be cached after downloading.",
         "PATH",
     )
     .optopt(
@@ -912,6 +921,15 @@ fn get_setup() -> Setup {
         }
     };
 
+    let tmp_dir = opt_str(TEMP_DIR).map_or(SessionConfig::default().tmp_dir, |p| {
+        let tmp_dir = PathBuf::from(p);
+        if let Err(e) = create_dir_all(&tmp_dir) {
+            error!("could not create or access specified tmp directory: {}", e);
+            exit(1);
+        }
+        tmp_dir
+    });
+
     let cache = {
         let volume_dir = opt_str(SYSTEM_CACHE)
             .or_else(|| opt_str(CACHE))
@@ -1162,6 +1180,7 @@ fn get_setup() -> Setup {
                 exit(1);
             }
         }),
+		tmp_dir,
     };
 
     let player_config = {

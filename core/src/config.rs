@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::PathBuf;
 use std::str::FromStr;
 use url::Url;
 
@@ -8,6 +9,7 @@ pub struct SessionConfig {
     pub device_id: String,
     pub proxy: Option<Url>,
     pub ap_port: Option<u16>,
+    pub tmp_dir: PathBuf,
 }
 
 impl Default for SessionConfig {
@@ -18,6 +20,7 @@ impl Default for SessionConfig {
             device_id,
             proxy: None,
             ap_port: None,
+            tmp_dir: std::env::temp_dir(),
         }
     }
 }

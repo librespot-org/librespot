@@ -406,8 +406,7 @@ impl AudioFileStreaming {
             read_position: AtomicUsize::new(0),
         });
 
-        // TODO : use new_in() to store securely in librespot directory
-        let write_file = NamedTempFile::new().unwrap();
+        let write_file = NamedTempFile::new_in(session.config().tmp_dir.clone()).unwrap();
         let read_file = write_file.reopen().unwrap();
 
         let (stream_loader_command_tx, stream_loader_command_rx) =
