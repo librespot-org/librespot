@@ -350,7 +350,7 @@ impl Cache {
         }
     }
 
-    fn file_path(&self, file: FileId) -> Option<PathBuf> {
+    pub fn file_path(&self, file: FileId) -> Option<PathBuf> {
         self.audio_location.as_ref().map(|location| {
             let name = file.to_base16();
             let mut path = location.join(&name[0..2]);

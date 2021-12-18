@@ -310,10 +310,12 @@ impl AudioFile {
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
             if let Some(cache) = session_.cache() {
-                debug!("File {} complete, saving to cache", file_id);
-                cache.save_file(file_id, &mut file);
-            } else {
-                debug!("File {} complete", file_id);
+                if cache.file_path(file_id).is_some() {
+                    cache.save_file(file_id, &mut file);
+                    debug!("File {} cached to {:?}", file_id, cache.file(file_id));
+                }
+
+                debug!("Downloading file {} complete", file_id);
             }
         }));
 
