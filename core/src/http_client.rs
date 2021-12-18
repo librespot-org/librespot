@@ -4,18 +4,20 @@ use futures_util::FutureExt;
 use http::header::HeaderValue;
 use http::uri::InvalidUri;
 use hyper::client::{HttpConnector, ResponseFuture};
-use hyper::header::{InvalidHeaderValue, USER_AGENT};
+use hyper::header::USER_AGENT;
 use hyper::{Body, Client, Request, Response, StatusCode};
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::HttpsConnector;
-use rustls::ClientConfig;
-use std::env::consts::OS;
+use rustls::{ClientConfig, RootCertStore};
 use thiserror::Error;
 use url::Url;
+
+use std::env::consts::OS;
 
 use crate::version::{SPOTIFY_MOBILE_VERSION, SPOTIFY_VERSION, VERSION_STRING};
 
 pub struct HttpClient {
+    user_agent: HeaderValue,
     proxy: Option<Url>,
     tls_config: ClientConfig,
 }
@@ -34,12 +36,6 @@ pub enum HttpClientError {
     ProxyBuilder(#[from] std::io::Error),
 }
 
-impl From<InvalidHeaderValue> for HttpClientError {
-    fn from(err: InvalidHeaderValue) -> Self {
-        Self::Parsing(err.into())
-    }
-}
-
 impl From<InvalidUri> for HttpClientError {
     fn from(err: InvalidUri) -> Self {
         Self::Parsing(err.into())
@@ -48,6 +44,30 @@ impl From<InvalidUri> for HttpClientError {
 
 impl HttpClient {
     pub fn new(proxy: Option<&Url>) -> Self {
+        let spotify_version = match OS {
+            "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
+            _ => SPOTIFY_VERSION.to_string(),
+        };
+
+        let spotify_platform = match OS {
+            "android" => "Android/31",
+            "ios" => "iOS/15.1.1",
+            "macos" => "OSX/0",
+            "windows" => "Win32/0",
+            _ => "Linux/0",
+        };
+
+        let user_agent_str = &format!(
+            "Spotify/{} {} ({})",
+            spotify_version, spotify_platform, VERSION_STRING
+        );
+
+        let user_agent = HeaderValue::from_str(user_agent_str).unwrap_or_else(|err| {
+            error!("Invalid user agent <{}>: {}", user_agent_str, err);
+            error!("Parts of the API will probably not work. Please report this as a bug.");
+            HeaderValue::from_static("")
+        });
+
         // configuring TLS is expensive and should be done once per process
         let root_store = match rustls_native_certs::load_native_certs() {
             Ok(store) => store,
@@ -55,7 +75,11 @@ impl HttpClient {
                 warn!("Could not load all certificates: {:?}", err);
                 store
             }
-            Err((None, err)) => Err(err).expect("cannot access native cert store"),
+            Err((None, err)) => {
+                error!("Cannot access native certificate store: {}", err);
+                error!("Continuing, but most requests will probably fail until you fix your system certificate store.");
+                RootCertStore::empty()
+            }
         };
 
         let mut tls_config = ClientConfig::new();
@@ -63,12 +87,15 @@ impl HttpClient {
         tls_config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
 
         Self {
+            user_agent,
             proxy: proxy.cloned(),
             tls_config,
         }
     }
 
     pub async fn request(&self, req: Request<Body>) -> Result<Response<Body>, HttpClientError> {
+        debug!("Requesting {:?}", req.uri().to_string());
+
         let request = self.request_fut(req)?;
         {
             let response = request.await;
@@ -97,34 +124,12 @@ impl HttpClient {
     }
 
     pub fn request_fut(&self, mut req: Request<Body>) -> Result<ResponseFuture, HttpClientError> {
-        trace!("Requesting {:?}", req.uri().to_string());
-
         let mut http = HttpConnector::new();
         http.enforce_http(false);
         let connector = HttpsConnector::from((http, self.tls_config.clone()));
 
-        let spotify_version = match OS {
-            "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
-            _ => SPOTIFY_VERSION.to_string(),
-        };
-
-        let spotify_platform = match OS {
-            "android" => "Android/31",
-            "ios" => "iOS/15.1.1",
-            "macos" => "OSX/0",
-            "windows" => "Win32/0",
-            _ => "Linux/0",
-        };
-
         let headers_mut = req.headers_mut();
-        headers_mut.insert(
-            USER_AGENT,
-            // Some features like lyrics are version-gated and require an official version string.
-            HeaderValue::from_str(&format!(
-                "Spotify/{} {} ({})",
-                spotify_version, spotify_platform, VERSION_STRING
-            ))?,
-        );
+        headers_mut.insert(USER_AGENT, self.user_agent.clone());
 
         let request = if let Some(url) = &self.proxy {
             let proxy_uri = url.to_string().parse()?;

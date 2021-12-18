@@ -1151,7 +1151,6 @@ fn get_setup() -> Setup {
     };
 
     let session_config = SessionConfig {
-        user_agent: version::VERSION_STRING.to_string(),
         device_id: device_id(&connect_config.name),
         proxy: opt_str(PROXY).or_else(|| std::env::var("http_proxy").ok()).map(
             |s| {

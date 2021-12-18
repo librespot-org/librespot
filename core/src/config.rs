@@ -5,7 +5,6 @@ use url::Url;
 
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
-    pub user_agent: String,
     pub device_id: String,
     pub proxy: Option<Url>,
     pub ap_port: Option<u16>,
@@ -16,7 +15,6 @@ impl Default for SessionConfig {
     fn default() -> SessionConfig {
         let device_id = uuid::Uuid::new_v4().to_hyphenated().to_string();
         SessionConfig {
-            user_agent: crate::version::VERSION_STRING.to_string(),
             device_id,
             proxy: None,
             ap_port: None,

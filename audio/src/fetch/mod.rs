@@ -363,6 +363,8 @@ impl AudioFileStreaming {
         let mut cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
         let url = cdn_url.get_url()?;
 
+        trace!("Streaming {:?}", url);
+
         let mut streamer = session.spclient().stream_file(url, 0, download_size)?;
         let request_time = Instant::now();
 
