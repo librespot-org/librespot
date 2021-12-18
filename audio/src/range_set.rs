@@ -10,7 +10,7 @@ pub struct Range {
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        return write!(f, "[{}, {}]", self.start, self.start + self.length - 1);
+        write!(f, "[{}, {}]", self.start, self.start + self.length - 1)
     }
 }
 
@@ -24,16 +24,16 @@ impl Range {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct RangeSet {
     ranges: Vec<Range>,
 }
 
 impl fmt::Display for RangeSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "(").unwrap();
+        write!(f, "(")?;
         for range in self.ranges.iter() {
-            write!(f, "{}", range).unwrap();
+            write!(f, "{}", range)?;
         }
         write!(f, ")")
     }

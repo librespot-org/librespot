@@ -350,7 +350,7 @@ impl Cache {
         }
     }
 
-    pub fn file_path(&self, file: FileId) -> Option<PathBuf> {
+    fn file_path(&self, file: FileId) -> Option<PathBuf> {
         self.audio_location.as_ref().map(|location| {
             let name = file.to_base16();
             let mut path = location.join(&name[0..2]);
@@ -377,24 +377,22 @@ impl Cache {
         }
     }
 
-    pub fn save_file<F: Read>(&self, file: FileId, contents: &mut F) {
-        let path = if let Some(path) = self.file_path(file) {
-            path
-        } else {
-            return;
-        };
-        let parent = path.parent().unwrap();
-
-        let result = fs::create_dir_all(parent)
-            .and_then(|_| File::create(&path))
-            .and_then(|mut file| io::copy(contents, &mut file));
-
-        if let Ok(size) = result {
-            if let Some(limiter) = self.size_limiter.as_deref() {
-                limiter.add(&path, size);
-                limiter.prune();
+    pub fn save_file<F: Read>(&self, file: FileId, contents: &mut F) -> bool {
+        if let Some(path) = self.file_path(file) {
+            if let Some(parent) = path.parent() {
+                if let Ok(size) = fs::create_dir_all(parent)
+                    .and_then(|_| File::create(&path))
+                    .and_then(|mut file| io::copy(contents, &mut file))
+                {
+                    if let Some(limiter) = self.size_limiter.as_deref() {
+                        limiter.add(&path, size);
+                        limiter.prune();
+                    }
+                    return true;
+                }
             }
         }
+        false
     }
 
     pub fn remove_file(&self, file: FileId) -> Result<(), RemoveFileError> {

@@ -10,9 +10,10 @@ use std::{mem, thread};
 use byteorder::{LittleEndian, ReadBytesExt};
 use futures_util::stream::futures_unordered::FuturesUnordered;
 use futures_util::{future, StreamExt, TryFutureExt};
+use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::audio::{AudioDecrypt, AudioFile, StreamLoaderController};
+use crate::audio::{AudioDecrypt, AudioFile, AudioFileError, StreamLoaderController};
 use crate::audio::{
     READ_AHEAD_BEFORE_PLAYBACK, READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK,
     READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS,
@@ -31,6 +32,14 @@ use crate::{MS_PER_PAGE, NUM_CHANNELS, PAGES_PER_MS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
+
+pub type PlayerResult = Result<(), PlayerError>;
+
+#[derive(Debug, Error)]
+pub enum PlayerError {
+    #[error("audio file error: {0}")]
+    AudioFile(#[from] AudioFileError),
+}
 
 pub struct Player {
     commands: Option<mpsc::UnboundedSender<PlayerCommand>>,
@@ -214,6 +223,17 @@ pub struct NormalisationData {
     track_peak: f32,
     album_gain_db: f32,
     album_peak: f32,
+}
+
+impl Default for NormalisationData {
+    fn default() -> Self {
+        Self {
+            track_gain_db: 0.0,
+            track_peak: 1.0,
+            album_gain_db: 0.0,
+            album_peak: 1.0,
+        }
+    }
 }
 
 impl NormalisationData {
@@ -698,19 +718,20 @@ impl PlayerTrackLoader {
     }
 
     fn stream_data_rate(&self, format: AudioFileFormat) -> usize {
-        match format {
-            AudioFileFormat::OGG_VORBIS_96 => 12 * 1024,
-            AudioFileFormat::OGG_VORBIS_160 => 20 * 1024,
-            AudioFileFormat::OGG_VORBIS_320 => 40 * 1024,
-            AudioFileFormat::MP3_256 => 32 * 1024,
-            AudioFileFormat::MP3_320 => 40 * 1024,
-            AudioFileFormat::MP3_160 => 20 * 1024,
-            AudioFileFormat::MP3_96 => 12 * 1024,
-            AudioFileFormat::MP3_160_ENC => 20 * 1024,
-            AudioFileFormat::AAC_24 => 3 * 1024,
-            AudioFileFormat::AAC_48 => 6 * 1024,
-            AudioFileFormat::FLAC_FLAC => 112 * 1024, // assume 900 kbps on average
-        }
+        let kbps = match format {
+            AudioFileFormat::OGG_VORBIS_96 => 12,
+            AudioFileFormat::OGG_VORBIS_160 => 20,
+            AudioFileFormat::OGG_VORBIS_320 => 40,
+            AudioFileFormat::MP3_256 => 32,
+            AudioFileFormat::MP3_320 => 40,
+            AudioFileFormat::MP3_160 => 20,
+            AudioFileFormat::MP3_96 => 12,
+            AudioFileFormat::MP3_160_ENC => 20,
+            AudioFileFormat::AAC_24 => 3,
+            AudioFileFormat::AAC_48 => 6,
+            AudioFileFormat::FLAC_FLAC => 112, // assume 900 kbit/s on average
+        };
+        kbps * 1024
     }
 
     async fn load_track(
@@ -805,9 +826,10 @@ impl PlayerTrackLoader {
                     return None;
                 }
             };
+
             let is_cached = encrypted_file.is_cached();
 
-            let stream_loader_controller = encrypted_file.get_stream_loader_controller();
+            let stream_loader_controller = encrypted_file.get_stream_loader_controller().ok()?;
 
             if play_from_beginning {
                 // No need to seek -> we stream from the beginning
@@ -830,13 +852,8 @@ impl PlayerTrackLoader {
             let normalisation_data = match NormalisationData::parse_from_file(&mut decrypted_file) {
                 Ok(data) => data,
                 Err(_) => {
-                    warn!("Unable to extract normalisation data, using default value.");
-                    NormalisationData {
-                        track_gain_db: 0.0,
-                        track_peak: 1.0,
-                        album_gain_db: 0.0,
-                        album_peak: 1.0,
-                    }
+                    warn!("Unable to extract normalisation data, using default values.");
+                    NormalisationData::default()
                 }
             };
 
@@ -929,7 +946,9 @@ impl Future for PlayerInternal {
             };
 
             if let Some(cmd) = cmd {
-                self.handle_command(cmd);
+                if let Err(e) = self.handle_command(cmd) {
+                    error!("Error handling command: {}", e);
+                }
             }
 
             // Handle loading of a new track to play
@@ -1109,7 +1128,9 @@ impl Future for PlayerInternal {
                 if (!*suggested_to_preload_next_track)
                     && ((duration_ms as i64 - Self::position_pcm_to_ms(stream_position_pcm) as i64)
                         < PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS as i64)
-                    && stream_loader_controller.range_to_end_available()
+                    && stream_loader_controller
+                        .range_to_end_available()
+                        .unwrap_or(false)
                 {
                     *suggested_to_preload_next_track = true;
                     self.send_event(PlayerEvent::TimeToPreloadNextTrack {
@@ -1785,7 +1806,7 @@ impl PlayerInternal {
         }
     }
 
-    fn handle_command_seek(&mut self, position_ms: u32) {
+    fn handle_command_seek(&mut self, position_ms: u32) -> PlayerResult {
         if let Some(stream_loader_controller) = self.state.stream_loader_controller() {
             stream_loader_controller.set_random_access_mode();
         }
@@ -1818,7 +1839,7 @@ impl PlayerInternal {
         }
 
         // ensure we have a bit of a buffer of downloaded data
-        self.preload_data_before_playback();
+        self.preload_data_before_playback()?;
 
         if let PlayerState::Playing {
             track_id,
@@ -1851,11 +1872,13 @@ impl PlayerInternal {
                 duration_ms,
             });
         }
+
+        Ok(())
     }
 
-    fn handle_command(&mut self, cmd: PlayerCommand) {
+    fn handle_command(&mut self, cmd: PlayerCommand) -> PlayerResult {
         debug!("command={:?}", cmd);
-        match cmd {
+        let result = match cmd {
             PlayerCommand::Load {
                 track_id,
                 play_request_id,
@@ -1865,7 +1888,7 @@ impl PlayerInternal {
 
             PlayerCommand::Preload { track_id } => self.handle_command_preload(track_id),
 
-            PlayerCommand::Seek(position_ms) => self.handle_command_seek(position_ms),
+            PlayerCommand::Seek(position_ms) => self.handle_command_seek(position_ms)?,
 
             PlayerCommand::Play => self.handle_play(),
 
@@ -1884,7 +1907,9 @@ impl PlayerInternal {
             PlayerCommand::SetAutoNormaliseAsAlbum(setting) => {
                 self.auto_normalise_as_album = setting
             }
-        }
+        };
+
+        Ok(result)
     }
 
     fn send_event(&mut self, event: PlayerEvent) {
@@ -1928,7 +1953,7 @@ impl PlayerInternal {
         result_rx.map_err(|_| ())
     }
 
-    fn preload_data_before_playback(&mut self) {
+    fn preload_data_before_playback(&mut self) -> Result<(), PlayerError> {
         if let PlayerState::Playing {
             bytes_per_second,
             ref mut stream_loader_controller,
@@ -1951,7 +1976,11 @@ impl PlayerInternal {
                     * bytes_per_second as f32) as usize,
                 (READ_AHEAD_BEFORE_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
             );
-            stream_loader_controller.fetch_next_blocking(wait_for_data_length);
+            stream_loader_controller
+                .fetch_next_blocking(wait_for_data_length)
+                .map_err(|e| e.into())
+        } else {
+            Ok(())
         }
     }
 }

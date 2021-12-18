@@ -14,7 +14,9 @@ use url::Url;
 
 use std::env::consts::OS;
 
-use crate::version::{SPOTIFY_MOBILE_VERSION, SPOTIFY_VERSION, VERSION_STRING};
+use crate::version::{
+    FALLBACK_USER_AGENT, SPOTIFY_MOBILE_VERSION, SPOTIFY_VERSION, VERSION_STRING,
+};
 
 pub struct HttpClient {
     user_agent: HeaderValue,
@@ -64,8 +66,8 @@ impl HttpClient {
 
         let user_agent = HeaderValue::from_str(user_agent_str).unwrap_or_else(|err| {
             error!("Invalid user agent <{}>: {}", user_agent_str, err);
-            error!("Parts of the API will probably not work. Please report this as a bug.");
-            HeaderValue::from_static("")
+            error!("Please report this as a bug.");
+            HeaderValue::from_static(FALLBACK_USER_AGENT)
         });
 
         // configuring TLS is expensive and should be done once per process

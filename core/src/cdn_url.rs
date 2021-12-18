@@ -80,7 +80,7 @@ impl CdnUrl {
             return Err(CdnUrlError::Empty);
         }
 
-        // remove expired URLs until the first one is current, or none are left
+        // prune expired URLs until the first one is current, or none are left
         let now = Local::now();
         while !self.urls.is_empty() {
             let maybe_expiring = self.urls[0].1;

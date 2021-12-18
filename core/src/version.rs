@@ -21,3 +21,6 @@ pub const SPOTIFY_VERSION: u64 = 117300517;
 
 /// The protocol version of the Spotify mobile app.
 pub const SPOTIFY_MOBILE_VERSION: &str = "8.6.84";
+
+/// The user agent to fall back to, if one could not be determined dynamically.
+pub const FALLBACK_USER_AGENT: &str = "Spotify/117300517 Linux/0 (librespot)";

@@ -13,7 +13,10 @@ use librespot_core::session::Session;
 
 use crate::range_set::{Range, RangeSet};
 
-use super::{AudioFileShared, DownloadStrategy, StreamLoaderCommand, StreamingRequest};
+use super::{
+    AudioFileError, AudioFileResult, AudioFileShared, DownloadStrategy, StreamLoaderCommand,
+    StreamingRequest,
+};
 use super::{
     FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME, MAX_PREFETCH_REQUESTS,
     MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
@@ -33,7 +36,7 @@ async fn receive_data(
     shared: Arc<AudioFileShared>,
     file_data_tx: mpsc::UnboundedSender<ReceivedData>,
     mut request: StreamingRequest,
-) {
+) -> AudioFileResult {
     let requested_offset = request.offset;
     let requested_length = request.length;
 
@@ -97,7 +100,10 @@ async fn receive_data(
     if request_length > 0 {
         let missing_range = Range::new(data_offset, request_length);
 
-        let mut download_status = shared.download_status.lock().unwrap();
+        let mut download_status = shared
+            .download_status
+            .lock()
+            .map_err(|_| AudioFileError::Poisoned)?;
         download_status.requested.subtract_range(&missing_range);
         shared.cond.notify_all();
     }
@@ -106,16 +112,23 @@ async fn receive_data(
         .number_of_open_requests
         .fetch_sub(1, Ordering::SeqCst);
 
-    if let Err(e) = result {
-        error!(
-            "Error from streamer for range {} (+{}): {:?}",
-            requested_offset, requested_length, e
-        );
-    } else if request_length > 0 {
-        warn!(
-            "Streamer for range {} (+{}) received less data from server than requested.",
-            requested_offset, requested_length
-        );
+    match result {
+        Ok(()) => {
+            if request_length > 0 {
+                warn!(
+                    "Streamer for range {} (+{}) received less data from server than requested.",
+                    requested_offset, requested_length
+                );
+            }
+            Ok(())
+        }
+        Err(e) => {
+            error!(
+                "Error from streamer for range {} (+{}): {:?}",
+                requested_offset, requested_length, e
+            );
+            Err(e.into())
+        }
     }
 }
 
@@ -137,22 +150,19 @@ enum ControlFlow {
 }
 
 impl AudioFileFetch {
-    fn get_download_strategy(&mut self) -> DownloadStrategy {
-        *(self.shared.download_strategy.lock().unwrap())
+    fn get_download_strategy(&mut self) -> Result<DownloadStrategy, AudioFileError> {
+        let strategy = self
+            .shared
+            .download_strategy
+            .lock()
+            .map_err(|_| AudioFileError::Poisoned)?;
+
+        Ok(*(strategy))
     }
 
-    fn download_range(&mut self, offset: usize, mut length: usize) {
+    fn download_range(&mut self, offset: usize, mut length: usize) -> AudioFileResult {
         if length < MINIMUM_DOWNLOAD_SIZE {
             length = MINIMUM_DOWNLOAD_SIZE;
-        }
-
-        // ensure the values are within the bounds
-        if offset >= self.shared.file_size {
-            return;
-        }
-
-        if length == 0 {
-            return;
         }
 
         if offset + length > self.shared.file_size {
@@ -162,7 +172,11 @@ impl AudioFileFetch {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length));
 
-        let mut download_status = self.shared.download_status.lock().unwrap();
+        let mut download_status = self
+            .shared
+            .download_status
+            .lock()
+            .map_err(|_| AudioFileError::Poisoned)?;
 
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
@@ -205,9 +219,15 @@ impl AudioFileFetch {
                 }
             }
         }
+
+        Ok(())
     }
 
-    fn pre_fetch_more_data(&mut self, bytes: usize, max_requests_to_send: usize) {
+    fn pre_fetch_more_data(
+        &mut self,
+        bytes: usize,
+        max_requests_to_send: usize,
+    ) -> AudioFileResult {
         let mut bytes_to_go = bytes;
         let mut requests_to_go = max_requests_to_send;
 
@@ -216,7 +236,11 @@ impl AudioFileFetch {
             let mut missing_data = RangeSet::new();
             missing_data.add_range(&Range::new(0, self.shared.file_size));
             {
-                let download_status = self.shared.download_status.lock().unwrap();
+                let download_status = self
+                    .shared
+                    .download_status
+                    .lock()
+                    .map_err(|_| AudioFileError::Poisoned)?;
                 missing_data.subtract_range_set(&download_status.downloaded);
                 missing_data.subtract_range_set(&download_status.requested);
             }
@@ -234,7 +258,7 @@ impl AudioFileFetch {
                 let range = tail_end.get_range(0);
                 let offset = range.start;
                 let length = min(range.length, bytes_to_go);
-                self.download_range(offset, length);
+                self.download_range(offset, length)?;
                 requests_to_go -= 1;
                 bytes_to_go -= length;
             } else if !missing_data.is_empty() {
@@ -242,20 +266,20 @@ impl AudioFileFetch {
                 let range = missing_data.get_range(0);
                 let offset = range.start;
                 let length = min(range.length, bytes_to_go);
-                self.download_range(offset, length);
+                self.download_range(offset, length)?;
                 requests_to_go -= 1;
                 bytes_to_go -= length;
             } else {
-                return;
+                break;
             }
         }
+
+        Ok(())
     }
 
-    fn handle_file_data(&mut self, data: ReceivedData) -> ControlFlow {
+    fn handle_file_data(&mut self, data: ReceivedData) -> Result<ControlFlow, AudioFileError> {
         match data {
             ReceivedData::ResponseTime(response_time) => {
-                trace!("Ping time estimated as: {} ms", response_time.as_millis());
-
                 // prune old response times. Keep at most two so we can push a third.
                 while self.network_response_times.len() >= 3 {
                     self.network_response_times.remove(0);
@@ -276,24 +300,27 @@ impl AudioFileFetch {
                     _ => unreachable!(),
                 };
 
+                trace!("Ping time estimated as: {} ms", ping_time.as_millis());
+
                 // store our new estimate for everyone to see
                 self.shared
                     .ping_time_ms
                     .store(ping_time.as_millis() as usize, Ordering::Relaxed);
             }
             ReceivedData::Data(data) => {
-                self.output
-                    .as_mut()
-                    .unwrap()
-                    .seek(SeekFrom::Start(data.offset as u64))
-                    .unwrap();
-                self.output
-                    .as_mut()
-                    .unwrap()
-                    .write_all(data.data.as_ref())
-                    .unwrap();
+                match self.output.as_mut() {
+                    Some(output) => {
+                        output.seek(SeekFrom::Start(data.offset as u64))?;
+                        output.write_all(data.data.as_ref())?;
+                    }
+                    None => return Err(AudioFileError::Output),
+                }
 
-                let mut download_status = self.shared.download_status.lock().unwrap();
+                let mut download_status = self
+                    .shared
+                    .download_status
+                    .lock()
+                    .map_err(|_| AudioFileError::Poisoned)?;
 
                 let received_range = Range::new(data.offset, data.data.len());
                 download_status.downloaded.add_range(&received_range);
@@ -305,36 +332,50 @@ impl AudioFileFetch {
                 drop(download_status);
 
                 if full {
-                    self.finish();
-                    return ControlFlow::Break;
+                    self.finish()?;
+                    return Ok(ControlFlow::Break);
                 }
             }
         }
-        ControlFlow::Continue
+
+        Ok(ControlFlow::Continue)
     }
 
-    fn handle_stream_loader_command(&mut self, cmd: StreamLoaderCommand) -> ControlFlow {
+    fn handle_stream_loader_command(
+        &mut self,
+        cmd: StreamLoaderCommand,
+    ) -> Result<ControlFlow, AudioFileError> {
         match cmd {
             StreamLoaderCommand::Fetch(request) => {
-                self.download_range(request.start, request.length);
+                self.download_range(request.start, request.length)?;
             }
             StreamLoaderCommand::RandomAccessMode() => {
-                *(self.shared.download_strategy.lock().unwrap()) = DownloadStrategy::RandomAccess();
+                *(self
+                    .shared
+                    .download_strategy
+                    .lock()
+                    .map_err(|_| AudioFileError::Poisoned)?) = DownloadStrategy::RandomAccess();
             }
             StreamLoaderCommand::StreamMode() => {
-                *(self.shared.download_strategy.lock().unwrap()) = DownloadStrategy::Streaming();
+                *(self
+                    .shared
+                    .download_strategy
+                    .lock()
+                    .map_err(|_| AudioFileError::Poisoned)?) = DownloadStrategy::Streaming();
             }
-            StreamLoaderCommand::Close() => return ControlFlow::Break,
+            StreamLoaderCommand::Close() => return Ok(ControlFlow::Break),
         }
-        ControlFlow::Continue
+        Ok(ControlFlow::Continue)
     }
 
-    fn finish(&mut self) {
-        let mut output = self.output.take().unwrap();
-        let complete_tx = self.complete_tx.take().unwrap();
+    fn finish(&mut self) -> AudioFileResult {
+        let mut output = self.output.take().ok_or(AudioFileError::Output)?;
+        let complete_tx = self.complete_tx.take().ok_or(AudioFileError::Output)?;
 
-        output.seek(SeekFrom::Start(0)).unwrap();
-        let _ = complete_tx.send(output);
+        output.seek(SeekFrom::Start(0))?;
+        complete_tx
+            .send(output)
+            .map_err(|_| AudioFileError::Channel)
     }
 }
 
@@ -345,7 +386,7 @@ pub(super) async fn audio_file_fetch(
     output: NamedTempFile,
     mut stream_loader_command_rx: mpsc::UnboundedReceiver<StreamLoaderCommand>,
     complete_tx: oneshot::Sender<NamedTempFile>,
-) {
+) -> AudioFileResult {
     let (file_data_tx, mut file_data_rx) = mpsc::unbounded_channel();
 
     {
@@ -353,7 +394,10 @@ pub(super) async fn audio_file_fetch(
             initial_request.offset,
             initial_request.offset + initial_request.length,
         );
-        let mut download_status = shared.download_status.lock().unwrap();
+        let mut download_status = shared
+            .download_status
+            .lock()
+            .map_err(|_| AudioFileError::Poisoned)?;
         download_status.requested.add_range(&requested_range);
     }
 
@@ -376,25 +420,39 @@ pub(super) async fn audio_file_fetch(
     loop {
         tokio::select! {
             cmd = stream_loader_command_rx.recv() => {
-                if cmd.map_or(true, |cmd| fetch.handle_stream_loader_command(cmd) == ControlFlow::Break) {
-                    break;
+                match cmd {
+                        Some(cmd) => {
+                            if fetch.handle_stream_loader_command(cmd)? == ControlFlow::Break {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
                 }
-            },
-            data = file_data_rx.recv() => {
-                if data.map_or(true, |data| fetch.handle_file_data(data) == ControlFlow::Break) {
-                    break;
+                data = file_data_rx.recv() => {
+                match data {
+                    Some(data) => {
+                        if fetch.handle_file_data(data)? == ControlFlow::Break {
+                            break;
+                        }
+                    }
+                    None => break,
                 }
             }
         }
 
-        if fetch.get_download_strategy() == DownloadStrategy::Streaming() {
+        if fetch.get_download_strategy()? == DownloadStrategy::Streaming() {
             let number_of_open_requests =
                 fetch.shared.number_of_open_requests.load(Ordering::SeqCst);
             if number_of_open_requests < MAX_PREFETCH_REQUESTS {
                 let max_requests_to_send = MAX_PREFETCH_REQUESTS - number_of_open_requests;
 
                 let bytes_pending: usize = {
-                    let download_status = fetch.shared.download_status.lock().unwrap();
+                    let download_status = fetch
+                        .shared
+                        .download_status
+                        .lock()
+                        .map_err(|_| AudioFileError::Poisoned)?;
                     download_status
                         .requested
                         .minus(&download_status.downloaded)
@@ -418,9 +476,11 @@ pub(super) async fn audio_file_fetch(
                     fetch.pre_fetch_more_data(
                         desired_pending_bytes - bytes_pending,
                         max_requests_to_send,
-                    );
+                    )?;
                 }
             }
         }
     }
+
+    Ok(())
 }
