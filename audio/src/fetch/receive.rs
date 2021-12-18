@@ -280,6 +280,8 @@ impl AudioFileFetch {
     fn handle_file_data(&mut self, data: ReceivedData) -> Result<ControlFlow, AudioFileError> {
         match data {
             ReceivedData::ResponseTime(response_time) => {
+                let old_ping_time_ms = self.shared.ping_time_ms.load(Ordering::Relaxed);
+
                 // prune old response times. Keep at most two so we can push a third.
                 while self.network_response_times.len() >= 3 {
                     self.network_response_times.remove(0);
@@ -289,23 +291,32 @@ impl AudioFileFetch {
                 self.network_response_times.push(response_time);
 
                 // stats::median is experimental. So we calculate the median of up to three ourselves.
-                let ping_time = match self.network_response_times.len() {
-                    1 => self.network_response_times[0],
-                    2 => (self.network_response_times[0] + self.network_response_times[1]) / 2,
-                    3 => {
-                        let mut times = self.network_response_times.clone();
-                        times.sort_unstable();
-                        times[1]
-                    }
-                    _ => unreachable!(),
+                let ping_time_ms = {
+                    let response_time = match self.network_response_times.len() {
+                        1 => self.network_response_times[0],
+                        2 => (self.network_response_times[0] + self.network_response_times[1]) / 2,
+                        3 => {
+                            let mut times = self.network_response_times.clone();
+                            times.sort_unstable();
+                            times[1]
+                        }
+                        _ => unreachable!(),
+                    };
+                    response_time.as_millis() as usize
                 };
 
-                trace!("Ping time estimated as: {} ms", ping_time.as_millis());
+                // print when the new estimate deviates by more than 10% from the last
+                if f32::abs(
+                    (ping_time_ms as f32 - old_ping_time_ms as f32) / old_ping_time_ms as f32,
+                ) > 0.1
+                {
+                    debug!("Ping time now estimated as: {} ms", ping_time_ms);
+                }
 
                 // store our new estimate for everyone to see
                 self.shared
                     .ping_time_ms
-                    .store(ping_time.as_millis() as usize, Ordering::Relaxed);
+                    .store(ping_time_ms, Ordering::Relaxed);
             }
             ReceivedData::Data(data) => {
                 match self.output.as_mut() {
