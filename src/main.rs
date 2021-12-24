@@ -1568,6 +1568,9 @@ fn get_setup() -> Setup {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     const RUST_BACKTRACE: &str = "RUST_BACKTRACE";
+    const RECONNECT_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(600);
+    const RECONNECT_RATE_LIMIT: usize = 5;
+
     if env::var(RUST_BACKTRACE).is_err() {
         env::set_var(RUST_BACKTRACE, "full")
     }
@@ -1585,14 +1588,18 @@ async fn main() {
     if setup.enable_discovery {
         let device_id = setup.session_config.device_id.clone();
 
-        discovery = Some(
-            librespot::discovery::Discovery::builder(device_id)
-                .name(setup.connect_config.name.clone())
-                .device_type(setup.connect_config.device_type)
-                .port(setup.zeroconf_port)
-                .launch()
-                .unwrap(),
-        );
+        discovery = match librespot::discovery::Discovery::builder(device_id)
+            .name(setup.connect_config.name.clone())
+            .device_type(setup.connect_config.device_type)
+            .port(setup.zeroconf_port)
+            .launch()
+        {
+            Ok(d) => Some(d),
+            Err(e) => {
+                error!("Discovery Error: {}", e);
+                exit(1);
+            }
+        }
     }
 
     if let Some(credentials) = setup.credentials {
@@ -1609,7 +1616,12 @@ async fn main() {
 
     loop {
         tokio::select! {
-            credentials = async { discovery.as_mut().unwrap().next().await }, if discovery.is_some() => {
+            credentials = async {
+                match discovery.as_mut() {
+                    Some(d) => d.next().await,
+                    _ => None
+                }
+            }, if discovery.is_some() => {
                 match credentials {
                     Some(credentials) => {
                         last_credentials = Some(credentials.clone());
@@ -1630,8 +1642,8 @@ async fn main() {
                         ).fuse());
                     },
                     None => {
-                        warn!("Discovery stopped!");
-                        discovery = None;
+                        error!("Discovery stopped unexpectedly");
+                        exit(1);
                     }
                 }
             },
@@ -1682,20 +1694,22 @@ async fn main() {
                     exit(1);
                 }
             },
-            _ = async { spirc_task.as_mut().unwrap().await }, if spirc_task.is_some() => {
+            _ = async {
+                if let Some(task) = spirc_task.as_mut() {
+                    task.await;
+                }
+            }, if spirc_task.is_some() => {
                 spirc_task = None;
 
                 warn!("Spirc shut down unexpectedly");
-                while !auto_connect_times.is_empty()
-                    && ((Instant::now() - auto_connect_times[0]).as_secs() > 600)
-                {
-                    let _ = auto_connect_times.remove(0);
-                }
 
-                if let Some(credentials) = last_credentials.clone() {
-                    if auto_connect_times.len() >= 5 {
-                        warn!("Spirc shut down too often. Not reconnecting automatically.");
-                    } else {
+                let mut reconnect_exceeds_rate_limit = || {
+                    auto_connect_times.retain(|&t| t.elapsed() < RECONNECT_RATE_LIMIT_WINDOW);
+                    auto_connect_times.len() > RECONNECT_RATE_LIMIT
+                };
+
+                match last_credentials.clone() {
+                    Some(credentials) if !reconnect_exceeds_rate_limit() => {
                         auto_connect_times.push(Instant::now());
 
                         connecting = Box::pin(Session::connect(
@@ -1703,19 +1717,25 @@ async fn main() {
                             credentials,
                             setup.cache.clone(),
                         ).fuse());
-                    }
+                    },
+                    _ => {
+                        error!("Spirc shut down too often. Not reconnecting automatically.");
+                        exit(1);
+                    },
                 }
             },
-            event = async { player_event_channel.as_mut().unwrap().recv().await }, if player_event_channel.is_some() => match event {
+            event = async {
+                match player_event_channel.as_mut() {
+                    Some(p) => p.recv().await,
+                    _ => None
+                }
+            }, if player_event_channel.is_some() => match event {
                 Some(event) => {
                     if let Some(program) = &setup.player_event_program {
                         if let Some(child) = run_program_on_events(event, program) {
-                            if child.is_ok() {
-
-                                let mut child = child.unwrap();
-
+                            if let Ok(mut child) = child {
                                 tokio::spawn(async move {
-                                    match child.wait().await  {
+                                    match child.wait().await {
                                         Ok(e) if e.success() => (),
                                         Ok(e) => {
                                             if let Some(code) = e.code() {
@@ -1741,7 +1761,8 @@ async fn main() {
             },
             _ = tokio::signal::ctrl_c() => {
                 break;
-            }
+            },
+            else => break,
         }
     }
 
@@ -1754,7 +1775,8 @@ async fn main() {
         if let Some(mut spirc_task) = spirc_task {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => (),
-                _ = spirc_task.as_mut() => ()
+                _ = spirc_task.as_mut() => (),
+                else => (),
             }
         }
     }
