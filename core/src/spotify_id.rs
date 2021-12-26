@@ -516,7 +516,6 @@ mod tests {
     struct ConversionCase {
         id: u128,
         kind: SpotifyItemType,
-        uri_error: Option<SpotifyIdError>,
         uri: &'static str,
         base16: &'static str,
         base62: &'static str,
@@ -527,7 +526,6 @@ mod tests {
         ConversionCase {
             id: 238762092608182713602505436543891614649,
             kind: SpotifyItemType::Track,
-            uri_error: None,
             uri: "spotify:track:5sWHDYs0csV6RS48xBl0tH",
             base16: "b39fe8081e1f4c54be38e8d6f9f12bb9",
             base62: "5sWHDYs0csV6RS48xBl0tH",
@@ -538,7 +536,6 @@ mod tests {
         ConversionCase {
             id: 204841891221366092811751085145916697048,
             kind: SpotifyItemType::Track,
-            uri_error: None,
             uri: "spotify:track:4GNcXTGWmnZ3ySrqvol3o4",
             base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
@@ -549,7 +546,6 @@ mod tests {
         ConversionCase {
             id: 204841891221366092811751085145916697048,
             kind: SpotifyItemType::Episode,
-            uri_error: None,
             uri: "spotify:episode:4GNcXTGWmnZ3ySrqvol3o4",
             base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
@@ -560,7 +556,6 @@ mod tests {
         ConversionCase {
             id: 204841891221366092811751085145916697048,
             kind: SpotifyItemType::Show,
-            uri_error: None,
             uri: "spotify:show:4GNcXTGWmnZ3ySrqvol3o4",
             base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
@@ -575,7 +570,6 @@ mod tests {
             id: 0,
             kind: SpotifyItemType::Unknown,
             // Invalid ID in the URI.
-            uri_error: SpotifyIdError::InvalidId,
             uri: "spotify:arbitrarywhatever:5sWHDYs0Bl0tH",
             base16: "ZZZZZ8081e1f4c54be38e8d6f9f12bb9",
             base62: "!!!!!Ys0csV6RS48xBl0tH",
@@ -588,7 +582,6 @@ mod tests {
             id: 0,
             kind: SpotifyItemType::Unknown,
             // Missing colon between ID and type.
-            uri_error: SpotifyIdError::InvalidFormat,
             uri: "spotify:arbitrarywhatever5sWHDYs0csV6RS48xBl0tH",
             base16: "--------------------",
             base62: "....................",
@@ -601,7 +594,6 @@ mod tests {
             id: 0,
             kind: SpotifyItemType::Unknown,
             // Uri too short
-            uri_error: SpotifyIdError::InvalidId,
             uri: "spotify:azb:aRS48xBl0tH",
             base16: "--------------------",
             base62: "....................",
@@ -619,10 +611,7 @@ mod tests {
         }
 
         for c in &CONV_INVALID {
-            assert_eq!(
-                SpotifyId::from_base62(c.base62),
-                Err(SpotifyIdError::InvalidId)
-            );
+            assert!(SpotifyId::from_base62(c.base62).is_err(),);
         }
     }
 
@@ -645,10 +634,7 @@ mod tests {
         }
 
         for c in &CONV_INVALID {
-            assert_eq!(
-                SpotifyId::from_base16(c.base16),
-                Err(SpotifyIdError::InvalidId)
-            );
+            assert!(SpotifyId::from_base16(c.base16).is_err(),);
         }
     }
 
@@ -674,7 +660,7 @@ mod tests {
         }
 
         for c in &CONV_INVALID {
-            assert_eq!(SpotifyId::from_uri(c.uri), Err(c.uri_error.unwrap()));
+            assert!(SpotifyId::from_uri(c.uri).is_err());
         }
     }
 
@@ -697,7 +683,7 @@ mod tests {
         }
 
         for c in &CONV_INVALID {
-            assert_eq!(SpotifyId::from_raw(c.raw), Err(SpotifyIdError::InvalidId));
+            assert!(SpotifyId::from_raw(c.raw).is_err());
         }
     }
 }
