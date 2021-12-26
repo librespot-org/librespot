@@ -27,7 +27,6 @@ tokio = { version = "1.0", features = ["parking_lot", "sync", "rt"] }
 
 [dependencies.librespot-core]
 path = "../core"
-default_features = false
 version = "0.3.1"
 
 [dev-dependencies]
@@ -36,4 +35,4 @@ hex = "0.4"
 tokio = { version = "1.0", features = ["macros", "parking_lot", "rt"] }
 
 [features]
-with-dns-sd = ["dns-sd"]
+with-dns-sd = ["dns-sd", "librespot-core/with-dns-sd"]
