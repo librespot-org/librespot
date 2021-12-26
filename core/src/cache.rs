@@ -189,7 +189,7 @@ impl FsSizeLimiter {
     }
 
     fn add(&self, file: &Path, size: u64) {
-        self.limiter.lock().add(file, size, SystemTime::now());
+        self.limiter.lock().add(file, size, SystemTime::now())
     }
 
     fn touch(&self, file: &Path) -> bool {

@@ -106,12 +106,12 @@ async fn receive_data(
     drop(request.streamer);
 
     if request_length > 0 {
-        let missing_range = Range::new(data_offset, request_length);
-
-        let mut download_status = shared.download_status.lock();
-
-        download_status.requested.subtract_range(&missing_range);
-        shared.cond.notify_all();
+        {
+            let missing_range = Range::new(data_offset, request_length);
+            let mut download_status = shared.download_status.lock();
+            download_status.requested.subtract_range(&missing_range);
+            shared.cond.notify_all();
+        }
     }
 
     shared
@@ -172,14 +172,18 @@ impl AudioFileFetch {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length));
 
+        // The iteration that follows spawns streamers fast, without awaiting them,
+        // so holding the lock for the entire scope of this function should be faster
+        // then locking and unlocking multiple times.
         let mut download_status = self.shared.download_status.lock();
 
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
 
-        for range in ranges_to_request.iter() {
-            let url = self.shared.cdn_url.try_get_url()?;
+        // Likewise, checking for the URL expiry once will guarantee validity long enough.
+        let url = self.shared.cdn_url.try_get_url()?;
 
+        for range in ranges_to_request.iter() {
             let streamer = self
                 .session
                 .spclient()
@@ -219,7 +223,6 @@ impl AudioFileFetch {
             missing_data.add_range(&Range::new(0, self.shared.file_size));
             {
                 let download_status = self.shared.download_status.lock();
-
                 missing_data.subtract_range_set(&download_status.downloaded);
                 missing_data.subtract_range_set(&download_status.requested);
             }
@@ -306,16 +309,16 @@ impl AudioFileFetch {
                     None => return Err(AudioFileError::Output.into()),
                 }
 
-                let mut download_status = self.shared.download_status.lock();
-
                 let received_range = Range::new(data.offset, data.data.len());
-                download_status.downloaded.add_range(&received_range);
-                self.shared.cond.notify_all();
 
-                let full = download_status.downloaded.contained_length_from_value(0)
-                    >= self.shared.file_size;
+                let full = {
+                    let mut download_status = self.shared.download_status.lock();
+                    download_status.downloaded.add_range(&received_range);
+                    self.shared.cond.notify_all();
 
-                drop(download_status);
+                    download_status.downloaded.contained_length_from_value(0)
+                        >= self.shared.file_size
+                };
 
                 if full {
                     self.finish()?;
@@ -380,8 +383,8 @@ pub(super) async fn audio_file_fetch(
             initial_request.offset,
             initial_request.offset + initial_request.length,
         );
-        let mut download_status = shared.download_status.lock();
 
+        let mut download_status = shared.download_status.lock();
         download_status.requested.add_range(&requested_range);
     }
 
