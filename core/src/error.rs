@@ -12,6 +12,9 @@ use thiserror::Error;
 use tokio::sync::{mpsc::error::SendError, oneshot::error::RecvError};
 use url::ParseError;
 
+#[cfg(feature = "with-dns-sd")]
+use dns_sd::DNSError;
+
 #[derive(Debug)]
 pub struct Error {
     pub kind: ErrorKind,
@@ -280,6 +283,13 @@ impl fmt::Display for Error {
 impl From<DecodeError> for Error {
     fn from(err: DecodeError) -> Self {
         Self::new(ErrorKind::FailedPrecondition, err)
+    }
+}
+
+#[cfg(feature = "with-dns-sd")]
+impl From<DNSError> for Error {
+    fn from(err: DNSError) -> Self {
+        Self::new(ErrorKind::Unavailable, err)
     }
 }
 

@@ -1303,6 +1303,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
+ "dns-sd",
  "env_logger",
  "form_urlencoded",
  "futures-core",
