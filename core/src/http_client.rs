@@ -156,7 +156,8 @@ impl HttpClient {
     pub fn request_fut(&self, mut req: Request<Body>) -> Result<ResponseFuture, Error> {
         let mut http = HttpConnector::new();
         http.enforce_http(false);
-        let connector = HttpsConnector::from((http, self.tls_config.clone()));
+
+        let https_connector = HttpsConnector::from((http, self.tls_config.clone()));
 
         let headers_mut = req.headers_mut();
         headers_mut.insert(USER_AGENT, self.user_agent.clone());
@@ -164,11 +165,14 @@ impl HttpClient {
         let request = if let Some(url) = &self.proxy {
             let proxy_uri = url.to_string().parse()?;
             let proxy = Proxy::new(Intercept::All, proxy_uri);
-            let proxy_connector = ProxyConnector::from_proxy(connector, proxy)?;
+            let proxy_connector = ProxyConnector::from_proxy(https_connector, proxy)?;
 
             Client::builder().build(proxy_connector).request(req)
         } else {
-            Client::builder().build(connector).request(req)
+            Client::builder()
+                .http2_adaptive_window(true)
+                .build(https_connector)
+                .request(req)
         };
 
         Ok(request)
