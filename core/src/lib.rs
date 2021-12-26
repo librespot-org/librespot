@@ -20,6 +20,7 @@ pub mod date;
 mod dealer;
 #[doc(hidden)]
 pub mod diffie_hellman;
+pub mod error;
 pub mod file_id;
 mod http_client;
 pub mod mercury;
@@ -34,3 +35,9 @@ pub mod token;
 #[doc(hidden)]
 pub mod util;
 pub mod version;
+
+pub use config::SessionConfig;
+pub use error::Error;
+pub use file_id::FileId;
+pub use session::Session;
+pub use spotify_id::SpotifyId;

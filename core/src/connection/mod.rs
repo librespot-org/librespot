@@ -1,23 +1,21 @@
 mod codec;
 mod handshake;
 
-pub use self::codec::ApCodec;
-pub use self::handshake::handshake;
+pub use self::{codec::ApCodec, handshake::handshake};
 
-use std::io::{self, ErrorKind};
+use std::io;
 
 use futures_util::{SinkExt, StreamExt};
 use num_traits::FromPrimitive;
-use protobuf::{self, Message, ProtobufError};
+use protobuf::{self, Message};
 use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use url::Url;
 
-use crate::authentication::Credentials;
-use crate::packet::PacketType;
+use crate::{authentication::Credentials, packet::PacketType, version, Error};
+
 use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
-use crate::version;
 
 pub type Transport = Framed<TcpStream, ApCodec>;
 
@@ -42,13 +40,19 @@ fn login_error_message(code: &ErrorCode) -> &'static str {
 pub enum AuthenticationError {
     #[error("Login failed with reason: {}", login_error_message(.0))]
     LoginFailed(ErrorCode),
-    #[error("Authentication failed: {0}")]
-    IoError(#[from] io::Error),
+    #[error("invalid packet {0}")]
+    Packet(u8),
+    #[error("transport returned no data")]
+    Transport,
 }
 
-impl From<ProtobufError> for AuthenticationError {
-    fn from(e: ProtobufError) -> Self {
-        io::Error::new(ErrorKind::InvalidData, e).into()
+impl From<AuthenticationError> for Error {
+    fn from(err: AuthenticationError) -> Self {
+        match err {
+            AuthenticationError::LoginFailed(_) => Error::permission_denied(err),
+            AuthenticationError::Packet(_) => Error::unimplemented(err),
+            AuthenticationError::Transport => Error::unavailable(err),
+        }
     }
 }
 
@@ -68,7 +72,7 @@ pub async fn authenticate(
     transport: &mut Transport,
     credentials: Credentials,
     device_id: &str,
-) -> Result<Credentials, AuthenticationError> {
+) -> Result<Credentials, Error> {
     use crate::protocol::authentication::{APWelcome, ClientResponseEncrypted, CpuFamily, Os};
 
     let cpu_family = match std::env::consts::ARCH {
@@ -119,12 +123,15 @@ pub async fn authenticate(
     packet.set_version_string(format!("librespot {}", version::SEMVER));
 
     let cmd = PacketType::Login;
-    let data = packet.write_to_bytes().unwrap();
+    let data = packet.write_to_bytes()?;
 
     transport.send((cmd as u8, data)).await?;
-    let (cmd, data) = transport.next().await.expect("EOF")?;
+    let (cmd, data) = transport
+        .next()
+        .await
+        .ok_or(AuthenticationError::Transport)??;
     let packet_type = FromPrimitive::from_u8(cmd);
-    match packet_type {
+    let result = match packet_type {
         Some(PacketType::APWelcome) => {
             let welcome_data = APWelcome::parse_from_bytes(data.as_ref())?;
 
@@ -141,8 +148,13 @@ pub async fn authenticate(
             Err(error_data.into())
         }
         _ => {
-            let msg = format!("Received invalid packet: {}", cmd);
-            Err(io::Error::new(ErrorKind::InvalidData, msg).into())
+            trace!(
+                "Did not expect {:?} AES key packet with data {:#?}",
+                cmd,
+                data
+            );
+            Err(AuthenticationError::Packet(cmd))
         }
-    }
+    };
+    Ok(result?)
 }

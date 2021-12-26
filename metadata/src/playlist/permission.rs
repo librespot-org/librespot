@@ -1,10 +1,8 @@
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{fmt::Debug, ops::Deref};
 
 use crate::util::from_repeated_enum;
 
 use librespot_protocol as protocol;
-
 use protocol::playlist_permission::Capabilities as CapabilitiesMessage;
 use protocol::playlist_permission::PermissionLevel;
 

@@ -1,30 +1,20 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::ops::Deref;
-
-use crate::{
-    artist::Artists,
-    availability::Availabilities,
-    copyright::Copyrights,
-    error::{MetadataError, RequestError},
-    external_id::ExternalIds,
-    image::Images,
-    request::RequestResult,
-    restriction::Restrictions,
-    sale_period::SalePeriods,
-    track::Tracks,
-    util::try_from_repeated_message,
-    Metadata,
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
 };
 
-use librespot_core::date::Date;
-use librespot_core::session::Session;
-use librespot_core::spotify_id::SpotifyId;
+use crate::{
+    artist::Artists, availability::Availabilities, copyright::Copyrights, external_id::ExternalIds,
+    image::Images, request::RequestResult, restriction::Restrictions, sale_period::SalePeriods,
+    track::Tracks, util::try_from_repeated_message, Metadata,
+};
+
+use librespot_core::{date::Date, Error, Session, SpotifyId};
+
 use librespot_protocol as protocol;
-
-use protocol::metadata::Disc as DiscMessage;
-
 pub use protocol::metadata::Album_Type as AlbumType;
+use protocol::metadata::Disc as DiscMessage;
 
 #[derive(Debug, Clone)]
 pub struct Album {
@@ -94,20 +84,16 @@ impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
     async fn request(session: &Session, album_id: SpotifyId) -> RequestResult {
-        session
-            .spclient()
-            .get_album_metadata(album_id)
-            .await
-            .map_err(RequestError::Http)
+        session.spclient().get_album_metadata(album_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, MetadataError> {
+    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }
 
 impl TryFrom<&<Self as Metadata>::Message> for Album {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(album: &<Self as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
             id: album.try_into()?,
@@ -138,7 +124,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Album {
 try_from_repeated_message!(<Album as Metadata>::Message, Albums);
 
 impl TryFrom<&DiscMessage> for Disc {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(disc: &DiscMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             number: disc.get_number(),

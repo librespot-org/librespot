@@ -12,10 +12,9 @@ use crate::{
 
 use super::file::AudioFiles;
 
-use librespot_core::session::{Session, UserData};
-use librespot_core::spotify_id::{SpotifyId, SpotifyItemType};
+use librespot_core::{session::UserData, spotify_id::SpotifyItemType, Error, Session, SpotifyId};
 
-pub type AudioItemResult = Result<AudioItem, MetadataError>;
+pub type AudioItemResult = Result<AudioItem, Error>;
 
 // A wrapper with fields the player needs
 #[derive(Debug, Clone)]
@@ -34,7 +33,7 @@ impl AudioItem {
         match id.item_type {
             SpotifyItemType::Track => Track::get_audio_item(session, id).await,
             SpotifyItemType::Episode => Episode::get_audio_item(session, id).await,
-            _ => Err(MetadataError::NonPlayable),
+            _ => Err(Error::unavailable(MetadataError::NonPlayable)),
         }
     }
 }

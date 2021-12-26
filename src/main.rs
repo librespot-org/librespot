@@ -1,3 +1,14 @@
+use std::{
+    env,
+    fs::create_dir_all,
+    ops::RangeInclusive,
+    path::{Path, PathBuf},
+    pin::Pin,
+    process::exit,
+    str::FromStr,
+    time::{Duration, Instant},
+};
+
 use futures_util::{future, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
 use log::{error, info, trace, warn};
@@ -6,34 +17,30 @@ use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
-use librespot::connect::spirc::Spirc;
-use librespot::core::authentication::Credentials;
-use librespot::core::cache::Cache;
-use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig};
-use librespot::core::session::Session;
-use librespot::core::version;
-use librespot::playback::audio_backend::{self, SinkBuilder, BACKENDS};
-use librespot::playback::config::{
-    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
+use librespot::{
+    connect::spirc::Spirc,
+    core::{
+        authentication::Credentials,
+        cache::Cache,
+        config::{ConnectConfig, DeviceType},
+        version, Session, SessionConfig,
+    },
+    playback::{
+        audio_backend::{self, SinkBuilder, BACKENDS},
+        config::{
+            AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
+        },
+        dither,
+        mixer::{self, MixerConfig, MixerFn},
+        player::{db_to_ratio, ratio_to_db, Player},
+    },
 };
-use librespot::playback::dither;
+
 #[cfg(feature = "alsa-backend")]
 use librespot::playback::mixer::alsamixer::AlsaMixer;
-use librespot::playback::mixer::{self, MixerConfig, MixerFn};
-use librespot::playback::player::{db_to_ratio, ratio_to_db, Player};
 
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
-
-use std::env;
-use std::fs::create_dir_all;
-use std::ops::RangeInclusive;
-use std::path::{Path, PathBuf};
-use std::pin::Pin;
-use std::process::exit;
-use std::str::FromStr;
-use std::time::Duration;
-use std::time::Instant;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -1530,7 +1537,9 @@ async fn main() {
                         auto_connect_times.clear();
 
                         if let Some(spirc) = spirc.take() {
-                            spirc.shutdown();
+                            if let Err(e) = spirc.shutdown() {
+                                error!("error sending spirc shutdown message: {}", e);
+                            }
                         }
                         if let Some(spirc_task) = spirc_task.take() {
                             // Continue shutdown in its own task
@@ -1585,8 +1594,13 @@ async fn main() {
                         }
                     };
 
-                    let (spirc_, spirc_task_) = Spirc::new(connect_config, session, player, mixer);
-
+                    let (spirc_, spirc_task_) = match Spirc::new(connect_config, session, player, mixer) {
+                        Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
+                        Err(e) => {
+                            error!("could not initialize spirc: {}", e);
+                            exit(1);
+                        }
+                    };
                     spirc = Some(spirc_);
                     spirc_task = Some(Box::pin(spirc_task_));
                     player_event_channel = Some(event_channel);
@@ -1663,7 +1677,9 @@ async fn main() {
 
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
-        spirc.shutdown();
+        if let Err(e) = spirc.shutdown() {
+            error!("error sending spirc shutdown message: {}", e);
+        }
 
         if let Some(mut spirc_task) = spirc_task {
             tokio::select! {

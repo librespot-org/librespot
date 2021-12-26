@@ -1,11 +1,19 @@
+use std::io;
+
 use byteorder::{BigEndian, ByteOrder};
 use bytes::{BufMut, Bytes, BytesMut};
 use shannon::Shannon;
-use std::io;
+use thiserror::Error;
 use tokio_util::codec::{Decoder, Encoder};
 
 const HEADER_SIZE: usize = 3;
 const MAC_SIZE: usize = 4;
+
+#[derive(Debug, Error)]
+pub enum ApCodecError {
+    #[error("payload was malformed")]
+    Payload,
+}
 
 #[derive(Debug)]
 enum DecodeState {
@@ -87,7 +95,10 @@ impl Decoder for ApCodec {
 
                 let mut payload = buf.split_to(size + MAC_SIZE);
 
-                self.decode_cipher.decrypt(payload.get_mut(..size).unwrap());
+                self.decode_cipher
+                    .decrypt(payload.get_mut(..size).ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::InvalidData, ApCodecError::Payload)
+                    })?);
                 let mac = payload.split_off(size);
                 self.decode_cipher.check_mac(mac.as_ref())?;
 

@@ -2,7 +2,7 @@
 
 use num_derive::{FromPrimitive, ToPrimitive};
 
-#[derive(Debug, FromPrimitive, ToPrimitive)]
+#[derive(Debug, Copy, Clone, FromPrimitive, ToPrimitive)]
 pub enum PacketType {
     SecretBlock = 0x02,
     Ping = 0x04,

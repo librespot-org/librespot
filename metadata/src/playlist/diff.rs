@@ -1,13 +1,13 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-
-use crate::error::MetadataError;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+};
 
 use super::operation::PlaylistOperations;
 
-use librespot_core::spotify_id::SpotifyId;
-use librespot_protocol as protocol;
+use librespot_core::SpotifyId;
 
+use librespot_protocol as protocol;
 use protocol::playlist4_external::Diff as DiffMessage;
 
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ pub struct PlaylistDiff {
 }
 
 impl TryFrom<&DiffMessage> for PlaylistDiff {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(diff: &DiffMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             from_revision: diff.get_from_revision().try_into()?,

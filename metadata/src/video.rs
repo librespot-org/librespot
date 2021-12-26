@@ -1,11 +1,10 @@
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{fmt::Debug, ops::Deref};
 
 use crate::util::from_repeated_message;
 
-use librespot_core::file_id::FileId;
-use librespot_protocol as protocol;
+use librespot_core::FileId;
 
+use librespot_protocol as protocol;
 use protocol::metadata::VideoFile as VideoFileMessage;
 
 #[derive(Debug, Clone)]

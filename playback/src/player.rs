@@ -1,45 +1,40 @@
-use std::cmp::max;
-use std::future::Future;
-use std::io::{self, Read, Seek, SeekFrom};
-use std::pin::Pin;
-use std::process::exit;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
-use std::{mem, thread};
+use std::{
+    cmp::max,
+    future::Future,
+    io::{self, Read, Seek, SeekFrom},
+    mem,
+    pin::Pin,
+    process::exit,
+    task::{Context, Poll},
+    thread,
+    time::{Duration, Instant},
+};
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use futures_util::stream::futures_unordered::FuturesUnordered;
-use futures_util::{future, StreamExt, TryFutureExt};
-use thiserror::Error;
+use futures_util::{future, stream::futures_unordered::FuturesUnordered, StreamExt, TryFutureExt};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::audio::{AudioDecrypt, AudioFile, AudioFileError, StreamLoaderController};
-use crate::audio::{
-    READ_AHEAD_BEFORE_PLAYBACK, READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK,
-    READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS,
+use crate::{
+    audio::{
+        AudioDecrypt, AudioFile, StreamLoaderController, READ_AHEAD_BEFORE_PLAYBACK,
+        READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK,
+        READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS,
+    },
+    audio_backend::Sink,
+    config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
+    convert::Converter,
+    core::{util::SeqGenerator, Error, Session, SpotifyId},
+    decoder::{AudioDecoder, AudioPacket, DecoderError, PassthroughDecoder, VorbisDecoder},
+    metadata::audio::{AudioFileFormat, AudioItem},
+    mixer::AudioFilter,
 };
-use crate::audio_backend::Sink;
-use crate::config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig};
-use crate::convert::Converter;
-use crate::core::session::Session;
-use crate::core::spotify_id::SpotifyId;
-use crate::core::util::SeqGenerator;
-use crate::decoder::{AudioDecoder, AudioPacket, DecoderError, PassthroughDecoder, VorbisDecoder};
-use crate::metadata::audio::{AudioFileFormat, AudioItem};
-use crate::mixer::AudioFilter;
 
 use crate::{MS_PER_PAGE, NUM_CHANNELS, PAGES_PER_MS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 
-pub type PlayerResult = Result<(), PlayerError>;
-
-#[derive(Debug, Error)]
-pub enum PlayerError {
-    #[error("audio file error: {0}")]
-    AudioFile(#[from] AudioFileError),
-}
+pub type PlayerResult = Result<(), Error>;
 
 pub struct Player {
     commands: Option<mpsc::UnboundedSender<PlayerCommand>>,
@@ -755,7 +750,7 @@ impl PlayerTrackLoader {
         let audio = match self.find_available_alternative(audio).await {
             Some(audio) => audio,
             None => {
-                warn!("<{}> is not available", spotify_id.to_uri());
+                error!("<{}> is not available", spotify_id.to_uri());
                 return None;
             }
         };
@@ -801,7 +796,7 @@ impl PlayerTrackLoader {
         let (format, file_id) = match entry {
             Some(t) => t,
             None => {
-                warn!("<{}> is not available in any supported format", audio.name);
+                error!("<{}> is not available in any supported format", audio.name);
                 return None;
             }
         };
@@ -973,7 +968,7 @@ impl Future for PlayerInternal {
                         }
                     }
                     Poll::Ready(Err(e)) => {
-                        warn!(
+                        error!(
                             "Skipping to next track, unable to load track <{:?}>: {:?}",
                             track_id, e
                         );
@@ -1077,7 +1072,7 @@ impl Future for PlayerInternal {
                                             }
                                         }
                                         Err(e) => {
-                                            warn!("Skipping to next track, unable to decode samples for track <{:?}>: {:?}", track_id, e);
+                                            error!("Skipping to next track, unable to decode samples for track <{:?}>: {:?}", track_id, e);
                                             self.send_event(PlayerEvent::EndOfTrack {
                                                 track_id,
                                                 play_request_id,
@@ -1093,7 +1088,7 @@ impl Future for PlayerInternal {
                             self.handle_packet(packet, normalisation_factor);
                         }
                         Err(e) => {
-                            warn!("Skipping to next track, unable to get next packet for track <{:?}>: {:?}", track_id, e);
+                            error!("Skipping to next track, unable to get next packet for track <{:?}>: {:?}", track_id, e);
                             self.send_event(PlayerEvent::EndOfTrack {
                                 track_id,
                                 play_request_id,
@@ -1128,9 +1123,7 @@ impl Future for PlayerInternal {
                 if (!*suggested_to_preload_next_track)
                     && ((duration_ms as i64 - Self::position_pcm_to_ms(stream_position_pcm) as i64)
                         < PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS as i64)
-                    && stream_loader_controller
-                        .range_to_end_available()
-                        .unwrap_or(false)
+                    && stream_loader_controller.range_to_end_available()
                 {
                     *suggested_to_preload_next_track = true;
                     self.send_event(PlayerEvent::TimeToPreloadNextTrack {
@@ -1266,7 +1259,7 @@ impl PlayerInternal {
             });
             self.ensure_sink_running();
         } else {
-            warn!("Player::play called from invalid state");
+            error!("Player::play called from invalid state");
         }
     }
 
@@ -1290,7 +1283,7 @@ impl PlayerInternal {
                 duration_ms,
             });
         } else {
-            warn!("Player::pause called from invalid state");
+            error!("Player::pause called from invalid state");
         }
     }
 
@@ -1830,7 +1823,7 @@ impl PlayerInternal {
                 Err(e) => error!("PlayerInternal handle_command_seek: {}", e),
             }
         } else {
-            warn!("Player::seek called from invalid state");
+            error!("Player::seek called from invalid state");
         }
 
         // If we're playing, ensure, that we have enough data leaded to avoid a buffer underrun.
@@ -1953,7 +1946,7 @@ impl PlayerInternal {
         result_rx.map_err(|_| ())
     }
 
-    fn preload_data_before_playback(&mut self) -> Result<(), PlayerError> {
+    fn preload_data_before_playback(&mut self) -> PlayerResult {
         if let PlayerState::Playing {
             bytes_per_second,
             ref mut stream_loader_controller,
@@ -1978,7 +1971,7 @@ impl PlayerInternal {
             );
             stream_loader_controller
                 .fetch_next_blocking(wait_for_data_length)
-                .map_err(|e| e.into())
+                .map_err(Into::into)
         } else {
             Ok(())
         }

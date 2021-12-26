@@ -1,13 +1,12 @@
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{fmt::Debug, ops::Deref};
 
 use thiserror::Error;
 
 use crate::util::from_repeated_message;
 
 use librespot_core::date::Date;
-use librespot_protocol as protocol;
 
+use librespot_protocol as protocol;
 use protocol::metadata::Availability as AvailabilityMessage;
 
 pub type AudioItemAvailability = Result<(), UnavailabilityReason>;

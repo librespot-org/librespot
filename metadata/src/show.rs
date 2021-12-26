@@ -1,15 +1,16 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-
-use crate::{
-    availability::Availabilities, copyright::Copyrights, episode::Episodes, error::RequestError,
-    image::Images, restriction::Restrictions, Metadata, MetadataError, RequestResult,
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
 };
 
-use librespot_core::session::Session;
-use librespot_core::spotify_id::SpotifyId;
-use librespot_protocol as protocol;
+use crate::{
+    availability::Availabilities, copyright::Copyrights, episode::Episodes, image::Images,
+    restriction::Restrictions, Metadata, RequestResult,
+};
 
+use librespot_core::{Error, Session, SpotifyId};
+
+use librespot_protocol as protocol;
 pub use protocol::metadata::Show_ConsumptionOrder as ShowConsumptionOrder;
 pub use protocol::metadata::Show_MediaType as ShowMediaType;
 
@@ -39,20 +40,16 @@ impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
     async fn request(session: &Session, show_id: SpotifyId) -> RequestResult {
-        session
-            .spclient()
-            .get_show_metadata(show_id)
-            .await
-            .map_err(RequestError::Http)
+        session.spclient().get_show_metadata(show_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, MetadataError> {
+    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }
 
 impl TryFrom<&<Self as Metadata>::Message> for Show {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(show: &<Self as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
             id: show.try_into()?,

@@ -1,6 +1,5 @@
-use std::fmt;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{fmt, path::PathBuf, str::FromStr};
+
 use url::Url;
 
 #[derive(Clone, Debug)]

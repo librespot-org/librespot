@@ -1,22 +1,25 @@
-use crate::apresolve::SocketAddress;
-use crate::file_id::FileId;
-use crate::http_client::HttpClientError;
-use crate::mercury::MercuryError;
-use crate::protocol::canvaz::EntityCanvazRequest;
-use crate::protocol::connect::PutStateRequest;
-use crate::protocol::extended_metadata::BatchedEntityRequest;
-use crate::spotify_id::SpotifyId;
+use std::time::Duration;
 
 use bytes::Bytes;
 use futures_util::future::IntoStream;
 use http::header::HeaderValue;
-use hyper::client::ResponseFuture;
-use hyper::header::{InvalidHeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE};
-use hyper::{Body, HeaderMap, Method, Request};
+use hyper::{
+    client::ResponseFuture,
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
+    Body, HeaderMap, Method, Request,
+};
 use protobuf::Message;
 use rand::Rng;
-use std::time::Duration;
-use thiserror::Error;
+
+use crate::{
+    apresolve::SocketAddress,
+    error::ErrorKind,
+    protocol::{
+        canvaz::EntityCanvazRequest, connect::PutStateRequest,
+        extended_metadata::BatchedEntityRequest,
+    },
+    Error, FileId, SpotifyId,
+};
 
 component! {
     SpClient : SpClientInner {
@@ -25,23 +28,7 @@ component! {
     }
 }
 
-pub type SpClientResult = Result<Bytes, SpClientError>;
-
-#[derive(Error, Debug)]
-pub enum SpClientError {
-    #[error("could not get authorization token")]
-    Token(#[from] MercuryError),
-    #[error("could not parse request: {0}")]
-    Parsing(#[from] http::Error),
-    #[error("could not complete request: {0}")]
-    Network(#[from] HttpClientError),
-}
-
-impl From<InvalidHeaderValue> for SpClientError {
-    fn from(err: InvalidHeaderValue) -> Self {
-        Self::Parsing(err.into())
-    }
-}
+pub type SpClientResult = Result<Bytes, Error>;
 
 #[derive(Copy, Clone, Debug)]
 pub enum RequestStrategy {
@@ -157,12 +144,8 @@ impl SpClient {
                 ))?,
             );
 
-            last_response = self
-                .session()
-                .http_client()
-                .request_body(request)
-                .await
-                .map_err(SpClientError::Network);
+            last_response = self.session().http_client().request_body(request).await;
+
             if last_response.is_ok() {
                 return last_response;
             }
@@ -177,9 +160,9 @@ impl SpClient {
 
             // Reconnection logic: drop the current access point if we are experiencing issues.
             // This will cause the next call to base_url() to resolve a new one.
-            if let Err(SpClientError::Network(ref network_error)) = last_response {
-                match network_error {
-                    HttpClientError::Response(_) | HttpClientError::Request(_) => {
+            if let Err(ref network_error) = last_response {
+                match network_error.kind {
+                    ErrorKind::Unavailable | ErrorKind::DeadlineExceeded => {
                         // Keep trying the current access point three times before dropping it.
                         if tries % 3 == 0 {
                             self.flush_accesspoint().await
@@ -244,7 +227,7 @@ impl SpClient {
     }
 
     pub async fn get_lyrics(&self, track_id: SpotifyId) -> SpClientResult {
-        let endpoint = format!("/color-lyrics/v1/track/{}", track_id.to_base62(),);
+        let endpoint = format!("/color-lyrics/v1/track/{}", track_id.to_base62());
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
             .await
@@ -291,7 +274,7 @@ impl SpClient {
         url: &str,
         offset: usize,
         length: usize,
-    ) -> Result<IntoStream<ResponseFuture>, SpClientError> {
+    ) -> Result<IntoStream<ResponseFuture>, Error> {
         let req = Request::builder()
             .method(&Method::GET)
             .uri(url)

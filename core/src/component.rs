@@ -14,7 +14,7 @@ macro_rules! component {
 
             #[allow(dead_code)]
             fn lock<F: FnOnce(&mut $inner) -> R, R>(&self, f: F) -> R {
-                let mut inner = (self.0).1.lock().expect("Mutex poisoned");
+                let mut inner = (self.0).1.lock().unwrap();
                 f(&mut inner)
             }
 

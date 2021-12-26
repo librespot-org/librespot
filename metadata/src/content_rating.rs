@@ -1,10 +1,8 @@
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{fmt::Debug, ops::Deref};
 
 use crate::util::from_repeated_message;
 
 use librespot_protocol as protocol;
-
 use protocol::metadata::ContentRating as ContentRatingMessage;
 
 #[derive(Debug, Clone)]

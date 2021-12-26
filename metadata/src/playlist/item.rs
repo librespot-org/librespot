@@ -1,17 +1,19 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
+};
 
-use crate::{error::MetadataError, util::try_from_repeated_message};
+use crate::util::try_from_repeated_message;
 
-use super::attribute::{PlaylistAttributes, PlaylistItemAttributes};
+use super::{
+    attribute::{PlaylistAttributes, PlaylistItemAttributes},
+    permission::Capabilities,
+};
 
-use librespot_core::date::Date;
-use librespot_core::spotify_id::SpotifyId;
+use librespot_core::{date::Date, SpotifyId};
+
 use librespot_protocol as protocol;
-
-use super::permission::Capabilities;
-
 use protocol::playlist4_external::Item as PlaylistItemMessage;
 use protocol::playlist4_external::ListItems as PlaylistItemsMessage;
 use protocol::playlist4_external::MetaItem as PlaylistMetaItemMessage;
@@ -62,7 +64,7 @@ impl Deref for PlaylistMetaItems {
 }
 
 impl TryFrom<&PlaylistItemMessage> for PlaylistItem {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(item: &PlaylistItemMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             id: item.try_into()?,
@@ -74,7 +76,7 @@ impl TryFrom<&PlaylistItemMessage> for PlaylistItem {
 try_from_repeated_message!(PlaylistItemMessage, PlaylistItems);
 
 impl TryFrom<&PlaylistItemsMessage> for PlaylistItemList {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(list_items: &PlaylistItemsMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             position: list_items.get_pos(),
@@ -86,7 +88,7 @@ impl TryFrom<&PlaylistItemsMessage> for PlaylistItemList {
 }
 
 impl TryFrom<&PlaylistMetaItemMessage> for PlaylistMetaItem {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(item: &PlaylistMetaItemMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             revision: item.try_into()?,

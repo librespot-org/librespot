@@ -1,15 +1,13 @@
-use std::future::Future;
-use std::mem;
-use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
+use std::{
+    future::Future,
+    mem,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use futures_core::ready;
-use futures_util::FutureExt;
-use futures_util::Sink;
-use futures_util::{future, SinkExt};
-use tokio::task::JoinHandle;
-use tokio::time::timeout;
+use futures_util::{future, FutureExt, Sink, SinkExt};
+use tokio::{task::JoinHandle, time::timeout};
 
 /// Returns a future that will flush the sink, even if flushing is temporarily completed.
 /// Finishes only if the sink throws an error.

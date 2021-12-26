@@ -1,6 +1,8 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
+};
 
 use crate::{
     audio::{
@@ -9,7 +11,6 @@ use crate::{
     },
     availability::Availabilities,
     content_rating::ContentRatings,
-    error::{MetadataError, RequestError},
     image::Images,
     request::RequestResult,
     restriction::Restrictions,
@@ -18,11 +19,9 @@ use crate::{
     Metadata,
 };
 
-use librespot_core::date::Date;
-use librespot_core::session::Session;
-use librespot_core::spotify_id::SpotifyId;
-use librespot_protocol as protocol;
+use librespot_core::{date::Date, Error, Session, SpotifyId};
 
+use librespot_protocol as protocol;
 pub use protocol::metadata::Episode_EpisodeType as EpisodeType;
 
 #[derive(Debug, Clone)]
@@ -90,20 +89,16 @@ impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 
     async fn request(session: &Session, episode_id: SpotifyId) -> RequestResult {
-        session
-            .spclient()
-            .get_episode_metadata(episode_id)
-            .await
-            .map_err(RequestError::Http)
+        session.spclient().get_episode_metadata(episode_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, MetadataError> {
+    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }
 
 impl TryFrom<&<Self as Metadata>::Message> for Episode {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(episode: &<Self as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
             id: episode.try_into()?,

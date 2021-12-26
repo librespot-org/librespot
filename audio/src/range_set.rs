@@ -1,6 +1,8 @@
-use std::cmp::{max, min};
-use std::fmt;
-use std::slice::Iter;
+use std::{
+    cmp::{max, min},
+    fmt,
+    slice::Iter,
+};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Range {

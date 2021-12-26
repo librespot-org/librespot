@@ -1,9 +1,10 @@
-use std::collections::HashMap;
-use std::future::Future;
-use std::mem;
-use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
+use std::{
+    collections::HashMap,
+    future::Future,
+    mem,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
@@ -11,9 +12,7 @@ use futures_util::FutureExt;
 use protobuf::Message;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::packet::PacketType;
-use crate::protocol;
-use crate::util::SeqGenerator;
+use crate::{packet::PacketType, protocol, util::SeqGenerator, Error};
 
 mod types;
 pub use self::types::*;
@@ -33,18 +32,18 @@ component! {
 pub struct MercuryPending {
     parts: Vec<Vec<u8>>,
     partial: Option<Vec<u8>>,
-    callback: Option<oneshot::Sender<Result<MercuryResponse, MercuryError>>>,
+    callback: Option<oneshot::Sender<Result<MercuryResponse, Error>>>,
 }
 
 pub struct MercuryFuture<T> {
-    receiver: oneshot::Receiver<Result<T, MercuryError>>,
+    receiver: oneshot::Receiver<Result<T, Error>>,
 }
 
 impl<T> Future for MercuryFuture<T> {
-    type Output = Result<T, MercuryError>;
+    type Output = Result<T, Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.receiver.poll_unpin(cx).map_err(|_| MercuryError)?
+        self.receiver.poll_unpin(cx)?
     }
 }
 
@@ -55,7 +54,7 @@ impl MercuryManager {
         seq
     }
 
-    fn request(&self, req: MercuryRequest) -> MercuryFuture<MercuryResponse> {
+    fn request(&self, req: MercuryRequest) -> Result<MercuryFuture<MercuryResponse>, Error> {
         let (tx, rx) = oneshot::channel();
 
         let pending = MercuryPending {
@@ -72,13 +71,13 @@ impl MercuryManager {
         });
 
         let cmd = req.method.command();
-        let data = req.encode(&seq);
+        let data = req.encode(&seq)?;
 
-        self.session().send_packet(cmd, data);
-        MercuryFuture { receiver: rx }
+        self.session().send_packet(cmd, data)?;
+        Ok(MercuryFuture { receiver: rx })
     }
 
-    pub fn get<T: Into<String>>(&self, uri: T) -> MercuryFuture<MercuryResponse> {
+    pub fn get<T: Into<String>>(&self, uri: T) -> Result<MercuryFuture<MercuryResponse>, Error> {
         self.request(MercuryRequest {
             method: MercuryMethod::Get,
             uri: uri.into(),
@@ -87,7 +86,11 @@ impl MercuryManager {
         })
     }
 
-    pub fn send<T: Into<String>>(&self, uri: T, data: Vec<u8>) -> MercuryFuture<MercuryResponse> {
+    pub fn send<T: Into<String>>(
+        &self,
+        uri: T,
+        data: Vec<u8>,
+    ) -> Result<MercuryFuture<MercuryResponse>, Error> {
         self.request(MercuryRequest {
             method: MercuryMethod::Send,
             uri: uri.into(),
@@ -103,7 +106,7 @@ impl MercuryManager {
     pub fn subscribe<T: Into<String>>(
         &self,
         uri: T,
-    ) -> impl Future<Output = Result<mpsc::UnboundedReceiver<MercuryResponse>, MercuryError>> + 'static
+    ) -> impl Future<Output = Result<mpsc::UnboundedReceiver<MercuryResponse>, Error>> + 'static
     {
         let uri = uri.into();
         let request = self.request(MercuryRequest {
@@ -115,7 +118,7 @@ impl MercuryManager {
 
         let manager = self.clone();
         async move {
-            let response = request.await?;
+            let response = request?.await?;
 
             let (tx, rx) = mpsc::unbounded_channel();
 
@@ -125,13 +128,18 @@ impl MercuryManager {
                     if !response.payload.is_empty() {
                         // Old subscription protocol, watch the provided list of URIs
                         for sub in response.payload {
-                            let mut sub =
-                                protocol::pubsub::Subscription::parse_from_bytes(&sub).unwrap();
-                            let sub_uri = sub.take_uri();
+                            match protocol::pubsub::Subscription::parse_from_bytes(&sub) {
+                                Ok(mut sub) => {
+                                    let sub_uri = sub.take_uri();
 
-                            debug!("subscribed sub_uri={}", sub_uri);
+                                    debug!("subscribed sub_uri={}", sub_uri);
 
-                            inner.subscriptions.push((sub_uri, tx.clone()));
+                                    inner.subscriptions.push((sub_uri, tx.clone()));
+                                }
+                                Err(e) => {
+                                    error!("could not subscribe to {}: {}", uri, e);
+                                }
+                            }
                         }
                     } else {
                         // New subscription protocol, watch the requested URI
@@ -165,7 +173,7 @@ impl MercuryManager {
         }
     }
 
-    pub(crate) fn dispatch(&self, cmd: PacketType, mut data: Bytes) {
+    pub(crate) fn dispatch(&self, cmd: PacketType, mut data: Bytes) -> Result<(), Error> {
         let seq_len = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
         let seq = data.split_to(seq_len).as_ref().to_owned();
 
@@ -185,7 +193,7 @@ impl MercuryManager {
                     }
                 } else {
                     warn!("Ignore seq {:?} cmd {:x}", seq, cmd as u8);
-                    return;
+                    return Err(MercuryError::Command(cmd).into());
                 }
             }
         };
@@ -205,10 +213,12 @@ impl MercuryManager {
         }
 
         if flags == 0x1 {
-            self.complete_request(cmd, pending);
+            self.complete_request(cmd, pending)?;
         } else {
             self.lock(move |inner| inner.pending.insert(seq, pending));
         }
+
+        Ok(())
     }
 
     fn parse_part(data: &mut Bytes) -> Vec<u8> {
@@ -216,9 +226,9 @@ impl MercuryManager {
         data.split_to(size).as_ref().to_owned()
     }
 
-    fn complete_request(&self, cmd: PacketType, mut pending: MercuryPending) {
+    fn complete_request(&self, cmd: PacketType, mut pending: MercuryPending) -> Result<(), Error> {
         let header_data = pending.parts.remove(0);
-        let header = protocol::mercury::Header::parse_from_bytes(&header_data).unwrap();
+        let header = protocol::mercury::Header::parse_from_bytes(&header_data)?;
 
         let response = MercuryResponse {
             uri: header.get_uri().to_string(),
@@ -226,13 +236,17 @@ impl MercuryManager {
             payload: pending.parts,
         };
 
-        if response.status_code >= 500 {
-            panic!("Spotify servers returned an error. Restart librespot.");
-        } else if response.status_code >= 400 {
-            warn!("error {} for uri {}", response.status_code, &response.uri);
+        let status_code = response.status_code;
+        if status_code >= 500 {
+            error!("error {} for uri {}", status_code, &response.uri);
+            Err(MercuryError::Response(response).into())
+        } else if status_code >= 400 {
+            error!("error {} for uri {}", status_code, &response.uri);
             if let Some(cb) = pending.callback {
-                let _ = cb.send(Err(MercuryError));
+                cb.send(Err(MercuryError::Response(response.clone()).into()))
+                    .map_err(|_| MercuryError::Channel)?;
             }
+            Err(MercuryError::Response(response).into())
         } else if let PacketType::MercuryEvent = cmd {
             self.lock(|inner| {
                 let mut found = false;
@@ -242,7 +256,7 @@ impl MercuryManager {
                 // before sending while saving the subscription under its unencoded form.
                 let mut uri_split = response.uri.split('/');
 
-                let encoded_uri = std::iter::once(uri_split.next().unwrap().to_string())
+                let encoded_uri = std::iter::once(uri_split.next().unwrap_or_default().to_string())
                     .chain(uri_split.map(|component| {
                         form_urlencoded::byte_serialize(component.as_bytes()).collect::<String>()
                     }))
@@ -263,12 +277,19 @@ impl MercuryManager {
                 });
 
                 if !found {
-                    debug!("unknown subscription uri={}", response.uri);
+                    debug!("unknown subscription uri={}", &response.uri);
                     trace!("response pushed over Mercury: {:?}", response);
+                    Err(MercuryError::Response(response).into())
+                } else {
+                    Ok(())
                 }
             })
         } else if let Some(cb) = pending.callback {
-            let _ = cb.send(Ok(response));
+            cb.send(Ok(response)).map_err(|_| MercuryError::Channel)?;
+            Ok(())
+        } else {
+            error!("can't handle Mercury response: {:?}", response);
+            Err(MercuryError::Response(response).into())
         }
     }
 

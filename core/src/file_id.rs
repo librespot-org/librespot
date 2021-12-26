@@ -1,6 +1,6 @@
-use librespot_protocol as protocol;
-
 use std::fmt;
+
+use librespot_protocol as protocol;
 
 use crate::spotify_id::to_base16;
 

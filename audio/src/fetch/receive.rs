@@ -1,25 +1,25 @@
-use std::cmp::{max, min};
-use std::io::{Seek, SeekFrom, Write};
-use std::sync::{atomic, Arc};
-use std::time::{Duration, Instant};
+use std::{
+    cmp::{max, min},
+    io::{Seek, SeekFrom, Write},
+    sync::{atomic, Arc},
+    time::{Duration, Instant},
+};
 
 use atomic::Ordering;
 use bytes::Bytes;
 use futures_util::StreamExt;
+use hyper::StatusCode;
 use tempfile::NamedTempFile;
 use tokio::sync::{mpsc, oneshot};
 
-use librespot_core::session::Session;
+use librespot_core::{session::Session, Error};
 
 use crate::range_set::{Range, RangeSet};
 
 use super::{
     AudioFileError, AudioFileResult, AudioFileShared, DownloadStrategy, StreamLoaderCommand,
-    StreamingRequest,
-};
-use super::{
-    FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME, MAX_PREFETCH_REQUESTS,
-    MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
+    StreamingRequest, FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME,
+    MAX_PREFETCH_REQUESTS, MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
 };
 
 struct PartialFileData {
@@ -49,19 +49,27 @@ async fn receive_data(
 
     let mut measure_ping_time = old_number_of_request == 0;
 
-    let result = loop {
-        let body = match request.initial_body.take() {
+    let result: Result<_, Error> = loop {
+        let response = match request.initial_response.take() {
             Some(data) => data,
             None => match request.streamer.next().await {
-                Some(Ok(response)) => response.into_body(),
-                Some(Err(e)) => break Err(e),
+                Some(Ok(response)) => response,
+                Some(Err(e)) => break Err(e.into()),
                 None => break Ok(()),
             },
         };
 
+        let code = response.status();
+        let body = response.into_body();
+
+        if code != StatusCode::PARTIAL_CONTENT {
+            debug!("Streamer expected partial content but got: {}", code);
+            break Err(AudioFileError::StatusCode(code).into());
+        }
+
         let data = match hyper::body::to_bytes(body).await {
             Ok(bytes) => bytes,
-            Err(e) => break Err(e),
+            Err(e) => break Err(e.into()),
         };
 
         if measure_ping_time {
@@ -69,16 +77,16 @@ async fn receive_data(
             if duration > MAXIMUM_ASSUMED_PING_TIME {
                 duration = MAXIMUM_ASSUMED_PING_TIME;
             }
-            let _ = file_data_tx.send(ReceivedData::ResponseTime(duration));
+            file_data_tx.send(ReceivedData::ResponseTime(duration))?;
             measure_ping_time = false;
         }
 
         let data_size = data.len();
 
-        let _ = file_data_tx.send(ReceivedData::Data(PartialFileData {
+        file_data_tx.send(ReceivedData::Data(PartialFileData {
             offset: data_offset,
             data,
-        }));
+        }))?;
         data_offset += data_size;
         if request_length < data_size {
             warn!(
@@ -100,10 +108,8 @@ async fn receive_data(
     if request_length > 0 {
         let missing_range = Range::new(data_offset, request_length);
 
-        let mut download_status = shared
-            .download_status
-            .lock()
-            .map_err(|_| AudioFileError::Poisoned)?;
+        let mut download_status = shared.download_status.lock().unwrap();
+
         download_status.requested.subtract_range(&missing_range);
         shared.cond.notify_all();
     }
@@ -127,7 +133,7 @@ async fn receive_data(
                 "Error from streamer for range {} (+{}): {:?}",
                 requested_offset, requested_length, e
             );
-            Err(e.into())
+            Err(e)
         }
     }
 }
@@ -150,14 +156,8 @@ enum ControlFlow {
 }
 
 impl AudioFileFetch {
-    fn get_download_strategy(&mut self) -> Result<DownloadStrategy, AudioFileError> {
-        let strategy = self
-            .shared
-            .download_strategy
-            .lock()
-            .map_err(|_| AudioFileError::Poisoned)?;
-
-        Ok(*(strategy))
+    fn get_download_strategy(&mut self) -> DownloadStrategy {
+        *(self.shared.download_strategy.lock().unwrap())
     }
 
     fn download_range(&mut self, offset: usize, mut length: usize) -> AudioFileResult {
@@ -172,52 +172,34 @@ impl AudioFileFetch {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length));
 
-        let mut download_status = self
-            .shared
-            .download_status
-            .lock()
-            .map_err(|_| AudioFileError::Poisoned)?;
+        let mut download_status = self.shared.download_status.lock().unwrap();
 
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
 
-        let cdn_url = &self.shared.cdn_url;
-        let file_id = cdn_url.file_id;
-
         for range in ranges_to_request.iter() {
-            match cdn_url.urls.first() {
-                Some(url) => {
-                    match self
-                        .session
-                        .spclient()
-                        .stream_file(&url.0, range.start, range.length)
-                    {
-                        Ok(streamer) => {
-                            download_status.requested.add_range(range);
+            let url = self.shared.cdn_url.try_get_url()?;
 
-                            let streaming_request = StreamingRequest {
-                                streamer,
-                                initial_body: None,
-                                offset: range.start,
-                                length: range.length,
-                                request_time: Instant::now(),
-                            };
+            let streamer = self
+                .session
+                .spclient()
+                .stream_file(url, range.start, range.length)?;
 
-                            self.session.spawn(receive_data(
-                                self.shared.clone(),
-                                self.file_data_tx.clone(),
-                                streaming_request,
-                            ));
-                        }
-                        Err(e) => {
-                            error!("Unable to open stream for track <{}>: {:?}", file_id, e);
-                        }
-                    }
-                }
-                None => {
-                    error!("Unable to get CDN URL for track <{}>", file_id);
-                }
-            }
+            download_status.requested.add_range(range);
+
+            let streaming_request = StreamingRequest {
+                streamer,
+                initial_response: None,
+                offset: range.start,
+                length: range.length,
+                request_time: Instant::now(),
+            };
+
+            self.session.spawn(receive_data(
+                self.shared.clone(),
+                self.file_data_tx.clone(),
+                streaming_request,
+            ));
         }
 
         Ok(())
@@ -236,11 +218,8 @@ impl AudioFileFetch {
             let mut missing_data = RangeSet::new();
             missing_data.add_range(&Range::new(0, self.shared.file_size));
             {
-                let download_status = self
-                    .shared
-                    .download_status
-                    .lock()
-                    .map_err(|_| AudioFileError::Poisoned)?;
+                let download_status = self.shared.download_status.lock().unwrap();
+
                 missing_data.subtract_range_set(&download_status.downloaded);
                 missing_data.subtract_range_set(&download_status.requested);
             }
@@ -277,7 +256,7 @@ impl AudioFileFetch {
         Ok(())
     }
 
-    fn handle_file_data(&mut self, data: ReceivedData) -> Result<ControlFlow, AudioFileError> {
+    fn handle_file_data(&mut self, data: ReceivedData) -> Result<ControlFlow, Error> {
         match data {
             ReceivedData::ResponseTime(response_time) => {
                 let old_ping_time_ms = self.shared.ping_time_ms.load(Ordering::Relaxed);
@@ -324,14 +303,10 @@ impl AudioFileFetch {
                         output.seek(SeekFrom::Start(data.offset as u64))?;
                         output.write_all(data.data.as_ref())?;
                     }
-                    None => return Err(AudioFileError::Output),
+                    None => return Err(AudioFileError::Output.into()),
                 }
 
-                let mut download_status = self
-                    .shared
-                    .download_status
-                    .lock()
-                    .map_err(|_| AudioFileError::Poisoned)?;
+                let mut download_status = self.shared.download_status.lock().unwrap();
 
                 let received_range = Range::new(data.offset, data.data.len());
                 download_status.downloaded.add_range(&received_range);
@@ -355,38 +330,38 @@ impl AudioFileFetch {
     fn handle_stream_loader_command(
         &mut self,
         cmd: StreamLoaderCommand,
-    ) -> Result<ControlFlow, AudioFileError> {
+    ) -> Result<ControlFlow, Error> {
         match cmd {
             StreamLoaderCommand::Fetch(request) => {
                 self.download_range(request.start, request.length)?;
             }
             StreamLoaderCommand::RandomAccessMode() => {
-                *(self
-                    .shared
-                    .download_strategy
-                    .lock()
-                    .map_err(|_| AudioFileError::Poisoned)?) = DownloadStrategy::RandomAccess();
+                *(self.shared.download_strategy.lock().unwrap()) = DownloadStrategy::RandomAccess();
             }
             StreamLoaderCommand::StreamMode() => {
-                *(self
-                    .shared
-                    .download_strategy
-                    .lock()
-                    .map_err(|_| AudioFileError::Poisoned)?) = DownloadStrategy::Streaming();
+                *(self.shared.download_strategy.lock().unwrap()) = DownloadStrategy::Streaming();
             }
             StreamLoaderCommand::Close() => return Ok(ControlFlow::Break),
         }
+
         Ok(ControlFlow::Continue)
     }
 
     fn finish(&mut self) -> AudioFileResult {
-        let mut output = self.output.take().ok_or(AudioFileError::Output)?;
-        let complete_tx = self.complete_tx.take().ok_or(AudioFileError::Output)?;
+        let output = self.output.take();
 
-        output.seek(SeekFrom::Start(0))?;
-        complete_tx
-            .send(output)
-            .map_err(|_| AudioFileError::Channel)
+        let complete_tx = self.complete_tx.take();
+
+        if let Some(mut output) = output {
+            output.seek(SeekFrom::Start(0))?;
+            if let Some(complete_tx) = complete_tx {
+                complete_tx
+                    .send(output)
+                    .map_err(|_| AudioFileError::Channel)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -405,10 +380,8 @@ pub(super) async fn audio_file_fetch(
             initial_request.offset,
             initial_request.offset + initial_request.length,
         );
-        let mut download_status = shared
-            .download_status
-            .lock()
-            .map_err(|_| AudioFileError::Poisoned)?;
+        let mut download_status = shared.download_status.lock().unwrap();
+
         download_status.requested.add_range(&requested_range);
     }
 
@@ -452,18 +425,15 @@ pub(super) async fn audio_file_fetch(
             }
         }
 
-        if fetch.get_download_strategy()? == DownloadStrategy::Streaming() {
+        if fetch.get_download_strategy() == DownloadStrategy::Streaming() {
             let number_of_open_requests =
                 fetch.shared.number_of_open_requests.load(Ordering::SeqCst);
             if number_of_open_requests < MAX_PREFETCH_REQUESTS {
                 let max_requests_to_send = MAX_PREFETCH_REQUESTS - number_of_open_requests;
 
                 let bytes_pending: usize = {
-                    let download_status = fetch
-                        .shared
-                        .download_status
-                        .lock()
-                        .map_err(|_| AudioFileError::Poisoned)?;
+                    let download_status = fetch.shared.download_status.lock().unwrap();
+
                     download_status
                         .requested
                         .minus(&download_status.downloaded)

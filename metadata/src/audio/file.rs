@@ -1,12 +1,9 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{collections::HashMap, fmt::Debug, ops::Deref};
 
-use librespot_core::file_id::FileId;
+use librespot_core::FileId;
+
 use librespot_protocol as protocol;
-
 use protocol::metadata::AudioFile as AudioFileMessage;
-
 pub use protocol::metadata::AudioFile_Format as AudioFileFormat;
 
 #[derive(Debug, Clone)]

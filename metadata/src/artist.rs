@@ -1,23 +1,17 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::ops::Deref;
-
-use crate::{
-    error::{MetadataError, RequestError},
-    request::RequestResult,
-    track::Tracks,
-    util::try_from_repeated_message,
-    Metadata,
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
 };
 
-use librespot_core::session::Session;
-use librespot_core::spotify_id::SpotifyId;
+use crate::{request::RequestResult, track::Tracks, util::try_from_repeated_message, Metadata};
+
+use librespot_core::{Error, Session, SpotifyId};
+
 use librespot_protocol as protocol;
-
 use protocol::metadata::ArtistWithRole as ArtistWithRoleMessage;
-use protocol::metadata::TopTracks as TopTracksMessage;
-
 pub use protocol::metadata::ArtistWithRole_ArtistRole as ArtistRole;
+use protocol::metadata::TopTracks as TopTracksMessage;
 
 #[derive(Debug, Clone)]
 pub struct Artist {
@@ -88,20 +82,16 @@ impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
     async fn request(session: &Session, artist_id: SpotifyId) -> RequestResult {
-        session
-            .spclient()
-            .get_artist_metadata(artist_id)
-            .await
-            .map_err(RequestError::Http)
+        session.spclient().get_artist_metadata(artist_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, MetadataError> {
+    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }
 
 impl TryFrom<&<Self as Metadata>::Message> for Artist {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(artist: &<Self as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
             id: artist.try_into()?,
@@ -114,7 +104,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Artist {
 try_from_repeated_message!(<Artist as Metadata>::Message, Artists);
 
 impl TryFrom<&ArtistWithRoleMessage> for ArtistWithRole {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(artist_with_role: &ArtistWithRoleMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             id: artist_with_role.try_into()?,
@@ -127,7 +117,7 @@ impl TryFrom<&ArtistWithRoleMessage> for ArtistWithRole {
 try_from_repeated_message!(ArtistWithRoleMessage, ArtistsWithRole);
 
 impl TryFrom<&TopTracksMessage> for TopTracks {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(top_tracks: &TopTracksMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             country: top_tracks.get_country().to_owned(),

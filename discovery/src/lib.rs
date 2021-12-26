@@ -27,6 +27,8 @@ pub use crate::core::authentication::Credentials;
 /// Determining the icon in the list of available devices.
 pub use crate::core::config::DeviceType;
 
+pub use crate::core::Error;
+
 /// Makes this device visible to Spotify clients in the local network.
 ///
 /// `Discovery` implements the [`Stream`] trait. Every time this device
@@ -48,13 +50,28 @@ pub struct Builder {
 
 /// Errors that can occur while setting up a [`Discovery`] instance.
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum DiscoveryError {
     /// Setting up service discovery via DNS-SD failed.
     #[error("Setting up dns-sd failed: {0}")]
     DnsSdError(#[from] io::Error),
     /// Setting up the http server failed.
+    #[error("Creating SHA1 HMAC failed for base key {0:?}")]
+    HmacError(Vec<u8>),
     #[error("Setting up the http server failed: {0}")]
     HttpServerError(#[from] hyper::Error),
+    #[error("Missing params for key {0}")]
+    ParamsError(&'static str),
+}
+
+impl From<DiscoveryError> for Error {
+    fn from(err: DiscoveryError) -> Self {
+        match err {
+            DiscoveryError::DnsSdError(_) => Error::unavailable(err),
+            DiscoveryError::HmacError(_) => Error::invalid_argument(err),
+            DiscoveryError::HttpServerError(_) => Error::unavailable(err),
+            DiscoveryError::ParamsError(_) => Error::invalid_argument(err),
+        }
+    }
 }
 
 impl Builder {
@@ -96,7 +113,7 @@ impl Builder {
     pub fn launch(self) -> Result<Discovery, Error> {
         let mut port = self.port;
         let name = self.server_config.name.clone().into_owned();
-        let server = DiscoveryServer::new(self.server_config, &mut port)?;
+        let server = DiscoveryServer::new(self.server_config, &mut port)??;
 
         let svc;
 
@@ -109,8 +126,7 @@ impl Builder {
                     None,
                     port,
                     &["VERSION=1.0", "CPath=/"],
-                )
-                .unwrap();
+                    )?;
 
             } else {
                 let responder = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?;

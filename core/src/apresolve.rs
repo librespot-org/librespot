@@ -1,7 +1,9 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use hyper::{Body, Method, Request};
 use serde::Deserialize;
-use std::error::Error;
-use std::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::Error;
 
 pub type SocketAddress = (String, u16);
 
@@ -67,7 +69,7 @@ impl ApResolver {
             .collect()
     }
 
-    pub async fn try_apresolve(&self) -> Result<ApResolveData, Box<dyn Error>> {
+    pub async fn try_apresolve(&self) -> Result<ApResolveData, Error> {
         let req = Request::builder()
             .method(Method::GET)
             .uri("http://apresolve.spotify.com/?type=accesspoint&type=dealer&type=spclient")

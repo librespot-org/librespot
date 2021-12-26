@@ -13,6 +13,7 @@ base64 = "0.13"
 cfg-if = "1.0"
 form_urlencoded = "1.0"
 futures-core = "0.3"
+futures-util = "0.3"
 hmac = "0.11"
 hyper = { version = "0.14", features = ["server", "http1", "tcp"] }
 libmdns = "0.6"

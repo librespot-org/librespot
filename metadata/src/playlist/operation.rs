@@ -1,9 +1,10 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
+};
 
 use crate::{
-    error::MetadataError,
     playlist::{
         attribute::{PlaylistUpdateAttributes, PlaylistUpdateItemAttributes},
         item::PlaylistItems,
@@ -12,13 +13,11 @@ use crate::{
 };
 
 use librespot_protocol as protocol;
-
 use protocol::playlist4_external::Add as PlaylistAddMessage;
 use protocol::playlist4_external::Mov as PlaylistMoveMessage;
 use protocol::playlist4_external::Op as PlaylistOperationMessage;
-use protocol::playlist4_external::Rem as PlaylistRemoveMessage;
-
 pub use protocol::playlist4_external::Op_Kind as PlaylistOperationKind;
+use protocol::playlist4_external::Rem as PlaylistRemoveMessage;
 
 #[derive(Debug, Clone)]
 pub struct PlaylistOperation {
@@ -64,7 +63,7 @@ pub struct PlaylistOperationRemove {
 }
 
 impl TryFrom<&PlaylistOperationMessage> for PlaylistOperation {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(operation: &PlaylistOperationMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             kind: operation.get_kind(),
@@ -80,7 +79,7 @@ impl TryFrom<&PlaylistOperationMessage> for PlaylistOperation {
 try_from_repeated_message!(PlaylistOperationMessage, PlaylistOperations);
 
 impl TryFrom<&PlaylistAddMessage> for PlaylistOperationAdd {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(add: &PlaylistAddMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             from_index: add.get_from_index(),
@@ -102,7 +101,7 @@ impl From<&PlaylistMoveMessage> for PlaylistOperationMove {
 }
 
 impl TryFrom<&PlaylistRemoveMessage> for PlaylistOperationRemove {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(remove: &PlaylistRemoveMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             from_index: remove.get_from_index(),

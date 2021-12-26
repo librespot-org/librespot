@@ -1,11 +1,12 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
+};
 
 use protobuf::Message;
 
 use crate::{
-    error::MetadataError,
     request::{MercuryRequest, RequestResult},
     util::{from_repeated_enum, try_from_repeated_message},
     Metadata,
@@ -16,11 +17,13 @@ use super::{
     permission::Capabilities,
 };
 
-use librespot_core::date::Date;
-use librespot_core::session::Session;
-use librespot_core::spotify_id::{NamedSpotifyId, SpotifyId};
-use librespot_protocol as protocol;
+use librespot_core::{
+    date::Date,
+    spotify_id::{NamedSpotifyId, SpotifyId},
+    Error, Session,
+};
 
+use librespot_protocol as protocol;
 use protocol::playlist4_external::GeoblockBlockingType as Geoblock;
 
 #[derive(Debug, Clone)]
@@ -111,7 +114,7 @@ impl Playlist {
         session: &Session,
         username: &str,
         playlist_id: SpotifyId,
-    ) -> Result<Self, MetadataError> {
+    ) -> Result<Self, Error> {
         let response = Self::request_for_user(session, username, playlist_id).await?;
         let msg = <Self as Metadata>::Message::parse_from_bytes(&response)?;
         Self::parse(&msg, playlist_id)
@@ -153,7 +156,7 @@ impl Metadata for Playlist {
         <Self as MercuryRequest>::request(session, &uri).await
     }
 
-    fn parse(msg: &Self::Message, id: SpotifyId) -> Result<Self, MetadataError> {
+    fn parse(msg: &Self::Message, id: SpotifyId) -> Result<Self, Error> {
         // the playlist proto doesn't contain the id so we decorate it
         let playlist = SelectedListContent::try_from(msg)?;
         let id = NamedSpotifyId::from_spotify_id(id, playlist.owner_username);
@@ -188,10 +191,7 @@ impl RootPlaylist {
     }
 
     #[allow(dead_code)]
-    pub async fn get_root_for_user(
-        session: &Session,
-        username: &str,
-    ) -> Result<Self, MetadataError> {
+    pub async fn get_root_for_user(session: &Session, username: &str) -> Result<Self, Error> {
         let response = Self::request_for_user(session, username).await?;
         let msg = protocol::playlist4_external::SelectedListContent::parse_from_bytes(&response)?;
         Ok(Self(SelectedListContent::try_from(&msg)?))
@@ -199,7 +199,7 @@ impl RootPlaylist {
 }
 
 impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(playlist: &<Playlist as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
             revision: playlist.get_revision().try_into()?,

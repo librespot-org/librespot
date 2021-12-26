@@ -1246,6 +1246,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
  "tokio-stream",
 ]
@@ -1309,6 +1310,7 @@ dependencies = [
  "form_urlencoded",
  "futures",
  "futures-core",
+ "futures-util",
  "hex",
  "hmac",
  "hyper",

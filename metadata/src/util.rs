@@ -27,7 +27,7 @@ pub(crate) use from_repeated_enum;
 macro_rules! try_from_repeated_message {
     ($src:ty, $dst:ty) => {
         impl TryFrom<&[$src]> for $dst {
-            type Error = MetadataError;
+            type Error = librespot_core::Error;
             fn try_from(src: &[$src]) -> Result<Self, Self::Error> {
                 let result: Result<Vec<_>, _> = src.iter().map(TryFrom::try_from).collect();
                 Ok(Self(result?))

@@ -1,24 +1,24 @@
-use std::collections::HashMap;
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
+};
 
-use crate::{error::MetadataError, image::PictureSizes, util::from_repeated_enum};
+use crate::{image::PictureSizes, util::from_repeated_enum};
 
-use librespot_core::date::Date;
-use librespot_core::spotify_id::SpotifyId;
+use librespot_core::{date::Date, SpotifyId};
+
 use librespot_protocol as protocol;
-
 use protocol::playlist4_external::FormatListAttribute as PlaylistFormatAttributeMessage;
+pub use protocol::playlist4_external::ItemAttributeKind as PlaylistItemAttributeKind;
 use protocol::playlist4_external::ItemAttributes as PlaylistItemAttributesMessage;
 use protocol::playlist4_external::ItemAttributesPartialState as PlaylistPartialItemAttributesMessage;
+pub use protocol::playlist4_external::ListAttributeKind as PlaylistAttributeKind;
 use protocol::playlist4_external::ListAttributes as PlaylistAttributesMessage;
 use protocol::playlist4_external::ListAttributesPartialState as PlaylistPartialAttributesMessage;
 use protocol::playlist4_external::UpdateItemAttributes as PlaylistUpdateItemAttributesMessage;
 use protocol::playlist4_external::UpdateListAttributes as PlaylistUpdateAttributesMessage;
-
-pub use protocol::playlist4_external::ItemAttributeKind as PlaylistItemAttributeKind;
-pub use protocol::playlist4_external::ListAttributeKind as PlaylistAttributeKind;
 
 #[derive(Debug, Clone)]
 pub struct PlaylistAttributes {
@@ -108,7 +108,7 @@ pub struct PlaylistUpdateItemAttributes {
 }
 
 impl TryFrom<&PlaylistAttributesMessage> for PlaylistAttributes {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(attributes: &PlaylistAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             name: attributes.get_name().to_owned(),
@@ -142,7 +142,7 @@ impl From<&[PlaylistFormatAttributeMessage]> for PlaylistFormatAttribute {
 }
 
 impl TryFrom<&PlaylistItemAttributesMessage> for PlaylistItemAttributes {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(attributes: &PlaylistItemAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             added_by: attributes.get_added_by().to_owned(),
@@ -155,7 +155,7 @@ impl TryFrom<&PlaylistItemAttributesMessage> for PlaylistItemAttributes {
     }
 }
 impl TryFrom<&PlaylistPartialAttributesMessage> for PlaylistPartialAttributes {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(attributes: &PlaylistPartialAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             values: attributes.get_values().try_into()?,
@@ -165,7 +165,7 @@ impl TryFrom<&PlaylistPartialAttributesMessage> for PlaylistPartialAttributes {
 }
 
 impl TryFrom<&PlaylistPartialItemAttributesMessage> for PlaylistPartialItemAttributes {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(attributes: &PlaylistPartialItemAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             values: attributes.get_values().try_into()?,
@@ -175,7 +175,7 @@ impl TryFrom<&PlaylistPartialItemAttributesMessage> for PlaylistPartialItemAttri
 }
 
 impl TryFrom<&PlaylistUpdateAttributesMessage> for PlaylistUpdateAttributes {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(update: &PlaylistUpdateAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             new_attributes: update.get_new_attributes().try_into()?,
@@ -185,7 +185,7 @@ impl TryFrom<&PlaylistUpdateAttributesMessage> for PlaylistUpdateAttributes {
 }
 
 impl TryFrom<&PlaylistUpdateItemAttributesMessage> for PlaylistUpdateItemAttributes {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(update: &PlaylistUpdateItemAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             index: update.get_index(),

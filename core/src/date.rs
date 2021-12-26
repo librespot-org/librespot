@@ -1,18 +1,23 @@
-use std::convert::TryFrom;
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::{convert::TryFrom, fmt::Debug, ops::Deref};
 
-use chrono::{DateTime, Utc};
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use thiserror::Error;
+
+use crate::Error;
 
 use librespot_protocol as protocol;
 use protocol::metadata::Date as DateMessage;
 
 #[derive(Debug, Error)]
 pub enum DateError {
-    #[error("item has invalid date")]
-    InvalidTimestamp,
+    #[error("item has invalid timestamp {0}")]
+    Timestamp(i64),
+}
+
+impl From<DateError> for Error {
+    fn from(err: DateError) -> Self {
+        Error::invalid_argument(err)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -30,11 +35,11 @@ impl Date {
         self.0.timestamp()
     }
 
-    pub fn from_timestamp(timestamp: i64) -> Result<Self, DateError> {
+    pub fn from_timestamp(timestamp: i64) -> Result<Self, Error> {
         if let Some(date_time) = NaiveDateTime::from_timestamp_opt(timestamp, 0) {
             Ok(Self::from_utc(date_time))
         } else {
-            Err(DateError::InvalidTimestamp)
+            Err(DateError::Timestamp(timestamp).into())
         }
     }
 
@@ -67,7 +72,7 @@ impl From<DateTime<Utc>> for Date {
 }
 
 impl TryFrom<i64> for Date {
-    type Error = DateError;
+    type Error = crate::Error;
     fn try_from(timestamp: i64) -> Result<Self, Self::Error> {
         Self::from_timestamp(timestamp)
     }

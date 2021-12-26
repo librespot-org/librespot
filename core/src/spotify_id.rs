@@ -1,13 +1,17 @@
-use librespot_protocol as protocol;
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    ops::Deref,
+};
 
 use thiserror::Error;
 
-use std::convert::{TryFrom, TryInto};
-use std::fmt;
-use std::ops::Deref;
+use crate::Error;
+
+use librespot_protocol as protocol;
 
 // re-export FileId for historic reasons, when it was part of this mod
-pub use crate::file_id::FileId;
+pub use crate::FileId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpotifyItemType {
@@ -64,8 +68,14 @@ pub enum SpotifyIdError {
     InvalidRoot,
 }
 
-pub type SpotifyIdResult = Result<SpotifyId, SpotifyIdError>;
-pub type NamedSpotifyIdResult = Result<NamedSpotifyId, SpotifyIdError>;
+impl From<SpotifyIdError> for Error {
+    fn from(err: SpotifyIdError) -> Self {
+        Error::invalid_argument(err)
+    }
+}
+
+pub type SpotifyIdResult = Result<SpotifyId, Error>;
+pub type NamedSpotifyIdResult = Result<NamedSpotifyId, Error>;
 
 const BASE62_DIGITS: &[u8; 62] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &[u8; 16] = b"0123456789abcdef";
@@ -95,7 +105,7 @@ impl SpotifyId {
             let p = match c {
                 b'0'..=b'9' => c - b'0',
                 b'a'..=b'f' => c - b'a' + 10,
-                _ => return Err(SpotifyIdError::InvalidId),
+                _ => return Err(SpotifyIdError::InvalidId.into()),
             } as u128;
 
             dst <<= 4;
@@ -121,7 +131,7 @@ impl SpotifyId {
                 b'0'..=b'9' => c - b'0',
                 b'a'..=b'z' => c - b'a' + 10,
                 b'A'..=b'Z' => c - b'A' + 36,
-                _ => return Err(SpotifyIdError::InvalidId),
+                _ => return Err(SpotifyIdError::InvalidId.into()),
             } as u128;
 
             dst *= 62;
@@ -143,7 +153,7 @@ impl SpotifyId {
                 id: u128::from_be_bytes(dst),
                 item_type: SpotifyItemType::Unknown,
             }),
-            Err(_) => Err(SpotifyIdError::InvalidId),
+            Err(_) => Err(SpotifyIdError::InvalidId.into()),
         }
     }
 
@@ -161,20 +171,20 @@ impl SpotifyId {
 
         // At minimum, should be `spotify:{type}:{id}`
         if uri_parts.len() < 3 {
-            return Err(SpotifyIdError::InvalidFormat);
+            return Err(SpotifyIdError::InvalidFormat.into());
         }
 
         if uri_parts[0] != "spotify" {
-            return Err(SpotifyIdError::InvalidRoot);
+            return Err(SpotifyIdError::InvalidRoot.into());
         }
 
-        let id = uri_parts.pop().unwrap();
+        let id = uri_parts.pop().unwrap_or_default();
         if id.len() != Self::SIZE_BASE62 {
-            return Err(SpotifyIdError::InvalidId);
+            return Err(SpotifyIdError::InvalidId.into());
         }
 
         Ok(Self {
-            item_type: uri_parts.pop().unwrap().into(),
+            item_type: uri_parts.pop().unwrap_or_default().into(),
             ..Self::from_base62(id)?
         })
     }
@@ -285,15 +295,15 @@ impl NamedSpotifyId {
 
         // At minimum, should be `spotify:user:{username}:{type}:{id}`
         if uri_parts.len() < 5 {
-            return Err(SpotifyIdError::InvalidFormat);
+            return Err(SpotifyIdError::InvalidFormat.into());
         }
 
         if uri_parts[0] != "spotify" {
-            return Err(SpotifyIdError::InvalidRoot);
+            return Err(SpotifyIdError::InvalidRoot.into());
         }
 
         if uri_parts[1] != "user" {
-            return Err(SpotifyIdError::InvalidFormat);
+            return Err(SpotifyIdError::InvalidFormat.into());
         }
 
         Ok(Self {
@@ -344,35 +354,35 @@ impl fmt::Display for NamedSpotifyId {
 }
 
 impl TryFrom<&[u8]> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
         Self::from_raw(src)
     }
 }
 
 impl TryFrom<&str> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(src: &str) -> Result<Self, Self::Error> {
         Self::from_base62(src)
     }
 }
 
 impl TryFrom<String> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(src: String) -> Result<Self, Self::Error> {
         Self::try_from(src.as_str())
     }
 }
 
 impl TryFrom<&Vec<u8>> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(src: &Vec<u8>) -> Result<Self, Self::Error> {
         Self::try_from(src.as_slice())
     }
 }
 
 impl TryFrom<&protocol::spirc::TrackRef> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(track: &protocol::spirc::TrackRef) -> Result<Self, Self::Error> {
         match SpotifyId::from_raw(track.get_gid()) {
             Ok(mut id) => {
@@ -385,7 +395,7 @@ impl TryFrom<&protocol::spirc::TrackRef> for SpotifyId {
 }
 
 impl TryFrom<&protocol::metadata::Album> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(album: &protocol::metadata::Album) -> Result<Self, Self::Error> {
         Ok(Self {
             item_type: SpotifyItemType::Album,
@@ -395,7 +405,7 @@ impl TryFrom<&protocol::metadata::Album> for SpotifyId {
 }
 
 impl TryFrom<&protocol::metadata::Artist> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(artist: &protocol::metadata::Artist) -> Result<Self, Self::Error> {
         Ok(Self {
             item_type: SpotifyItemType::Artist,
@@ -405,7 +415,7 @@ impl TryFrom<&protocol::metadata::Artist> for SpotifyId {
 }
 
 impl TryFrom<&protocol::metadata::Episode> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(episode: &protocol::metadata::Episode) -> Result<Self, Self::Error> {
         Ok(Self {
             item_type: SpotifyItemType::Episode,
@@ -415,7 +425,7 @@ impl TryFrom<&protocol::metadata::Episode> for SpotifyId {
 }
 
 impl TryFrom<&protocol::metadata::Track> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(track: &protocol::metadata::Track) -> Result<Self, Self::Error> {
         Ok(Self {
             item_type: SpotifyItemType::Track,
@@ -425,7 +435,7 @@ impl TryFrom<&protocol::metadata::Track> for SpotifyId {
 }
 
 impl TryFrom<&protocol::metadata::Show> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(show: &protocol::metadata::Show) -> Result<Self, Self::Error> {
         Ok(Self {
             item_type: SpotifyItemType::Show,
@@ -435,7 +445,7 @@ impl TryFrom<&protocol::metadata::Show> for SpotifyId {
 }
 
 impl TryFrom<&protocol::metadata::ArtistWithRole> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(artist: &protocol::metadata::ArtistWithRole) -> Result<Self, Self::Error> {
         Ok(Self {
             item_type: SpotifyItemType::Artist,
@@ -445,7 +455,7 @@ impl TryFrom<&protocol::metadata::ArtistWithRole> for SpotifyId {
 }
 
 impl TryFrom<&protocol::playlist4_external::Item> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(item: &protocol::playlist4_external::Item) -> Result<Self, Self::Error> {
         Ok(Self {
             item_type: SpotifyItemType::Track,
@@ -457,7 +467,7 @@ impl TryFrom<&protocol::playlist4_external::Item> for SpotifyId {
 // Note that this is the unique revision of an item's metadata on a playlist,
 // not the ID of that item or playlist.
 impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(item: &protocol::playlist4_external::MetaItem) -> Result<Self, Self::Error> {
         Self::try_from(item.get_revision())
     }
@@ -465,7 +475,7 @@ impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyId {
 
 // Note that this is the unique revision of a playlist, not the ID of that playlist.
 impl TryFrom<&protocol::playlist4_external::SelectedListContent> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(
         playlist: &protocol::playlist4_external::SelectedListContent,
     ) -> Result<Self, Self::Error> {
@@ -477,7 +487,7 @@ impl TryFrom<&protocol::playlist4_external::SelectedListContent> for SpotifyId {
 // which is why we now don't create a separate `Playlist` enum value yet and choose
 // to discard any item type.
 impl TryFrom<&protocol::playlist_annotate3::TranscodedPicture> for SpotifyId {
-    type Error = SpotifyIdError;
+    type Error = crate::Error;
     fn try_from(
         picture: &protocol::playlist_annotate3::TranscodedPicture,
     ) -> Result<Self, Self::Error> {
@@ -565,7 +575,7 @@ mod tests {
             id: 0,
             kind: SpotifyItemType::Unknown,
             // Invalid ID in the URI.
-            uri_error: Some(SpotifyIdError::InvalidId),
+            uri_error: SpotifyIdError::InvalidId,
             uri: "spotify:arbitrarywhatever:5sWHDYs0Bl0tH",
             base16: "ZZZZZ8081e1f4c54be38e8d6f9f12bb9",
             base62: "!!!!!Ys0csV6RS48xBl0tH",
@@ -578,7 +588,7 @@ mod tests {
             id: 0,
             kind: SpotifyItemType::Unknown,
             // Missing colon between ID and type.
-            uri_error: Some(SpotifyIdError::InvalidFormat),
+            uri_error: SpotifyIdError::InvalidFormat,
             uri: "spotify:arbitrarywhatever5sWHDYs0csV6RS48xBl0tH",
             base16: "--------------------",
             base62: "....................",
@@ -591,7 +601,7 @@ mod tests {
             id: 0,
             kind: SpotifyItemType::Unknown,
             // Uri too short
-            uri_error: Some(SpotifyIdError::InvalidId),
+            uri_error: SpotifyIdError::InvalidId,
             uri: "spotify:azb:aRS48xBl0tH",
             base16: "--------------------",
             base62: "....................",

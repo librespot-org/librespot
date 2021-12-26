@@ -4,16 +4,14 @@ use std::fmt::Debug;
 use protobuf::Message;
 
 use crate::{
-    error::MetadataError,
     image::TranscodedPictures,
     request::{MercuryRequest, RequestResult},
     Metadata,
 };
 
-use librespot_core::session::Session;
-use librespot_core::spotify_id::SpotifyId;
-use librespot_protocol as protocol;
+use librespot_core::{Error, Session, SpotifyId};
 
+use librespot_protocol as protocol;
 pub use protocol::playlist_annotate3::AbuseReportState;
 
 #[derive(Debug, Clone)]
@@ -34,7 +32,7 @@ impl Metadata for PlaylistAnnotation {
         Self::request_for_user(session, &current_user, playlist_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, MetadataError> {
+    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
         Ok(Self {
             description: msg.get_description().to_owned(),
             picture: msg.get_picture().to_owned(), // TODO: is this a URL or Spotify URI?
@@ -64,7 +62,7 @@ impl PlaylistAnnotation {
         session: &Session,
         username: &str,
         playlist_id: SpotifyId,
-    ) -> Result<Self, MetadataError> {
+    ) -> Result<Self, Error> {
         let response = Self::request_for_user(session, username, playlist_id).await?;
         let msg = <Self as Metadata>::Message::parse_from_bytes(&response)?;
         Self::parse(&msg, playlist_id)
@@ -74,7 +72,7 @@ impl PlaylistAnnotation {
 impl MercuryRequest for PlaylistAnnotation {}
 
 impl TryFrom<&<PlaylistAnnotation as Metadata>::Message> for PlaylistAnnotation {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(
         annotation: &<PlaylistAnnotation as Metadata>::Message,
     ) -> Result<Self, Self::Error> {

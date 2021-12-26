@@ -1,21 +1,18 @@
-use std::convert::{TryFrom, TryInto};
-use std::fmt::Debug;
-use std::ops::Deref;
-
-use crate::{
-    error::MetadataError,
-    util::{from_repeated_message, try_from_repeated_message},
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
 };
 
-use librespot_core::file_id::FileId;
-use librespot_core::spotify_id::SpotifyId;
-use librespot_protocol as protocol;
+use crate::util::{from_repeated_message, try_from_repeated_message};
 
+use librespot_core::{FileId, SpotifyId};
+
+use librespot_protocol as protocol;
 use protocol::metadata::Image as ImageMessage;
+pub use protocol::metadata::Image_Size as ImageSize;
 use protocol::playlist4_external::PictureSize as PictureSizeMessage;
 use protocol::playlist_annotate3::TranscodedPicture as TranscodedPictureMessage;
-
-pub use protocol::metadata::Image_Size as ImageSize;
 
 #[derive(Debug, Clone)]
 pub struct Image {
@@ -92,7 +89,7 @@ impl From<&PictureSizeMessage> for PictureSize {
 from_repeated_message!(PictureSizeMessage, PictureSizes);
 
 impl TryFrom<&TranscodedPictureMessage> for TranscodedPicture {
-    type Error = MetadataError;
+    type Error = librespot_core::Error;
     fn try_from(picture: &TranscodedPictureMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             target_name: picture.get_target_name().to_owned(),

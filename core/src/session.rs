@@ -1,13 +1,16 @@
-use std::collections::HashMap;
-use std::future::Future;
-use std::io;
-use std::pin::Pin;
-use std::process::exit;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock, Weak};
-use std::task::Context;
-use std::task::Poll;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    future::Future,
+    io,
+    pin::Pin,
+    process::exit,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, RwLock, Weak,
+    },
+    task::{Context, Poll},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
@@ -20,18 +23,21 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::apresolve::ApResolver;
-use crate::audio_key::AudioKeyManager;
-use crate::authentication::Credentials;
-use crate::cache::Cache;
-use crate::channel::ChannelManager;
-use crate::config::SessionConfig;
-use crate::connection::{self, AuthenticationError};
-use crate::http_client::HttpClient;
-use crate::mercury::MercuryManager;
-use crate::packet::PacketType;
-use crate::spclient::SpClient;
-use crate::token::TokenProvider;
+use crate::{
+    apresolve::ApResolver,
+    audio_key::AudioKeyManager,
+    authentication::Credentials,
+    cache::Cache,
+    channel::ChannelManager,
+    config::SessionConfig,
+    connection::{self, AuthenticationError},
+    http_client::HttpClient,
+    mercury::MercuryManager,
+    packet::PacketType,
+    spclient::SpClient,
+    token::TokenProvider,
+    Error,
+};
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -39,6 +45,18 @@ pub enum SessionError {
     AuthenticationError(#[from] AuthenticationError),
     #[error("Cannot create session: {0}")]
     IoError(#[from] io::Error),
+    #[error("packet {0} unknown")]
+    Packet(u8),
+}
+
+impl From<SessionError> for Error {
+    fn from(err: SessionError) -> Self {
+        match err {
+            SessionError::AuthenticationError(_) => Error::unauthenticated(err),
+            SessionError::IoError(_) => Error::unavailable(err),
+            SessionError::Packet(_) => Error::unimplemented(err),
+        }
+    }
 }
 
 pub type UserAttributes = HashMap<String, String>;
@@ -88,7 +106,7 @@ impl Session {
         config: SessionConfig,
         credentials: Credentials,
         cache: Option<Cache>,
-    ) -> Result<Session, SessionError> {
+    ) -> Result<Session, Error> {
         let http_client = HttpClient::new(config.proxy.as_ref());
         let (sender_tx, sender_rx) = mpsc::unbounded_channel();
         let session_id = SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -214,9 +232,18 @@ impl Session {
         }
     }
 
-    fn dispatch(&self, cmd: u8, data: Bytes) {
+    fn dispatch(&self, cmd: u8, data: Bytes) -> Result<(), Error> {
         use PacketType::*;
+
         let packet_type = FromPrimitive::from_u8(cmd);
+        let cmd = match packet_type {
+            Some(cmd) => cmd,
+            None => {
+                trace!("Ignoring unknown packet {:x}", cmd);
+                return Err(SessionError::Packet(cmd).into());
+            }
+        };
+
         match packet_type {
             Some(Ping) => {
                 let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
@@ -229,24 +256,21 @@ impl Session {
                 self.0.data.write().unwrap().time_delta = server_timestamp - timestamp;
 
                 self.debug_info();
-                self.send_packet(Pong, vec![0, 0, 0, 0]);
+                self.send_packet(Pong, vec![0, 0, 0, 0])
             }
             Some(CountryCode) => {
-                let country = String::from_utf8(data.as_ref().to_owned()).unwrap();
+                let country = String::from_utf8(data.as_ref().to_owned())?;
                 info!("Country: {:?}", country);
                 self.0.data.write().unwrap().user_data.country = country;
+                Ok(())
             }
-            Some(StreamChunkRes) | Some(ChannelError) => {
-                self.channel().dispatch(packet_type.unwrap(), data);
-            }
-            Some(AesKey) | Some(AesKeyError) => {
-                self.audio_key().dispatch(packet_type.unwrap(), data);
-            }
+            Some(StreamChunkRes) | Some(ChannelError) => self.channel().dispatch(cmd, data),
+            Some(AesKey) | Some(AesKeyError) => self.audio_key().dispatch(cmd, data),
             Some(MercuryReq) | Some(MercurySub) | Some(MercuryUnsub) | Some(MercuryEvent) => {
-                self.mercury().dispatch(packet_type.unwrap(), data);
+                self.mercury().dispatch(cmd, data)
             }
             Some(ProductInfo) => {
-                let data = std::str::from_utf8(&data).unwrap();
+                let data = std::str::from_utf8(&data)?;
                 let mut reader = quick_xml::Reader::from_str(data);
 
                 let mut buf = Vec::new();
@@ -256,8 +280,7 @@ impl Session {
                 loop {
                     match reader.read_event(&mut buf) {
                         Ok(Event::Start(ref element)) => {
-                            current_element =
-                                std::str::from_utf8(element.name()).unwrap().to_owned()
+                            current_element = std::str::from_utf8(element.name())?.to_owned()
                         }
                         Ok(Event::End(_)) => {
                             current_element = String::new();
@@ -266,7 +289,7 @@ impl Session {
                             if !current_element.is_empty() {
                                 let _ = user_attributes.insert(
                                     current_element.clone(),
-                                    value.unescape_and_decode(&reader).unwrap(),
+                                    value.unescape_and_decode(&reader)?,
                                 );
                             }
                         }
@@ -284,24 +307,23 @@ impl Session {
                 Self::check_catalogue(&user_attributes);
 
                 self.0.data.write().unwrap().user_data.attributes = user_attributes;
+                Ok(())
             }
             Some(PongAck)
             | Some(SecretBlock)
             | Some(LegacyWelcome)
             | Some(UnknownDataAllZeros)
-            | Some(LicenseVersion) => {}
+            | Some(LicenseVersion) => Ok(()),
             _ => {
-                if let Some(packet_type) = PacketType::from_u8(cmd) {
-                    trace!("Ignoring {:?} packet with data {:#?}", packet_type, data);
-                } else {
-                    trace!("Ignoring unknown packet {:x}", cmd);
-                }
+                trace!("Ignoring {:?} packet with data {:#?}", cmd, data);
+                Err(SessionError::Packet(cmd as u8).into())
             }
         }
     }
 
-    pub fn send_packet(&self, cmd: PacketType, data: Vec<u8>) {
-        self.0.tx_connection.send((cmd as u8, data)).unwrap();
+    pub fn send_packet(&self, cmd: PacketType, data: Vec<u8>) -> Result<(), Error> {
+        self.0.tx_connection.send((cmd as u8, data))?;
+        Ok(())
     }
 
     pub fn cache(&self) -> Option<&Arc<Cache>> {
@@ -393,7 +415,7 @@ impl SessionWeak {
     }
 
     pub(crate) fn upgrade(&self) -> Session {
-        self.try_upgrade().expect("Session died")
+        self.try_upgrade().expect("Session died") // TODO
     }
 }
 
@@ -434,7 +456,9 @@ where
                 }
             };
 
-            session.dispatch(cmd, data);
+            if let Err(e) = session.dispatch(cmd, data) {
+                error!("could not dispatch command: {}", e);
+            }
         }
     }
 }

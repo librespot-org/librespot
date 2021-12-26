@@ -8,16 +8,28 @@
 //   user-library-modify, user-library-read, user-follow-modify, user-follow-read, streaming,
 //   app-remote-control
 
-use crate::mercury::MercuryError;
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
+use thiserror::Error;
 
-use std::error::Error;
-use std::time::{Duration, Instant};
+use crate::Error;
 
 component! {
     TokenProvider : TokenProviderInner {
         tokens: Vec<Token> = vec![],
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum TokenError {
+    #[error("no tokens available")]
+    Empty,
+}
+
+impl From<TokenError> for Error {
+    fn from(err: TokenError) -> Self {
+        Error::unavailable(err)
     }
 }
 
@@ -54,11 +66,7 @@ impl TokenProvider {
     }
 
     // scopes must be comma-separated
-    pub async fn get_token(&self, scopes: &str) -> Result<Token, MercuryError> {
-        if scopes.is_empty() {
-            return Err(MercuryError);
-        }
-
+    pub async fn get_token(&self, scopes: &str) -> Result<Token, Error> {
         if let Some(index) = self.find_token(scopes.split(',').collect()) {
             let cached_token = self.lock(|inner| inner.tokens[index].clone());
             if cached_token.is_expired() {
@@ -79,14 +87,10 @@ impl TokenProvider {
             Self::KEYMASTER_CLIENT_ID,
             self.session().device_id()
         );
-        let request = self.session().mercury().get(query_uri);
+        let request = self.session().mercury().get(query_uri)?;
         let response = request.await?;
-        let data = response
-            .payload
-            .first()
-            .expect("No tokens received")
-            .to_vec();
-        let token = Token::new(String::from_utf8(data).unwrap()).map_err(|_| MercuryError)?;
+        let data = response.payload.first().ok_or(TokenError::Empty)?.to_vec();
+        let token = Token::new(String::from_utf8(data)?)?;
         trace!("Got token: {:#?}", token);
         self.lock(|inner| inner.tokens.push(token.clone()));
         Ok(token)
@@ -96,7 +100,7 @@ impl TokenProvider {
 impl Token {
     const EXPIRY_THRESHOLD: Duration = Duration::from_secs(10);
 
-    pub fn new(body: String) -> Result<Self, Box<dyn Error>> {
+    pub fn new(body: String) -> Result<Self, Error> {
         let data: TokenData = serde_json::from_slice(body.as_ref())?;
         Ok(Self {
             access_token: data.access_token,

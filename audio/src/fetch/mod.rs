@@ -1,54 +1,57 @@
 mod receive;
 
-use std::cmp::{max, min};
-use std::fs;
-use std::io::{self, Read, Seek, SeekFrom};
-use std::sync::atomic::{self, AtomicUsize};
-use std::sync::{Arc, Condvar, Mutex};
-use std::time::{Duration, Instant};
+use std::{
+    cmp::{max, min},
+    fs,
+    io::{self, Read, Seek, SeekFrom},
+    sync::{
+        atomic::{self, AtomicUsize},
+        Arc, Condvar, Mutex,
+    },
+    time::{Duration, Instant},
+};
 
-use futures_util::future::IntoStream;
-use futures_util::{StreamExt, TryFutureExt};
-use hyper::client::ResponseFuture;
-use hyper::header::CONTENT_RANGE;
-use hyper::Body;
+use futures_util::{future::IntoStream, StreamExt, TryFutureExt};
+use hyper::{client::ResponseFuture, header::CONTENT_RANGE, Body, Response, StatusCode};
 use tempfile::NamedTempFile;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 
-use librespot_core::cdn_url::{CdnUrl, CdnUrlError};
-use librespot_core::file_id::FileId;
-use librespot_core::session::Session;
-use librespot_core::spclient::SpClientError;
+use librespot_core::{cdn_url::CdnUrl, Error, FileId, Session};
 
 use self::receive::audio_file_fetch;
 
 use crate::range_set::{Range, RangeSet};
 
-pub type AudioFileResult = Result<(), AudioFileError>;
+pub type AudioFileResult = Result<(), librespot_core::Error>;
 
 #[derive(Error, Debug)]
 pub enum AudioFileError {
-    #[error("could not complete CDN request: {0}")]
-    Cdn(#[from] hyper::Error),
-    #[error("channel was disconnected")]
+    #[error("other end of channel disconnected")]
     Channel,
-    #[error("empty response")]
-    Empty,
-    #[error("I/O error: {0}")]
-    Io(#[from] io::Error),
-    #[error("output file unavailable")]
+    #[error("required header not found")]
+    Header,
+    #[error("streamer received no data")]
+    NoData,
+    #[error("no output available")]
     Output,
-    #[error("error parsing response")]
-    Parsing,
-    #[error("mutex was poisoned")]
-    Poisoned,
-    #[error("could not complete API request: {0}")]
-    SpClient(#[from] SpClientError),
-    #[error("streamer did not report progress")]
-    Timeout,
-    #[error("could not get CDN URL: {0}")]
-    Url(#[from] CdnUrlError),
+    #[error("invalid status code {0}")]
+    StatusCode(StatusCode),
+    #[error("wait timeout exceeded")]
+    WaitTimeout,
+}
+
+impl From<AudioFileError> for Error {
+    fn from(err: AudioFileError) -> Self {
+        match err {
+            AudioFileError::Channel => Error::aborted(err),
+            AudioFileError::Header => Error::unavailable(err),
+            AudioFileError::NoData => Error::unavailable(err),
+            AudioFileError::Output => Error::aborted(err),
+            AudioFileError::StatusCode(_) => Error::failed_precondition(err),
+            AudioFileError::WaitTimeout => Error::deadline_exceeded(err),
+        }
+    }
 }
 
 /// The minimum size of a block that is requested from the Spotify servers in one request.
@@ -124,7 +127,7 @@ pub enum AudioFile {
 #[derive(Debug)]
 pub struct StreamingRequest {
     streamer: IntoStream<ResponseFuture>,
-    initial_body: Option<Body>,
+    initial_response: Option<Response<Body>>,
     offset: usize,
     length: usize,
     request_time: Instant,
@@ -154,12 +157,9 @@ impl StreamLoaderController {
         self.file_size == 0
     }
 
-    pub fn range_available(&self, range: Range) -> Result<bool, AudioFileError> {
+    pub fn range_available(&self, range: Range) -> bool {
         let available = if let Some(ref shared) = self.stream_shared {
-            let download_status = shared
-                .download_status
-                .lock()
-                .map_err(|_| AudioFileError::Poisoned)?;
+            let download_status = shared.download_status.lock().unwrap();
 
             range.length
                 <= download_status
@@ -169,16 +169,16 @@ impl StreamLoaderController {
             range.length <= self.len() - range.start
         };
 
-        Ok(available)
+        available
     }
 
-    pub fn range_to_end_available(&self) -> Result<bool, AudioFileError> {
+    pub fn range_to_end_available(&self) -> bool {
         match self.stream_shared {
             Some(ref shared) => {
                 let read_position = shared.read_position.load(atomic::Ordering::Relaxed);
                 self.range_available(Range::new(read_position, self.len() - read_position))
             }
-            None => Ok(true),
+            None => true,
         }
     }
 
@@ -190,7 +190,8 @@ impl StreamLoaderController {
 
     fn send_stream_loader_command(&self, command: StreamLoaderCommand) {
         if let Some(ref channel) = self.channel_tx {
-            // ignore the error in case the channel has been closed already.
+            // Ignore the error in case the channel has been closed already.
+            // This means that the file was completely downloaded.
             let _ = channel.send(command);
         }
     }
@@ -213,10 +214,7 @@ impl StreamLoaderController {
         self.fetch(range);
 
         if let Some(ref shared) = self.stream_shared {
-            let mut download_status = shared
-                .download_status
-                .lock()
-                .map_err(|_| AudioFileError::Poisoned)?;
+            let mut download_status = shared.download_status.lock().unwrap();
 
             while range.length
                 > download_status
@@ -226,7 +224,7 @@ impl StreamLoaderController {
                 download_status = shared
                     .cond
                     .wait_timeout(download_status, DOWNLOAD_TIMEOUT)
-                    .map_err(|_| AudioFileError::Timeout)?
+                    .map_err(|_| AudioFileError::WaitTimeout)?
                     .0;
                 if range.length
                     > (download_status
@@ -319,7 +317,7 @@ impl AudioFile {
         file_id: FileId,
         bytes_per_second: usize,
         play_from_beginning: bool,
-    ) -> Result<AudioFile, AudioFileError> {
+    ) -> Result<AudioFile, Error> {
         if let Some(file) = session.cache().and_then(|cache| cache.file(file_id)) {
             debug!("File {} already in cache", file_id);
             return Ok(AudioFile::Cached(file));
@@ -340,9 +338,14 @@ impl AudioFile {
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
             if let Some(cache) = session_.cache() {
-                if cache.save_file(file_id, &mut file) {
-                    debug!("File {} cached to {:?}", file_id, cache.file(file_id));
+                if let Some(cache_id) = cache.file(file_id) {
+                    if let Err(e) = cache.save_file(file_id, &mut file) {
+                        error!("Error caching file {} to {:?}: {}", file_id, cache_id, e);
+                    } else {
+                        debug!("File {} cached to {:?}", file_id, cache_id);
+                    }
                 }
+
                 debug!("Downloading file {} complete", file_id);
             }
         }));
@@ -350,7 +353,7 @@ impl AudioFile {
         Ok(AudioFile::Streaming(streaming.await?))
     }
 
-    pub fn get_stream_loader_controller(&self) -> Result<StreamLoaderController, AudioFileError> {
+    pub fn get_stream_loader_controller(&self) -> Result<StreamLoaderController, Error> {
         let controller = match self {
             AudioFile::Streaming(ref stream) => StreamLoaderController {
                 channel_tx: Some(stream.stream_loader_command_tx.clone()),
@@ -379,7 +382,7 @@ impl AudioFileStreaming {
         complete_tx: oneshot::Sender<NamedTempFile>,
         bytes_per_second: usize,
         play_from_beginning: bool,
-    ) -> Result<AudioFileStreaming, AudioFileError> {
+    ) -> Result<AudioFileStreaming, Error> {
         let download_size = if play_from_beginning {
             INITIAL_DOWNLOAD_SIZE
                 + max(
@@ -392,8 +395,8 @@ impl AudioFileStreaming {
             INITIAL_DOWNLOAD_SIZE
         };
 
-        let mut cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
-        let url = cdn_url.get_url()?;
+        let cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
+        let url = cdn_url.try_get_url()?;
 
         trace!("Streaming {:?}", url);
 
@@ -403,23 +406,19 @@ impl AudioFileStreaming {
         // Get the first chunk with the headers to get the file size.
         // The remainder of that chunk with possibly also a response body is then
         // further processed in `audio_file_fetch`.
-        let response = match streamer.next().await {
-            Some(Ok(data)) => data,
-            Some(Err(e)) => return Err(AudioFileError::Cdn(e)),
-            None => return Err(AudioFileError::Empty),
-        };
+        let response = streamer.next().await.ok_or(AudioFileError::NoData)??;
+
         let header_value = response
             .headers()
             .get(CONTENT_RANGE)
-            .ok_or(AudioFileError::Parsing)?;
-
-        let str_value = header_value.to_str().map_err(|_| AudioFileError::Parsing)?;
-        let file_size_str = str_value.split('/').last().ok_or(AudioFileError::Parsing)?;
-        let file_size = file_size_str.parse().map_err(|_| AudioFileError::Parsing)?;
+            .ok_or(AudioFileError::Header)?;
+        let str_value = header_value.to_str()?;
+        let file_size_str = str_value.split('/').last().unwrap_or_default();
+        let file_size = file_size_str.parse()?;
 
         let initial_request = StreamingRequest {
             streamer,
-            initial_body: Some(response.into_body()),
+            initial_response: Some(response),
             offset: 0,
             length: download_size,
             request_time,
@@ -474,12 +473,7 @@ impl Read for AudioFileStreaming {
 
         let length = min(output.len(), self.shared.file_size - offset);
 
-        let length_to_request = match *(self
-            .shared
-            .download_strategy
-            .lock()
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "mutex was poisoned"))?)
-        {
+        let length_to_request = match *(self.shared.download_strategy.lock().unwrap()) {
             DownloadStrategy::RandomAccess() => length,
             DownloadStrategy::Streaming() => {
                 // Due to the read-ahead stuff, we potentially request more than the actual request demanded.
@@ -503,42 +497,32 @@ impl Read for AudioFileStreaming {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length_to_request));
 
-        let mut download_status = self
-            .shared
-            .download_status
-            .lock()
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "mutex was poisoned"))?;
+        let mut download_status = self.shared.download_status.lock().unwrap();
+
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
 
         for &range in ranges_to_request.iter() {
             self.stream_loader_command_tx
                 .send(StreamLoaderCommand::Fetch(range))
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "tx channel is disconnected"))?;
+                .map_err(|err| io::Error::new(io::ErrorKind::BrokenPipe, err))?;
         }
 
         if length == 0 {
             return Ok(0);
         }
 
-        let mut download_message_printed = false;
         while !download_status.downloaded.contains(offset) {
-            if let DownloadStrategy::Streaming() = *self
-                .shared
-                .download_strategy
-                .lock()
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "mutex was poisoned"))?
-            {
-                if !download_message_printed {
-                    debug!("Stream waiting for download of file position {}. Downloaded ranges: {}. Pending ranges: {}", offset, download_status.downloaded, download_status.requested.minus(&download_status.downloaded));
-                    download_message_printed = true;
-                }
-            }
             download_status = self
                 .shared
                 .cond
                 .wait_timeout(download_status, DOWNLOAD_TIMEOUT)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "timeout acquiring mutex"))?
+                .map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        Error::deadline_exceeded(AudioFileError::WaitTimeout),
+                    )
+                })?
                 .0;
         }
         let available_length = download_status
@@ -550,15 +534,6 @@ impl Read for AudioFileStreaming {
         self.position = self.read_file.seek(SeekFrom::Start(offset as u64))?;
         let read_len = min(length, available_length);
         let read_len = self.read_file.read(&mut output[..read_len])?;
-
-        if download_message_printed {
-            debug!(
-                "Read at postion {} completed. {} bytes returned, {} bytes were requested.",
-                offset,
-                read_len,
-                output.len()
-            );
-        }
 
         self.position += read_len as u64;
         self.shared
