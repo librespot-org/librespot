@@ -6,7 +6,7 @@ use std::{
     pin::Pin,
     sync::{
         atomic::{self, AtomicBool},
-        Arc, Mutex,
+        Arc,
     },
     task::Poll,
     time::Duration,
@@ -14,6 +14,7 @@ use std::{
 
 use futures_core::{Future, Stream};
 use futures_util::{future::join_all, SinkExt, StreamExt};
+use parking_lot::Mutex;
 use thiserror::Error;
 use tokio::{
     select,
@@ -310,7 +311,6 @@ impl DealerShared {
         if let Some(split) = split_uri(&msg.uri) {
             self.message_handlers
                 .lock()
-                .unwrap()
                 .retain(split, &mut |tx| tx.send(msg.clone()).is_ok());
         }
     }
@@ -330,7 +330,7 @@ impl DealerShared {
         };
 
         {
-            let handler_map = self.request_handlers.lock().unwrap();
+            let handler_map = self.request_handlers.lock();
 
             if let Some(handler) = handler_map.get(split) {
                 handler.handle_request(request, responder);
@@ -349,7 +349,9 @@ impl DealerShared {
     }
 
     async fn closed(&self) {
-        self.notify_drop.acquire().await.unwrap_err();
+        if self.notify_drop.acquire().await.is_ok() {
+            error!("should never have gotten a permit");
+        }
     }
 
     fn is_closed(&self) -> bool {
@@ -367,19 +369,15 @@ impl Dealer {
     where
         H: RequestHandler,
     {
-        add_handler(
-            &mut self.shared.request_handlers.lock().unwrap(),
-            uri,
-            handler,
-        )
+        add_handler(&mut self.shared.request_handlers.lock(), uri, handler)
     }
 
     pub fn remove_handler(&self, uri: &str) -> Option<Box<dyn RequestHandler>> {
-        remove_handler(&mut self.shared.request_handlers.lock().unwrap(), uri)
+        remove_handler(&mut self.shared.request_handlers.lock(), uri)
     }
 
     pub fn subscribe(&self, uris: &[&str]) -> Result<Subscription, Error> {
-        subscribe(&mut self.shared.message_handlers.lock().unwrap(), uris)
+        subscribe(&mut self.shared.message_handlers.lock(), uris)
     }
 
     pub async fn close(mut self) {

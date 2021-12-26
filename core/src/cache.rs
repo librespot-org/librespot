@@ -4,10 +4,11 @@ use std::{
     fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::SystemTime,
 };
 
+use parking_lot::Mutex;
 use priority_queue::PriorityQueue;
 use thiserror::Error;
 
@@ -187,48 +188,40 @@ impl FsSizeLimiter {
         }
     }
 
-    fn add(&self, file: &Path, size: u64) -> Result<(), Error> {
-        self.limiter
-            .lock()
-            .unwrap()
-            .add(file, size, SystemTime::now());
-        Ok(())
+    fn add(&self, file: &Path, size: u64) {
+        self.limiter.lock().add(file, size, SystemTime::now());
     }
 
-    fn touch(&self, file: &Path) -> Result<bool, Error> {
-        Ok(self.limiter.lock().unwrap().update(file, SystemTime::now()))
+    fn touch(&self, file: &Path) -> bool {
+        self.limiter.lock().update(file, SystemTime::now())
     }
 
-    fn remove(&self, file: &Path) -> Result<bool, Error> {
-        Ok(self.limiter.lock().unwrap().remove(file))
+    fn remove(&self, file: &Path) -> bool {
+        self.limiter.lock().remove(file)
     }
 
-    fn prune_internal<F: FnMut() -> Result<Option<PathBuf>, Error>>(
-        mut pop: F,
-    ) -> Result<(), Error> {
+    fn prune_internal<F: FnMut() -> Option<PathBuf>>(mut pop: F) -> Result<(), Error> {
         let mut first = true;
         let mut count = 0;
         let mut last_error = None;
 
-        while let Ok(result) = pop() {
-            if let Some(file) = result {
-                if first {
-                    debug!("Cache dir exceeds limit, removing least recently used files.");
-                    first = false;
-                }
-
-                let res = fs::remove_file(&file);
-                if let Err(e) = res {
-                    warn!("Could not remove file {:?} from cache dir: {}", file, e);
-                    last_error = Some(e);
-                } else {
-                    count += 1;
-                }
+        while let Some(file) = pop() {
+            if first {
+                debug!("Cache dir exceeds limit, removing least recently used files.");
+                first = false;
             }
 
-            if count > 0 {
-                info!("Removed {} cache files.", count);
+            let res = fs::remove_file(&file);
+            if let Err(e) = res {
+                warn!("Could not remove file {:?} from cache dir: {}", file, e);
+                last_error = Some(e);
+            } else {
+                count += 1;
             }
+        }
+
+        if count > 0 {
+            info!("Removed {} cache files.", count);
         }
 
         if let Some(err) = last_error {
@@ -239,14 +232,14 @@ impl FsSizeLimiter {
     }
 
     fn prune(&self) -> Result<(), Error> {
-        Self::prune_internal(|| Ok(self.limiter.lock().unwrap().pop()))
+        Self::prune_internal(|| self.limiter.lock().pop())
     }
 
     fn new(path: &Path, limit: u64) -> Result<Self, Error> {
         let mut limiter = SizeLimiter::new(limit);
 
         Self::init_dir(&mut limiter, path);
-        Self::prune_internal(|| Ok(limiter.pop()))?;
+        Self::prune_internal(|| limiter.pop())?;
 
         Ok(Self {
             limiter: Mutex::new(limiter),
@@ -388,8 +381,8 @@ impl Cache {
         match File::open(&path) {
             Ok(file) => {
                 if let Some(limiter) = self.size_limiter.as_deref() {
-                    if let Err(e) = limiter.touch(&path) {
-                        error!("limiter could not touch {:?}: {}", path, e);
+                    if !limiter.touch(&path) {
+                        error!("limiter could not touch {:?}", path);
                     }
                 }
                 Some(file)
@@ -411,8 +404,8 @@ impl Cache {
                     .and_then(|mut file| io::copy(contents, &mut file))
                 {
                     if let Some(limiter) = self.size_limiter.as_deref() {
-                        limiter.add(&path, size)?;
-                        limiter.prune()?
+                        limiter.add(&path, size);
+                        limiter.prune()?;
                     }
                     return Ok(());
                 }
@@ -426,7 +419,7 @@ impl Cache {
 
         fs::remove_file(&path)?;
         if let Some(limiter) = self.size_limiter.as_deref() {
-            limiter.remove(&path)?;
+            limiter.remove(&path);
         }
 
         Ok(())

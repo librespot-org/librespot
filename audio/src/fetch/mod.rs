@@ -6,13 +6,14 @@ use std::{
     io::{self, Read, Seek, SeekFrom},
     sync::{
         atomic::{self, AtomicUsize},
-        Arc, Condvar, Mutex,
+        Arc,
     },
     time::{Duration, Instant},
 };
 
 use futures_util::{future::IntoStream, StreamExt, TryFutureExt};
 use hyper::{client::ResponseFuture, header::CONTENT_RANGE, Body, Response, StatusCode};
+use parking_lot::{Condvar, Mutex};
 use tempfile::NamedTempFile;
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
@@ -159,7 +160,7 @@ impl StreamLoaderController {
 
     pub fn range_available(&self, range: Range) -> bool {
         let available = if let Some(ref shared) = self.stream_shared {
-            let download_status = shared.download_status.lock().unwrap();
+            let download_status = shared.download_status.lock();
 
             range.length
                 <= download_status
@@ -214,18 +215,21 @@ impl StreamLoaderController {
         self.fetch(range);
 
         if let Some(ref shared) = self.stream_shared {
-            let mut download_status = shared.download_status.lock().unwrap();
+            let mut download_status = shared.download_status.lock();
 
             while range.length
                 > download_status
                     .downloaded
                     .contained_length_from_value(range.start)
             {
-                download_status = shared
+                if shared
                     .cond
-                    .wait_timeout(download_status, DOWNLOAD_TIMEOUT)
-                    .map_err(|_| AudioFileError::WaitTimeout)?
-                    .0;
+                    .wait_for(&mut download_status, DOWNLOAD_TIMEOUT)
+                    .timed_out()
+                {
+                    return Err(AudioFileError::WaitTimeout.into());
+                }
+
                 if range.length
                     > (download_status
                         .downloaded
@@ -473,7 +477,7 @@ impl Read for AudioFileStreaming {
 
         let length = min(output.len(), self.shared.file_size - offset);
 
-        let length_to_request = match *(self.shared.download_strategy.lock().unwrap()) {
+        let length_to_request = match *(self.shared.download_strategy.lock()) {
             DownloadStrategy::RandomAccess() => length,
             DownloadStrategy::Streaming() => {
                 // Due to the read-ahead stuff, we potentially request more than the actual request demanded.
@@ -497,7 +501,7 @@ impl Read for AudioFileStreaming {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length_to_request));
 
-        let mut download_status = self.shared.download_status.lock().unwrap();
+        let mut download_status = self.shared.download_status.lock();
 
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
@@ -513,17 +517,17 @@ impl Read for AudioFileStreaming {
         }
 
         while !download_status.downloaded.contains(offset) {
-            download_status = self
+            if self
                 .shared
                 .cond
-                .wait_timeout(download_status, DOWNLOAD_TIMEOUT)
-                .map_err(|_| {
-                    io::Error::new(
-                        io::ErrorKind::TimedOut,
-                        Error::deadline_exceeded(AudioFileError::WaitTimeout),
-                    )
-                })?
-                .0;
+                .wait_for(&mut download_status, DOWNLOAD_TIMEOUT)
+                .timed_out()
+            {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    Error::deadline_exceeded(AudioFileError::WaitTimeout),
+                ));
+            }
         }
         let available_length = download_status
             .downloaded

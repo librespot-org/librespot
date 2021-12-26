@@ -50,7 +50,7 @@ version = "0.3.1"
 
 [dependencies]
 base64 = "0.13"
-env_logger =  {version = "0.8", default-features = false, features = ["termcolor","humantime","atty"]}
+env_logger =  { version = "0.8", default-features = false, features = ["termcolor", "humantime", "atty"] }
 futures-util = { version = "0.3", default_features = false }
 getopts = "0.2.21"
 hex = "0.4"
@@ -58,7 +58,7 @@ hyper = "0.14"
 log = "0.4"
 rpassword = "5.0"
 thiserror = "1.0"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "sync", "process"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "sync", "parking_lot", "process"] }
 url = "2.2"
 sha-1 = "0.9"
 

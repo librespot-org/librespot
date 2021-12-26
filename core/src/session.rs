@@ -6,7 +6,7 @@ use std::{
     process::exit,
     sync::{
         atomic::{AtomicUsize, Ordering},
-        Arc, RwLock, Weak,
+        Arc, Weak,
     },
     task::{Context, Poll},
     time::{SystemTime, UNIX_EPOCH},
@@ -18,6 +18,7 @@ use futures_core::TryStream;
 use futures_util::{future, ready, StreamExt, TryStreamExt};
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
+use parking_lot::RwLock;
 use quick_xml::events::Event;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -138,8 +139,7 @@ impl Session {
             connection::authenticate(&mut transport, credentials, &session.config().device_id)
                 .await?;
         info!("Authenticated as \"{}\" !", reusable_credentials.username);
-        session.0.data.write().unwrap().user_data.canonical_username =
-            reusable_credentials.username.clone();
+        session.0.data.write().user_data.canonical_username = reusable_credentials.username.clone();
         if let Some(cache) = session.cache() {
             cache.save_credentials(&reusable_credentials);
         }
@@ -200,7 +200,7 @@ impl Session {
     }
 
     pub fn time_delta(&self) -> i64 {
-        self.0.data.read().unwrap().time_delta
+        self.0.data.read().time_delta
     }
 
     pub fn spawn<T>(&self, task: T)
@@ -253,7 +253,7 @@ impl Session {
                 }
                 .as_secs() as i64;
 
-                self.0.data.write().unwrap().time_delta = server_timestamp - timestamp;
+                self.0.data.write().time_delta = server_timestamp - timestamp;
 
                 self.debug_info();
                 self.send_packet(Pong, vec![0, 0, 0, 0])
@@ -261,7 +261,7 @@ impl Session {
             Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned())?;
                 info!("Country: {:?}", country);
-                self.0.data.write().unwrap().user_data.country = country;
+                self.0.data.write().user_data.country = country;
                 Ok(())
             }
             Some(StreamChunkRes) | Some(ChannelError) => self.channel().dispatch(cmd, data),
@@ -306,7 +306,7 @@ impl Session {
                 trace!("Received product info: {:#?}", user_attributes);
                 Self::check_catalogue(&user_attributes);
 
-                self.0.data.write().unwrap().user_data.attributes = user_attributes;
+                self.0.data.write().user_data.attributes = user_attributes;
                 Ok(())
             }
             Some(PongAck)
@@ -335,7 +335,7 @@ impl Session {
     }
 
     pub fn user_data(&self) -> UserData {
-        self.0.data.read().unwrap().user_data.clone()
+        self.0.data.read().user_data.clone()
     }
 
     pub fn device_id(&self) -> &str {
@@ -343,21 +343,15 @@ impl Session {
     }
 
     pub fn connection_id(&self) -> String {
-        self.0.data.read().unwrap().connection_id.clone()
+        self.0.data.read().connection_id.clone()
     }
 
     pub fn set_connection_id(&self, connection_id: String) {
-        self.0.data.write().unwrap().connection_id = connection_id;
+        self.0.data.write().connection_id = connection_id;
     }
 
     pub fn username(&self) -> String {
-        self.0
-            .data
-            .read()
-            .unwrap()
-            .user_data
-            .canonical_username
-            .clone()
+        self.0.data.read().user_data.canonical_username.clone()
     }
 
     pub fn set_user_attribute(&self, key: &str, value: &str) -> Option<String> {
@@ -368,7 +362,6 @@ impl Session {
         self.0
             .data
             .write()
-            .unwrap()
             .user_data
             .attributes
             .insert(key.to_owned(), value.to_owned())
@@ -377,13 +370,7 @@ impl Session {
     pub fn set_user_attributes(&self, attributes: UserAttributes) {
         Self::check_catalogue(&attributes);
 
-        self.0
-            .data
-            .write()
-            .unwrap()
-            .user_data
-            .attributes
-            .extend(attributes)
+        self.0.data.write().user_data.attributes.extend(attributes)
     }
 
     fn weak(&self) -> SessionWeak {
@@ -395,14 +382,14 @@ impl Session {
     }
 
     pub fn shutdown(&self) {
-        debug!("Invalidating session[{}]", self.0.session_id);
-        self.0.data.write().unwrap().invalid = true;
+        debug!("Invalidating session [{}]", self.0.session_id);
+        self.0.data.write().invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
     }
 
     pub fn is_invalid(&self) -> bool {
-        self.0.data.read().unwrap().invalid
+        self.0.data.read().invalid
     }
 }
 
@@ -415,7 +402,8 @@ impl SessionWeak {
     }
 
     pub(crate) fn upgrade(&self) -> Session {
-        self.try_upgrade().expect("Session died") // TODO
+        self.try_upgrade()
+            .expect("session was dropped and so should have this component")
     }
 }
 
