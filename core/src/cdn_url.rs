@@ -39,13 +39,15 @@ pub enum CdnUrlError {
     Expired,
     #[error("resolved storage is not for CDN")]
     Storage,
+    #[error("no URLs resolved")]
+    Unresolved,
 }
 
 impl From<CdnUrlError> for Error {
     fn from(err: CdnUrlError) -> Self {
         match err {
             CdnUrlError::Expired => Error::deadline_exceeded(err),
-            CdnUrlError::Storage => Error::unavailable(err),
+            CdnUrlError::Storage | CdnUrlError::Unresolved => Error::unavailable(err),
         }
     }
 }
@@ -66,7 +68,7 @@ impl CdnUrl {
 
     pub async fn resolve_audio(&self, session: &Session) -> Result<Self, Error> {
         let file_id = self.file_id;
-        let response = session.spclient().get_audio_urls(file_id).await?;
+        let response = session.spclient().get_audio_storage(file_id).await?;
         let msg = CdnUrlMessage::parse_from_bytes(&response)?;
         let urls = MaybeExpiringUrls::try_from(msg)?;
 
@@ -78,6 +80,10 @@ impl CdnUrl {
     }
 
     pub fn try_get_url(&self) -> Result<&str, Error> {
+        if self.urls.is_empty() {
+            return Err(CdnUrlError::Unresolved.into());
+        }
+
         let now = Local::now();
         let url = self.urls.iter().find(|url| match url.1 {
             Some(expiry) => now < expiry.as_utc(),

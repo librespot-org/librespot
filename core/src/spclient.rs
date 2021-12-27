@@ -13,6 +13,7 @@ use rand::Rng;
 
 use crate::{
     apresolve::SocketAddress,
+    cdn_url::CdnUrl,
     error::ErrorKind,
     protocol::{
         canvaz::EntityCanvazRequest, connect::PutStateRequest,
@@ -261,7 +262,7 @@ impl SpClient {
             .await
     }
 
-    pub async fn get_audio_urls(&self, file_id: FileId) -> SpClientResult {
+    pub async fn get_audio_storage(&self, file_id: FileId) -> SpClientResult {
         let endpoint = format!(
             "/storage-resolve/files/audio/interactive/{}",
             file_id.to_base16()
@@ -269,12 +270,13 @@ impl SpClient {
         self.request(&Method::GET, &endpoint, None, None).await
     }
 
-    pub fn stream_file(
+    pub fn stream_from_cdn(
         &self,
-        url: &str,
+        cdn_url: &CdnUrl,
         offset: usize,
         length: usize,
     ) -> Result<IntoStream<ResponseFuture>, Error> {
+        let url = cdn_url.try_get_url()?;
         let req = Request::builder()
             .method(&Method::GET)
             .uri(url)

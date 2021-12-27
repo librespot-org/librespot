@@ -399,12 +399,13 @@ impl AudioFileStreaming {
             INITIAL_DOWNLOAD_SIZE
         };
 
+        trace!("Streaming {}", file_id);
+
         let cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
-        let url = cdn_url.try_get_url()?;
 
-        trace!("Streaming {:?}", url);
-
-        let mut streamer = session.spclient().stream_file(url, 0, download_size)?;
+        let mut streamer = session
+            .spclient()
+            .stream_from_cdn(&cdn_url, 0, download_size)?;
         let request_time = Instant::now();
 
         // Get the first chunk with the headers to get the file size.

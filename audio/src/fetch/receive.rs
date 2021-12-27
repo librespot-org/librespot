@@ -43,6 +43,8 @@ async fn receive_data(
     let mut data_offset = requested_offset;
     let mut request_length = requested_length;
 
+    // TODO : check Content-Length and Content-Range headers
+
     let old_number_of_request = shared
         .number_of_open_requests
         .fetch_add(1, Ordering::SeqCst);
@@ -180,14 +182,14 @@ impl AudioFileFetch {
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
 
-        // Likewise, checking for the URL expiry once will guarantee validity long enough.
-        let url = self.shared.cdn_url.try_get_url()?;
+        // TODO : refresh cdn_url when the token expired
 
         for range in ranges_to_request.iter() {
-            let streamer = self
-                .session
-                .spclient()
-                .stream_file(url, range.start, range.length)?;
+            let streamer = self.session.spclient().stream_from_cdn(
+                &self.shared.cdn_url,
+                range.start,
+                range.length,
+            )?;
 
             download_status.requested.add_range(range);
 
