@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
 - [main] Don't panic when parsing options. Instead list valid values and exit.
+- [main] `--alsa-mixer-device` and `--alsa-mixer-index` now fallback to the card and index specified in `--device`.
 
 ### Removed
 - [playback] `alsamixer`: previously deprecated option `mixer-card` has been removed.
