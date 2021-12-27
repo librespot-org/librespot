@@ -694,7 +694,10 @@ struct PlayerTrackLoader {
 
 impl PlayerTrackLoader {
     async fn find_available_alternative(&self, audio: AudioItem) -> Option<AudioItem> {
-        if audio.availability.is_ok() {
+        if let Err(e) = audio.availability {
+            error!("Track is unavailable: {}", e);
+            None
+        } else if !audio.files.is_empty() {
             Some(audio)
         } else if let Some(alternatives) = &audio.alternatives {
             let alternatives: FuturesUnordered<_> = alternatives
@@ -708,6 +711,7 @@ impl PlayerTrackLoader {
                 .next()
                 .await
         } else {
+            error!("Track should be available, but no alternatives found.");
             None
         }
     }
