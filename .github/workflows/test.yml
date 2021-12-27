@@ -67,7 +67,6 @@ jobs:
           - 1.48 # MSRV (Minimum supported rust version)
           - stable
           - beta
-        experimental: [false]
         # Ignore failures in nightly
         include:
           - os: ubuntu-latest
