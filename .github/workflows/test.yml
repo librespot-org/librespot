@@ -31,32 +31,20 @@ on:
         "!LICENSE",
         "!*.sh",
       ]
-  schedule:
-    # Run CI every week
-    - cron: "00 01 * * 0"
 
 env:
   RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
+
+# The layering here is as follows, checking in priority from highest to lowest:
+#  1. absence of errors and warnings on Linux/x86
+#  2. cross compilation on Windows and Linux/ARM
+#  3. absence of lints
+#  4. code formatting
 
 jobs:
-  fmt:
-    name: rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt
-      - run: cargo fmt --all -- --check
-
   test-linux:
-    needs: fmt
-    name: cargo +${{ matrix.toolchain }} build (${{ matrix.os }})
+    name: cargo +${{ matrix.toolchain }} check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
     strategy:
@@ -66,11 +54,11 @@ jobs:
         toolchain:
           - 1.48 # MSRV (Minimum supported rust version)
           - stable
-          - beta
-        # Ignore failures in nightly
+        experimental: [false]
+        # Ignore failures in beta
         include:
           - os: ubuntu-latest
-            toolchain: nightly
+            toolchain: beta
             experimental: true
     steps:
       - name: Checkout code
@@ -105,22 +93,25 @@ jobs:
       - run: cargo test --workspace
 
       - run: cargo install cargo-hack
-      - run: cargo hack  --workspace --remove-dev-deps
-      - run: cargo build -p librespot-core --no-default-features
-      - run: cargo build -p librespot-core
-      - run: cargo hack build --each-feature -p librespot-discovery
-      - run: cargo hack build --each-feature -p librespot-playback
-      - run: cargo hack build --each-feature
+      - run: cargo hack --workspace --remove-dev-deps
+      - run: cargo check -p librespot-core --no-default-features
+      - run: cargo check -p librespot-core
+      - run: cargo hack check --each-feature -p librespot-discovery
+      - run: cargo hack check --each-feature -p librespot-playback
+      - run: cargo hack check --each-feature
 
   test-windows:
-    needs: fmt
-    name: cargo build (${{ matrix.os }})
+    needs: test-linux
+    name: cargo +${{ matrix.toolchain }} check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest]
-        toolchain: [stable]
+        toolchain:
+          - 1.48 # MSRV (Minimum supported rust version)
+          - stable
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -152,20 +143,22 @@ jobs:
 
       - run: cargo install cargo-hack
       - run: cargo hack --workspace --remove-dev-deps
-      - run: cargo build --no-default-features
-      - run: cargo build
+      - run: cargo check --no-default-features
+      - run: cargo check
 
   test-cross-arm:
-    needs: fmt
+    name: cross +${{ matrix.toolchain }} build ${{ matrix.target }}
+    needs: test-linux
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            target: armv7-unknown-linux-gnueabihf
-            toolchain: stable
+        os: [ubuntu-latest]
+        target: [armv7-unknown-linux-gnueabihf]
+        toolchain:
+          - 1.48 # MSRV (Minimum supported rust version)
+          - stable
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -196,3 +189,67 @@ jobs:
         run: cargo install cross || true
       - name: Build
         run: cross build --locked --target ${{ matrix.target }} --no-default-features
+
+  clippy:
+    needs: [test-cross-arm, test-windows]
+    name: cargo +${{ matrix.toolchain }} clippy (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        toolchain: [stable]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+          components: clippy
+
+      - name: Get Rustc version
+        id: get-rustc-version
+        run: echo "::set-output name=version::$(rustc -V)"
+        shell: bash
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Install developer package dependencies
+        run: sudo apt-get update && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev libavahi-compat-libdnssd-dev
+
+      - run: cargo install cargo-hack
+      - run: cargo hack --workspace --remove-dev-deps
+      - run: cargo clippy -p librespot-core --no-default-features
+      - run: cargo clippy -p librespot-core
+      - run: cargo hack clippy --each-feature -p librespot-discovery
+      - run: cargo hack clippy --each-feature -p librespot-playback
+      - run: cargo hack clippy --each-feature
+
+  fmt:
+    needs: clippy
+    name: cargo +${{ matrix.toolchain }} fmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt
+      - run: cargo fmt --all -- --check
