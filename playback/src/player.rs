@@ -1,5 +1,6 @@
 use std::{
     cmp::max,
+    fmt,
     future::Future,
     io::{self, Read, Seek, SeekFrom},
     mem,
@@ -234,7 +235,16 @@ impl Default for NormalisationData {
 impl NormalisationData {
     fn parse_from_file<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
-        file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
+
+        let newpos = file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
+        if newpos != SPOTIFY_NORMALIZATION_HEADER_START_OFFSET {
+            error!(
+                "NormalisationData::parse_from_file seeking to {} but position is now {}",
+                SPOTIFY_NORMALIZATION_HEADER_START_OFFSET, newpos
+            );
+            error!("Falling back to default (non-track and non-album) normalisation data.");
+            return Ok(NormalisationData::default());
+        }
 
         let track_gain_db = file.read_f32::<LittleEndian>()?;
         let track_peak = file.read_f32::<LittleEndian>()?;
@@ -527,7 +537,7 @@ impl PlayerState {
             Stopped | EndOfTrack { .. } | Paused { .. } | Loading { .. } => false,
             Playing { .. } => true,
             Invalid => {
-                error!("PlayerState is_playing: invalid state");
+                error!("PlayerState::is_playing in invalid state");
                 exit(1);
             }
         }
@@ -555,7 +565,7 @@ impl PlayerState {
                 ref mut decoder, ..
             } => Some(decoder),
             Invalid => {
-                error!("PlayerState decoder: invalid state");
+                error!("PlayerState::decoder in invalid state");
                 exit(1);
             }
         }
@@ -574,7 +584,7 @@ impl PlayerState {
                 ..
             } => Some(stream_loader_controller),
             Invalid => {
-                error!("PlayerState stream_loader_controller: invalid state");
+                error!("PlayerState::stream_loader_controller in invalid state");
                 exit(1);
             }
         }
@@ -582,7 +592,8 @@ impl PlayerState {
 
     fn playing_to_end_of_track(&mut self) {
         use self::PlayerState::*;
-        match mem::replace(self, Invalid) {
+        let new_state = mem::replace(self, Invalid);
+        match new_state {
             Playing {
                 track_id,
                 play_request_id,
@@ -608,7 +619,10 @@ impl PlayerState {
                 };
             }
             _ => {
-                error!("Called playing_to_end_of_track in non-playing state.");
+                error!(
+                    "Called playing_to_end_of_track in non-playing state: {:?}",
+                    new_state
+                );
                 exit(1);
             }
         }
@@ -616,7 +630,8 @@ impl PlayerState {
 
     fn paused_to_playing(&mut self) {
         use self::PlayerState::*;
-        match ::std::mem::replace(self, Invalid) {
+        let new_state = mem::replace(self, Invalid);
+        match new_state {
             Paused {
                 track_id,
                 play_request_id,
@@ -644,7 +659,10 @@ impl PlayerState {
                 };
             }
             _ => {
-                error!("PlayerState paused_to_playing: invalid state");
+                error!(
+                    "PlayerState::paused_to_playing in invalid state: {:?}",
+                    new_state
+                );
                 exit(1);
             }
         }
@@ -652,7 +670,8 @@ impl PlayerState {
 
     fn playing_to_paused(&mut self) {
         use self::PlayerState::*;
-        match ::std::mem::replace(self, Invalid) {
+        let new_state = mem::replace(self, Invalid);
+        match new_state {
             Playing {
                 track_id,
                 play_request_id,
@@ -680,7 +699,10 @@ impl PlayerState {
                 };
             }
             _ => {
-                error!("PlayerState playing_to_paused: invalid state");
+                error!(
+                    "PlayerState::playing_to_paused in invalid state: {:?}",
+                    new_state
+                );
                 exit(1);
             }
         }
@@ -900,15 +922,18 @@ impl PlayerTrackLoader {
                 }
             };
 
+            let mut stream_position_pcm = 0;
             let position_pcm = PlayerInternal::position_ms_to_pcm(position_ms);
 
-            if position_pcm != 0 {
-                if let Err(e) = decoder.seek(position_pcm) {
-                    error!("PlayerTrackLoader load_track: {}", e);
+            if position_pcm > 0 {
+                stream_loader_controller.set_random_access_mode();
+                match decoder.seek(position_pcm) {
+                    Ok(_) => stream_position_pcm = position_pcm,
+                    Err(e) => error!("PlayerTrackLoader::load_track error seeking: {}", e),
                 }
                 stream_loader_controller.set_stream_mode();
-            }
-            let stream_position_pcm = position_pcm;
+            };
+
             info!("<{}> ({} ms) loaded", audio.name, audio.duration);
 
             return Some(PlayerLoadedTrackData {
@@ -1237,7 +1262,7 @@ impl PlayerInternal {
             }
             PlayerState::Stopped => (),
             PlayerState::Invalid => {
-                error!("PlayerInternal handle_player_stop: invalid state");
+                error!("PlayerInternal::handle_player_stop in invalid state");
                 exit(1);
             }
         }
@@ -1263,7 +1288,7 @@ impl PlayerInternal {
             });
             self.ensure_sink_running();
         } else {
-            error!("Player::play called from invalid state");
+            error!("Player::play called from invalid state: {:?}", self.state);
         }
     }
 
@@ -1287,7 +1312,7 @@ impl PlayerInternal {
                 duration_ms,
             });
         } else {
-            error!("Player::pause called from invalid state");
+            error!("Player::pause called from invalid state: {:?}", self.state);
         }
     }
 
@@ -1548,7 +1573,10 @@ impl PlayerInternal {
                 position_ms,
             }),
             PlayerState::Invalid { .. } => {
-                error!("PlayerInternal handle_command_load: invalid state");
+                error!(
+                    "Player::handle_command_load called from invalid state: {:?}",
+                    self.state
+                );
                 exit(1);
             }
         }
@@ -1578,12 +1606,12 @@ impl PlayerInternal {
                     loaded_track
                         .stream_loader_controller
                         .set_random_access_mode();
-                    if let Err(e) = loaded_track.decoder.seek(position_pcm) {
-                        // This may be blocking.
-                        error!("PlayerInternal handle_command_load: {}", e);
+                    // This may be blocking.
+                    match loaded_track.decoder.seek(position_pcm) {
+                        Ok(_) => loaded_track.stream_position_pcm = position_pcm,
+                        Err(e) => error!("PlayerInternal handle_command_load: {}", e),
                     }
                     loaded_track.stream_loader_controller.set_stream_mode();
-                    loaded_track.stream_position_pcm = position_pcm;
                 }
                 self.preload = PlayerPreload::None;
                 self.start_playback(track_id, play_request_id, loaded_track, play);
@@ -1617,12 +1645,14 @@ impl PlayerInternal {
 
                 if position_pcm != *stream_position_pcm {
                     stream_loader_controller.set_random_access_mode();
-                    if let Err(e) = decoder.seek(position_pcm) {
-                        // This may be blocking.
-                        error!("PlayerInternal handle_command_load: {}", e);
+                    // This may be blocking.
+                    match decoder.seek(position_pcm) {
+                        Ok(_) => *stream_position_pcm = position_pcm,
+                        Err(e) => {
+                            error!("PlayerInternal::handle_command_load error seeking: {}", e)
+                        }
                     }
                     stream_loader_controller.set_stream_mode();
-                    *stream_position_pcm = position_pcm;
                 }
 
                 // Move the info from the current state into a PlayerLoadedTrackData so we can use
@@ -1692,9 +1722,10 @@ impl PlayerInternal {
                         loaded_track
                             .stream_loader_controller
                             .set_random_access_mode();
-                        if let Err(e) = loaded_track.decoder.seek(position_pcm) {
-                            // This may be blocking
-                            error!("PlayerInternal handle_command_load: {}", e);
+                        // This may be blocking
+                        match loaded_track.decoder.seek(position_pcm) {
+                            Ok(_) => loaded_track.stream_position_pcm = position_pcm,
+                            Err(e) => error!("PlayerInternal handle_command_load: {}", e),
                         }
                         loaded_track.stream_loader_controller.set_stream_mode();
                     }
@@ -1824,10 +1855,10 @@ impl PlayerInternal {
                         *stream_position_pcm = position_pcm;
                     }
                 }
-                Err(e) => error!("PlayerInternal handle_command_seek: {}", e),
+                Err(e) => error!("PlayerInternal::handle_command_seek error: {}", e),
             }
         } else {
-            error!("Player::seek called from invalid state");
+            error!("Player::seek called from invalid state: {:?}", self.state);
         }
 
         // If we're playing, ensure, that we have enough data leaded to avoid a buffer underrun.
@@ -1988,8 +2019,8 @@ impl Drop for PlayerInternal {
     }
 }
 
-impl ::std::fmt::Debug for PlayerCommand {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl fmt::Debug for PlayerCommand {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             PlayerCommand::Load {
                 track_id,
@@ -2024,8 +2055,8 @@ impl ::std::fmt::Debug for PlayerCommand {
     }
 }
 
-impl ::std::fmt::Debug for PlayerState {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+impl fmt::Debug for PlayerState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use PlayerState::*;
         match *self {
             Stopped => f.debug_struct("Stopped").finish(),
@@ -2076,9 +2107,19 @@ struct Subfile<T: Read + Seek> {
 
 impl<T: Read + Seek> Subfile<T> {
     pub fn new(mut stream: T, offset: u64) -> Subfile<T> {
-        if let Err(e) = stream.seek(SeekFrom::Start(offset)) {
-            error!("Subfile new Error: {}", e);
+        let target = SeekFrom::Start(offset);
+        match stream.seek(target) {
+            Ok(pos) => {
+                if pos != offset {
+                    error!(
+                        "Subfile::new seeking to {:?} but position is now {:?}",
+                        target, pos
+                    );
+                }
+            }
+            Err(e) => error!("Subfile new Error: {}", e),
         }
+
         Subfile { stream, offset }
     }
 }
@@ -2097,10 +2138,14 @@ impl<T: Read + Seek> Seek for Subfile<T> {
         };
 
         let newpos = self.stream.seek(pos)?;
-        if newpos > self.offset {
+
+        if newpos >= self.offset {
             Ok(newpos - self.offset)
         } else {
-            Ok(0)
+            Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "newpos < self.offset",
+            ))
         }
     }
 }

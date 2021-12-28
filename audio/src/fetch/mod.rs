@@ -341,6 +341,8 @@ impl AudioFile {
 
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
+            debug!("Downloading file {} complete", file_id);
+
             if let Some(cache) = session_.cache() {
                 if let Some(cache_id) = cache.file(file_id) {
                     if let Err(e) = cache.save_file(file_id, &mut file) {
@@ -349,8 +351,6 @@ impl AudioFile {
                         debug!("File {} cached to {:?}", file_id, cache_id);
                     }
                 }
-
-                debug!("Downloading file {} complete", file_id);
             }
         }));
 
@@ -399,9 +399,11 @@ impl AudioFileStreaming {
             INITIAL_DOWNLOAD_SIZE
         };
 
-        trace!("Streaming {}", file_id);
-
         let cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
+
+        if let Ok(url) = cdn_url.try_get_url() {
+            trace!("Streaming from {}", url);
+        }
 
         let mut streamer = session
             .spclient()
@@ -438,7 +440,7 @@ impl AudioFileStreaming {
                 requested: RangeSet::new(),
                 downloaded: RangeSet::new(),
             }),
-            download_strategy: Mutex::new(DownloadStrategy::RandomAccess()), // start with random access mode until someone tells us otherwise
+            download_strategy: Mutex::new(DownloadStrategy::Streaming()),
             number_of_open_requests: AtomicUsize::new(0),
             ping_time_ms: AtomicUsize::new(0),
             read_position: AtomicUsize::new(0),

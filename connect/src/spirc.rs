@@ -626,7 +626,11 @@ impl SpircTask {
             if Some(play_request_id) == self.play_request_id {
                 match event {
                     PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track(),
-                    PlayerEvent::Loading { .. } => self.notify(None, false),
+                    PlayerEvent::Loading { .. } => {
+                        trace!("==> kPlayStatusLoading");
+                        self.state.set_status(PlayStatus::kPlayStatusLoading);
+                        self.notify(None, false)
+                    }
                     PlayerEvent::Playing { position_ms, .. } => {
                         trace!("==> kPlayStatusPlay");
                         let new_nominal_start_time = self.now_ms() - position_ms as i64;
@@ -687,15 +691,18 @@ impl SpircTask {
                             _ => Ok(()),
                         }
                     }
-                    PlayerEvent::Stopped { .. } => match self.play_status {
-                        SpircPlayStatus::Stopped => Ok(()),
-                        _ => {
-                            warn!("The player has stopped unexpectedly.");
-                            self.state.set_status(PlayStatus::kPlayStatusStop);
-                            self.play_status = SpircPlayStatus::Stopped;
-                            self.notify(None, true)
+                    PlayerEvent::Stopped { .. } => {
+                        trace!("==> kPlayStatusStop");
+                        match self.play_status {
+                            SpircPlayStatus::Stopped => Ok(()),
+                            _ => {
+                                warn!("The player has stopped unexpectedly.");
+                                self.state.set_status(PlayStatus::kPlayStatusStop);
+                                self.play_status = SpircPlayStatus::Stopped;
+                                self.notify(None, true)
+                            }
                         }
-                    },
+                    }
                     PlayerEvent::TimeToPreloadNextTrack { .. } => {
                         self.handle_preload_next_track();
                         Ok(())
@@ -923,12 +930,6 @@ impl SpircTask {
                 position_ms,
                 preloading_of_next_track_triggered,
             } => {
-                // TODO - also apply this to the arm below
-                // Synchronize the volume from the mixer. This is useful on
-                // systems that can switch sources from and back to librespot.
-                let current_volume = self.mixer.volume();
-                self.set_volume(current_volume);
-
                 self.player.play();
                 self.state.set_status(PlayStatus::kPlayStatusPlay);
                 self.update_state_position(position_ms);
@@ -938,13 +939,16 @@ impl SpircTask {
                 };
             }
             SpircPlayStatus::LoadingPause { position_ms } => {
-                // TODO - fix "Player::play called from invalid state" when hitting play
-                // on initial start-up, when starting halfway a track
                 self.player.play();
                 self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
             }
-            _ => (),
+            _ => return,
         }
+
+        // Synchronize the volume from the mixer. This is useful on
+        // systems that can switch sources from and back to librespot.
+        let current_volume = self.mixer.volume();
+        self.set_volume(current_volume);
     }
 
     fn handle_play_pause(&mut self) {
@@ -1252,11 +1256,11 @@ impl SpircTask {
     }
 
     fn update_tracks(&mut self, frame: &protocol::spirc::Frame) {
-        debug!("State: {:?}", frame.get_state());
+        trace!("State: {:#?}", frame.get_state());
         let index = frame.get_state().get_playing_track_index();
         let context_uri = frame.get_state().get_context_uri().to_owned();
         let tracks = frame.get_state().get_track();
-        debug!("Frame has {:?} tracks", tracks.len());
+        trace!("Frame has {:?} tracks", tracks.len());
         if context_uri.starts_with("spotify:station:")
             || context_uri.starts_with("spotify:dailymix:")
         {
