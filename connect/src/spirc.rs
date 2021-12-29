@@ -1,27 +1,67 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    convert::TryFrom,
+    future::Future,
+    pin::Pin,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
-use crate::context::StationContext;
-use crate::core::config::ConnectConfig;
-use crate::core::mercury::{MercuryError, MercurySender};
-use crate::core::session::Session;
-use crate::core::spotify_id::{SpotifyAudioType, SpotifyId, SpotifyIdError};
-use crate::core::util::SeqGenerator;
-use crate::core::version;
-use crate::playback::mixer::Mixer;
-use crate::playback::player::{Player, PlayerEvent, PlayerEventChannel};
-use crate::protocol;
-use crate::protocol::spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef};
+use futures_util::{
+    future::{self, FusedFuture},
+    stream::FusedStream,
+    FutureExt, StreamExt, TryFutureExt,
+};
 
-use futures_util::future::{self, FusedFuture};
-use futures_util::stream::FusedStream;
-use futures_util::{FutureExt, StreamExt};
 use protobuf::{self, Message};
 use rand::seq::SliceRandom;
+use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
+use crate::{
+    context::StationContext,
+    core::{
+        config::ConnectConfig, // TODO: move to connect?
+        mercury::{MercuryError, MercurySender},
+        session::UserAttributes,
+        util::SeqGenerator,
+        version,
+        Error,
+        Session,
+        SpotifyId,
+    },
+    playback::{
+        mixer::Mixer,
+        player::{Player, PlayerEvent, PlayerEventChannel},
+    },
+    protocol::{
+        self,
+        explicit_content_pubsub::UserAttributesUpdate,
+        spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef},
+        user_attributes::UserAttributesMutation,
+    },
+};
+
+#[derive(Debug, Error)]
+pub enum SpircError {
+    #[error("response payload empty")]
+    NoData,
+    #[error("message addressed at another ident: {0}")]
+    Ident(String),
+    #[error("message pushed for another URI")]
+    InvalidUri(String),
+}
+
+impl From<SpircError> for Error {
+    fn from(err: SpircError) -> Self {
+        match err {
+            SpircError::NoData => Error::unavailable(err),
+            SpircError::Ident(_) => Error::aborted(err),
+            SpircError::InvalidUri(_) => Error::aborted(err),
+        }
+    }
+}
+
+#[derive(Debug)]
 enum SpircPlayStatus {
     Stopped,
     LoadingPlay {
@@ -56,15 +96,18 @@ struct SpircTask {
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
 
-    subscription: BoxedStream<Frame>,
+    remote_update: BoxedStream<Result<Frame, Error>>,
+    connection_id_update: BoxedStream<Result<String, Error>>,
+    user_attributes_update: BoxedStream<Result<UserAttributesUpdate, Error>>,
+    user_attributes_mutation: BoxedStream<Result<UserAttributesMutation, Error>>,
     sender: MercurySender,
     commands: Option<mpsc::UnboundedReceiver<SpircCommand>>,
     player_events: Option<PlayerEventChannel>,
 
     shutdown: bool,
     session: Session,
-    context_fut: BoxedFuture<Result<serde_json::Value, MercuryError>>,
-    autoplay_fut: BoxedFuture<Result<String, MercuryError>>,
+    context_fut: BoxedFuture<Result<serde_json::Value, Error>>,
+    autoplay_fut: BoxedFuture<Result<String, Error>>,
     context: Option<StationContext>,
 }
 
@@ -107,7 +150,7 @@ fn initial_state() -> State {
 fn initial_device_state(config: ConnectConfig) -> DeviceState {
     {
         let mut msg = DeviceState::new();
-        msg.set_sw_version(version::VERSION_STRING.to_string());
+        msg.set_sw_version(version::SEMVER.to_string());
         msg.set_is_active(false);
         msg.set_can_play(true);
         msg.set_volume(0);
@@ -225,25 +268,67 @@ impl Spirc {
         session: Session,
         player: Player,
         mixer: Box<dyn Mixer>,
-    ) -> (Spirc, impl Future<Output = ()>) {
+    ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
         debug!("new Spirc[{}]", session.session_id());
 
         let ident = session.device_id().to_owned();
 
         // Uri updated in response to issue #288
-        debug!("canonical_username: {}", &session.username());
-        let uri = format!("hm://remote/user/{}/", url_encode(&session.username()));
+        let canonical_username = &session.username();
+        debug!("canonical_username: {}", canonical_username);
+        let uri = format!("hm://remote/user/{}/", url_encode(canonical_username));
 
-        let subscription = Box::pin(
+        let remote_update = Box::pin(
             session
                 .mercury()
                 .subscribe(uri.clone())
-                .map(Result::unwrap)
+                .inspect_err(|x| error!("remote update error: {}", x))
+                .and_then(|x| async move { Ok(x) })
+                .map(Result::unwrap) // guaranteed to be safe by `and_then` above
                 .map(UnboundedReceiverStream::new)
                 .flatten_stream()
-                .map(|response| -> Frame {
-                    let data = response.payload.first().unwrap();
-                    Frame::parse_from_bytes(data).unwrap()
+                .map(|response| -> Result<Frame, Error> {
+                    let data = response.payload.first().ok_or(SpircError::NoData)?;
+                    Ok(Frame::parse_from_bytes(data)?)
+                }),
+        );
+
+        let connection_id_update = Box::pin(
+            session
+                .mercury()
+                .listen_for("hm://pusher/v1/connections/")
+                .map(UnboundedReceiverStream::new)
+                .flatten_stream()
+                .map(|response| -> Result<String, Error> {
+                    let connection_id = response
+                        .uri
+                        .strip_prefix("hm://pusher/v1/connections/")
+                        .ok_or_else(|| SpircError::InvalidUri(response.uri.clone()))?;
+                    Ok(connection_id.to_owned())
+                }),
+        );
+
+        let user_attributes_update = Box::pin(
+            session
+                .mercury()
+                .listen_for("spotify:user:attributes:update")
+                .map(UnboundedReceiverStream::new)
+                .flatten_stream()
+                .map(|response| -> Result<UserAttributesUpdate, Error> {
+                    let data = response.payload.first().ok_or(SpircError::NoData)?;
+                    Ok(UserAttributesUpdate::parse_from_bytes(data)?)
+                }),
+        );
+
+        let user_attributes_mutation = Box::pin(
+            session
+                .mercury()
+                .listen_for("spotify:user:attributes:mutated")
+                .map(UnboundedReceiverStream::new)
+                .flatten_stream()
+                .map(|response| -> Result<UserAttributesMutation, Error> {
+                    let data = response.payload.first().ok_or(SpircError::NoData)?;
+                    Ok(UserAttributesMutation::parse_from_bytes(data)?)
                 }),
         );
 
@@ -274,7 +359,10 @@ impl Spirc {
             play_request_id: None,
             play_status: SpircPlayStatus::Stopped,
 
-            subscription,
+            remote_update,
+            connection_id_update,
+            user_attributes_update,
+            user_attributes_mutation,
             sender,
             commands: Some(cmd_rx),
             player_events: Some(player_events),
@@ -296,37 +384,37 @@ impl Spirc {
 
         let spirc = Spirc { commands: cmd_tx };
 
-        task.hello();
+        task.hello()?;
 
-        (spirc, task.run())
+        Ok((spirc, task.run()))
     }
 
-    pub fn play(&self) {
-        let _ = self.commands.send(SpircCommand::Play);
+    pub fn play(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Play)?)
     }
-    pub fn play_pause(&self) {
-        let _ = self.commands.send(SpircCommand::PlayPause);
+    pub fn play_pause(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::PlayPause)?)
     }
-    pub fn pause(&self) {
-        let _ = self.commands.send(SpircCommand::Pause);
+    pub fn pause(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Pause)?)
     }
-    pub fn prev(&self) {
-        let _ = self.commands.send(SpircCommand::Prev);
+    pub fn prev(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Prev)?)
     }
-    pub fn next(&self) {
-        let _ = self.commands.send(SpircCommand::Next);
+    pub fn next(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Next)?)
     }
-    pub fn volume_up(&self) {
-        let _ = self.commands.send(SpircCommand::VolumeUp);
+    pub fn volume_up(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::VolumeUp)?)
     }
-    pub fn volume_down(&self) {
-        let _ = self.commands.send(SpircCommand::VolumeDown);
+    pub fn volume_down(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::VolumeDown)?)
     }
-    pub fn shutdown(&self) {
-        let _ = self.commands.send(SpircCommand::Shutdown);
+    pub fn shutdown(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Shutdown)?)
     }
-    pub fn shuffle(&self) {
-        let _ = self.commands.send(SpircCommand::Shuffle);
+    pub fn shuffle(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Shuffle)?)
     }
 }
 
@@ -336,18 +424,57 @@ impl SpircTask {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
             tokio::select! {
-                frame = self.subscription.next() => match frame {
-                    Some(frame) => self.handle_frame(frame),
+                remote_update = self.remote_update.next() => match remote_update {
+                    Some(result) => match result {
+                        Ok(update) => if let Err(e) = self.handle_remote_update(update) {
+                            error!("could not dispatch remote update: {}", e);
+                        }
+                        Err(e) => error!("could not parse remote update: {}", e),
+                    }
                     None => {
                         error!("subscription terminated");
                         break;
                     }
                 },
-                cmd = async { commands.unwrap().recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
-                    self.handle_command(cmd);
+                user_attributes_update = self.user_attributes_update.next() => match user_attributes_update {
+                    Some(result) => match result {
+                        Ok(attributes) => self.handle_user_attributes_update(attributes),
+                        Err(e) => error!("could not parse user attributes update: {}", e),
+                    }
+                    None => {
+                        error!("user attributes update selected, but none received");
+                        break;
+                    }
                 },
-                event = async { player_events.unwrap().recv().await }, if player_events.is_some() => if let Some(event) = event {
-                    self.handle_player_event(event)
+                user_attributes_mutation = self.user_attributes_mutation.next() => match user_attributes_mutation {
+                    Some(result) => match result {
+                        Ok(attributes) => self.handle_user_attributes_mutation(attributes),
+                        Err(e) => error!("could not parse user attributes mutation: {}", e),
+                    }
+                    None => {
+                        error!("user attributes mutation selected, but none received");
+                        break;
+                    }
+                },
+                connection_id_update = self.connection_id_update.next() => match connection_id_update {
+                    Some(result) => match result {
+                        Ok(connection_id) => self.handle_connection_id_update(connection_id),
+                        Err(e) => error!("could not parse connection ID update: {}", e),
+                    }
+                    None => {
+                        error!("connection ID update selected, but none received");
+                        break;
+                    }
+                },
+                cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
+                    if let Err(e) = self.handle_command(cmd) {
+                        error!("could not dispatch command: {}", e);
+                    }
+                },
+                event = async { player_events?.recv().await }, if player_events.is_some() => if let Some(event) = event {
+                    if let Err(e) = self.handle_player_event(event) {
+                        error!("could not dispatch player event: {}", e);
+                    }
                 },
                 result = self.sender.flush(), if !self.sender.is_flushed() => if result.is_err() {
                     error!("Cannot flush spirc event sender.");
@@ -417,79 +544,80 @@ impl SpircTask {
         self.state.set_position_ms(position_ms);
     }
 
-    fn handle_command(&mut self, cmd: SpircCommand) {
+    fn handle_command(&mut self, cmd: SpircCommand) -> Result<(), Error> {
         let active = self.device.get_is_active();
         match cmd {
             SpircCommand::Play => {
                 if active {
                     self.handle_play();
-                    self.notify(None, true);
+                    self.notify(None, true)
                 } else {
-                    CommandSender::new(self, MessageType::kMessageTypePlay).send();
+                    CommandSender::new(self, MessageType::kMessageTypePlay).send()
                 }
             }
             SpircCommand::PlayPause => {
                 if active {
                     self.handle_play_pause();
-                    self.notify(None, true);
+                    self.notify(None, true)
                 } else {
-                    CommandSender::new(self, MessageType::kMessageTypePlayPause).send();
+                    CommandSender::new(self, MessageType::kMessageTypePlayPause).send()
                 }
             }
             SpircCommand::Pause => {
                 if active {
                     self.handle_pause();
-                    self.notify(None, true);
+                    self.notify(None, true)
                 } else {
-                    CommandSender::new(self, MessageType::kMessageTypePause).send();
+                    CommandSender::new(self, MessageType::kMessageTypePause).send()
                 }
             }
             SpircCommand::Prev => {
                 if active {
                     self.handle_prev();
-                    self.notify(None, true);
+                    self.notify(None, true)
                 } else {
-                    CommandSender::new(self, MessageType::kMessageTypePrev).send();
+                    CommandSender::new(self, MessageType::kMessageTypePrev).send()
                 }
             }
             SpircCommand::Next => {
                 if active {
                     self.handle_next();
-                    self.notify(None, true);
+                    self.notify(None, true)
                 } else {
-                    CommandSender::new(self, MessageType::kMessageTypeNext).send();
+                    CommandSender::new(self, MessageType::kMessageTypeNext).send()
                 }
             }
             SpircCommand::VolumeUp => {
                 if active {
                     self.handle_volume_up();
-                    self.notify(None, true);
+                    self.notify(None, true)
                 } else {
-                    CommandSender::new(self, MessageType::kMessageTypeVolumeUp).send();
+                    CommandSender::new(self, MessageType::kMessageTypeVolumeUp).send()
                 }
             }
             SpircCommand::VolumeDown => {
                 if active {
                     self.handle_volume_down();
-                    self.notify(None, true);
+                    self.notify(None, true)
                 } else {
-                    CommandSender::new(self, MessageType::kMessageTypeVolumeDown).send();
+                    CommandSender::new(self, MessageType::kMessageTypeVolumeDown).send()
                 }
             }
             SpircCommand::Shutdown => {
-                CommandSender::new(self, MessageType::kMessageTypeGoodbye).send();
+                CommandSender::new(self, MessageType::kMessageTypeGoodbye).send()?;
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()
                 }
+                Ok(())
             }
             SpircCommand::Shuffle => {
-                CommandSender::new(self, MessageType::kMessageTypeShuffle).send();
+                CommandSender::new(self, MessageType::kMessageTypeShuffle).send()
             }
         }
     }
 
-    fn handle_player_event(&mut self, event: PlayerEvent) {
+    fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
         // we only process events if the play_request_id matches. If it doesn't, it is
         // an event that belongs to a previous track and only arrives now due to a race
         // condition. In this case we have updated the state already and don't want to
@@ -498,8 +626,13 @@ impl SpircTask {
             if Some(play_request_id) == self.play_request_id {
                 match event {
                     PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track(),
-                    PlayerEvent::Loading { .. } => self.notify(None, false),
+                    PlayerEvent::Loading { .. } => {
+                        trace!("==> kPlayStatusLoading");
+                        self.state.set_status(PlayStatus::kPlayStatusLoading);
+                        self.notify(None, false)
+                    }
                     PlayerEvent::Playing { position_ms, .. } => {
+                        trace!("==> kPlayStatusPlay");
                         let new_nominal_start_time = self.now_ms() - position_ms as i64;
                         match self.play_status {
                             SpircPlayStatus::Playing {
@@ -509,27 +642,29 @@ impl SpircTask {
                                 if (*nominal_start_time - new_nominal_start_time).abs() > 100 {
                                     *nominal_start_time = new_nominal_start_time;
                                     self.update_state_position(position_ms);
-                                    self.notify(None, true);
+                                    self.notify(None, true)
+                                } else {
+                                    Ok(())
                                 }
                             }
                             SpircPlayStatus::LoadingPlay { .. }
                             | SpircPlayStatus::LoadingPause { .. } => {
                                 self.state.set_status(PlayStatus::kPlayStatusPlay);
                                 self.update_state_position(position_ms);
-                                self.notify(None, true);
                                 self.play_status = SpircPlayStatus::Playing {
                                     nominal_start_time: new_nominal_start_time,
                                     preloading_of_next_track_triggered: false,
                                 };
+                                self.notify(None, true)
                             }
-                            _ => (),
-                        };
-                        trace!("==> kPlayStatusPlay");
+                            _ => Ok(()),
+                        }
                     }
                     PlayerEvent::Paused {
                         position_ms: new_position_ms,
                         ..
                     } => {
+                        trace!("==> kPlayStatusPause");
                         match self.play_status {
                             SpircPlayStatus::Paused {
                                 ref mut position_ms,
@@ -538,42 +673,96 @@ impl SpircTask {
                                 if *position_ms != new_position_ms {
                                     *position_ms = new_position_ms;
                                     self.update_state_position(new_position_ms);
-                                    self.notify(None, true);
+                                    self.notify(None, true)
+                                } else {
+                                    Ok(())
                                 }
                             }
                             SpircPlayStatus::LoadingPlay { .. }
                             | SpircPlayStatus::LoadingPause { .. } => {
                                 self.state.set_status(PlayStatus::kPlayStatusPause);
                                 self.update_state_position(new_position_ms);
-                                self.notify(None, true);
                                 self.play_status = SpircPlayStatus::Paused {
                                     position_ms: new_position_ms,
                                     preloading_of_next_track_triggered: false,
                                 };
+                                self.notify(None, true)
                             }
-                            _ => (),
+                            _ => Ok(()),
                         }
-                        trace!("==> kPlayStatusPause");
                     }
-                    PlayerEvent::Stopped { .. } => match self.play_status {
-                        SpircPlayStatus::Stopped => (),
-                        _ => {
-                            warn!("The player has stopped unexpectedly.");
-                            self.state.set_status(PlayStatus::kPlayStatusStop);
-                            self.notify(None, true);
-                            self.play_status = SpircPlayStatus::Stopped;
+                    PlayerEvent::Stopped { .. } => {
+                        trace!("==> kPlayStatusStop");
+                        match self.play_status {
+                            SpircPlayStatus::Stopped => Ok(()),
+                            _ => {
+                                warn!("The player has stopped unexpectedly.");
+                                self.state.set_status(PlayStatus::kPlayStatusStop);
+                                self.play_status = SpircPlayStatus::Stopped;
+                                self.notify(None, true)
+                            }
                         }
-                    },
-                    PlayerEvent::TimeToPreloadNextTrack { .. } => self.handle_preload_next_track(),
-                    PlayerEvent::Unavailable { track_id, .. } => self.handle_unavailable(track_id),
-                    _ => (),
+                    }
+                    PlayerEvent::TimeToPreloadNextTrack { .. } => {
+                        self.handle_preload_next_track();
+                        Ok(())
+                    }
+                    PlayerEvent::Unavailable { track_id, .. } => {
+                        self.handle_unavailable(track_id);
+                        Ok(())
+                    }
+                    _ => Ok(()),
                 }
+            } else {
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    fn handle_connection_id_update(&mut self, connection_id: String) {
+        trace!("Received connection ID update: {:?}", connection_id);
+        self.session.set_connection_id(connection_id);
+    }
+
+    fn handle_user_attributes_update(&mut self, update: UserAttributesUpdate) {
+        trace!("Received attributes update: {:#?}", update);
+        let attributes: UserAttributes = update
+            .get_pairs()
+            .iter()
+            .map(|pair| (pair.get_key().to_owned(), pair.get_value().to_owned()))
+            .collect();
+        self.session.set_user_attributes(attributes)
+    }
+
+    fn handle_user_attributes_mutation(&mut self, mutation: UserAttributesMutation) {
+        for attribute in mutation.get_fields().iter() {
+            let key = attribute.get_name();
+            if let Some(old_value) = self.session.user_data().attributes.get(key) {
+                let new_value = match old_value.as_ref() {
+                    "0" => "1",
+                    "1" => "0",
+                    _ => old_value,
+                };
+                self.session.set_user_attribute(key, new_value);
+                trace!(
+                    "Received attribute mutation, {} was {} is now {}",
+                    key,
+                    old_value,
+                    new_value
+                );
+            } else {
+                trace!(
+                    "Received attribute mutation for {} but key was not found!",
+                    key
+                );
             }
         }
     }
 
-    fn handle_frame(&mut self, frame: Frame) {
-        let state_string = match frame.get_state().get_status() {
+    fn handle_remote_update(&mut self, update: Frame) -> Result<(), Error> {
+        let state_string = match update.get_state().get_status() {
             PlayStatus::kPlayStatusLoading => "kPlayStatusLoading",
             PlayStatus::kPlayStatusPause => "kPlayStatusPause",
             PlayStatus::kPlayStatusStop => "kPlayStatusStop",
@@ -582,24 +771,24 @@ impl SpircTask {
 
         debug!(
             "{:?} {:?} {} {} {} {}",
-            frame.get_typ(),
-            frame.get_device_state().get_name(),
-            frame.get_ident(),
-            frame.get_seq_nr(),
-            frame.get_state_update_id(),
+            update.get_typ(),
+            update.get_device_state().get_name(),
+            update.get_ident(),
+            update.get_seq_nr(),
+            update.get_state_update_id(),
             state_string,
         );
 
-        if frame.get_ident() == self.ident
-            || (!frame.get_recipient().is_empty() && !frame.get_recipient().contains(&self.ident))
+        let device_id = &self.ident;
+        let ident = update.get_ident();
+        if ident == device_id
+            || (!update.get_recipient().is_empty() && !update.get_recipient().contains(device_id))
         {
-            return;
+            return Err(SpircError::Ident(ident.to_string()).into());
         }
 
-        match frame.get_typ() {
-            MessageType::kMessageTypeHello => {
-                self.notify(Some(frame.get_ident()), true);
-            }
+        match update.get_typ() {
+            MessageType::kMessageTypeHello => self.notify(Some(ident), true),
 
             MessageType::kMessageTypeLoad => {
                 if !self.device.get_is_active() {
@@ -608,12 +797,12 @@ impl SpircTask {
                     self.device.set_became_active_at(now);
                 }
 
-                self.update_tracks(&frame);
+                self.update_tracks(&update);
 
                 if !self.state.get_track().is_empty() {
                     let start_playing =
-                        frame.get_state().get_status() == PlayStatus::kPlayStatusPlay;
-                    self.load_track(start_playing, frame.get_state().get_position_ms());
+                        update.get_state().get_status() == PlayStatus::kPlayStatusPlay;
+                    self.load_track(start_playing, update.get_state().get_position_ms());
                 } else {
                     info!("No more tracks left in queue");
                     self.state.set_status(PlayStatus::kPlayStatusStop);
@@ -621,51 +810,51 @@ impl SpircTask {
                     self.play_status = SpircPlayStatus::Stopped;
                 }
 
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypePlay => {
                 self.handle_play();
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypePlayPause => {
                 self.handle_play_pause();
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypePause => {
                 self.handle_pause();
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypeNext => {
                 self.handle_next();
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypePrev => {
                 self.handle_prev();
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypeVolumeUp => {
                 self.handle_volume_up();
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypeVolumeDown => {
                 self.handle_volume_down();
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypeRepeat => {
-                self.state.set_repeat(frame.get_state().get_repeat());
-                self.notify(None, true);
+                self.state.set_repeat(update.get_state().get_repeat());
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypeShuffle => {
-                self.state.set_shuffle(frame.get_state().get_shuffle());
+                self.state.set_shuffle(update.get_state().get_shuffle());
                 if self.state.get_shuffle() {
                     let current_index = self.state.get_playing_track_index();
                     {
@@ -681,17 +870,17 @@ impl SpircTask {
                     let context = self.state.get_context_uri();
                     debug!("{:?}", context);
                 }
-                self.notify(None, true);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypeSeek => {
-                self.handle_seek(frame.get_position());
-                self.notify(None, true);
+                self.handle_seek(update.get_position());
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypeReplace => {
-                self.update_tracks(&frame);
-                self.notify(None, true);
+                self.update_tracks(&update);
+                self.notify(None, true)?;
 
                 if let SpircPlayStatus::Playing {
                     preloading_of_next_track_triggered,
@@ -709,27 +898,29 @@ impl SpircTask {
                         }
                     }
                 }
+                Ok(())
             }
 
             MessageType::kMessageTypeVolume => {
-                self.set_volume(frame.get_volume() as u16);
-                self.notify(None, true);
+                self.set_volume(update.get_volume() as u16);
+                self.notify(None, true)
             }
 
             MessageType::kMessageTypeNotify => {
                 if self.device.get_is_active()
-                    && frame.get_device_state().get_is_active()
+                    && update.get_device_state().get_is_active()
                     && self.device.get_became_active_at()
-                        <= frame.get_device_state().get_became_active_at()
+                        <= update.get_device_state().get_became_active_at()
                 {
                     self.device.set_is_active(false);
                     self.state.set_status(PlayStatus::kPlayStatusStop);
                     self.player.stop();
                     self.play_status = SpircPlayStatus::Stopped;
                 }
+                Ok(())
             }
 
-            _ => (),
+            _ => Ok(()),
         }
     }
 
@@ -739,11 +930,6 @@ impl SpircTask {
                 position_ms,
                 preloading_of_next_track_triggered,
             } => {
-                // Synchronize the volume from the mixer. This is useful on
-                // systems that can switch sources from and back to librespot.
-                let current_volume = self.mixer.volume();
-                self.set_volume(current_volume);
-
                 self.player.play();
                 self.state.set_status(PlayStatus::kPlayStatusPlay);
                 self.update_state_position(position_ms);
@@ -756,8 +942,13 @@ impl SpircTask {
                 self.player.play();
                 self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
             }
-            _ => (),
+            _ => return,
         }
+
+        // Synchronize the volume from the mixer. This is useful on
+        // systems that can switch sources from and back to librespot.
+        let current_volume = self.mixer.volume();
+        self.set_volume(current_volume);
     }
 
     fn handle_play_pause(&mut self) {
@@ -887,8 +1078,8 @@ impl SpircTask {
         let tracks_len = self.state.get_track().len() as u32;
         debug!(
             "At track {:?} of {:?} <{:?}> update [{}]",
-            new_index,
-            self.state.get_track().len(),
+            new_index + 1,
+            tracks_len,
             self.state.get_context_uri(),
             tracks_len - new_index < CONTEXT_FETCH_THRESHOLD
         );
@@ -902,16 +1093,20 @@ impl SpircTask {
             self.context_fut = self.resolve_station(&context_uri);
             self.update_tracks_from_context();
         }
-        if self.config.autoplay && new_index == tracks_len - 1 {
-            // Extend the playlist
-            // Note: This doesn't seem to reflect in the UI
-            // the additional tracks in the frame don't show up as with station view
-            debug!("Extending playlist <{}>", context_uri);
-            self.update_tracks_from_context();
-        }
         if new_index >= tracks_len {
-            new_index = 0; // Loop around back to start
-            continue_playing = self.state.get_repeat();
+            if self.config.autoplay {
+                // Extend the playlist
+                debug!("Extending playlist <{}>", context_uri);
+                self.update_tracks_from_context();
+                self.player.set_auto_normalise_as_album(false);
+            } else {
+                new_index = 0;
+                continue_playing = self.state.get_repeat();
+                debug!(
+                    "Looping around back to start, repeat is {}",
+                    continue_playing
+                );
+            }
         }
 
         if tracks_len > 0 {
@@ -975,9 +1170,9 @@ impl SpircTask {
         self.set_volume(volume);
     }
 
-    fn handle_end_of_track(&mut self) {
+    fn handle_end_of_track(&mut self) -> Result<(), Error> {
         self.handle_next();
-        self.notify(None, true);
+        self.notify(None, true)
     }
 
     fn position(&mut self) -> u32 {
@@ -992,48 +1187,40 @@ impl SpircTask {
         }
     }
 
-    fn resolve_station(&self, uri: &str) -> BoxedFuture<Result<serde_json::Value, MercuryError>> {
+    fn resolve_station(&self, uri: &str) -> BoxedFuture<Result<serde_json::Value, Error>> {
         let radio_uri = format!("hm://radio-apollo/v3/stations/{}", uri);
 
         self.resolve_uri(&radio_uri)
     }
 
-    fn resolve_autoplay_uri(&self, uri: &str) -> BoxedFuture<Result<String, MercuryError>> {
+    fn resolve_autoplay_uri(&self, uri: &str) -> BoxedFuture<Result<String, Error>> {
         let query_uri = format!("hm://autoplay-enabled/query?uri={}", uri);
         let request = self.session.mercury().get(query_uri);
         Box::pin(
             async {
-                let response = request.await?;
+                let response = request?.await?;
 
                 if response.status_code == 200 {
-                    let data = response
-                        .payload
-                        .first()
-                        .expect("Empty autoplay uri")
-                        .to_vec();
-                    let autoplay_uri = String::from_utf8(data).unwrap();
-                    Ok(autoplay_uri)
+                    let data = response.payload.first().ok_or(SpircError::NoData)?.to_vec();
+                    Ok(String::from_utf8(data)?)
                 } else {
                     warn!("No autoplay_uri found");
-                    Err(MercuryError)
+                    Err(MercuryError::Response(response).into())
                 }
             }
             .fuse(),
         )
     }
 
-    fn resolve_uri(&self, uri: &str) -> BoxedFuture<Result<serde_json::Value, MercuryError>> {
+    fn resolve_uri(&self, uri: &str) -> BoxedFuture<Result<serde_json::Value, Error>> {
         let request = self.session.mercury().get(uri);
 
         Box::pin(
             async move {
-                let response = request.await?;
+                let response = request?.await?;
 
-                let data = response
-                    .payload
-                    .first()
-                    .expect("Empty payload on context uri");
-                let response: serde_json::Value = serde_json::from_slice(&data).unwrap();
+                let data = response.payload.first().ok_or(SpircError::NoData)?;
+                let response: serde_json::Value = serde_json::from_slice(data)?;
 
                 Ok(response)
             }
@@ -1051,7 +1238,7 @@ impl SpircTask {
             if let Some(head) = track_vec.len().checked_sub(CONTEXT_TRACKS_HISTORY) {
                 track_vec.drain(0..head);
             }
-            track_vec.extend_from_slice(&new_tracks);
+            track_vec.extend_from_slice(new_tracks);
             self.state
                 .set_track(protobuf::RepeatedField::from_vec(track_vec));
 
@@ -1069,11 +1256,11 @@ impl SpircTask {
     }
 
     fn update_tracks(&mut self, frame: &protocol::spirc::Frame) {
-        debug!("State: {:?}", frame.get_state());
+        trace!("State: {:#?}", frame.get_state());
         let index = frame.get_state().get_playing_track_index();
         let context_uri = frame.get_state().get_context_uri().to_owned();
         let tracks = frame.get_state().get_track();
-        debug!("Frame has {:?} tracks", tracks.len());
+        trace!("Frame has {:?} tracks", tracks.len());
         if context_uri.starts_with("spotify:station:")
             || context_uri.starts_with("spotify:dailymix:")
         {
@@ -1083,6 +1270,9 @@ impl SpircTask {
             // Get autoplay_station_uri for regular playlists
             self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
         }
+
+        self.player
+            .set_auto_normalise_as_album(context_uri.starts_with("spotify:album:"));
 
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.iter().cloned().collect());
@@ -1097,15 +1287,6 @@ impl SpircTask {
         if state.get_shuffle() {
             self.state.set_shuffle(true);
         }
-    }
-
-    // should this be a method of SpotifyId directly?
-    fn get_spotify_id_for_track(&self, track_ref: &TrackRef) -> Result<SpotifyId, SpotifyIdError> {
-        SpotifyId::from_raw(track_ref.get_gid()).or_else(|_| {
-            let uri = track_ref.get_uri();
-            debug!("Malformed or no gid, attempting to parse URI <{}>", uri);
-            SpotifyId::from_uri(uri)
-        })
     }
 
     // Helper to find corresponding index(s) for track_id
@@ -1133,6 +1314,14 @@ impl SpircTask {
     fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
         let tracks_len = self.state.get_track().len();
 
+        // Guard against tracks_len being zero to prevent
+        // 'index out of bounds: the len is 0 but the index is 0'
+        // https://github.com/librespot-org/librespot/issues/226#issuecomment-971642037
+        if tracks_len == 0 {
+            warn!("No playable track found in state: {:?}", self.state);
+            return None;
+        }
+
         let mut new_playlist_index = index as usize;
 
         if new_playlist_index >= tracks_len {
@@ -1146,11 +1335,8 @@ impl SpircTask {
         // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
 
         let mut track_ref = self.state.get_track()[new_playlist_index].clone();
-        let mut track_id = self.get_spotify_id_for_track(&track_ref);
-        while self.track_ref_is_unavailable(&track_ref)
-            || track_id.is_err()
-            || track_id.unwrap().audio_type == SpotifyAudioType::NonPlayable
-        {
+        let mut track_id = SpotifyId::try_from(&track_ref);
+        while self.track_ref_is_unavailable(&track_ref) || track_id.is_err() {
             warn!(
                 "Skipping track <{:?}> at position [{}] of {}",
                 track_ref, new_playlist_index, tracks_len
@@ -1166,7 +1352,7 @@ impl SpircTask {
                 return None;
             }
             track_ref = self.state.get_track()[new_playlist_index].clone();
-            track_id = self.get_spotify_id_for_track(&track_ref);
+            track_id = SpotifyId::try_from(&track_ref);
         }
 
         match track_id {
@@ -1201,13 +1387,17 @@ impl SpircTask {
         }
     }
 
-    fn hello(&mut self) {
-        CommandSender::new(self, MessageType::kMessageTypeHello).send();
+    fn hello(&mut self) -> Result<(), Error> {
+        CommandSender::new(self, MessageType::kMessageTypeHello).send()
     }
 
-    fn notify(&mut self, recipient: Option<&str>, suppress_loading_status: bool) {
+    fn notify(
+        &mut self,
+        recipient: Option<&str>,
+        suppress_loading_status: bool,
+    ) -> Result<(), Error> {
         if suppress_loading_status && (self.state.get_status() == PlayStatus::kPlayStatusLoading) {
-            return;
+            return Ok(());
         };
         let status_string = match self.state.get_status() {
             PlayStatus::kPlayStatusLoading => "kPlayStatusLoading",
@@ -1218,9 +1408,9 @@ impl SpircTask {
         trace!("Sending status to server: [{}]", status_string);
         let mut cs = CommandSender::new(self, MessageType::kMessageTypeNotify);
         if let Some(s) = recipient {
-            cs = cs.recipient(&s);
+            cs = cs.recipient(s);
         }
-        cs.send();
+        cs.send()
     }
 
     fn set_volume(&mut self, volume: u16) {
@@ -1268,11 +1458,11 @@ impl<'a> CommandSender<'a> {
         self
     }
 
-    fn send(mut self) {
+    fn send(mut self) -> Result<(), Error> {
         if !self.frame.has_state() && self.spirc.device.get_is_active() {
             self.frame.set_state(self.spirc.state.clone());
         }
 
-        self.spirc.sender.send(self.frame.write_to_bytes().unwrap());
+        self.spirc.sender.send(self.frame.write_to_bytes()?)
     }
 }

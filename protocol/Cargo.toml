@@ -1,6 +1,6 @@
 [package]
 name = "librespot-protocol"
-version = "0.2.0"
+version = "0.3.1"
 authors = ["Paul Liétar <paul@lietar.net>"]
 build = "build.rs"
 description = "The protobuf logic for communicating with Spotify servers"
@@ -9,8 +9,8 @@ repository = "https://github.com/librespot-org/librespot"
 edition = "2018"
 
 [dependencies]
-protobuf = "2.14.0"
+protobuf = "2.25"
 
 [build-dependencies]
-protobuf-codegen-pure = "2.14.0"
+protobuf-codegen-pure = "2.25"
 glob = "0.3.0"

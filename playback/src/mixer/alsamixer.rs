@@ -10,6 +10,7 @@ use alsa::{Ctl, Round};
 use std::ffi::CString;
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct AlsaMixer {
     config: MixerConfig,
     min: i64,
@@ -31,14 +32,14 @@ const ZERO_DB: MilliBel = MilliBel(0);
 impl Mixer for AlsaMixer {
     fn open(config: MixerConfig) -> Self {
         info!(
-            "Mixing with alsa and volume control: {:?} for card: {} with mixer control: {},{}",
-            config.volume_ctrl, config.card, config.control, config.index,
+            "Mixing with Alsa and volume control: {:?} for device: {} with mixer control: {},{}",
+            config.volume_ctrl, config.device, config.control, config.index,
         );
 
         let mut config = config; // clone
 
         let mixer =
-            alsa::mixer::Mixer::new(&config.card, false).expect("Could not open Alsa mixer");
+            alsa::mixer::Mixer::new(&config.device, false).expect("Could not open Alsa mixer");
         let simple_element = mixer
             .find_selem(&SelemId::new(&config.control, config.index))
             .expect("Could not find Alsa mixer control");
@@ -56,8 +57,8 @@ impl Mixer for AlsaMixer {
         // Query dB volume range -- note that Alsa exposes a different
         // API for hardware and software mixers
         let (min_millibel, max_millibel) = if is_softvol {
-            let control =
-                Ctl::new(&config.card, false).expect("Could not open Alsa softvol with that card");
+            let control = Ctl::new(&config.device, false)
+                .expect("Could not open Alsa softvol with that device");
             let mut element_id = ElemId::new(ElemIface::Mixer);
             element_id.set_name(
                 &CString::new(config.control.as_str())
@@ -144,7 +145,7 @@ impl Mixer for AlsaMixer {
 
     fn volume(&self) -> u16 {
         let mixer =
-            alsa::mixer::Mixer::new(&self.config.card, false).expect("Could not open Alsa mixer");
+            alsa::mixer::Mixer::new(&self.config.device, false).expect("Could not open Alsa mixer");
         let simple_element = mixer
             .find_selem(&SelemId::new(&self.config.control, self.config.index))
             .expect("Could not find Alsa mixer control");
@@ -184,7 +185,7 @@ impl Mixer for AlsaMixer {
 
     fn set_volume(&self, volume: u16) {
         let mixer =
-            alsa::mixer::Mixer::new(&self.config.card, false).expect("Could not open Alsa mixer");
+            alsa::mixer::Mixer::new(&self.config.device, false).expect("Could not open Alsa mixer");
         let simple_element = mixer
             .find_selem(&SelemId::new(&self.config.control, self.config.index))
             .expect("Could not find Alsa mixer control");
@@ -249,7 +250,7 @@ impl AlsaMixer {
         }
 
         let mixer =
-            alsa::mixer::Mixer::new(&self.config.card, false).expect("Could not open Alsa mixer");
+            alsa::mixer::Mixer::new(&self.config.device, false).expect("Could not open Alsa mixer");
         let simple_element = mixer
             .find_selem(&SelemId::new(&self.config.control, self.config.index))
             .expect("Could not find Alsa mixer control");

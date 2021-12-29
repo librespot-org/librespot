@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
@@ -17,6 +17,7 @@ import "playlist_track_state.proto";
 import "playlist_user_state.proto";
 import "metadata/track_metadata.proto";
 
+option objc_class_prefix = "SPTPlaylistCosmosPlaylist";
 option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.playlist.proto";
 
@@ -86,4 +87,5 @@ message Response {
     optional on_demand_set.proto.OnDemandInFreeReason on_demand_in_free_reason = 21;
     optional Collaborators collaborators = 22;
     optional playlist_permission.proto.Permission base_permission = 23;
+    optional playlist_permission.proto.Capabilities user_capabilities = 24;
 }

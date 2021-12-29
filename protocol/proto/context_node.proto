@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
@@ -20,4 +20,5 @@ message ContextNode {
     optional ContextProcessor context_processor = 6;
     optional string session_id = 7;
     optional sint32 iteration = 8;
+    optional bool pending_pause = 9;
 }

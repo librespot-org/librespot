@@ -1,0 +1,12 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.proto;
+
+option optimize_for = CODE_SIZE;
+
+message Status {
+    int32 code = 1;
+    string reason = 2;
+}

@@ -1,15 +1,30 @@
-use std::cmp::Reverse;
-use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::{self, Error, ErrorKind, Read, Write};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
+use std::{
+    cmp::Reverse,
+    collections::HashMap,
+    fs::{self, File},
+    io::{self, Read, Write},
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::SystemTime,
+};
 
+use parking_lot::Mutex;
 use priority_queue::PriorityQueue;
+use thiserror::Error;
 
-use crate::authentication::Credentials;
-use crate::spotify_id::FileId;
+use crate::{authentication::Credentials, error::ErrorKind, Error, FileId};
+
+#[derive(Debug, Error)]
+pub enum CacheError {
+    #[error("audio cache location is not configured")]
+    Path,
+}
+
+impl From<CacheError> for Error {
+    fn from(err: CacheError) -> Self {
+        Error::failed_precondition(err)
+    }
+}
 
 /// Some kind of data structure that holds some paths, the size of these files and a timestamp.
 /// It keeps track of the file sizes and is able to pop the path with the oldest timestamp if
@@ -57,16 +72,17 @@ impl SizeLimiter {
     /// to delete the file in the file system.
     fn pop(&mut self) -> Option<PathBuf> {
         if self.exceeds_limit() {
-            let (next, _) = self
-                .queue
-                .pop()
-                .expect("in_use was > 0, so the queue should have contained an item.");
-            let size = self
-                .sizes
-                .remove(&next)
-                .expect("`queue` and `sizes` should have the same keys.");
-            self.in_use -= size;
-            Some(next)
+            if let Some((next, _)) = self.queue.pop() {
+                if let Some(size) = self.sizes.remove(&next) {
+                    self.in_use -= size;
+                } else {
+                    error!("`queue` and `sizes` should have the same keys.");
+                }
+                Some(next)
+            } else {
+                error!("in_use was > 0, so the queue should have contained an item.");
+                None
+            }
         } else {
             None
         }
@@ -85,11 +101,11 @@ impl SizeLimiter {
             return false;
         }
 
-        let size = self
-            .sizes
-            .remove(file)
-            .expect("`queue` and `sizes` should have the same keys.");
-        self.in_use -= size;
+        if let Some(size) = self.sizes.remove(file) {
+            self.in_use -= size;
+        } else {
+            error!("`queue` and `sizes` should have the same keys.");
+        }
 
         true
     }
@@ -173,23 +189,21 @@ impl FsSizeLimiter {
     }
 
     fn add(&self, file: &Path, size: u64) {
-        self.limiter
-            .lock()
-            .unwrap()
-            .add(file, size, SystemTime::now());
+        self.limiter.lock().add(file, size, SystemTime::now())
     }
 
     fn touch(&self, file: &Path) -> bool {
-        self.limiter.lock().unwrap().update(file, SystemTime::now())
+        self.limiter.lock().update(file, SystemTime::now())
     }
 
-    fn remove(&self, file: &Path) {
-        self.limiter.lock().unwrap().remove(file);
+    fn remove(&self, file: &Path) -> bool {
+        self.limiter.lock().remove(file)
     }
 
-    fn prune_internal<F: FnMut() -> Option<PathBuf>>(mut pop: F) {
+    fn prune_internal<F: FnMut() -> Option<PathBuf>>(mut pop: F) -> Result<(), Error> {
         let mut first = true;
         let mut count = 0;
+        let mut last_error = None;
 
         while let Some(file) = pop() {
             if first {
@@ -197,8 +211,10 @@ impl FsSizeLimiter {
                 first = false;
             }
 
-            if let Err(e) = fs::remove_file(&file) {
+            let res = fs::remove_file(&file);
+            if let Err(e) = res {
                 warn!("Could not remove file {:?} from cache dir: {}", file, e);
+                last_error = Some(e);
             } else {
                 count += 1;
             }
@@ -207,21 +223,27 @@ impl FsSizeLimiter {
         if count > 0 {
             info!("Removed {} cache files.", count);
         }
+
+        if let Some(err) = last_error {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
     }
 
-    fn prune(&self) {
-        Self::prune_internal(|| self.limiter.lock().unwrap().pop())
+    fn prune(&self) -> Result<(), Error> {
+        Self::prune_internal(|| self.limiter.lock().pop())
     }
 
-    fn new(path: &Path, limit: u64) -> Self {
+    fn new(path: &Path, limit: u64) -> Result<Self, Error> {
         let mut limiter = SizeLimiter::new(limit);
 
         Self::init_dir(&mut limiter, path);
-        Self::prune_internal(|| limiter.pop());
+        Self::prune_internal(|| limiter.pop())?;
 
-        Self {
+        Ok(Self {
             limiter: Mutex::new(limiter),
-        }
+        })
     }
 }
 
@@ -234,33 +256,39 @@ pub struct Cache {
     size_limiter: Option<Arc<FsSizeLimiter>>,
 }
 
-pub struct RemoveFileError(());
-
 impl Cache {
     pub fn new<P: AsRef<Path>>(
-        system_location: Option<P>,
-        audio_location: Option<P>,
+        credentials_path: Option<P>,
+        volume_path: Option<P>,
+        audio_path: Option<P>,
         size_limit: Option<u64>,
-    ) -> io::Result<Self> {
-        if let Some(location) = &system_location {
+    ) -> Result<Self, Error> {
+        let mut size_limiter = None;
+
+        if let Some(location) = &credentials_path {
             fs::create_dir_all(location)?;
         }
 
-        let mut size_limiter = None;
+        let credentials_location = credentials_path
+            .as_ref()
+            .map(|p| p.as_ref().join("credentials.json"));
 
-        if let Some(location) = &audio_location {
+        if let Some(location) = &volume_path {
             fs::create_dir_all(location)?;
+        }
+
+        let volume_location = volume_path.as_ref().map(|p| p.as_ref().join("volume"));
+
+        if let Some(location) = &audio_path {
+            fs::create_dir_all(location)?;
+
             if let Some(limit) = size_limit {
-                let limiter = FsSizeLimiter::new(location.as_ref(), limit);
+                let limiter = FsSizeLimiter::new(location.as_ref(), limit)?;
                 size_limiter = Some(Arc::new(limiter));
             }
         }
 
-        let audio_location = audio_location.map(|p| p.as_ref().to_owned());
-        let volume_location = system_location.as_ref().map(|p| p.as_ref().join("volume"));
-        let credentials_location = system_location
-            .as_ref()
-            .map(|p| p.as_ref().join("credentials.json"));
+        let audio_location = audio_path.map(|p| p.as_ref().to_owned());
 
         let cache = Cache {
             credentials_location,
@@ -276,11 +304,11 @@ impl Cache {
         let location = self.credentials_location.as_ref()?;
 
         // This closure is just convencience to enable the question mark operator
-        let read = || {
+        let read = || -> Result<Credentials, Error> {
             let mut file = File::open(location)?;
             let mut contents = String::new();
             file.read_to_string(&mut contents)?;
-            serde_json::from_str(&contents).map_err(|e| Error::new(ErrorKind::InvalidData, e))
+            Ok(serde_json::from_str(&contents)?)
         };
 
         match read() {
@@ -288,7 +316,7 @@ impl Cache {
             Err(e) => {
                 // If the file did not exist, the file was probably not written
                 // before. Otherwise, log the error.
-                if e.kind() != ErrorKind::NotFound {
+                if e.kind != ErrorKind::NotFound {
                     warn!("Error reading credentials from cache: {}", e);
                 }
                 None
@@ -312,19 +340,17 @@ impl Cache {
     pub fn volume(&self) -> Option<u16> {
         let location = self.volume_location.as_ref()?;
 
-        let read = || {
+        let read = || -> Result<u16, Error> {
             let mut file = File::open(location)?;
             let mut contents = String::new();
             file.read_to_string(&mut contents)?;
-            contents
-                .parse()
-                .map_err(|e| Error::new(ErrorKind::InvalidData, e))
+            Ok(contents.parse()?)
         };
 
         match read() {
             Ok(v) => Some(v),
             Err(e) => {
-                if e.kind() != ErrorKind::NotFound {
+                if e.kind != ErrorKind::NotFound {
                     warn!("Error reading volume from cache: {}", e);
                 }
                 None
@@ -355,12 +381,14 @@ impl Cache {
         match File::open(&path) {
             Ok(file) => {
                 if let Some(limiter) = self.size_limiter.as_deref() {
-                    limiter.touch(&path);
+                    if !limiter.touch(&path) {
+                        error!("limiter could not touch {:?}", path);
+                    }
                 }
                 Some(file)
             }
             Err(e) => {
-                if e.kind() != ErrorKind::NotFound {
+                if e.kind() != io::ErrorKind::NotFound {
                     warn!("Error reading file from cache: {}", e)
                 }
                 None
@@ -368,38 +396,33 @@ impl Cache {
         }
     }
 
-    pub fn save_file<F: Read>(&self, file: FileId, contents: &mut F) {
-        let path = if let Some(path) = self.file_path(file) {
-            path
-        } else {
-            return;
-        };
-        let parent = path.parent().unwrap();
-
-        let result = fs::create_dir_all(parent)
-            .and_then(|_| File::create(&path))
-            .and_then(|mut file| io::copy(contents, &mut file));
-
-        if let Ok(size) = result {
-            if let Some(limiter) = self.size_limiter.as_deref() {
-                limiter.add(&path, size);
-                limiter.prune();
+    pub fn save_file<F: Read>(&self, file: FileId, contents: &mut F) -> Result<(), Error> {
+        if let Some(path) = self.file_path(file) {
+            if let Some(parent) = path.parent() {
+                if let Ok(size) = fs::create_dir_all(parent)
+                    .and_then(|_| File::create(&path))
+                    .and_then(|mut file| io::copy(contents, &mut file))
+                {
+                    if let Some(limiter) = self.size_limiter.as_deref() {
+                        limiter.add(&path, size);
+                        limiter.prune()?;
+                    }
+                    return Ok(());
+                }
             }
         }
+        Err(CacheError::Path.into())
     }
 
-    pub fn remove_file(&self, file: FileId) -> Result<(), RemoveFileError> {
-        let path = self.file_path(file).ok_or(RemoveFileError(()))?;
+    pub fn remove_file(&self, file: FileId) -> Result<(), Error> {
+        let path = self.file_path(file).ok_or(CacheError::Path)?;
 
-        if let Err(err) = fs::remove_file(&path) {
-            warn!("Unable to remove file from cache: {}", err);
-            Err(RemoveFileError(()))
-        } else {
-            if let Some(limiter) = self.size_limiter.as_deref() {
-                limiter.remove(&path);
-            }
-            Ok(())
+        fs::remove_file(&path)?;
+        if let Some(limiter) = self.size_limiter.as_deref() {
+            limiter.remove(&path);
         }
+
+        Ok(())
     }
 }
 

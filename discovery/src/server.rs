@@ -1,26 +1,35 @@
-use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::convert::Infallible;
-use std::net::{Ipv4Addr, SocketAddr};
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    convert::Infallible,
+    net::{Ipv4Addr, SocketAddr},
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
-use aes_ctr::cipher::generic_array::GenericArray;
-use aes_ctr::cipher::{NewStreamCipher, SyncStreamCipher};
-use aes_ctr::Aes128Ctr;
+use aes_ctr::{
+    cipher::generic_array::GenericArray,
+    cipher::{NewStreamCipher, SyncStreamCipher},
+    Aes128Ctr,
+};
 use futures_core::Stream;
+use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac, NewMac};
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, StatusCode};
-use log::{debug, warn};
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Body, Method, Request, Response, StatusCode,
+};
+use log::{debug, error, warn};
 use serde_json::json;
 use sha1::{Digest, Sha1};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::core::authentication::Credentials;
-use crate::core::config::DeviceType;
-use crate::core::diffie_hellman::DhLocalKeys;
+use super::DiscoveryError;
+
+use crate::core::{
+    authentication::Credentials, config::DeviceType, diffie_hellman::DhLocalKeys, Error,
+};
 
 type Params<'a> = BTreeMap<Cow<'a, str>, Cow<'a, str>>;
 
@@ -57,7 +66,7 @@ impl RequestHandler {
             "status": 101,
             "statusString": "ERROR-OK",
             "spotifyError": 0,
-            "version": "2.7.1",
+            "version": crate::core::version::SEMVER,
             "deviceID": (self.config.device_id),
             "remoteName": (self.config.name),
             "activeUser": "",
@@ -76,14 +85,26 @@ impl RequestHandler {
         Response::new(Body::from(body))
     }
 
-    fn handle_add_user(&self, params: &Params<'_>) -> Response<hyper::Body> {
-        let username = params.get("userName").unwrap().as_ref();
-        let encrypted_blob = params.get("blob").unwrap();
-        let client_key = params.get("clientKey").unwrap();
+    fn handle_add_user(&self, params: &Params<'_>) -> Result<Response<hyper::Body>, Error> {
+        let username_key = "userName";
+        let username = params
+            .get(username_key)
+            .ok_or(DiscoveryError::ParamsError(username_key))?
+            .as_ref();
 
-        let encrypted_blob = base64::decode(encrypted_blob.as_bytes()).unwrap();
+        let blob_key = "blob";
+        let encrypted_blob = params
+            .get(blob_key)
+            .ok_or(DiscoveryError::ParamsError(blob_key))?;
 
-        let client_key = base64::decode(client_key.as_bytes()).unwrap();
+        let clientkey_key = "clientKey";
+        let client_key = params
+            .get(clientkey_key)
+            .ok_or(DiscoveryError::ParamsError(clientkey_key))?;
+
+        let encrypted_blob = base64::decode(encrypted_blob.as_bytes())?;
+
+        let client_key = base64::decode(client_key.as_bytes())?;
         let shared_key = self.keys.shared_secret(&client_key);
 
         let iv = &encrypted_blob[0..16];
@@ -94,21 +115,21 @@ impl RequestHandler {
         let base_key = &base_key[..16];
 
         let checksum_key = {
-            let mut h =
-                Hmac::<Sha1>::new_from_slice(base_key).expect("HMAC can take key of any size");
+            let mut h = Hmac::<Sha1>::new_from_slice(base_key)
+                .map_err(|_| DiscoveryError::HmacError(base_key.to_vec()))?;
             h.update(b"checksum");
             h.finalize().into_bytes()
         };
 
         let encryption_key = {
-            let mut h =
-                Hmac::<Sha1>::new_from_slice(base_key).expect("HMAC can take key of any size");
+            let mut h = Hmac::<Sha1>::new_from_slice(base_key)
+                .map_err(|_| DiscoveryError::HmacError(base_key.to_vec()))?;
             h.update(b"encryption");
             h.finalize().into_bytes()
         };
 
-        let mut h =
-            Hmac::<Sha1>::new_from_slice(&checksum_key).expect("HMAC can take key of any size");
+        let mut h = Hmac::<Sha1>::new_from_slice(&checksum_key)
+            .map_err(|_| DiscoveryError::HmacError(base_key.to_vec()))?;
         h.update(encrypted);
         if h.verify(cksum).is_err() {
             warn!("Login error for user {:?}: MAC mismatch", username);
@@ -119,7 +140,7 @@ impl RequestHandler {
             });
 
             let body = result.to_string();
-            return Response::new(Body::from(body));
+            return Ok(Response::new(Body::from(body)));
         }
 
         let decrypted = {
@@ -129,13 +150,12 @@ impl RequestHandler {
                 GenericArray::from_slice(iv),
             );
             cipher.apply_keystream(&mut data);
-            String::from_utf8(data).unwrap()
+            data
         };
 
-        let credentials =
-            Credentials::with_blob(username.to_string(), &decrypted, &self.config.device_id);
+        let credentials = Credentials::with_blob(username, &decrypted, &self.config.device_id)?;
 
-        self.tx.send(credentials).unwrap();
+        self.tx.send(credentials)?;
 
         let result = json!({
             "status": 101,
@@ -144,7 +164,7 @@ impl RequestHandler {
         });
 
         let body = result.to_string();
-        Response::new(Body::from(body))
+        Ok(Response::new(Body::from(body)))
     }
 
     fn not_found(&self) -> Response<hyper::Body> {
@@ -153,7 +173,10 @@ impl RequestHandler {
         res
     }
 
-    async fn handle(self: Arc<Self>, request: Request<Body>) -> hyper::Result<Response<Body>> {
+    async fn handle(
+        self: Arc<Self>,
+        request: Request<Body>,
+    ) -> Result<hyper::Result<Response<Body>>, Error> {
         let mut params = Params::new();
 
         let (parts, body) = request.into_parts();
@@ -173,11 +196,11 @@ impl RequestHandler {
 
         let action = params.get("action").map(Cow::as_ref);
 
-        Ok(match (parts.method, action) {
+        Ok(Ok(match (parts.method, action) {
             (Method::GET, Some("getInfo")) => self.handle_get_info(),
-            (Method::POST, Some("addUser")) => self.handle_add_user(&params),
+            (Method::POST, Some("addUser")) => self.handle_add_user(&params)?,
             _ => self.not_found(),
-        })
+        }))
     }
 }
 
@@ -187,7 +210,7 @@ pub struct DiscoveryServer {
 }
 
 impl DiscoveryServer {
-    pub fn new(config: Config, port: &mut u16) -> hyper::Result<Self> {
+    pub fn new(config: Config, port: &mut u16) -> Result<hyper::Result<Self>, Error> {
         let (discovery, cred_rx) = RequestHandler::new(config);
         let discovery = Arc::new(discovery);
 
@@ -198,7 +221,14 @@ impl DiscoveryServer {
         let make_service = make_service_fn(move |_| {
             let discovery = discovery.clone();
             async move {
-                Ok::<_, hyper::Error>(service_fn(move |request| discovery.clone().handle(request)))
+                Ok::<_, hyper::Error>(service_fn(move |request| {
+                    discovery
+                        .clone()
+                        .handle(request)
+                        .inspect_err(|e| error!("could not handle discovery request: {}", e))
+                        .and_then(|x| async move { Ok(x) })
+                        .map(Result::unwrap) // guaranteed by `and_then` above
+                }))
             }
         });
 
@@ -210,8 +240,10 @@ impl DiscoveryServer {
         tokio::spawn(async {
             let result = server
                 .with_graceful_shutdown(async {
-                    close_rx.await.unwrap_err();
                     debug!("Shutting down discovery server");
+                    if close_rx.await.is_ok() {
+                        debug!("unable to close discovery Rx channel completely");
+                    }
                 })
                 .await;
 
@@ -220,10 +252,10 @@ impl DiscoveryServer {
             }
         });
 
-        Ok(Self {
+        Ok(Ok(Self {
             cred_rx,
             _close_tx: close_tx,
-        })
+        }))
     }
 }
 

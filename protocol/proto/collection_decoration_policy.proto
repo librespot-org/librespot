@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.proto;
+
+import "policy/artist_decoration_policy.proto";
+import "policy/album_decoration_policy.proto";
+import "policy/track_decoration_policy.proto";
+
+option optimize_for = CODE_SIZE;
+
+message CollectionArtistDecorationPolicy {
+    cosmos_util.proto.ArtistCollectionDecorationPolicy collection_policy = 1;
+    cosmos_util.proto.ArtistSyncDecorationPolicy sync_policy = 2;
+    cosmos_util.proto.ArtistDecorationPolicy artist_policy = 3;
+    bool decorated = 4;
+}
+
+message CollectionAlbumDecorationPolicy {
+    bool decorated = 1;
+    bool album_type = 2;
+    CollectionArtistDecorationPolicy artist_policy = 3;
+    CollectionArtistDecorationPolicy artists_policy = 4;
+    cosmos_util.proto.AlbumCollectionDecorationPolicy collection_policy = 5;
+    cosmos_util.proto.AlbumSyncDecorationPolicy sync_policy = 6;
+    cosmos_util.proto.AlbumDecorationPolicy album_policy = 7;
+}
+
+message CollectionTrackDecorationPolicy {
+    cosmos_util.proto.TrackCollectionDecorationPolicy collection_policy = 1;
+    cosmos_util.proto.TrackSyncDecorationPolicy sync_policy = 2;
+    cosmos_util.proto.TrackDecorationPolicy track_policy = 3;
+    cosmos_util.proto.TrackPlayedStateDecorationPolicy played_state_policy = 4;
+    CollectionAlbumDecorationPolicy album_policy = 5;
+    cosmos_util.proto.ArtistDecorationPolicy artist_policy = 6;
+    bool decorated = 7;
+}

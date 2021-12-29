@@ -1,5 +1,4 @@
-use std::io;
-use std::net::ToSocketAddrs;
+use std::{io, net::ToSocketAddrs};
 
 use tokio::net::TcpStream;
 use url::Url;

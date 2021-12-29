@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
@@ -140,6 +140,7 @@ message Show {
     repeated Availability availability = 78;
     optional string trailer_uri = 83;
     optional bool music_and_talk = 85;
+    optional bool is_audiobook = 89;
 }
 
 message Episode {
@@ -173,6 +174,8 @@ message Episode {
     }
     
     optional bool music_and_talk = 91;
+    repeated ContentRating content_rating = 95;
+    optional bool is_audiobook_chapter = 96;
 }
 
 message Licensor {

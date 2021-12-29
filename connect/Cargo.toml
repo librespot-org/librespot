@@ -1,6 +1,6 @@
 [package]
 name = "librespot-connect"
-version = "0.2.0"
+version = "0.3.1"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The discovery and Spotify Connect logic for librespot"
 license = "MIT"
@@ -15,24 +15,25 @@ protobuf = "2.14.0"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1.0", features = ["macros", "sync"] }
+thiserror = "1.0"
+tokio = { version = "1.0", features = ["macros", "parking_lot", "sync"] }
 tokio-stream = "0.1.1"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.2.0"
+version = "0.3.1"
 
 [dependencies.librespot-playback]
 path = "../playback"
-version = "0.2.0"
+version = "0.3.1"
 
 [dependencies.librespot-protocol]
 path = "../protocol"
-version = "0.2.0"
+version = "0.3.1"
 
 [dependencies.librespot-discovery]
 path = "../discovery"
-version = "0.2.0"
+version = "0.3.1"
 
 [features]
 with-dns-sd = ["librespot-discovery/with-dns-sd"]

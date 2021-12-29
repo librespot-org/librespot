@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
@@ -14,6 +14,7 @@ message UserDecorationPolicy {
     bool name = 3;
     bool image = 4;
     bool thumbnail = 5;
+    bool color = 6;
 }
 
 message CollaboratorPolicy {

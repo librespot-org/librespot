@@ -1,29 +1,41 @@
 mod maps;
 pub mod protocol;
 
-use std::iter;
-use std::pin::Pin;
-use std::sync::atomic::AtomicBool;
-use std::sync::{atomic, Arc, Mutex};
-use std::task::Poll;
-use std::time::Duration;
+use std::{
+    iter,
+    pin::Pin,
+    sync::{
+        atomic::{self, AtomicBool},
+        Arc,
+    },
+    task::Poll,
+    time::Duration,
+};
 
 use futures_core::{Future, Stream};
-use futures_util::future::join_all;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{future::join_all, SinkExt, StreamExt};
+use parking_lot::Mutex;
 use thiserror::Error;
-use tokio::select;
-use tokio::sync::mpsc::{self, UnboundedReceiver};
-use tokio::sync::Semaphore;
-use tokio::task::JoinHandle;
+use tokio::{
+    select,
+    sync::{
+        mpsc::{self, UnboundedReceiver},
+        Semaphore,
+    },
+    task::JoinHandle,
+};
 use tokio_tungstenite::tungstenite;
 use tungstenite::error::UrlError;
 use url::Url;
 
 use self::maps::*;
 use self::protocol::*;
-use crate::socket;
-use crate::util::{keep_flushing, CancelOnDrop, TimeoutOnDrop};
+
+use crate::{
+    socket,
+    util::{keep_flushing, CancelOnDrop, TimeoutOnDrop},
+    Error,
+};
 
 type WsMessage = tungstenite::Message;
 type WsError = tungstenite::Error;
@@ -164,24 +176,38 @@ fn split_uri(s: &str) -> Option<impl Iterator<Item = &'_ str>> {
 pub enum AddHandlerError {
     #[error("There is already a handler for the given uri")]
     AlreadyHandled,
-    #[error("The specified uri is invalid")]
-    InvalidUri,
+    #[error("The specified uri {0} is invalid")]
+    InvalidUri(String),
+}
+
+impl From<AddHandlerError> for Error {
+    fn from(err: AddHandlerError) -> Self {
+        match err {
+            AddHandlerError::AlreadyHandled => Error::aborted(err),
+            AddHandlerError::InvalidUri(_) => Error::invalid_argument(err),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Error)]
 pub enum SubscriptionError {
     #[error("The specified uri is invalid")]
-    InvalidUri,
+    InvalidUri(String),
+}
+
+impl From<SubscriptionError> for Error {
+    fn from(err: SubscriptionError) -> Self {
+        Error::invalid_argument(err)
+    }
 }
 
 fn add_handler(
     map: &mut HandlerMap<Box<dyn RequestHandler>>,
     uri: &str,
     handler: impl RequestHandler,
-) -> Result<(), AddHandlerError> {
-    let split = split_uri(uri).ok_or(AddHandlerError::InvalidUri)?;
+) -> Result<(), Error> {
+    let split = split_uri(uri).ok_or_else(|| AddHandlerError::InvalidUri(uri.to_string()))?;
     map.insert(split, Box::new(handler))
-        .map_err(|_| AddHandlerError::AlreadyHandled)
 }
 
 fn remove_handler<T>(map: &mut HandlerMap<T>, uri: &str) -> Option<T> {
@@ -191,11 +217,11 @@ fn remove_handler<T>(map: &mut HandlerMap<T>, uri: &str) -> Option<T> {
 fn subscribe(
     map: &mut SubscriberMap<MessageHandler>,
     uris: &[&str],
-) -> Result<Subscription, SubscriptionError> {
+) -> Result<Subscription, Error> {
     let (tx, rx) = mpsc::unbounded_channel();
 
     for &uri in uris {
-        let split = split_uri(uri).ok_or(SubscriptionError::InvalidUri)?;
+        let split = split_uri(uri).ok_or_else(|| SubscriptionError::InvalidUri(uri.to_string()))?;
         map.insert(split, tx.clone());
     }
 
@@ -237,15 +263,11 @@ impl Builder {
         Self::default()
     }
 
-    pub fn add_handler(
-        &mut self,
-        uri: &str,
-        handler: impl RequestHandler,
-    ) -> Result<(), AddHandlerError> {
+    pub fn add_handler(&mut self, uri: &str, handler: impl RequestHandler) -> Result<(), Error> {
         add_handler(&mut self.request_handlers, uri, handler)
     }
 
-    pub fn subscribe(&mut self, uris: &[&str]) -> Result<Subscription, SubscriptionError> {
+    pub fn subscribe(&mut self, uris: &[&str]) -> Result<Subscription, Error> {
         subscribe(&mut self.message_handlers, uris)
     }
 
@@ -289,7 +311,6 @@ impl DealerShared {
         if let Some(split) = split_uri(&msg.uri) {
             self.message_handlers
                 .lock()
-                .unwrap()
                 .retain(split, &mut |tx| tx.send(msg.clone()).is_ok());
         }
     }
@@ -309,7 +330,7 @@ impl DealerShared {
         };
 
         {
-            let handler_map = self.request_handlers.lock().unwrap();
+            let handler_map = self.request_handlers.lock();
 
             if let Some(handler) = handler_map.get(split) {
                 handler.handle_request(request, responder);
@@ -328,7 +349,9 @@ impl DealerShared {
     }
 
     async fn closed(&self) {
-        self.notify_drop.acquire().await.unwrap_err();
+        if self.notify_drop.acquire().await.is_ok() {
+            error!("should never have gotten a permit");
+        }
     }
 
     fn is_closed(&self) -> bool {
@@ -342,23 +365,19 @@ pub struct Dealer {
 }
 
 impl Dealer {
-    pub fn add_handler<H>(&self, uri: &str, handler: H) -> Result<(), AddHandlerError>
+    pub fn add_handler<H>(&self, uri: &str, handler: H) -> Result<(), Error>
     where
         H: RequestHandler,
     {
-        add_handler(
-            &mut self.shared.request_handlers.lock().unwrap(),
-            uri,
-            handler,
-        )
+        add_handler(&mut self.shared.request_handlers.lock(), uri, handler)
     }
 
     pub fn remove_handler(&self, uri: &str) -> Option<Box<dyn RequestHandler>> {
-        remove_handler(&mut self.shared.request_handlers.lock().unwrap(), uri)
+        remove_handler(&mut self.shared.request_handlers.lock(), uri)
     }
 
-    pub fn subscribe(&self, uris: &[&str]) -> Result<Subscription, SubscriptionError> {
-        subscribe(&mut self.shared.message_handlers.lock().unwrap(), uris)
+    pub fn subscribe(&self, uris: &[&str]) -> Result<Subscription, Error> {
+        subscribe(&mut self.shared.message_handlers.lock(), uris)
     }
 
     pub async fn close(mut self) {
@@ -367,7 +386,9 @@ impl Dealer {
         self.shared.notify_drop.close();
 
         if let Some(handle) = self.handle.take() {
-            CancelOnDrop(handle).await.unwrap();
+            if let Err(e) = CancelOnDrop(handle).await {
+                error!("error aborting dealer operations: {}", e);
+            }
         }
     }
 }
@@ -401,7 +422,7 @@ async fn connect(
 
     // Spawn a task that will forward messages from the channel to the websocket.
     let send_task = {
-        let shared = Arc::clone(&shared);
+        let shared = Arc::clone(shared);
 
         tokio::spawn(async move {
             let result = loop {
@@ -450,7 +471,7 @@ async fn connect(
         })
     };
 
-    let shared = Arc::clone(&shared);
+    let shared = Arc::clone(shared);
 
     // A task that receives messages from the web socket.
     let receive_task = tokio::spawn(async {
@@ -556,11 +577,15 @@ async fn run<F, Fut>(
                 select! {
                     () = shared.closed() => break,
                     r = t0 => {
-                        r.unwrap(); // Whatever has gone wrong (probably panicked), we can't handle it, so let's panic too.
+                        if let Err(e) = r {
+                            error!("timeout on task 0: {}", e);
+                        }
                         tasks.0.take();
                     },
                     r = t1 => {
-                        r.unwrap();
+                        if let Err(e) = r {
+                            error!("timeout on task 1: {}", e);
+                        }
                         tasks.1.take();
                     }
                 }
@@ -576,7 +601,7 @@ async fn run<F, Fut>(
                 match connect(&url, proxy.as_ref(), &shared).await {
                     Ok((s, r)) => tasks = (init_task(s), init_task(r)),
                     Err(e) => {
-                        warn!("Error while connecting: {}", e);
+                        error!("Error while connecting: {}", e);
                         tokio::time::sleep(RECONNECT_INTERVAL).await;
                     }
                 }

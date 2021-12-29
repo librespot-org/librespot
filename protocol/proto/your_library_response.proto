@@ -1,112 +1,23 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
 package spotify.your_library.proto;
 
+import "your_library_decorated_entity.proto";
+
 option optimize_for = CODE_SIZE;
 
-message YourLibraryEntityInfo {
-    string key = 1;
-    string name = 2;
-    string uri = 3;
-    string group_label = 5;
-    string image_uri = 6;
-    bool pinned = 7;
-    
-    Pinnable pinnable = 8;
-    enum Pinnable {
-        YES = 0;
-        NO_IN_FOLDER = 1;
-    }
-}
-
-message Offline {
-    enum Availability {
-        UNKNOWN = 0;
-        NO = 1;
-        YES = 2;
-        DOWNLOADING = 3;
-        WAITING = 4;
-    }
-}
-
-message YourLibraryAlbumExtraInfo {
-    string artist_name = 1;
-    Offline.Availability offline_availability = 3;
-}
-
-message YourLibraryArtistExtraInfo {
-    int32 num_tracks_in_collection = 1;
-}
-
-message YourLibraryPlaylistExtraInfo {
-    string creator_name = 1;
-    Offline.Availability offline_availability = 3;
-    bool is_loading = 5;
-}
-
-message YourLibraryShowExtraInfo {
-    string creator_name = 1;
-    Offline.Availability offline_availability = 3;
-    int64 publish_date = 4;
-    bool is_music_and_talk = 5;
-}
-
-message YourLibraryFolderExtraInfo {
-    int32 number_of_playlists = 2;
-    int32 number_of_folders = 3;
-}
-
-message YourLibraryLikedSongsExtraInfo {
-    Offline.Availability offline_availability = 2;
-    int32 number_of_songs = 3;
-}
-
-message YourLibraryYourEpisodesExtraInfo {
-    Offline.Availability offline_availability = 2;
-    int32 number_of_episodes = 3;
-}
-
-message YourLibraryNewEpisodesExtraInfo {
-    int64 publish_date = 1;
-}
-
-message YourLibraryLocalFilesExtraInfo {
-    int32 number_of_files = 1;
-}
-
-message YourLibraryResponseEntity {
-    YourLibraryEntityInfo entityInfo = 1;
-    
-    oneof entity {
-        YourLibraryAlbumExtraInfo album = 2;
-        YourLibraryArtistExtraInfo artist = 3;
-        YourLibraryPlaylistExtraInfo playlist = 4;
-        YourLibraryShowExtraInfo show = 5;
-        YourLibraryFolderExtraInfo folder = 6;
-        YourLibraryLikedSongsExtraInfo liked_songs = 8;
-        YourLibraryYourEpisodesExtraInfo your_episodes = 9;
-        YourLibraryNewEpisodesExtraInfo new_episodes = 10;
-        YourLibraryLocalFilesExtraInfo local_files = 11;
-    }
-}
-
 message YourLibraryResponseHeader {
-    bool has_albums = 1;
-    bool has_artists = 2;
-    bool has_playlists = 3;
-    bool has_shows = 4;
-    bool has_downloaded_albums = 5;
-    bool has_downloaded_artists = 6;
-    bool has_downloaded_playlists = 7;
-    bool has_downloaded_shows = 8;
     int32 remaining_entities = 9;
     bool is_loading = 12;
+    YourLibraryAvailableEntityTypes has = 13;
+    YourLibraryAvailableEntityTypes has_downloaded = 14;
+    string folder_name = 15;
 }
 
 message YourLibraryResponse {
     YourLibraryResponseHeader header = 1;
-    repeated YourLibraryResponseEntity entity = 2;
+    repeated YourLibraryDecoratedEntity entity = 2;
     string error = 99;
 }

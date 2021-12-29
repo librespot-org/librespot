@@ -1,0 +1,88 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopPerformanceIssue {
+    optional string event_type = 1;
+    optional bool is_continuation_event = 2;
+    optional double sample_time_interval_seconds = 3;
+    optional string computer_platform = 4;
+    optional double last_seen_main_thread_latency_seconds = 5;
+    optional double last_seen_core_thread_latency_seconds = 6;
+    optional double total_spotify_processes_cpu_load_percent = 7;
+    optional double main_process_cpu_load_percent = 8;
+    optional int64 mac_main_process_vm_size_bytes = 9;
+    optional int64 mac_main_process_resident_size_bytes = 10;
+    optional double mac_main_process_num_page_faults_per_second = 11;
+    optional double mac_main_process_num_pageins_per_second = 12;
+    optional double mac_main_process_num_cow_faults_per_second = 13;
+    optional double mac_main_process_num_context_switches_per_second = 14;
+    optional int64 main_process_num_total_threads = 15;
+    optional int64 main_process_num_running_threads = 16;
+    optional double renderer_process_cpu_load_percent = 17;
+    optional int64 mac_renderer_process_vm_size_bytes = 18;
+    optional int64 mac_renderer_process_resident_size_bytes = 19;
+    optional double mac_renderer_process_num_page_faults_per_second = 20;
+    optional double mac_renderer_process_num_pageins_per_second = 21;
+    optional double mac_renderer_process_num_cow_faults_per_second = 22;
+    optional double mac_renderer_process_num_context_switches_per_second = 23;
+    optional int64 renderer_process_num_total_threads = 24;
+    optional int64 renderer_process_num_running_threads = 25;
+    optional double system_total_cpu_load_percent = 26;
+    optional int64 mac_system_total_free_memory_size_bytes = 27;
+    optional int64 mac_system_total_active_memory_size_bytes = 28;
+    optional int64 mac_system_total_inactive_memory_size_bytes = 29;
+    optional int64 mac_system_total_wired_memory_size_bytes = 30;
+    optional int64 mac_system_total_compressed_memory_size_bytes = 31;
+    optional double mac_system_current_num_pageins_per_second = 32;
+    optional double mac_system_current_num_pageouts_per_second = 33;
+    optional double mac_system_current_num_page_faults_per_second = 34;
+    optional double mac_system_current_num_cow_faults_per_second = 35;
+    optional int64 system_current_num_total_processes = 36;
+    optional int64 system_current_num_total_threads = 37;
+    optional int64 computer_boot_disk_free_space_bytes = 38;
+    optional int64 application_disk_free_space_bytes = 39;
+    optional int64 application_cache_disk_free_space_bytes = 40;
+    optional bool computer_is_currently_running_on_battery_power = 41;
+    optional double computer_remaining_battery_capacity_percent = 42;
+    optional double computer_estimated_remaining_battery_time_seconds = 43;
+    optional int64 mac_computer_num_available_logical_cpu_cores_due_to_power_management = 44;
+    optional double mac_computer_current_processor_speed_percent_due_to_power_management = 45;
+    optional double mac_computer_current_cpu_time_limit_percent_due_to_power_management = 46;
+    optional double app_screen_width_points = 47;
+    optional double app_screen_height_points = 48;
+    optional double mac_app_screen_scale_factor = 49;
+    optional int64 app_screen_bits_per_pixel = 50;
+    optional bool app_screen_supports_dci_p3_color_gamut = 51;
+    optional bool app_screen_is_built_in = 52;
+    optional string app_screen_graphics_card_model = 53;
+    optional int64 app_screen_graphics_card_vram_size_bytes = 54;
+    optional double app_window_width_points = 55;
+    optional double app_window_height_points = 56;
+    optional double app_window_percentage_on_screen = 57;
+    optional double app_window_percentage_non_obscured = 58;
+    optional double system_up_time_including_sleep_seconds = 59;
+    optional double system_up_time_awake_seconds = 60;
+    optional double app_up_time_including_sleep_seconds = 61;
+    optional double computer_time_since_last_sleep_start_seconds = 62;
+    optional double computer_time_since_last_sleep_end_seconds = 63;
+    optional bool mac_system_user_session_is_currently_active = 64;
+    optional double mac_system_time_since_last_user_session_deactivation_seconds = 65;
+    optional double mac_system_time_since_last_user_session_reactivation_seconds = 66;
+    optional bool application_is_currently_active = 67;
+    optional bool application_window_is_currently_visible = 68;
+    optional bool mac_application_window_is_currently_minimized = 69;
+    optional bool application_window_is_currently_fullscreen = 70;
+    optional bool mac_application_is_currently_hidden = 71;
+    optional bool application_user_is_currently_logged_in = 72;
+    optional double application_time_since_last_user_log_in = 73;
+    optional double application_time_since_last_user_log_out = 74;
+    optional bool application_is_playing_now = 75;
+    optional string application_currently_playing_type = 76;
+    optional string application_currently_playing_uri = 77;
+    optional string application_currently_playing_ad_id = 78;
+}

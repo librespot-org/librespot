@@ -1,13 +1,15 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
 package spotify.playlist.cosmos.rootlist_request.proto;
 
 import "playlist_folder_state.proto";
+import "playlist_permission.proto";
 import "playlist_playlist_state.proto";
 import "protobuf_delta.proto";
 
+option objc_class_prefix = "SPTPlaylistCosmosRootlist";
 option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.playlist.proto";
 
@@ -18,6 +20,7 @@ message Playlist {
     optional uint32 add_time = 4;
     optional bool is_on_demand_in_free = 5;
     optional string group_label = 6;
+    optional playlist_permission.proto.Capabilities capabilities = 7;
 }
 
 message Item {

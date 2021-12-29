@@ -6,7 +6,7 @@ DRY_RUN='false'
 WORKINGDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $WORKINGDIR
 
-crates=( "protocol" "core" "audio" "metadata" "playback" "connect" "librespot" )
+crates=( "protocol" "core" "discovery" "audio" "metadata" "playback" "connect" "librespot" )
 
 function switchBranch {
   if [ "$SKIP_MERGE" = 'false' ] ; then

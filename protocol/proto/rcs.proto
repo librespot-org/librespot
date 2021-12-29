@@ -52,7 +52,7 @@ message ClientPropertySet {
     message ComponentInfo {
         string name = 3;
         
-        reserved 1, 2, "owner", "tags";
+        //reserved 1, 2, "owner", "tags";
     }
     
     string property_set_key = 7;

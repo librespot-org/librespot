@@ -1,8 +1,10 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
 package spotify.playlist4.proto;
+
+import "playlist_permission.proto";
 
 option optimize_for = CODE_SIZE;
 option java_outer_classname = "Playlist4ApiProto";
@@ -19,6 +21,8 @@ message MetaItem {
     optional int32 length = 3;
     optional int64 timestamp = 4;
     optional string owner_username = 5;
+    optional bool abuse_reporting_enabled = 6;
+    optional spotify.playlist_permission.proto.Capabilities capabilities = 7;
 }
 
 message ListItems {
@@ -187,16 +191,45 @@ message SelectedListContent {
     optional int64 timestamp = 15;
     optional string owner_username = 16;
     optional bool abuse_reporting_enabled = 17;
+    optional spotify.playlist_permission.proto.Capabilities capabilities = 18;
+    repeated GeoblockBlockingType geoblock = 19;
 }
 
 message CreateListReply {
-    required bytes uri = 1;
+    required string uri = 1;
     optional bytes revision = 2;
 }
 
-message ModifyReply {
-    required bytes uri = 1;
-    optional bytes revision = 2;
+message PlaylistV1UriRequest {
+    repeated string v2_uris = 1;
+}
+
+message PlaylistV1UriReply {
+    map<string, string> v2_uri_to_v1_uri = 1;
+}
+
+message ListUpdateRequest {
+    optional bytes base_revision = 1;
+    optional ListAttributes attributes = 2;
+    repeated Item items = 3;
+    optional ChangeInfo info = 4;
+}
+
+message RegisterPlaylistImageRequest {
+    optional string upload_token = 1;
+}
+
+message RegisterPlaylistImageResponse {
+    optional bytes picture = 1;
+}
+
+message ResolvedPersonalizedPlaylist {
+    optional string uri = 1;
+    optional string tag = 2;
+}
+
+message PlaylistUriResolverResponse {
+    repeated ResolvedPersonalizedPlaylist resolved_playlists = 1;
 }
 
 message SubscribeRequest {
@@ -212,6 +245,19 @@ message PlaylistModificationInfo {
     optional bytes new_revision = 2;
     optional bytes parent_revision = 3;
     repeated Op ops = 4;
+}
+
+message RootlistModificationInfo {
+    optional bytes new_revision = 1;
+    optional bytes parent_revision = 2;
+    repeated Op ops = 3;
+}
+
+message FollowerUpdate {
+    optional string uri = 1;
+    optional string username = 2;
+    optional bool is_following = 3;
+    optional uint64 timestamp = 4;
 }
 
 enum ListAttributeKind {
@@ -236,4 +282,11 @@ enum ItemAttributeKind {
     ITEM_PUBLIC = 10;
     ITEM_FORMAT_ATTRIBUTES = 11;
     ITEM_ID = 12;
+}
+
+enum GeoblockBlockingType {
+    GEOBLOCK_BLOCKING_TYPE_UNSPECIFIED = 0;
+    GEOBLOCK_BLOCKING_TYPE_TITLE = 1;
+    GEOBLOCK_BLOCKING_TYPE_DESCRIPTION = 2;
+    GEOBLOCK_BLOCKING_TYPE_IMAGE = 3;
 }

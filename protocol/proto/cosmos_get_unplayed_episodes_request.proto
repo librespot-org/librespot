@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
@@ -9,6 +9,7 @@ import "played_state/episode_played_state.proto";
 import "sync/episode_sync_state.proto";
 import "metadata/episode_metadata.proto";
 
+option objc_class_prefix = "SPTCollectionCosmosUnplayedEpisodes";
 option optimize_for = CODE_SIZE;
 
 message Item {

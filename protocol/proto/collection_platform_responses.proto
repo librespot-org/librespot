@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
@@ -10,8 +10,13 @@ message CollectionPlatformSimpleResponse {
     string error_msg = 1;
 }
 
+message CollectionPlatformItem {
+    string uri = 1;
+    int64 add_time = 2;
+}
+
 message CollectionPlatformItemsResponse {
-    repeated string items = 1;
+    repeated CollectionPlatformItem items = 1;
 }
 
 message CollectionPlatformContainsResponse {

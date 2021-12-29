@@ -1,57 +1,26 @@
-use std::cmp::{max, min};
-use std::io::{Seek, SeekFrom, Write};
-use std::sync::{atomic, Arc};
-use std::time::{Duration, Instant};
+use std::{
+    cmp::{max, min},
+    io::{Seek, SeekFrom, Write},
+    sync::{atomic, Arc},
+    time::{Duration, Instant},
+};
 
 use atomic::Ordering;
-use byteorder::{BigEndian, WriteBytesExt};
 use bytes::Bytes;
 use futures_util::StreamExt;
-use librespot_core::channel::{Channel, ChannelData};
-use librespot_core::packet::PacketType;
-use librespot_core::session::Session;
-use librespot_core::spotify_id::FileId;
+use hyper::StatusCode;
 use tempfile::NamedTempFile;
 use tokio::sync::{mpsc, oneshot};
 
+use librespot_core::{session::Session, Error};
+
 use crate::range_set::{Range, RangeSet};
 
-use super::{AudioFileShared, DownloadStrategy, StreamLoaderCommand};
 use super::{
-    FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME, MAX_PREFETCH_REQUESTS,
-    MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
+    AudioFileError, AudioFileResult, AudioFileShared, DownloadStrategy, StreamLoaderCommand,
+    StreamingRequest, FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME,
+    MAX_PREFETCH_REQUESTS, MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
 };
-
-pub fn request_range(session: &Session, file: FileId, offset: usize, length: usize) -> Channel {
-    assert!(
-        offset % 4 == 0,
-        "Range request start positions must be aligned by 4 bytes."
-    );
-    assert!(
-        length % 4 == 0,
-        "Range request range lengths must be aligned by 4 bytes."
-    );
-    let start = offset / 4;
-    let end = (offset + length) / 4;
-
-    let (id, channel) = session.channel().allocate();
-
-    let mut data: Vec<u8> = Vec::new();
-    data.write_u16::<BigEndian>(id).unwrap();
-    data.write_u8(0).unwrap();
-    data.write_u8(1).unwrap();
-    data.write_u16::<BigEndian>(0x0000).unwrap();
-    data.write_u32::<BigEndian>(0x00000000).unwrap();
-    data.write_u32::<BigEndian>(0x00009C40).unwrap();
-    data.write_u32::<BigEndian>(0x00020000).unwrap();
-    data.write(&file.0).unwrap();
-    data.write_u32::<BigEndian>(start as u32).unwrap();
-    data.write_u32::<BigEndian>(end as u32).unwrap();
-
-    session.send_packet(PacketType::StreamChunk, data);
-
-    channel
-}
 
 struct PartialFileData {
     offset: usize,
@@ -66,13 +35,15 @@ enum ReceivedData {
 async fn receive_data(
     shared: Arc<AudioFileShared>,
     file_data_tx: mpsc::UnboundedSender<ReceivedData>,
-    mut data_rx: ChannelData,
-    initial_data_offset: usize,
-    initial_request_length: usize,
-    request_sent_time: Instant,
-) {
-    let mut data_offset = initial_data_offset;
-    let mut request_length = initial_request_length;
+    mut request: StreamingRequest,
+) -> AudioFileResult {
+    let requested_offset = request.offset;
+    let requested_length = request.length;
+
+    let mut data_offset = requested_offset;
+    let mut request_length = requested_length;
+
+    // TODO : check Content-Length and Content-Range headers
 
     let old_number_of_request = shared
         .number_of_open_requests
@@ -80,31 +51,49 @@ async fn receive_data(
 
     let mut measure_ping_time = old_number_of_request == 0;
 
-    let result = loop {
-        let data = match data_rx.next().await {
-            Some(Ok(data)) => data,
-            Some(Err(e)) => break Err(e),
-            None => break Ok(()),
+    let result: Result<_, Error> = loop {
+        let response = match request.initial_response.take() {
+            Some(data) => data,
+            None => match request.streamer.next().await {
+                Some(Ok(response)) => response,
+                Some(Err(e)) => break Err(e.into()),
+                None => break Ok(()),
+            },
+        };
+
+        let code = response.status();
+        let body = response.into_body();
+
+        if code != StatusCode::PARTIAL_CONTENT {
+            debug!("Streamer expected partial content but got: {}", code);
+            break Err(AudioFileError::StatusCode(code).into());
+        }
+
+        let data = match hyper::body::to_bytes(body).await {
+            Ok(bytes) => bytes,
+            Err(e) => break Err(e.into()),
         };
 
         if measure_ping_time {
-            let mut duration = Instant::now() - request_sent_time;
+            let mut duration = Instant::now() - request.request_time;
             if duration > MAXIMUM_ASSUMED_PING_TIME {
                 duration = MAXIMUM_ASSUMED_PING_TIME;
             }
-            let _ = file_data_tx.send(ReceivedData::ResponseTime(duration));
+            file_data_tx.send(ReceivedData::ResponseTime(duration))?;
             measure_ping_time = false;
         }
+
         let data_size = data.len();
-        let _ = file_data_tx.send(ReceivedData::Data(PartialFileData {
+
+        file_data_tx.send(ReceivedData::Data(PartialFileData {
             offset: data_offset,
             data,
-        }));
+        }))?;
         data_offset += data_size;
         if request_length < data_size {
             warn!(
-                "Data receiver for range {} (+{}) received more data from server than requested.",
-                initial_data_offset, initial_request_length
+                "Data receiver for range {} (+{}) received more data from server than requested ({} instead of {}).",
+                requested_offset, requested_length, data_size, request_length
             );
             request_length = 0;
         } else {
@@ -116,28 +105,38 @@ async fn receive_data(
         }
     };
 
-    if request_length > 0 {
-        let missing_range = Range::new(data_offset, request_length);
+    drop(request.streamer);
 
-        let mut download_status = shared.download_status.lock().unwrap();
-        download_status.requested.subtract_range(&missing_range);
-        shared.cond.notify_all();
+    if request_length > 0 {
+        {
+            let missing_range = Range::new(data_offset, request_length);
+            let mut download_status = shared.download_status.lock();
+            download_status.requested.subtract_range(&missing_range);
+            shared.cond.notify_all();
+        }
     }
 
     shared
         .number_of_open_requests
         .fetch_sub(1, Ordering::SeqCst);
 
-    if result.is_err() {
-        warn!(
-            "Error from channel for data receiver for range {} (+{}).",
-            initial_data_offset, initial_request_length
-        );
-    } else if request_length > 0 {
-        warn!(
-            "Data receiver for range {} (+{}) received less data from server than requested.",
-            initial_data_offset, initial_request_length
-        );
+    match result {
+        Ok(()) => {
+            if request_length > 0 {
+                warn!(
+                    "Streamer for range {} (+{}) received less data from server than requested.",
+                    requested_offset, requested_length
+                );
+            }
+            Ok(())
+        }
+        Err(e) => {
+            error!(
+                "Error from streamer for range {} (+{}): {:?}",
+                requested_offset, requested_length, e
+            );
+            Err(e)
+        }
     }
 }
 
@@ -160,67 +159,63 @@ enum ControlFlow {
 
 impl AudioFileFetch {
     fn get_download_strategy(&mut self) -> DownloadStrategy {
-        *(self.shared.download_strategy.lock().unwrap())
+        *(self.shared.download_strategy.lock())
     }
 
-    fn download_range(&mut self, mut offset: usize, mut length: usize) {
+    fn download_range(&mut self, offset: usize, mut length: usize) -> AudioFileResult {
         if length < MINIMUM_DOWNLOAD_SIZE {
             length = MINIMUM_DOWNLOAD_SIZE;
-        }
-
-        // ensure the values are within the bounds and align them by 4 for the spotify protocol.
-        if offset >= self.shared.file_size {
-            return;
-        }
-
-        if length == 0 {
-            return;
         }
 
         if offset + length > self.shared.file_size {
             length = self.shared.file_size - offset;
         }
 
-        if offset % 4 != 0 {
-            length += offset % 4;
-            offset -= offset % 4;
-        }
-
-        if length % 4 != 0 {
-            length += 4 - (length % 4);
-        }
-
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length));
 
-        let mut download_status = self.shared.download_status.lock().unwrap();
+        // The iteration that follows spawns streamers fast, without awaiting them,
+        // so holding the lock for the entire scope of this function should be faster
+        // then locking and unlocking multiple times.
+        let mut download_status = self.shared.download_status.lock();
 
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
 
+        // TODO : refresh cdn_url when the token expired
+
         for range in ranges_to_request.iter() {
-            let (_headers, data) = request_range(
-                &self.session,
-                self.shared.file_id,
+            let streamer = self.session.spclient().stream_from_cdn(
+                &self.shared.cdn_url,
                 range.start,
                 range.length,
-            )
-            .split();
+            )?;
 
             download_status.requested.add_range(range);
+
+            let streaming_request = StreamingRequest {
+                streamer,
+                initial_response: None,
+                offset: range.start,
+                length: range.length,
+                request_time: Instant::now(),
+            };
 
             self.session.spawn(receive_data(
                 self.shared.clone(),
                 self.file_data_tx.clone(),
-                data,
-                range.start,
-                range.length,
-                Instant::now(),
+                streaming_request,
             ));
         }
+
+        Ok(())
     }
 
-    fn pre_fetch_more_data(&mut self, bytes: usize, max_requests_to_send: usize) {
+    fn pre_fetch_more_data(
+        &mut self,
+        bytes: usize,
+        max_requests_to_send: usize,
+    ) -> AudioFileResult {
         let mut bytes_to_go = bytes;
         let mut requests_to_go = max_requests_to_send;
 
@@ -229,7 +224,7 @@ impl AudioFileFetch {
             let mut missing_data = RangeSet::new();
             missing_data.add_range(&Range::new(0, self.shared.file_size));
             {
-                let download_status = self.shared.download_status.lock().unwrap();
+                let download_status = self.shared.download_status.lock();
                 missing_data.subtract_range_set(&download_status.downloaded);
                 missing_data.subtract_range_set(&download_status.requested);
             }
@@ -247,7 +242,7 @@ impl AudioFileFetch {
                 let range = tail_end.get_range(0);
                 let offset = range.start;
                 let length = min(range.length, bytes_to_go);
-                self.download_range(offset, length);
+                self.download_range(offset, length)?;
                 requests_to_go -= 1;
                 bytes_to_go -= length;
             } else if !missing_data.is_empty() {
@@ -255,19 +250,21 @@ impl AudioFileFetch {
                 let range = missing_data.get_range(0);
                 let offset = range.start;
                 let length = min(range.length, bytes_to_go);
-                self.download_range(offset, length);
+                self.download_range(offset, length)?;
                 requests_to_go -= 1;
                 bytes_to_go -= length;
             } else {
-                return;
+                break;
             }
         }
+
+        Ok(())
     }
 
-    fn handle_file_data(&mut self, data: ReceivedData) -> ControlFlow {
+    fn handle_file_data(&mut self, data: ReceivedData) -> Result<ControlFlow, Error> {
         match data {
             ReceivedData::ResponseTime(response_time) => {
-                trace!("Ping time estimated as: {}ms", response_time.as_millis());
+                let old_ping_time_ms = self.shared.ping_time_ms.load(Ordering::Relaxed);
 
                 // prune old response times. Keep at most two so we can push a third.
                 while self.network_response_times.len() >= 3 {
@@ -278,109 +275,129 @@ impl AudioFileFetch {
                 self.network_response_times.push(response_time);
 
                 // stats::median is experimental. So we calculate the median of up to three ourselves.
-                let ping_time = match self.network_response_times.len() {
-                    1 => self.network_response_times[0],
-                    2 => (self.network_response_times[0] + self.network_response_times[1]) / 2,
-                    3 => {
-                        let mut times = self.network_response_times.clone();
-                        times.sort_unstable();
-                        times[1]
-                    }
-                    _ => unreachable!(),
+                let ping_time_ms = {
+                    let response_time = match self.network_response_times.len() {
+                        1 => self.network_response_times[0],
+                        2 => (self.network_response_times[0] + self.network_response_times[1]) / 2,
+                        3 => {
+                            let mut times = self.network_response_times.clone();
+                            times.sort_unstable();
+                            times[1]
+                        }
+                        _ => unreachable!(),
+                    };
+                    response_time.as_millis() as usize
                 };
+
+                // print when the new estimate deviates by more than 10% from the last
+                if f32::abs(
+                    (ping_time_ms as f32 - old_ping_time_ms as f32) / old_ping_time_ms as f32,
+                ) > 0.1
+                {
+                    debug!("Ping time now estimated as: {} ms", ping_time_ms);
+                }
 
                 // store our new estimate for everyone to see
                 self.shared
                     .ping_time_ms
-                    .store(ping_time.as_millis() as usize, Ordering::Relaxed);
+                    .store(ping_time_ms, Ordering::Relaxed);
             }
             ReceivedData::Data(data) => {
-                self.output
-                    .as_mut()
-                    .unwrap()
-                    .seek(SeekFrom::Start(data.offset as u64))
-                    .unwrap();
-                self.output
-                    .as_mut()
-                    .unwrap()
-                    .write_all(data.data.as_ref())
-                    .unwrap();
-
-                let mut download_status = self.shared.download_status.lock().unwrap();
+                match self.output.as_mut() {
+                    Some(output) => {
+                        output.seek(SeekFrom::Start(data.offset as u64))?;
+                        output.write_all(data.data.as_ref())?;
+                    }
+                    None => return Err(AudioFileError::Output.into()),
+                }
 
                 let received_range = Range::new(data.offset, data.data.len());
-                download_status.downloaded.add_range(&received_range);
-                self.shared.cond.notify_all();
 
-                let full = download_status.downloaded.contained_length_from_value(0)
-                    >= self.shared.file_size;
+                let full = {
+                    let mut download_status = self.shared.download_status.lock();
+                    download_status.downloaded.add_range(&received_range);
+                    self.shared.cond.notify_all();
 
-                drop(download_status);
+                    download_status.downloaded.contained_length_from_value(0)
+                        >= self.shared.file_size
+                };
 
                 if full {
-                    self.finish();
-                    return ControlFlow::Break;
+                    self.finish()?;
+                    return Ok(ControlFlow::Break);
                 }
             }
         }
-        ControlFlow::Continue
+
+        Ok(ControlFlow::Continue)
     }
 
-    fn handle_stream_loader_command(&mut self, cmd: StreamLoaderCommand) -> ControlFlow {
+    fn handle_stream_loader_command(
+        &mut self,
+        cmd: StreamLoaderCommand,
+    ) -> Result<ControlFlow, Error> {
         match cmd {
             StreamLoaderCommand::Fetch(request) => {
-                self.download_range(request.start, request.length);
+                self.download_range(request.start, request.length)?;
             }
             StreamLoaderCommand::RandomAccessMode() => {
-                *(self.shared.download_strategy.lock().unwrap()) = DownloadStrategy::RandomAccess();
+                *(self.shared.download_strategy.lock()) = DownloadStrategy::RandomAccess();
             }
             StreamLoaderCommand::StreamMode() => {
-                *(self.shared.download_strategy.lock().unwrap()) = DownloadStrategy::Streaming();
+                *(self.shared.download_strategy.lock()) = DownloadStrategy::Streaming();
             }
-            StreamLoaderCommand::Close() => return ControlFlow::Break,
+            StreamLoaderCommand::Close() => return Ok(ControlFlow::Break),
         }
-        ControlFlow::Continue
+
+        Ok(ControlFlow::Continue)
     }
 
-    fn finish(&mut self) {
-        let mut output = self.output.take().unwrap();
-        let complete_tx = self.complete_tx.take().unwrap();
+    fn finish(&mut self) -> AudioFileResult {
+        let output = self.output.take();
 
-        output.seek(SeekFrom::Start(0)).unwrap();
-        let _ = complete_tx.send(output);
+        let complete_tx = self.complete_tx.take();
+
+        if let Some(mut output) = output {
+            output.seek(SeekFrom::Start(0))?;
+            if let Some(complete_tx) = complete_tx {
+                complete_tx
+                    .send(output)
+                    .map_err(|_| AudioFileError::Channel)?;
+            }
+        }
+
+        Ok(())
     }
 }
 
 pub(super) async fn audio_file_fetch(
     session: Session,
     shared: Arc<AudioFileShared>,
-    initial_data_rx: ChannelData,
-    initial_request_sent_time: Instant,
-    initial_data_length: usize,
-
+    initial_request: StreamingRequest,
     output: NamedTempFile,
     mut stream_loader_command_rx: mpsc::UnboundedReceiver<StreamLoaderCommand>,
     complete_tx: oneshot::Sender<NamedTempFile>,
-) {
+) -> AudioFileResult {
     let (file_data_tx, mut file_data_rx) = mpsc::unbounded_channel();
 
     {
-        let requested_range = Range::new(0, initial_data_length);
-        let mut download_status = shared.download_status.lock().unwrap();
+        let requested_range = Range::new(
+            initial_request.offset,
+            initial_request.offset + initial_request.length,
+        );
+
+        let mut download_status = shared.download_status.lock();
         download_status.requested.add_range(&requested_range);
     }
 
     session.spawn(receive_data(
         shared.clone(),
         file_data_tx.clone(),
-        initial_data_rx,
-        0,
-        initial_data_length,
-        initial_request_sent_time,
+        initial_request,
     ));
 
     let mut fetch = AudioFileFetch {
-        session,
+        session: session.clone(),
         shared,
         output: Some(output),
 
@@ -392,13 +409,23 @@ pub(super) async fn audio_file_fetch(
     loop {
         tokio::select! {
             cmd = stream_loader_command_rx.recv() => {
-                if cmd.map_or(true, |cmd| fetch.handle_stream_loader_command(cmd) == ControlFlow::Break) {
-                    break;
+                match cmd {
+                        Some(cmd) => {
+                            if fetch.handle_stream_loader_command(cmd)? == ControlFlow::Break {
+                                break;
+                            }
+                        }
+                        None => break,
+                    }
                 }
-            },
-            data = file_data_rx.recv() => {
-                if data.map_or(true, |data| fetch.handle_file_data(data) == ControlFlow::Break) {
-                    break;
+                data = file_data_rx.recv() => {
+                match data {
+                    Some(data) => {
+                        if fetch.handle_file_data(data)? == ControlFlow::Break {
+                            break;
+                        }
+                    }
+                    None => break,
                 }
             }
         }
@@ -410,7 +437,8 @@ pub(super) async fn audio_file_fetch(
                 let max_requests_to_send = MAX_PREFETCH_REQUESTS - number_of_open_requests;
 
                 let bytes_pending: usize = {
-                    let download_status = fetch.shared.download_status.lock().unwrap();
+                    let download_status = fetch.shared.download_status.lock();
+
                     download_status
                         .requested
                         .minus(&download_status.downloaded)
@@ -425,7 +453,7 @@ pub(super) async fn audio_file_fetch(
                 let desired_pending_bytes = max(
                     (PREFETCH_THRESHOLD_FACTOR
                         * ping_time_seconds
-                        * fetch.shared.stream_data_rate as f32) as usize,
+                        * fetch.shared.bytes_per_second as f32) as usize,
                     (FAST_PREFETCH_THRESHOLD_FACTOR * ping_time_seconds * download_rate as f32)
                         as usize,
                 );
@@ -434,9 +462,11 @@ pub(super) async fn audio_file_fetch(
                     fetch.pre_fetch_more_data(
                         desired_pending_bytes - bytes_pending,
                         max_requests_to_send,
-                    );
+                    )?;
                 }
             }
         }
     }
+
+    Ok(())
 }

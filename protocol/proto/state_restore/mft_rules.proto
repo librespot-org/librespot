@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "state_restore/context_player_rules_base.proto";
+
+option optimize_for = CODE_SIZE;
+
+message PlayEvents {
+    required int32 max_consecutive = 1;
+    required int32 max_occurrences_in_period = 2;
+    required int64 period = 3;
+}
+
+message SkipEvents {
+    required int32 max_occurrences_in_period = 1;
+    required int64 period = 2;
+}
+
+message Context {
+    required int32 min_tracks = 1;
+}
+
+message MftConfiguration {
+    optional PlayEvents track = 1;
+    optional PlayEvents album = 2;
+    optional PlayEvents artist = 3;
+    optional SkipEvents skip = 4;
+    optional Context context = 5;
+}
+
+message MftRules {
+    required bool locked = 1;
+    optional MftConfiguration config = 2;
+    map<string, ContextPlayerRulesBase> forward_rules = 3;
+}

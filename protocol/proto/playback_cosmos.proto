@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
@@ -60,11 +60,12 @@ message InfoResponse {
     float gain_adjustment = 13;
     bool has_loudness = 14;
     float loudness = 15;
-    string file_origin = 16;
     string strategy = 17;
     int32 target_bitrate = 18;
     int32 advised_bitrate = 19;
     bool target_file_available = 20;
+    
+    reserved 16;
 }
 
 message FormatsResponse {

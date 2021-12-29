@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "context_track.proto";
+import "state_restore/random_source.proto";
+
+option optimize_for = CODE_SIZE;
+
+message MftRandomTrackInjection {
+    required RandomSource random_source = 1;
+    required int32 offset = 2;
+}
+
+message MftRulesInjectFillerTracks {
+    repeated ContextTrack fallback_tracks = 1;
+    required MftRandomTrackInjection padding_track_injection = 2;
+    required RandomSource random_source = 3;
+    required bool filter_explicit_content = 4;
+    repeated string feature_classes = 5;
+}

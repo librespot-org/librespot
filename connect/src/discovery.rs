@@ -1,10 +1,11 @@
-use std::io;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use futures_util::Stream;
-use librespot_core::authentication::Credentials;
-use librespot_core::config::ConnectConfig;
+use librespot_core::{authentication::Credentials, config::ConnectConfig};
 
 pub struct DiscoveryStream(librespot_discovery::Discovery);
 

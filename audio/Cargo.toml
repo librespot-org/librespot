@@ -1,20 +1,25 @@
 [package]
 name = "librespot-audio"
-version = "0.2.0"
+version = "0.3.1"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description="The audio fetching and processing logic for librespot"
-license="MIT"
+license = "MIT"
 edition = "2018"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.2.0"
+version = "0.3.1"
 
 [dependencies]
 aes-ctr = "0.6"
 byteorder = "1.4"
 bytes = "1.0"
-log = "0.4"
+futures-core = { version = "0.3", default-features = false }
+futures-executor = "0.3"
 futures-util = { version = "0.3", default_features = false }
+hyper = { version = "0.14", features = ["client"] }
+log = "0.4"
+parking_lot = { version = "0.11", features = ["deadlock_detection"] }
 tempfile = "3.1"
-tokio = { version = "1", features = ["sync", "macros"] }
+thiserror = "1.0"
+tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }

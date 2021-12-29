@@ -1,16 +1,28 @@
+use std::{env::consts::ARCH, io};
+
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use hmac::{Hmac, Mac, NewMac};
 use protobuf::{self, Message};
 use rand::{thread_rng, RngCore};
 use sha1::Sha1;
-use std::io;
+use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::{Decoder, Framed};
 
 use super::codec::ApCodec;
-use crate::diffie_hellman::DhLocalKeys;
+
+use crate::{diffie_hellman::DhLocalKeys, version};
+
 use crate::protocol;
-use crate::protocol::keyexchange::{APResponseMessage, ClientHello, ClientResponsePlaintext};
+use crate::protocol::keyexchange::{
+    APResponseMessage, ClientHello, ClientResponsePlaintext, Platform, ProductFlags,
+};
+
+#[derive(Debug, Error)]
+pub enum HandshakeError {
+    #[error("invalid key length")]
+    InvalidLength,
+}
 
 pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     mut connection: T,
@@ -27,7 +39,7 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
         .to_owned();
 
     let shared_secret = local_keys.shared_secret(&remote_key);
-    let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator);
+    let (challenge, send_key, recv_key) = compute_keys(&shared_secret, &accumulator)?;
     let codec = ApCodec::new(&send_key, &recv_key);
 
     client_response(&mut connection, challenge).await?;
@@ -42,14 +54,56 @@ where
     let mut client_nonce = vec![0; 0x10];
     thread_rng().fill_bytes(&mut client_nonce);
 
+    let platform = match std::env::consts::OS {
+        "android" => Platform::PLATFORM_ANDROID_ARM,
+        "freebsd" | "netbsd" | "openbsd" => match ARCH {
+            "x86_64" => Platform::PLATFORM_FREEBSD_X86_64,
+            _ => Platform::PLATFORM_FREEBSD_X86,
+        },
+        "ios" => match ARCH {
+            "arm64" => Platform::PLATFORM_IPHONE_ARM64,
+            _ => Platform::PLATFORM_IPHONE_ARM,
+        },
+        "linux" => match ARCH {
+            "arm" | "arm64" => Platform::PLATFORM_LINUX_ARM,
+            "blackfin" => Platform::PLATFORM_LINUX_BLACKFIN,
+            "mips" => Platform::PLATFORM_LINUX_MIPS,
+            "sh" => Platform::PLATFORM_LINUX_SH,
+            "x86_64" => Platform::PLATFORM_LINUX_X86_64,
+            _ => Platform::PLATFORM_LINUX_X86,
+        },
+        "macos" => match ARCH {
+            "ppc" | "ppc64" => Platform::PLATFORM_OSX_PPC,
+            "x86_64" => Platform::PLATFORM_OSX_X86_64,
+            _ => Platform::PLATFORM_OSX_X86,
+        },
+        "windows" => match ARCH {
+            "arm" => Platform::PLATFORM_WINDOWS_CE_ARM,
+            "x86_64" => Platform::PLATFORM_WIN32_X86_64,
+            _ => Platform::PLATFORM_WIN32_X86,
+        },
+        _ => Platform::PLATFORM_LINUX_X86,
+    };
+
+    #[cfg(debug_assertions)]
+    const PRODUCT_FLAGS: ProductFlags = ProductFlags::PRODUCT_FLAG_DEV_BUILD;
+    #[cfg(not(debug_assertions))]
+    const PRODUCT_FLAGS: ProductFlags = ProductFlags::PRODUCT_FLAG_NONE;
+
     let mut packet = ClientHello::new();
     packet
         .mut_build_info()
-        .set_product(protocol::keyexchange::Product::PRODUCT_PARTNER);
+        // ProductInfo won't push autoplay and perhaps other settings
+        // when set to anything else than PRODUCT_CLIENT
+        .set_product(protocol::keyexchange::Product::PRODUCT_CLIENT);
     packet
         .mut_build_info()
-        .set_platform(protocol::keyexchange::Platform::PLATFORM_LINUX_X86);
-    packet.mut_build_info().set_version(109800078);
+        .mut_product_flags()
+        .push(PRODUCT_FLAGS);
+    packet.mut_build_info().set_platform(platform);
+    packet
+        .mut_build_info()
+        .set_version(version::SPOTIFY_VERSION);
     packet
         .mut_cryptosuites_supported()
         .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON);
@@ -66,8 +120,8 @@ where
 
     let mut buffer = vec![0, 4];
     let size = 2 + 4 + packet.compute_size();
-    <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size).unwrap();
-    packet.write_to_vec(&mut buffer).unwrap();
+    <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size)?;
+    packet.write_to_vec(&mut buffer)?;
 
     connection.write_all(&buffer[..]).await?;
     Ok(buffer)
@@ -87,8 +141,8 @@ where
 
     let mut buffer = vec![];
     let size = 4 + packet.compute_size();
-    <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size).unwrap();
-    packet.write_to_vec(&mut buffer).unwrap();
+    <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size)?;
+    packet.write_to_vec(&mut buffer)?;
 
     connection.write_all(&buffer[..]).await?;
     Ok(())
@@ -102,7 +156,7 @@ where
     let header = read_into_accumulator(connection, 4, acc).await?;
     let size = BigEndian::read_u32(header) as usize;
     let data = read_into_accumulator(connection, size - 4, acc).await?;
-    let message = M::parse_from_bytes(data).unwrap();
+    let message = M::parse_from_bytes(data)?;
     Ok(message)
 }
 
@@ -118,24 +172,26 @@ async fn read_into_accumulator<'a, 'b, T: AsyncRead + Unpin>(
     Ok(&mut acc[offset..])
 }
 
-fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+fn compute_keys(shared_secret: &[u8], packets: &[u8]) -> io::Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
     type HmacSha1 = Hmac<Sha1>;
 
     let mut data = Vec::with_capacity(0x64);
     for i in 1..6 {
-        let mut mac =
-            HmacSha1::new_from_slice(&shared_secret).expect("HMAC can take key of any size");
+        let mut mac = HmacSha1::new_from_slice(shared_secret).map_err(|_| {
+            io::Error::new(io::ErrorKind::InvalidData, HandshakeError::InvalidLength)
+        })?;
         mac.update(packets);
         mac.update(&[i]);
         data.extend_from_slice(&mac.finalize().into_bytes());
     }
 
-    let mut mac = HmacSha1::new_from_slice(&data[..0x14]).expect("HMAC can take key of any size");
+    let mut mac = HmacSha1::new_from_slice(&data[..0x14])
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, HandshakeError::InvalidLength))?;
     mac.update(packets);
 
-    (
+    Ok((
         mac.finalize().into_bytes().to_vec(),
         data[0x14..0x34].to_vec(),
         data[0x34..0x54].to_vec(),
-    )
+    ))
 }

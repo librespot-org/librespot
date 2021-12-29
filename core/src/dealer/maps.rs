@@ -1,7 +1,20 @@
 use std::collections::HashMap;
 
-#[derive(Debug)]
-pub struct AlreadyHandledError(());
+use thiserror::Error;
+
+use crate::Error;
+
+#[derive(Debug, Error)]
+pub enum HandlerMapError {
+    #[error("request was already handled")]
+    AlreadyHandled,
+}
+
+impl From<HandlerMapError> for Error {
+    fn from(err: HandlerMapError) -> Self {
+        Error::aborted(err)
+    }
+}
 
 pub enum HandlerMap<T> {
     Leaf(T),
@@ -19,9 +32,9 @@ impl<T> HandlerMap<T> {
         &mut self,
         mut path: impl Iterator<Item = &'a str>,
         handler: T,
-    ) -> Result<(), AlreadyHandledError> {
+    ) -> Result<(), Error> {
         match self {
-            Self::Leaf(_) => Err(AlreadyHandledError(())),
+            Self::Leaf(_) => Err(HandlerMapError::AlreadyHandled.into()),
             Self::Branch(children) => {
                 if let Some(component) = path.next() {
                     let node = children.entry(component.to_owned()).or_default();
@@ -30,7 +43,7 @@ impl<T> HandlerMap<T> {
                     *self = Self::Leaf(handler);
                     Ok(())
                 } else {
-                    Err(AlreadyHandledError(()))
+                    Err(HandlerMapError::AlreadyHandled.into())
                 }
             }
         }

@@ -17,7 +17,7 @@ message ResolveRequest {
         BackendContext backend_context = 12 [deprecated = true];
     }
     
-    reserved 4, 5, "custom_context", "projection";
+    //reserved 4, 5, "custom_context", "projection";
 }
 
 message ResolveResponse {

@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.ratings;
+
+import "google/protobuf/timestamp.proto";
+
+option objc_class_prefix = "SPT";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "RatingsMetadataProto";
+option java_package = "com.spotify.podcastcreatorinteractivity.v1";
+
+message Rating {
+    string user_id = 1;
+    string show_uri = 2;
+    int32 rating = 3;
+    google.protobuf.Timestamp rated_at = 4;
+}
+
+message AverageRating {
+    double average = 1;
+    int64 total_ratings = 2;
+    bool show_average = 3;
+}
+
+message PodcastRating {
+    AverageRating average_rating = 1;
+    Rating rating = 2;
+    bool can_rate = 3;
+}

@@ -1,4 +1,4 @@
-use super::{Open, Sink};
+use super::{Open, Sink, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -6,7 +6,6 @@ use crate::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
-use std::io;
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 pub struct JackSink {
@@ -25,15 +24,12 @@ pub struct JackData {
 impl ProcessHandler for JackData {
     fn process(&mut self, _: &Client, ps: &ProcessScope) -> Control {
         // get output port buffers
-        let mut out_r = self.port_r.as_mut_slice(ps);
-        let mut out_l = self.port_l.as_mut_slice(ps);
-        let buf_r: &mut [f32] = &mut out_r;
-        let buf_l: &mut [f32] = &mut out_l;
+        let buf_r: &mut [f32] = self.port_r.as_mut_slice(ps);
+        let buf_l: &mut [f32] = self.port_l.as_mut_slice(ps);
         // get queue iterator
         let mut queue_iter = self.rec.try_iter();
 
-        let buf_size = buf_r.len();
-        for i in 0..buf_size {
+        for i in 0..buf_r.len() {
             buf_r[i] = queue_iter.next().unwrap_or(0.0);
             buf_l[i] = queue_iter.next().unwrap_or(0.0);
         }
@@ -70,8 +66,12 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> io::Result<()> {
-        let samples_f32: &[f32] = &converter.f64_to_f32(packet.samples());
+    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
+        let samples = packet
+            .samples()
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+
+        let samples_f32: &[f32] = &converter.f64_to_f32(samples);
         for sample in samples_f32.iter() {
             let res = self.send.send(*sample);
             if res.is_err() {

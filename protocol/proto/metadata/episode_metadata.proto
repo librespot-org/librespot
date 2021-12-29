@@ -1,9 +1,10 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
 package spotify.cosmos_util.proto;
 
+import "metadata/extension.proto";
 import "metadata/image_group.proto";
 import "podcast_segments.proto";
 import "podcast_subscription.proto";
@@ -56,4 +57,7 @@ message EpisodeMetadata {
     optional bool is_music_and_talk = 19;
     optional podcast_segments.PodcastSegments podcast_segments = 20;
     optional podcast_paywalls.PodcastSubscription podcast_subscription = 21;
+    repeated Extension extension = 22;
+    optional bool is_19_plus_only = 23;
+    optional bool is_book_chapter = 24;
 }

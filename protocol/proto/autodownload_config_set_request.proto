@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.autodownload_esperanto.proto;
+
+import "autodownload_config_common.proto";
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "spotify.autodownload.esperanto.proto";
+
+message AutoDownloadSetRequest {
+    oneof config {
+        AutoDownloadGlobalConfig global = 1;
+        AutoDownloadShowConfig show = 2;
+    }
+}
+
+message AutoDownloadSetResponse {
+    string error = 99;
+}

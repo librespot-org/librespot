@@ -1,0 +1,44 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.canvaz.cache;
+
+import "canvaz-meta.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.canvazcache.proto";
+
+message Artist {
+    string uri = 1;
+    string name = 2;
+    string avatar = 3;
+}
+
+message EntityCanvazResponse {
+    repeated Canvaz canvases = 1;
+    message Canvaz {
+        string id = 1;
+        string url = 2;
+        string file_id = 3;
+        spotify.canvaz.Type type = 4;
+        string entity_uri = 5;
+        Artist artist = 6;
+        bool explicit = 7;
+        string uploaded_by = 8;
+        string etag = 9;
+        string canvas_uri = 11;
+        string storylines_id = 12;
+    }
+    
+    int64 ttl_in_seconds = 2;
+}
+
+message EntityCanvazRequest {
+    repeated Entity entities = 1;
+    message Entity {
+        string entity_uri = 1;
+        string etag = 2;
+    }
+}

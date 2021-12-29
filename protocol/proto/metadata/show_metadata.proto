@@ -1,9 +1,10 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto2";
 
 package spotify.cosmos_util.proto;
 
+import "metadata/extension.proto";
 import "metadata/image_group.proto";
 
 option java_multiple_files = true;
@@ -25,4 +26,6 @@ message ShowMetadata {
     repeated string copyright = 12;
     optional string trailer_uri = 13;
     optional bool is_music_and_talk = 14;
+    repeated Extension extension = 15;
+    optional bool is_book = 16;
 }

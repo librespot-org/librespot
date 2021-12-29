@@ -1,4 +1,4 @@
-use super::{Open, Sink, SinkAsBytes};
+use super::{Open, Sink, SinkAsBytes, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
@@ -11,7 +11,7 @@ use gst::prelude::*;
 use zerocopy::AsBytes;
 
 use std::sync::mpsc::{sync_channel, SyncSender};
-use std::{io, thread};
+use std::thread;
 
 #[allow(dead_code)]
 pub struct GstreamerSink {
@@ -131,7 +131,7 @@ impl Sink for GstreamerSink {
 }
 
 impl SinkAsBytes for GstreamerSink {
-    fn write_bytes(&mut self, data: &[u8]) -> io::Result<()> {
+    fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         // Copy expensively (in to_vec()) to avoid thread synchronization
         self.tx
             .send(data.to_vec())

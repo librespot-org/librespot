@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+option optimize_for = CODE_SIZE;
+
+message Strings {
+    repeated string strings = 1;
+}
+
+message RemoveBannedTracksRules {
+    repeated string banned_tracks = 1;
+    repeated string banned_albums = 2;
+    repeated string banned_artists = 3;
+    map<string, Strings> banned_context_tracks = 4;
+}

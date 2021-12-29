@@ -1,15 +1,9 @@
 use futures::StreamExt;
 use librespot_discovery::DeviceType;
 use sha1::{Digest, Sha1};
-use simple_logger::SimpleLogger;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    SimpleLogger::new()
-        .with_level(log::LevelFilter::Debug)
-        .init()
-        .unwrap();
-
     let name = "Librespot";
     let device_id = hex::encode(Sha1::digest(name.as_bytes()));
 

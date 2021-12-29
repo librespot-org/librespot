@@ -1,8 +1,10 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.1.73.517 (macOS)
 
 syntax = "proto3";
 
 package spotify.cosmos_util.proto;
+
+import "extension_kind.proto";
 
 option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
@@ -24,6 +26,8 @@ message ShowDecorationPolicy {
     bool trailer_uri = 13;
     bool is_music_and_talk = 14;
     bool access_info = 15;
+    repeated extendedmetadata.ExtensionKind extension = 16;
+    bool is_book = 17;
 }
 
 message ShowPlayedStateDecorationPolicy {

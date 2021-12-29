@@ -1,50 +1,63 @@
+use std::{
+    env,
+    fs::create_dir_all,
+    ops::RangeInclusive,
+    path::{Path, PathBuf},
+    pin::Pin,
+    process::exit,
+    str::FromStr,
+    time::{Duration, Instant},
+};
+
 use futures_util::{future, FutureExt, StreamExt};
 use librespot_playback::player::PlayerEvent;
-use log::{error, info, warn};
+use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
-use librespot::connect::spirc::Spirc;
-use librespot::core::authentication::Credentials;
-use librespot::core::cache::Cache;
-use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig};
-use librespot::core::session::Session;
-use librespot::core::version;
-use librespot::playback::audio_backend::{self, SinkBuilder, BACKENDS};
-use librespot::playback::config::{
-    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
+use librespot::{
+    connect::spirc::Spirc,
+    core::{
+        authentication::Credentials,
+        cache::Cache,
+        config::{ConnectConfig, DeviceType},
+        version, Session, SessionConfig,
+    },
+    playback::{
+        audio_backend::{self, SinkBuilder, BACKENDS},
+        config::{
+            AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
+        },
+        dither,
+        mixer::{self, MixerConfig, MixerFn},
+        player::{db_to_ratio, ratio_to_db, Player},
+    },
 };
-use librespot::playback::dither;
+
 #[cfg(feature = "alsa-backend")]
 use librespot::playback::mixer::alsamixer::AlsaMixer;
-use librespot::playback::mixer::mappings::MappedCtrl;
-use librespot::playback::mixer::{self, MixerConfig, MixerFn};
-use librespot::playback::player::{db_to_ratio, Player};
 
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
-
-use std::env;
-use std::io::{stderr, Write};
-use std::path::Path;
-use std::pin::Pin;
-use std::process::exit;
-use std::str::FromStr;
-use std::time::Duration;
-use std::time::Instant;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
 }
 
 fn usage(program: &str, opts: &getopts::Options) -> String {
-    let brief = format!("Usage: {} [options]", program);
+    let repo_home = env!("CARGO_PKG_REPOSITORY");
+    let desc = env!("CARGO_PKG_DESCRIPTION");
+    let version = get_version_string();
+    let brief = format!(
+        "{}\n\n{}\n\n{}\n\nUsage: {} [<Options>]",
+        version, desc, repo_home, program
+    );
     opts.usage(&brief)
 }
 
-fn setup_logging(verbose: bool) {
+fn setup_logging(quiet: bool, verbose: bool) {
     let mut builder = env_logger::Builder::new();
     match env::var("RUST_LOG") {
         Ok(config) => {
@@ -53,50 +66,35 @@ fn setup_logging(verbose: bool) {
 
             if verbose {
                 warn!("`--verbose` flag overidden by `RUST_LOG` environment variable");
+            } else if quiet {
+                warn!("`--quiet` flag overidden by `RUST_LOG` environment variable");
             }
         }
         Err(_) => {
             if verbose {
                 builder.parse_filters("libmdns=info,librespot=trace");
+            } else if quiet {
+                builder.parse_filters("libmdns=warn,librespot=warn");
             } else {
                 builder.parse_filters("libmdns=info,librespot=info");
             }
             builder.init();
+
+            if verbose && quiet {
+                warn!("`--verbose` and `--quiet` are mutually exclusive. Logging can not be both verbose and quiet. Using verbose mode.");
+            }
         }
     }
 }
 
 fn list_backends() {
-    println!("Available backends : ");
+    println!("Available backends: ");
     for (&(name, _), idx) in BACKENDS.iter().zip(0..) {
         if idx == 0 {
             println!("- {} (default)", name);
         } else {
             println!("- {}", name);
         }
-    }
-}
-
-pub fn get_credentials<F: FnOnce(&String) -> Option<String>>(
-    username: Option<String>,
-    password: Option<String>,
-    cached_credentials: Option<Credentials>,
-    prompt: F,
-) -> Option<Credentials> {
-    if let Some(username) = username {
-        if let Some(password) = password {
-            return Some(Credentials::with_password(username, password));
-        }
-
-        match cached_credentials {
-            Some(credentials) if username == credentials.username => Some(credentials),
-            _ => {
-                let password = prompt(&username)?;
-                Some(Credentials::with_password(username, password))
-            }
-        }
-    } else {
-        cached_credentials
     }
 }
 
@@ -160,14 +158,20 @@ pub fn parse_file_size(input: &str) -> Result<u64, ParseFileSizeError> {
     Ok((num * base.pow(exponent) as f64) as u64)
 }
 
-fn print_version() {
-    println!(
-        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
+fn get_version_string() -> String {
+    #[cfg(debug_assertions)]
+    const BUILD_PROFILE: &str = "debug";
+    #[cfg(not(debug_assertions))]
+    const BUILD_PROFILE: &str = "release";
+
+    format!(
+        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id}, Profile: {build_profile})",
         semver = version::SEMVER,
         sha = version::SHA_SHORT,
         build_date = version::BUILD_DATE,
-        build_id = version::BUILD_ID
-    );
+        build_id = version::BUILD_ID,
+        build_profile = BUILD_PROFILE
+    )
 }
 
 struct Setup {
@@ -187,27 +191,37 @@ struct Setup {
     emit_sink_events: bool,
 }
 
-fn get_setup(args: &[String]) -> Setup {
+fn get_setup() -> Setup {
+    const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
+    const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
+    const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=2.0;
+    const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f64> = -10.0..=10.0;
+    const VALID_NORMALISATION_THRESHOLD_RANGE: RangeInclusive<f64> = -10.0..=0.0;
+    const VALID_NORMALISATION_ATTACK_RANGE: RangeInclusive<u64> = 1..=500;
+    const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
+
     const AP_PORT: &str = "ap-port";
     const AUTOPLAY: &str = "autoplay";
     const BACKEND: &str = "backend";
-    const BITRATE: &str = "b";
-    const CACHE: &str = "c";
+    const BITRATE: &str = "bitrate";
+    const CACHE: &str = "cache";
     const CACHE_SIZE_LIMIT: &str = "cache-size-limit";
     const DEVICE: &str = "device";
     const DEVICE_TYPE: &str = "device-type";
     const DISABLE_AUDIO_CACHE: &str = "disable-audio-cache";
+    const DISABLE_CREDENTIAL_CACHE: &str = "disable-credential-cache";
     const DISABLE_DISCOVERY: &str = "disable-discovery";
     const DISABLE_GAPLESS: &str = "disable-gapless";
     const DITHER: &str = "dither";
     const EMIT_SINK_EVENTS: &str = "emit-sink-events";
     const ENABLE_VOLUME_NORMALISATION: &str = "enable-volume-normalisation";
     const FORMAT: &str = "format";
-    const HELP: &str = "h";
+    const HELP: &str = "help";
     const INITIAL_VOLUME: &str = "initial-volume";
-    const MIXER_CARD: &str = "mixer-card";
-    const MIXER_INDEX: &str = "mixer-index";
-    const MIXER_NAME: &str = "mixer-name";
+    const MIXER_TYPE: &str = "mixer";
+    const ALSA_MIXER_DEVICE: &str = "alsa-mixer-device";
+    const ALSA_MIXER_INDEX: &str = "alsa-mixer-index";
+    const ALSA_MIXER_CONTROL: &str = "alsa-mixer-control";
     const NAME: &str = "name";
     const NORMALISATION_ATTACK: &str = "normalisation-attack";
     const NORMALISATION_GAIN_TYPE: &str = "normalisation-gain-type";
@@ -220,7 +234,9 @@ fn get_setup(args: &[String]) -> Setup {
     const PASSTHROUGH: &str = "passthrough";
     const PASSWORD: &str = "password";
     const PROXY: &str = "proxy";
+    const QUIET: &str = "quiet";
     const SYSTEM_CACHE: &str = "system-cache";
+    const TEMP_DIR: &str = "tmp";
     const USERNAME: &str = "username";
     const VERBOSE: &str = "verbose";
     const VERSION: &str = "version";
@@ -228,315 +244,732 @@ fn get_setup(args: &[String]) -> Setup {
     const VOLUME_RANGE: &str = "volume-range";
     const ZEROCONF_PORT: &str = "zeroconf-port";
 
+    // Mostly arbitrary.
+    const AUTOPLAY_SHORT: &str = "A";
+    const AP_PORT_SHORT: &str = "a";
+    const BACKEND_SHORT: &str = "B";
+    const BITRATE_SHORT: &str = "b";
+    const SYSTEM_CACHE_SHORT: &str = "C";
+    const CACHE_SHORT: &str = "c";
+    const DITHER_SHORT: &str = "D";
+    const DEVICE_SHORT: &str = "d";
+    const VOLUME_CTRL_SHORT: &str = "E";
+    const VOLUME_RANGE_SHORT: &str = "e";
+    const DEVICE_TYPE_SHORT: &str = "F";
+    const FORMAT_SHORT: &str = "f";
+    const DISABLE_AUDIO_CACHE_SHORT: &str = "G";
+    const DISABLE_GAPLESS_SHORT: &str = "g";
+    const DISABLE_CREDENTIAL_CACHE_SHORT: &str = "H";
+    const HELP_SHORT: &str = "h";
+    const CACHE_SIZE_LIMIT_SHORT: &str = "M";
+    const MIXER_TYPE_SHORT: &str = "m";
+    const ENABLE_VOLUME_NORMALISATION_SHORT: &str = "N";
+    const NAME_SHORT: &str = "n";
+    const DISABLE_DISCOVERY_SHORT: &str = "O";
+    const ONEVENT_SHORT: &str = "o";
+    const PASSTHROUGH_SHORT: &str = "P";
+    const PASSWORD_SHORT: &str = "p";
+    const EMIT_SINK_EVENTS_SHORT: &str = "Q";
+    const QUIET_SHORT: &str = "q";
+    const INITIAL_VOLUME_SHORT: &str = "R";
+    const ALSA_MIXER_DEVICE_SHORT: &str = "S";
+    const ALSA_MIXER_INDEX_SHORT: &str = "s";
+    const ALSA_MIXER_CONTROL_SHORT: &str = "T";
+    const TEMP_DIR_SHORT: &str = "t";
+    const NORMALISATION_ATTACK_SHORT: &str = "U";
+    const USERNAME_SHORT: &str = "u";
+    const VERSION_SHORT: &str = "V";
+    const VERBOSE_SHORT: &str = "v";
+    const NORMALISATION_GAIN_TYPE_SHORT: &str = "W";
+    const NORMALISATION_KNEE_SHORT: &str = "w";
+    const NORMALISATION_METHOD_SHORT: &str = "X";
+    const PROXY_SHORT: &str = "x";
+    const NORMALISATION_PREGAIN_SHORT: &str = "Y";
+    const NORMALISATION_RELEASE_SHORT: &str = "y";
+    const NORMALISATION_THRESHOLD_SHORT: &str = "Z";
+    const ZEROCONF_PORT_SHORT: &str = "z";
+
+    // Options that have different descriptions
+    // depending on what backends were enabled at build time.
+    #[cfg(feature = "alsa-backend")]
+    const MIXER_TYPE_DESC: &str = "Mixer to use {alsa|softvol}. Defaults to softvol.";
+    #[cfg(not(feature = "alsa-backend"))]
+    const MIXER_TYPE_DESC: &str = "Not supported by the included audio backend(s).";
+    #[cfg(any(
+        feature = "alsa-backend",
+        feature = "rodio-backend",
+        feature = "portaudio-backend"
+    ))]
+    const DEVICE_DESC: &str = "Audio device to use. Use ? to list options if using alsa, portaudio or rodio. Defaults to the backend's default.";
+    #[cfg(not(any(
+        feature = "alsa-backend",
+        feature = "rodio-backend",
+        feature = "portaudio-backend"
+    )))]
+    const DEVICE_DESC: &str = "Not supported by the included audio backend(s).";
+    #[cfg(feature = "alsa-backend")]
+    const ALSA_MIXER_CONTROL_DESC: &str =
+        "Alsa mixer control, e.g. PCM, Master or similar. Defaults to PCM.";
+    #[cfg(not(feature = "alsa-backend"))]
+    const ALSA_MIXER_CONTROL_DESC: &str = "Not supported by the included audio backend(s).";
+    #[cfg(feature = "alsa-backend")]
+    const ALSA_MIXER_DEVICE_DESC: &str = "Alsa mixer device, e.g hw:0 or similar from `aplay -l`. Defaults to `--device` if specified, default otherwise.";
+    #[cfg(not(feature = "alsa-backend"))]
+    const ALSA_MIXER_DEVICE_DESC: &str = "Not supported by the included audio backend(s).";
+    #[cfg(feature = "alsa-backend")]
+    const ALSA_MIXER_INDEX_DESC: &str = "Alsa index of the cards mixer. Defaults to 0.";
+    #[cfg(not(feature = "alsa-backend"))]
+    const ALSA_MIXER_INDEX_DESC: &str = "Not supported by the included audio backend(s).";
+    #[cfg(feature = "alsa-backend")]
+    const INITIAL_VOLUME_DESC: &str = "Initial volume in % from 0 - 100. Default for softvol: 50. For the alsa mixer: the current volume.";
+    #[cfg(not(feature = "alsa-backend"))]
+    const INITIAL_VOLUME_DESC: &str = "Initial volume in % from 0 - 100. Defaults to 50.";
+    #[cfg(feature = "alsa-backend")]
+    const VOLUME_RANGE_DESC: &str = "Range of the volume control (dB) from 0.0 to 100.0. Default for softvol: 60.0. For the alsa mixer: what the control supports.";
+    #[cfg(not(feature = "alsa-backend"))]
+    const VOLUME_RANGE_DESC: &str =
+        "Range of the volume control (dB) from 0.0 to 100.0. Defaults to 60.0.";
+
     let mut opts = getopts::Options::new();
     opts.optflag(
+        HELP_SHORT,
         HELP,
-        "help",
         "Print this help menu.",
-    ).optopt(
-        CACHE,
-        "cache",
-        "Path to a directory where files will be cached.",
-        "PATH",
-    ).optopt(
-        "",
-        SYSTEM_CACHE,
-        "Path to a directory where system files (credentials, volume) will be cached. Can be different from cache option value.",
-        "PATH",
-    ).optopt(
-        "",
-        CACHE_SIZE_LIMIT,
-        "Limits the size of the cache for audio files.",
-        "SIZE"
-    ).optflag("", DISABLE_AUDIO_CACHE, "Disable caching of the audio data.")
-    .optopt("n", NAME, "Device name.", "NAME")
-    .optopt("", DEVICE_TYPE, "Displayed device type.", "TYPE")
+    )
+    .optflag(
+        VERSION_SHORT,
+        VERSION,
+        "Display librespot version string.",
+    )
+    .optflag(
+        VERBOSE_SHORT,
+        VERBOSE,
+        "Enable verbose log output.",
+    )
+    .optflag(
+        QUIET_SHORT,
+        QUIET,
+        "Only log warning and error messages.",
+    )
+    .optflag(
+        DISABLE_AUDIO_CACHE_SHORT,
+        DISABLE_AUDIO_CACHE,
+        "Disable caching of the audio data.",
+    )
+    .optflag(
+        DISABLE_CREDENTIAL_CACHE_SHORT,
+        DISABLE_CREDENTIAL_CACHE,
+        "Disable caching of credentials.",
+    )
+    .optflag(
+        DISABLE_DISCOVERY_SHORT,
+        DISABLE_DISCOVERY,
+        "Disable zeroconf discovery mode.",
+    )
+    .optflag(
+        DISABLE_GAPLESS_SHORT,
+        DISABLE_GAPLESS,
+        "Disable gapless playback.",
+    )
+    .optflag(
+        EMIT_SINK_EVENTS_SHORT,
+        EMIT_SINK_EVENTS,
+        "Run PROGRAM set by `--onevent` before the sink is opened and after it is closed.",
+    )
+    .optflag(
+        AUTOPLAY_SHORT,
+        AUTOPLAY,
+        "Automatically play similar songs when your music ends.",
+    )
+    .optflag(
+        PASSTHROUGH_SHORT,
+        PASSTHROUGH,
+        "Pass a raw stream to the output. Only works with the pipe and subprocess backends.",
+    )
+    .optflag(
+        ENABLE_VOLUME_NORMALISATION_SHORT,
+        ENABLE_VOLUME_NORMALISATION,
+        "Play all tracks at approximately the same apparent volume.",
+    )
     .optopt(
+        NAME_SHORT,
+        NAME,
+        "Device name. Defaults to Librespot.",
+        "NAME",
+    )
+    .optopt(
+        BITRATE_SHORT,
         BITRATE,
-        "bitrate",
         "Bitrate (kbps) {96|160|320}. Defaults to 160.",
         "BITRATE",
     )
     .optopt(
-        "",
-        ONEVENT,
-        "Run PROGRAM when a playback event occurs.",
-        "PROGRAM",
-    )
-    .optflag("", EMIT_SINK_EVENTS, "Run program set by --onevent before sink is opened and after it is closed.")
-    .optflag("v", VERBOSE, "Enable verbose output.")
-    .optflag("V", VERSION, "Display librespot version string.")
-    .optopt("u", USERNAME, "Username to sign in with.", "USERNAME")
-    .optopt("p", PASSWORD, "Password", "PASSWORD")
-    .optopt("", PROXY, "HTTP proxy to use when connecting.", "URL")
-    .optopt("", AP_PORT, "Connect to AP with specified port. If no AP with that port are present fallback AP will be used. Available ports are usually 80, 443 and 4070.", "PORT")
-    .optflag("", DISABLE_DISCOVERY, "Disable discovery mode.")
-    .optopt(
-        "",
-        BACKEND,
-        "Audio backend to use. Use '?' to list options.",
-        "NAME",
-    )
-    .optopt(
-        "",
-        DEVICE,
-        "Audio device to use. Use '?' to list options if using alsa, portaudio or rodio.",
-        "NAME",
-    )
-    .optopt(
-        "",
+        FORMAT_SHORT,
         FORMAT,
         "Output format {F64|F32|S32|S24|S24_3|S16}. Defaults to S16.",
         "FORMAT",
     )
     .optopt(
-        "",
+        DITHER_SHORT,
         DITHER,
-        "Specify the dither algorithm to use - [none, gpdf, tpdf, tpdf_hp]. Defaults to 'tpdf' for formats S16, S24, S24_3 and 'none' for other formats.",
+        "Specify the dither algorithm to use {none|gpdf|tpdf|tpdf_hp}. Defaults to tpdf for formats S16, S24, S24_3 and none for other formats.",
         "DITHER",
     )
-    .optopt("", "mixer", "Mixer to use {alsa|softvol}.", "MIXER")
     .optopt(
-        "m",
-        MIXER_NAME,
-        "Alsa mixer control, e.g. 'PCM' or 'Master'. Defaults to 'PCM'.",
+        DEVICE_TYPE_SHORT,
+        DEVICE_TYPE,
+        "Displayed device type. Defaults to speaker.",
+        "TYPE",
+    )
+    .optopt(
+        TEMP_DIR_SHORT,
+        TEMP_DIR,
+        "Path to a directory where files will be temporarily stored while downloading.",
+        "PATH",
+    )
+    .optopt(
+        CACHE_SHORT,
+        CACHE,
+        "Path to a directory where files will be cached after downloading.",
+        "PATH",
+    )
+    .optopt(
+        SYSTEM_CACHE_SHORT,
+        SYSTEM_CACHE,
+        "Path to a directory where system files (credentials, volume) will be cached. May be different from the `--cache` option value.",
+        "PATH",
+    )
+    .optopt(
+        CACHE_SIZE_LIMIT_SHORT,
+        CACHE_SIZE_LIMIT,
+        "Limits the size of the cache for audio files. It's possible to use suffixes like K, M or G, e.g. 16G for example.",
+        "SIZE"
+    )
+    .optopt(
+        BACKEND_SHORT,
+        BACKEND,
+        "Audio backend to use. Use ? to list options.",
         "NAME",
     )
     .optopt(
-        "",
-        MIXER_CARD,
-        "Alsa mixer card, e.g 'hw:0' or similar from `aplay -l`. Defaults to DEVICE if specified, 'default' otherwise.",
-        "MIXER_CARD",
+        USERNAME_SHORT,
+        USERNAME,
+        "Username used to sign in with.",
+        "USERNAME",
     )
     .optopt(
-        "",
-        MIXER_INDEX,
-        "Alsa index of the cards mixer. Defaults to 0.",
-        "INDEX",
+        PASSWORD_SHORT,
+        PASSWORD,
+        "Password used to sign in with.",
+        "PASSWORD",
     )
     .optopt(
-        "",
+        ONEVENT_SHORT,
+        ONEVENT,
+        "Run PROGRAM when a playback event occurs.",
+        "PROGRAM",
+    )
+    .optopt(
+        ALSA_MIXER_CONTROL_SHORT,
+        ALSA_MIXER_CONTROL,
+        ALSA_MIXER_CONTROL_DESC,
+        "NAME",
+    )
+    .optopt(
+        ALSA_MIXER_DEVICE_SHORT,
+        ALSA_MIXER_DEVICE,
+        ALSA_MIXER_DEVICE_DESC,
+        "DEVICE",
+    )
+    .optopt(
+        ALSA_MIXER_INDEX_SHORT,
+        ALSA_MIXER_INDEX,
+        ALSA_MIXER_INDEX_DESC,
+        "NUMBER",
+    )
+    .optopt(
+        MIXER_TYPE_SHORT,
+        MIXER_TYPE,
+        MIXER_TYPE_DESC,
+        "MIXER",
+    )
+    .optopt(
+        DEVICE_SHORT,
+        DEVICE,
+        DEVICE_DESC,
+        "NAME",
+    )
+    .optopt(
+        INITIAL_VOLUME_SHORT,
         INITIAL_VOLUME,
-        "Initial volume in % from 0-100. Default for softvol: '50'. For the Alsa mixer: the current volume.",
+        INITIAL_VOLUME_DESC,
         "VOLUME",
     )
     .optopt(
-        "",
-        ZEROCONF_PORT,
-        "The port the internal server advertised over zeroconf uses.",
-        "PORT",
-    )
-    .optflag(
-        "",
-        ENABLE_VOLUME_NORMALISATION,
-        "Play all tracks at the same volume.",
+        VOLUME_CTRL_SHORT,
+        VOLUME_CTRL,
+        "Volume control scale type {cubic|fixed|linear|log}. Defaults to log.",
+        "VOLUME_CTRL"
     )
     .optopt(
-        "",
+        VOLUME_RANGE_SHORT,
+        VOLUME_RANGE,
+        VOLUME_RANGE_DESC,
+        "RANGE",
+    )
+    .optopt(
+        NORMALISATION_METHOD_SHORT,
         NORMALISATION_METHOD,
         "Specify the normalisation method to use {basic|dynamic}. Defaults to dynamic.",
         "METHOD",
     )
     .optopt(
-        "",
+        NORMALISATION_GAIN_TYPE_SHORT,
         NORMALISATION_GAIN_TYPE,
-        "Specify the normalisation gain type to use {track|album}. Defaults to album.",
+        "Specify the normalisation gain type to use {track|album|auto}. Defaults to auto.",
         "TYPE",
     )
     .optopt(
-        "",
+        NORMALISATION_PREGAIN_SHORT,
         NORMALISATION_PREGAIN,
-        "Pregain (dB) applied by volume normalisation. Defaults to 0.",
+        "Pregain (dB) applied by volume normalisation from -10.0 to 10.0. Defaults to 0.0.",
         "PREGAIN",
     )
     .optopt(
-        "",
+        NORMALISATION_THRESHOLD_SHORT,
         NORMALISATION_THRESHOLD,
-        "Threshold (dBFS) to prevent clipping. Defaults to -1.0.",
+        "Threshold (dBFS) at which point the dynamic limiter engages to prevent clipping from 0.0 to -10.0. Defaults to -2.0.",
         "THRESHOLD",
     )
     .optopt(
-        "",
+        NORMALISATION_ATTACK_SHORT,
         NORMALISATION_ATTACK,
-        "Attack time (ms) in which the dynamic limiter is reducing gain. Defaults to 5.",
+        "Attack time (ms) in which the dynamic limiter reduces gain from 1 to 500. Defaults to 5.",
         "TIME",
     )
     .optopt(
-        "",
+        NORMALISATION_RELEASE_SHORT,
         NORMALISATION_RELEASE,
-        "Release or decay time (ms) in which the dynamic limiter is restoring gain. Defaults to 100.",
+        "Release or decay time (ms) in which the dynamic limiter restores gain from 1 to 1000. Defaults to 100.",
         "TIME",
     )
     .optopt(
-        "",
+        NORMALISATION_KNEE_SHORT,
         NORMALISATION_KNEE,
-        "Knee steepness of the dynamic limiter. Defaults to 1.0.",
+        "Knee steepness of the dynamic limiter from 0.0 to 2.0. Defaults to 1.0.",
         "KNEE",
     )
     .optopt(
-        "",
-        VOLUME_CTRL,
-        "Volume control type {cubic|fixed|linear|log}. Defaults to log.",
-        "VOLUME_CTRL"
+        ZEROCONF_PORT_SHORT,
+        ZEROCONF_PORT,
+        "The port the internal server advertises over zeroconf 1 - 65535. Ports <= 1024 may require root privileges.",
+        "PORT",
     )
     .optopt(
-        "",
-        VOLUME_RANGE,
-        "Range of the volume control (dB). Default for softvol: 60. For the Alsa mixer: what the control supports.",
-        "RANGE",
+        PROXY_SHORT,
+        PROXY,
+        "HTTP proxy to use when connecting.",
+        "URL",
     )
-    .optflag(
-        "",
-        AUTOPLAY,
-        "Automatically play similar songs when your music ends.",
-    )
-    .optflag(
-        "",
-        DISABLE_GAPLESS,
-        "Disable gapless playback.",
-    )
-    .optflag(
-        "",
-        PASSTHROUGH,
-        "Pass raw stream to output, only works for pipe and subprocess.",
+    .optopt(
+        AP_PORT_SHORT,
+        AP_PORT,
+        "Connect to an AP with a specified port 1 - 65535. If no AP with that port is present a fallback AP will be used. Available ports are usually 80, 443 and 4070.",
+        "PORT",
     );
+
+    let args: Vec<_> = std::env::args_os()
+        .filter_map(|s| match s.into_string() {
+            Ok(valid) => Some(valid),
+            Err(s) => {
+                eprintln!(
+                    "Command line argument was not valid Unicode and will not be evaluated: {:?}",
+                    s
+                );
+                None
+            }
+        })
+        .collect();
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
-        Err(f) => {
-            eprintln!(
-                "Error parsing command line options: {}\n{}",
-                f,
-                usage(&args[0], &opts)
-            );
+        Err(e) => {
+            eprintln!("Error parsing command line options: {}", e);
+            println!("\n{}", usage(&args[0], &opts));
             exit(1);
         }
     };
 
-    if matches.opt_present(HELP) {
+    let stripped_env_key = |k: &str| {
+        k.trim_start_matches("LIBRESPOT_")
+            .replace("_", "-")
+            .to_lowercase()
+    };
+
+    let env_vars: Vec<_> = env::vars_os().filter_map(|(k, v)| match k.into_string() {
+        Ok(key) if key.starts_with("LIBRESPOT_") => {
+            let stripped_key = stripped_env_key(&key);
+            // We only care about long option/flag names.
+            if stripped_key.chars().count() > 1 && matches.opt_defined(&stripped_key) {
+                match v.into_string() {
+                    Ok(value) => Some((key, value)),
+                    Err(s) => {
+                        eprintln!("Environment variable was not valid Unicode and will not be evaluated: {}={:?}", key, s);
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        },
+        _ => None
+    })
+    .collect();
+
+    let opt_present =
+        |opt| matches.opt_present(opt) || env_vars.iter().any(|(k, _)| stripped_env_key(k) == opt);
+
+    let opt_str = |opt| {
+        if matches.opt_present(opt) {
+            matches.opt_str(opt)
+        } else {
+            env_vars
+                .iter()
+                .find(|(k, _)| stripped_env_key(k) == opt)
+                .map(|(_, v)| v.to_string())
+        }
+    };
+
+    if opt_present(HELP) {
         println!("{}", usage(&args[0], &opts));
         exit(0);
     }
 
-    if matches.opt_present(VERSION) {
-        print_version();
+    if opt_present(VERSION) {
+        println!("{}", get_version_string());
         exit(0);
     }
 
-    let verbose = matches.opt_present(VERBOSE);
-    setup_logging(verbose);
+    setup_logging(opt_present(QUIET), opt_present(VERBOSE));
 
-    info!(
-        "librespot {semver} {sha} (Built on {build_date}, Build ID: {build_id})",
-        semver = version::SEMVER,
-        sha = version::SHA_SHORT,
-        build_date = version::BUILD_DATE,
-        build_id = version::BUILD_ID
-    );
+    info!("{}", get_version_string());
 
-    let backend_name = matches.opt_str(BACKEND);
+    if !env_vars.is_empty() {
+        trace!("Environment variable(s):");
+
+        for (k, v) in &env_vars {
+            if matches!(k.as_str(), "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME") {
+                trace!("\t\t{}=\"XXXXXXXX\"", k);
+            } else if v.is_empty() {
+                trace!("\t\t{}=", k);
+            } else {
+                trace!("\t\t{}=\"{}\"", k, v);
+            }
+        }
+    }
+
+    let args_len = args.len();
+
+    if args_len > 1 {
+        trace!("Command line argument(s):");
+
+        for (index, key) in args.iter().enumerate() {
+            let opt = key.trim_start_matches('-');
+
+            if index > 0
+                && &args[index - 1] != key
+                && matches.opt_defined(opt)
+                && matches.opt_present(opt)
+            {
+                if matches!(opt, PASSWORD | PASSWORD_SHORT | USERNAME | USERNAME_SHORT) {
+                    // Don't log creds.
+                    trace!("\t\t{} \"XXXXXXXX\"", key);
+                } else {
+                    let value = matches.opt_str(opt).unwrap_or_else(|| "".to_string());
+                    if value.is_empty() {
+                        trace!("\t\t{}", key);
+                    } else {
+                        trace!("\t\t{} \"{}\"", key, value);
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(not(feature = "alsa-backend"))]
+    for a in &[
+        MIXER_TYPE,
+        ALSA_MIXER_DEVICE,
+        ALSA_MIXER_INDEX,
+        ALSA_MIXER_CONTROL,
+    ] {
+        if opt_present(a) {
+            warn!("Alsa specific options have no effect if the alsa backend is not enabled at build time.");
+            break;
+        }
+    }
+
+    let backend_name = opt_str(BACKEND);
     if backend_name == Some("?".into()) {
         list_backends();
         exit(0);
     }
 
-    let backend = audio_backend::find(backend_name).expect("Invalid backend");
+    let invalid_error_msg =
+        |long: &str, short: &str, invalid: &str, valid_values: &str, default_value: &str| {
+            error!("Invalid `--{}` / `-{}`: \"{}\"", long, short, invalid);
 
-    let format = matches
-        .opt_str(FORMAT)
+            if !valid_values.is_empty() {
+                println!("Valid `--{}` / `-{}` values: {}", long, short, valid_values);
+            }
+
+            if !default_value.is_empty() {
+                println!("Default: {}", default_value);
+            }
+        };
+
+    let empty_string_error_msg = |long: &str, short: &str| {
+        error!("`--{}` / `-{}` can not be an empty string", long, short);
+        exit(1);
+    };
+
+    let backend = audio_backend::find(backend_name).unwrap_or_else(|| {
+        invalid_error_msg(
+            BACKEND,
+            BACKEND_SHORT,
+            &opt_str(BACKEND).unwrap_or_default(),
+            "",
+            "",
+        );
+
+        list_backends();
+        exit(1);
+    });
+
+    let format = opt_str(FORMAT)
         .as_deref()
-        .map(|format| AudioFormat::from_str(format).expect("Invalid output format"))
+        .map(|format| {
+            AudioFormat::from_str(format).unwrap_or_else(|_| {
+                let default_value = &format!("{:?}", AudioFormat::default());
+                invalid_error_msg(
+                    FORMAT,
+                    FORMAT_SHORT,
+                    format,
+                    "F64, F32, S32, S24, S24_3, S16",
+                    default_value,
+                );
+
+                exit(1);
+            })
+        })
         .unwrap_or_default();
 
-    let device = matches.opt_str(DEVICE);
-    if device == Some("?".into()) {
-        backend(device, format);
-        exit(0);
+    #[cfg(any(
+        feature = "alsa-backend",
+        feature = "rodio-backend",
+        feature = "portaudio-backend"
+    ))]
+    let device = opt_str(DEVICE);
+
+    #[cfg(any(
+        feature = "alsa-backend",
+        feature = "rodio-backend",
+        feature = "portaudio-backend"
+    ))]
+    if let Some(ref value) = device {
+        if value == "?" {
+            backend(device, format);
+            exit(0);
+        } else if value.is_empty() {
+            empty_string_error_msg(DEVICE, DEVICE_SHORT);
+        }
     }
 
-    let mixer_name = matches.opt_str(MIXER_NAME);
-    let mixer = mixer::find(mixer_name.as_deref()).expect("Invalid mixer");
+    #[cfg(not(any(
+        feature = "alsa-backend",
+        feature = "rodio-backend",
+        feature = "portaudio-backend"
+    )))]
+    let device: Option<String> = None;
+
+    #[cfg(not(any(
+        feature = "alsa-backend",
+        feature = "rodio-backend",
+        feature = "portaudio-backend"
+    )))]
+    if opt_present(DEVICE) {
+        warn!(
+            "The `--{}` / `-{}` option is not supported by the included audio backend(s), and has no effect.",
+            DEVICE, DEVICE_SHORT,
+        );
+    }
+
+    #[cfg(feature = "alsa-backend")]
+    let mixer_type = opt_str(MIXER_TYPE);
+    #[cfg(not(feature = "alsa-backend"))]
+    let mixer_type: Option<String> = None;
+
+    let mixer = mixer::find(mixer_type.as_deref()).unwrap_or_else(|| {
+        invalid_error_msg(
+            MIXER_TYPE,
+            MIXER_TYPE_SHORT,
+            &opt_str(MIXER_TYPE).unwrap_or_default(),
+            "alsa, softvol",
+            "softvol",
+        );
+
+        exit(1);
+    });
 
     let mixer_config = {
-        let card = matches.opt_str(MIXER_CARD).unwrap_or_else(|| {
+        let mixer_default_config = MixerConfig::default();
+
+        #[cfg(feature = "alsa-backend")]
+        let device = opt_str(ALSA_MIXER_DEVICE).unwrap_or_else(|| {
             if let Some(ref device_name) = device {
                 device_name.to_string()
             } else {
-                MixerConfig::default().card
+                mixer_default_config.device.clone()
             }
         });
-        let index = matches
-            .opt_str(MIXER_INDEX)
-            .map(|index| index.parse::<u32>().unwrap())
-            .unwrap_or(0);
-        let control = matches
-            .opt_str(MIXER_NAME)
-            .unwrap_or_else(|| MixerConfig::default().control);
-        let mut volume_range = matches
-            .opt_str(VOLUME_RANGE)
-            .map(|range| range.parse::<f64>().unwrap())
-            .unwrap_or_else(|| match mixer_name.as_deref() {
+
+        #[cfg(not(feature = "alsa-backend"))]
+        let device = mixer_default_config.device;
+
+        #[cfg(feature = "alsa-backend")]
+        let index = opt_str(ALSA_MIXER_INDEX)
+            .map(|index| {
+                index.parse::<u32>().unwrap_or_else(|_| {
+                    invalid_error_msg(
+                        ALSA_MIXER_INDEX,
+                        ALSA_MIXER_INDEX_SHORT,
+                        &index,
+                        "",
+                        &mixer_default_config.index.to_string(),
+                    );
+
+                    exit(1);
+                })
+            })
+            .unwrap_or_else(|| mixer_default_config.index);
+
+        #[cfg(not(feature = "alsa-backend"))]
+        let index = mixer_default_config.index;
+
+        #[cfg(feature = "alsa-backend")]
+        let control = opt_str(ALSA_MIXER_CONTROL).unwrap_or(mixer_default_config.control);
+
+        #[cfg(feature = "alsa-backend")]
+        if control.is_empty() {
+            empty_string_error_msg(ALSA_MIXER_CONTROL, ALSA_MIXER_CONTROL_SHORT);
+        }
+
+        #[cfg(not(feature = "alsa-backend"))]
+        let control = mixer_default_config.control;
+
+        let volume_range = opt_str(VOLUME_RANGE)
+            .map(|range| match range.parse::<f64>() {
+                Ok(value) if (VALID_VOLUME_RANGE).contains(&value) => value,
+                _ => {
+                    let valid_values = &format!(
+                        "{} - {}",
+                        VALID_VOLUME_RANGE.start(),
+                        VALID_VOLUME_RANGE.end()
+                    );
+
+                    #[cfg(feature = "alsa-backend")]
+                    let default_value = &format!(
+                        "softvol - {}, alsa - what the control supports",
+                        VolumeCtrl::DEFAULT_DB_RANGE
+                    );
+
+                    #[cfg(not(feature = "alsa-backend"))]
+                    let default_value = &VolumeCtrl::DEFAULT_DB_RANGE.to_string();
+
+                    invalid_error_msg(
+                        VOLUME_RANGE,
+                        VOLUME_RANGE_SHORT,
+                        &range,
+                        valid_values,
+                        default_value,
+                    );
+
+                    exit(1);
+                }
+            })
+            .unwrap_or_else(|| match mixer_type.as_deref() {
                 #[cfg(feature = "alsa-backend")]
-                Some(AlsaMixer::NAME) => 0.0, // let Alsa query the control
+                Some(AlsaMixer::NAME) => 0.0, // let alsa query the control
                 _ => VolumeCtrl::DEFAULT_DB_RANGE,
             });
-        if volume_range < 0.0 {
-            // User might have specified range as minimum dB volume.
-            volume_range = -volume_range;
-            warn!(
-                "Please enter positive volume ranges only, assuming {:.2} dB",
-                volume_range
-            );
-        }
-        let volume_ctrl = matches
-            .opt_str(VOLUME_CTRL)
+
+        let volume_ctrl = opt_str(VOLUME_CTRL)
             .as_deref()
             .map(|volume_ctrl| {
-                VolumeCtrl::from_str_with_range(volume_ctrl, volume_range)
-                    .expect("Invalid volume control type")
+                VolumeCtrl::from_str_with_range(volume_ctrl, volume_range).unwrap_or_else(|_| {
+                    invalid_error_msg(
+                        VOLUME_CTRL,
+                        VOLUME_CTRL_SHORT,
+                        volume_ctrl,
+                        "cubic, fixed, linear, log",
+                        "log",
+                    );
+
+                    exit(1);
+                })
             })
-            .unwrap_or_else(|| {
-                let mut volume_ctrl = VolumeCtrl::default();
-                volume_ctrl.set_db_range(volume_range);
-                volume_ctrl
-            });
+            .unwrap_or_else(|| VolumeCtrl::Log(volume_range));
 
         MixerConfig {
-            card,
+            device,
             control,
             index,
             volume_ctrl,
         }
     };
 
-    let cache = {
-        let audio_dir;
-        let system_dir;
-        if matches.opt_present(DISABLE_AUDIO_CACHE) {
-            audio_dir = None;
-            system_dir = matches
-                .opt_str(SYSTEM_CACHE)
-                .or_else(|| matches.opt_str(CACHE))
-                .map(|p| p.into());
-        } else {
-            let cache_dir = matches.opt_str(CACHE);
-            audio_dir = cache_dir
-                .as_ref()
-                .map(|p| AsRef::<Path>::as_ref(p).join("files"));
-            system_dir = matches
-                .opt_str(SYSTEM_CACHE)
-                .or(cache_dir)
-                .map(|p| p.into());
+    let tmp_dir = opt_str(TEMP_DIR).map_or(SessionConfig::default().tmp_dir, |p| {
+        let tmp_dir = PathBuf::from(p);
+        if let Err(e) = create_dir_all(&tmp_dir) {
+            error!("could not create or access specified tmp directory: {}", e);
+            exit(1);
         }
+        tmp_dir
+    });
+
+    let cache = {
+        let volume_dir = opt_str(SYSTEM_CACHE)
+            .or_else(|| opt_str(CACHE))
+            .map(|p| p.into());
+
+        let cred_dir = if opt_present(DISABLE_CREDENTIAL_CACHE) {
+            None
+        } else {
+            volume_dir.clone()
+        };
+
+        let audio_dir = if opt_present(DISABLE_AUDIO_CACHE) {
+            None
+        } else {
+            opt_str(CACHE)
+                .as_ref()
+                .map(|p| AsRef::<Path>::as_ref(p).join("files"))
+        };
 
         let limit = if audio_dir.is_some() {
-            matches
-                .opt_str(CACHE_SIZE_LIMIT)
+            opt_str(CACHE_SIZE_LIMIT)
                 .as_deref()
                 .map(parse_file_size)
                 .map(|e| {
                     e.unwrap_or_else(|e| {
-                        eprintln!("Invalid argument passed as cache size limit: {}", e);
+                        invalid_error_msg(
+                            CACHE_SIZE_LIMIT,
+                            CACHE_SIZE_LIMIT_SHORT,
+                            &e.to_string(),
+                            "",
+                            "",
+                        );
+
                         exit(1);
                     })
                 })
@@ -544,7 +977,14 @@ fn get_setup(args: &[String]) -> Setup {
             None
         };
 
-        match Cache::new(system_dir, audio_dir, limit) {
+        if audio_dir.is_none() && opt_present(CACHE_SIZE_LIMIT) {
+            warn!(
+                "Without a `--{}` / `-{}` path, and/or if the `--{}` / `-{}` flag is set, `--{}` / `-{}` has no effect.",
+                CACHE, CACHE_SHORT, DISABLE_AUDIO_CACHE, DISABLE_AUDIO_CACHE_SHORT, CACHE_SIZE_LIMIT, CACHE_SIZE_LIMIT_SHORT
+            );
+        }
+
+        match Cache::new(cred_dir, volume_dir, audio_dir, limit) {
             Ok(cache) => Some(cache),
             Err(e) => {
                 warn!("Cannot create cache: {}", e);
@@ -553,153 +993,461 @@ fn get_setup(args: &[String]) -> Setup {
         }
     };
 
-    let initial_volume = matches
-        .opt_str(INITIAL_VOLUME)
-        .map(|initial_volume| {
-            let volume = initial_volume.parse::<u16>().unwrap();
-            if volume > 100 {
-                error!("Initial volume must be in the range 0-100.");
-                // the cast will saturate, not necessary to take further action
-            }
-            (volume as f32 / 100.0 * VolumeCtrl::MAX_VOLUME as f32) as u16
-        })
-        .or_else(|| match mixer_name.as_deref() {
-            #[cfg(feature = "alsa-backend")]
-            Some(AlsaMixer::NAME) => None,
-            _ => cache.as_ref().and_then(Cache::volume),
-        });
-
-    let zeroconf_port = matches
-        .opt_str(ZEROCONF_PORT)
-        .map(|port| port.parse::<u16>().unwrap())
-        .unwrap_or(0);
-
-    let name = matches
-        .opt_str(NAME)
-        .unwrap_or_else(|| "Librespot".to_string());
-
     let credentials = {
-        let cached_credentials = cache.as_ref().and_then(Cache::credentials);
+        let cached_creds = cache.as_ref().and_then(Cache::credentials);
 
-        let password = |username: &String| -> Option<String> {
-            write!(stderr(), "Password for {}: ", username).ok()?;
-            stderr().flush().ok()?;
-            rpassword::read_password().ok()
-        };
-
-        get_credentials(
-            matches.opt_str(USERNAME),
-            matches.opt_str(PASSWORD),
-            cached_credentials,
-            password,
-        )
-    };
-
-    let session_config = {
-        let device_id = device_id(&name);
-
-        SessionConfig {
-            user_agent: version::VERSION_STRING.to_string(),
-            device_id,
-            proxy: matches.opt_str(PROXY).or_else(|| std::env::var("http_proxy").ok()).map(
-                |s| {
-                    match Url::parse(&s) {
-                        Ok(url) => {
-                            if url.host().is_none() || url.port_or_known_default().is_none() {
-                                panic!("Invalid proxy url, only URLs on the format \"http://host:port\" are allowed");
+        if let Some(username) = opt_str(USERNAME) {
+            if username.is_empty() {
+                empty_string_error_msg(USERNAME, USERNAME_SHORT);
+            }
+            if let Some(password) = opt_str(PASSWORD) {
+                if password.is_empty() {
+                    empty_string_error_msg(PASSWORD, PASSWORD_SHORT);
+                }
+                Some(Credentials::with_password(username, password))
+            } else {
+                match cached_creds {
+                    Some(creds) if username == creds.username => Some(creds),
+                    _ => {
+                        let prompt = &format!("Password for {}: ", username);
+                        match rpassword::prompt_password_stderr(prompt) {
+                            Ok(password) => {
+                                if !password.is_empty() {
+                                    Some(Credentials::with_password(username, password))
+                                } else {
+                                    trace!("Password was empty.");
+                                    if cached_creds.is_some() {
+                                        trace!("Using cached credentials.");
+                                    }
+                                    cached_creds
+                                }
                             }
-
-                            if url.scheme() != "http" {
-                                panic!("Only unsecure http:// proxies are supported");
+                            Err(e) => {
+                                warn!("Cannot parse password: {}", e);
+                                if cached_creds.is_some() {
+                                    trace!("Using cached credentials.");
+                                }
+                                cached_creds
                             }
-                            url
-                        },
-                        Err(err) => panic!("Invalid proxy URL: {}, only URLs in the format \"http://host:port\" are allowed", err)
+                        }
                     }
-                },
-            ),
-            ap_port: matches
-                .opt_str(AP_PORT)
-                .map(|port| port.parse::<u16>().expect("Invalid port")),
+                }
+            }
+        } else {
+            if cached_creds.is_some() {
+                trace!("Using cached credentials.");
+            }
+            cached_creds
         }
     };
 
-    let player_config = {
-        let bitrate = matches
-            .opt_str(BITRATE)
-            .as_deref()
-            .map(|bitrate| Bitrate::from_str(bitrate).expect("Invalid bitrate"))
-            .unwrap_or_default();
+    let enable_discovery = !opt_present(DISABLE_DISCOVERY);
 
-        let gapless = !matches.opt_present(DISABLE_GAPLESS);
+    if credentials.is_none() && !enable_discovery {
+        error!("Credentials are required if discovery is disabled.");
+        exit(1);
+    }
 
-        let normalisation = matches.opt_present(ENABLE_VOLUME_NORMALISATION);
-        let normalisation_method = matches
-            .opt_str(NORMALISATION_METHOD)
-            .as_deref()
-            .map(|method| {
-                NormalisationMethod::from_str(method).expect("Invalid normalisation method")
-            })
-            .unwrap_or_default();
-        let normalisation_type = matches
-            .opt_str(NORMALISATION_GAIN_TYPE)
-            .as_deref()
-            .map(|gain_type| {
-                NormalisationType::from_str(gain_type).expect("Invalid normalisation type")
-            })
-            .unwrap_or_default();
-        let normalisation_pregain = matches
-            .opt_str(NORMALISATION_PREGAIN)
-            .map(|pregain| pregain.parse::<f64>().expect("Invalid pregain float value"))
-            .unwrap_or(PlayerConfig::default().normalisation_pregain);
-        let normalisation_threshold = matches
-            .opt_str(NORMALISATION_THRESHOLD)
-            .map(|threshold| {
-                db_to_ratio(
-                    threshold
-                        .parse::<f64>()
-                        .expect("Invalid threshold float value"),
-                )
-            })
-            .unwrap_or(PlayerConfig::default().normalisation_threshold);
-        let normalisation_attack = matches
-            .opt_str(NORMALISATION_ATTACK)
-            .map(|attack| {
-                Duration::from_millis(attack.parse::<u64>().expect("Invalid attack value"))
-            })
-            .unwrap_or(PlayerConfig::default().normalisation_attack);
-        let normalisation_release = matches
-            .opt_str(NORMALISATION_RELEASE)
-            .map(|release| {
-                Duration::from_millis(release.parse::<u64>().expect("Invalid release value"))
-            })
-            .unwrap_or(PlayerConfig::default().normalisation_release);
-        let normalisation_knee = matches
-            .opt_str(NORMALISATION_KNEE)
-            .map(|knee| knee.parse::<f64>().expect("Invalid knee float value"))
-            .unwrap_or(PlayerConfig::default().normalisation_knee);
+    if !enable_discovery && opt_present(ZEROCONF_PORT) {
+        warn!(
+            "With the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
+            DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
+        );
+    }
 
-        let ditherer_name = matches.opt_str(DITHER);
-        let ditherer = match ditherer_name.as_deref() {
-            // explicitly disabled on command line
-            Some("none") => None,
-            // explicitly set on command line
-            Some(_) => {
-                if format == AudioFormat::F64 || format == AudioFormat::F32 {
-                    unimplemented!("Dithering is not available on format {:?}", format);
+    let zeroconf_port = if enable_discovery {
+        opt_str(ZEROCONF_PORT)
+            .map(|port| match port.parse::<u16>() {
+                Ok(value) if value != 0 => value,
+                _ => {
+                    let valid_values = &format!("1 - {}", u16::MAX);
+                    invalid_error_msg(ZEROCONF_PORT, ZEROCONF_PORT_SHORT, &port, valid_values, "");
+
+                    exit(1);
                 }
-                Some(dither::find_ditherer(ditherer_name).expect("Invalid ditherer"))
+            })
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    let connect_config = {
+        let connect_default_config = ConnectConfig::default();
+
+        let name = opt_str(NAME).unwrap_or_else(|| connect_default_config.name.clone());
+
+        if name.is_empty() {
+            empty_string_error_msg(NAME, NAME_SHORT);
+            exit(1);
+        }
+
+        let initial_volume = opt_str(INITIAL_VOLUME)
+            .map(|initial_volume| {
+                let volume = match initial_volume.parse::<u16>() {
+                    Ok(value) if (VALID_INITIAL_VOLUME_RANGE).contains(&value) => value,
+                    _ => {
+                        let valid_values = &format!(
+                            "{} - {}",
+                            VALID_INITIAL_VOLUME_RANGE.start(),
+                            VALID_INITIAL_VOLUME_RANGE.end()
+                        );
+
+                        #[cfg(feature = "alsa-backend")]
+                        let default_value = &format!(
+                            "{}, or the current value when the alsa mixer is used.",
+                            connect_default_config.initial_volume.unwrap_or_default()
+                        );
+
+                        #[cfg(not(feature = "alsa-backend"))]
+                        let default_value = &connect_default_config
+                            .initial_volume
+                            .unwrap_or_default()
+                            .to_string();
+
+                        invalid_error_msg(
+                            INITIAL_VOLUME,
+                            INITIAL_VOLUME_SHORT,
+                            &initial_volume,
+                            valid_values,
+                            default_value,
+                        );
+
+                        exit(1);
+                    }
+                };
+
+                (volume as f32 / 100.0 * VolumeCtrl::MAX_VOLUME as f32) as u16
+            })
+            .or_else(|| match mixer_type.as_deref() {
+                #[cfg(feature = "alsa-backend")]
+                Some(AlsaMixer::NAME) => None,
+                _ => cache.as_ref().and_then(Cache::volume),
+            });
+
+        let device_type = opt_str(DEVICE_TYPE)
+            .as_deref()
+            .map(|device_type| {
+                DeviceType::from_str(device_type).unwrap_or_else(|_| {
+                    invalid_error_msg(
+                        DEVICE_TYPE,
+                        DEVICE_TYPE_SHORT,
+                        device_type,
+                        "computer, tablet, smartphone, \
+                        speaker, tv, avr, stb, audiodongle, \
+                        gameconsole, castaudio, castvideo, \
+                        automobile, smartwatch, chromebook, \
+                        carthing, homething",
+                        DeviceType::default().into(),
+                    );
+
+                    exit(1);
+                })
+            })
+            .unwrap_or_default();
+
+        let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
+        let autoplay = opt_present(AUTOPLAY);
+
+        ConnectConfig {
+            name,
+            device_type,
+            initial_volume,
+            has_volume_ctrl,
+            autoplay,
+        }
+    };
+
+    let session_config = SessionConfig {
+        device_id: device_id(&connect_config.name),
+        proxy: opt_str(PROXY).or_else(|| std::env::var("http_proxy").ok()).map(
+            |s| {
+                match Url::parse(&s) {
+                    Ok(url) => {
+                        if url.host().is_none() || url.port_or_known_default().is_none() {
+                            error!("Invalid proxy url, only URLs on the format \"http(s)://host:port\" are allowed");
+                            exit(1);
+                        }
+
+                        url
+                    },
+                    Err(e) => {
+                        error!("Invalid proxy URL: \"{}\", only URLs in the format \"http(s)://host:port\" are allowed", e);
+                        exit(1);
+                    }
+                }
+            },
+        ),
+        ap_port: opt_str(AP_PORT).map(|port| match port.parse::<u16>() {
+            Ok(value) if value != 0 => value,
+            _ => {
+                let valid_values = &format!("1 - {}", u16::MAX);
+                invalid_error_msg(AP_PORT, AP_PORT_SHORT, &port, valid_values, "");
+
+                exit(1);
             }
-            // nothing set on command line => use default
+        }),
+		tmp_dir,
+    };
+
+    let player_config = {
+        let player_default_config = PlayerConfig::default();
+
+        let bitrate = opt_str(BITRATE)
+            .as_deref()
+            .map(|bitrate| {
+                Bitrate::from_str(bitrate).unwrap_or_else(|_| {
+                    invalid_error_msg(BITRATE, BITRATE_SHORT, bitrate, "96, 160, 320", "160");
+                    exit(1);
+                })
+            })
+            .unwrap_or(player_default_config.bitrate);
+
+        let gapless = !opt_present(DISABLE_GAPLESS);
+
+        let normalisation = opt_present(ENABLE_VOLUME_NORMALISATION);
+
+        let normalisation_method;
+        let normalisation_type;
+        let normalisation_pregain;
+        let normalisation_threshold;
+        let normalisation_attack;
+        let normalisation_release;
+        let normalisation_knee;
+
+        if !normalisation {
+            for a in &[
+                NORMALISATION_METHOD,
+                NORMALISATION_GAIN_TYPE,
+                NORMALISATION_PREGAIN,
+                NORMALISATION_THRESHOLD,
+                NORMALISATION_ATTACK,
+                NORMALISATION_RELEASE,
+                NORMALISATION_KNEE,
+            ] {
+                if opt_present(a) {
+                    warn!(
+                        "Without the `--{}` / `-{}` flag normalisation options have no effect.",
+                        ENABLE_VOLUME_NORMALISATION, ENABLE_VOLUME_NORMALISATION_SHORT,
+                    );
+                    break;
+                }
+            }
+
+            normalisation_method = player_default_config.normalisation_method;
+            normalisation_type = player_default_config.normalisation_type;
+            normalisation_pregain = player_default_config.normalisation_pregain;
+            normalisation_threshold = player_default_config.normalisation_threshold;
+            normalisation_attack = player_default_config.normalisation_attack;
+            normalisation_release = player_default_config.normalisation_release;
+            normalisation_knee = player_default_config.normalisation_knee;
+        } else {
+            normalisation_method = opt_str(NORMALISATION_METHOD)
+                .as_deref()
+                .map(|method| {
+                    warn!(
+                        "`--{}` / `-{}` will be deprecated in a future release.",
+                        NORMALISATION_METHOD, NORMALISATION_METHOD_SHORT
+                    );
+
+                    let method = NormalisationMethod::from_str(method).unwrap_or_else(|_| {
+                        invalid_error_msg(
+                            NORMALISATION_METHOD,
+                            NORMALISATION_METHOD_SHORT,
+                            method,
+                            "basic, dynamic",
+                            &format!("{:?}", player_default_config.normalisation_method),
+                        );
+
+                        exit(1);
+                    });
+
+                    if matches!(method, NormalisationMethod::Basic) {
+                        warn!(
+                            "`--{}` / `-{}` {:?} will be deprecated in a future release.",
+                            NORMALISATION_METHOD, NORMALISATION_METHOD_SHORT, method
+                        );
+                    }
+
+                    method
+                })
+                .unwrap_or(player_default_config.normalisation_method);
+
+            normalisation_type = opt_str(NORMALISATION_GAIN_TYPE)
+                .as_deref()
+                .map(|gain_type| {
+                    NormalisationType::from_str(gain_type).unwrap_or_else(|_| {
+                        invalid_error_msg(
+                            NORMALISATION_GAIN_TYPE,
+                            NORMALISATION_GAIN_TYPE_SHORT,
+                            gain_type,
+                            "track, album, auto",
+                            &format!("{:?}", player_default_config.normalisation_type),
+                        );
+
+                        exit(1);
+                    })
+                })
+                .unwrap_or(player_default_config.normalisation_type);
+
+            normalisation_pregain = opt_str(NORMALISATION_PREGAIN)
+                .map(|pregain| match pregain.parse::<f64>() {
+                    Ok(value) if (VALID_NORMALISATION_PREGAIN_RANGE).contains(&value) => value,
+                    _ => {
+                        let valid_values = &format!(
+                            "{} - {}",
+                            VALID_NORMALISATION_PREGAIN_RANGE.start(),
+                            VALID_NORMALISATION_PREGAIN_RANGE.end()
+                        );
+
+                        invalid_error_msg(
+                            NORMALISATION_PREGAIN,
+                            NORMALISATION_PREGAIN_SHORT,
+                            &pregain,
+                            valid_values,
+                            &player_default_config.normalisation_pregain.to_string(),
+                        );
+
+                        exit(1);
+                    }
+                })
+                .unwrap_or(player_default_config.normalisation_pregain);
+
+            normalisation_threshold = opt_str(NORMALISATION_THRESHOLD)
+                .map(|threshold| match threshold.parse::<f64>() {
+                    Ok(value) if (VALID_NORMALISATION_THRESHOLD_RANGE).contains(&value) => {
+                        db_to_ratio(value)
+                    }
+                    _ => {
+                        let valid_values = &format!(
+                            "{} - {}",
+                            VALID_NORMALISATION_THRESHOLD_RANGE.start(),
+                            VALID_NORMALISATION_THRESHOLD_RANGE.end()
+                        );
+
+                        invalid_error_msg(
+                            NORMALISATION_THRESHOLD,
+                            NORMALISATION_THRESHOLD_SHORT,
+                            &threshold,
+                            valid_values,
+                            &ratio_to_db(player_default_config.normalisation_threshold).to_string(),
+                        );
+
+                        exit(1);
+                    }
+                })
+                .unwrap_or(player_default_config.normalisation_threshold);
+
+            normalisation_attack = opt_str(NORMALISATION_ATTACK)
+                .map(|attack| match attack.parse::<u64>() {
+                    Ok(value) if (VALID_NORMALISATION_ATTACK_RANGE).contains(&value) => {
+                        Duration::from_millis(value)
+                    }
+                    _ => {
+                        let valid_values = &format!(
+                            "{} - {}",
+                            VALID_NORMALISATION_ATTACK_RANGE.start(),
+                            VALID_NORMALISATION_ATTACK_RANGE.end()
+                        );
+
+                        invalid_error_msg(
+                            NORMALISATION_ATTACK,
+                            NORMALISATION_ATTACK_SHORT,
+                            &attack,
+                            valid_values,
+                            &player_default_config
+                                .normalisation_attack
+                                .as_millis()
+                                .to_string(),
+                        );
+
+                        exit(1);
+                    }
+                })
+                .unwrap_or(player_default_config.normalisation_attack);
+
+            normalisation_release = opt_str(NORMALISATION_RELEASE)
+                .map(|release| match release.parse::<u64>() {
+                    Ok(value) if (VALID_NORMALISATION_RELEASE_RANGE).contains(&value) => {
+                        Duration::from_millis(value)
+                    }
+                    _ => {
+                        let valid_values = &format!(
+                            "{} - {}",
+                            VALID_NORMALISATION_RELEASE_RANGE.start(),
+                            VALID_NORMALISATION_RELEASE_RANGE.end()
+                        );
+
+                        invalid_error_msg(
+                            NORMALISATION_RELEASE,
+                            NORMALISATION_RELEASE_SHORT,
+                            &release,
+                            valid_values,
+                            &player_default_config
+                                .normalisation_release
+                                .as_millis()
+                                .to_string(),
+                        );
+
+                        exit(1);
+                    }
+                })
+                .unwrap_or(player_default_config.normalisation_release);
+
+            normalisation_knee = opt_str(NORMALISATION_KNEE)
+                .map(|knee| match knee.parse::<f64>() {
+                    Ok(value) if (VALID_NORMALISATION_KNEE_RANGE).contains(&value) => value,
+                    _ => {
+                        let valid_values = &format!(
+                            "{} - {}",
+                            VALID_NORMALISATION_KNEE_RANGE.start(),
+                            VALID_NORMALISATION_KNEE_RANGE.end()
+                        );
+
+                        invalid_error_msg(
+                            NORMALISATION_KNEE,
+                            NORMALISATION_KNEE_SHORT,
+                            &knee,
+                            valid_values,
+                            &player_default_config.normalisation_knee.to_string(),
+                        );
+
+                        exit(1);
+                    }
+                })
+                .unwrap_or(player_default_config.normalisation_knee);
+        }
+
+        let ditherer_name = opt_str(DITHER);
+        let ditherer = match ditherer_name.as_deref() {
+            Some(value) => match value {
+                "none" => None,
+                _ => match format {
+                    AudioFormat::F64 | AudioFormat::F32 => {
+                        error!("Dithering is not available with format: {:?}.", format);
+                        exit(1);
+                    }
+                    _ => Some(dither::find_ditherer(ditherer_name).unwrap_or_else(|| {
+                        invalid_error_msg(
+                            DITHER,
+                            DITHER_SHORT,
+                            &opt_str(DITHER).unwrap_or_default(),
+                            "none, gpdf, tpdf, tpdf_hp for formats S16, S24, S24_3, S32, none for formats F32, F64",
+                            "tpdf for formats S16, S24, S24_3 and none for formats S32, F32, F64",
+                        );
+
+                        exit(1);
+                    })),
+                },
+            },
             None => match format {
                 AudioFormat::S16 | AudioFormat::S24 | AudioFormat::S24_3 => {
-                    PlayerConfig::default().ditherer
+                    player_default_config.ditherer
                 }
                 _ => None,
             },
         };
 
-        let passthrough = matches.opt_present(PASSTHROUGH);
+        let passthrough = opt_present(PASSTHROUGH);
 
         PlayerConfig {
             bitrate,
@@ -717,27 +1465,8 @@ fn get_setup(args: &[String]) -> Setup {
         }
     };
 
-    let connect_config = {
-        let device_type = matches
-            .opt_str(DEVICE_TYPE)
-            .as_deref()
-            .map(|device_type| DeviceType::from_str(device_type).expect("Invalid device type"))
-            .unwrap_or_default();
-        let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
-        let autoplay = matches.opt_present(AUTOPLAY);
-
-        ConnectConfig {
-            name,
-            device_type,
-            initial_volume,
-            has_volume_ctrl,
-            autoplay,
-        }
-    };
-
-    let enable_discovery = !matches.opt_present(DISABLE_DISCOVERY);
-    let player_event_program = matches.opt_str(ONEVENT);
-    let emit_sink_events = matches.opt_present(EMIT_SINK_EVENTS);
+    let player_event_program = opt_str(ONEVENT);
+    let emit_sink_events = opt_present(EMIT_SINK_EVENTS);
 
     Setup {
         format,
@@ -764,8 +1493,7 @@ async fn main() {
         env::set_var(RUST_BACKTRACE, "full")
     }
 
-    let args: Vec<String> = std::env::args().collect();
-    let setup = get_setup(&args);
+    let setup = get_setup();
 
     let mut last_credentials = None;
     let mut spirc: Option<Spirc> = None;
@@ -809,7 +1537,9 @@ async fn main() {
                         auto_connect_times.clear();
 
                         if let Some(spirc) = spirc.take() {
-                            spirc.shutdown();
+                            if let Err(e) = spirc.shutdown() {
+                                error!("error sending spirc shutdown message: {}", e);
+                            }
                         }
                         if let Some(spirc_task) = spirc_task.take() {
                             // Continue shutdown in its own task
@@ -864,14 +1594,20 @@ async fn main() {
                         }
                     };
 
-                    let (spirc_, spirc_task_) = Spirc::new(connect_config, session, player, mixer);
-
+                    let (spirc_, spirc_task_) = match Spirc::new(connect_config, session, player, mixer) {
+                        Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
+                        Err(e) => {
+                            error!("could not initialize spirc: {}", e);
+                            exit(1);
+                        }
+                    };
                     spirc = Some(spirc_);
                     spirc_task = Some(Box::pin(spirc_task_));
                     player_event_channel = Some(event_channel);
                 },
                 Err(e) => {
-                    warn!("Connection failed: {}", e);
+                    error!("Connection failed: {}", e);
+                    exit(1);
                 }
             },
             _ = async { spirc_task.as_mut().unwrap().await }, if spirc_task.is_some() => {
@@ -941,7 +1677,9 @@ async fn main() {
 
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
-        spirc.shutdown();
+        if let Err(e) = spirc.shutdown() {
+            error!("error sending spirc shutdown message: {}", e);
+        }
 
         if let Some(mut spirc_task) = spirc_task {
             tokio::select! {
