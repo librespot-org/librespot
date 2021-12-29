@@ -66,7 +66,7 @@ impl Open for JackSink {
 }
 
 impl Sink for JackSink {
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
+    fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         let samples = packet
             .samples()
             .map_err(|e| SinkError::OnWrite(e.to_string()))?;
