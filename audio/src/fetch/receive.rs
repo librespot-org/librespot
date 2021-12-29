@@ -418,7 +418,7 @@ pub(super) async fn audio_file_fetch(
                         None => break,
                     }
                 }
-                data = file_data_rx.recv() => {
+            data = file_data_rx.recv() => {
                 match data {
                     Some(data) => {
                         if fetch.handle_file_data(data)? == ControlFlow::Break {

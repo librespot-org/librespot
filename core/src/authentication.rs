@@ -15,6 +15,8 @@ use crate::{protocol::authentication::AuthenticationType, Error};
 pub enum AuthenticationError {
     #[error("unknown authentication type {0}")]
     AuthType(u32),
+    #[error("invalid key")]
+    Key,
 }
 
 impl From<AuthenticationError> for Error {
@@ -90,6 +92,10 @@ impl Credentials {
 
         let key = {
             let mut key = [0u8; 24];
+            if key.len() < 20 {
+                return Err(AuthenticationError::Key.into());
+            }
+
             pbkdf2::<Hmac<Sha1>>(&secret, username.as_bytes(), 0x100, &mut key[0..20]);
 
             let hash = &Sha1::digest(&key[..20]);

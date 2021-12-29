@@ -448,6 +448,7 @@ async fn connect(
                     e = keep_flushing(&mut ws_tx) => {
                         break Err(e)
                     }
+                    else => (),
                 }
             };
 

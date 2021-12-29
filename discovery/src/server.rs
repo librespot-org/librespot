@@ -107,9 +107,14 @@ impl RequestHandler {
         let client_key = base64::decode(client_key.as_bytes())?;
         let shared_key = self.keys.shared_secret(&client_key);
 
+        let encrypted_blob_len = encrypted_blob.len();
+        if encrypted_blob_len < 16 {
+            return Err(DiscoveryError::HmacError(encrypted_blob.to_vec()).into());
+        }
+
         let iv = &encrypted_blob[0..16];
-        let encrypted = &encrypted_blob[16..encrypted_blob.len() - 20];
-        let cksum = &encrypted_blob[encrypted_blob.len() - 20..encrypted_blob.len()];
+        let encrypted = &encrypted_blob[16..encrypted_blob_len - 20];
+        let cksum = &encrypted_blob[encrypted_blob_len - 20..encrypted_blob_len];
 
         let base_key = Sha1::digest(&shared_key);
         let base_key = &base_key[..16];
