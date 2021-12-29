@@ -550,7 +550,7 @@ impl SpircTask {
             SpircCommand::Play => {
                 if active {
                     self.handle_play();
-                    self.notify(None, true)
+                    self.notify(None)
                 } else {
                     CommandSender::new(self, MessageType::kMessageTypePlay).send()
                 }
@@ -558,7 +558,7 @@ impl SpircTask {
             SpircCommand::PlayPause => {
                 if active {
                     self.handle_play_pause();
-                    self.notify(None, true)
+                    self.notify(None)
                 } else {
                     CommandSender::new(self, MessageType::kMessageTypePlayPause).send()
                 }
@@ -566,7 +566,7 @@ impl SpircTask {
             SpircCommand::Pause => {
                 if active {
                     self.handle_pause();
-                    self.notify(None, true)
+                    self.notify(None)
                 } else {
                     CommandSender::new(self, MessageType::kMessageTypePause).send()
                 }
@@ -574,7 +574,7 @@ impl SpircTask {
             SpircCommand::Prev => {
                 if active {
                     self.handle_prev();
-                    self.notify(None, true)
+                    self.notify(None)
                 } else {
                     CommandSender::new(self, MessageType::kMessageTypePrev).send()
                 }
@@ -582,7 +582,7 @@ impl SpircTask {
             SpircCommand::Next => {
                 if active {
                     self.handle_next();
-                    self.notify(None, true)
+                    self.notify(None)
                 } else {
                     CommandSender::new(self, MessageType::kMessageTypeNext).send()
                 }
@@ -590,7 +590,7 @@ impl SpircTask {
             SpircCommand::VolumeUp => {
                 if active {
                     self.handle_volume_up();
-                    self.notify(None, true)
+                    self.notify(None)
                 } else {
                     CommandSender::new(self, MessageType::kMessageTypeVolumeUp).send()
                 }
@@ -598,7 +598,7 @@ impl SpircTask {
             SpircCommand::VolumeDown => {
                 if active {
                     self.handle_volume_down();
-                    self.notify(None, true)
+                    self.notify(None)
                 } else {
                     CommandSender::new(self, MessageType::kMessageTypeVolumeDown).send()
                 }
@@ -629,7 +629,7 @@ impl SpircTask {
                     PlayerEvent::Loading { .. } => {
                         trace!("==> kPlayStatusLoading");
                         self.state.set_status(PlayStatus::kPlayStatusLoading);
-                        self.notify(None, false)
+                        self.notify(None)
                     }
                     PlayerEvent::Playing { position_ms, .. } => {
                         trace!("==> kPlayStatusPlay");
@@ -642,7 +642,7 @@ impl SpircTask {
                                 if (*nominal_start_time - new_nominal_start_time).abs() > 100 {
                                     *nominal_start_time = new_nominal_start_time;
                                     self.update_state_position(position_ms);
-                                    self.notify(None, true)
+                                    self.notify(None)
                                 } else {
                                     Ok(())
                                 }
@@ -655,7 +655,7 @@ impl SpircTask {
                                     nominal_start_time: new_nominal_start_time,
                                     preloading_of_next_track_triggered: false,
                                 };
-                                self.notify(None, true)
+                                self.notify(None)
                             }
                             _ => Ok(()),
                         }
@@ -673,7 +673,7 @@ impl SpircTask {
                                 if *position_ms != new_position_ms {
                                     *position_ms = new_position_ms;
                                     self.update_state_position(new_position_ms);
-                                    self.notify(None, true)
+                                    self.notify(None)
                                 } else {
                                     Ok(())
                                 }
@@ -686,7 +686,7 @@ impl SpircTask {
                                     position_ms: new_position_ms,
                                     preloading_of_next_track_triggered: false,
                                 };
-                                self.notify(None, true)
+                                self.notify(None)
                             }
                             _ => Ok(()),
                         }
@@ -699,7 +699,7 @@ impl SpircTask {
                                 warn!("The player has stopped unexpectedly.");
                                 self.state.set_status(PlayStatus::kPlayStatusStop);
                                 self.play_status = SpircPlayStatus::Stopped;
-                                self.notify(None, true)
+                                self.notify(None)
                             }
                         }
                     }
@@ -788,7 +788,7 @@ impl SpircTask {
         }
 
         match update.get_typ() {
-            MessageType::kMessageTypeHello => self.notify(Some(ident), true),
+            MessageType::kMessageTypeHello => self.notify(Some(ident)),
 
             MessageType::kMessageTypeLoad => {
                 if !self.device.get_is_active() {
@@ -810,47 +810,47 @@ impl SpircTask {
                     self.play_status = SpircPlayStatus::Stopped;
                 }
 
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypePlay => {
                 self.handle_play();
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypePlayPause => {
                 self.handle_play_pause();
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypePause => {
                 self.handle_pause();
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypeNext => {
                 self.handle_next();
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypePrev => {
                 self.handle_prev();
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypeVolumeUp => {
                 self.handle_volume_up();
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypeVolumeDown => {
                 self.handle_volume_down();
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypeRepeat => {
                 self.state.set_repeat(update.get_state().get_repeat());
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypeShuffle => {
@@ -870,17 +870,16 @@ impl SpircTask {
                     let context = self.state.get_context_uri();
                     debug!("{:?}", context);
                 }
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypeSeek => {
                 self.handle_seek(update.get_position());
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypeReplace => {
                 self.update_tracks(&update);
-                self.notify(None, true)?;
 
                 if let SpircPlayStatus::Playing {
                     preloading_of_next_track_triggered,
@@ -898,12 +897,13 @@ impl SpircTask {
                         }
                     }
                 }
-                Ok(())
+
+                self.notify(None)
             }
 
             MessageType::kMessageTypeVolume => {
                 self.set_volume(update.get_volume() as u16);
-                self.notify(None, true)
+                self.notify(None)
             }
 
             MessageType::kMessageTypeNotify => {
@@ -1172,7 +1172,7 @@ impl SpircTask {
 
     fn handle_end_of_track(&mut self) -> Result<(), Error> {
         self.handle_next();
-        self.notify(None, true)
+        self.notify(None)
     }
 
     fn position(&mut self) -> u32 {
@@ -1391,14 +1391,7 @@ impl SpircTask {
         CommandSender::new(self, MessageType::kMessageTypeHello).send()
     }
 
-    fn notify(
-        &mut self,
-        recipient: Option<&str>,
-        suppress_loading_status: bool,
-    ) -> Result<(), Error> {
-        if suppress_loading_status && (self.state.get_status() == PlayStatus::kPlayStatusLoading) {
-            return Ok(());
-        };
+    fn notify(&mut self, recipient: Option<&str>) -> Result<(), Error> {
         let status_string = match self.state.get_status() {
             PlayStatus::kPlayStatusLoading => "kPlayStatusLoading",
             PlayStatus::kPlayStatusPause => "kPlayStatusPause",

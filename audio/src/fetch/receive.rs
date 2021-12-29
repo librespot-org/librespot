@@ -427,7 +427,8 @@ pub(super) async fn audio_file_fetch(
                     }
                     None => break,
                 }
-            }
+            },
+            else => (),
         }
 
         if fetch.get_download_strategy() == DownloadStrategy::Streaming() {

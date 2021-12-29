@@ -857,14 +857,6 @@ impl PlayerTrackLoader {
 
             let stream_loader_controller = encrypted_file.get_stream_loader_controller().ok()?;
 
-            if play_from_beginning {
-                // No need to seek -> we stream from the beginning
-                stream_loader_controller.set_stream_mode();
-            } else {
-                // we need to seek -> we set stream mode after the initial seek.
-                stream_loader_controller.set_random_access_mode();
-            }
-
             let key = match self.session.audio_key().request(spotify_id, file_id).await {
                 Ok(key) => key,
                 Err(e) => {
@@ -874,6 +866,10 @@ impl PlayerTrackLoader {
             };
 
             let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
+
+            // Parsing normalisation data and starting playback from *beyond* the beginning
+            // will trigger a seek() so always start in random access mode.
+            stream_loader_controller.set_random_access_mode();
 
             let normalisation_data = match NormalisationData::parse_from_file(&mut decrypted_file) {
                 Ok(data) => data,
@@ -930,14 +926,16 @@ impl PlayerTrackLoader {
             let mut stream_position_pcm = 0;
             let position_pcm = PlayerInternal::position_ms_to_pcm(position_ms);
 
-            if position_pcm > 0 {
-                stream_loader_controller.set_random_access_mode();
+            if !play_from_beginning {
                 match decoder.seek(position_pcm) {
                     Ok(_) => stream_position_pcm = position_pcm,
                     Err(e) => error!("PlayerTrackLoader::load_track error seeking: {}", e),
                 }
-                stream_loader_controller.set_stream_mode();
             };
+
+            // Transition from random access mode to streaming mode now that
+            // we are ready to play from the requested position.
+            stream_loader_controller.set_stream_mode();
 
             info!("<{}> ({} ms) loaded", audio.name, audio.duration);
 
