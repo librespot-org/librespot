@@ -1,11 +1,13 @@
 use std::{
     cmp::max,
+    collections::HashMap,
     fmt,
     future::Future,
     io::{self, Read, Seek, SeekFrom},
     mem,
     pin::Pin,
     process::exit,
+    sync::Arc,
     task::{Context, Poll},
     thread,
     time::{Duration, Instant},
@@ -13,6 +15,7 @@ use std::{
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use futures_util::{future, stream::futures_unordered::FuturesUnordered, StreamExt, TryFutureExt};
+use parking_lot::Mutex;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
@@ -56,6 +59,7 @@ struct PlayerInternal {
     session: Session,
     config: PlayerConfig,
     commands: mpsc::UnboundedReceiver<PlayerCommand>,
+    load_handles: Arc<Mutex<HashMap<thread::ThreadId, thread::JoinHandle<()>>>>,
 
     state: PlayerState,
     preload: PlayerPreload,
@@ -344,6 +348,7 @@ impl Player {
                 session,
                 config,
                 commands: cmd_rx,
+                load_handles: Arc::new(Mutex::new(HashMap::new())),
 
                 state: PlayerState::Stopped,
                 preload: PlayerPreload::None,
@@ -1953,7 +1958,7 @@ impl PlayerInternal {
     }
 
     fn load_track(
-        &self,
+        &mut self,
         spotify_id: SpotifyId,
         position_ms: u32,
     ) -> impl Future<Output = Result<PlayerLoadedTrackData, ()>> + Send + 'static {
@@ -1970,13 +1975,20 @@ impl PlayerInternal {
 
         let (result_tx, result_rx) = oneshot::channel();
 
+        let load_handles_clone = self.load_handles.clone();
         let handle = tokio::runtime::Handle::current();
-        thread::spawn(move || {
+        let load_handle = thread::spawn(move || {
             let data = handle.block_on(loader.load_track(spotify_id, position_ms));
             if let Some(data) = data {
                 let _ = result_tx.send(data);
             }
+
+            let mut load_handles = load_handles_clone.lock();
+            load_handles.remove(&thread::current().id());
         });
+
+        let mut load_handles = self.load_handles.lock();
+        load_handles.insert(load_handle.thread().id(), load_handle);
 
         result_rx.map_err(|_| ())
     }
@@ -2016,6 +2028,20 @@ impl PlayerInternal {
 impl Drop for PlayerInternal {
     fn drop(&mut self) {
         debug!("drop PlayerInternal[{}]", self.session.session_id());
+
+        let handles: Vec<thread::JoinHandle<()>> = {
+            // waiting for the thread while holding the mutex would result in a deadlock
+            let mut load_handles = self.load_handles.lock();
+
+            load_handles
+                .drain()
+                .map(|(_thread_id, handle)| handle)
+                .collect()
+        };
+
+        for handle in handles {
+            let _ = handle.join();
+        }
     }
 }
 

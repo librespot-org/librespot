@@ -1406,6 +1406,7 @@ dependencies = [
  "librespot-metadata",
  "log",
  "ogg",
+ "parking_lot",
  "portaudio-rs",
  "rand",
  "rand_distr",
