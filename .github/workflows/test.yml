@@ -3,7 +3,7 @@ name: test
 
 on:
   push:
-    branches: [master, dev]
+    branches: [dev, master, new-api]
     paths:
       [
         "**.rs",
@@ -31,6 +31,9 @@ on:
         "!LICENSE",
         "!*.sh",
       ]
+  schedule:
+    # Run CI every week
+    - cron: "00 01 * * 0"
 
 env:
   RUST_BACKTRACE: 1
