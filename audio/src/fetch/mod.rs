@@ -387,6 +387,10 @@ impl AudioFileStreaming {
         bytes_per_second: usize,
         play_from_beginning: bool,
     ) -> Result<AudioFileStreaming, Error> {
+        // When the audio file is really small, this `download_size` may turn out to be
+        // larger than the audio file we're going to stream later on. This is OK; requesting
+        // `Content-Range` > `Content-Length` will return the complete file with status code
+        // 206 Partial Content.
         let download_size = if play_from_beginning {
             INITIAL_DOWNLOAD_SIZE
                 + max(

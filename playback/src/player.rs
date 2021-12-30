@@ -867,8 +867,7 @@ impl PlayerTrackLoader {
 
             let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
-            // Parsing normalisation data and starting playback from *beyond* the beginning
-            // will trigger a seek() so always start in random access mode.
+            // Parsing normalisation data will trigger a seek() so always start in random access mode.
             stream_loader_controller.set_random_access_mode();
 
             let normalisation_data = match NormalisationData::parse_from_file(&mut decrypted_file) {
@@ -923,13 +922,19 @@ impl PlayerTrackLoader {
                 }
             };
 
-            let mut stream_position_pcm = 0;
+            // Ensure the starting position. Even when we want to play from the beginning,
+            // the cursor may have been moved by parsing normalisation data. This may not
+            // matter for playback (but won't hurt either), but may be useful for the
+            // passthrough decoder.
             let position_pcm = PlayerInternal::position_ms_to_pcm(position_ms);
-
-            if !play_from_beginning {
-                match decoder.seek(position_pcm) {
-                    Ok(_) => stream_position_pcm = position_pcm,
-                    Err(e) => error!("PlayerTrackLoader::load_track error seeking: {}", e),
+            let stream_position_pcm = match decoder.seek(position_pcm) {
+                Ok(_) => position_pcm,
+                Err(e) => {
+                    warn!(
+                        "PlayerTrackLoader::load_track error seeking to PCM page {}: {}",
+                        position_pcm, e
+                    );
+                    0
                 }
             };
 
