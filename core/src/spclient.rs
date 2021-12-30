@@ -136,6 +136,14 @@ impl SpClient {
             let mut url = self.base_url().await;
             url.push_str(endpoint);
 
+            // Add metrics. There is also an optional `partner` key with a value like
+            // `vodafone-uk` but we've yet to discover how we can find that value.
+            let separator = match url.find('?') {
+                Some(_) => "&",
+                None => "?",
+            };
+            url.push_str(&format!("{}product=0", separator));
+
             let mut request = Request::builder()
                 .method(method)
                 .uri(url)

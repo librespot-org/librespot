@@ -334,6 +334,9 @@ impl Session {
         &self.0.config
     }
 
+    // This clones a fairly large struct, so use a specific getter or setter unless
+    // you need more fields at once, in which case this can spare multiple `read`
+    // locks.
     pub fn user_data(&self) -> UserData {
         self.0.data.read().user_data.clone()
     }
@@ -352,6 +355,10 @@ impl Session {
 
     pub fn username(&self) -> String {
         self.0.data.read().user_data.canonical_username.clone()
+    }
+
+    pub fn country(&self) -> String {
+        self.0.data.read().user_data.country.clone()
     }
 
     pub fn set_user_attribute(&self, key: &str, value: &str) -> Option<String> {

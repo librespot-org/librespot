@@ -129,7 +129,7 @@ impl HttpClient {
     }
 
     pub async fn request(&self, req: Request<Body>) -> Result<Response<Body>, Error> {
-        debug!("Requesting {:?}", req.uri().to_string());
+        debug!("Requesting {}", req.uri().to_string());
 
         let request = self.request_fut(req)?;
         let response = request.await;
