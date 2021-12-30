@@ -10,6 +10,7 @@ use hyper::{
 };
 use protobuf::Message;
 use rand::Rng;
+use thiserror::Error;
 
 use crate::{
     apresolve::SocketAddress,
@@ -30,6 +31,18 @@ component! {
 }
 
 pub type SpClientResult = Result<Bytes, Error>;
+
+#[derive(Debug, Error)]
+pub enum SpClientError {
+    #[error("missing attribute {0}")]
+    Attribute(String),
+}
+
+impl From<SpClientError> for Error {
+    fn from(err: SpClientError) -> Self {
+        Self::failed_precondition(err)
+    }
+}
 
 #[derive(Copy, Clone, Debug)]
 pub enum RequestStrategy {
@@ -289,5 +302,51 @@ impl SpClient {
         let stream = self.session().http_client().request_stream(req)?;
 
         Ok(stream)
+    }
+
+    pub async fn request_url(&self, url: String) -> SpClientResult {
+        let request = Request::builder()
+            .method(&Method::GET)
+            .uri(url)
+            .body(Body::empty())?;
+
+        self.session().http_client().request_body(request).await
+    }
+
+    // Audio preview in 96 kbps MP3, unencrypted
+    pub async fn get_audio_preview(&self, preview_id: &FileId) -> SpClientResult {
+        let attribute = "audio-preview-url-template";
+        let template = self
+            .session()
+            .get_user_attribute(attribute)
+            .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
+
+        let url = template.replace("{id}", &preview_id.to_base16());
+
+        self.request_url(url).await
+    }
+
+    // The first 128 kB of a track, unencrypted
+    pub async fn get_head_file(&self, file_id: FileId) -> SpClientResult {
+        let attribute = "head-files-url";
+        let template = self
+            .session()
+            .get_user_attribute(attribute)
+            .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
+
+        let url = template.replace("{file_id}", &file_id.to_base16());
+
+        self.request_url(url).await
+    }
+
+    pub async fn get_image(&self, image_id: FileId) -> SpClientResult {
+        let attribute = "image-url";
+        let template = self
+            .session()
+            .get_user_attribute(attribute)
+            .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
+        let url = template.replace("{file_id}", &image_id.to_base16());
+
+        self.request_url(url).await
     }
 }

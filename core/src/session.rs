@@ -373,6 +373,16 @@ impl Session {
         self.0.data.write().user_data.attributes.extend(attributes)
     }
 
+    pub fn get_user_attribute(&self, key: &str) -> Option<String> {
+        self.0
+            .data
+            .read()
+            .user_data
+            .attributes
+            .get(key)
+            .map(Clone::clone)
+    }
+
     fn weak(&self) -> SessionWeak {
         SessionWeak(Arc::downgrade(&self.0))
     }
