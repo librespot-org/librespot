@@ -98,6 +98,7 @@ enum PlayerCommand {
     SetSinkEventCallback(Option<SinkEventCallback>),
     EmitVolumeSetEvent(u16),
     SetAutoNormaliseAsAlbum(bool),
+    SkipExplicitContent(),
 }
 
 #[derive(Debug, Clone)]
@@ -456,6 +457,10 @@ impl Player {
     pub fn set_auto_normalise_as_album(&self, setting: bool) {
         self.command(PlayerCommand::SetAutoNormaliseAsAlbum(setting));
     }
+
+    pub fn skip_explicit_content(&self) {
+        self.command(PlayerCommand::SkipExplicitContent());
+    }
 }
 
 impl Drop for Player {
@@ -478,6 +483,7 @@ struct PlayerLoadedTrackData {
     bytes_per_second: usize,
     duration_ms: u32,
     stream_position_pcm: u64,
+    is_explicit: bool,
 }
 
 enum PlayerPreload {
@@ -513,6 +519,7 @@ enum PlayerState {
         duration_ms: u32,
         stream_position_pcm: u64,
         suggested_to_preload_next_track: bool,
+        is_explicit: bool,
     },
     Playing {
         track_id: SpotifyId,
@@ -526,6 +533,7 @@ enum PlayerState {
         stream_position_pcm: u64,
         reported_nominal_start_time: Option<Instant>,
         suggested_to_preload_next_track: bool,
+        is_explicit: bool,
     },
     EndOfTrack {
         track_id: SpotifyId,
@@ -608,6 +616,7 @@ impl PlayerState {
                 normalisation_data,
                 stream_loader_controller,
                 stream_position_pcm,
+                is_explicit,
                 ..
             } => {
                 *self = EndOfTrack {
@@ -620,6 +629,7 @@ impl PlayerState {
                         bytes_per_second,
                         duration_ms,
                         stream_position_pcm,
+                        is_explicit,
                     },
                 };
             }
@@ -648,6 +658,7 @@ impl PlayerState {
                 bytes_per_second,
                 stream_position_pcm,
                 suggested_to_preload_next_track,
+                is_explicit,
             } => {
                 *self = Playing {
                     track_id,
@@ -661,6 +672,7 @@ impl PlayerState {
                     stream_position_pcm,
                     reported_nominal_start_time: None,
                     suggested_to_preload_next_track,
+                    is_explicit,
                 };
             }
             _ => {
@@ -689,6 +701,7 @@ impl PlayerState {
                 stream_position_pcm,
                 reported_nominal_start_time: _,
                 suggested_to_preload_next_track,
+                is_explicit,
             } => {
                 *self = Paused {
                     track_id,
@@ -701,6 +714,7 @@ impl PlayerState {
                     bytes_per_second,
                     stream_position_pcm,
                     suggested_to_preload_next_track,
+                    is_explicit,
                 };
             }
             _ => {
@@ -777,6 +791,16 @@ impl PlayerTrackLoader {
             "Loading <{}> with Spotify URI <{}>",
             audio.name, audio.spotify_uri
         );
+
+        let is_explicit = audio.is_explicit;
+        if is_explicit {
+            if let Some(value) = self.session.get_user_attribute("filter-explicit-content") {
+                if &value == "1" {
+                    warn!("Track is marked as explicit, which client setting forbids.");
+                    return None;
+                }
+            }
+        }
 
         let audio = match self.find_available_alternative(audio).await {
             Some(audio) => audio,
@@ -951,6 +975,7 @@ impl PlayerTrackLoader {
                 bytes_per_second,
                 duration_ms,
                 stream_position_pcm,
+                is_explicit,
             });
         }
     }
@@ -1518,6 +1543,7 @@ impl PlayerInternal {
                     Instant::now() - Duration::from_millis(position_ms as u64),
                 ),
                 suggested_to_preload_next_track: false,
+                is_explicit: loaded_track.is_explicit,
             };
         } else {
             self.ensure_sink_stopped(false);
@@ -1533,6 +1559,7 @@ impl PlayerInternal {
                 bytes_per_second: loaded_track.bytes_per_second,
                 stream_position_pcm: loaded_track.stream_position_pcm,
                 suggested_to_preload_next_track: false,
+                is_explicit: loaded_track.is_explicit,
             };
 
             self.send_event(PlayerEvent::Paused {
@@ -1674,6 +1701,7 @@ impl PlayerInternal {
                     bytes_per_second,
                     duration_ms,
                     normalisation_data,
+                    is_explicit,
                     ..
                 }
                 | PlayerState::Paused {
@@ -1683,6 +1711,7 @@ impl PlayerInternal {
                     bytes_per_second,
                     duration_ms,
                     normalisation_data,
+                    is_explicit,
                     ..
                 } = old_state
                 {
@@ -1693,6 +1722,7 @@ impl PlayerInternal {
                         bytes_per_second,
                         duration_ms,
                         stream_position_pcm,
+                        is_explicit,
                     };
 
                     self.preload = PlayerPreload::None;
@@ -1943,6 +1973,30 @@ impl PlayerInternal {
             PlayerCommand::SetAutoNormaliseAsAlbum(setting) => {
                 self.auto_normalise_as_album = setting
             }
+
+            PlayerCommand::SkipExplicitContent() => {
+                if let PlayerState::Playing {
+                    track_id,
+                    play_request_id,
+                    is_explicit,
+                    ..
+                }
+                | PlayerState::Paused {
+                    track_id,
+                    play_request_id,
+                    is_explicit,
+                    ..
+                } = self.state
+                {
+                    if is_explicit {
+                        warn!("Currently loaded track is explicit, which client setting forbids -- skipping to next track.");
+                        self.send_event(PlayerEvent::EndOfTrack {
+                            track_id,
+                            play_request_id,
+                        })
+                    }
+                }
+            }
         };
 
         Ok(result)
@@ -2080,6 +2134,7 @@ impl fmt::Debug for PlayerCommand {
                 .debug_tuple("SetAutoNormaliseAsAlbum")
                 .field(&setting)
                 .finish(),
+            PlayerCommand::SkipExplicitContent() => f.debug_tuple("SkipExplicitContent").finish(),
         }
     }
 }

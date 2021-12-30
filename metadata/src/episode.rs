@@ -80,6 +80,7 @@ impl InnerAudioItem for Episode {
             duration: episode.duration,
             availability,
             alternatives: None,
+            is_explicit: episode.is_explicit,
         })
     }
 }

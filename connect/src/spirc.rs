@@ -746,12 +746,17 @@ impl SpircTask {
                     _ => old_value,
                 };
                 self.session.set_user_attribute(key, new_value);
+
                 trace!(
                     "Received attribute mutation, {} was {} is now {}",
                     key,
                     old_value,
                     new_value
                 );
+
+                if key == "filter-explicit-content" && new_value == "1" {
+                    self.player.skip_explicit_content();
+                }
             } else {
                 trace!(
                     "Received attribute mutation for {} but key was not found!",

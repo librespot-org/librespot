@@ -26,6 +26,7 @@ pub struct AudioItem {
     pub duration: i32,
     pub availability: AudioItemAvailability,
     pub alternatives: Option<Tracks>,
+    pub is_explicit: bool,
 }
 
 impl AudioItem {

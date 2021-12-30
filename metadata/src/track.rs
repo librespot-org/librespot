@@ -95,6 +95,7 @@ impl InnerAudioItem for Track {
             duration: track.duration,
             availability,
             alternatives,
+            is_explicit: track.is_explicit,
         })
     }
 }
