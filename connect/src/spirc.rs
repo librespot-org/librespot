@@ -86,7 +86,6 @@ type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
 struct SpircTask {
     player: Player,
     mixer: Box<dyn Mixer>,
-    config: SpircTaskConfig,
 
     sequence: SeqGenerator<u32>,
 
@@ -121,10 +120,6 @@ pub enum SpircCommand {
     VolumeDown,
     Shutdown,
     Shuffle,
-}
-
-struct SpircTaskConfig {
-    autoplay: bool,
 }
 
 const CONTEXT_TRACKS_HISTORY: usize = 10;
@@ -337,9 +332,6 @@ impl Spirc {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let initial_volume = config.initial_volume;
-        let task_config = SpircTaskConfig {
-            autoplay: config.autoplay,
-        };
 
         let device = initial_device_state(config);
 
@@ -348,7 +340,6 @@ impl Spirc {
         let mut task = SpircTask {
             player,
             mixer,
-            config: task_config,
 
             sequence: SeqGenerator::new(1),
 
@@ -1098,8 +1089,19 @@ impl SpircTask {
             self.context_fut = self.resolve_station(&context_uri);
             self.update_tracks_from_context();
         }
+
         if new_index >= tracks_len {
-            if self.config.autoplay {
+            let autoplay = self
+                .session
+                .get_user_attribute("autoplay")
+                .unwrap_or_else(|| {
+                    warn!(
+                        "Unable to get autoplay user attribute. Continuing with autoplay disabled."
+                    );
+                    "0".into()
+                });
+
+            if autoplay == "1" {
                 // Extend the playlist
                 debug!("Extending playlist <{}>", context_uri);
                 self.update_tracks_from_context();
@@ -1262,18 +1264,23 @@ impl SpircTask {
 
     fn update_tracks(&mut self, frame: &protocol::spirc::Frame) {
         trace!("State: {:#?}", frame.get_state());
+
         let index = frame.get_state().get_playing_track_index();
         let context_uri = frame.get_state().get_context_uri().to_owned();
         let tracks = frame.get_state().get_track();
+
         trace!("Frame has {:?} tracks", tracks.len());
+
         if context_uri.starts_with("spotify:station:")
             || context_uri.starts_with("spotify:dailymix:")
         {
             self.context_fut = self.resolve_station(&context_uri);
-        } else if self.config.autoplay {
-            info!("Fetching autoplay context uri");
-            // Get autoplay_station_uri for regular playlists
-            self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
+        } else if let Some(autoplay) = self.session.get_user_attribute("autoplay") {
+            if &autoplay == "1" {
+                info!("Fetching autoplay context uri");
+                // Get autoplay_station_uri for regular playlists
+                self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
+            }
         }
 
         self.player

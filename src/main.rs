@@ -201,7 +201,6 @@ fn get_setup() -> Setup {
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
 
     const AP_PORT: &str = "ap-port";
-    const AUTOPLAY: &str = "autoplay";
     const BACKEND: &str = "backend";
     const BITRATE: &str = "bitrate";
     const CACHE: &str = "cache";
@@ -245,7 +244,6 @@ fn get_setup() -> Setup {
     const ZEROCONF_PORT: &str = "zeroconf-port";
 
     // Mostly arbitrary.
-    const AUTOPLAY_SHORT: &str = "A";
     const AP_PORT_SHORT: &str = "a";
     const BACKEND_SHORT: &str = "B";
     const BITRATE_SHORT: &str = "b";
@@ -375,11 +373,6 @@ fn get_setup() -> Setup {
         EMIT_SINK_EVENTS_SHORT,
         EMIT_SINK_EVENTS,
         "Run PROGRAM set by `--onevent` before the sink is opened and after it is closed.",
-    )
-    .optflag(
-        AUTOPLAY_SHORT,
-        AUTOPLAY,
-        "Automatically play similar songs when your music ends.",
     )
     .optflag(
         PASSTHROUGH_SHORT,
@@ -1245,14 +1238,12 @@ fn get_setup() -> Setup {
             .unwrap_or_default();
 
         let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
-        let autoplay = opt_present(AUTOPLAY);
 
         ConnectConfig {
             name,
             device_type,
             initial_volume,
             has_volume_ctrl,
-            autoplay,
         }
     };
 
