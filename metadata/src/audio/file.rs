@@ -20,7 +20,15 @@ impl From<&[AudioFileMessage]> for AudioFiles {
     fn from(files: &[AudioFileMessage]) -> Self {
         let audio_files = files
             .iter()
-            .map(|file| (file.get_format(), FileId::from(file.get_file_id())))
+            .filter_map(|file| {
+                let file_id = FileId::from(file.get_file_id());
+                if file.has_format() {
+                    Some((file.get_format(), file_id))
+                } else {
+                    trace!("Ignoring file <{}> with unspecified format", file_id);
+                    None
+                }
+            })
             .collect();
 
         AudioFiles(audio_files)

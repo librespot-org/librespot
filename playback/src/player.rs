@@ -16,6 +16,7 @@ use std::{
 use byteorder::{LittleEndian, ReadBytesExt};
 use futures_util::{future, stream::futures_unordered::FuturesUnordered, StreamExt, TryFutureExt};
 use parking_lot::Mutex;
+use symphonia::core::io::MediaSource;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
@@ -28,7 +29,7 @@ use crate::{
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
     core::{util::SeqGenerator, Error, Session, SpotifyId},
-    decoder::{AudioDecoder, AudioPacket, DecoderError, PassthroughDecoder, VorbisDecoder},
+    decoder::{AudioDecoder, AudioPacket, PassthroughDecoder, SymphoniaDecoder},
     metadata::audio::{AudioFileFormat, AudioItem},
     mixer::AudioFilter,
 };
@@ -220,10 +221,12 @@ pub fn ratio_to_db(ratio: f64) -> f64 {
 
 #[derive(Clone, Copy, Debug)]
 pub struct NormalisationData {
-    track_gain_db: f32,
-    track_peak: f32,
-    album_gain_db: f32,
-    album_peak: f32,
+    // Spotify provides these as `f32`, but audio metadata can contain up to `f64`.
+    // Also, this negates the need for casting during sample processing.
+    pub track_gain_db: f64,
+    pub track_peak: f64,
+    pub album_gain_db: f64,
+    pub album_peak: f64,
 }
 
 impl Default for NormalisationData {
@@ -238,7 +241,7 @@ impl Default for NormalisationData {
 }
 
 impl NormalisationData {
-    fn parse_from_file<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
+    fn parse_from_ogg<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
 
         let newpos = file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
@@ -251,10 +254,10 @@ impl NormalisationData {
             return Ok(NormalisationData::default());
         }
 
-        let track_gain_db = file.read_f32::<LittleEndian>()?;
-        let track_peak = file.read_f32::<LittleEndian>()?;
-        let album_gain_db = file.read_f32::<LittleEndian>()?;
-        let album_peak = file.read_f32::<LittleEndian>()?;
+        let track_gain_db = file.read_f32::<LittleEndian>()? as f64;
+        let track_peak = file.read_f32::<LittleEndian>()? as f64;
+        let album_gain_db = file.read_f32::<LittleEndian>()? as f64;
+        let album_peak = file.read_f32::<LittleEndian>()? as f64;
 
         let r = NormalisationData {
             track_gain_db,
@@ -277,11 +280,11 @@ impl NormalisationData {
             [data.track_gain_db, data.track_peak]
         };
 
-        let normalisation_power = gain_db as f64 + config.normalisation_pregain;
+        let normalisation_power = gain_db + config.normalisation_pregain;
         let mut normalisation_factor = db_to_ratio(normalisation_power);
 
-        if normalisation_factor * gain_peak as f64 > config.normalisation_threshold {
-            let limited_normalisation_factor = config.normalisation_threshold / gain_peak as f64;
+        if normalisation_factor * gain_peak > config.normalisation_threshold {
+            let limited_normalisation_factor = config.normalisation_threshold / gain_peak;
             let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
 
             if config.normalisation_method == NormalisationMethod::Basic {
@@ -304,7 +307,7 @@ impl NormalisationData {
             normalisation_factor * 100.0
         );
 
-        normalisation_factor as f64
+        normalisation_factor
     }
 }
 
@@ -820,23 +823,34 @@ impl PlayerTrackLoader {
         }
         let duration_ms = audio.duration as u32;
 
-        // (Most) podcasts seem to support only 96 kbps Vorbis, so fall back to it
-        // TODO: update this logic once we also support MP3 and/or FLAC
+        // (Most) podcasts seem to support only 96 kbps Ogg Vorbis, so fall back to it
         let formats = match self.config.bitrate {
             Bitrate::Bitrate96 => [
                 AudioFileFormat::OGG_VORBIS_96,
+                AudioFileFormat::MP3_96,
                 AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::MP3_160,
+                AudioFileFormat::MP3_256,
                 AudioFileFormat::OGG_VORBIS_320,
+                AudioFileFormat::MP3_320,
             ],
             Bitrate::Bitrate160 => [
                 AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::MP3_160,
                 AudioFileFormat::OGG_VORBIS_96,
+                AudioFileFormat::MP3_96,
+                AudioFileFormat::MP3_256,
                 AudioFileFormat::OGG_VORBIS_320,
+                AudioFileFormat::MP3_320,
             ],
             Bitrate::Bitrate320 => [
                 AudioFileFormat::OGG_VORBIS_320,
+                AudioFileFormat::MP3_320,
+                AudioFileFormat::MP3_256,
                 AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::MP3_160,
                 AudioFileFormat::OGG_VORBIS_96,
+                AudioFileFormat::MP3_96,
             ],
         };
 
@@ -879,42 +893,47 @@ impl PlayerTrackLoader {
 
             let is_cached = encrypted_file.is_cached();
 
+            // Setting up demuxing and decoding will trigger a seek() so always start in random access mode.
             let stream_loader_controller = encrypted_file.get_stream_loader_controller().ok()?;
-
-            let key = match self.session.audio_key().request(spotify_id, file_id).await {
-                Ok(key) => key,
-                Err(e) => {
-                    error!("Unable to load decryption key: {:?}", e);
-                    return None;
-                }
-            };
-
-            let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
-
-            // Parsing normalisation data will trigger a seek() so always start in random access mode.
             stream_loader_controller.set_random_access_mode();
 
-            let normalisation_data = match NormalisationData::parse_from_file(&mut decrypted_file) {
-                Ok(data) => data,
-                Err(_) => {
-                    warn!("Unable to extract normalisation data, using default values.");
-                    NormalisationData::default()
+            // Not all audio files are encrypted. If we can't get a key, try loading the track
+            // without decryption. If the file was encrypted after all, the decoder will fail
+            // parsing and bail out, so we should be safe from outputting ear-piercing noise.
+            let key = match self.session.audio_key().request(spotify_id, file_id).await {
+                Ok(key) => Some(key),
+                Err(e) => {
+                    warn!("Unable to load key, continuing without decryption: {}", e);
+                    None
                 }
             };
+            let decrypted_file = AudioDecrypt::new(key, encrypted_file);
+            let mut audio_file =
+                Subfile::new(decrypted_file, stream_loader_controller.len() as u64);
 
-            let audio_file = Subfile::new(decrypted_file, 0xa7);
-
+            let mut normalisation_data = None;
             let result = if self.config.passthrough {
-                match PassthroughDecoder::new(audio_file) {
-                    Ok(result) => Ok(Box::new(result) as Decoder),
-                    Err(e) => Err(DecoderError::PassthroughDecoder(e.to_string())),
-                }
+                PassthroughDecoder::new(audio_file, format).map(|x| Box::new(x) as Decoder)
             } else {
-                match VorbisDecoder::new(audio_file) {
-                    Ok(result) => Ok(Box::new(result) as Decoder),
-                    Err(e) => Err(DecoderError::LewtonDecoder(e.to_string())),
+                // Spotify stores normalisation data in a custom Ogg packet instead of Vorbis comments.
+                if SymphoniaDecoder::is_ogg_vorbis(format) {
+                    normalisation_data = NormalisationData::parse_from_ogg(&mut audio_file).ok();
                 }
+
+                SymphoniaDecoder::new(audio_file, format).map(|mut decoder| {
+                    // For formats other that Vorbis, we'll try getting normalisation data from
+                    // ReplayGain metadata fields, if present.
+                    if normalisation_data.is_none() {
+                        normalisation_data = decoder.normalisation_data();
+                    }
+                    Box::new(decoder) as Decoder
+                })
             };
+
+            let normalisation_data = normalisation_data.unwrap_or_else(|| {
+                warn!("Unable to get normalisation data, continuing with defaults.");
+                NormalisationData::default()
+            });
 
             let mut decoder = match result {
                 Ok(decoder) => decoder,
@@ -1035,7 +1054,7 @@ impl Future for PlayerInternal {
                             track_id, e
                         );
                         debug_assert!(self.state.is_loading());
-                        self.send_event(PlayerEvent::EndOfTrack {
+                        self.send_event(PlayerEvent::Unavailable {
                             track_id,
                             play_request_id,
                         })
@@ -2184,27 +2203,24 @@ impl fmt::Debug for PlayerState {
         }
     }
 }
+
 struct Subfile<T: Read + Seek> {
     stream: T,
-    offset: u64,
+    length: u64,
 }
 
 impl<T: Read + Seek> Subfile<T> {
-    pub fn new(mut stream: T, offset: u64) -> Subfile<T> {
-        let target = SeekFrom::Start(offset);
-        match stream.seek(target) {
+    pub fn new(mut stream: T, length: u64) -> Subfile<T> {
+        match stream.seek(SeekFrom::Start(0)) {
             Ok(pos) => {
-                if pos != offset {
-                    error!(
-                        "Subfile::new seeking to {:?} but position is now {:?}",
-                        target, pos
-                    );
+                if pos != 0 {
+                    error!("Subfile::new seeking to 0 but position is now {:?}", pos);
                 }
             }
             Err(e) => error!("Subfile new Error: {}", e),
         }
 
-        Subfile { stream, offset }
+        Subfile { stream, length }
     }
 }
 
@@ -2215,21 +2231,20 @@ impl<T: Read + Seek> Read for Subfile<T> {
 }
 
 impl<T: Read + Seek> Seek for Subfile<T> {
-    fn seek(&mut self, mut pos: SeekFrom) -> io::Result<u64> {
-        pos = match pos {
-            SeekFrom::Start(offset) => SeekFrom::Start(offset + self.offset),
-            x => x,
-        };
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        self.stream.seek(pos)
+    }
+}
 
-        let newpos = self.stream.seek(pos)?;
+impl<R> MediaSource for Subfile<R>
+where
+    R: Read + Seek + Send,
+{
+    fn is_seekable(&self) -> bool {
+        true
+    }
 
-        if newpos >= self.offset {
-            Ok(newpos - self.offset)
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "newpos < self.offset",
-            ))
-        }
+    fn byte_len(&self) -> Option<u64> {
+        Some(self.length)
     }
 }

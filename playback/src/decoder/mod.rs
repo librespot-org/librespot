@@ -1,26 +1,28 @@
 use thiserror::Error;
 
-mod lewton_decoder;
-pub use lewton_decoder::VorbisDecoder;
+use crate::metadata::audio::AudioFileFormat;
 
 mod passthrough_decoder;
 pub use passthrough_decoder::PassthroughDecoder;
 
+mod symphonia_decoder;
+pub use symphonia_decoder::SymphoniaDecoder;
+
 #[derive(Error, Debug)]
 pub enum DecoderError {
-    #[error("Lewton Decoder Error: {0}")]
-    LewtonDecoder(String),
     #[error("Passthrough Decoder Error: {0}")]
     PassthroughDecoder(String),
+    #[error("Symphonia Decoder Error: {0}")]
+    SymphoniaDecoder(String),
 }
 
 pub type DecoderResult<T> = Result<T, DecoderError>;
 
 #[derive(Error, Debug)]
 pub enum AudioPacketError {
-    #[error("Decoder OggData Error: Can't return OggData on Samples")]
-    OggData,
-    #[error("Decoder Samples Error: Can't return Samples on OggData")]
+    #[error("Decoder Raw Error: Can't return Raw on Samples")]
+    Raw,
+    #[error("Decoder Samples Error: Can't return Samples on Raw")]
     Samples,
 }
 
@@ -28,25 +30,20 @@ pub type AudioPacketResult<T> = Result<T, AudioPacketError>;
 
 pub enum AudioPacket {
     Samples(Vec<f64>),
-    OggData(Vec<u8>),
+    Raw(Vec<u8>),
 }
 
 impl AudioPacket {
-    pub fn samples_from_f32(f32_samples: Vec<f32>) -> Self {
-        let f64_samples = f32_samples.iter().map(|sample| *sample as f64).collect();
-        AudioPacket::Samples(f64_samples)
-    }
-
     pub fn samples(&self) -> AudioPacketResult<&[f64]> {
         match self {
             AudioPacket::Samples(s) => Ok(s),
-            AudioPacket::OggData(_) => Err(AudioPacketError::OggData),
+            AudioPacket::Raw(_) => Err(AudioPacketError::Raw),
         }
     }
 
     pub fn oggdata(&self) -> AudioPacketResult<&[u8]> {
         match self {
-            AudioPacket::OggData(d) => Ok(d),
+            AudioPacket::Raw(d) => Ok(d),
             AudioPacket::Samples(_) => Err(AudioPacketError::Samples),
         }
     }
@@ -54,12 +51,43 @@ impl AudioPacket {
     pub fn is_empty(&self) -> bool {
         match self {
             AudioPacket::Samples(s) => s.is_empty(),
-            AudioPacket::OggData(d) => d.is_empty(),
+            AudioPacket::Raw(d) => d.is_empty(),
         }
     }
 }
 
 pub trait AudioDecoder {
-    fn seek(&mut self, absgp: u64) -> DecoderResult<()>;
+    fn seek(&mut self, absgp: u64) -> Result<u64, DecoderError>;
     fn next_packet(&mut self) -> DecoderResult<Option<AudioPacket>>;
+
+    fn is_ogg_vorbis(format: AudioFileFormat) -> bool
+    where
+        Self: Sized,
+    {
+        matches!(
+            format,
+            AudioFileFormat::OGG_VORBIS_320
+                | AudioFileFormat::OGG_VORBIS_160
+                | AudioFileFormat::OGG_VORBIS_96
+        )
+    }
+
+    fn is_mp3(format: AudioFileFormat) -> bool
+    where
+        Self: Sized,
+    {
+        matches!(
+            format,
+            AudioFileFormat::MP3_320
+                | AudioFileFormat::MP3_256
+                | AudioFileFormat::MP3_160
+                | AudioFileFormat::MP3_96
+        )
+    }
+}
+
+impl From<symphonia::core::errors::Error> for DecoderError {
+    fn from(err: symphonia::core::errors::Error) -> Self {
+        Self::SymphoniaDecoder(err.to_string())
+    }
 }

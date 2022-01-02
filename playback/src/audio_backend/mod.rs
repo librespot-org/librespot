@@ -71,7 +71,7 @@ macro_rules! sink_as_bytes {
                         self.write_bytes(samples_s16.as_bytes())
                     }
                 },
-                AudioPacket::OggData(samples) => self.write_bytes(samples),
+                AudioPacket::Raw(samples) => self.write_bytes(samples),
             }
         }
     };

@@ -25,11 +25,11 @@ impl<R> AudioDecoder for VorbisDecoder<R>
 where
     R: Read + Seek,
 {
-    fn seek(&mut self, absgp: u64) -> DecoderResult<()> {
+    fn seek(&mut self, absgp: u64) -> Result<u64, DecoderError> {
         self.0
             .seek_absgp_pg(absgp)
             .map_err(|e| DecoderError::LewtonDecoder(e.to_string()))?;
-        Ok(())
+        Ok(absgp)
     }
 
     fn next_packet(&mut self) -> DecoderResult<Option<AudioPacket>> {

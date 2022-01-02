@@ -14,16 +14,20 @@ const AUDIO_AESIV: [u8; 16] = [
 ];
 
 pub struct AudioDecrypt<T: io::Read> {
-    cipher: Aes128Ctr,
+    // a `None` cipher is a convenience to make `AudioDecrypt` pass files unaltered
+    cipher: Option<Aes128Ctr>,
     reader: T,
 }
 
 impl<T: io::Read> AudioDecrypt<T> {
-    pub fn new(key: AudioKey, reader: T) -> AudioDecrypt<T> {
-        let cipher = Aes128Ctr::new(
-            GenericArray::from_slice(&key.0),
-            GenericArray::from_slice(&AUDIO_AESIV),
-        );
+    pub fn new(key: Option<AudioKey>, reader: T) -> AudioDecrypt<T> {
+        let cipher = key.map(|key| {
+            Aes128Ctr::new(
+                GenericArray::from_slice(&key.0),
+                GenericArray::from_slice(&AUDIO_AESIV),
+            )
+        });
+
         AudioDecrypt { cipher, reader }
     }
 }
@@ -32,7 +36,9 @@ impl<T: io::Read> io::Read for AudioDecrypt<T> {
     fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
         let len = self.reader.read(output)?;
 
-        self.cipher.apply_keystream(&mut output[..len]);
+        if let Some(ref mut cipher) = self.cipher {
+            cipher.apply_keystream(&mut output[..len]);
+        }
 
         Ok(len)
     }
@@ -42,7 +48,9 @@ impl<T: io::Read + io::Seek> io::Seek for AudioDecrypt<T> {
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         let newpos = self.reader.seek(pos)?;
 
-        self.cipher.seek(newpos);
+        if let Some(ref mut cipher) = self.cipher {
+            cipher.seek(newpos);
+        }
 
         Ok(newpos)
     }

@@ -18,15 +18,15 @@ path = "../metadata"
 version = "0.3.1"
 
 [dependencies]
+byteorder = "1.4"
 futures-executor = "0.3"
 futures-util = { version = "0.3", default_features = false, features = ["alloc"] }
 log = "0.4"
-byteorder = "1.4"
+parking_lot = { version = "0.11", features = ["deadlock_detection"] }
 shell-words = "1.0.0"
 thiserror = "1.0"
 tokio = { version = "1", features = ["parking_lot", "rt", "rt-multi-thread", "sync"] }
 zerocopy = { version = "0.3" }
-parking_lot = { version = "0.11", features = ["deadlock_detection"] }
 
 # Backends
 alsa            = { version = "0.5", optional = true }
@@ -43,8 +43,10 @@ glib            = { version = "0.10", optional = true }
 rodio           = { version = "0.14", optional = true, default-features = false }
 cpal            = { version = "0.13", optional = true }
 
-# Decoder
-lewton = "0.10"
+# Container and audio decoder
+symphonia = { version = "0.4", default-features = false, features = ["mp3", "ogg", "vorbis"] }
+
+# Legacy Ogg container decoder for the passthrough decoder
 ogg = "0.8"
 
 # Dithering

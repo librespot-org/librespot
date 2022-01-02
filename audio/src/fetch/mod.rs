@@ -57,6 +57,7 @@ impl From<AudioFileError> for Error {
 
 /// The minimum size of a block that is requested from the Spotify servers in one request.
 /// This is the block size that is typically requested while doing a `seek()` on a file.
+/// The Symphonia decoder requires this to be a power of 2 and > 32 kB.
 /// Note: smaller requests can happen if part of the block is downloaded already.
 pub const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 128;
 

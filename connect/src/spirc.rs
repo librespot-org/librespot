@@ -687,7 +687,6 @@ impl SpircTask {
                         match self.play_status {
                             SpircPlayStatus::Stopped => Ok(()),
                             _ => {
-                                warn!("The player has stopped unexpectedly.");
                                 self.state.set_status(PlayStatus::kPlayStatusStop);
                                 self.play_status = SpircPlayStatus::Stopped;
                                 self.notify(None)
@@ -801,9 +800,7 @@ impl SpircTask {
                     self.load_track(start_playing, update.get_state().get_position_ms());
                 } else {
                     info!("No more tracks left in queue");
-                    self.state.set_status(PlayStatus::kPlayStatusStop);
-                    self.player.stop();
-                    self.play_status = SpircPlayStatus::Stopped;
+                    self.handle_stop();
                 }
 
                 self.notify(None)
@@ -909,15 +906,17 @@ impl SpircTask {
                         <= update.get_device_state().get_became_active_at()
                 {
                     self.device.set_is_active(false);
-                    self.state.set_status(PlayStatus::kPlayStatusStop);
-                    self.player.stop();
-                    self.play_status = SpircPlayStatus::Stopped;
+                    self.handle_stop();
                 }
                 Ok(())
             }
 
             _ => Ok(()),
         }
+    }
+
+    fn handle_stop(&mut self) {
+        self.player.stop();
     }
 
     fn handle_play(&mut self) {
@@ -1036,13 +1035,14 @@ impl SpircTask {
                 ..
             } => {
                 *preloading_of_next_track_triggered = true;
-                if let Some(track_id) = self.preview_next_track() {
-                    self.player.preload(track_id);
-                }
             }
-            SpircPlayStatus::LoadingPause { .. }
-            | SpircPlayStatus::LoadingPlay { .. }
-            | SpircPlayStatus::Stopped => (),
+            _ => (),
+        }
+
+        if let Some(track_id) = self.preview_next_track() {
+            self.player.preload(track_id);
+        } else {
+            self.handle_stop();
         }
     }
 
@@ -1122,9 +1122,7 @@ impl SpircTask {
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
             self.state.set_playing_track_index(0);
-            self.state.set_status(PlayStatus::kPlayStatusStop);
-            self.player.stop();
-            self.play_status = SpircPlayStatus::Stopped;
+            self.handle_stop();
         }
     }
 
@@ -1392,9 +1390,7 @@ impl SpircTask {
                 }
             }
             None => {
-                self.state.set_status(PlayStatus::kPlayStatusStop);
-                self.player.stop();
-                self.play_status = SpircPlayStatus::Stopped;
+                self.handle_stop();
             }
         }
     }
