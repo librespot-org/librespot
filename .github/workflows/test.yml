@@ -55,7 +55,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         toolchain:
-          - 1.48 # MSRV (Minimum supported rust version)
+          - 1.51 # MSRV (Minimum supported rust version)
           - stable
         experimental: [false]
         # Ignore failures in beta
