@@ -1,11 +1,12 @@
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use vergen::{generate_cargo_keys, ConstantsFlags};
+use vergen::{vergen, Config, ShaKind, TimestampKind};
 
 fn main() {
-    let mut flags = ConstantsFlags::all();
-    flags.toggle(ConstantsFlags::REBUILD_ON_HEAD_CHANGE);
-    generate_cargo_keys(ConstantsFlags::all()).expect("Unable to generate the cargo keys!");
+    let mut config = Config::default();
+    *config.git_mut().sha_kind_mut() = ShaKind::Short;
+    *config.build_mut().kind_mut() = TimestampKind::DateOnly;
+    vergen(config).expect("Unable to generate the cargo keys!");
 
     let build_id: String = rand::thread_rng()
         .sample_iter(Alphanumeric)
