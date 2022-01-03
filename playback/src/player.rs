@@ -34,7 +34,7 @@ use crate::{
     mixer::AudioFilter,
 };
 
-use crate::{MS_PER_PAGE, NUM_CHANNELS, PAGES_PER_MS, SAMPLES_PER_SECOND};
+use crate::SAMPLES_PER_SECOND;
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
@@ -489,7 +489,7 @@ struct PlayerLoadedTrackData {
     stream_loader_controller: StreamLoaderController,
     bytes_per_second: usize,
     duration_ms: u32,
-    stream_position_pcm: u64,
+    stream_position_ms: u32,
     is_explicit: bool,
 }
 
@@ -524,7 +524,7 @@ enum PlayerState {
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
         duration_ms: u32,
-        stream_position_pcm: u64,
+        stream_position_ms: u32,
         suggested_to_preload_next_track: bool,
         is_explicit: bool,
     },
@@ -537,7 +537,7 @@ enum PlayerState {
         stream_loader_controller: StreamLoaderController,
         bytes_per_second: usize,
         duration_ms: u32,
-        stream_position_pcm: u64,
+        stream_position_ms: u32,
         reported_nominal_start_time: Option<Instant>,
         suggested_to_preload_next_track: bool,
         is_explicit: bool,
@@ -622,7 +622,7 @@ impl PlayerState {
                 bytes_per_second,
                 normalisation_data,
                 stream_loader_controller,
-                stream_position_pcm,
+                stream_position_ms,
                 is_explicit,
                 ..
             } => {
@@ -635,7 +635,7 @@ impl PlayerState {
                         stream_loader_controller,
                         bytes_per_second,
                         duration_ms,
-                        stream_position_pcm,
+                        stream_position_ms,
                         is_explicit,
                     },
                 };
@@ -663,7 +663,7 @@ impl PlayerState {
                 stream_loader_controller,
                 duration_ms,
                 bytes_per_second,
-                stream_position_pcm,
+                stream_position_ms,
                 suggested_to_preload_next_track,
                 is_explicit,
             } => {
@@ -676,7 +676,7 @@ impl PlayerState {
                     stream_loader_controller,
                     duration_ms,
                     bytes_per_second,
-                    stream_position_pcm,
+                    stream_position_ms,
                     reported_nominal_start_time: None,
                     suggested_to_preload_next_track,
                     is_explicit,
@@ -705,7 +705,7 @@ impl PlayerState {
                 stream_loader_controller,
                 duration_ms,
                 bytes_per_second,
-                stream_position_pcm,
+                stream_position_ms,
                 reported_nominal_start_time: _,
                 suggested_to_preload_next_track,
                 is_explicit,
@@ -719,7 +719,7 @@ impl PlayerState {
                     stream_loader_controller,
                     duration_ms,
                     bytes_per_second,
-                    stream_position_pcm,
+                    stream_position_ms,
                     suggested_to_preload_next_track,
                     is_explicit,
                 };
@@ -981,13 +981,12 @@ impl PlayerTrackLoader {
             // the cursor may have been moved by parsing normalisation data. This may not
             // matter for playback (but won't hurt either), but may be useful for the
             // passthrough decoder.
-            let position_pcm = PlayerInternal::position_ms_to_pcm(position_ms);
-            let stream_position_pcm = match decoder.seek(position_pcm) {
-                Ok(_) => position_pcm,
+            let stream_position_ms = match decoder.seek(position_ms) {
+                Ok(_) => position_ms,
                 Err(e) => {
                     warn!(
-                        "PlayerTrackLoader::load_track error seeking to PCM page {}: {}",
-                        position_pcm, e
+                        "PlayerTrackLoader::load_track error seeking to {}: {}",
+                        position_ms, e
                     );
                     0
                 }
@@ -1005,7 +1004,7 @@ impl PlayerTrackLoader {
                 stream_loader_controller,
                 bytes_per_second,
                 duration_ms,
-                stream_position_pcm,
+                stream_position_ms,
                 is_explicit,
             });
         }
@@ -1118,23 +1117,18 @@ impl Future for PlayerInternal {
                     play_request_id,
                     ref mut decoder,
                     normalisation_factor,
-                    ref mut stream_position_pcm,
+                    ref mut stream_position_ms,
                     ref mut reported_nominal_start_time,
                     duration_ms,
                     ..
                 } = self.state
                 {
                     match decoder.next_packet() {
-                        Ok(packet) => {
-                            if !passthrough {
-                                if let Some(ref packet) = packet {
+                        Ok(result) => {
+                            if let Some((new_stream_position_ms, ref packet)) = result {
+                                if !passthrough {
                                     match packet.samples() {
-                                        Ok(samples) => {
-                                            *stream_position_pcm +=
-                                                (samples.len() / NUM_CHANNELS as usize) as u64;
-                                            let stream_position_millis =
-                                                Self::position_pcm_to_ms(*stream_position_pcm);
-
+                                        Ok(_) => {
                                             let notify_about_position =
                                                 match *reported_nominal_start_time {
                                                     None => true,
@@ -1144,7 +1138,7 @@ impl Future for PlayerInternal {
                                                             - reported_nominal_start_time)
                                                             .as_millis()
                                                             as i64
-                                                            - stream_position_millis as i64;
+                                                            - new_stream_position_ms as i64;
                                                         lag > Duration::from_secs(1).as_millis()
                                                             as i64
                                                     }
@@ -1153,13 +1147,13 @@ impl Future for PlayerInternal {
                                                 *reported_nominal_start_time = Some(
                                                     Instant::now()
                                                         - Duration::from_millis(
-                                                            stream_position_millis as u64,
+                                                            new_stream_position_ms as u64,
                                                         ),
                                                 );
                                                 self.send_event(PlayerEvent::Playing {
                                                     track_id,
                                                     play_request_id,
-                                                    position_ms: stream_position_millis as u32,
+                                                    position_ms: new_stream_position_ms as u32,
                                                     duration_ms,
                                                 });
                                             }
@@ -1172,13 +1166,13 @@ impl Future for PlayerInternal {
                                             })
                                         }
                                     }
+                                } else {
+                                    // position, even if irrelevant, must be set so that seek() is called
+                                    *stream_position_ms = new_stream_position_ms;
                                 }
-                            } else {
-                                // position, even if irrelevant, must be set so that seek() is called
-                                *stream_position_pcm = duration_ms.into();
                             }
 
-                            self.handle_packet(packet, normalisation_factor);
+                            self.handle_packet(result, normalisation_factor);
                         }
                         Err(e) => {
                             error!("Skipping to next track, unable to get next packet for track <{:?}>: {:?}", track_id, e);
@@ -1198,7 +1192,7 @@ impl Future for PlayerInternal {
                 track_id,
                 play_request_id,
                 duration_ms,
-                stream_position_pcm,
+                stream_position_ms,
                 ref mut stream_loader_controller,
                 ref mut suggested_to_preload_next_track,
                 ..
@@ -1207,14 +1201,14 @@ impl Future for PlayerInternal {
                 track_id,
                 play_request_id,
                 duration_ms,
-                stream_position_pcm,
+                stream_position_ms,
                 ref mut stream_loader_controller,
                 ref mut suggested_to_preload_next_track,
                 ..
             } = self.state
             {
                 if (!*suggested_to_preload_next_track)
-                    && ((duration_ms as i64 - Self::position_pcm_to_ms(stream_position_pcm) as i64)
+                    && ((duration_ms as i64 - stream_position_ms as i64)
                         < PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS as i64)
                     && stream_loader_controller.range_to_end_available()
                 {
@@ -1238,14 +1232,6 @@ impl Future for PlayerInternal {
 }
 
 impl PlayerInternal {
-    fn position_pcm_to_ms(position_pcm: u64) -> u32 {
-        (position_pcm as f64 * MS_PER_PAGE) as u32
-    }
-
-    fn position_ms_to_pcm(position_ms: u32) -> u64 {
-        (position_ms as f64 * PAGES_PER_MS) as u64
-    }
-
     fn ensure_sink_running(&mut self) {
         if self.sink_status != SinkStatus::Running {
             trace!("== Starting sink ==");
@@ -1336,18 +1322,16 @@ impl PlayerInternal {
         if let PlayerState::Paused {
             track_id,
             play_request_id,
-            stream_position_pcm,
+            stream_position_ms,
             duration_ms,
             ..
         } = self.state
         {
             self.state.paused_to_playing();
-
-            let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
             self.send_event(PlayerEvent::Playing {
                 track_id,
                 play_request_id,
-                position_ms,
+                position_ms: stream_position_ms,
                 duration_ms,
             });
             self.ensure_sink_running();
@@ -1360,7 +1344,7 @@ impl PlayerInternal {
         if let PlayerState::Playing {
             track_id,
             play_request_id,
-            stream_position_pcm,
+            stream_position_ms,
             duration_ms,
             ..
         } = self.state
@@ -1368,11 +1352,10 @@ impl PlayerInternal {
             self.state.playing_to_paused();
 
             self.ensure_sink_stopped(false);
-            let position_ms = Self::position_pcm_to_ms(stream_position_pcm);
             self.send_event(PlayerEvent::Paused {
                 track_id,
                 play_request_id,
-                position_ms,
+                position_ms: stream_position_ms,
                 duration_ms,
             });
         } else {
@@ -1380,9 +1363,9 @@ impl PlayerInternal {
         }
     }
 
-    fn handle_packet(&mut self, packet: Option<AudioPacket>, normalisation_factor: f64) {
+    fn handle_packet(&mut self, packet: Option<(u32, AudioPacket)>, normalisation_factor: f64) {
         match packet {
-            Some(mut packet) => {
+            Some((_, mut packet)) => {
                 if !packet.is_empty() {
                     if let AudioPacket::Samples(ref mut data) = packet {
                         if self.config.normalisation
@@ -1537,7 +1520,7 @@ impl PlayerInternal {
         loaded_track: PlayerLoadedTrackData,
         start_playback: bool,
     ) {
-        let position_ms = Self::position_pcm_to_ms(loaded_track.stream_position_pcm);
+        let position_ms = loaded_track.stream_position_ms;
 
         let mut config = self.config.clone();
         if config.normalisation_type == NormalisationType::Auto {
@@ -1569,7 +1552,7 @@ impl PlayerInternal {
                 stream_loader_controller: loaded_track.stream_loader_controller,
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
-                stream_position_pcm: loaded_track.stream_position_pcm,
+                stream_position_ms: loaded_track.stream_position_ms,
                 reported_nominal_start_time: Some(
                     Instant::now() - Duration::from_millis(position_ms as u64),
                 ),
@@ -1588,7 +1571,7 @@ impl PlayerInternal {
                 stream_loader_controller: loaded_track.stream_loader_controller,
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
-                stream_position_pcm: loaded_track.stream_position_pcm,
+                stream_position_ms: loaded_track.stream_position_ms,
                 suggested_to_preload_next_track: false,
                 is_explicit: loaded_track.is_explicit,
             };
@@ -1666,15 +1649,13 @@ impl PlayerInternal {
                     }
                 };
 
-                let position_pcm = Self::position_ms_to_pcm(position_ms);
-
-                if position_pcm != loaded_track.stream_position_pcm {
+                if position_ms != loaded_track.stream_position_ms {
                     loaded_track
                         .stream_loader_controller
                         .set_random_access_mode();
                     // This may be blocking.
-                    match loaded_track.decoder.seek(position_pcm) {
-                        Ok(_) => loaded_track.stream_position_pcm = position_pcm,
+                    match loaded_track.decoder.seek(position_ms) {
+                        Ok(_) => loaded_track.stream_position_ms = position_ms,
                         Err(e) => error!("PlayerInternal handle_command_load: {}", e),
                     }
                     loaded_track.stream_loader_controller.set_stream_mode();
@@ -1692,14 +1673,14 @@ impl PlayerInternal {
         // Check if we are already playing the track. If so, just do a seek and update our info.
         if let PlayerState::Playing {
             track_id: current_track_id,
-            ref mut stream_position_pcm,
+            ref mut stream_position_ms,
             ref mut decoder,
             ref mut stream_loader_controller,
             ..
         }
         | PlayerState::Paused {
             track_id: current_track_id,
-            ref mut stream_position_pcm,
+            ref mut stream_position_ms,
             ref mut decoder,
             ref mut stream_loader_controller,
             ..
@@ -1707,13 +1688,11 @@ impl PlayerInternal {
         {
             if current_track_id == track_id {
                 // we can use the current decoder. Ensure it's at the correct position.
-                let position_pcm = Self::position_ms_to_pcm(position_ms);
-
-                if position_pcm != *stream_position_pcm {
+                if position_ms != *stream_position_ms {
                     stream_loader_controller.set_random_access_mode();
                     // This may be blocking.
-                    match decoder.seek(position_pcm) {
-                        Ok(_) => *stream_position_pcm = position_pcm,
+                    match decoder.seek(position_ms) {
+                        Ok(_) => *stream_position_ms = position_ms,
                         Err(e) => {
                             error!("PlayerInternal::handle_command_load error seeking: {}", e)
                         }
@@ -1726,7 +1705,7 @@ impl PlayerInternal {
                 let old_state = mem::replace(&mut self.state, PlayerState::Invalid);
 
                 if let PlayerState::Playing {
-                    stream_position_pcm,
+                    stream_position_ms,
                     decoder,
                     stream_loader_controller,
                     bytes_per_second,
@@ -1736,7 +1715,7 @@ impl PlayerInternal {
                     ..
                 }
                 | PlayerState::Paused {
-                    stream_position_pcm,
+                    stream_position_ms,
                     decoder,
                     stream_loader_controller,
                     bytes_per_second,
@@ -1752,7 +1731,7 @@ impl PlayerInternal {
                         stream_loader_controller,
                         bytes_per_second,
                         duration_ms,
-                        stream_position_pcm,
+                        stream_position_ms,
                         is_explicit,
                     };
 
@@ -1785,15 +1764,13 @@ impl PlayerInternal {
                     mut loaded_track,
                 } = preload
                 {
-                    let position_pcm = Self::position_ms_to_pcm(position_ms);
-
-                    if position_pcm != loaded_track.stream_position_pcm {
+                    if position_ms != loaded_track.stream_position_ms {
                         loaded_track
                             .stream_loader_controller
                             .set_random_access_mode();
                         // This may be blocking
-                        match loaded_track.decoder.seek(position_pcm) {
-                            Ok(_) => loaded_track.stream_position_pcm = position_pcm,
+                        match loaded_track.decoder.seek(position_ms) {
+                            Ok(_) => loaded_track.stream_position_ms = position_ms,
                             Err(e) => error!("PlayerInternal handle_command_load: {}", e),
                         }
                         loaded_track.stream_loader_controller.set_stream_mode();
@@ -1908,20 +1885,18 @@ impl PlayerInternal {
             stream_loader_controller.set_random_access_mode();
         }
         if let Some(decoder) = self.state.decoder() {
-            let position_pcm = Self::position_ms_to_pcm(position_ms);
-
-            match decoder.seek(position_pcm) {
+            match decoder.seek(position_ms) {
                 Ok(_) => {
                     if let PlayerState::Playing {
-                        ref mut stream_position_pcm,
+                        ref mut stream_position_ms,
                         ..
                     }
                     | PlayerState::Paused {
-                        ref mut stream_position_pcm,
+                        ref mut stream_position_ms,
                         ..
                     } = self.state
                     {
-                        *stream_position_pcm = position_pcm;
+                        *stream_position_ms = position_ms;
                     }
                 }
                 Err(e) => error!("PlayerInternal::handle_command_seek error: {}", e),

@@ -55,8 +55,8 @@ impl AudioPacket {
 }
 
 pub trait AudioDecoder {
-    fn seek(&mut self, absgp: u64) -> Result<u64, DecoderError>;
-    fn next_packet(&mut self) -> DecoderResult<Option<AudioPacket>>;
+    fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError>;
+    fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>>;
 }
 
 impl From<symphonia::core::errors::Error> for DecoderError {

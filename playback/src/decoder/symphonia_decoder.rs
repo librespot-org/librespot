@@ -8,6 +8,7 @@ use symphonia::core::{
     io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
     meta::{MetadataOptions, StandardTagKey, Value},
     probe::Hint,
+    units::Time,
 };
 
 use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
@@ -15,10 +16,10 @@ use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 use crate::{
     metadata::audio::{AudioFileFormat, AudioFiles},
     player::NormalisationData,
+    PAGES_PER_MS,
 };
 
 pub struct SymphoniaDecoder {
-    track_id: u32,
     decoder: Box<dyn Decoder>,
     format: Box<dyn FormatReader>,
     sample_buffer: SampleBuffer<f64>,
@@ -85,7 +86,6 @@ impl SymphoniaDecoder {
         let sample_buffer = SampleBuffer::new(max_frames, SignalSpec { rate, channels });
 
         Ok(Self {
-            track_id: track.id,
             decoder,
             format,
             sample_buffer,
@@ -127,22 +127,40 @@ impl SymphoniaDecoder {
             }
         }
     }
+
+    fn ts_to_ms(&self, ts: u64) -> u32 {
+        let time_base = self.decoder.codec_params().time_base;
+        let seeked_to_ms = match time_base {
+            Some(time_base) => {
+                let time = time_base.calc_time(ts);
+                (time.seconds as f64 + time.frac) * 1000.
+            }
+            // Fallback in the unexpected case that the format has no base time set.
+            None => (ts as f64 * PAGES_PER_MS),
+        };
+        seeked_to_ms as u32
+    }
 }
 
 impl AudioDecoder for SymphoniaDecoder {
-    // TODO : change to position ms
-    fn seek(&mut self, absgp: u64) -> Result<u64, DecoderError> {
-        let seeked_to = self.format.seek(
+    fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError> {
+        let seconds = position_ms as u64 / 1000;
+        let frac = (position_ms as f64 % 1000.) / 1000.;
+        let time = Time::new(seconds, frac);
+
+        // `track_id: None` implies the default track ID (of the container, not of Spotify).
+        let seeked_to_ts = self.format.seek(
             SeekMode::Accurate,
-            SeekTo::TimeStamp {
-                ts: absgp, // TODO : move to Duration
-                track_id: self.track_id,
+            SeekTo::Time {
+                time,
+                track_id: None,
             },
         )?;
-        Ok(seeked_to.actual_ts)
+
+        Ok(self.ts_to_ms(seeked_to_ts.actual_ts))
     }
 
-    fn next_packet(&mut self) -> DecoderResult<Option<AudioPacket>> {
+    fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>> {
         let packet = match self.format.next_packet() {
             Ok(packet) => packet,
             Err(Error::IoError(err)) => {
@@ -159,11 +177,10 @@ impl AudioDecoder for SymphoniaDecoder {
 
         match self.decoder.decode(&packet) {
             Ok(audio_buf) => {
-                // TODO : track current playback position
                 self.sample_buffer.copy_interleaved_ref(audio_buf);
-                Ok(Some(AudioPacket::Samples(
-                    self.sample_buffer.samples().to_vec(),
-                )))
+                let position_ms = self.ts_to_ms(packet.pts());
+                let samples = AudioPacket::Samples(self.sample_buffer.samples().to_vec());
+                Ok(Some((position_ms, samples)))
             }
             Err(Error::ResetRequired) => {
                 // This may happen after a seek.
