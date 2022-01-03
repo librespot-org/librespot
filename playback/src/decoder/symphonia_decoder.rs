@@ -43,7 +43,19 @@ impl SymphoniaDecoder {
         } else if AudioFiles::is_mp3(format) {
             hint.with_extension("mp3");
             hint.mime_type("audio/mp3");
+        } else if AudioFiles::is_flac(format) {
+            hint.with_extension("flac");
+            hint.mime_type("audio/flac");
         }
+
+        let max_format_size = if AudioFiles::is_ogg_vorbis(format) {
+            8192
+        } else if AudioFiles::is_mp3(format) {
+            2304
+        } else {
+            // like FLAC
+            65535
+        };
 
         let format_opts = Default::default();
         let metadata_opts: MetadataOptions = Default::default();
@@ -81,8 +93,10 @@ impl SymphoniaDecoder {
             )));
         }
 
-        // TODO: settle on a sane default depending on the format
-        let max_frames = decoder.codec_params().max_frames_per_packet.unwrap_or(8192);
+        let max_frames = decoder
+            .codec_params()
+            .max_frames_per_packet
+            .unwrap_or(max_format_size);
         let sample_buffer = SampleBuffer::new(max_frames, SignalSpec { rate, channels });
 
         Ok(Self {

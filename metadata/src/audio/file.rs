@@ -33,7 +33,12 @@ impl AudioFiles {
                 | AudioFileFormat::MP3_256
                 | AudioFileFormat::MP3_160
                 | AudioFileFormat::MP3_96
+                | AudioFileFormat::MP3_160_ENC
         )
+    }
+
+    pub fn is_flac(format: AudioFileFormat) -> bool {
+        matches!(format, AudioFileFormat::FLAC_FLAC)
     }
 }
 
