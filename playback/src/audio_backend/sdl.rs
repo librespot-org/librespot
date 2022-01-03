@@ -82,7 +82,7 @@ impl Sink for SdlSink {
         Ok(())
     }
 
-    fn write(&mut self, packet: &AudioPacket, converter: &mut Converter) -> SinkResult<()> {
+    fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         macro_rules! drain_sink {
             ($queue: expr, $size: expr) => {{
                 // sleep and wait for sdl thread to drain the queue a bit
