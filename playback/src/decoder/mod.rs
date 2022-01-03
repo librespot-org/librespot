@@ -1,7 +1,5 @@
 use thiserror::Error;
 
-use crate::metadata::audio::AudioFileFormat;
-
 mod passthrough_decoder;
 pub use passthrough_decoder::PassthroughDecoder;
 
@@ -59,31 +57,6 @@ impl AudioPacket {
 pub trait AudioDecoder {
     fn seek(&mut self, absgp: u64) -> Result<u64, DecoderError>;
     fn next_packet(&mut self) -> DecoderResult<Option<AudioPacket>>;
-
-    fn is_ogg_vorbis(format: AudioFileFormat) -> bool
-    where
-        Self: Sized,
-    {
-        matches!(
-            format,
-            AudioFileFormat::OGG_VORBIS_320
-                | AudioFileFormat::OGG_VORBIS_160
-                | AudioFileFormat::OGG_VORBIS_96
-        )
-    }
-
-    fn is_mp3(format: AudioFileFormat) -> bool
-    where
-        Self: Sized,
-    {
-        matches!(
-            format,
-            AudioFileFormat::MP3_320
-                | AudioFileFormat::MP3_256
-                | AudioFileFormat::MP3_160
-                | AudioFileFormat::MP3_96
-        )
-    }
 }
 
 impl From<symphonia::core::errors::Error> for DecoderError {

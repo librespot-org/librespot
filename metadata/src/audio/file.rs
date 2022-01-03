@@ -16,6 +16,27 @@ impl Deref for AudioFiles {
     }
 }
 
+impl AudioFiles {
+    pub fn is_ogg_vorbis(format: AudioFileFormat) -> bool {
+        matches!(
+            format,
+            AudioFileFormat::OGG_VORBIS_320
+                | AudioFileFormat::OGG_VORBIS_160
+                | AudioFileFormat::OGG_VORBIS_96
+        )
+    }
+
+    pub fn is_mp3(format: AudioFileFormat) -> bool {
+        matches!(
+            format,
+            AudioFileFormat::MP3_320
+                | AudioFileFormat::MP3_256
+                | AudioFileFormat::MP3_160
+                | AudioFileFormat::MP3_96
+        )
+    }
+}
+
 impl From<&[AudioFileMessage]> for AudioFiles {
     fn from(files: &[AudioFileMessage]) -> Self {
         let audio_files = files

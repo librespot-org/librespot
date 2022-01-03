@@ -12,7 +12,10 @@ use symphonia::core::{
 
 use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 
-use crate::{metadata::audio::AudioFileFormat, player::NormalisationData};
+use crate::{
+    metadata::audio::{AudioFileFormat, AudioFiles},
+    player::NormalisationData,
+};
 
 pub struct SymphoniaDecoder {
     track_id: u32,
@@ -33,10 +36,10 @@ impl SymphoniaDecoder {
 
         // Not necessary, but speeds up loading.
         let mut hint = Hint::new();
-        if Self::is_ogg_vorbis(format) {
+        if AudioFiles::is_ogg_vorbis(format) {
             hint.with_extension("ogg");
             hint.mime_type("audio/ogg");
-        } else if Self::is_mp3(format) {
+        } else if AudioFiles::is_mp3(format) {
             hint.with_extension("mp3");
             hint.mime_type("audio/mp3");
         }

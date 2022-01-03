@@ -30,7 +30,7 @@ use crate::{
     convert::Converter,
     core::{util::SeqGenerator, Error, Session, SpotifyId},
     decoder::{AudioDecoder, AudioPacket, PassthroughDecoder, SymphoniaDecoder},
-    metadata::audio::{AudioFileFormat, AudioItem},
+    metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::AudioFilter,
 };
 
@@ -38,6 +38,10 @@ use crate::{MS_PER_PAGE, NUM_CHANNELS, PAGES_PER_MS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
+
+// Spotify inserts a custom Ogg packet at the start with custom metadata values, that you would
+// otherwise expect in Vorbis comments. This packet isn't well-formed and players may balk at it.
+const SPOTIFY_OGG_HEADER_END: u64 = 0xa7;
 
 pub type PlayerResult = Result<(), Error>;
 
@@ -907,19 +911,27 @@ impl PlayerTrackLoader {
                     None
                 }
             };
-            let decrypted_file = AudioDecrypt::new(key, encrypted_file);
-            let mut audio_file =
-                Subfile::new(decrypted_file, stream_loader_controller.len() as u64);
+            let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
-            let mut normalisation_data = None;
+            let is_ogg_vorbis = AudioFiles::is_ogg_vorbis(format);
+            let (offset, mut normalisation_data) = if is_ogg_vorbis {
+                // Spotify stores normalisation data in a custom Ogg packet instead of Vorbis comments.
+                let normalisation_data =
+                    NormalisationData::parse_from_ogg(&mut decrypted_file).ok();
+                (SPOTIFY_OGG_HEADER_END, normalisation_data)
+            } else {
+                (0, None)
+            };
+
+            let audio_file = Subfile::new(
+                decrypted_file,
+                offset,
+                stream_loader_controller.len() as u64,
+            );
+
             let result = if self.config.passthrough {
                 PassthroughDecoder::new(audio_file, format).map(|x| Box::new(x) as Decoder)
             } else {
-                // Spotify stores normalisation data in a custom Ogg packet instead of Vorbis comments.
-                if SymphoniaDecoder::is_ogg_vorbis(format) {
-                    normalisation_data = NormalisationData::parse_from_ogg(&mut audio_file).ok();
-                }
-
                 SymphoniaDecoder::new(audio_file, format).map(|mut decoder| {
                     // For formats other that Vorbis, we'll try getting normalisation data from
                     // ReplayGain metadata fields, if present.
@@ -2206,21 +2218,30 @@ impl fmt::Debug for PlayerState {
 
 struct Subfile<T: Read + Seek> {
     stream: T,
+    offset: u64,
     length: u64,
 }
 
 impl<T: Read + Seek> Subfile<T> {
-    pub fn new(mut stream: T, length: u64) -> Subfile<T> {
-        match stream.seek(SeekFrom::Start(0)) {
+    pub fn new(mut stream: T, offset: u64, length: u64) -> Subfile<T> {
+        let target = SeekFrom::Start(offset);
+        match stream.seek(target) {
             Ok(pos) => {
-                if pos != 0 {
-                    error!("Subfile::new seeking to 0 but position is now {:?}", pos);
+                if pos != offset {
+                    error!(
+                        "Subfile::new seeking to {:?} but position is now {:?}",
+                        target, pos
+                    );
                 }
             }
             Err(e) => error!("Subfile new Error: {}", e),
         }
 
-        Subfile { stream, length }
+        Subfile {
+            stream,
+            offset,
+            length,
+        }
     }
 }
 
@@ -2232,7 +2253,21 @@ impl<T: Read + Seek> Read for Subfile<T> {
 
 impl<T: Read + Seek> Seek for Subfile<T> {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
-        self.stream.seek(pos)
+        let pos = match pos {
+            SeekFrom::Start(offset) => SeekFrom::Start(offset + self.offset),
+            x => x,
+        };
+
+        let newpos = self.stream.seek(pos)?;
+
+        if newpos >= self.offset {
+            Ok(newpos - self.offset)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "newpos < self.offset",
+            ))
+        }
     }
 }
 

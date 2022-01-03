@@ -9,7 +9,7 @@ use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 
 use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 
-use crate::metadata::audio::AudioFileFormat;
+use crate::metadata::audio::{AudioFileFormat, AudioFiles};
 
 fn get_header<T>(code: u8, rdr: &mut PacketReader<T>) -> DecoderResult<Box<[u8]>>
 where
@@ -44,7 +44,7 @@ pub struct PassthroughDecoder<R: Read + Seek> {
 impl<R: Read + Seek> PassthroughDecoder<R> {
     /// Constructs a new Decoder from a given implementation of `Read + Seek`.
     pub fn new(rdr: R, format: AudioFileFormat) -> DecoderResult<Self> {
-        if !Self::is_ogg_vorbis(format) {
+        if !AudioFiles::is_ogg_vorbis(format) {
             return Err(DecoderError::PassthroughDecoder(format!(
                 "Passthrough decoder is not implemented for format {:?}",
                 format
