@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `alsa`: Improve `--device ?` functionality for the alsa backend.
 - [contrib] Hardened security of the systemd service units
 - [main] Verbose logging mode (`-v`, `--verbose`) now logs all parsed environment variables and command line arguments (credentials are redacted).
+- [playback] `Sink`: `write()` now receives ownership of the packet (breaking).
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).

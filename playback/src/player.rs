@@ -1477,7 +1477,7 @@ impl PlayerInternal {
                         }
                     }
 
-                    if let Err(e) = self.sink.write(&packet, &mut self.converter) {
+                    if let Err(e) = self.sink.write(packet, &mut self.converter) {
                         error!("{}", e);
                         exit(1);
                     }
