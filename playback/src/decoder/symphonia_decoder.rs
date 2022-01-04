@@ -1,7 +1,7 @@
 use std::io;
 
 use symphonia::core::{
-    audio::{SampleBuffer, SignalSpec},
+    audio::SampleBuffer,
     codecs::{Decoder, DecoderOptions},
     errors::Error,
     formats::{FormatReader, SeekMode, SeekTo},
@@ -16,13 +16,13 @@ use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 use crate::{
     metadata::audio::{AudioFileFormat, AudioFiles},
     player::NormalisationData,
-    PAGES_PER_MS,
+    NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE,
 };
 
 pub struct SymphoniaDecoder {
     decoder: Box<dyn Decoder>,
     format: Box<dyn FormatReader>,
-    sample_buffer: SampleBuffer<f64>,
+    sample_buffer: Option<SampleBuffer<f64>>,
 }
 
 impl SymphoniaDecoder {
@@ -48,15 +48,6 @@ impl SymphoniaDecoder {
             hint.mime_type("audio/flac");
         }
 
-        let max_format_size = if AudioFiles::is_ogg_vorbis(format) {
-            8192
-        } else if AudioFiles::is_mp3(format) {
-            2304
-        } else {
-            // like FLAC
-            65535
-        };
-
         let format_opts = Default::default();
         let metadata_opts: MetadataOptions = Default::default();
         let decoder_opts: DecoderOptions = Default::default();
@@ -79,30 +70,27 @@ impl SymphoniaDecoder {
             DecoderError::SymphoniaDecoder("Could not retrieve channel configuration".into())
         })?;
 
-        if rate != crate::SAMPLE_RATE {
+        if rate != SAMPLE_RATE {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported sample rate: {}",
                 rate
             )));
         }
 
-        if channels.count() != crate::NUM_CHANNELS as usize {
+        if channels.count() != NUM_CHANNELS as usize {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported number of channels: {}",
                 channels
             )));
         }
 
-        let max_frames = decoder
-            .codec_params()
-            .max_frames_per_packet
-            .unwrap_or(max_format_size);
-        let sample_buffer = SampleBuffer::new(max_frames, SignalSpec { rate, channels });
-
         Ok(Self {
             decoder,
             format,
-            sample_buffer,
+
+            // We set the sample buffer when decoding the first full packet,
+            // whose duration is also the ideal sample buffer size.
+            sample_buffer: None,
         })
     }
 
@@ -171,6 +159,10 @@ impl AudioDecoder for SymphoniaDecoder {
             },
         )?;
 
+        // Seeking is a `FormatReader` operation, so the decoder cannot reliably
+        // know when a seek took place. Reset it to avoid audio glitches.
+        self.decoder.reset();
+
         Ok(self.ts_to_ms(seeked_to_ts.actual_ts))
     }
 
@@ -184,23 +176,33 @@ impl AudioDecoder for SymphoniaDecoder {
                     return Err(DecoderError::SymphoniaDecoder(err.to_string()));
                 }
             }
+            Err(Error::ResetRequired) => {
+                self.decoder.reset();
+                return self.next_packet();
+            }
             Err(err) => {
                 return Err(err.into());
             }
         };
 
+        let position_ms = self.ts_to_ms(packet.pts());
+
         match self.decoder.decode(&packet) {
-            Ok(audio_buf) => {
-                self.sample_buffer.copy_interleaved_ref(audio_buf);
-                let position_ms = self.ts_to_ms(packet.pts());
-                let samples = AudioPacket::Samples(self.sample_buffer.samples().to_vec());
+            Ok(decoded) => {
+                if self.sample_buffer.is_none() {
+                    let spec = *decoded.spec();
+                    let duration = decoded.capacity() as u64;
+                    self.sample_buffer
+                        .replace(SampleBuffer::new(duration, spec));
+                }
+
+                let sample_buffer = self.sample_buffer.as_mut().unwrap(); // guaranteed above
+                sample_buffer.copy_interleaved_ref(decoded);
+                let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
                 Ok(Some((position_ms, samples)))
             }
-            Err(Error::ResetRequired) => {
-                // This may happen after a seek.
-                self.decoder.reset();
-                self.next_packet()
-            }
+            // Also propagate `ResetRequired` errors from the decoder to the player,
+            // so that it will skip to the next track and reload the entire Symphonia decoder.
             Err(err) => Err(err.into()),
         }
     }
