@@ -65,10 +65,7 @@ pub const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 128;
 /// Note: if the file is opened to play from the beginning, the amount of data to
 /// read ahead is requested in addition to this amount. If the file is opened to seek to
 /// another position, then only this amount is requested on the first request.
-pub const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 128;
-
-/// The ping time that is used for calculations before a ping time was actually measured.
-pub const INITIAL_PING_TIME_ESTIMATE: Duration = Duration::from_millis(500);
+pub const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 8;
 
 /// If the measured ping time to the Spotify server is larger than this value, it is capped
 /// to avoid run-away block sizes and pre-fetching.
@@ -321,7 +318,6 @@ impl AudioFile {
         session: &Session,
         file_id: FileId,
         bytes_per_second: usize,
-        play_from_beginning: bool,
     ) -> Result<AudioFile, Error> {
         if let Some(file) = session.cache().and_then(|cache| cache.file(file_id)) {
             debug!("File {} already in cache", file_id);
@@ -332,13 +328,8 @@ impl AudioFile {
 
         let (complete_tx, complete_rx) = oneshot::channel();
 
-        let streaming = AudioFileStreaming::open(
-            session.clone(),
-            file_id,
-            complete_tx,
-            bytes_per_second,
-            play_from_beginning,
-        );
+        let streaming =
+            AudioFileStreaming::open(session.clone(), file_id, complete_tx, bytes_per_second);
 
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
@@ -386,38 +377,26 @@ impl AudioFileStreaming {
         file_id: FileId,
         complete_tx: oneshot::Sender<NamedTempFile>,
         bytes_per_second: usize,
-        play_from_beginning: bool,
     ) -> Result<AudioFileStreaming, Error> {
-        // When the audio file is really small, this `download_size` may turn out to be
-        // larger than the audio file we're going to stream later on. This is OK; requesting
-        // `Content-Range` > `Content-Length` will return the complete file with status code
-        // 206 Partial Content.
-        let download_size = if play_from_beginning {
-            INITIAL_DOWNLOAD_SIZE
-                + max(
-                    (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
-                    (INITIAL_PING_TIME_ESTIMATE.as_secs_f32()
-                        * READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
-                        * bytes_per_second as f32) as usize,
-                )
-        } else {
-            INITIAL_DOWNLOAD_SIZE
-        };
-
         let cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
 
         if let Ok(url) = cdn_url.try_get_url() {
             trace!("Streaming from {}", url);
         }
 
-        let mut streamer = session
-            .spclient()
-            .stream_from_cdn(&cdn_url, 0, download_size)?;
-        let request_time = Instant::now();
+        // When the audio file is really small, this `download_size` may turn out to be
+        // larger than the audio file we're going to stream later on. This is OK; requesting
+        // `Content-Range` > `Content-Length` will return the complete file with status code
+        // 206 Partial Content.
+        let mut streamer =
+            session
+                .spclient()
+                .stream_from_cdn(&cdn_url, 0, INITIAL_DOWNLOAD_SIZE)?;
 
         // Get the first chunk with the headers to get the file size.
         // The remainder of that chunk with possibly also a response body is then
         // further processed in `audio_file_fetch`.
+        let request_time = Instant::now();
         let response = streamer.next().await.ok_or(AudioFileError::NoData)??;
 
         let header_value = response
@@ -425,14 +404,16 @@ impl AudioFileStreaming {
             .get(CONTENT_RANGE)
             .ok_or(AudioFileError::Header)?;
         let str_value = header_value.to_str()?;
-        let file_size_str = str_value.split('/').last().unwrap_or_default();
-        let file_size = file_size_str.parse()?;
+        let hyphen_index = str_value.find('-').unwrap_or_default();
+        let slash_index = str_value.find('/').unwrap_or_default();
+        let upper_bound: usize = str_value[hyphen_index + 1..slash_index].parse()?;
+        let file_size = str_value[slash_index + 1..].parse()?;
 
         let initial_request = StreamingRequest {
             streamer,
             initial_response: Some(response),
             offset: 0,
-            length: download_size,
+            length: upper_bound + 1,
             request_time,
         };
 

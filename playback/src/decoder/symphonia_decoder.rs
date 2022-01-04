@@ -1,14 +1,19 @@
 use std::io;
 
-use symphonia::core::{
-    audio::SampleBuffer,
-    codecs::{Decoder, DecoderOptions},
-    errors::Error,
-    formats::{FormatReader, SeekMode, SeekTo},
-    io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
-    meta::{MetadataOptions, StandardTagKey, Value},
-    probe::Hint,
-    units::Time,
+use symphonia::{
+    core::{
+        audio::SampleBuffer,
+        codecs::{Decoder, DecoderOptions},
+        errors::Error,
+        formats::{FormatReader, SeekMode, SeekTo},
+        io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
+        meta::{StandardTagKey, Value},
+        units::Time,
+    },
+    default::{
+        codecs::{Mp3Decoder, VorbisDecoder},
+        formats::{Mp3Reader, OggReader},
+    },
 };
 
 use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
@@ -20,13 +25,13 @@ use crate::{
 };
 
 pub struct SymphoniaDecoder {
-    decoder: Box<dyn Decoder>,
     format: Box<dyn FormatReader>,
+    decoder: Box<dyn Decoder>,
     sample_buffer: Option<SampleBuffer<f64>>,
 }
 
 impl SymphoniaDecoder {
-    pub fn new<R>(input: R, format: AudioFileFormat) -> DecoderResult<Self>
+    pub fn new<R>(input: R, file_format: AudioFileFormat) -> DecoderResult<Self>
     where
         R: MediaSource + 'static,
     {
@@ -35,41 +40,37 @@ impl SymphoniaDecoder {
         };
         let mss = MediaSourceStream::new(Box::new(input), mss_opts);
 
-        // Not necessary, but speeds up loading.
-        let mut hint = Hint::new();
-        if AudioFiles::is_ogg_vorbis(format) {
-            hint.with_extension("ogg");
-            hint.mime_type("audio/ogg");
-        } else if AudioFiles::is_mp3(format) {
-            hint.with_extension("mp3");
-            hint.mime_type("audio/mp3");
-        } else if AudioFiles::is_flac(format) {
-            hint.with_extension("flac");
-            hint.mime_type("audio/flac");
-        }
-
         let format_opts = Default::default();
-        let metadata_opts: MetadataOptions = Default::default();
-        let decoder_opts: DecoderOptions = Default::default();
-
-        let probed =
-            symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts)?;
-        let format = probed.format;
+        let format: Box<dyn FormatReader> = if AudioFiles::is_ogg_vorbis(file_format) {
+            Box::new(OggReader::try_new(mss, &format_opts)?)
+        } else if AudioFiles::is_mp3(file_format) {
+            Box::new(Mp3Reader::try_new(mss, &format_opts)?)
+        } else {
+            return Err(DecoderError::SymphoniaDecoder(format!(
+                "Unsupported format: {:?}",
+                file_format
+            )));
+        };
 
         let track = format.default_track().ok_or_else(|| {
             DecoderError::SymphoniaDecoder("Could not retrieve default track".into())
         })?;
 
-        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &decoder_opts)?;
+        let decoder_opts: DecoderOptions = Default::default();
+        let decoder: Box<dyn Decoder> = if AudioFiles::is_ogg_vorbis(file_format) {
+            Box::new(VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?)
+        } else if AudioFiles::is_mp3(file_format) {
+            Box::new(Mp3Decoder::try_new(&track.codec_params, &decoder_opts)?)
+        } else {
+            return Err(DecoderError::SymphoniaDecoder(format!(
+                "Unsupported decoder: {:?}",
+                file_format
+            )));
+        };
 
-        let codec_params = decoder.codec_params();
-        let rate = codec_params.sample_rate.ok_or_else(|| {
+        let rate = decoder.codec_params().sample_rate.ok_or_else(|| {
             DecoderError::SymphoniaDecoder("Could not retrieve sample rate".into())
         })?;
-        let channels = codec_params.channels.ok_or_else(|| {
-            DecoderError::SymphoniaDecoder("Could not retrieve channel configuration".into())
-        })?;
-
         if rate != SAMPLE_RATE {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported sample rate: {}",
@@ -77,6 +78,9 @@ impl SymphoniaDecoder {
             )));
         }
 
+        let channels = decoder.codec_params().channels.ok_or_else(|| {
+            DecoderError::SymphoniaDecoder("Could not retrieve channel configuration".into())
+        })?;
         if channels.count() != NUM_CHANNELS as usize {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported number of channels: {}",
@@ -85,8 +89,8 @@ impl SymphoniaDecoder {
         }
 
         Ok(Self {
-            decoder,
             format,
+            decoder,
 
             // We set the sample buffer when decoding the first full packet,
             // whose duration is also the ideal sample buffer size.
