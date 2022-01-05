@@ -27,8 +27,9 @@ use tokio::sync::{mpsc, oneshot};
 
 use super::DiscoveryError;
 
-use crate::core::{
-    authentication::Credentials, config::DeviceType, diffie_hellman::DhLocalKeys, Error,
+use crate::{
+    connect::config::DeviceType,
+    core::{authentication::Credentials, diffie_hellman::DhLocalKeys, Error},
 };
 
 type Params<'a> = BTreeMap<Cow<'a, str>, Cow<'a, str>>;

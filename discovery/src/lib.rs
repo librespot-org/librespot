@@ -16,6 +16,7 @@ use std::task::{Context, Poll};
 
 use cfg_if::cfg_if;
 use futures_core::Stream;
+use librespot_connect as connect;
 use librespot_core as core;
 use thiserror::Error;
 
@@ -25,7 +26,7 @@ use self::server::DiscoveryServer;
 pub use crate::core::authentication::Credentials;
 
 /// Determining the icon in the list of available devices.
-pub use crate::core::config::DeviceType;
+pub use crate::connect::config::DeviceType;
 
 pub use crate::core::Error;
 

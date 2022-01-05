@@ -18,16 +18,13 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
+    config::ConnectConfig,
     context::StationContext,
     core::{
-        config::ConnectConfig, // TODO: move to connect?
         mercury::{MercuryError, MercurySender},
         session::UserAttributes,
         util::SeqGenerator,
-        version,
-        Error,
-        Session,
-        SpotifyId,
+        version, Error, Session, SpotifyId,
     },
     playback::{
         mixer::Mixer,

@@ -25,6 +25,10 @@ sha-1 = "0.9"
 thiserror = "1.0"
 tokio = { version = "1.0", features = ["parking_lot", "sync", "rt"] }
 
+[dependencies.librespot-connect]
+path = "../connect"
+version = "0.3.1"
+
 [dependencies.librespot-core]
 path = "../core"
 version = "0.3.1"
