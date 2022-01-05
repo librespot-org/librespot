@@ -153,15 +153,15 @@ impl<'a> Sink for PortAudioSink<'a> {
 
         let result = match self {
             Self::F32(stream, _parameters) => {
-                let samples_f32: &[f32] = &converter.f64_to_f32(&samples);
+                let samples_f32: &[f32] = &converter.f64_to_f32(samples);
                 write_sink!(ref mut stream, samples_f32)
             }
             Self::S32(stream, _parameters) => {
-                let samples_s32: &[i32] = &converter.f64_to_s32(&samples);
+                let samples_s32: &[i32] = &converter.f64_to_s32(samples);
                 write_sink!(ref mut stream, samples_s32)
             }
             Self::S16(stream, _parameters) => {
-                let samples_s16: &[i16] = &converter.f64_to_s16(&samples);
+                let samples_s16: &[i16] = &converter.f64_to_s16(samples);
                 write_sink!(ref mut stream, samples_s16)
             }
         };
