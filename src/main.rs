@@ -396,7 +396,7 @@ fn get_setup() -> Setup {
     .optopt(
         FORMAT_SHORT,
         FORMAT,
-        "Output format {F64|F32|S32|S24|S24_3|S16}. Defaults to S16.",
+        "Output format {F64|F32|S32|S24|S24_3|S16|auto}. Defaults to auto.",
         "FORMAT",
     )
     .optopt(
@@ -739,7 +739,7 @@ fn get_setup() -> Setup {
                     FORMAT,
                     FORMAT_SHORT,
                     format,
-                    "F64, F32, S32, S24, S24_3, S16",
+                    "F64, F32, S32, S24, S24_3, S16, auto",
                     default_value,
                 );
 
@@ -1510,8 +1510,8 @@ fn get_setup() -> Setup {
                             DITHER,
                             DITHER_SHORT,
                             &opt_str(DITHER).unwrap_or_default(),
-                            "none, gpdf, tpdf, tpdf_hp for formats S16, S24, S24_3, S32, none for formats F32, F64",
-                            "tpdf for formats S16, S24, S24_3 and none for formats S32, F32, F64",
+                            "none, gpdf, tpdf, tpdf_hp for formats S16, S24, S24_3, S32, none for formats F32, F64, auto",
+                            "tpdf for formats S16, S24, S24_3 and none for formats S32, F32, F64, auto",
                         );
 
                         exit(1);

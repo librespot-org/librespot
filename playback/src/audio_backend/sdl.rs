@@ -41,7 +41,7 @@ impl Open for SdlSink {
             }};
         }
         match format {
-            AudioFormat::F32 => open_sink!(Self::F32, f32),
+            AudioFormat::F32 | AudioFormat::Auto => open_sink!(Self::F32, f32),
             AudioFormat::S32 => open_sink!(Self::S32, i32),
             AudioFormat::S16 => open_sink!(Self::S16, i16),
             _ => {

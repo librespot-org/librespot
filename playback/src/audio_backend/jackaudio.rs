@@ -39,10 +39,10 @@ impl ProcessHandler for JackData {
 
 impl Open for JackSink {
     fn open(client_name: Option<String>, format: AudioFormat) -> Self {
-        if format != AudioFormat::F32 {
+        if !matches!(format, AudioFormat::F32 | AudioFormat::Auto) {
             warn!("JACK currently does not support {:?} output", format);
         }
-        info!("Using JACK sink with format {:?}", AudioFormat::F32);
+        info!("Using JACK sink with format {:?}", format);
 
         let client_name = client_name.unwrap_or_else(|| "librespot".to_string());
         let (client, _status) =

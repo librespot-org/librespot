@@ -95,6 +95,7 @@ impl From<AudioFormat> for Format {
             S24_3 => Format::S243LE,
             #[cfg(target_endian = "big")]
             S24_3 => Format::S243BE,
+            _ => unreachable!(),
         }
     }
 }
@@ -166,28 +167,18 @@ fn list_compatible_devices() -> SinkResult<()> {
     Ok(())
 }
 
-fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> {
+fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, AudioFormat, usize)> {
     let pcm = PCM::new(dev_name, Direction::Playback, false).map_err(|e| AlsaError::PcmSetUp {
         device: dev_name.to_string(),
         e,
     })?;
 
-    let bytes_per_period = {
+    let (bytes_per_period, format) = {
         let hwp = HwParams::any(&pcm).map_err(AlsaError::HwParams)?;
 
         hwp.set_access(Access::RWInterleaved)
             .map_err(|e| AlsaError::UnsupportedAccessType {
                 device: dev_name.to_string(),
-                e,
-            })?;
-
-        let alsa_format = Format::from(format);
-
-        hwp.set_format(alsa_format)
-            .map_err(|e| AlsaError::UnsupportedFormat {
-                device: dev_name.to_string(),
-                alsa_format,
-                format,
                 e,
             })?;
 
@@ -203,6 +194,38 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
             .map_err(|e| AlsaError::UnsupportedChannelCount {
                 device: dev_name.to_string(),
                 channel_count: NUM_CHANNELS,
+                e,
+            })?;
+
+        let actual_format = if format == AudioFormat::Auto {
+            let mut format = AudioFormat::S16;
+
+            for f in &[
+                AudioFormat::F64,
+                AudioFormat::F32,
+                AudioFormat::S32,
+                AudioFormat::S24,
+                AudioFormat::S24_3,
+                AudioFormat::S16,
+            ] {
+                if hwp.test_format(Format::from(*f)).is_ok() {
+                    format = *f;
+                    break;
+                }
+            }
+
+            format
+        } else {
+            format
+        };
+
+        let alsa_format = Format::from(actual_format);
+
+        hwp.set_format(alsa_format)
+            .map_err(|e| AlsaError::UnsupportedFormat {
+                device: dev_name.to_string(),
+                alsa_format,
+                format,
                 e,
             })?;
 
@@ -389,12 +412,15 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
         trace!("Actual Frames per Period: {:?}", frames_per_period);
 
         // Let ALSA do the math for us.
-        pcm.frames_to_bytes(frames_per_period) as usize
+        (
+            pcm.frames_to_bytes(frames_per_period) as usize,
+            actual_format,
+        )
     };
 
     trace!("Period Buffer size in bytes: {:?}", bytes_per_period);
 
-    Ok((pcm, bytes_per_period))
+    Ok((pcm, format, bytes_per_period))
 }
 
 impl Open for AlsaSink {
@@ -428,8 +454,9 @@ impl Open for AlsaSink {
 impl Sink for AlsaSink {
     fn start(&mut self) -> SinkResult<()> {
         if self.pcm.is_none() {
-            let (pcm, bytes_per_period) = open_device(&self.device, self.format)?;
+            let (pcm, format, bytes_per_period) = open_device(&self.device, self.format)?;
             self.pcm = Some(pcm);
+            self.format = format;
 
             if self.period_buffer.capacity() != bytes_per_period {
                 self.period_buffer = Vec::with_capacity(bytes_per_period);

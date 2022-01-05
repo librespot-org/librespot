@@ -39,6 +39,7 @@ pub enum AudioFormat {
     S24,
     S24_3,
     S16,
+    Auto,
 }
 
 impl FromStr for AudioFormat {
@@ -51,6 +52,7 @@ impl FromStr for AudioFormat {
             "S24" => Ok(Self::S24),
             "S24_3" => Ok(Self::S24_3),
             "S16" => Ok(Self::S16),
+            "AUTO" => Ok(Self::Auto),
             _ => Err(()),
         }
     }
@@ -58,7 +60,7 @@ impl FromStr for AudioFormat {
 
 impl Default for AudioFormat {
     fn default() -> Self {
-        Self::S16
+        Self::Auto
     }
 }
 
@@ -69,9 +71,9 @@ impl AudioFormat {
         match self {
             Self::F64 => mem::size_of::<f64>(),
             Self::F32 => mem::size_of::<f32>(),
+            Self::S32 | Self::S24 => mem::size_of::<i32>(),
             Self::S24_3 => mem::size_of::<i24>(),
-            Self::S16 => mem::size_of::<i16>(),
-            _ => mem::size_of::<i32>(), // S32 and S24 are both stored in i32
+            Self::S16 | Self::Auto => mem::size_of::<i16>(),
         }
     }
 }

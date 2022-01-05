@@ -29,6 +29,7 @@ impl Open for GstreamerSink {
         let gst_format = match format {
             AudioFormat::S24 => "S24_32".to_string(),
             AudioFormat::S24_3 => "S24".to_string(),
+            AudioFormat::Auto => "F32".to_string(),
             _ => format!("{:?}", format),
         };
         let sample_size = format.size();

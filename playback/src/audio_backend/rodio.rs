@@ -174,13 +174,23 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
         host.id().name()
     );
 
-    if format != AudioFormat::S16 && format != AudioFormat::F32 {
+    if !matches!(
+        format,
+        AudioFormat::F32 | AudioFormat::S16 | AudioFormat::Auto
+    ) {
         unimplemented!("Rodio currently only supports F32 and S16 formats");
     }
 
     let (sink, stream) = create_sink(&host, device).unwrap();
 
     debug!("Rodio sink was created");
+
+    let format = if format == AudioFormat::Auto {
+        AudioFormat::F32
+    } else {
+        format
+    };
+
     RodioSink {
         rodio_sink: sink,
         format,

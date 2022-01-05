@@ -66,7 +66,7 @@ macro_rules! sink_as_bytes {
                         let samples_s24_3: &[i24] = &converter.f64_to_s24_3(&samples);
                         self.write_bytes(samples_s24_3.as_bytes())
                     }
-                    AudioFormat::S16 => {
+                    AudioFormat::S16 | AudioFormat::Auto => {
                         let samples_s16: &[i16] = &converter.f64_to_s16(&samples);
                         self.write_bytes(samples_s16.as_bytes())
                     }
