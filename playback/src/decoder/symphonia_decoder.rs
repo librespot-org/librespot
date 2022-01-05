@@ -171,43 +171,44 @@ impl AudioDecoder for SymphoniaDecoder {
     }
 
     fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>> {
-        let packet = match self.format.next_packet() {
-            Ok(packet) => packet,
-            Err(Error::IoError(err)) => {
-                if err.kind() == io::ErrorKind::UnexpectedEof {
-                    return Ok(None);
-                } else {
-                    return Err(DecoderError::SymphoniaDecoder(err.to_string()));
+        loop {
+            let packet = match self.format.next_packet() {
+                Ok(packet) => packet,
+                Err(Error::IoError(err)) => {
+                    if err.kind() == io::ErrorKind::UnexpectedEof {
+                        return Ok(None);
+                    } else {
+                        return Err(DecoderError::SymphoniaDecoder(err.to_string()));
+                    }
                 }
-            }
-            Err(Error::ResetRequired) => {
-                self.decoder.reset();
-                return self.next_packet();
-            }
-            Err(err) => {
-                return Err(err.into());
-            }
-        };
-
-        let position_ms = self.ts_to_ms(packet.pts());
-
-        match self.decoder.decode(&packet) {
-            Ok(decoded) => {
-                if self.sample_buffer.is_none() {
-                    let spec = *decoded.spec();
-                    let duration = decoded.capacity() as u64;
-                    self.sample_buffer
-                        .replace(SampleBuffer::new(duration, spec));
+                Err(err) => {
+                    return Err(err.into());
                 }
+            };
 
-                let sample_buffer = self.sample_buffer.as_mut().unwrap(); // guaranteed above
-                sample_buffer.copy_interleaved_ref(decoded);
-                let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
-                Ok(Some((position_ms, samples)))
+            let position_ms = self.ts_to_ms(packet.pts());
+
+            match self.decoder.decode(&packet) {
+                Ok(decoded) => {
+                    if self.sample_buffer.is_none() {
+                        let spec = *decoded.spec();
+                        let duration = decoded.capacity() as u64;
+                        self.sample_buffer
+                            .replace(SampleBuffer::new(duration, spec));
+                    }
+
+                    let sample_buffer = self.sample_buffer.as_mut().unwrap(); // guaranteed above
+                    sample_buffer.copy_interleaved_ref(decoded);
+                    let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
+                    return Ok(Some((position_ms, samples)));
+                }
+                Err(Error::DecodeError(_)) => {
+                    // The packet failed to decode due to corrupted or invalid data, get a new
+                    // packet and try again.
+                    continue;
+                }
+                Err(err) => return Err(err.into()),
             }
-            // Also propagate `ResetRequired` errors from the decoder to the player,
-            // so that it will skip to the next track and reload the entire Symphonia decoder.
-            Err(err) => Err(err.into()),
         }
     }
 }
