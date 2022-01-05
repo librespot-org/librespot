@@ -336,7 +336,7 @@ impl AudioFile {
             debug!("Downloading file {} complete", file_id);
 
             if let Some(cache) = session_.cache() {
-                if let Some(cache_id) = cache.file(file_id) {
+                if let Some(cache_id) = cache.file_path(file_id) {
                     if let Err(e) = cache.save_file(file_id, &mut file) {
                         error!("Error caching file {} to {:?}: {}", file_id, cache_id, e);
                     } else {

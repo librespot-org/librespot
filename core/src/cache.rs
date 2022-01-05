@@ -367,7 +367,7 @@ impl Cache {
         }
     }
 
-    fn file_path(&self, file: FileId) -> Option<PathBuf> {
+    pub fn file_path(&self, file: FileId) -> Option<PathBuf> {
         self.audio_location.as_ref().map(|location| {
             let name = file.to_base16();
             let mut path = location.join(&name[0..2]);
@@ -396,7 +396,7 @@ impl Cache {
         }
     }
 
-    pub fn save_file<F: Read>(&self, file: FileId, contents: &mut F) -> Result<(), Error> {
+    pub fn save_file<F: Read>(&self, file: FileId, contents: &mut F) -> Result<PathBuf, Error> {
         if let Some(path) = self.file_path(file) {
             if let Some(parent) = path.parent() {
                 if let Ok(size) = fs::create_dir_all(parent)
@@ -407,7 +407,7 @@ impl Cache {
                         limiter.add(&path, size);
                         limiter.prune()?;
                     }
-                    return Ok(());
+                    return Ok(path);
                 }
             }
         }
