@@ -2057,24 +2057,23 @@ impl PlayerInternal {
             ..
         } = self.state
         {
+            let ping_time = stream_loader_controller.ping_time().as_secs_f32();
+
             // Request our read ahead range
             let request_data_length = max(
-                (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
-                    * stream_loader_controller.ping_time().as_secs_f32()
-                    * bytes_per_second as f32) as usize,
+                (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS * ping_time * bytes_per_second as f32)
+                    as usize,
                 (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
             );
-            stream_loader_controller.fetch_next(request_data_length);
 
-            // Request the part we want to wait for blocking. This effecively means we wait for the previous request to partially complete.
+            // Request the part we want to wait for blocking. This effectively means we wait for the previous request to partially complete.
             let wait_for_data_length = max(
-                (READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS
-                    * stream_loader_controller.ping_time().as_secs_f32()
-                    * bytes_per_second as f32) as usize,
+                (READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS * ping_time * bytes_per_second as f32)
+                    as usize,
                 (READ_AHEAD_BEFORE_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
             );
             stream_loader_controller
-                .fetch_next_blocking(wait_for_data_length)
+                .fetch_next_and_wait(request_data_length, wait_for_data_length)
                 .map_err(Into::into)
         } else {
             Ok(())

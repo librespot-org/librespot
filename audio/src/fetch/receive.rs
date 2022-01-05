@@ -1,11 +1,10 @@
 use std::{
     cmp::{max, min},
     io::{Seek, SeekFrom, Write},
-    sync::{atomic, Arc},
+    sync::{atomic::Ordering, Arc},
     time::{Duration, Instant},
 };
 
-use atomic::Ordering;
 use bytes::Bytes;
 use futures_util::StreamExt;
 use hyper::StatusCode;
@@ -231,7 +230,7 @@ impl AudioFileFetch {
 
             // download data from after the current read position first
             let mut tail_end = RangeSet::new();
-            let read_position = self.shared.read_position.load(Ordering::Relaxed);
+            let read_position = self.shared.read_position.load(Ordering::Acquire);
             tail_end.add_range(&Range::new(
                 read_position,
                 self.shared.file_size - read_position,

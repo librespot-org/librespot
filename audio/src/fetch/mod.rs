@@ -5,7 +5,7 @@ use std::{
     fs,
     io::{self, Read, Seek, SeekFrom},
     sync::{
-        atomic::{self, AtomicUsize},
+        atomic::{AtomicUsize, Ordering},
         Arc,
     },
     time::{Duration, Instant},
@@ -66,6 +66,9 @@ pub const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 128;
 /// read ahead is requested in addition to this amount. If the file is opened to seek to
 /// another position, then only this amount is requested on the first request.
 pub const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 8;
+
+/// The ping time that is used for calculations before a ping time was actually measured.
+pub const INITIAL_PING_TIME_ESTIMATE: Duration = Duration::from_millis(500);
 
 /// If the measured ping time to the Spotify server is larger than this value, it is capped
 /// to avoid run-away block sizes and pre-fetching.
@@ -174,7 +177,7 @@ impl StreamLoaderController {
     pub fn range_to_end_available(&self) -> bool {
         match self.stream_shared {
             Some(ref shared) => {
-                let read_position = shared.read_position.load(atomic::Ordering::Relaxed);
+                let read_position = shared.read_position.load(Ordering::Acquire);
                 self.range_available(Range::new(read_position, self.len() - read_position))
             }
             None => true,
@@ -183,7 +186,7 @@ impl StreamLoaderController {
 
     pub fn ping_time(&self) -> Duration {
         Duration::from_millis(self.stream_shared.as_ref().map_or(0, |shared| {
-            shared.ping_time_ms.load(atomic::Ordering::Relaxed) as u64
+            shared.ping_time_ms.load(Ordering::Relaxed) as u64
         }))
     }
 
@@ -244,24 +247,51 @@ impl StreamLoaderController {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn fetch_next(&self, length: usize) {
         if let Some(ref shared) = self.stream_shared {
             let range = Range {
-                start: shared.read_position.load(atomic::Ordering::Relaxed),
+                start: shared.read_position.load(Ordering::Acquire),
                 length,
             };
             self.fetch(range);
         }
     }
 
+    #[allow(dead_code)]
     pub fn fetch_next_blocking(&self, length: usize) -> AudioFileResult {
         match self.stream_shared {
             Some(ref shared) => {
                 let range = Range {
-                    start: shared.read_position.load(atomic::Ordering::Relaxed),
+                    start: shared.read_position.load(Ordering::Acquire),
                     length,
                 };
                 self.fetch_blocking(range)
+            }
+            None => Ok(()),
+        }
+    }
+
+    pub fn fetch_next_and_wait(
+        &self,
+        request_length: usize,
+        wait_length: usize,
+    ) -> AudioFileResult {
+        match self.stream_shared {
+            Some(ref shared) => {
+                let start = shared.read_position.load(Ordering::Acquire);
+
+                let request_range = Range {
+                    start,
+                    length: request_length,
+                };
+                self.fetch(request_range);
+
+                let wait_range = Range {
+                    start,
+                    length: wait_length,
+                };
+                self.fetch_blocking(wait_range)
             }
             None => Ok(()),
         }
@@ -428,7 +458,7 @@ impl AudioFileStreaming {
             }),
             download_strategy: Mutex::new(DownloadStrategy::Streaming()),
             number_of_open_requests: AtomicUsize::new(0),
-            ping_time_ms: AtomicUsize::new(0),
+            ping_time_ms: AtomicUsize::new(INITIAL_PING_TIME_ESTIMATE.as_millis() as usize),
             read_position: AtomicUsize::new(0),
         });
 
@@ -465,15 +495,17 @@ impl Read for AudioFileStreaming {
         }
 
         let length = min(output.len(), self.shared.file_size - offset);
+        if length == 0 {
+            return Ok(0);
+        }
 
         let length_to_request = match *(self.shared.download_strategy.lock()) {
             DownloadStrategy::RandomAccess() => length,
             DownloadStrategy::Streaming() => {
                 // Due to the read-ahead stuff, we potentially request more than the actual request demanded.
-                let ping_time_seconds = Duration::from_millis(
-                    self.shared.ping_time_ms.load(atomic::Ordering::Relaxed) as u64,
-                )
-                .as_secs_f32();
+                let ping_time_seconds =
+                    Duration::from_millis(self.shared.ping_time_ms.load(Ordering::Relaxed) as u64)
+                        .as_secs_f32();
 
                 let length_to_request = length
                     + max(
@@ -499,10 +531,6 @@ impl Read for AudioFileStreaming {
             self.stream_loader_command_tx
                 .send(StreamLoaderCommand::Fetch(range))
                 .map_err(|err| io::Error::new(io::ErrorKind::BrokenPipe, err))?;
-        }
-
-        if length == 0 {
-            return Ok(0);
         }
 
         while !download_status.downloaded.contains(offset) {
@@ -531,7 +559,7 @@ impl Read for AudioFileStreaming {
         self.position += read_len as u64;
         self.shared
             .read_position
-            .store(self.position as usize, atomic::Ordering::Relaxed);
+            .store(self.position as usize, Ordering::Release);
 
         Ok(read_len)
     }
@@ -543,7 +571,7 @@ impl Seek for AudioFileStreaming {
         // Do not seek past EOF
         self.shared
             .read_position
-            .store(self.position as usize, atomic::Ordering::Relaxed);
+            .store(self.position as usize, Ordering::Release);
         Ok(self.position)
     }
 }

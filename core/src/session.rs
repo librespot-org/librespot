@@ -110,7 +110,7 @@ impl Session {
     ) -> Result<Session, Error> {
         let http_client = HttpClient::new(config.proxy.as_ref());
         let (sender_tx, sender_rx) = mpsc::unbounded_channel();
-        let session_id = SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let session_id = SESSION_COUNTER.fetch_add(1, Ordering::AcqRel);
 
         debug!("new Session[{}]", session_id);
 
@@ -130,7 +130,7 @@ impl Session {
             session_id,
         }));
 
-        let ap = session.apresolver().resolve("accesspoint").await;
+        let ap = session.apresolver().resolve("accesspoint").await?;
         info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
         let mut transport =
             connection::connect(&ap.0, ap.1, session.config().proxy.as_ref()).await?;

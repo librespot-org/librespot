@@ -65,13 +65,13 @@ impl SpClient {
         self.lock(|inner| inner.accesspoint = None)
     }
 
-    pub async fn get_accesspoint(&self) -> SocketAddress {
+    pub async fn get_accesspoint(&self) -> Result<SocketAddress, Error> {
         // Memoize the current access point.
         let ap = self.lock(|inner| inner.accesspoint.clone());
-        match ap {
+        let tuple = match ap {
             Some(tuple) => tuple,
             None => {
-                let tuple = self.session().apresolver().resolve("spclient").await;
+                let tuple = self.session().apresolver().resolve("spclient").await?;
                 self.lock(|inner| inner.accesspoint = Some(tuple.clone()));
                 info!(
                     "Resolved \"{}:{}\" as spclient access point",
@@ -79,12 +79,13 @@ impl SpClient {
                 );
                 tuple
             }
-        }
+        };
+        Ok(tuple)
     }
 
-    pub async fn base_url(&self) -> String {
-        let ap = self.get_accesspoint().await;
-        format!("https://{}:{}", ap.0, ap.1)
+    pub async fn base_url(&self) -> Result<String, Error> {
+        let ap = self.get_accesspoint().await?;
+        Ok(format!("https://{}:{}", ap.0, ap.1))
     }
 
     pub async fn request_with_protobuf(
@@ -133,7 +134,7 @@ impl SpClient {
 
             // Reconnection logic: retrieve the endpoint every iteration, so we can try
             // another access point when we are experiencing network issues (see below).
-            let mut url = self.base_url().await;
+            let mut url = self.base_url().await?;
             url.push_str(endpoint);
 
             // Add metrics. There is also an optional `partner` key with a value like

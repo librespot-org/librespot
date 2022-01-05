@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    hint,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use hyper::{Body, Method, Request};
 use serde::Deserialize;
@@ -37,7 +40,7 @@ impl Default for ApResolveData {
 component! {
     ApResolver : ApResolverInner {
         data: AccessPoints = AccessPoints::default(),
-        spinlock: AtomicUsize = AtomicUsize::new(0),
+        in_progress: AtomicBool = AtomicBool::new(false),
     }
 }
 
@@ -107,16 +110,15 @@ impl ApResolver {
         })
     }
 
-    pub async fn resolve(&self, endpoint: &str) -> SocketAddress {
+    pub async fn resolve(&self, endpoint: &str) -> Result<SocketAddress, Error> {
         // Use a spinlock to make this function atomic. Otherwise, various race conditions may
         // occur, e.g. when the session is created, multiple components are launched almost in
         // parallel and they will all call this function, while resolving is still in progress.
         self.lock(|inner| {
-            while inner.spinlock.load(Ordering::SeqCst) != 0 {
-                #[allow(deprecated)]
-                std::sync::atomic::spin_loop_hint()
+            while inner.in_progress.load(Ordering::Acquire) {
+                hint::spin_loop();
             }
-            inner.spinlock.store(1, Ordering::SeqCst);
+            inner.in_progress.store(true, Ordering::Release);
         });
 
         if self.is_empty() {
@@ -131,10 +133,15 @@ impl ApResolver {
                 "accesspoint" => inner.data.accesspoint.remove(0),
                 "dealer" => inner.data.dealer.remove(0),
                 "spclient" => inner.data.spclient.remove(0),
-                _ => unimplemented!(),
+                _ => {
+                    return Err(Error::unimplemented(format!(
+                        "No implementation to resolve access point {}",
+                        endpoint
+                    )))
+                }
             };
-            inner.spinlock.store(0, Ordering::SeqCst);
-            access_point
+            inner.in_progress.store(false, Ordering::Release);
+            Ok(access_point)
         })
     }
 }
