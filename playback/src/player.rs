@@ -1104,6 +1104,8 @@ impl Future for PlayerInternal {
                     match decoder.next_packet() {
                         Ok(result) => {
                             if let Some((new_stream_position_ms, ref packet)) = result {
+                                *stream_position_ms = new_stream_position_ms;
+
                                 if !passthrough {
                                     match packet.samples() {
                                         Ok(_) => {
@@ -1144,9 +1146,6 @@ impl Future for PlayerInternal {
                                             })
                                         }
                                     }
-                                } else {
-                                    // position, even if irrelevant, must be set so that seek() is called
-                                    *stream_position_ms = new_stream_position_ms;
                                 }
                             }
 
