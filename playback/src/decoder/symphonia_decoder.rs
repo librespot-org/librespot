@@ -16,7 +16,9 @@ use symphonia::{
     },
 };
 
-use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
+use super::{
+    AudioDecoder, AudioPacket, AudioPacketPosition, AudioPositionKind, DecoderError, DecoderResult,
+};
 
 use crate::{
     metadata::audio::{AudioFileFormat, AudioFiles},
@@ -170,7 +172,9 @@ impl AudioDecoder for SymphoniaDecoder {
         Ok(self.ts_to_ms(seeked_to_ts.actual_ts))
     }
 
-    fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>> {
+    fn next_packet(&mut self) -> DecoderResult<Option<(AudioPacketPosition, AudioPacket)>> {
+        let mut position_kind = AudioPositionKind::Current;
+
         loop {
             let packet = match self.format.next_packet() {
                 Ok(packet) => packet,
@@ -187,6 +191,10 @@ impl AudioDecoder for SymphoniaDecoder {
             };
 
             let position_ms = self.ts_to_ms(packet.pts());
+            let packet_position = AudioPacketPosition {
+                position_ms,
+                kind: position_kind,
+            };
 
             match self.decoder.decode(&packet) {
                 Ok(decoded) => {
@@ -200,11 +208,14 @@ impl AudioDecoder for SymphoniaDecoder {
                     let sample_buffer = self.sample_buffer.as_mut().unwrap(); // guaranteed above
                     sample_buffer.copy_interleaved_ref(decoded);
                     let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
-                    return Ok(Some((position_ms, samples)));
+
+                    return Ok(Some((packet_position, samples)));
                 }
                 Err(Error::DecodeError(_)) => {
                     // The packet failed to decode due to corrupted or invalid data, get a new
                     // packet and try again.
+                    warn!("Skipping malformed audio packet at {} ms", position_ms);
+                    position_kind = AudioPositionKind::SkippedTo;
                     continue;
                 }
                 Err(err) => return Err(err.into()),

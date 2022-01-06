@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use thiserror::Error;
 
 mod passthrough_decoder;
@@ -54,9 +56,31 @@ impl AudioPacket {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub enum AudioPositionKind {
+    // the position is at the expected packet
+    Current,
+    // the decoder skipped some corrupted or invalid data,
+    // and the position is now later than expected
+    SkippedTo,
+}
+
+#[derive(Debug, Clone)]
+pub struct AudioPacketPosition {
+    pub position_ms: u32,
+    pub kind: AudioPositionKind,
+}
+
+impl Deref for AudioPacketPosition {
+    type Target = u32;
+    fn deref(&self) -> &Self::Target {
+        &self.position_ms
+    }
+}
+
 pub trait AudioDecoder {
     fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError>;
-    fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>>;
+    fn next_packet(&mut self) -> DecoderResult<Option<(AudioPacketPosition, AudioPacket)>>;
 }
 
 impl From<DecoderError> for librespot_core::error::Error {

@@ -29,7 +29,10 @@ use crate::{
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
     core::{util::SeqGenerator, Error, Session, SpotifyId},
-    decoder::{AudioDecoder, AudioPacket, PassthroughDecoder, SymphoniaDecoder},
+    decoder::{
+        AudioDecoder, AudioPacket, AudioPacketPosition, AudioPositionKind, PassthroughDecoder,
+        SymphoniaDecoder,
+    },
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::AudioFilter,
 };
@@ -1103,17 +1106,21 @@ impl Future for PlayerInternal {
                 {
                     match decoder.next_packet() {
                         Ok(result) => {
-                            if let Some((new_stream_position_ms, ref packet)) = result {
+                            if let Some((ref packet_position, ref packet)) = result {
+                                let new_stream_position_ms = packet_position.position_ms;
                                 *stream_position_ms = new_stream_position_ms;
 
                                 if !passthrough {
                                     match packet.samples() {
                                         Ok(_) => {
-                                            let notify_about_position =
-                                                match *reported_nominal_start_time {
+                                            // Only notify if we're skipped some packets *or* we are behind.
+                                            // If we're ahead it's probably due to a buffer of the backend
+                                            // and we're actually in time.
+                                            let notify_about_position = packet_position.kind
+                                                != AudioPositionKind::Current
+                                                || match *reported_nominal_start_time {
                                                     None => true,
                                                     Some(reported_nominal_start_time) => {
-                                                        // only notify if we're behind. If we're ahead it's probably due to a buffer of the backend and we're actually in time.
                                                         let lag = (Instant::now()
                                                             - reported_nominal_start_time)
                                                             .as_millis()
@@ -1340,7 +1347,11 @@ impl PlayerInternal {
         }
     }
 
-    fn handle_packet(&mut self, packet: Option<(u32, AudioPacket)>, normalisation_factor: f64) {
+    fn handle_packet(
+        &mut self,
+        packet: Option<(AudioPacketPosition, AudioPacket)>,
+        normalisation_factor: f64,
+    ) {
         match packet {
             Some((_, mut packet)) => {
                 if !packet.is_empty() {
