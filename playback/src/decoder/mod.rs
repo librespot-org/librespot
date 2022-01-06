@@ -59,6 +59,12 @@ pub trait AudioDecoder {
     fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>>;
 }
 
+impl From<DecoderError> for librespot_core::error::Error {
+    fn from(err: DecoderError) -> Self {
+        librespot_core::error::Error::aborted(err)
+    }
+}
+
 impl From<symphonia::core::errors::Error> for DecoderError {
     fn from(err: symphonia::core::errors::Error) -> Self {
         Self::SymphoniaDecoder(err.to_string())

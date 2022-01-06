@@ -325,10 +325,16 @@ struct AudioFileDownloadStatus {
     downloaded: RangeSet,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum DownloadStrategy {
     RandomAccess(),
     Streaming(),
+}
+
+impl Default for DownloadStrategy {
+    fn default() -> Self {
+        Self::Streaming()
+    }
 }
 
 struct AudioFileShared {
@@ -456,13 +462,15 @@ impl AudioFileStreaming {
                 requested: RangeSet::new(),
                 downloaded: RangeSet::new(),
             }),
-            download_strategy: Mutex::new(DownloadStrategy::Streaming()),
+            download_strategy: Mutex::new(DownloadStrategy::default()),
             number_of_open_requests: AtomicUsize::new(0),
             ping_time_ms: AtomicUsize::new(INITIAL_PING_TIME_ESTIMATE.as_millis() as usize),
             read_position: AtomicUsize::new(0),
         });
 
         let write_file = NamedTempFile::new_in(session.config().tmp_dir.clone())?;
+        write_file.as_file().set_len(file_size as u64)?;
+
         let read_file = write_file.reopen()?;
 
         let (stream_loader_command_tx, stream_loader_command_rx) =
@@ -567,11 +575,44 @@ impl Read for AudioFileStreaming {
 
 impl Seek for AudioFileStreaming {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        // If we are already at this position, we don't need to switch download strategy.
+        // These checks and locks are less expensive than interrupting streaming.
+        let current_position = self.position as i64;
+        let requested_pos = match pos {
+            SeekFrom::Start(pos) => pos as i64,
+            SeekFrom::End(pos) => self.shared.file_size as i64 - pos - 1,
+            SeekFrom::Current(pos) => current_position + pos,
+        };
+        if requested_pos == current_position {
+            return Ok(current_position as u64);
+        }
+
+        // Again if we have already downloaded this part.
+        let available = self
+            .shared
+            .download_status
+            .lock()
+            .downloaded
+            .contains(requested_pos as usize);
+
+        let mut old_strategy = DownloadStrategy::default();
+        if !available {
+            // Ensure random access mode if we need to download this part.
+            old_strategy = std::mem::replace(
+                &mut *(self.shared.download_strategy.lock()),
+                DownloadStrategy::RandomAccess(),
+            );
+        }
+
         self.position = self.read_file.seek(pos)?;
-        // Do not seek past EOF
         self.shared
             .read_position
             .store(self.position as usize, Ordering::Release);
+
+        if !available && old_strategy != DownloadStrategy::RandomAccess() {
+            *(self.shared.download_strategy.lock()) = old_strategy;
+        }
+
         Ok(self.position)
     }
 }
