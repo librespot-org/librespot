@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf, str::FromStr};
 
 use url::Url;
 
@@ -19,5 +19,100 @@ impl Default for SessionConfig {
             ap_port: None,
             tmp_dir: std::env::temp_dir(),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub enum DeviceType {
+    Unknown = 0,
+    Computer = 1,
+    Tablet = 2,
+    Smartphone = 3,
+    Speaker = 4,
+    Tv = 5,
+    Avr = 6,
+    Stb = 7,
+    AudioDongle = 8,
+    GameConsole = 9,
+    CastAudio = 10,
+    CastVideo = 11,
+    Automobile = 12,
+    Smartwatch = 13,
+    Chromebook = 14,
+    UnknownSpotify = 100,
+    CarThing = 101,
+    Observer = 102,
+    HomeThing = 103,
+}
+
+impl FromStr for DeviceType {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use self::DeviceType::*;
+        match s.to_lowercase().as_ref() {
+            "computer" => Ok(Computer),
+            "tablet" => Ok(Tablet),
+            "smartphone" => Ok(Smartphone),
+            "speaker" => Ok(Speaker),
+            "tv" => Ok(Tv),
+            "avr" => Ok(Avr),
+            "stb" => Ok(Stb),
+            "audiodongle" => Ok(AudioDongle),
+            "gameconsole" => Ok(GameConsole),
+            "castaudio" => Ok(CastAudio),
+            "castvideo" => Ok(CastVideo),
+            "automobile" => Ok(Automobile),
+            "smartwatch" => Ok(Smartwatch),
+            "chromebook" => Ok(Chromebook),
+            "carthing" => Ok(CarThing),
+            "homething" => Ok(HomeThing),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<&DeviceType> for &str {
+    fn from(d: &DeviceType) -> &'static str {
+        use self::DeviceType::*;
+        match d {
+            Unknown => "Unknown",
+            Computer => "Computer",
+            Tablet => "Tablet",
+            Smartphone => "Smartphone",
+            Speaker => "Speaker",
+            Tv => "TV",
+            Avr => "AVR",
+            Stb => "STB",
+            AudioDongle => "AudioDongle",
+            GameConsole => "GameConsole",
+            CastAudio => "CastAudio",
+            CastVideo => "CastVideo",
+            Automobile => "Automobile",
+            Smartwatch => "Smartwatch",
+            Chromebook => "Chromebook",
+            UnknownSpotify => "UnknownSpotify",
+            CarThing => "CarThing",
+            Observer => "Observer",
+            HomeThing => "HomeThing",
+        }
+    }
+}
+
+impl From<DeviceType> for &str {
+    fn from(d: DeviceType) -> &'static str {
+        (&d).into()
+    }
+}
+
+impl fmt::Display for DeviceType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let str: &str = self.into();
+        f.write_str(str)
+    }
+}
+
+impl Default for DeviceType {
+    fn default() -> DeviceType {
+        DeviceType::Speaker
     }
 }

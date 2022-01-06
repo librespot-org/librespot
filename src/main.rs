@@ -18,11 +18,11 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
 use librespot::{
-    connect::{
-        config::{ConnectConfig, DeviceType},
-        spirc::Spirc,
+    connect::{config::ConnectConfig, spirc::Spirc},
+    core::{
+        authentication::Credentials, cache::Cache, config::DeviceType, version, Session,
+        SessionConfig,
     },
-    core::{authentication::Credentials, cache::Cache, version, Session, SessionConfig},
     playback::{
         audio_backend::{self, SinkBuilder, BACKENDS},
         config::{

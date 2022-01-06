@@ -1369,7 +1369,6 @@ dependencies = [
  "hmac",
  "hyper",
  "libmdns",
- "librespot-connect",
  "librespot-core",
  "log",
  "rand",

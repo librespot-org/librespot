@@ -9,26 +9,27 @@
 
 mod server;
 
-use std::borrow::Cow;
-use std::io;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    borrow::Cow,
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use cfg_if::cfg_if;
 use futures_core::Stream;
-use librespot_connect as connect;
-use librespot_core as core;
 use thiserror::Error;
 
 use self::server::DiscoveryServer;
+
+pub use crate::core::Error;
+use librespot_core as core;
 
 /// Credentials to be used in [`librespot`](`librespot_core`).
 pub use crate::core::authentication::Credentials;
 
 /// Determining the icon in the list of available devices.
-pub use crate::connect::config::DeviceType;
-
-pub use crate::core::Error;
+pub use crate::core::config::DeviceType;
 
 /// Makes this device visible to Spotify clients in the local network.
 ///

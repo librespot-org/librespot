@@ -28,7 +28,7 @@ use tokio::sync::{mpsc, oneshot};
 use super::DiscoveryError;
 
 use crate::{
-    connect::config::DeviceType,
+    core::config::DeviceType,
     core::{authentication::Credentials, diffie_hellman::DhLocalKeys, Error},
 };
 
