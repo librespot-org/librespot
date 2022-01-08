@@ -1,6 +1,6 @@
 use std::io::{self, Read};
 
-use aes::Aes192;
+use aes::{Aes192, BlockDecrypt};
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;

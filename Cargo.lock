@@ -19,44 +19,14 @@ checksum = "f26201604c87b1e01bd3d98f8d5d9a8fcbb815e8cedb41ffccbeb4bf593a35fe"
 
 [[package]]
 name = "aes"
-version = "0.6.0"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "884391ef1066acaa41e766ba8f596341b96e93ce34f9a43e7d24bf0a0eaf0561"
+checksum = "9e8b47f52ea9bae42228d07ec09eb676433d7c4ed1ebdf0f1d1c29ed446f1ab8"
 dependencies = [
- "aes-soft",
- "aesni",
+ "cfg-if 1.0.0",
  "cipher",
-]
-
-[[package]]
-name = "aes-ctr"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7729c3cde54d67063be556aeac75a81330d802f0259500ca40cb52967f975763"
-dependencies = [
- "aes-soft",
- "aesni",
- "cipher",
+ "cpufeatures",
  "ctr",
-]
-
-[[package]]
-name = "aes-soft"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be14c7498ea50828a38d0e24a765ed2effe92a705885b57d029cd67d45744072"
-dependencies = [
- "cipher",
- "opaque-debug",
-]
-
-[[package]]
-name = "aesni"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea2e11f5e94c2f7d386164cc2aa1f97823fed6f259e486940a71c174dd01b0ce"
-dependencies = [
- "cipher",
  "opaque-debug",
 ]
 
@@ -261,9 +231,9 @@ dependencies = [
 
 [[package]]
 name = "cipher"
-version = "0.2.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12f8e7987cbd042a63249497f41aed09f8e65add917ea6566effbc56578d6801"
+checksum = "7ee52072ec15386f770805afd189a01c8841be8696bed250fa2f13c4c0d6dfb7"
 dependencies = [
  "generic-array",
 ]
@@ -380,9 +350,9 @@ dependencies = [
 
 [[package]]
 name = "ctr"
-version = "0.6.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb4a30d54f7443bf3d6191dcd486aca19e67cb3c49fa7a06a319966346707e7f"
+checksum = "049bb91fb4aaf0e3c7efa6cd5ef877dbbbd15b39dad06d9948de4ec8a75761ea"
 dependencies = [
  "cipher",
 ]
@@ -1269,7 +1239,7 @@ dependencies = [
 name = "librespot-audio"
 version = "0.3.1"
 dependencies = [
- "aes-ctr",
+ "aes",
  "byteorder",
  "bytes",
  "futures-core",
@@ -1357,7 +1327,7 @@ dependencies = [
 name = "librespot-discovery"
 version = "0.3.1"
 dependencies = [
- "aes-ctr",
+ "aes",
  "base64",
  "cfg-if 1.0.0",
  "dns-sd",

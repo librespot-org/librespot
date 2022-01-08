@@ -1,9 +1,7 @@
 use std::io;
 
-use aes_ctr::{
-    cipher::{
-        generic_array::GenericArray, NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek,
-    },
+use aes::{
+    cipher::{generic_array::GenericArray, NewCipher, StreamCipher, StreamCipherSeek},
     Aes128Ctr,
 };
 

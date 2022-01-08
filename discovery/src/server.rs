@@ -8,9 +8,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use aes_ctr::{
+use aes::{
     cipher::generic_array::GenericArray,
-    cipher::{NewStreamCipher, SyncStreamCipher},
+    cipher::{NewCipher, StreamCipher},
     Aes128Ctr,
 };
 use futures_core::Stream;
