@@ -26,8 +26,8 @@ hmac = "0.11"
 httparse = "1.3"
 http = "0.2"
 hyper = { version = "0.14", features = ["client", "http1", "http2", "tcp"] }
-hyper-proxy = { version = "0.9.1", default-features = false, features = ["rustls"] }
-hyper-rustls = { version = "0.22", default-features = false, features = ["native-tokio"] }
+hyper-proxy = { version = "0.9", default-features = false, features = ["rustls"] }
+hyper-rustls = { version = "0.23", features = ["http2"] }
 log = "0.4"
 num = "0.4"
 num-bigint = { version = "0.4", features = ["rand"] }
@@ -41,16 +41,14 @@ priority-queue = "1.1"
 protobuf = "2.14.0"
 quick-xml = { version = "0.22", features = ["serialize"] }
 rand = "0.8"
-rustls = "0.19"
-rustls-native-certs = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha-1 = "0.9"
 shannon = "0.2.0"
 thiserror = "1.0"
-tokio = { version = "1.5", features = ["io-util", "macros", "net", "parking_lot", "rt", "sync", "time"] }
-tokio-stream = "0.1.1"
-tokio-tungstenite = { version = "0.14", default-features = false, features = ["rustls-tls"] }
+tokio = { version = "1", features = ["io-util", "macros", "net", "parking_lot", "rt", "sync", "time"] }
+tokio-stream = "0.1"
+tokio-tungstenite = { version = "*", default-features = false, features = ["rustls-tls-native-roots"] }
 tokio-util = { version = "0.6", features = ["codec"] }
 url = "2.1"
 uuid = { version = "0.8", default-features = false, features = ["v4"] }

@@ -23,7 +23,7 @@ rand = "0.8"
 serde_json = "1.0.25"
 sha-1 = "0.9"
 thiserror = "1.0"
-tokio = { version = "1.0", features = ["parking_lot", "sync", "rt"] }
+tokio = { version = "1", features = ["parking_lot", "sync", "rt"] }
 
 [dependencies.librespot-core]
 path = "../core"
@@ -32,7 +32,7 @@ version = "0.3.1"
 [dev-dependencies]
 futures = "0.3"
 hex = "0.4"
-tokio = { version = "1.0", features = ["macros", "parking_lot", "rt"] }
+tokio = { version = "1", features = ["macros", "parking_lot", "rt"] }
 
 [features]
 with-dns-sd = ["dns-sd", "librespot-core/with-dns-sd"]

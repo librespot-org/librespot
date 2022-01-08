@@ -9,8 +9,7 @@ use hyper::{
     Body, Client, Request, Response, StatusCode,
 };
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
-use hyper_rustls::HttpsConnector;
-use rustls::{ClientConfig, RootCertStore};
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use thiserror::Error;
 use url::Url;
 
@@ -71,10 +70,11 @@ impl From<HttpClientError> for Error {
     }
 }
 
+#[derive(Clone)]
 pub struct HttpClient {
     user_agent: HeaderValue,
     proxy: Option<Url>,
-    tls_config: ClientConfig,
+    https_connector: HttpsConnector<HttpConnector>,
 }
 
 impl HttpClient {
@@ -99,32 +99,21 @@ impl HttpClient {
 
         let user_agent = HeaderValue::from_str(user_agent_str).unwrap_or_else(|err| {
             error!("Invalid user agent <{}>: {}", user_agent_str, err);
-            error!("Please report this as a bug.");
             HeaderValue::from_static(FALLBACK_USER_AGENT)
         });
 
         // configuring TLS is expensive and should be done once per process
-        let root_store = match rustls_native_certs::load_native_certs() {
-            Ok(store) => store,
-            Err((Some(store), err)) => {
-                warn!("Could not load all certificates: {:?}", err);
-                store
-            }
-            Err((None, err)) => {
-                error!("Cannot access native certificate store: {}", err);
-                error!("Continuing, but most requests will probably fail until you fix your system certificate store.");
-                RootCertStore::empty()
-            }
-        };
-
-        let mut tls_config = ClientConfig::new();
-        tls_config.root_store = root_store;
-        tls_config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
+        let https_connector = HttpsConnectorBuilder::new()
+            .with_native_roots()
+            .https_or_http()
+            .enable_http1()
+            .enable_http2()
+            .build();
 
         Self {
             user_agent,
             proxy: proxy.cloned(),
-            tls_config,
+            https_connector,
         }
     }
 
@@ -154,24 +143,19 @@ impl HttpClient {
     }
 
     pub fn request_fut(&self, mut req: Request<Body>) -> Result<ResponseFuture, Error> {
-        let mut http = HttpConnector::new();
-        http.enforce_http(false);
-
-        let https_connector = HttpsConnector::from((http, self.tls_config.clone()));
-
         let headers_mut = req.headers_mut();
         headers_mut.insert(USER_AGENT, self.user_agent.clone());
 
         let request = if let Some(url) = &self.proxy {
             let proxy_uri = url.to_string().parse()?;
             let proxy = Proxy::new(Intercept::All, proxy_uri);
-            let proxy_connector = ProxyConnector::from_proxy(https_connector, proxy)?;
+            let proxy_connector = ProxyConnector::from_proxy(self.https_connector.clone(), proxy)?;
 
             Client::builder().build(proxy_connector).request(req)
         } else {
             Client::builder()
                 .http2_adaptive_window(true)
-                .build(https_connector)
+                .build(self.https_connector.clone())
                 .request(req)
         };
 
