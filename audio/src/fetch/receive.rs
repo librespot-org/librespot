@@ -16,9 +16,9 @@ use librespot_core::{session::Session, Error};
 use crate::range_set::{Range, RangeSet};
 
 use super::{
-    AudioFileError, AudioFileResult, AudioFileShared, DownloadStrategy, StreamLoaderCommand,
-    StreamingRequest, FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME,
-    MAX_PREFETCH_REQUESTS, MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
+    AudioFileError, AudioFileResult, AudioFileShared, StreamLoaderCommand, StreamingRequest,
+    FAST_PREFETCH_THRESHOLD_FACTOR, MAXIMUM_ASSUMED_PING_TIME, MAX_PREFETCH_REQUESTS,
+    MINIMUM_DOWNLOAD_SIZE, PREFETCH_THRESHOLD_FACTOR,
 };
 
 struct PartialFileData {
@@ -157,8 +157,8 @@ enum ControlFlow {
 }
 
 impl AudioFileFetch {
-    fn get_download_strategy(&mut self) -> DownloadStrategy {
-        *(self.shared.download_strategy.lock())
+    fn is_download_streaming(&mut self) -> bool {
+        self.shared.download_streaming.load(Ordering::Acquire)
     }
 
     fn download_range(&mut self, offset: usize, mut length: usize) -> AudioFileResult {
@@ -337,15 +337,17 @@ impl AudioFileFetch {
     ) -> Result<ControlFlow, Error> {
         match cmd {
             StreamLoaderCommand::Fetch(request) => {
-                self.download_range(request.start, request.length)?;
+                self.download_range(request.start, request.length)?
             }
-            StreamLoaderCommand::RandomAccessMode() => {
-                *(self.shared.download_strategy.lock()) = DownloadStrategy::RandomAccess();
-            }
-            StreamLoaderCommand::StreamMode() => {
-                *(self.shared.download_strategy.lock()) = DownloadStrategy::Streaming();
-            }
-            StreamLoaderCommand::Close() => return Ok(ControlFlow::Break),
+            StreamLoaderCommand::RandomAccessMode => self
+                .shared
+                .download_streaming
+                .store(false, Ordering::Release),
+            StreamLoaderCommand::StreamMode => self
+                .shared
+                .download_streaming
+                .store(true, Ordering::Release),
+            StreamLoaderCommand::Close => return Ok(ControlFlow::Break),
         }
 
         Ok(ControlFlow::Continue)
@@ -430,7 +432,7 @@ pub(super) async fn audio_file_fetch(
             else => (),
         }
 
-        if fetch.get_download_strategy() == DownloadStrategy::Streaming() {
+        if fetch.is_download_streaming() {
             let number_of_open_requests =
                 fetch.shared.number_of_open_requests.load(Ordering::SeqCst);
             if number_of_open_requests < MAX_PREFETCH_REQUESTS {

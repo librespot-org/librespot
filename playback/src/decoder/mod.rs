@@ -56,19 +56,10 @@ impl AudioPacket {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub enum AudioPositionKind {
-    // the position is at the expected packet
-    Current,
-    // the decoder skipped some corrupted or invalid data,
-    // and the position is now later than expected
-    SkippedTo,
-}
-
 #[derive(Debug, Clone)]
 pub struct AudioPacketPosition {
     pub position_ms: u32,
-    pub kind: AudioPositionKind,
+    pub skipped: bool,
 }
 
 impl Deref for AudioPacketPosition {

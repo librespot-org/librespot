@@ -30,8 +30,7 @@ use crate::{
     convert::Converter,
     core::{util::SeqGenerator, Error, Session, SpotifyId},
     decoder::{
-        AudioDecoder, AudioPacket, AudioPacketPosition, AudioPositionKind, PassthroughDecoder,
-        SymphoniaDecoder,
+        AudioDecoder, AudioPacket, AudioPacketPosition, PassthroughDecoder, SymphoniaDecoder,
     },
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::AudioFilter,
@@ -1116,8 +1115,7 @@ impl Future for PlayerInternal {
                                             // Only notify if we're skipped some packets *or* we are behind.
                                             // If we're ahead it's probably due to a buffer of the backend
                                             // and we're actually in time.
-                                            let notify_about_position = packet_position.kind
-                                                != AudioPositionKind::Current
+                                            let notify_about_position = packet_position.skipped
                                                 || match *reported_nominal_start_time {
                                                     None => true,
                                                     Some(reported_nominal_start_time) => {

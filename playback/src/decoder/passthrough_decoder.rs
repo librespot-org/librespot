@@ -7,9 +7,7 @@ use std::{
 // TODO: move this to the Symphonia Ogg demuxer
 use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 
-use super::{
-    AudioDecoder, AudioPacket, AudioPacketPosition, AudioPositionKind, DecoderError, DecoderResult,
-};
+use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
 
 use crate::{
     metadata::audio::{AudioFileFormat, AudioFiles},
@@ -212,7 +210,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                 let position_ms = Self::position_pcm_to_ms(pckgp_page);
                 let packet_position = AudioPacketPosition {
                     position_ms,
-                    kind: AudioPositionKind::Current,
+                    skipped: false,
                 };
 
                 let ogg_data = AudioPacket::Raw(std::mem::take(data));
