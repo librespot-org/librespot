@@ -1,7 +1,7 @@
 use std::{env::consts::ARCH, io};
 
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
-use hmac::{Hmac, Mac, NewMac};
+use hmac::{Hmac, Mac};
 use protobuf::{self, Message};
 use rand::{thread_rng, RngCore};
 use sha1::Sha1;

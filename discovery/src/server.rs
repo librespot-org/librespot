@@ -15,7 +15,7 @@ use aes::{
 };
 use futures_core::Stream;
 use futures_util::{FutureExt, TryFutureExt};
-use hmac::{Hmac, Mac, NewMac};
+use hmac::{Hmac, Mac};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, StatusCode,
@@ -137,7 +137,7 @@ impl RequestHandler {
         let mut h = Hmac::<Sha1>::new_from_slice(&checksum_key)
             .map_err(|_| DiscoveryError::HmacError(base_key.to_vec()))?;
         h.update(encrypted);
-        if h.verify(cksum).is_err() {
+        if h.verify_slice(cksum).is_err() {
             warn!("Login error for user {:?}: MAC mismatch", username);
             let result = json!({
                 "status": 102,
