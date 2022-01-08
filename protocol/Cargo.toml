@@ -12,5 +12,5 @@ edition = "2018"
 protobuf = "2.25"
 
 [build-dependencies]
-protobuf-codegen-pure = "2.25"
 glob = "0.3.0"
+protobuf-codegen-pure = "2.25"

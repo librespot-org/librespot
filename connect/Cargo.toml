@@ -9,7 +9,7 @@ edition = "2018"
 
 [dependencies]
 form_urlencoded = "1.0"
-futures-util = { version = "0.3.5", default_features = false }
+futures-util = "0.3"
 log = "0.4"
 protobuf = "2.14.0"
 rand = "0.8"
