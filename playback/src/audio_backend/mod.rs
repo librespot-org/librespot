@@ -13,6 +13,8 @@ pub enum SinkError {
     OnWrite(String),
     #[error("Audio Sink Error Invalid Parameters: {0}")]
     InvalidParams(String),
+    #[error("Audio Sink Error Changing State: {0}")]
+    StateChange(String),
 }
 
 pub type SinkResult<T> = Result<T, SinkError>;

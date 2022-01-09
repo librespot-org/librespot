@@ -1,17 +1,20 @@
-use super::{Open, Sink, SinkAsBytes, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use std::{
+    ops::Drop,
+    sync::mpsc::{sync_channel, SyncSender},
+    thread,
+};
 
 use gstreamer as gst;
 use gstreamer_app as gst_app;
 
-use gst::prelude::*;
+use gst::{prelude::*, State};
 use zerocopy::AsBytes;
 
-use std::sync::mpsc::{sync_channel, SyncSender};
-use std::thread;
+use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
+
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS, SAMPLE_RATE,
+};
 
 #[allow(dead_code)]
 pub struct GstreamerSink {
@@ -115,8 +118,8 @@ impl Open for GstreamerSink {
         });
 
         pipeline
-            .set_state(gst::State::Playing)
-            .expect("unable to set the pipeline to the `Playing` state");
+            .set_state(State::Ready)
+            .expect("unable to set the pipeline to the `Ready` state");
 
         Self {
             tx,
@@ -127,7 +130,27 @@ impl Open for GstreamerSink {
 }
 
 impl Sink for GstreamerSink {
+    fn start(&mut self) -> SinkResult<()> {
+        self.pipeline
+            .set_state(State::Playing)
+            .map_err(|e| SinkError::StateChange(e.to_string()))?;
+        Ok(())
+    }
+
+    fn stop(&mut self) -> SinkResult<()> {
+        self.pipeline
+            .set_state(State::Paused)
+            .map_err(|e| SinkError::StateChange(e.to_string()))?;
+        Ok(())
+    }
+
     sink_as_bytes!();
+}
+
+impl Drop for GstreamerSink {
+    fn drop(&mut self) {
+        let _ = self.pipeline.set_state(State::Null);
+    }
 }
 
 impl SinkAsBytes for GstreamerSink {
