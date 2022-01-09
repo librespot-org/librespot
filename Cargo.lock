@@ -48,19 +48,7 @@ dependencies = [
  "alsa-sys",
  "bitflags",
  "libc",
- "nix 0.20.0",
-]
-
-[[package]]
-name = "alsa"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5915f52fe2cf65e83924d037b6c5290b7cee097c6b5c8700746e6168a343fd6b"
-dependencies = [
- "alsa-sys",
- "bitflags",
- "libc",
- "nix 0.23.1",
+ "nix",
 ]
 
 [[package]]
@@ -324,7 +312,7 @@ version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98f45f0a21f617cd2c788889ef710b63f075c949259593ea09c826f1e47a2418"
 dependencies = [
- "alsa 0.5.0",
+ "alsa",
  "core-foundation-sys",
  "coreaudio-rs",
  "jack 0.7.3",
@@ -335,7 +323,7 @@ dependencies = [
  "mach",
  "ndk 0.3.0",
  "ndk-glue 0.3.0",
- "nix 0.20.0",
+ "nix",
  "oboe",
  "parking_lot",
  "stdweb",
@@ -1466,7 +1454,7 @@ dependencies = [
 name = "librespot-playback"
 version = "0.3.1"
 dependencies = [
- "alsa 0.6.0",
+ "alsa",
  "byteorder",
  "cpal",
  "futures-util",
@@ -1559,15 +1547,6 @@ name = "memchr"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
-
-[[package]]
-name = "memoffset"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
-dependencies = [
- "autocfg",
-]
 
 [[package]]
 name = "mime"
@@ -1704,19 +1683,6 @@ dependencies = [
  "cc",
  "cfg-if",
  "libc",
-]
-
-[[package]]
-name = "nix"
-version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if",
- "libc",
- "memoffset",
 ]
 
 [[package]]
