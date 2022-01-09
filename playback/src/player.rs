@@ -1107,23 +1107,41 @@ impl Future for PlayerInternal {
                         Ok(result) => {
                             if let Some((ref packet_position, ref packet)) = result {
                                 let new_stream_position_ms = packet_position.position_ms;
-                                *stream_position_ms = new_stream_position_ms;
+                                let expected_position_ms = std::mem::replace(
+                                    &mut *stream_position_ms,
+                                    new_stream_position_ms,
+                                );
 
                                 if !passthrough {
                                     match packet.samples() {
                                         Ok(_) => {
-                                            // Only notify if we're skipped some packets *or* we are behind.
-                                            // If we're ahead it's probably due to a buffer of the backend
-                                            // and we're actually in time.
                                             let new_stream_position = Duration::from_millis(
                                                 new_stream_position_ms as u64,
                                             );
-                                            let notify_about_position = packet_position.skipped
-                                                || match *reported_nominal_start_time {
+
+                                            let now = Instant::now();
+
+                                            // Only notify if we're skipped some packets *or* we are behind.
+                                            // If we're ahead it's probably due to a buffer of the backend
+                                            // and we're actually in time.
+                                            let notify_about_position =
+                                                match *reported_nominal_start_time {
                                                     None => true,
                                                     Some(reported_nominal_start_time) => {
                                                         let mut notify = false;
-                                                        if let Some(lag) = Instant::now()
+
+                                                        if packet_position.skipped {
+                                                            if let Some(ahead) = new_stream_position
+                                                                .checked_sub(Duration::from_millis(
+                                                                    expected_position_ms as u64,
+                                                                ))
+                                                            {
+                                                                notify |=
+                                                                    ahead >= Duration::from_secs(1)
+                                                            }
+                                                        }
+
+                                                        if let Some(lag) = now
                                                             .checked_duration_since(
                                                                 reported_nominal_start_time,
                                                             )
@@ -1131,16 +1149,18 @@ impl Future for PlayerInternal {
                                                             if let Some(lag) =
                                                                 lag.checked_sub(new_stream_position)
                                                             {
-                                                                notify =
-                                                                    lag > Duration::from_secs(1)
+                                                                notify |=
+                                                                    lag >= Duration::from_secs(1)
                                                             }
                                                         }
+
                                                         notify
                                                     }
                                                 };
+
                                             if notify_about_position {
                                                 *reported_nominal_start_time =
-                                                    Instant::now().checked_sub(new_stream_position);
+                                                    now.checked_sub(new_stream_position);
                                                 self.send_event(PlayerEvent::Playing {
                                                     track_id,
                                                     play_request_id,
