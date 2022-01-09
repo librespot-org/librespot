@@ -1,11 +1,13 @@
-use librespot::playback::player::PlayerEvent;
-use librespot::playback::player::SinkStatus;
+use std::{
+    collections::HashMap,
+    io,
+    process::{Command, ExitStatus},
+};
+
 use log::info;
 use tokio::process::{Child as AsyncChild, Command as AsyncCommand};
 
-use std::collections::HashMap;
-use std::io;
-use std::process::{Command, ExitStatus};
+use librespot::playback::player::{PlayerEvent, SinkStatus};
 
 pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Result<AsyncChild>> {
     let mut env_vars = HashMap::new();

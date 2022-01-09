@@ -10,7 +10,6 @@ use std::{
 };
 
 use futures_util::{future, FutureExt, StreamExt};
-use librespot_playback::player::PlayerEvent;
 use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
@@ -30,7 +29,7 @@ use librespot::{
         },
         dither,
         mixer::{self, MixerConfig, MixerFn},
-        player::{db_to_ratio, ratio_to_db, Player},
+        player::{db_to_ratio, ratio_to_db, Player, PlayerEvent},
     },
 };
 

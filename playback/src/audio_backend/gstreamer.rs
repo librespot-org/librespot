@@ -56,17 +56,17 @@ impl Open for GstreamerSink {
         let pipeline = pipelinee
             .dynamic_cast::<gst::Pipeline>()
             .expect("couldn't cast pipeline element at runtime!");
-        let bus = pipeline.get_bus().expect("couldn't get bus from pipeline");
+        let bus = pipeline.bus().expect("couldn't get bus from pipeline");
         let mainloop = glib::MainLoop::new(None, false);
         let appsrce: gst::Element = pipeline
-            .get_by_name("appsrc0")
+            .by_name("appsrc0")
             .expect("couldn't get appsrc from pipeline");
         let appsrc: gst_app::AppSrc = appsrce
             .dynamic_cast::<gst_app::AppSrc>()
             .expect("couldn't cast AppSrc element at runtime!");
         let bufferpool = gst::BufferPool::new();
-        let appsrc_caps = appsrc.get_caps().expect("couldn't get appsrc caps");
-        let mut conf = bufferpool.get_config();
+        let appsrc_caps = appsrc.caps().expect("couldn't get appsrc caps");
+        let mut conf = bufferpool.config();
         conf.set_params(Some(&appsrc_caps), 4096 * sample_size as u32, 0, 0);
         bufferpool
             .set_config(conf)
@@ -99,9 +99,9 @@ impl Open for GstreamerSink {
                     gst::MessageView::Error(err) => {
                         println!(
                             "Error from {:?}: {} ({:?})",
-                            err.get_src().map(|s| s.get_path_string()),
-                            err.get_error(),
-                            err.get_debug()
+                            err.src().map(|s| s.path_string()),
+                            err.error(),
+                            err.debug()
                         );
                         watch_mainloop.quit();
                     }
