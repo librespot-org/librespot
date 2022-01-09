@@ -1115,26 +1115,32 @@ impl Future for PlayerInternal {
                                             // Only notify if we're skipped some packets *or* we are behind.
                                             // If we're ahead it's probably due to a buffer of the backend
                                             // and we're actually in time.
+                                            let new_stream_position = Duration::from_millis(
+                                                new_stream_position_ms as u64,
+                                            );
                                             let notify_about_position = packet_position.skipped
                                                 || match *reported_nominal_start_time {
                                                     None => true,
                                                     Some(reported_nominal_start_time) => {
-                                                        let lag = (Instant::now()
-                                                            - reported_nominal_start_time)
-                                                            .as_millis()
-                                                            as i64
-                                                            - new_stream_position_ms as i64;
-                                                        lag > Duration::from_secs(1).as_millis()
-                                                            as i64
+                                                        let mut notify = false;
+                                                        if let Some(lag) = Instant::now()
+                                                            .checked_duration_since(
+                                                                reported_nominal_start_time,
+                                                            )
+                                                        {
+                                                            if let Some(lag) =
+                                                                lag.checked_sub(new_stream_position)
+                                                            {
+                                                                notify =
+                                                                    lag > Duration::from_secs(1)
+                                                            }
+                                                        }
+                                                        notify
                                                     }
                                                 };
                                             if notify_about_position {
-                                                *reported_nominal_start_time = Some(
-                                                    Instant::now()
-                                                        - Duration::from_millis(
-                                                            new_stream_position_ms as u64,
-                                                        ),
-                                                );
+                                                *reported_nominal_start_time =
+                                                    Instant::now().checked_sub(new_stream_position);
                                                 self.send_event(PlayerEvent::Playing {
                                                     track_id,
                                                     play_request_id,
@@ -1539,9 +1545,8 @@ impl PlayerInternal {
                 duration_ms: loaded_track.duration_ms,
                 bytes_per_second: loaded_track.bytes_per_second,
                 stream_position_ms: loaded_track.stream_position_ms,
-                reported_nominal_start_time: Some(
-                    Instant::now() - Duration::from_millis(position_ms as u64),
-                ),
+                reported_nominal_start_time: Instant::now()
+                    .checked_sub(Duration::from_millis(position_ms as u64)),
                 suggested_to_preload_next_track: false,
                 is_explicit: loaded_track.is_explicit,
             };
@@ -1873,7 +1878,7 @@ impl PlayerInternal {
         } = self.state
         {
             *reported_nominal_start_time =
-                Some(Instant::now() - Duration::from_millis(position_ms as u64));
+                Instant::now().checked_sub(Duration::from_millis(position_ms as u64));
             self.send_event(PlayerEvent::Playing {
                 track_id,
                 play_request_id,
