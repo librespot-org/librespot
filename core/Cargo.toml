@@ -23,7 +23,7 @@ form_urlencoded = "1.0"
 futures-core = "0.3"
 futures-util = { version = "0.3", features = ["alloc", "bilock", "sink", "unstable"] }
 hmac = "0.12"
-httparse = "1.3"
+httparse = "1.5"
 http = "0.2"
 hyper = { version = "0.14", features = ["client", "http1", "http2", "tcp"] }
 hyper-proxy = { version = "0.9", default-features = false, features = ["rustls"] }
@@ -34,10 +34,10 @@ num-bigint = { version = "0.4", features = ["rand"] }
 num-derive = "0.3"
 num-integer = "0.1"
 num-traits = "0.2"
-once_cell = "1.5.2"
+once_cell = "1.9"
 parking_lot = { version = "0.11", features = ["deadlock_detection"] }
 pbkdf2 = { version = "0.10", default-features = false, features = ["hmac"] }
-priority-queue = "1.1"
+priority-queue = "1.2.1"
 protobuf = "2"
 quick-xml = { version = "0.22", features = ["serialize"] }
 rand = "0.8"
@@ -50,16 +50,16 @@ tokio = { version = "1", features = ["io-util", "macros", "net", "parking_lot", 
 tokio-stream = "0.1"
 tokio-tungstenite = { version = "*", default-features = false, features = ["rustls-tls-native-roots"] }
 tokio-util = { version = "0.6", features = ["codec"] }
-url = "2.1"
+url = "2"
 uuid = { version = "0.8", default-features = false, features = ["v4"] }
 
 [build-dependencies]
 rand = "0.8"
-vergen = "3.0.4"
+vergen = { version = "6", default-features = false, features = ["build", "git"] }
 
 [dev-dependencies]
-env_logger = "0.8"
-tokio = { version = "1.0", features = ["macros", "parking_lot"] }
+env_logger = "0.9"
+tokio = { version = "1", features = ["macros", "parking_lot"] }
 
 [features]
 with-dns-sd = ["dns-sd"]
