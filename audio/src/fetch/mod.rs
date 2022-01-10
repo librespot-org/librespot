@@ -61,6 +61,10 @@ impl From<AudioFileError> for Error {
 /// Note: smaller requests can happen if part of the block is downloaded already.
 pub const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 128;
 
+/// The minimum network throughput that we expect. Together with the minimum download size,
+/// this will determine the time we will wait for a response.
+pub const MINIMUM_THROUGHPUT: usize = 8192;
+
 /// The amount of data that is requested when initially opening a file.
 /// Note: if the file is opened to play from the beginning, the amount of data to
 /// read ahead is requested in addition to this amount. If the file is opened to seek to
@@ -119,7 +123,8 @@ pub const FAST_PREFETCH_THRESHOLD_FACTOR: f32 = 1.5;
 pub const MAX_PREFETCH_REQUESTS: usize = 4;
 
 /// The time we will wait to obtain status updates on downloading.
-pub const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(1);
+pub const DOWNLOAD_TIMEOUT: Duration =
+    Duration::from_secs((MINIMUM_DOWNLOAD_SIZE / MINIMUM_THROUGHPUT) as u64);
 
 pub enum AudioFile {
     Cached(fs::File),
