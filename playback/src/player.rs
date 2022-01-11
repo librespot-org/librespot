@@ -61,12 +61,8 @@ struct PlayerInternal {
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
     converter: Converter,
 
-    limiter_active: bool,
-    limiter_attack_counter: u32,
-    limiter_release_counter: u32,
-    limiter_peak_sample: f64,
-    limiter_factor: f64,
-    limiter_strength: f64,
+    normalisation_integrator: f64,
+    normalisation_peak: f64,
 
     auto_normalise_as_album: bool,
 }
@@ -208,6 +204,14 @@ pub fn ratio_to_db(ratio: f64) -> f64 {
     ratio.log10() * DB_VOLTAGE_RATIO
 }
 
+pub fn duration_to_coefficient(duration: Duration) -> f64 {
+    f64::exp(-1.0 / (duration.as_secs_f64() * SAMPLES_PER_SECOND as f64))
+}
+
+pub fn coefficient_to_duration(coefficient: f64) -> Duration {
+    Duration::from_secs_f64(-1.0 / f64::ln(coefficient) / SAMPLES_PER_SECOND as f64)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct NormalisationData {
     track_gain_db: f32,
@@ -241,17 +245,19 @@ impl NormalisationData {
             return 1.0;
         }
 
-        let [gain_db, gain_peak] = if config.normalisation_type == NormalisationType::Album {
-            [data.album_gain_db, data.album_peak]
+        let (gain_db, gain_peak) = if config.normalisation_type == NormalisationType::Album {
+            (data.album_gain_db, data.album_peak as f64)
         } else {
-            [data.track_gain_db, data.track_peak]
+            (data.track_gain_db, data.track_peak as f64)
         };
 
-        let normalisation_power = gain_db as f64 + config.normalisation_pregain;
-        let mut normalisation_factor = db_to_ratio(normalisation_power);
+        let normalisation_power = gain_db + config.normalisation_pregain_db;
+        let mut normalisation_factor = db_to_ratio(normalisation_power as f64);
 
-        if normalisation_factor * gain_peak as f64 > config.normalisation_threshold {
-            let limited_normalisation_factor = config.normalisation_threshold / gain_peak as f64;
+        if normalisation_power + ratio_to_db(gain_peak) as f32 > config.normalisation_threshold_dbfs
+        {
+            let limited_normalisation_factor =
+                db_to_ratio(config.normalisation_threshold_dbfs as f64) / gain_peak;
             let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
 
             if config.normalisation_method == NormalisationMethod::Basic {
@@ -260,7 +266,7 @@ impl NormalisationData {
             } else {
                 warn!(
                     "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
-                    normalisation_power - limited_normalisation_power
+                    normalisation_power as f64 - limited_normalisation_power
                 );
             }
 
@@ -295,18 +301,25 @@ impl Player {
             debug!("Normalisation Type: {:?}", config.normalisation_type);
             debug!(
                 "Normalisation Pregain: {:.1} dB",
-                config.normalisation_pregain
+                config.normalisation_pregain_db
             );
             debug!(
                 "Normalisation Threshold: {:.1} dBFS",
-                ratio_to_db(config.normalisation_threshold)
+                config.normalisation_threshold_dbfs
             );
             debug!("Normalisation Method: {:?}", config.normalisation_method);
 
             if config.normalisation_method == NormalisationMethod::Dynamic {
-                debug!("Normalisation Attack: {:?}", config.normalisation_attack);
-                debug!("Normalisation Release: {:?}", config.normalisation_release);
-                debug!("Normalisation Knee: {:?}", config.normalisation_knee);
+                // as_millis() has rounding errors (truncates)
+                debug!(
+                    "Normalisation Attack: {:.0} ms",
+                    coefficient_to_duration(config.normalisation_attack_cf).as_secs_f64() * 1000.
+                );
+                debug!(
+                    "Normalisation Release: {:.0} ms",
+                    coefficient_to_duration(config.normalisation_release_cf).as_secs_f64() * 1000.
+                );
+                debug!("Normalisation Knee: {} dB", config.normalisation_knee_db);
             }
         }
 
@@ -329,12 +342,8 @@ impl Player {
                 event_senders: [event_sender].to_vec(),
                 converter,
 
-                limiter_active: false,
-                limiter_attack_counter: 0,
-                limiter_release_counter: 0,
-                limiter_peak_sample: 0.0,
-                limiter_factor: 1.0,
-                limiter_strength: 0.0,
+                normalisation_peak: 0.0,
+                normalisation_integrator: 0.0,
 
                 auto_normalise_as_album: false,
             };
@@ -1275,110 +1284,74 @@ impl PlayerInternal {
             Some(mut packet) => {
                 if !packet.is_empty() {
                     if let AudioPacket::Samples(ref mut data) = packet {
+                        // For the basic normalisation method, a normalisation factor of 1.0 indicates that
+                        // there is nothing to normalise (all samples should pass unaltered). For the
+                        // dynamic method, there may still be peaks that we want to shave off.
                         if self.config.normalisation
                             && !(f64::abs(normalisation_factor - 1.0) <= f64::EPSILON
                                 && self.config.normalisation_method == NormalisationMethod::Basic)
                         {
+                            // casts and zero-cost shorthands
+                            let threshold_db = self.config.normalisation_threshold_dbfs as f64;
+                            let knee_db = self.config.normalisation_knee_db as f64;
+                            let attack_cf = self.config.normalisation_attack_cf;
+                            let release_cf = self.config.normalisation_release_cf;
+
                             for sample in data.iter_mut() {
-                                let mut actual_normalisation_factor = normalisation_factor;
+                                *sample *= normalisation_factor; // for both the basic and dynamic limiter
+
+                                // Feedforward limiter in the log domain
+                                // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012). Digital Dynamic
+                                // Range Compressor Design—A Tutorial and Analysis. Journal of The Audio
+                                // Engineering Society, 60, 399-408.
                                 if self.config.normalisation_method == NormalisationMethod::Dynamic
                                 {
-                                    if self.limiter_active {
-                                        // "S"-shaped curve with a configurable knee during attack and release:
-                                        //  - > 1.0 yields soft knees at start and end, steeper in between
-                                        //  - 1.0 yields a linear function from 0-100%
-                                        //  - between 0.0 and 1.0 yields hard knees at start and end, flatter in between
-                                        //  - 0.0 yields a step response to 50%, causing distortion
-                                        //  - Rates < 0.0 invert the limiter and are invalid
-                                        let mut shaped_limiter_strength = self.limiter_strength;
-                                        if shaped_limiter_strength > 0.0
-                                            && shaped_limiter_strength < 1.0
-                                        {
-                                            shaped_limiter_strength = 1.0
-                                                / (1.0
-                                                    + f64::powf(
-                                                        shaped_limiter_strength
-                                                            / (1.0 - shaped_limiter_strength),
-                                                        -self.config.normalisation_knee,
-                                                    ));
-                                        }
-                                        actual_normalisation_factor =
-                                            (1.0 - shaped_limiter_strength) * normalisation_factor
-                                                + shaped_limiter_strength * self.limiter_factor;
+                                    // steps 1 + 2: half-wave rectification and conversion into dB
+                                    let abs_sample_db = ratio_to_db(sample.abs());
+
+                                    // Some tracks have samples that are precisely 0.0, but log(0.0)
+                                    // returns -inf and gets the compressor stuck
+                                    if !abs_sample_db.is_normal() {
+                                        break;
+                                    }
+
+                                    // step 3: gain computer with soft knee
+                                    let biased_sample = abs_sample_db - threshold_db;
+                                    let limited_sample = if 2.0 * biased_sample < -knee_db {
+                                        abs_sample_db
+                                    } else if 2.0 * biased_sample.abs() <= knee_db {
+                                        abs_sample_db
+                                            - (biased_sample + knee_db / 2.0).powi(2)
+                                                / (2.0 * knee_db)
+                                    } else {
+                                        threshold_db as f64
                                     };
 
-                                    // Cast the fields here for better readability
-                                    let normalisation_attack =
-                                        self.config.normalisation_attack.as_secs_f64();
-                                    let normalisation_release =
-                                        self.config.normalisation_release.as_secs_f64();
-                                    let limiter_release_counter =
-                                        self.limiter_release_counter as f64;
-                                    let limiter_attack_counter = self.limiter_attack_counter as f64;
-                                    let samples_per_second = SAMPLES_PER_SECOND as f64;
+                                    // step 4: subtractor
+                                    let limiter_input = abs_sample_db - limited_sample;
 
-                                    // Always check for peaks, even when the limiter is already active.
-                                    // There may be even higher peaks than we initially targeted.
-                                    // Check against the normalisation factor that would be applied normally.
-                                    let abs_sample = f64::abs(*sample * normalisation_factor);
-                                    if abs_sample > self.config.normalisation_threshold {
-                                        self.limiter_active = true;
-                                        if self.limiter_release_counter > 0 {
-                                            // A peak was encountered while releasing the limiter;
-                                            // synchronize with the current release limiter strength.
-                                            self.limiter_attack_counter = (((samples_per_second
-                                                * normalisation_release)
-                                                - limiter_release_counter)
-                                                / (normalisation_release / normalisation_attack))
-                                                as u32;
-                                            self.limiter_release_counter = 0;
-                                        }
+                                    // step 5: smooth, decoupled peak detector
+                                    self.normalisation_integrator = f64::max(
+                                        limiter_input,
+                                        release_cf * self.normalisation_integrator
+                                            + (1.0 - release_cf) * limiter_input,
+                                    );
+                                    self.normalisation_peak = attack_cf * self.normalisation_peak
+                                        + (1.0 - attack_cf) * self.normalisation_integrator;
 
-                                        self.limiter_attack_counter =
-                                            self.limiter_attack_counter.saturating_add(1);
+                                    // step 6: make-up gain applied later (volume attenuation)
+                                    // Applying the standard normalisation factor here won't work,
+                                    // because there are tracks with peaks as high as 6 dB above
+                                    // the default threshold, so that would clip.
 
-                                        self.limiter_strength = limiter_attack_counter
-                                            / (samples_per_second * normalisation_attack);
-
-                                        if abs_sample > self.limiter_peak_sample {
-                                            self.limiter_peak_sample = abs_sample;
-                                            self.limiter_factor =
-                                                self.config.normalisation_threshold
-                                                    / self.limiter_peak_sample;
-                                        }
-                                    } else if self.limiter_active {
-                                        if self.limiter_attack_counter > 0 {
-                                            // Release may start within the attack period, before
-                                            // the limiter reached full strength. For that reason
-                                            // start the release by synchronizing with the current
-                                            // attack limiter strength.
-                                            self.limiter_release_counter = (((samples_per_second
-                                                * normalisation_attack)
-                                                - limiter_attack_counter)
-                                                * (normalisation_release / normalisation_attack))
-                                                as u32;
-                                            self.limiter_attack_counter = 0;
-                                        }
-
-                                        self.limiter_release_counter =
-                                            self.limiter_release_counter.saturating_add(1);
-
-                                        if self.limiter_release_counter
-                                            > (samples_per_second * normalisation_release) as u32
-                                        {
-                                            self.reset_limiter();
-                                        } else {
-                                            self.limiter_strength = ((samples_per_second
-                                                * normalisation_release)
-                                                - limiter_release_counter)
-                                                / (samples_per_second * normalisation_release);
-                                        }
-                                    }
+                                    // steps 7-8: conversion into level and multiplication into gain stage
+                                    *sample *= db_to_ratio(-self.normalisation_peak);
                                 }
-                                *sample *= actual_normalisation_factor;
                             }
                         }
 
+                        // Apply volume attenuation last. TODO: make this so we can chain
+                        // the normaliser and mixer as a processing pipeline.
                         if let Some(ref editor) = self.audio_filter {
                             editor.modify_stream(data)
                         }
@@ -1409,15 +1382,6 @@ impl PlayerInternal {
                 }
             }
         }
-    }
-
-    fn reset_limiter(&mut self) {
-        self.limiter_active = false;
-        self.limiter_release_counter = 0;
-        self.limiter_attack_counter = 0;
-        self.limiter_peak_sample = 0.0;
-        self.limiter_factor = 1.0;
-        self.limiter_strength = 0.0;
     }
 
     fn start_playback(
