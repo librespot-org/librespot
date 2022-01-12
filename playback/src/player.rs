@@ -246,16 +246,15 @@ impl NormalisationData {
         }
 
         let (gain_db, gain_peak) = if config.normalisation_type == NormalisationType::Album {
-            (data.album_gain_db, data.album_peak as f64)
+            (data.album_gain_db as f64, data.album_peak as f64)
         } else {
-            (data.track_gain_db, data.track_peak as f64)
+            (data.track_gain_db as f64, data.track_peak as f64)
         };
 
-        let normalisation_power = gain_db + config.normalisation_pregain_db;
-        let mut normalisation_factor = db_to_ratio(normalisation_power as f64);
+        let normalisation_power = gain_db + config.normalisation_pregain_db as f64;
+        let mut normalisation_factor = db_to_ratio(normalisation_power);
 
-        if normalisation_power + ratio_to_db(gain_peak) as f32 > config.normalisation_threshold_dbfs
-        {
+        if normalisation_power + ratio_to_db(gain_peak) > config.normalisation_threshold_dbfs {
             let limited_normalisation_factor =
                 db_to_ratio(config.normalisation_threshold_dbfs as f64) / gain_peak;
             let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
@@ -266,7 +265,7 @@ impl NormalisationData {
             } else {
                 warn!(
                     "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
-                    normalisation_power as f64 - limited_normalisation_power
+                    normalisation_power - limited_normalisation_power
                 );
             }
 
@@ -1291,9 +1290,9 @@ impl PlayerInternal {
                             && !(f64::abs(normalisation_factor - 1.0) <= f64::EPSILON
                                 && self.config.normalisation_method == NormalisationMethod::Basic)
                         {
-                            // casts and zero-cost shorthands
-                            let threshold_db = self.config.normalisation_threshold_dbfs as f64;
-                            let knee_db = self.config.normalisation_knee_db as f64;
+                            // zero-cost shorthands
+                            let threshold_db = self.config.normalisation_threshold_dbfs;
+                            let knee_db = self.config.normalisation_knee_db;
                             let attack_cf = self.config.normalisation_attack_cf;
                             let release_cf = self.config.normalisation_release_cf;
 
@@ -1310,9 +1309,9 @@ impl PlayerInternal {
                                     let abs_sample_db = ratio_to_db(sample.abs());
 
                                     // Some tracks have samples that are precisely 0.0, but log(0.0)
-                                    // returns -inf and gets the compressor stuck
+                                    // returns -inf and gets the peak detector stuck.
                                     if !abs_sample_db.is_normal() {
-                                        break;
+                                        continue;
                                     }
 
                                     // step 3: gain computer with soft knee

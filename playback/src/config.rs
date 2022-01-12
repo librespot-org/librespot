@@ -131,10 +131,10 @@ pub struct PlayerConfig {
     pub normalisation_type: NormalisationType,
     pub normalisation_method: NormalisationMethod,
     pub normalisation_pregain_db: f32,
-    pub normalisation_threshold_dbfs: f32,
+    pub normalisation_threshold_dbfs: f64,
     pub normalisation_attack_cf: f64,
     pub normalisation_release_cf: f64,
-    pub normalisation_knee_db: f32,
+    pub normalisation_knee_db: f64,
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
     // (thereby circumventing Send bounds that they might not satisfy)

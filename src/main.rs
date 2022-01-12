@@ -186,9 +186,9 @@ struct Setup {
 fn get_setup() -> Setup {
     const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
     const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
-    const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f32> = 0.0..=2.0;
+    const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=10.0;
     const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f32> = -10.0..=10.0;
-    const VALID_NORMALISATION_THRESHOLD_RANGE: RangeInclusive<f32> = -10.0..=0.0;
+    const VALID_NORMALISATION_THRESHOLD_RANGE: RangeInclusive<f64> = -10.0..=0.0;
     const VALID_NORMALISATION_ATTACK_RANGE: RangeInclusive<u64> = 1..=500;
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
 
@@ -1392,7 +1392,7 @@ fn get_setup() -> Setup {
                 .unwrap_or(player_default_config.normalisation_pregain_db);
 
             normalisation_threshold_dbfs = opt_str(NORMALISATION_THRESHOLD)
-                .map(|threshold| match threshold.parse::<f32>() {
+                .map(|threshold| match threshold.parse::<f64>() {
                     Ok(value) if (VALID_NORMALISATION_THRESHOLD_RANGE).contains(&value) => value,
                     _ => {
                         let valid_values = &format!(
@@ -1473,7 +1473,7 @@ fn get_setup() -> Setup {
                 .unwrap_or(player_default_config.normalisation_release_cf);
 
             normalisation_knee_db = opt_str(NORMALISATION_KNEE)
-                .map(|knee| match knee.parse::<f32>() {
+                .map(|knee| match knee.parse::<f64>() {
                     Ok(value) if (VALID_NORMALISATION_KNEE_RANGE).contains(&value) => value,
                     _ => {
                         let valid_values = &format!(
