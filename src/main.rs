@@ -748,44 +748,12 @@ fn get_setup() -> Setup {
         })
         .unwrap_or_default();
 
-    #[cfg(any(
-        feature = "alsa-backend",
-        feature = "rodio-backend",
-        feature = "portaudio-backend"
-    ))]
     let device = opt_str(DEVICE);
-
-    #[cfg(any(
-        feature = "alsa-backend",
-        feature = "rodio-backend",
-        feature = "portaudio-backend"
-    ))]
     if let Some(ref value) = device {
         if value == "?" {
             backend(device, format);
             exit(0);
-        } else if value.is_empty() {
-            empty_string_error_msg(DEVICE, DEVICE_SHORT);
         }
-    }
-
-    #[cfg(not(any(
-        feature = "alsa-backend",
-        feature = "rodio-backend",
-        feature = "portaudio-backend"
-    )))]
-    let device: Option<String> = None;
-
-    #[cfg(not(any(
-        feature = "alsa-backend",
-        feature = "rodio-backend",
-        feature = "portaudio-backend"
-    )))]
-    if opt_present(DEVICE) {
-        warn!(
-            "The `--{}` / `-{}` option is not supported by the included audio backend(s), and has no effect.",
-            DEVICE, DEVICE_SHORT,
-        );
     }
 
     #[cfg(feature = "alsa-backend")]
