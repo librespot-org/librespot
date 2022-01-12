@@ -1274,6 +1274,7 @@ fn get_setup() -> Setup {
             }
         }),
 		tmp_dir,
+        ..SessionConfig::default()
     };
 
     let player_config = {

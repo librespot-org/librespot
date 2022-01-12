@@ -710,7 +710,7 @@ impl SpircTask {
 
     fn handle_connection_id_update(&mut self, connection_id: String) {
         trace!("Received connection ID update: {:?}", connection_id);
-        self.session.set_connection_id(connection_id);
+        self.session.set_connection_id(&connection_id);
     }
 
     fn handle_user_attributes_update(&mut self, update: UserAttributesUpdate) {
@@ -754,29 +754,22 @@ impl SpircTask {
     }
 
     fn handle_remote_update(&mut self, update: Frame) -> Result<(), Error> {
-        let state_string = match update.get_state().get_status() {
-            PlayStatus::kPlayStatusLoading => "kPlayStatusLoading",
-            PlayStatus::kPlayStatusPause => "kPlayStatusPause",
-            PlayStatus::kPlayStatusStop => "kPlayStatusStop",
-            PlayStatus::kPlayStatusPlay => "kPlayStatusPlay",
-        };
+        trace!("Received update frame: {:#?}", update,);
 
-        debug!(
-            "{:?} {:?} {} {} {} {}",
-            update.get_typ(),
-            update.get_device_state().get_name(),
-            update.get_ident(),
-            update.get_seq_nr(),
-            update.get_state_update_id(),
-            state_string,
-        );
-
+        // First see if this update was intended for us.
         let device_id = &self.ident;
         let ident = update.get_ident();
         if ident == device_id
             || (!update.get_recipient().is_empty() && !update.get_recipient().contains(device_id))
         {
             return Err(SpircError::Ident(ident.to_string()).into());
+        }
+
+        for entry in update.get_device_state().get_metadata().iter() {
+            if entry.get_field_type() == "client_id" {
+                self.session.set_client_id(entry.get_metadata());
+                break;
+            }
         }
 
         match update.get_typ() {

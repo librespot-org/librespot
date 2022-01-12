@@ -2,8 +2,11 @@ use std::{fmt, path::PathBuf, str::FromStr};
 
 use url::Url;
 
+const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
+
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
+    pub client_id: String,
     pub device_id: String,
     pub proxy: Option<Url>,
     pub ap_port: Option<u16>,
@@ -14,6 +17,7 @@ impl Default for SessionConfig {
     fn default() -> SessionConfig {
         let device_id = uuid::Uuid::new_v4().to_hyphenated().to_string();
         SessionConfig {
+            client_id: KEYMASTER_CLIENT_ID.to_owned(),
             device_id,
             proxy: None,
             ap_port: None,

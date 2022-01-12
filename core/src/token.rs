@@ -52,8 +52,6 @@ struct TokenData {
 }
 
 impl TokenProvider {
-    const KEYMASTER_CLIENT_ID: &'static str = "65b708073fc0480ea92a077233ca87bd";
-
     fn find_token(&self, scopes: Vec<&str>) -> Option<usize> {
         self.lock(|inner| {
             for i in 0..inner.tokens.len() {
@@ -84,8 +82,8 @@ impl TokenProvider {
         let query_uri = format!(
             "hm://keymaster/token/authenticated?scope={}&client_id={}&device_id={}",
             scopes,
-            Self::KEYMASTER_CLIENT_ID,
-            self.session().device_id()
+            self.session().client_id(),
+            self.session().device_id(),
         );
         let request = self.session().mercury().get(query_uri)?;
         let response = request.await?;

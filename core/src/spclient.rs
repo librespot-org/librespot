@@ -333,7 +333,12 @@ impl SpClient {
             .get_user_attribute(attribute)
             .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
 
-        let url = template.replace("{id}", &preview_id.to_base16());
+        let mut url = template.replace("{id}", &preview_id.to_base16());
+        let separator = match url.find('?') {
+            Some(_) => "&",
+            None => "?",
+        };
+        url.push_str(&format!("{}cid={}", separator, self.session().client_id()));
 
         self.request_url(url).await
     }
