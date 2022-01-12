@@ -61,13 +61,12 @@ async fn receive_data(
         };
 
         let code = response.status();
-        let body = response.into_body();
-
         if code != StatusCode::PARTIAL_CONTENT {
             debug!("Streamer expected partial content but got: {}", code);
             break Err(AudioFileError::StatusCode(code).into());
         }
 
+        let body = response.into_body();
         let data = match hyper::body::to_bytes(body).await {
             Ok(bytes) => bytes,
             Err(e) => break Err(e.into()),

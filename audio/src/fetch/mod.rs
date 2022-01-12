@@ -428,6 +428,12 @@ impl AudioFileStreaming {
         let request_time = Instant::now();
         let response = streamer.next().await.ok_or(AudioFileError::NoData)??;
 
+        let code = response.status();
+        if code != StatusCode::PARTIAL_CONTENT {
+            debug!("Streamer expected partial content but got: {}", code);
+            return Err(AudioFileError::StatusCode(code).into());
+        }
+
         let header_value = response
             .headers()
             .get(CONTENT_RANGE)
