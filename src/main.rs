@@ -753,6 +753,8 @@ fn get_setup() -> Setup {
         if value == "?" {
             backend(device, format);
             exit(0);
+        } else if value.is_empty() {
+            empty_string_error_msg(DEVICE, DEVICE_SHORT);
         }
     }
 
