@@ -430,7 +430,10 @@ impl AudioFileStreaming {
 
         let code = response.status();
         if code != StatusCode::PARTIAL_CONTENT {
-            debug!("Streamer expected partial content but got: {}", code);
+            debug!(
+                "Opening audio file expected partial content but got: {}",
+                code
+            );
             return Err(AudioFileError::StatusCode(code).into());
         }
 
