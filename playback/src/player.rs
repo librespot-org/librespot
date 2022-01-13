@@ -14,7 +14,10 @@ use std::{
 };
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use futures_util::{future, stream::futures_unordered::FuturesUnordered, StreamExt, TryFutureExt};
+use futures_util::{
+    future, future::FusedFuture, stream::futures_unordered::FuturesUnordered, StreamExt,
+    TryFutureExt,
+};
 use parking_lot::Mutex;
 use symphonia::core::io::MediaSource;
 use tokio::sync::{mpsc, oneshot};
@@ -499,7 +502,7 @@ enum PlayerPreload {
     None,
     Loading {
         track_id: SpotifyId,
-        loader: Pin<Box<dyn Future<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
+        loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
     },
     Ready {
         track_id: SpotifyId,
@@ -515,7 +518,7 @@ enum PlayerState {
         track_id: SpotifyId,
         play_request_id: u64,
         start_playback: bool,
-        loader: Pin<Box<dyn Future<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
+        loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
     },
     Paused {
         track_id: SpotifyId,
@@ -571,6 +574,7 @@ impl PlayerState {
         matches!(self, Stopped)
     }
 
+    #[allow(dead_code)]
     fn is_loading(&self) -> bool {
         use self::PlayerState::*;
         matches!(self, Loading { .. })
@@ -1026,31 +1030,34 @@ impl Future for PlayerInternal {
                 play_request_id,
             } = self.state
             {
-                match loader.as_mut().poll(cx) {
-                    Poll::Ready(Ok(loaded_track)) => {
-                        self.start_playback(
-                            track_id,
-                            play_request_id,
-                            loaded_track,
-                            start_playback,
-                        );
-                        if let PlayerState::Loading { .. } = self.state {
-                            error!("The state wasn't changed by start_playback()");
-                            exit(1);
+                // The loader may be terminated if we are trying to load the same track
+                // as before, and that track failed to open before.
+                if !loader.as_mut().is_terminated() {
+                    match loader.as_mut().poll(cx) {
+                        Poll::Ready(Ok(loaded_track)) => {
+                            self.start_playback(
+                                track_id,
+                                play_request_id,
+                                loaded_track,
+                                start_playback,
+                            );
+                            if let PlayerState::Loading { .. } = self.state {
+                                error!("The state wasn't changed by start_playback()");
+                                exit(1);
+                            }
                         }
+                        Poll::Ready(Err(e)) => {
+                            error!(
+                                "Skipping to next track, unable to load track <{:?}>: {:?}",
+                                track_id, e
+                            );
+                            self.send_event(PlayerEvent::Unavailable {
+                                track_id,
+                                play_request_id,
+                            })
+                        }
+                        Poll::Pending => (),
                     }
-                    Poll::Ready(Err(e)) => {
-                        error!(
-                            "Skipping to next track, unable to load track <{:?}>: {:?}",
-                            track_id, e
-                        );
-                        debug_assert!(self.state.is_loading());
-                        self.send_event(PlayerEvent::Unavailable {
-                            track_id,
-                            play_request_id,
-                        })
-                    }
-                    Poll::Pending => (),
                 }
             }
 
@@ -2000,7 +2007,7 @@ impl PlayerInternal {
         &mut self,
         spotify_id: SpotifyId,
         position_ms: u32,
-    ) -> impl Future<Output = Result<PlayerLoadedTrackData, ()>> + Send + 'static {
+    ) -> impl FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send + 'static {
         // This method creates a future that returns the loaded stream and associated info.
         // Ideally all work should be done using asynchronous code. However, seek() on the
         // audio stream is implemented in a blocking fashion. Thus, we can't turn it into future
