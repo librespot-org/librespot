@@ -1308,7 +1308,7 @@ impl PlayerInternal {
                                     // steps 1 + 2: half-wave rectification and conversion into dB
                                     let abs_sample_db = ratio_to_db(sample.abs());
 
-                                    // Some tracks have samples that are precisely 0.0, but log(0.0)
+                                    // Some tracks have samples that are precisely 0.0, but ratio_to_db(0.0)
                                     // returns -inf and gets the peak detector stuck.
                                     if !abs_sample_db.is_normal() {
                                         continue;
@@ -1328,6 +1328,14 @@ impl PlayerInternal {
 
                                     // step 4: subtractor
                                     let limiter_input = abs_sample_db - limited_sample;
+
+                                    // Spare the CPU unless the limiter is active or we are riding a peak.
+                                    if !(limiter_input > 0.0
+                                        || self.normalisation_integrator > 0.0
+                                        || self.normalisation_peak > 0.0)
+                                    {
+                                        continue;
+                                    }
 
                                     // step 5: smooth, decoupled peak detector
                                     self.normalisation_integrator = f64::max(
