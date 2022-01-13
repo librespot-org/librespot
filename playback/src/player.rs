@@ -2195,19 +2195,20 @@ impl<T: Read + Seek> Seek for Subfile<T> {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         let pos = match pos {
             SeekFrom::Start(offset) => SeekFrom::Start(offset + self.offset),
-            x => x,
+            SeekFrom::End(offset) => {
+                if (self.length as i64 - offset) < self.offset as i64 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "newpos would be < self.offset",
+                    ));
+                }
+                pos
+            }
+            _ => pos,
         };
 
         let newpos = self.stream.seek(pos)?;
-
-        if newpos >= self.offset {
-            Ok(newpos - self.offset)
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "newpos < self.offset",
-            ))
-        }
+        Ok(newpos - self.offset)
     }
 }
 
