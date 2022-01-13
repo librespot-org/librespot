@@ -558,7 +558,7 @@ impl Read for AudioFileStreaming {
         let available_length = download_status
             .downloaded
             .contained_length_from_value(offset);
-        assert!(available_length > 0);
+
         drop(download_status);
 
         self.position = self.read_file.seek(SeekFrom::Start(offset as u64))?;

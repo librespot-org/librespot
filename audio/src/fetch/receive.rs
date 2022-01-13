@@ -53,8 +53,7 @@ async fn receive_data(
                 Some(Err(e)) => break Err(e.into()),
                 None => {
                     if actual_length != request.length {
-                        let msg =
-                            format!("did not expect body to contain {} bytes", actual_length,);
+                        let msg = format!("did not expect body to contain {} bytes", actual_length);
                         break Err(Error::data_loss(msg));
                     }
 
@@ -83,6 +82,11 @@ async fn receive_data(
         if measure_ping_time {
             let mut duration = Instant::now() - request.request_time;
             if duration > MAXIMUM_ASSUMED_PING_TIME {
+                warn!(
+                    "Ping time {} ms exceeds maximum {}, setting to maximum",
+                    duration.as_millis(),
+                    MAXIMUM_ASSUMED_PING_TIME.as_millis()
+                );
                 duration = MAXIMUM_ASSUMED_PING_TIME;
             }
             file_data_tx.send(ReceivedData::ResponseTime(duration))?;
@@ -135,7 +139,10 @@ impl AudioFileFetch {
         }
 
         if offset + length > self.shared.file_size {
-            length = self.shared.file_size - offset;
+            return Err(Error::out_of_range(format!(
+                "Range {} +{} exceeds file size {}",
+                offset, length, self.shared.file_size
+            )));
         }
 
         let mut ranges_to_request = RangeSet::new();
