@@ -20,7 +20,7 @@ use librespot::playback::dither;
 #[cfg(feature = "alsa-backend")]
 use librespot::playback::mixer::alsamixer::AlsaMixer;
 use librespot::playback::mixer::{self, MixerConfig, MixerFn};
-use librespot::playback::player::{db_to_ratio, ratio_to_db, Player};
+use librespot::playback::player::{coefficient_to_duration, duration_to_coefficient, Player};
 
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
@@ -186,8 +186,8 @@ struct Setup {
 fn get_setup() -> Setup {
     const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
     const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
-    const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=2.0;
-    const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f64> = -10.0..=10.0;
+    const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=10.0;
+    const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f32> = -10.0..=10.0;
     const VALID_NORMALISATION_THRESHOLD_RANGE: RangeInclusive<f64> = -10.0..=0.0;
     const VALID_NORMALISATION_ATTACK_RANGE: RangeInclusive<u64> = 1..=500;
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
@@ -540,7 +540,7 @@ fn get_setup() -> Setup {
     .optopt(
         NORMALISATION_KNEE_SHORT,
         NORMALISATION_KNEE,
-        "Knee steepness of the dynamic limiter from 0.0 to 2.0. Defaults to 1.0.",
+        "Knee width (dB) of the dynamic limiter from 0.0 to 10.0. Defaults to 5.0.",
         "KNEE",
     )
     .optopt(
@@ -1257,11 +1257,11 @@ fn get_setup() -> Setup {
 
         let normalisation_method;
         let normalisation_type;
-        let normalisation_pregain;
-        let normalisation_threshold;
-        let normalisation_attack;
-        let normalisation_release;
-        let normalisation_knee;
+        let normalisation_pregain_db;
+        let normalisation_threshold_dbfs;
+        let normalisation_attack_cf;
+        let normalisation_release_cf;
+        let normalisation_knee_db;
 
         if !normalisation {
             for a in &[
@@ -1284,11 +1284,11 @@ fn get_setup() -> Setup {
 
             normalisation_method = player_default_config.normalisation_method;
             normalisation_type = player_default_config.normalisation_type;
-            normalisation_pregain = player_default_config.normalisation_pregain;
-            normalisation_threshold = player_default_config.normalisation_threshold;
-            normalisation_attack = player_default_config.normalisation_attack;
-            normalisation_release = player_default_config.normalisation_release;
-            normalisation_knee = player_default_config.normalisation_knee;
+            normalisation_pregain_db = player_default_config.normalisation_pregain_db;
+            normalisation_threshold_dbfs = player_default_config.normalisation_threshold_dbfs;
+            normalisation_attack_cf = player_default_config.normalisation_attack_cf;
+            normalisation_release_cf = player_default_config.normalisation_release_cf;
+            normalisation_knee_db = player_default_config.normalisation_knee_db;
         } else {
             normalisation_method = opt_str(NORMALISATION_METHOD)
                 .as_deref()
@@ -1338,8 +1338,8 @@ fn get_setup() -> Setup {
                 })
                 .unwrap_or(player_default_config.normalisation_type);
 
-            normalisation_pregain = opt_str(NORMALISATION_PREGAIN)
-                .map(|pregain| match pregain.parse::<f64>() {
+            normalisation_pregain_db = opt_str(NORMALISATION_PREGAIN)
+                .map(|pregain| match pregain.parse::<f32>() {
                     Ok(value) if (VALID_NORMALISATION_PREGAIN_RANGE).contains(&value) => value,
                     _ => {
                         let valid_values = &format!(
@@ -1353,19 +1353,17 @@ fn get_setup() -> Setup {
                             NORMALISATION_PREGAIN_SHORT,
                             &pregain,
                             valid_values,
-                            &player_default_config.normalisation_pregain.to_string(),
+                            &player_default_config.normalisation_pregain_db.to_string(),
                         );
 
                         exit(1);
                     }
                 })
-                .unwrap_or(player_default_config.normalisation_pregain);
+                .unwrap_or(player_default_config.normalisation_pregain_db);
 
-            normalisation_threshold = opt_str(NORMALISATION_THRESHOLD)
+            normalisation_threshold_dbfs = opt_str(NORMALISATION_THRESHOLD)
                 .map(|threshold| match threshold.parse::<f64>() {
-                    Ok(value) if (VALID_NORMALISATION_THRESHOLD_RANGE).contains(&value) => {
-                        db_to_ratio(value)
-                    }
+                    Ok(value) if (VALID_NORMALISATION_THRESHOLD_RANGE).contains(&value) => value,
                     _ => {
                         let valid_values = &format!(
                             "{} - {}",
@@ -1378,18 +1376,20 @@ fn get_setup() -> Setup {
                             NORMALISATION_THRESHOLD_SHORT,
                             &threshold,
                             valid_values,
-                            &ratio_to_db(player_default_config.normalisation_threshold).to_string(),
+                            &player_default_config
+                                .normalisation_threshold_dbfs
+                                .to_string(),
                         );
 
                         exit(1);
                     }
                 })
-                .unwrap_or(player_default_config.normalisation_threshold);
+                .unwrap_or(player_default_config.normalisation_threshold_dbfs);
 
-            normalisation_attack = opt_str(NORMALISATION_ATTACK)
+            normalisation_attack_cf = opt_str(NORMALISATION_ATTACK)
                 .map(|attack| match attack.parse::<u64>() {
                     Ok(value) if (VALID_NORMALISATION_ATTACK_RANGE).contains(&value) => {
-                        Duration::from_millis(value)
+                        duration_to_coefficient(Duration::from_millis(value))
                     }
                     _ => {
                         let valid_values = &format!(
@@ -1403,8 +1403,7 @@ fn get_setup() -> Setup {
                             NORMALISATION_ATTACK_SHORT,
                             &attack,
                             valid_values,
-                            &player_default_config
-                                .normalisation_attack
+                            &coefficient_to_duration(player_default_config.normalisation_attack_cf)
                                 .as_millis()
                                 .to_string(),
                         );
@@ -1412,12 +1411,12 @@ fn get_setup() -> Setup {
                         exit(1);
                     }
                 })
-                .unwrap_or(player_default_config.normalisation_attack);
+                .unwrap_or(player_default_config.normalisation_attack_cf);
 
-            normalisation_release = opt_str(NORMALISATION_RELEASE)
+            normalisation_release_cf = opt_str(NORMALISATION_RELEASE)
                 .map(|release| match release.parse::<u64>() {
                     Ok(value) if (VALID_NORMALISATION_RELEASE_RANGE).contains(&value) => {
-                        Duration::from_millis(value)
+                        duration_to_coefficient(Duration::from_millis(value))
                     }
                     _ => {
                         let valid_values = &format!(
@@ -1431,18 +1430,19 @@ fn get_setup() -> Setup {
                             NORMALISATION_RELEASE_SHORT,
                             &release,
                             valid_values,
-                            &player_default_config
-                                .normalisation_release
-                                .as_millis()
-                                .to_string(),
+                            &coefficient_to_duration(
+                                player_default_config.normalisation_release_cf,
+                            )
+                            .as_millis()
+                            .to_string(),
                         );
 
                         exit(1);
                     }
                 })
-                .unwrap_or(player_default_config.normalisation_release);
+                .unwrap_or(player_default_config.normalisation_release_cf);
 
-            normalisation_knee = opt_str(NORMALISATION_KNEE)
+            normalisation_knee_db = opt_str(NORMALISATION_KNEE)
                 .map(|knee| match knee.parse::<f64>() {
                     Ok(value) if (VALID_NORMALISATION_KNEE_RANGE).contains(&value) => value,
                     _ => {
@@ -1457,13 +1457,13 @@ fn get_setup() -> Setup {
                             NORMALISATION_KNEE_SHORT,
                             &knee,
                             valid_values,
-                            &player_default_config.normalisation_knee.to_string(),
+                            &player_default_config.normalisation_knee_db.to_string(),
                         );
 
                         exit(1);
                     }
                 })
-                .unwrap_or(player_default_config.normalisation_knee);
+                .unwrap_or(player_default_config.normalisation_knee_db);
         }
 
         let ditherer_name = opt_str(DITHER);
@@ -1505,11 +1505,11 @@ fn get_setup() -> Setup {
             normalisation,
             normalisation_type,
             normalisation_method,
-            normalisation_pregain,
-            normalisation_threshold,
-            normalisation_attack,
-            normalisation_release,
-            normalisation_knee,
+            normalisation_pregain_db,
+            normalisation_threshold_dbfs,
+            normalisation_attack_cf,
+            normalisation_release_cf,
+            normalisation_knee_db,
             ditherer,
         }
     };

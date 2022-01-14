@@ -1,10 +1,7 @@
-use super::player::db_to_ratio;
-use crate::convert::i24;
-pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
+use std::{mem, str::FromStr, time::Duration};
 
-use std::mem;
-use std::str::FromStr;
-use std::time::Duration;
+pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
+use crate::{convert::i24, player::duration_to_coefficient};
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
@@ -133,11 +130,11 @@ pub struct PlayerConfig {
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
     pub normalisation_method: NormalisationMethod,
-    pub normalisation_pregain: f64,
-    pub normalisation_threshold: f64,
-    pub normalisation_attack: Duration,
-    pub normalisation_release: Duration,
-    pub normalisation_knee: f64,
+    pub normalisation_pregain_db: f32,
+    pub normalisation_threshold_dbfs: f64,
+    pub normalisation_attack_cf: f64,
+    pub normalisation_release_cf: f64,
+    pub normalisation_knee_db: f64,
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
     // (thereby circumventing Send bounds that they might not satisfy)
@@ -152,11 +149,11 @@ impl Default for PlayerConfig {
             normalisation: false,
             normalisation_type: NormalisationType::default(),
             normalisation_method: NormalisationMethod::default(),
-            normalisation_pregain: 0.0,
-            normalisation_threshold: db_to_ratio(-2.0),
-            normalisation_attack: Duration::from_millis(5),
-            normalisation_release: Duration::from_millis(100),
-            normalisation_knee: 1.0,
+            normalisation_pregain_db: 0.0,
+            normalisation_threshold_dbfs: -2.0,
+            normalisation_attack_cf: duration_to_coefficient(Duration::from_millis(5)),
+            normalisation_release_cf: duration_to_coefficient(Duration::from_millis(100)),
+            normalisation_knee_db: 5.0,
             passthrough: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),
         }
