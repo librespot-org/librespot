@@ -7,7 +7,7 @@ In order to compile librespot, you will first need to set up a suitable Rust bui
 ### Install Rust
 The easiest, and recommended way to get Rust is to use [rustup](https://rustup.rs). Once that’s installed, Rust's standard tools should be set up and ready to use.
 
-*Note: The current minimum required Rust version at the time of writing is 1.48, you can find the current minimum version specified in the `.github/workflow/test.yml` file.*
+*Note: The current minimum required Rust version at the time of writing is 1.53.*
 
 #### Additional Rust tools - `rustfmt`
 To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-lang/rustfmt) and [`clippy`](https://github.com/rust-lang/rust-clippy), which are installed by default with `rustup` these days, else they can be installed manually with:
@@ -15,7 +15,7 @@ To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-
 rustup component add rustfmt
 rustup component add clippy
 ```
-Using `rustfmt` is not optional, as our CI checks against this repo's rules.
+Using `cargo fmt` and `cargo clippy` is not optional, as our CI checks against this repo's rules.
 
 ### General dependencies
 Along with Rust, you will also require a C compiler. 
@@ -63,7 +63,7 @@ sudo dnf install alsa-lib-devel
 The recommended method is to first fork the repo, so that you have a copy that you have read/write access to. After that, it’s a simple case of cloning your fork.
 
 ```bash
-git clone git@github.com:YOURUSERNAME/librespot.git
+git clone git@github.com:YOUR_USERNAME/librespot.git
 ```
 
 ## Compiling & Running
