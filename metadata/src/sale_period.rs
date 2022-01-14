@@ -1,4 +1,8 @@
-use std::{convert::{TryFrom, TryInto}, fmt::Debug, ops::Deref};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
+};
 
 use crate::{restriction::Restrictions, util::try_from_repeated_message};
 

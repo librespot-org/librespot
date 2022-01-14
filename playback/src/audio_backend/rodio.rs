@@ -135,21 +135,18 @@ fn create_sink(
     host: &cpal::Host,
     device: Option<String>,
 ) -> Result<(rodio::Sink, rodio::OutputStream), RodioError> {
-    let rodio_device = match device {
-        Some(ask) if &ask == "?" => {
-            let exit_code = match list_outputs(host) {
-                Ok(()) => 0,
-                Err(e) => {
-                    error!("{}", e);
-                    1
-                }
-            };
-            exit(exit_code)
-        }
+    let rodio_device = match device.as_deref() {
+        Some("?") => match list_outputs(host) {
+            Ok(()) => exit(0),
+            Err(e) => {
+                error!("{}", e);
+                exit(1);
+            }
+        },
         Some(device_name) => {
             host.output_devices()?
                 .find(|d| d.name().ok().map_or(false, |name| name == device_name)) // Ignore devices for which getting name fails
-                .ok_or(RodioError::DeviceNotAvailable(device_name))?
+                .ok_or_else(|| RodioError::DeviceNotAvailable(device_name.to_string()))?
         }
         None => host
             .default_output_device()

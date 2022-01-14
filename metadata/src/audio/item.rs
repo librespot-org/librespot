@@ -10,7 +10,9 @@ use crate::{
 
 use super::file::AudioFiles;
 
-use librespot_core::{session::UserData, date::Date, spotify_id::SpotifyItemType, Error, Session, SpotifyId};
+use librespot_core::{
+    date::Date, session::UserData, spotify_id::SpotifyItemType, Error, Session, SpotifyId,
+};
 
 pub type AudioItemResult = Result<AudioItem, Error>;
 

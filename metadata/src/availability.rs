@@ -1,4 +1,8 @@
-use std::{convert::{TryFrom, TryInto}, fmt::Debug, ops::Deref};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
+};
 
 use thiserror::Error;
 

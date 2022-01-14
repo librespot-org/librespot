@@ -5,7 +5,7 @@ use crate::decoder::AudioPacket;
 use shell_words::split;
 
 use std::io::Write;
-use std::process::{Child, Command, Stdio};
+use std::process::{exit, Child, Command, Stdio};
 
 pub struct SubprocessSink {
     shell_command: String,
@@ -15,16 +15,24 @@ pub struct SubprocessSink {
 
 impl Open for SubprocessSink {
     fn open(shell_command: Option<String>, format: AudioFormat) -> Self {
+        let shell_command = match shell_command.as_deref() {
+            Some("?") => {
+                info!("Usage: --backend subprocess --device {{shell_command}}");
+                exit(0);
+            }
+            Some(cmd) => cmd.to_owned(),
+            None => {
+                error!("subprocess sink requires specifying a shell command");
+                exit(1);
+            }
+        };
+
         info!("Using subprocess sink with format: {:?}", format);
 
-        if let Some(shell_command) = shell_command {
-            SubprocessSink {
-                shell_command,
-                child: None,
-                format,
-            }
-        } else {
-            panic!("subprocess sink requires specifying a shell command");
+        Self {
+            shell_command,
+            child: None,
+            format,
         }
     }
 }
