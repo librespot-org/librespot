@@ -1,6 +1,6 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{convert::{TryFrom, TryInto}, fmt::Debug, ops::Deref};
 
-use crate::{restriction::Restrictions, util::from_repeated_message};
+use crate::{restriction::Restrictions, util::try_from_repeated_message};
 
 use librespot_core::date::Date;
 
@@ -24,14 +24,15 @@ impl Deref for SalePeriods {
     }
 }
 
-impl From<&SalePeriodMessage> for SalePeriod {
-    fn from(sale_period: &SalePeriodMessage) -> Self {
-        Self {
+impl TryFrom<&SalePeriodMessage> for SalePeriod {
+    type Error = librespot_core::Error;
+    fn try_from(sale_period: &SalePeriodMessage) -> Result<Self, Self::Error> {
+        Ok(Self {
             restrictions: sale_period.get_restriction().into(),
-            start: sale_period.get_start().into(),
-            end: sale_period.get_end().into(),
-        }
+            start: sale_period.get_start().try_into()?,
+            end: sale_period.get_end().try_into()?,
+        })
     }
 }
 
-from_repeated_message!(SalePeriodMessage, SalePeriods);
+try_from_repeated_message!(SalePeriodMessage, SalePeriods);

@@ -1,30 +1,27 @@
-use std::{convert::TryFrom, fmt::Debug, ops::Deref};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt::Debug,
+    ops::Deref,
+};
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use thiserror::Error;
+use time::{error::ComponentRange, Date as _Date, OffsetDateTime, PrimitiveDateTime, Time};
 
 use crate::Error;
 
 use librespot_protocol as protocol;
 use protocol::metadata::Date as DateMessage;
 
-#[derive(Debug, Error)]
-pub enum DateError {
-    #[error("item has invalid timestamp {0}")]
-    Timestamp(i64),
-}
-
-impl From<DateError> for Error {
-    fn from(err: DateError) -> Self {
-        Error::invalid_argument(err)
+impl From<ComponentRange> for Error {
+    fn from(err: ComponentRange) -> Self {
+        Error::out_of_range(err)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Date(pub DateTime<Utc>);
+pub struct Date(pub OffsetDateTime);
 
 impl Deref for Date {
-    type Target = DateTime<Utc>;
+    type Target = OffsetDateTime;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -32,42 +29,43 @@ impl Deref for Date {
 
 impl Date {
     pub fn as_timestamp(&self) -> i64 {
-        self.0.timestamp()
+        self.0.unix_timestamp()
     }
 
     pub fn from_timestamp(timestamp: i64) -> Result<Self, Error> {
-        if let Some(date_time) = NaiveDateTime::from_timestamp_opt(timestamp, 0) {
-            Ok(Self::from_utc(date_time))
-        } else {
-            Err(DateError::Timestamp(timestamp).into())
-        }
+        let date_time = OffsetDateTime::from_unix_timestamp(timestamp)?;
+        Ok(Self(date_time))
     }
 
-    pub fn as_utc(&self) -> DateTime<Utc> {
+    pub fn as_utc(&self) -> OffsetDateTime {
         self.0
     }
 
-    pub fn from_utc(date_time: NaiveDateTime) -> Self {
-        Self(DateTime::<Utc>::from_utc(date_time, Utc))
+    pub fn from_utc(date_time: PrimitiveDateTime) -> Self {
+        Self(date_time.assume_utc())
+    }
+
+    pub fn now_utc() -> Self {
+        Self(OffsetDateTime::now_utc())
     }
 }
 
-impl From<&DateMessage> for Date {
-    fn from(date: &DateMessage) -> Self {
-        let naive_date = NaiveDate::from_ymd(
-            date.get_year() as i32,
-            date.get_month() as u32,
-            date.get_day() as u32,
-        );
-        let naive_time = NaiveTime::from_hms(date.get_hour() as u32, date.get_minute() as u32, 0);
-        let naive_datetime = NaiveDateTime::new(naive_date, naive_time);
-        Self(DateTime::<Utc>::from_utc(naive_datetime, Utc))
+impl TryFrom<&DateMessage> for Date {
+    type Error = crate::Error;
+    fn try_from(msg: &DateMessage) -> Result<Self, Self::Error> {
+        let date = _Date::from_calendar_date(
+            msg.get_year(),
+            (msg.get_month() as u8).try_into()?,
+            msg.get_day() as u8,
+        )?;
+        let time = Time::from_hms(msg.get_hour() as u8, msg.get_minute() as u8, 0)?;
+        Ok(Self::from_utc(PrimitiveDateTime::new(date, time)))
     }
 }
 
-impl From<DateTime<Utc>> for Date {
-    fn from(date: DateTime<Utc>) -> Self {
-        Self(date)
+impl From<OffsetDateTime> for Date {
+    fn from(datetime: OffsetDateTime) -> Self {
+        Self(datetime)
     }
 }
 

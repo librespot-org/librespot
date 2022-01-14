@@ -4,7 +4,6 @@ use std::{
     ops::Deref,
 };
 
-use chrono::Local;
 use uuid::Uuid;
 
 use crate::{
@@ -77,7 +76,7 @@ impl InnerAudioItem for Track {
         };
 
         // TODO: check meaning of earliest_live_timestamp in
-        let availability = if Local::now() < track.earliest_live_timestamp.as_utc() {
+        let availability = if Date::now_utc() < track.earliest_live_timestamp {
             Err(UnavailabilityReason::Embargo)
         } else {
             Self::available_for_user(
@@ -130,12 +129,12 @@ impl TryFrom<&<Self as Metadata>::Message> for Track {
             restrictions: track.get_restriction().into(),
             files: track.get_file().into(),
             alternatives: track.get_alternative().try_into()?,
-            sale_periods: track.get_sale_period().into(),
+            sale_periods: track.get_sale_period().try_into()?,
             previews: track.get_preview().into(),
             tags: track.get_tags().to_vec(),
             earliest_live_timestamp: track.get_earliest_live_timestamp().try_into()?,
             has_lyrics: track.get_has_lyrics(),
-            availability: track.get_availability().into(),
+            availability: track.get_availability().try_into()?,
             licensor: Uuid::from_slice(track.get_licensor().get_uuid())
                 .unwrap_or_else(|_| Uuid::nil()),
             language_of_performance: track.get_language_of_performance().to_vec(),

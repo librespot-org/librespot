@@ -3,7 +3,6 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use chrono::Local;
 use protobuf::Message;
 use thiserror::Error;
 use url::Url;
@@ -84,9 +83,9 @@ impl CdnUrl {
             return Err(CdnUrlError::Unresolved.into());
         }
 
-        let now = Local::now();
+        let now = Date::now_utc();
         let url = self.urls.iter().find(|url| match url.1 {
-            Some(expiry) => now < expiry.as_utc(),
+            Some(expiry) => now < expiry,
             None => true,
         });
 

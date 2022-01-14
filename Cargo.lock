@@ -237,7 +237,7 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits",
- "time",
+ "time 0.1.43",
  "winapi",
 ]
 
@@ -1369,7 +1369,6 @@ dependencies = [
  "base64",
  "byteorder",
  "bytes",
- "chrono",
  "dns-sd",
  "env_logger",
  "form_urlencoded",
@@ -1400,6 +1399,7 @@ dependencies = [
  "sha-1 0.10.0",
  "shannon",
  "thiserror",
+ "time 0.3.5",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
@@ -1441,7 +1441,6 @@ dependencies = [
  "async-trait",
  "byteorder",
  "bytes",
- "chrono",
  "librespot-core",
  "librespot-protocol",
  "log",
@@ -2735,6 +2734,15 @@ checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "time"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41effe7cfa8af36f439fac33861b66b049edc6f9a32331e2312660529c1c24ad"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

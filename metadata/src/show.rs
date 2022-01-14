@@ -65,7 +65,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Show {
             keywords: show.get_keyword().to_vec(),
             media_type: show.get_media_type(),
             consumption_order: show.get_consumption_order(),
-            availability: show.get_availability().into(),
+            availability: show.get_availability().try_into()?,
             trailer_uri: SpotifyId::from_uri(show.get_trailer_uri())?,
             has_music_and_talk: show.get_music_and_talk(),
             is_audiobook: show.get_is_audiobook(),

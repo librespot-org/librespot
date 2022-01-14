@@ -101,7 +101,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Album {
             artists: album.get_artist().try_into()?,
             album_type: album.get_field_type(),
             label: album.get_label().to_owned(),
-            date: album.get_date().into(),
+            date: album.get_date().try_into()?,
             popularity: album.get_popularity(),
             genres: album.get_genre().to_vec(),
             covers: album.get_cover().into(),
@@ -111,12 +111,12 @@ impl TryFrom<&<Self as Metadata>::Message> for Album {
             copyrights: album.get_copyright().into(),
             restrictions: album.get_restriction().into(),
             related: album.get_related().try_into()?,
-            sale_periods: album.get_sale_period().into(),
+            sale_periods: album.get_sale_period().try_into()?,
             cover_group: album.get_cover_group().get_image().into(),
             original_title: album.get_original_title().to_owned(),
             version_title: album.get_version_title().to_owned(),
             type_str: album.get_type_str().to_owned(),
-            availability: album.get_availability().into(),
+            availability: album.get_availability().try_into()?,
         })
     }
 }

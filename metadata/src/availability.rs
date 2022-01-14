@@ -1,8 +1,8 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{convert::{TryFrom, TryInto}, fmt::Debug, ops::Deref};
 
 use thiserror::Error;
 
-use crate::util::from_repeated_message;
+use crate::util::try_from_repeated_message;
 
 use librespot_core::date::Date;
 
@@ -39,13 +39,14 @@ pub enum UnavailabilityReason {
     NotWhitelisted,
 }
 
-impl From<&AvailabilityMessage> for Availability {
-    fn from(availability: &AvailabilityMessage) -> Self {
-        Self {
+impl TryFrom<&AvailabilityMessage> for Availability {
+    type Error = librespot_core::Error;
+    fn try_from(availability: &AvailabilityMessage) -> Result<Self, Self::Error> {
+        Ok(Self {
             catalogue_strs: availability.get_catalogue_str().to_vec(),
-            start: availability.get_start().into(),
-        }
+            start: availability.get_start().try_into()?,
+        })
     }
 }
 
-from_repeated_message!(AvailabilityMessage, Availabilities);
+try_from_repeated_message!(AvailabilityMessage, Availabilities);

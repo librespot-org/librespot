@@ -1,7 +1,5 @@
 use std::fmt::Debug;
 
-use chrono::Local;
-
 use crate::{
     availability::{AudioItemAvailability, Availabilities, UnavailabilityReason},
     episode::Episode,
@@ -12,7 +10,7 @@ use crate::{
 
 use super::file::AudioFiles;
 
-use librespot_core::{session::UserData, spotify_id::SpotifyItemType, Error, Session, SpotifyId};
+use librespot_core::{session::UserData, date::Date, spotify_id::SpotifyItemType, Error, Session, SpotifyId};
 
 pub type AudioItemResult = Result<AudioItem, Error>;
 
@@ -93,7 +91,7 @@ pub trait InnerAudioItem {
 
         if !(availability
             .iter()
-            .any(|availability| Local::now() >= availability.start.as_utc()))
+            .any(|availability| Date::now_utc() >= availability.start))
         {
             return Err(UnavailabilityReason::Embargo);
         }
