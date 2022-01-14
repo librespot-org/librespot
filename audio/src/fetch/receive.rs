@@ -96,6 +96,16 @@ async fn receive_data(
 
     drop(request.streamer);
 
+    let bytes_remaining = request.length - actual_length;
+    if bytes_remaining > 0 {
+        {
+            let missing_range = Range::new(offset, bytes_remaining);
+            let mut download_status = shared.download_status.lock();
+            download_status.requested.subtract_range(&missing_range);
+            shared.cond.notify_all();
+        }
+    }
+
     shared
         .number_of_open_requests
         .fetch_sub(1, Ordering::SeqCst);
@@ -139,10 +149,7 @@ impl AudioFileFetch {
         }
 
         if offset + length > self.shared.file_size {
-            return Err(Error::out_of_range(format!(
-                "Range {} +{} exceeds file size {}",
-                offset, length, self.shared.file_size
-            )));
+            length = self.shared.file_size - offset;
         }
 
         let mut ranges_to_request = RangeSet::new();
