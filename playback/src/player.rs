@@ -225,10 +225,10 @@ impl NormalisationData {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
         file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
 
-        let track_gain_db = file.read_f64::<LittleEndian>()?;
-        let track_peak = file.read_f64::<LittleEndian>()?;
-        let album_gain_db = file.read_f64::<LittleEndian>()?;
-        let album_peak = file.read_f64::<LittleEndian>()?;
+        let track_gain_db = file.read_f32::<LittleEndian>()? as f64;
+        let track_peak = file.read_f32::<LittleEndian>()? as f64;
+        let album_gain_db = file.read_f32::<LittleEndian>()? as f64;
+        let album_peak = file.read_f32::<LittleEndian>()? as f64;
 
         let r = NormalisationData {
             track_gain_db,
