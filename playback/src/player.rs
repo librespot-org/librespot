@@ -1305,14 +1305,20 @@ impl PlayerInternal {
                                 // Engineering Society, 60, 399-408.
                                 if self.config.normalisation_method == NormalisationMethod::Dynamic
                                 {
-                                    // steps 1 + 2: half-wave rectification and conversion into dB
-                                    let abs_sample_db = ratio_to_db(sample.abs());
-
-                                    // Some tracks have samples that are precisely 0.0, but ratio_to_db(0.0)
-                                    // returns -inf and gets the peak detector stuck.
-                                    if !abs_sample_db.is_normal() {
+                                    if !(self.normalisation_integrator > 0.0
+                                        || self.normalisation_peak > 0.0)
+                                    {
                                         continue;
                                     }
+
+                                    let ratio = sample.abs();
+                                    // Some tracks have samples that are precisely 0.0, but ratio_to_db(0.0)
+                                    // returns -inf and gets the peak detector stuck.
+                                    if ratio == 0.0 {
+                                        continue;
+                                    }
+                                    // steps 1 + 2: half-wave rectification and conversion into dB
+                                    let abs_sample_db = ratio_to_db(ratio);
 
                                     // step 3: gain computer with soft knee
                                     let biased_sample = abs_sample_db - threshold_db;
@@ -1329,11 +1335,8 @@ impl PlayerInternal {
                                     // step 4: subtractor
                                     let limiter_input = abs_sample_db - limited_sample;
 
-                                    // Spare the CPU unless the limiter is active or we are riding a peak.
-                                    if !(limiter_input > 0.0
-                                        || self.normalisation_integrator > 0.0
-                                        || self.normalisation_peak > 0.0)
-                                    {
+                                    // Spare the CPU unless the limiter is active.
+                                    if limiter_input <= 0.0 {
                                         continue;
                                     }
 
