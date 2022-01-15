@@ -1305,8 +1305,6 @@ impl PlayerInternal {
                                 // Engineering Society, 60, 399-408.
                                 if self.config.normalisation_method == NormalisationMethod::Dynamic
                                 {
-                                    let mut limiter_input = 0.0;
-
                                     // Some tracks have samples that are precisely 0.0. That's silence
                                     // and we know we don't need to limit that, in which we can spare
                                     // the CPU cycles.
@@ -1314,16 +1312,17 @@ impl PlayerInternal {
                                     // Also, calling `ratio_to_db(0.0)` returns `inf` and would get the
                                     // peak detector stuck. Also catch the unlikely case where a sample
                                     // is decoded as `NaN` or some other non-normal value.
-                                    if sample.is_normal() {
+                                    let limiter_input = if sample.is_normal() {
                                         // step 1 & 2: half-wave rectification & conversion into dB
                                         let abs_sample_db = ratio_to_db(sample.abs());
 
                                         // step 3: gain computer with soft knee
                                         let biased_sample = abs_sample_db - threshold_db;
+                                        let double_biased_sample = biased_sample * 2.0;
 
-                                        let limited_sample = if 2.0 * biased_sample < -knee_db {
+                                        let limited_sample = if double_biased_sample < -knee_db {
                                             abs_sample_db
-                                        } else if 2.0 * biased_sample.abs() <= knee_db {
+                                        } else if double_biased_sample.abs() <= knee_db {
                                             abs_sample_db
                                                 - (biased_sample + knee_db / 2.0).powi(2)
                                                     / (2.0 * knee_db)
@@ -1332,8 +1331,10 @@ impl PlayerInternal {
                                         };
 
                                         // step 4: subtractor
-                                        limiter_input = abs_sample_db - limited_sample;
-                                    }
+                                        abs_sample_db - limited_sample
+                                    } else {
+                                        0.0
+                                    };
 
                                     // Spare the CPU unless (1) the limiter is engaged, (2) we
                                     // were in attack or (3) we were in release, and that attack/
