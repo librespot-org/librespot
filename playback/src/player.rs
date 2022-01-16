@@ -1316,22 +1316,20 @@ impl PlayerInternal {
                                         // step 1-2: half-wave rectification and conversion into dB
                                         let abs_sample_db = ratio_to_db(sample.abs());
 
-                                        // step 3: gain computer with soft knee
+                                        // step 3-4: gain computer with soft knee and subtractor
                                         let bias_db = abs_sample_db - threshold_db;
                                         let knee_boundary_db = bias_db * 2.0;
 
-                                        let offset_db = if knee_boundary_db < -knee_db {
-                                            abs_sample_db
+                                        if knee_boundary_db < -knee_db {
+                                            0.0
                                         } else if knee_boundary_db.abs() <= knee_db {
                                             abs_sample_db
-                                                - (bias_db + knee_db / 2.0).powi(2)
-                                                    / (2.0 * knee_db)
+                                                - (abs_sample_db
+                                                    - (bias_db + knee_db / 2.0).powi(2)
+                                                        / (2.0 * knee_db))
                                         } else {
-                                            threshold_db
-                                        };
-
-                                        // step 4: subtractor
-                                        abs_sample_db - offset_db
+                                            abs_sample_db - threshold_db
+                                        }
                                     } else {
                                         0.0
                                     };
