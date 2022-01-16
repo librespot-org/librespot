@@ -7,7 +7,10 @@ use std::{
     mem,
     pin::Pin,
     process::exit,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     task::{Context, Poll},
     thread,
     time::{Duration, Instant},
@@ -84,7 +87,11 @@ struct PlayerInternal {
     normalisation_peak: f64,
 
     auto_normalise_as_album: bool,
+
+    player_id: usize,
 }
+
+static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 enum PlayerCommand {
     Load {
@@ -365,7 +372,8 @@ impl Player {
         }
 
         let handle = thread::spawn(move || {
-            debug!("new Player[{}]", session.session_id());
+            let player_id = PLAYER_COUNTER.fetch_add(1, Ordering::AcqRel);
+            debug!("new Player [{}]", player_id);
 
             let converter = Converter::new(config.ditherer);
 
@@ -388,6 +396,8 @@ impl Player {
                 normalisation_integrator: 0.0,
 
                 auto_normalise_as_album: false,
+
+                player_id,
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -488,9 +498,8 @@ impl Drop for Player {
         debug!("Shutting down player thread ...");
         self.commands = None;
         if let Some(handle) = self.thread_handle.take() {
-            match handle.join() {
-                Ok(_) => (),
-                Err(e) => error!("Player thread Error: {:?}", e),
+            if let Err(e) = handle.join() {
+                error!("Player thread Error: {:?}", e);
             }
         }
     }
@@ -2043,7 +2052,7 @@ impl PlayerInternal {
 
 impl Drop for PlayerInternal {
     fn drop(&mut self) {
-        debug!("drop PlayerInternal[{}]", self.session.session_id());
+        debug!("drop PlayerInternal[{}]", self.player_id);
 
         let handles: Vec<thread::JoinHandle<()>> = {
             // waiting for the thread while holding the mutex would result in a deadlock

@@ -4,10 +4,7 @@ use std::{
     io,
     pin::Pin,
     process::exit,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Weak,
-    },
+    sync::{Arc, Weak},
     task::{Context, Poll},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -97,11 +94,7 @@ struct SessionInternal {
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
-
-    session_id: usize,
 }
-
-static SESSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone)]
 pub struct Session(Arc<SessionInternal>);
@@ -110,8 +103,7 @@ impl Session {
     pub fn new(config: SessionConfig, cache: Option<Cache>) -> Self {
         let http_client = HttpClient::new(config.proxy.as_ref());
 
-        let session_id = SESSION_COUNTER.fetch_add(1, Ordering::AcqRel);
-        debug!("new Session[{}]", session_id);
+        debug!("new Session");
 
         Self(Arc::new(SessionInternal {
             config,
@@ -126,7 +118,6 @@ impl Session {
             spclient: OnceCell::new(),
             token_provider: OnceCell::new(),
             handle: tokio::runtime::Handle::current(),
-            session_id,
         }))
     }
 
@@ -218,8 +209,7 @@ impl Session {
 
     fn debug_info(&self) {
         debug!(
-            "Session[{}] strong={} weak={}",
-            self.0.session_id,
+            "Session strong={} weak={}",
             Arc::strong_count(&self.0),
             Arc::weak_count(&self.0)
         );
@@ -413,12 +403,8 @@ impl Session {
         SessionWeak(Arc::downgrade(&self.0))
     }
 
-    pub fn session_id(&self) -> usize {
-        self.0.session_id
-    }
-
     pub fn shutdown(&self) {
-        debug!("Invalidating session [{}]", self.0.session_id);
+        debug!("Invalidating session");
         self.0.data.write().invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
@@ -445,7 +431,7 @@ impl SessionWeak {
 
 impl Drop for SessionInternal {
     fn drop(&mut self) {
-        debug!("drop Session[{}]", self.session_id);
+        debug!("drop Session");
     }
 }
 

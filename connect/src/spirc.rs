@@ -2,6 +2,7 @@ use std::{
     convert::TryFrom,
     future::Future,
     pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -106,7 +107,11 @@ struct SpircTask {
     context_fut: BoxedFuture<Result<serde_json::Value, Error>>,
     autoplay_fut: BoxedFuture<Result<String, Error>>,
     context: Option<StationContext>,
+
+    spirc_id: usize,
 }
+
+static SPIRC_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub enum SpircCommand {
     Play,
@@ -263,7 +268,8 @@ impl Spirc {
         player: Player,
         mixer: Box<dyn Mixer>,
     ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
-        debug!("new Spirc[{}]", session.session_id());
+        let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
+        debug!("new Spirc[{}]", spirc_id);
 
         let ident = session.device_id().to_owned();
 
@@ -368,6 +374,8 @@ impl Spirc {
             context_fut: Box::pin(future::pending()),
             autoplay_fut: Box::pin(future::pending()),
             context: None,
+
+            spirc_id,
         };
 
         if let Some(volume) = initial_volume {
@@ -1427,7 +1435,7 @@ impl SpircTask {
 
 impl Drop for SpircTask {
     fn drop(&mut self) {
-        debug!("drop Spirc[{}]", self.session.session_id());
+        debug!("drop Spirc[{}]", self.spirc_id);
     }
 }
 
