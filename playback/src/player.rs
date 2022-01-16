@@ -1312,26 +1312,26 @@ impl PlayerInternal {
                                     // Also, calling `ratio_to_db(0.0)` returns `inf` and would get the
                                     // peak detector stuck. Also catch the unlikely case where a sample
                                     // is decoded as `NaN` or some other non-normal value.
-                                    let limiter_input = if sample.is_normal() {
-                                        // step 1 & 2: half-wave rectification & conversion into dB
+                                    let limiter_db = if sample.is_normal() {
+                                        // step 1-2: half-wave rectification and conversion into dB
                                         let abs_sample_db = ratio_to_db(sample.abs());
 
                                         // step 3: gain computer with soft knee
-                                        let biased_sample = abs_sample_db - threshold_db;
-                                        let double_biased_sample = biased_sample * 2.0;
+                                        let bias_db = abs_sample_db - threshold_db;
+                                        let knee_boundary_db = bias_db * 2.0;
 
-                                        let limited_sample = if double_biased_sample < -knee_db {
+                                        let offset_db = if knee_boundary_db < -knee_db {
                                             abs_sample_db
-                                        } else if double_biased_sample.abs() <= knee_db {
+                                        } else if knee_boundary_db.abs() <= knee_db {
                                             abs_sample_db
-                                                - (biased_sample + knee_db / 2.0).powi(2)
+                                                - (bias_db + knee_db / 2.0).powi(2)
                                                     / (2.0 * knee_db)
                                         } else {
                                             threshold_db
                                         };
 
                                         // step 4: subtractor
-                                        abs_sample_db - limited_sample
+                                        abs_sample_db - offset_db
                                     } else {
                                         0.0
                                     };
@@ -1339,15 +1339,15 @@ impl PlayerInternal {
                                     // Spare the CPU unless (1) the limiter is engaged, (2) we
                                     // were in attack or (3) we were in release, and that attack/
                                     // release wasn't finished yet.
-                                    if limiter_input > 0.0
+                                    if limiter_db > 0.0
                                         || self.normalisation_integrator > 0.0
                                         || self.normalisation_peak > 0.0
                                     {
                                         // step 5: smooth, decoupled peak detector
                                         self.normalisation_integrator = f64::max(
-                                            limiter_input,
+                                            limiter_db,
                                             release_cf * self.normalisation_integrator
-                                                + (1.0 - release_cf) * limiter_input,
+                                                + (1.0 - release_cf) * limiter_db,
                                         );
                                         self.normalisation_peak = attack_cf
                                             * self.normalisation_peak
