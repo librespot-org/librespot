@@ -1,20 +1,15 @@
 use std::time::Duration;
 
-use librespot_core::authentication::Credentials;
-use librespot_core::config::SessionConfig;
-use librespot_core::session::Session;
-
 use tokio::time::timeout;
+
+use librespot_core::{authentication::Credentials, config::SessionConfig, session::Session};
 
 #[tokio::test]
 async fn test_connection() {
     timeout(Duration::from_secs(30), async {
-        let result = Session::connect(
-            SessionConfig::default(),
-            Credentials::with_password("test", "test"),
-            None,
-        )
-        .await;
+        let result = Session::new(SessionConfig::default(), None)
+            .connect(Credentials::with_password("test", "test"))
+            .await;
 
         match result {
             Ok(_) => panic!("Authentication succeeded despite of bad credentials."),
