@@ -8,7 +8,7 @@ use std::{
 use futures_util::{
     future::{self, FusedFuture},
     stream::FusedStream,
-    FutureExt, StreamExt, TryFutureExt,
+    FutureExt, StreamExt,
 };
 
 use protobuf::{self, Message};
@@ -21,6 +21,7 @@ use crate::{
     config::ConnectConfig,
     context::StationContext,
     core::{
+        authentication::Credentials,
         mercury::{MercuryError, MercurySender},
         session::UserAttributes,
         util::SeqGenerator,
@@ -92,7 +93,7 @@ struct SpircTask {
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
 
-    remote_update: BoxedStream<Result<Frame, Error>>,
+    remote_update: BoxedStream<Result<(String, Frame), Error>>,
     connection_id_update: BoxedStream<Result<String, Error>>,
     user_attributes_update: BoxedStream<Result<UserAttributesUpdate, Error>>,
     user_attributes_mutation: BoxedStream<Result<UserAttributesMutation, Error>>,
@@ -255,9 +256,10 @@ fn url_encode(bytes: impl AsRef<[u8]>) -> String {
 }
 
 impl Spirc {
-    pub fn new(
+    pub async fn new(
         config: ConnectConfig,
         session: Session,
+        credentials: Credentials,
         player: Player,
         mixer: Box<dyn Mixer>,
     ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
@@ -265,23 +267,21 @@ impl Spirc {
 
         let ident = session.device_id().to_owned();
 
-        // Uri updated in response to issue #288
-        let canonical_username = &session.username();
-        debug!("canonical_username: {}", canonical_username);
-        let uri = format!("hm://remote/user/{}/", url_encode(canonical_username));
-
         let remote_update = Box::pin(
             session
                 .mercury()
-                .subscribe(uri.clone())
-                .inspect_err(|x| error!("remote update error: {}", x))
-                .and_then(|x| async move { Ok(x) })
-                .map(Result::unwrap) // guaranteed to be safe by `and_then` above
+                .listen_for("hm://remote/user/")
                 .map(UnboundedReceiverStream::new)
                 .flatten_stream()
-                .map(|response| -> Result<Frame, Error> {
+                .map(|response| -> Result<(String, Frame), Error> {
+                    let uri_split: Vec<&str> = response.uri.split('/').collect();
+                    let username = match uri_split.get(uri_split.len() - 2) {
+                        Some(s) => s.to_string(),
+                        None => String::new(),
+                    };
+
                     let data = response.payload.first().ok_or(SpircError::NoData)?;
-                    Ok(Frame::parse_from_bytes(data)?)
+                    Ok((username, Frame::parse_from_bytes(data)?))
                 }),
         );
 
@@ -324,7 +324,14 @@ impl Spirc {
                 }),
         );
 
-        let sender = session.mercury().sender(uri);
+        // Connect *after* all message listeners are registered
+        session.connect(credentials).await?;
+
+        let canonical_username = &session.username();
+        debug!("canonical_username: {}", canonical_username);
+        let sender_uri = format!("hm://remote/user/{}/", url_encode(canonical_username));
+
+        let sender = session.mercury().sender(sender_uri);
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
@@ -414,13 +421,17 @@ impl SpircTask {
             tokio::select! {
                 remote_update = self.remote_update.next() => match remote_update {
                     Some(result) => match result {
-                        Ok(update) => if let Err(e) = self.handle_remote_update(update) {
-                            error!("could not dispatch remote update: {}", e);
-                        }
+                        Ok((username, frame)) => {
+                            if username != self.session.username() {
+                                error!("could not dispatch remote update: frame was intended for {}", username);
+                            } else if let Err(e) = self.handle_remote_update(frame) {
+                                error!("could not dispatch remote update: {}", e);
+                            }
+                        },
                         Err(e) => error!("could not parse remote update: {}", e),
                     }
                     None => {
-                        error!("subscription terminated");
+                        error!("remote update selected, but none received");
                         break;
                     }
                 },
@@ -513,7 +524,7 @@ impl SpircTask {
         }
 
         if self.sender.flush().await.is_err() {
-            warn!("Cannot flush spirc event sender.");
+            warn!("Cannot flush spirc event sender when done.");
         }
     }
 
@@ -754,7 +765,7 @@ impl SpircTask {
     }
 
     fn handle_remote_update(&mut self, update: Frame) -> Result<(), Error> {
-        trace!("Received update frame: {:#?}", update,);
+        trace!("Received update frame: {:#?}", update);
 
         // First see if this update was intended for us.
         let device_id = &self.ident;

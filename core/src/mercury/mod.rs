@@ -248,21 +248,21 @@ impl MercuryManager {
             }
             Err(MercuryError::Response(response).into())
         } else if let PacketType::MercuryEvent = cmd {
+            // TODO: This is just a workaround to make utf-8 encoded usernames work.
+            // A better solution would be to use an uri struct and urlencode it directly
+            // before sending while saving the subscription under its unencoded form.
+            let mut uri_split = response.uri.split('/');
+
+            let encoded_uri = std::iter::once(uri_split.next().unwrap_or_default().to_string())
+                .chain(uri_split.map(|component| {
+                    form_urlencoded::byte_serialize(component.as_bytes()).collect::<String>()
+                }))
+                .collect::<Vec<String>>()
+                .join("/");
+
+            let mut found = false;
+
             self.lock(|inner| {
-                let mut found = false;
-
-                // TODO: This is just a workaround to make utf-8 encoded usernames work.
-                // A better solution would be to use an uri struct and urlencode it directly
-                // before sending while saving the subscription under its unencoded form.
-                let mut uri_split = response.uri.split('/');
-
-                let encoded_uri = std::iter::once(uri_split.next().unwrap_or_default().to_string())
-                    .chain(uri_split.map(|component| {
-                        form_urlencoded::byte_serialize(component.as_bytes()).collect::<String>()
-                    }))
-                    .collect::<Vec<String>>()
-                    .join("/");
-
                 inner.subscriptions.retain(|&(ref prefix, ref sub)| {
                     if encoded_uri.starts_with(prefix) {
                         found = true;
@@ -275,15 +275,15 @@ impl MercuryManager {
                         true
                     }
                 });
+            });
 
-                if !found {
-                    debug!("unknown subscription uri={}", &response.uri);
-                    trace!("response pushed over Mercury: {:?}", response);
-                    Err(MercuryError::Response(response).into())
-                } else {
-                    Ok(())
-                }
-            })
+            if !found {
+                debug!("unknown subscription uri={}", &response.uri);
+                trace!("response pushed over Mercury: {:?}", response);
+                Err(MercuryError::Response(response).into())
+            } else {
+                Ok(())
+            }
         } else if let Some(cb) = pending.callback {
             cb.send(Ok(response)).map_err(|_| MercuryError::Channel)?;
             Ok(())

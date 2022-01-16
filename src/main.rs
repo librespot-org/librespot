@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures_util::{future, FutureExt, StreamExt};
+use futures_util::StreamExt;
 use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
@@ -1562,7 +1562,9 @@ async fn main() {
     let mut player_event_channel: Option<UnboundedReceiver<PlayerEvent>> = None;
     let mut auto_connect_times: Vec<Instant> = vec![];
     let mut discovery = None;
-    let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
+    let mut connecting = false;
+
+    let session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
     if setup.enable_discovery {
         let device_id = setup.session_config.device_id.clone();
@@ -1582,15 +1584,8 @@ async fn main() {
     }
 
     if let Some(credentials) = setup.credentials {
-        last_credentials = Some(credentials.clone());
-        connecting = Box::pin(
-            Session::connect(
-                setup.session_config.clone(),
-                credentials,
-                setup.cache.clone(),
-            )
-            .fuse(),
-        );
+        last_credentials = Some(credentials);
+        connecting = true;
     }
 
     loop {
@@ -1616,11 +1611,7 @@ async fn main() {
                             tokio::spawn(spirc_task);
                         }
 
-                        connecting = Box::pin(Session::connect(
-                            setup.session_config.clone(),
-                            credentials,
-                            setup.cache.clone(),
-                        ).fuse());
+                        connecting = true;
                     },
                     None => {
                         error!("Discovery stopped unexpectedly");
@@ -1628,63 +1619,59 @@ async fn main() {
                     }
                 }
             },
-            session = &mut connecting, if !connecting.is_terminated() => match session {
-                Ok(session) => {
-                    let mixer_config = setup.mixer_config.clone();
-                    let mixer = (setup.mixer)(mixer_config);
-                    let player_config = setup.player_config.clone();
-                    let connect_config = setup.connect_config.clone();
+            _ = async {}, if connecting && last_credentials.is_some() => {
+                let mixer_config = setup.mixer_config.clone();
+                let mixer = (setup.mixer)(mixer_config);
+                let player_config = setup.player_config.clone();
+                let connect_config = setup.connect_config.clone();
 
-                    let audio_filter = mixer.get_audio_filter();
-                    let format = setup.format;
-                    let backend = setup.backend;
-                    let device = setup.device.clone();
-                    let (player, event_channel) =
-                        Player::new(player_config, session.clone(), audio_filter, move || {
-                            (backend)(device, format)
-                        });
+                let audio_filter = mixer.get_audio_filter();
+                let format = setup.format;
+                let backend = setup.backend;
+                let device = setup.device.clone();
+                let (player, event_channel) =
+                    Player::new(player_config, session.clone(), audio_filter, move || {
+                        (backend)(device, format)
+                    });
 
-                    if setup.emit_sink_events {
-                        if let Some(player_event_program) = setup.player_event_program.clone() {
-                            player.set_sink_event_callback(Some(Box::new(move |sink_status| {
-                                match emit_sink_event(sink_status, &player_event_program) {
-                                    Ok(e) if e.success() => (),
-                                    Ok(e) => {
-                                        if let Some(code) = e.code() {
-                                            warn!("Sink event program returned exit code {}", code);
-                                        } else {
-                                            warn!("Sink event program returned failure");
-                                        }
-                                    },
-                                    Err(e) => {
-                                        warn!("Emitting sink event failed: {}", e);
-                                    },
-                                }
-                            })));
-                        }
-                    };
+                if setup.emit_sink_events {
+                    if let Some(player_event_program) = setup.player_event_program.clone() {
+                        player.set_sink_event_callback(Some(Box::new(move |sink_status| {
+                            match emit_sink_event(sink_status, &player_event_program) {
+                                Ok(e) if e.success() => (),
+                                Ok(e) => {
+                                    if let Some(code) = e.code() {
+                                        warn!("Sink event program returned exit code {}", code);
+                                    } else {
+                                        warn!("Sink event program returned failure");
+                                    }
+                                },
+                                Err(e) => {
+                                    warn!("Emitting sink event failed: {}", e);
+                                },
+                            }
+                        })));
+                    }
+                };
 
-                    let (spirc_, spirc_task_) = match Spirc::new(connect_config, session, player, mixer) {
-                        Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
-                        Err(e) => {
-                            error!("could not initialize spirc: {}", e);
-                            exit(1);
-                        }
-                    };
-                    spirc = Some(spirc_);
-                    spirc_task = Some(Box::pin(spirc_task_));
-                    player_event_channel = Some(event_channel);
-                },
-                Err(e) => {
-                    error!("Connection failed: {}", e);
-                    exit(1);
-                }
+                let (spirc_, spirc_task_) = match Spirc::new(connect_config, session.clone(), last_credentials.clone().unwrap(), player, mixer).await {
+                    Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
+                    Err(e) => {
+                        error!("could not initialize spirc: {}", e);
+                        exit(1);
+                    }
+                };
+                spirc = Some(spirc_);
+                spirc_task = Some(Box::pin(spirc_task_));
+                player_event_channel = Some(event_channel);
+
+                connecting = false;
             },
             _ = async {
                 if let Some(task) = spirc_task.as_mut() {
                     task.await;
                 }
-            }, if spirc_task.is_some() => {
+            }, if spirc_task.is_some() && !connecting => {
                 spirc_task = None;
 
                 warn!("Spirc shut down unexpectedly");
@@ -1695,14 +1682,9 @@ async fn main() {
                 };
 
                 match last_credentials.clone() {
-                    Some(credentials) if !reconnect_exceeds_rate_limit() => {
+                    Some(_) if !reconnect_exceeds_rate_limit() => {
                         auto_connect_times.push(Instant::now());
-
-                        connecting = Box::pin(Session::connect(
-                            setup.session_config.clone(),
-                            credentials,
-                            setup.cache.clone(),
-                        ).fuse());
+                        connecting = true;
                     },
                     _ => {
                         error!("Spirc shut down too often. Not reconnecting automatically.");

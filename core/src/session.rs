@@ -46,6 +46,8 @@ pub enum SessionError {
     AuthenticationError(#[from] AuthenticationError),
     #[error("Cannot create session: {0}")]
     IoError(#[from] io::Error),
+    #[error("Session is not connected")]
+    NotConnected,
     #[error("packet {0} unknown")]
     Packet(u8),
 }
@@ -55,6 +57,7 @@ impl From<SessionError> for Error {
         match err {
             SessionError::AuthenticationError(_) => Error::unauthenticated(err),
             SessionError::IoError(_) => Error::unavailable(err),
+            SessionError::NotConnected => Error::unavailable(err),
             SessionError::Packet(_) => Error::unimplemented(err),
         }
     }
@@ -83,7 +86,7 @@ struct SessionInternal {
     data: RwLock<SessionData>,
 
     http_client: HttpClient,
-    tx_connection: mpsc::UnboundedSender<(u8, Vec<u8>)>,
+    tx_connection: OnceCell<mpsc::UnboundedSender<(u8, Vec<u8>)>>,
 
     apresolver: OnceCell<ApResolver>,
     audio_key: OnceCell<AudioKeyManager>,
@@ -104,22 +107,17 @@ static SESSION_COUNTER: AtomicUsize = AtomicUsize::new(0);
 pub struct Session(Arc<SessionInternal>);
 
 impl Session {
-    pub async fn connect(
-        config: SessionConfig,
-        credentials: Credentials,
-        cache: Option<Cache>,
-    ) -> Result<Session, Error> {
+    pub fn new(config: SessionConfig, cache: Option<Cache>) -> Self {
         let http_client = HttpClient::new(config.proxy.as_ref());
-        let (sender_tx, sender_rx) = mpsc::unbounded_channel();
-        let session_id = SESSION_COUNTER.fetch_add(1, Ordering::AcqRel);
 
+        let session_id = SESSION_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Session[{}]", session_id);
 
-        let session = Session(Arc::new(SessionInternal {
+        Self(Arc::new(SessionInternal {
             config,
             data: RwLock::new(SessionData::default()),
             http_client,
-            tx_connection: sender_tx,
+            tx_connection: OnceCell::new(),
             cache: cache.map(Arc::new),
             apresolver: OnceCell::new(),
             audio_key: OnceCell::new(),
@@ -129,27 +127,33 @@ impl Session {
             token_provider: OnceCell::new(),
             handle: tokio::runtime::Handle::current(),
             session_id,
-        }));
+        }))
+    }
 
-        let ap = session.apresolver().resolve("accesspoint").await?;
+    pub async fn connect(&self, credentials: Credentials) -> Result<(), Error> {
+        let ap = self.apresolver().resolve("accesspoint").await?;
         info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
-        let mut transport =
-            connection::connect(&ap.0, ap.1, session.config().proxy.as_ref()).await?;
+        let mut transport = connection::connect(&ap.0, ap.1, self.config().proxy.as_ref()).await?;
 
         let reusable_credentials =
-            connection::authenticate(&mut transport, credentials, &session.config().device_id)
-                .await?;
+            connection::authenticate(&mut transport, credentials, &self.config().device_id).await?;
         info!("Authenticated as \"{}\" !", reusable_credentials.username);
-        session.0.data.write().user_data.canonical_username = reusable_credentials.username.clone();
-        if let Some(cache) = session.cache() {
+        self.set_username(&reusable_credentials.username);
+        if let Some(cache) = self.cache() {
             cache.save_credentials(&reusable_credentials);
         }
 
+        let (tx_connection, rx_connection) = mpsc::unbounded_channel();
+        self.0
+            .tx_connection
+            .set(tx_connection)
+            .map_err(|_| SessionError::NotConnected)?;
+
         let (sink, stream) = transport.split();
-        let sender_task = UnboundedReceiverStream::new(sender_rx)
+        let sender_task = UnboundedReceiverStream::new(rx_connection)
             .map(Ok)
             .forward(sink);
-        let receiver_task = DispatchTask(stream, session.weak());
+        let receiver_task = DispatchTask(stream, self.weak());
 
         tokio::spawn(async move {
             let result = future::try_join(sender_task, receiver_task).await;
@@ -159,7 +163,7 @@ impl Session {
             }
         });
 
-        Ok(session)
+        Ok(())
     }
 
     pub fn apresolver(&self) -> &ApResolver {
@@ -323,8 +327,10 @@ impl Session {
     }
 
     pub fn send_packet(&self, cmd: PacketType, data: Vec<u8>) -> Result<(), Error> {
-        self.0.tx_connection.send((cmd as u8, data))?;
-        Ok(())
+        match self.0.tx_connection.get() {
+            Some(tx) => Ok(tx.send((cmd as u8, data))?),
+            None => Err(SessionError::NotConnected.into()),
+        }
     }
 
     pub fn cache(&self) -> Option<&Arc<Cache>> {
@@ -364,6 +370,10 @@ impl Session {
 
     pub fn username(&self) -> String {
         self.0.data.read().user_data.canonical_username.clone()
+    }
+
+    pub fn set_username(&self, username: &str) {
+        self.0.data.write().user_data.canonical_username = username.to_owned();
     }
 
     pub fn country(&self) -> String {
