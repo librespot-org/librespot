@@ -214,10 +214,10 @@ pub fn coefficient_to_duration(coefficient: f64) -> Duration {
 
 #[derive(Clone, Copy, Debug)]
 pub struct NormalisationData {
-    track_gain_db: f32,
-    track_peak: f32,
-    album_gain_db: f32,
-    album_peak: f32,
+    track_gain_db: f64,
+    track_peak: f64,
+    album_gain_db: f64,
+    album_peak: f64,
 }
 
 impl NormalisationData {
@@ -225,10 +225,10 @@ impl NormalisationData {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
         file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
 
-        let track_gain_db = file.read_f32::<LittleEndian>()?;
-        let track_peak = file.read_f32::<LittleEndian>()?;
-        let album_gain_db = file.read_f32::<LittleEndian>()?;
-        let album_peak = file.read_f32::<LittleEndian>()?;
+        let track_gain_db = file.read_f32::<LittleEndian>()? as f64;
+        let track_peak = file.read_f32::<LittleEndian>()? as f64;
+        let album_gain_db = file.read_f32::<LittleEndian>()? as f64;
+        let album_peak = file.read_f32::<LittleEndian>()? as f64;
 
         let r = NormalisationData {
             track_gain_db,
@@ -246,17 +246,17 @@ impl NormalisationData {
         }
 
         let (gain_db, gain_peak) = if config.normalisation_type == NormalisationType::Album {
-            (data.album_gain_db as f64, data.album_peak as f64)
+            (data.album_gain_db, data.album_peak)
         } else {
-            (data.track_gain_db as f64, data.track_peak as f64)
+            (data.track_gain_db, data.track_peak)
         };
 
-        let normalisation_power = gain_db + config.normalisation_pregain_db as f64;
+        let normalisation_power = gain_db + config.normalisation_pregain_db;
         let mut normalisation_factor = db_to_ratio(normalisation_power);
 
         if normalisation_power + ratio_to_db(gain_peak) > config.normalisation_threshold_dbfs {
             let limited_normalisation_factor =
-                db_to_ratio(config.normalisation_threshold_dbfs as f64) / gain_peak;
+                db_to_ratio(config.normalisation_threshold_dbfs) / gain_peak;
             let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
 
             if config.normalisation_method == NormalisationMethod::Basic {
@@ -279,7 +279,7 @@ impl NormalisationData {
             normalisation_factor * 100.0
         );
 
-        normalisation_factor as f64
+        normalisation_factor
     }
 }
 
@@ -1305,54 +1305,60 @@ impl PlayerInternal {
                                 // Engineering Society, 60, 399-408.
                                 if self.config.normalisation_method == NormalisationMethod::Dynamic
                                 {
-                                    // steps 1 + 2: half-wave rectification and conversion into dB
-                                    let abs_sample_db = ratio_to_db(sample.abs());
+                                    // Some tracks have samples that are precisely 0.0. That's silence
+                                    // and we know we don't need to limit that, in which we can spare
+                                    // the CPU cycles.
+                                    //
+                                    // Also, calling `ratio_to_db(0.0)` returns `inf` and would get the
+                                    // peak detector stuck. Also catch the unlikely case where a sample
+                                    // is decoded as `NaN` or some other non-normal value.
+                                    let limiter_db = if sample.is_normal() {
+                                        // step 1-2: half-wave rectification and conversion into dB
+                                        let abs_sample_db = ratio_to_db(sample.abs());
 
-                                    // Some tracks have samples that are precisely 0.0, but ratio_to_db(0.0)
-                                    // returns -inf and gets the peak detector stuck.
-                                    if !abs_sample_db.is_normal() {
-                                        continue;
-                                    }
+                                        // step 3-4: gain computer with soft knee and subtractor
+                                        let bias_db = abs_sample_db - threshold_db;
+                                        let knee_boundary_db = bias_db * 2.0;
 
-                                    // step 3: gain computer with soft knee
-                                    let biased_sample = abs_sample_db - threshold_db;
-                                    let limited_sample = if 2.0 * biased_sample < -knee_db {
-                                        abs_sample_db
-                                    } else if 2.0 * biased_sample.abs() <= knee_db {
-                                        abs_sample_db
-                                            - (biased_sample + knee_db / 2.0).powi(2)
-                                                / (2.0 * knee_db)
+                                        if knee_boundary_db < -knee_db {
+                                            0.0
+                                        } else if knee_boundary_db.abs() <= knee_db {
+                                            abs_sample_db
+                                                - (abs_sample_db
+                                                    - (bias_db + knee_db / 2.0).powi(2)
+                                                        / (2.0 * knee_db))
+                                        } else {
+                                            abs_sample_db - threshold_db
+                                        }
                                     } else {
-                                        threshold_db as f64
+                                        0.0
                                     };
 
-                                    // step 4: subtractor
-                                    let limiter_input = abs_sample_db - limited_sample;
-
-                                    // Spare the CPU unless the limiter is active or we are riding a peak.
-                                    if !(limiter_input > 0.0
+                                    // Spare the CPU unless (1) the limiter is engaged, (2) we
+                                    // were in attack or (3) we were in release, and that attack/
+                                    // release wasn't finished yet.
+                                    if limiter_db > 0.0
                                         || self.normalisation_integrator > 0.0
-                                        || self.normalisation_peak > 0.0)
+                                        || self.normalisation_peak > 0.0
                                     {
-                                        continue;
+                                        // step 5: smooth, decoupled peak detector
+                                        self.normalisation_integrator = f64::max(
+                                            limiter_db,
+                                            release_cf * self.normalisation_integrator
+                                                + (1.0 - release_cf) * limiter_db,
+                                        );
+                                        self.normalisation_peak = attack_cf
+                                            * self.normalisation_peak
+                                            + (1.0 - attack_cf) * self.normalisation_integrator;
+
+                                        // step 6: make-up gain applied later (volume attenuation)
+                                        // Applying the standard normalisation factor here won't work,
+                                        // because there are tracks with peaks as high as 6 dB above
+                                        // the default threshold, so that would clip.
+
+                                        // steps 7-8: conversion into level and multiplication into gain stage
+                                        *sample *= db_to_ratio(-self.normalisation_peak);
                                     }
-
-                                    // step 5: smooth, decoupled peak detector
-                                    self.normalisation_integrator = f64::max(
-                                        limiter_input,
-                                        release_cf * self.normalisation_integrator
-                                            + (1.0 - release_cf) * limiter_input,
-                                    );
-                                    self.normalisation_peak = attack_cf * self.normalisation_peak
-                                        + (1.0 - attack_cf) * self.normalisation_integrator;
-
-                                    // step 6: make-up gain applied later (volume attenuation)
-                                    // Applying the standard normalisation factor here won't work,
-                                    // because there are tracks with peaks as high as 6 dB above
-                                    // the default threshold, so that would clip.
-
-                                    // steps 7-8: conversion into level and multiplication into gain stage
-                                    *sample *= db_to_ratio(-self.normalisation_peak);
                                 }
                             }
                         }
