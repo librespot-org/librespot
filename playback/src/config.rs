@@ -130,7 +130,7 @@ pub struct PlayerConfig {
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
     pub normalisation_method: NormalisationMethod,
-    pub normalisation_pregain_db: f32,
+    pub normalisation_pregain_db: f64,
     pub normalisation_threshold_dbfs: f64,
     pub normalisation_attack_cf: f64,
     pub normalisation_release_cf: f64,

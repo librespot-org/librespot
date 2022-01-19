@@ -187,7 +187,7 @@ fn get_setup() -> Setup {
     const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
     const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
     const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=10.0;
-    const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f32> = -10.0..=10.0;
+    const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f64> = -10.0..=10.0;
     const VALID_NORMALISATION_THRESHOLD_RANGE: RangeInclusive<f64> = -10.0..=0.0;
     const VALID_NORMALISATION_ATTACK_RANGE: RangeInclusive<u64> = 1..=500;
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
@@ -1339,7 +1339,7 @@ fn get_setup() -> Setup {
                 .unwrap_or(player_default_config.normalisation_type);
 
             normalisation_pregain_db = opt_str(NORMALISATION_PREGAIN)
-                .map(|pregain| match pregain.parse::<f32>() {
+                .map(|pregain| match pregain.parse::<f64>() {
                     Ok(value) if (VALID_NORMALISATION_PREGAIN_RANGE).contains(&value) => value,
                     _ => {
                         let valid_values = &format!(
