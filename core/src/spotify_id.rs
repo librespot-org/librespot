@@ -2,6 +2,7 @@
 
 use std::convert::TryInto;
 use std::fmt;
+use std::string::FromUtf8Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpotifyAudioType {
@@ -136,7 +137,7 @@ impl SpotifyId {
 
     /// Returns the `SpotifyId` as a base16 (hex) encoded, `SpotifyId::SIZE_BASE16` (32)
     /// character long `String`.
-    pub fn to_base16(&self) -> String {
+    pub fn to_base16(&self) -> Result<String, FromUtf8Error> {
         to_base16(&self.to_raw(), &mut [0u8; SpotifyId::SIZE_BASE16])
     }
 
@@ -144,7 +145,7 @@ impl SpotifyId {
     /// character long `String`.
     ///
     /// [canonically]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn to_base62(&self) -> String {
+    pub fn to_base62(&self) -> Result<String, FromUtf8Error> {
         let mut dst = [0u8; 22];
         let mut i = 0;
         let n = self.id;
@@ -182,10 +183,7 @@ impl SpotifyId {
 
         dst.reverse();
 
-        unsafe {
-            // Safety: We are only dealing with ASCII characters.
-            String::from_utf8_unchecked(dst.to_vec())
-        }
+        String::from_utf8(dst.to_vec())
     }
 
     /// Returns a copy of the `SpotifyId` as an array of `SpotifyId::SIZE` (16) bytes in
@@ -202,7 +200,7 @@ impl SpotifyId {
     /// be encoded as `unknown`.
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn to_uri(&self) -> String {
+    pub fn to_uri(&self) -> Result<String, FromUtf8Error> {
         // 8 chars for the "spotify:" prefix + 1 colon + 22 chars base62 encoded ID  = 31
         // + unknown size audio_type.
         let audio_type: &str = self.audio_type.into();
@@ -210,9 +208,10 @@ impl SpotifyId {
         dst.push_str("spotify:");
         dst.push_str(audio_type);
         dst.push(':');
-        dst.push_str(&self.to_base62());
+        let base62 = self.to_base62()?;
+        dst.push_str(&base62);
 
-        dst
+        Ok(dst)
     }
 }
 
@@ -220,7 +219,7 @@ impl SpotifyId {
 pub struct FileId(pub [u8; 20]);
 
 impl FileId {
-    pub fn to_base16(&self) -> String {
+    pub fn to_base16(&self) -> Result<String, FromUtf8Error> {
         to_base16(&self.0, &mut [0u8; 40])
     }
 }
@@ -233,12 +232,12 @@ impl fmt::Debug for FileId {
 
 impl fmt::Display for FileId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.to_base16())
+        f.write_str(&self.to_base16().unwrap_or_default())
     }
 }
 
 #[inline]
-fn to_base16(src: &[u8], buf: &mut [u8]) -> String {
+fn to_base16(src: &[u8], buf: &mut [u8]) -> Result<String, FromUtf8Error> {
     let mut i = 0;
     for v in src {
         buf[i] = BASE16_DIGITS[(v >> 4) as usize];
@@ -246,10 +245,7 @@ fn to_base16(src: &[u8], buf: &mut [u8]) -> String {
         i += 2;
     }
 
-    unsafe {
-        // Safety: We are only dealing with ASCII characters.
-        String::from_utf8_unchecked(buf.to_vec())
-    }
+    String::from_utf8(buf.to_vec())
 }
 
 #[cfg(test)]
@@ -366,7 +362,7 @@ mod tests {
                 audio_type: c.kind,
             };
 
-            assert_eq!(id.to_base62(), c.base62);
+            assert_eq!(id.to_base62().unwrap(), c.base62);
         }
     }
 
@@ -389,7 +385,7 @@ mod tests {
                 audio_type: c.kind,
             };
 
-            assert_eq!(id.to_base16(), c.base16);
+            assert_eq!(id.to_base16().unwrap(), c.base16);
         }
     }
 
@@ -415,7 +411,7 @@ mod tests {
                 audio_type: c.kind,
             };
 
-            assert_eq!(id.to_uri(), c.uri);
+            assert_eq!(id.to_uri().unwrap(), c.uri);
         }
     }
 

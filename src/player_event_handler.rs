@@ -15,16 +15,16 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
             new_track_id,
         } => {
             env_vars.insert("PLAYER_EVENT", "changed".to_string());
-            env_vars.insert("OLD_TRACK_ID", old_track_id.to_base62());
-            env_vars.insert("TRACK_ID", new_track_id.to_base62());
+            env_vars.insert("OLD_TRACK_ID", old_track_id.to_base62().unwrap_or_default());
+            env_vars.insert("TRACK_ID", new_track_id.to_base62().unwrap_or_default());
         }
         PlayerEvent::Started { track_id, .. } => {
             env_vars.insert("PLAYER_EVENT", "started".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
+            env_vars.insert("TRACK_ID", track_id.to_base62().unwrap_or_default());
         }
         PlayerEvent::Stopped { track_id, .. } => {
             env_vars.insert("PLAYER_EVENT", "stopped".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
+            env_vars.insert("TRACK_ID", track_id.to_base62().unwrap_or_default());
         }
         PlayerEvent::Playing {
             track_id,
@@ -33,7 +33,7 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
             ..
         } => {
             env_vars.insert("PLAYER_EVENT", "playing".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
+            env_vars.insert("TRACK_ID", track_id.to_base62().unwrap_or_default());
             env_vars.insert("DURATION_MS", duration_ms.to_string());
             env_vars.insert("POSITION_MS", position_ms.to_string());
         }
@@ -44,13 +44,13 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
             ..
         } => {
             env_vars.insert("PLAYER_EVENT", "paused".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
+            env_vars.insert("TRACK_ID", track_id.to_base62().unwrap_or_default());
             env_vars.insert("DURATION_MS", duration_ms.to_string());
             env_vars.insert("POSITION_MS", position_ms.to_string());
         }
         PlayerEvent::Preloading { track_id, .. } => {
             env_vars.insert("PLAYER_EVENT", "preloading".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
+            env_vars.insert("TRACK_ID", track_id.to_base62().unwrap_or_default());
         }
         PlayerEvent::VolumeSet { volume } => {
             env_vars.insert("PLAYER_EVENT", "volume_set".to_string());

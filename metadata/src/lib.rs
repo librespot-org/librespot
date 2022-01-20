@@ -86,7 +86,7 @@ impl AudioFiles for Track {
         let item = Self::get(session, id).await?;
         Ok(AudioItem {
             id,
-            uri: format!("spotify:track:{}", id.to_base62()),
+            uri: format!("spotify:track:{}", id.to_base62().unwrap_or_default()),
             files: item.files,
             name: item.name,
             duration: item.duration,
@@ -103,7 +103,7 @@ impl AudioFiles for Episode {
 
         Ok(AudioItem {
             id,
-            uri: format!("spotify:episode:{}", id.to_base62()),
+            uri: format!("spotify:episode:{}", id.to_base62().unwrap_or_default()),
             files: item.files,
             name: item.name,
             duration: item.duration,
@@ -193,7 +193,10 @@ impl Metadata for Track {
     type Message = protocol::metadata::Track;
 
     fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/track/{}", id.to_base16())
+        format!(
+            "hm://metadata/3/track/{}",
+            id.to_base16().unwrap_or_default()
+        )
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
@@ -238,7 +241,10 @@ impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
     fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/album/{}", id.to_base16())
+        format!(
+            "hm://metadata/3/album/{}",
+            id.to_base16().unwrap_or_default()
+        )
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
@@ -283,7 +289,10 @@ impl Metadata for Playlist {
     type Message = protocol::playlist4changes::SelectedListContent;
 
     fn request_url(id: SpotifyId) -> String {
-        format!("hm://playlist/v2/playlist/{}", id.to_base62())
+        format!(
+            "hm://playlist/v2/playlist/{}",
+            id.to_base62().unwrap_or_default()
+        )
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
@@ -319,7 +328,10 @@ impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
     fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/artist/{}", id.to_base16())
+        format!(
+            "hm://metadata/3/artist/{}",
+            id.to_base16().unwrap_or_default()
+        )
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
@@ -352,7 +364,10 @@ impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 
     fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/episode/{}", id.to_base16())
+        format!(
+            "hm://metadata/3/episode/{}",
+            id.to_base16().unwrap_or_default()
+        )
     }
 
     fn parse(msg: &Self::Message, session: &Session) -> Self {
@@ -400,7 +415,10 @@ impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
     fn request_url(id: SpotifyId) -> String {
-        format!("hm://metadata/3/show/{}", id.to_base16())
+        format!(
+            "hm://metadata/3/show/{}",
+            id.to_base16().unwrap_or_default()
+        )
     }
 
     fn parse(msg: &Self::Message, _: &Session) -> Self {
