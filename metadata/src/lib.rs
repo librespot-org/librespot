@@ -7,12 +7,12 @@ extern crate log;
 extern crate async_trait;
 
 pub mod cover;
-
 use std::collections::HashMap;
+use std::string::FromUtf8Error;
 
 use librespot_core::mercury::MercuryError;
 use librespot_core::session::Session;
-use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId};
+use librespot_core::spotify_id::{FileId, SpotifyAudioType, SpotifyId, SpotifyIdError};
 use librespot_protocol as protocol;
 use protobuf::Message;
 
@@ -83,33 +83,48 @@ trait AudioFiles {
 #[async_trait]
 impl AudioFiles for Track {
     async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError> {
-        let item = Self::get(session, id).await?;
-        Ok(AudioItem {
-            id,
-            uri: format!("spotify:track:{}", id.to_base62().unwrap_or_default()),
-            files: item.files,
-            name: item.name,
-            duration: item.duration,
-            available: item.available,
-            alternatives: Some(item.alternatives),
-        })
+        match id.to_base62() {
+            Err(e) => {
+                warn!("Invalid Track SpotifyId: {}", e);
+                Err(MercuryError)
+            }
+            Ok(uri) => {
+                let item = Self::get(session, id).await?;
+                Ok(AudioItem {
+                    id,
+                    uri: format!("spotify:track:{}", uri),
+                    files: item.files,
+                    name: item.name,
+                    duration: item.duration,
+                    available: item.available,
+                    alternatives: Some(item.alternatives),
+                })
+            }
+        }
     }
 }
 
 #[async_trait]
 impl AudioFiles for Episode {
     async fn get_audio_item(session: &Session, id: SpotifyId) -> Result<AudioItem, MercuryError> {
-        let item = Self::get(session, id).await?;
-
-        Ok(AudioItem {
-            id,
-            uri: format!("spotify:episode:{}", id.to_base62().unwrap_or_default()),
-            files: item.files,
-            name: item.name,
-            duration: item.duration,
-            available: item.available,
-            alternatives: None,
-        })
+        match id.to_base62() {
+            Err(e) => {
+                warn!("Invalid Episode SpotifyId: {}", e);
+                Err(MercuryError)
+            }
+            Ok(uri) => {
+                let item = Self::get(session, id).await?;
+                Ok(AudioItem {
+                    id,
+                    uri: format!("spotify:episode:{}", uri),
+                    files: item.files,
+                    name: item.name,
+                    duration: item.duration,
+                    available: item.available,
+                    alternatives: None,
+                })
+            }
+        }
     }
 }
 
@@ -117,16 +132,38 @@ impl AudioFiles for Episode {
 pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::Message;
 
-    fn request_url(id: SpotifyId) -> String;
-    fn parse(msg: &Self::Message, session: &Session) -> Self;
+    fn request_url(id: SpotifyId) -> Result<String, FromUtf8Error>;
+    fn parse(msg: &Self::Message, session: &Session) -> Result<Self, SpotifyIdError>;
 
     async fn get(session: &Session, id: SpotifyId) -> Result<Self, MercuryError> {
-        let uri = Self::request_url(id);
-        let response = session.mercury().get(uri).await?;
-        let data = response.payload.first().expect("Empty payload");
-        let msg = Self::Message::parse_from_bytes(data).unwrap();
-
-        Ok(Self::parse(&msg, session))
+        match Self::request_url(id) {
+            Err(e) => {
+                warn!("Invalid SpotifyId: {}", e);
+                Err(MercuryError)
+            }
+            Ok(uri) => {
+                let response = session.mercury().get(uri).await?;
+                match response.payload.first() {
+                    None => {
+                        warn!("Empty payload");
+                        Err(MercuryError)
+                    }
+                    Some(data) => match Self::Message::parse_from_bytes(data) {
+                        Err(e) => {
+                            warn!("Error parsing message from bytes: {}", e);
+                            Err(MercuryError)
+                        }
+                        Ok(msg) => match Self::parse(&msg, session) {
+                            Err(e) => {
+                                warn!("Error parsing message: {:?}", e);
+                                Err(MercuryError)
+                            }
+                            Ok(parsed_msg) => Ok(parsed_msg),
+                        },
+                    },
+                }
+            }
+        }
     }
 }
 
@@ -192,110 +229,125 @@ pub struct Artist {
 impl Metadata for Track {
     type Message = protocol::metadata::Track;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!(
-            "hm://metadata/3/track/{}",
-            id.to_base16().unwrap_or_default()
-        )
+    fn request_url(id: SpotifyId) -> Result<String, FromUtf8Error> {
+        let id = id.to_base16()?;
+        Ok(format!("hm://metadata/3/track/{}", id))
     }
 
-    fn parse(msg: &Self::Message, session: &Session) -> Self {
+    fn parse(msg: &Self::Message, session: &Session) -> Result<Self, SpotifyIdError> {
         let country = session.country();
 
         let artists = msg
             .get_artist()
             .iter()
-            .filter(|artist| artist.has_gid())
-            .map(|artist| SpotifyId::from_raw(artist.get_gid()).unwrap())
-            .collect::<Vec<_>>();
+            .filter_map(|artist| {
+                if artist.has_gid() {
+                    SpotifyId::from_raw(artist.get_gid()).ok()
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let files = msg
             .get_file()
             .iter()
-            .filter(|file| file.has_file_id())
-            .map(|file| {
-                let mut dst = [0u8; 20];
-                dst.clone_from_slice(file.get_file_id());
-                (file.get_format(), FileId(dst))
+            .filter_map(|file| {
+                if file.has_file_id() {
+                    let mut dst = [0u8; 20];
+                    dst.clone_from_slice(file.get_file_id());
+                    Some((file.get_format(), FileId(dst)))
+                } else {
+                    None
+                }
             })
             .collect();
 
-        Track {
-            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
+        Ok(Track {
+            id: SpotifyId::from_raw(msg.get_gid())?,
             name: msg.get_name().to_owned(),
             duration: msg.get_duration(),
-            album: SpotifyId::from_raw(msg.get_album().get_gid()).unwrap(),
+            album: SpotifyId::from_raw(msg.get_album().get_gid())?,
             artists,
             files,
             alternatives: msg
                 .get_alternative()
                 .iter()
-                .map(|alt| SpotifyId::from_raw(alt.get_gid()).unwrap())
+                .filter_map(|alt| SpotifyId::from_raw(alt.get_gid()).ok())
                 .collect(),
             available: parse_restrictions(msg.get_restriction(), &country, "premium"),
-        }
+        })
     }
 }
 
 impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!(
-            "hm://metadata/3/album/{}",
-            id.to_base16().unwrap_or_default()
-        )
+    fn request_url(id: SpotifyId) -> Result<String, FromUtf8Error> {
+        let id = id.to_base16()?;
+        Ok(format!("hm://metadata/3/album/{}", id))
     }
 
-    fn parse(msg: &Self::Message, _: &Session) -> Self {
+    fn parse(msg: &Self::Message, _: &Session) -> Result<Self, SpotifyIdError> {
         let artists = msg
             .get_artist()
             .iter()
-            .filter(|artist| artist.has_gid())
-            .map(|artist| SpotifyId::from_raw(artist.get_gid()).unwrap())
-            .collect::<Vec<_>>();
+            .filter_map(|artist| {
+                if artist.has_gid() {
+                    SpotifyId::from_raw(artist.get_gid()).ok()
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let tracks = msg
             .get_disc()
             .iter()
             .flat_map(|disc| disc.get_track())
-            .filter(|track| track.has_gid())
-            .map(|track| SpotifyId::from_raw(track.get_gid()).unwrap())
-            .collect::<Vec<_>>();
+            .filter_map(|track| {
+                if track.has_gid() {
+                    SpotifyId::from_raw(track.get_gid()).ok()
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let covers = msg
             .get_cover_group()
             .get_image()
             .iter()
-            .filter(|image| image.has_file_id())
-            .map(|image| {
-                let mut dst = [0u8; 20];
-                dst.clone_from_slice(image.get_file_id());
-                FileId(dst)
+            .filter_map(|image| {
+                if image.has_file_id() {
+                    let mut dst = [0u8; 20];
+                    dst.clone_from_slice(image.get_file_id());
+                    Some(FileId(dst))
+                } else {
+                    None
+                }
             })
-            .collect::<Vec<_>>();
+            .collect();
 
-        Album {
-            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
+        Ok(Album {
+            id: SpotifyId::from_raw(msg.get_gid())?,
             name: msg.get_name().to_owned(),
             artists,
             tracks,
             covers,
-        }
+        })
     }
 }
 
 impl Metadata for Playlist {
     type Message = protocol::playlist4changes::SelectedListContent;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!(
-            "hm://playlist/v2/playlist/{}",
-            id.to_base62().unwrap_or_default()
-        )
+    fn request_url(id: SpotifyId) -> Result<String, FromUtf8Error> {
+        let id = id.to_base62()?;
+        Ok(format!("hm://playlist/v2/playlist/{}", id))
     }
 
-    fn parse(msg: &Self::Message, _: &Session) -> Self {
+    fn parse(msg: &Self::Message, _: &Session) -> Result<Self, SpotifyIdError> {
         let tracks = msg
             .get_contents()
             .get_items()
@@ -315,26 +367,24 @@ impl Metadata for Playlist {
             );
         }
 
-        Playlist {
+        Ok(Playlist {
             revision: msg.get_revision().to_vec(),
             name: msg.get_attributes().get_name().to_owned(),
             tracks,
             user: msg.get_owner_username().to_string(),
-        }
+        })
     }
 }
 
 impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!(
-            "hm://metadata/3/artist/{}",
-            id.to_base16().unwrap_or_default()
-        )
+    fn request_url(id: SpotifyId) -> Result<String, FromUtf8Error> {
+        let id = id.to_base16()?;
+        Ok(format!("hm://metadata/3/artist/{}", id))
     }
 
-    fn parse(msg: &Self::Message, session: &Session) -> Self {
+    fn parse(msg: &Self::Message, session: &Session) -> Result<Self, SpotifyIdError> {
         let country = session.country();
 
         let top_tracks: Vec<SpotifyId> = match msg
@@ -345,17 +395,22 @@ impl Metadata for Artist {
             Some(tracks) => tracks
                 .get_track()
                 .iter()
-                .filter(|track| track.has_gid())
-                .map(|track| SpotifyId::from_raw(track.get_gid()).unwrap())
-                .collect::<Vec<_>>(),
+                .filter_map(|track| {
+                    if track.has_gid() {
+                        SpotifyId::from_raw(track.get_gid()).ok()
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
             None => Vec::new(),
         };
 
-        Artist {
-            id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
+        Ok(Artist {
+            id: SpotifyId::from_raw(msg.get_gid())?,
             name: msg.get_name().to_owned(),
             top_tracks,
-        }
+        })
     }
 }
 
@@ -363,14 +418,12 @@ impl Metadata for Artist {
 impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!(
-            "hm://metadata/3/episode/{}",
-            id.to_base16().unwrap_or_default()
-        )
+    fn request_url(id: SpotifyId) -> Result<String, FromUtf8Error> {
+        let id = id.to_base16()?;
+        Ok(format!("hm://metadata/3/episode/{}", id))
     }
 
-    fn parse(msg: &Self::Message, session: &Session) -> Self {
+    fn parse(msg: &Self::Message, session: &Session) -> Result<Self, SpotifyIdError> {
         let country = session.country();
 
         let files = msg
@@ -394,9 +447,9 @@ impl Metadata for Episode {
                 dst.clone_from_slice(image.get_file_id());
                 FileId(dst)
             })
-            .collect::<Vec<_>>();
+            .collect();
 
-        Episode {
+        Ok(Episode {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             external_url: msg.get_external_url().to_owned(),
@@ -407,27 +460,30 @@ impl Metadata for Episode {
             files,
             available: parse_restrictions(msg.get_restriction(), &country, "premium"),
             explicit: msg.get_explicit().to_owned(),
-        }
+        })
     }
 }
 
 impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
-    fn request_url(id: SpotifyId) -> String {
-        format!(
-            "hm://metadata/3/show/{}",
-            id.to_base16().unwrap_or_default()
-        )
+    fn request_url(id: SpotifyId) -> Result<String, FromUtf8Error> {
+        let id = id.to_base16()?;
+        Ok(format!("hm://metadata/3/show/{}", id))
     }
 
-    fn parse(msg: &Self::Message, _: &Session) -> Self {
+    fn parse(msg: &Self::Message, _: &Session) -> Result<Self, SpotifyIdError> {
         let episodes = msg
             .get_episode()
             .iter()
-            .filter(|episode| episode.has_gid())
-            .map(|episode| SpotifyId::from_raw(episode.get_gid()).unwrap())
-            .collect::<Vec<_>>();
+            .filter_map(|episode| {
+                if episode.has_gid() {
+                    SpotifyId::from_raw(episode.get_gid()).ok()
+                } else {
+                    None
+                }
+            })
+            .collect();
 
         let covers = msg
             .get_covers()
@@ -439,15 +495,15 @@ impl Metadata for Show {
                 dst.clone_from_slice(image.get_file_id());
                 FileId(dst)
             })
-            .collect::<Vec<_>>();
+            .collect();
 
-        Show {
+        Ok(Show {
             id: SpotifyId::from_raw(msg.get_gid()).unwrap(),
             name: msg.get_name().to_owned(),
             publisher: msg.get_publisher().to_owned(),
             episodes,
             covers,
-        }
+        })
     }
 }
 

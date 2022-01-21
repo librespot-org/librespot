@@ -357,8 +357,8 @@ impl Cache {
                 path.push(&name[2..]);
                 path
             }),
-            _ => {
-                warn!("Invalid FileId");
+            Err(e) => {
+                warn!("Invalid FileId: {}", e.utf8_error());
                 None
             }
         }
