@@ -105,9 +105,14 @@ impl Session {
 
         debug!("new Session");
 
+        let session_data = SessionData {
+            client_id: config.client_id.clone(),
+            ..SessionData::default()
+        };
+
         Self(Arc::new(SessionInternal {
             config,
-            data: RwLock::new(SessionData::default()),
+            data: RwLock::new(session_data),
             http_client,
             tx_connection: OnceCell::new(),
             cache: cache.map(Arc::new),
