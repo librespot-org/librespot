@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::{
+    convert::TryInto,
+    time::{Duration, Instant},
+};
 
 use bytes::Bytes;
 use futures_util::future::IntoStream;
@@ -22,6 +25,7 @@ use crate::{
         connect::PutStateRequest,
         extended_metadata::BatchedEntityRequest,
     },
+    token::Token,
     version, Error, FileId, SpotifyId,
 };
 
@@ -29,7 +33,7 @@ component! {
     SpClient : SpClientInner {
         accesspoint: Option<SocketAddress> = None,
         strategy: RequestStrategy = RequestStrategy::default(),
-        client_token: String = String::new(),
+        client_token: Option<Token> = None,
     }
 }
 
@@ -92,11 +96,20 @@ impl SpClient {
     }
 
     pub async fn client_token(&self) -> Result<String, Error> {
-        // TODO: implement expiry
-        let client_token = self.lock(|inner| inner.client_token.clone());
-        if !client_token.is_empty() {
-            return Ok(client_token);
+        let client_token = self.lock(|inner| {
+            if let Some(token) = &inner.client_token {
+                if token.is_expired() {
+                    inner.client_token = None;
+                }
+            }
+            inner.client_token.clone()
+        });
+
+        if let Some(client_token) = client_token {
+            return Ok(client_token.access_token);
         }
+
+        trace!("Client token unavailable or expired, requesting new token.");
 
         let mut message = ClientTokenRequest::new();
         message.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
@@ -118,7 +131,7 @@ impl SpClient {
         windows_data.set_unknown_value_8(34404);
         windows_data.set_unknown_value_10(true);
 
-        let body = protobuf::text_format::print_to_string(&message);
+        let body = message.write_to_bytes()?;
 
         let request = Request::builder()
             .method(&Method::POST)
@@ -128,10 +141,35 @@ impl SpClient {
             .body(Body::from(body))?;
 
         let response = self.session().http_client().request_body(request).await?;
-        let response = ClientTokenResponse::parse_from_bytes(&response)?;
+        let message = ClientTokenResponse::parse_from_bytes(&response)?;
 
-        let client_token = response.get_granted_token().get_token().to_owned();
-        self.lock(|inner| inner.client_token = client_token.clone());
+        let client_token = self.lock(|inner| {
+            let access_token = message.get_granted_token().get_token().to_owned();
+
+            let client_token = Token {
+                access_token: access_token.clone(),
+                expires_in: Duration::from_secs(
+                    message
+                        .get_granted_token()
+                        .get_refresh_after_seconds()
+                        .try_into()
+                        .unwrap_or(7200),
+                ),
+                token_type: "client-token".to_string(),
+                scopes: message
+                    .get_granted_token()
+                    .get_domains()
+                    .iter()
+                    .map(|d| d.domain.clone())
+                    .collect(),
+                timestamp: Instant::now(),
+            };
+
+            trace!("Got client token: {:?}", client_token);
+
+            inner.client_token = Some(client_token);
+            access_token
+        });
 
         Ok(client_token)
     }
@@ -180,9 +218,6 @@ impl SpClient {
 
         let body = body.unwrap_or_else(String::new);
 
-        let client_token = self.client_token().await;
-        trace!("CLIENT TOKEN: {:?}", client_token);
-
         loop {
             tries += 1;
 
@@ -205,20 +240,19 @@ impl SpClient {
                 .body(Body::from(body.clone()))?;
 
             // Reconnection logic: keep getting (cached) tokens because they might have expired.
+            let token = self
+                .session()
+                .token_provider()
+                .get_token("playlist-read")
+                .await?;
+
             let headers_mut = request.headers_mut();
             if let Some(ref hdrs) = headers {
                 *headers_mut = hdrs.clone();
             }
             headers_mut.insert(
                 AUTHORIZATION,
-                HeaderValue::from_str(&format!(
-                    "Bearer {}",
-                    self.session()
-                        .token_provider()
-                        .get_token("playlist-read")
-                        .await?
-                        .access_token
-                ))?,
+                HeaderValue::from_str(&format!("{} {}", token.token_type, token.access_token,))?,
             );
 
             last_response = self.session().http_client().request_body(request).await;

@@ -93,7 +93,7 @@ impl TokenProvider {
         let request = self.session().mercury().get(query_uri)?;
         let response = request.await?;
         let data = response.payload.first().ok_or(TokenError::Empty)?.to_vec();
-        let token = Token::new(String::from_utf8(data)?)?;
+        let token = Token::from_json(String::from_utf8(data)?)?;
         trace!("Got token: {:#?}", token);
         self.lock(|inner| inner.tokens.push(token.clone()));
         Ok(token)
@@ -103,7 +103,7 @@ impl TokenProvider {
 impl Token {
     const EXPIRY_THRESHOLD: Duration = Duration::from_secs(10);
 
-    pub fn new(body: String) -> Result<Self, Error> {
+    pub fn from_json(body: String) -> Result<Self, Error> {
         let data: TokenData = serde_json::from_slice(body.as_ref())?;
         Ok(Self {
             access_token: data.access_token,
