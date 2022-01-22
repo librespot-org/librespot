@@ -281,7 +281,7 @@ impl Spirc {
                 .flatten_stream()
                 .map(|response| -> Result<(String, Frame), Error> {
                     let uri_split: Vec<&str> = response.uri.split('/').collect();
-                    let username = match uri_split.get(uri_split.len() - 2) {
+                    let username = match uri_split.get(4) {
                         Some(s) => s.to_string(),
                         None => String::new(),
                     };
