@@ -1,5 +1,3 @@
-// Extracted from: Spotify 1.1.33.569 (Windows)
-
 syntax = "proto3";
 
 package spotify.clienttoken.http.v0;
@@ -24,7 +22,7 @@ message ClientDataRequest {
     string client_id = 2;
     
     oneof data {
-        data.v0.ConnectivitySdkData connectivity_sdk_data = 3;
+        spotify.clienttoken.data.v0.ConnectivitySdkData connectivity_sdk_data = 3;
     }
 }
 
@@ -42,10 +40,15 @@ message ClientTokenResponse {
     }
 }
 
+message TokenDomain {
+     string domain = 1;
+}
+ 
 message GrantedTokenResponse {
     string token = 1;
     int32 expires_after_seconds = 2;
     int32 refresh_after_seconds = 3;
+    repeated TokenDomain domains = 4;
 }
 
 message ChallengesResponse {

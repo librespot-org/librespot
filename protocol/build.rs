@@ -17,6 +17,7 @@ fn compile() {
 
     let files = &[
         proto_dir.join("connect.proto"),
+        proto_dir.join("connectivity.proto"),
         proto_dir.join("devices.proto"),
         proto_dir.join("entity_extension_data.proto"),
         proto_dir.join("extended_metadata.proto"),
@@ -26,6 +27,7 @@ fn compile() {
         proto_dir.join("playlist_annotate3.proto"),
         proto_dir.join("playlist_permission.proto"),
         proto_dir.join("playlist4_external.proto"),
+        proto_dir.join("spotify/clienttoken/v0/clienttoken_http.proto"),
         proto_dir.join("storage-resolve.proto"),
         proto_dir.join("user_attributes.proto"),
         // TODO: remove these legacy protobufs when we are on the new API completely

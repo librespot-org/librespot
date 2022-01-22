@@ -5,7 +5,7 @@ use futures_util::future::IntoStream;
 use http::header::HeaderValue;
 use hyper::{
     client::ResponseFuture,
-    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
+    header::{ACCEPT, AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE, RANGE},
     Body, HeaderMap, Method, Request,
 };
 use protobuf::Message;
@@ -17,16 +17,19 @@ use crate::{
     cdn_url::CdnUrl,
     error::ErrorKind,
     protocol::{
-        canvaz::EntityCanvazRequest, connect::PutStateRequest,
+        canvaz::EntityCanvazRequest,
+        clienttoken_http::{ClientTokenRequest, ClientTokenRequestType, ClientTokenResponse},
+        connect::PutStateRequest,
         extended_metadata::BatchedEntityRequest,
     },
-    Error, FileId, SpotifyId,
+    version, Error, FileId, SpotifyId,
 };
 
 component! {
     SpClient : SpClientInner {
         accesspoint: Option<SocketAddress> = None,
         strategy: RequestStrategy = RequestStrategy::default(),
+        client_token: String = String::new(),
     }
 }
 
@@ -88,6 +91,51 @@ impl SpClient {
         Ok(format!("https://{}:{}", ap.0, ap.1))
     }
 
+    pub async fn client_token(&self) -> Result<String, Error> {
+        // TODO: implement expiry
+        let client_token = self.lock(|inner| inner.client_token.clone());
+        if !client_token.is_empty() {
+            return Ok(client_token);
+        }
+
+        let mut message = ClientTokenRequest::new();
+        message.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
+
+        let client_data = message.mut_client_data();
+        client_data.set_client_id(self.session().client_id());
+        client_data.set_client_version(version::SEMVER.to_string());
+
+        let connectivity_data = client_data.mut_connectivity_sdk_data();
+        connectivity_data.set_device_id(self.session().device_id().to_string());
+
+        let platform_data = connectivity_data.mut_platform_specific_data();
+        let windows_data = platform_data.mut_windows();
+        windows_data.set_os_version(10);
+        windows_data.set_os_build(21370);
+        windows_data.set_unknown_value_4(2);
+        windows_data.set_unknown_value_6(9);
+        windows_data.set_unknown_value_7(332);
+        windows_data.set_unknown_value_8(34404);
+        windows_data.set_unknown_value_10(true);
+
+        let body = protobuf::text_format::print_to_string(&message);
+
+        let request = Request::builder()
+            .method(&Method::POST)
+            .uri("https://clienttoken.spotify.com/v1/clienttoken")
+            .header(ACCEPT, HeaderValue::from_static("application/x-protobuf"))
+            .header(CONTENT_ENCODING, HeaderValue::from_static(""))
+            .body(Body::from(body))?;
+
+        let response = self.session().http_client().request_body(request).await?;
+        let response = ClientTokenResponse::parse_from_bytes(&response)?;
+
+        let client_token = response.get_granted_token().get_token().to_owned();
+        self.lock(|inner| inner.client_token = client_token.clone());
+
+        Ok(client_token)
+    }
+
     pub async fn request_with_protobuf(
         &self,
         method: &Method,
@@ -100,7 +148,7 @@ impl SpClient {
         let mut headers = headers.unwrap_or_else(HeaderMap::new);
         headers.insert(
             CONTENT_TYPE,
-            HeaderValue::from_static("application/protobuf"),
+            HeaderValue::from_static("application/x-protobuf"),
         );
 
         self.request(method, endpoint, Some(headers), Some(body))
@@ -131,6 +179,9 @@ impl SpClient {
         let mut last_response;
 
         let body = body.unwrap_or_else(String::new);
+
+        let client_token = self.client_token().await;
+        trace!("CLIENT TOKEN: {:?}", client_token);
 
         loop {
             tries += 1;
