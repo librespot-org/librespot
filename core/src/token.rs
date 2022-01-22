@@ -65,6 +65,11 @@ impl TokenProvider {
 
     // scopes must be comma-separated
     pub async fn get_token(&self, scopes: &str) -> Result<Token, Error> {
+        let client_id = self.session().client_id();
+        if client_id.is_empty() {
+            return Err(Error::invalid_argument("Client ID cannot be empty"));
+        }
+
         if let Some(index) = self.find_token(scopes.split(',').collect()) {
             let cached_token = self.lock(|inner| inner.tokens[index].clone());
             if cached_token.is_expired() {
@@ -82,7 +87,7 @@ impl TokenProvider {
         let query_uri = format!(
             "hm://keymaster/token/authenticated?scope={}&client_id={}&device_id={}",
             scopes,
-            self.session().client_id(),
+            client_id,
             self.session().device_id(),
         );
         let request = self.session().mercury().get(query_uri)?;
