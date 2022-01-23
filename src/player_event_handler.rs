@@ -5,6 +5,7 @@ use tokio::process::{Child as AsyncChild, Command as AsyncCommand};
 
 use std::collections::HashMap;
 use std::io;
+use std::io::{Error, ErrorKind};
 use std::process::{Command, ExitStatus};
 
 pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Result<AsyncChild>> {
@@ -13,45 +14,110 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
         PlayerEvent::Changed {
             old_track_id,
             new_track_id,
-        } => {
-            env_vars.insert("PLAYER_EVENT", "changed".to_string());
-            env_vars.insert("OLD_TRACK_ID", old_track_id.to_base62());
-            env_vars.insert("TRACK_ID", new_track_id.to_base62());
-        }
-        PlayerEvent::Started { track_id, .. } => {
-            env_vars.insert("PLAYER_EVENT", "started".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
-        }
-        PlayerEvent::Stopped { track_id, .. } => {
-            env_vars.insert("PLAYER_EVENT", "stopped".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
-        }
+        } => match old_track_id.to_base62() {
+            Err(e) => {
+                return Some(Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!(
+                        "PlayerEvent::Changed: Invalid old track id: {}",
+                        e.utf8_error()
+                    ),
+                )))
+            }
+            Ok(old_id) => match new_track_id.to_base62() {
+                Err(e) => {
+                    return Some(Err(Error::new(
+                        ErrorKind::InvalidData,
+                        format!(
+                            "PlayerEvent::Changed: Invalid new track id: {}",
+                            e.utf8_error()
+                        ),
+                    )))
+                }
+                Ok(new_id) => {
+                    env_vars.insert("PLAYER_EVENT", "changed".to_string());
+                    env_vars.insert("OLD_TRACK_ID", old_id);
+                    env_vars.insert("TRACK_ID", new_id);
+                }
+            },
+        },
+        PlayerEvent::Started { track_id, .. } => match track_id.to_base62() {
+            Err(e) => {
+                return Some(Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!("PlayerEvent::Started: Invalid track id: {}", e.utf8_error()),
+                )))
+            }
+            Ok(id) => {
+                env_vars.insert("PLAYER_EVENT", "started".to_string());
+                env_vars.insert("TRACK_ID", id);
+            }
+        },
+        PlayerEvent::Stopped { track_id, .. } => match track_id.to_base62() {
+            Err(e) => {
+                return Some(Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!("PlayerEvent::Stopped: Invalid track id: {}", e.utf8_error()),
+                )))
+            }
+            Ok(id) => {
+                env_vars.insert("PLAYER_EVENT", "stopped".to_string());
+                env_vars.insert("TRACK_ID", id);
+            }
+        },
         PlayerEvent::Playing {
             track_id,
             duration_ms,
             position_ms,
             ..
-        } => {
-            env_vars.insert("PLAYER_EVENT", "playing".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
-            env_vars.insert("DURATION_MS", duration_ms.to_string());
-            env_vars.insert("POSITION_MS", position_ms.to_string());
-        }
+        } => match track_id.to_base62() {
+            Err(e) => {
+                return Some(Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!("PlayerEvent::Playing: Invalid track id: {}", e.utf8_error()),
+                )))
+            }
+            Ok(id) => {
+                env_vars.insert("PLAYER_EVENT", "playing".to_string());
+                env_vars.insert("TRACK_ID", id);
+                env_vars.insert("DURATION_MS", duration_ms.to_string());
+                env_vars.insert("POSITION_MS", position_ms.to_string());
+            }
+        },
         PlayerEvent::Paused {
             track_id,
             duration_ms,
             position_ms,
             ..
-        } => {
-            env_vars.insert("PLAYER_EVENT", "paused".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
-            env_vars.insert("DURATION_MS", duration_ms.to_string());
-            env_vars.insert("POSITION_MS", position_ms.to_string());
-        }
-        PlayerEvent::Preloading { track_id, .. } => {
-            env_vars.insert("PLAYER_EVENT", "preloading".to_string());
-            env_vars.insert("TRACK_ID", track_id.to_base62());
-        }
+        } => match track_id.to_base62() {
+            Err(e) => {
+                return Some(Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!("PlayerEvent::Paused: Invalid track id: {}", e.utf8_error()),
+                )))
+            }
+            Ok(id) => {
+                env_vars.insert("PLAYER_EVENT", "paused".to_string());
+                env_vars.insert("TRACK_ID", id);
+                env_vars.insert("DURATION_MS", duration_ms.to_string());
+                env_vars.insert("POSITION_MS", position_ms.to_string());
+            }
+        },
+        PlayerEvent::Preloading { track_id, .. } => match track_id.to_base62() {
+            Err(e) => {
+                return Some(Err(Error::new(
+                    ErrorKind::InvalidData,
+                    format!(
+                        "PlayerEvent::Preloading: Invalid track id: {}",
+                        e.utf8_error()
+                    ),
+                )))
+            }
+            Ok(id) => {
+                env_vars.insert("PLAYER_EVENT", "preloading".to_string());
+                env_vars.insert("TRACK_ID", id);
+            }
+        },
         PlayerEvent::VolumeSet { volume } => {
             env_vars.insert("PLAYER_EVENT", "volume_set".to_string());
             env_vars.insert("VOLUME", volume.to_string());

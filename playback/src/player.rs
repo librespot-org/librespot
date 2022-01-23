@@ -740,7 +740,10 @@ impl PlayerTrackLoader {
         let audio = match self.find_available_alternative(audio).await {
             Some(audio) => audio,
             None => {
-                warn!("<{}> is not available", spotify_id.to_uri());
+                warn!(
+                    "<{}> is not available",
+                    spotify_id.to_uri().unwrap_or_default()
+                );
                 return None;
             }
         };
@@ -748,7 +751,7 @@ impl PlayerTrackLoader {
         if audio.duration < 0 {
             error!(
                 "Track duration for <{}> cannot be {}",
-                spotify_id.to_uri(),
+                spotify_id.to_uri().unwrap_or_default(),
                 audio.duration
             );
             return None;
