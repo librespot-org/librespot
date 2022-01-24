@@ -251,26 +251,21 @@ impl NormalisationData {
             (data.track_gain_db, data.track_peak)
         };
 
-        let normalisation_power = gain_db + config.normalisation_pregain_db;
-        let mut normalisation_factor = db_to_ratio(normalisation_power);
-
-        if normalisation_power + ratio_to_db(gain_peak) > config.normalisation_threshold_dbfs {
-            let limited_normalisation_factor =
-                db_to_ratio(config.normalisation_threshold_dbfs) / gain_peak;
-            let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
-
-            if config.normalisation_method == NormalisationMethod::Basic {
-                warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
-                normalisation_factor = limited_normalisation_factor;
-            } else {
-                warn!(
-                    "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
-                    normalisation_power - limited_normalisation_power
-                );
-            }
-
-            warn!("Please lower pregain to avoid.");
-        }
+        // As per the ReplayGain 1.0 & 2.0 (proposed) spec:
+        // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_1.0_specification#Clipping_prevention
+        // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_2.0_specification#Clipping_prevention
+        let normalisation_factor = if config.normalisation_method == NormalisationMethod::Basic {
+            // For Basic Normalisation, factor = min(ratio of (ReplayGain + PreGain), 1.0 / peak level).
+            f64::min(
+                db_to_ratio(gain_db + config.normalisation_pregain_db),
+                1.0 / gain_peak,
+            )
+        } else {
+            // For Dynamic Normalisation it's up to the player to decide,
+            // factor = ratio of (ReplayGain + PreGain).
+            // We then let the dynamic limiter handle gain reduction.
+            db_to_ratio(gain_db + config.normalisation_pregain_db)
+        };
 
         debug!("Normalisation Data: {:?}", data);
         debug!(
