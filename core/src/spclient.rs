@@ -125,10 +125,10 @@ impl SpClient {
         let windows_data = platform_data.mut_windows();
         windows_data.set_os_version(10);
         windows_data.set_os_build(21370);
-        windows_data.set_unknown_value_4(2);
+        windows_data.set_platform_id(2);
         windows_data.set_unknown_value_6(9);
-        windows_data.set_unknown_value_7(332);
-        windows_data.set_unknown_value_8(34404);
+        windows_data.set_image_file_machine(332);
+        windows_data.set_pe_machine(34404);
         windows_data.set_unknown_value_10(true);
 
         let body = message.write_to_bytes()?;
