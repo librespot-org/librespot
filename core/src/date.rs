@@ -53,11 +53,22 @@ impl Date {
 impl TryFrom<&DateMessage> for Date {
     type Error = crate::Error;
     fn try_from(msg: &DateMessage) -> Result<Self, Self::Error> {
-        let date = _Date::from_calendar_date(
-            msg.get_year(),
-            (msg.get_month() as u8).try_into()?,
-            msg.get_day() as u8,
-        )?;
+        // Some metadata contains a year, but no month. In that case just set January.
+        let month = if msg.has_month() {
+            msg.get_month() as u8
+        } else {
+            1
+        };
+
+        // Having no day will work, but may be unexpected: it will imply the last day
+        // of the month before. So prevent that, and just set day 1.
+        let day = if msg.has_day() {
+            msg.get_day() as u8
+        } else {
+            1
+        };
+
+        let date = _Date::from_calendar_date(msg.get_year(), month.try_into()?, day)?;
         let time = Time::from_hms(msg.get_hour() as u8, msg.get_minute() as u8, 0)?;
         Ok(Self::from_utc(PrimitiveDateTime::new(date, time)))
     }
