@@ -1059,7 +1059,6 @@ impl SpircTask {
     fn handle_unavailable(&mut self, track_id: SpotifyId) {
         let unavailables = self.get_track_index_for_spotify_id(&track_id, 0);
         for &index in unavailables.iter() {
-            debug_assert_eq!(self.state.get_track()[index].get_gid(), track_id.to_raw());
             let mut unplayable_track_ref = TrackRef::new();
             unplayable_track_ref.set_gid(self.state.get_track()[index].get_gid().to_vec());
             // Misuse context field to flag the track
@@ -1320,8 +1319,6 @@ impl SpircTask {
             .filter(|&(_, track_ref)| track_ref.get_gid() == track_id.to_raw())
             .map(|(idx, _)| start_index + idx)
             .collect();
-        // Sanity check
-        debug_assert!(!index.is_empty());
         index
     }
 

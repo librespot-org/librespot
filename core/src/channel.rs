@@ -173,7 +173,6 @@ impl Stream for Channel {
 
                     let length = BigEndian::read_u16(data.split_to(2).as_ref()) as usize;
                     if length == 0 {
-                        assert_eq!(data.len(), 0);
                         self.state = ChannelState::Data;
                     } else {
                         let header_id = data.split_to(1).as_ref()[0];

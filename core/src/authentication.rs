@@ -114,7 +114,6 @@ impl Credentials {
             let cipher = Aes192::new(GenericArray::from_slice(&key));
             let block_size = <Aes192 as BlockCipher>::BlockSize::to_usize();
 
-            assert_eq!(data.len() % block_size, 0);
             for chunk in data.chunks_exact_mut(block_size) {
                 cipher.decrypt_block(GenericArray::from_mut_slice(chunk));
             }

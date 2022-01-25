@@ -229,7 +229,6 @@ impl RangeSet {
                     self.ranges[self_index].end(),
                     other.ranges[other_index].end(),
                 );
-                assert!(new_start <= new_end);
                 result.add_range(&Range::new(new_start, new_end - new_start));
                 if self.ranges[self_index].end() <= other.ranges[other_index].end() {
                     self_index += 1;
