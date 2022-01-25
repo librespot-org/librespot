@@ -46,7 +46,7 @@ cpal            = { version = "0.13", optional = true }
 symphonia = { version = "0.4", default-features = false, features = ["mp3", "ogg", "vorbis"] }
 
 # Legacy Ogg container decoder for the passthrough decoder
-ogg = "0.8"
+ogg = { version = "0.8", optional = true }
 
 # Dithering
 rand = { version = "0.8", features = ["small_rng"] }
@@ -61,3 +61,5 @@ rodio-backend = ["rodio", "cpal"]
 rodiojack-backend = ["rodio", "cpal/jack"]
 sdl-backend = ["sdl2"]
 gstreamer-backend = ["gstreamer", "gstreamer-app", "glib"]
+
+passthrough-decoder = ["ogg"]

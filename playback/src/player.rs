@@ -35,12 +35,13 @@ use crate::{
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
     core::{util::SeqGenerator, Error, Session, SpotifyId},
-    decoder::{
-        AudioDecoder, AudioPacket, AudioPacketPosition, PassthroughDecoder, SymphoniaDecoder,
-    },
+    decoder::{AudioDecoder, AudioPacket, AudioPacketPosition, SymphoniaDecoder},
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::AudioFilter,
 };
+
+#[cfg(feature = "passthrough-decoder")]
+use crate::decoder::PassthroughDecoder;
 
 use crate::SAMPLES_PER_SECOND;
 
@@ -931,9 +932,7 @@ impl PlayerTrackLoader {
                 }
             };
 
-            let result = if self.config.passthrough {
-                PassthroughDecoder::new(audio_file, format).map(|x| Box::new(x) as Decoder)
-            } else {
+            let mut symphonia_decoder = |audio_file, format| {
                 SymphoniaDecoder::new(audio_file, format).map(|mut decoder| {
                     // For formats other that Vorbis, we'll try getting normalisation data from
                     // ReplayGain metadata fields, if present.
@@ -944,12 +943,22 @@ impl PlayerTrackLoader {
                 })
             };
 
+            #[cfg(feature = "passthrough-decoder")]
+            let decoder_type = if self.config.passthrough {
+                PassthroughDecoder::new(audio_file, format).map(|x| Box::new(x) as Decoder)
+            } else {
+                symphonia_decoder(audio_file, format)
+            };
+
+            #[cfg(not(feature = "passthrough-decoder"))]
+            let decoder_type = symphonia_decoder(audio_file, format);
+
             let normalisation_data = normalisation_data.unwrap_or_else(|| {
                 warn!("Unable to get normalisation data, continuing with defaults.");
                 NormalisationData::default()
             });
 
-            let mut decoder = match result {
+            let mut decoder = match decoder_type {
                 Ok(decoder) => decoder,
                 Err(e) if is_cached => {
                     warn!(

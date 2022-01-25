@@ -72,6 +72,8 @@ gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
 with-dns-sd = ["librespot-core/with-dns-sd", "librespot-discovery/with-dns-sd"]
 
+passthrough-decoder = ["librespot-playback/passthrough-decoder"]
+
 default = ["rodio-backend"]
 
 [package.metadata.deb]

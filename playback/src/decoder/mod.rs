@@ -2,7 +2,9 @@ use std::ops::Deref;
 
 use thiserror::Error;
 
+#[cfg(feature = "passthrough-decoder")]
 mod passthrough_decoder;
+#[cfg(feature = "passthrough-decoder")]
 pub use passthrough_decoder::PassthroughDecoder;
 
 mod symphonia_decoder;
@@ -41,7 +43,7 @@ impl AudioPacket {
         }
     }
 
-    pub fn oggdata(&self) -> AudioPacketResult<&[u8]> {
+    pub fn raw(&self) -> AudioPacketResult<&[u8]> {
         match self {
             AudioPacket::Raw(d) => Ok(d),
             AudioPacket::Samples(_) => Err(AudioPacketError::Samples),

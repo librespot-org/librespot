@@ -227,6 +227,7 @@ fn get_setup() -> Setup {
     const NORMALISATION_RELEASE: &str = "normalisation-release";
     const NORMALISATION_THRESHOLD: &str = "normalisation-threshold";
     const ONEVENT: &str = "onevent";
+    #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
     const PASSWORD: &str = "password";
     const PROXY: &str = "proxy";
@@ -262,6 +263,7 @@ fn get_setup() -> Setup {
     const NAME_SHORT: &str = "n";
     const DISABLE_DISCOVERY_SHORT: &str = "O";
     const ONEVENT_SHORT: &str = "o";
+    #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH_SHORT: &str = "P";
     const PASSWORD_SHORT: &str = "p";
     const EMIT_SINK_EVENTS_SHORT: &str = "Q";
@@ -370,11 +372,6 @@ fn get_setup() -> Setup {
         EMIT_SINK_EVENTS_SHORT,
         EMIT_SINK_EVENTS,
         "Run PROGRAM set by `--onevent` before the sink is opened and after it is closed.",
-    )
-    .optflag(
-        PASSTHROUGH_SHORT,
-        PASSTHROUGH,
-        "Pass a raw stream to the output. Only works with the pipe and subprocess backends.",
     )
     .optflag(
         ENABLE_VOLUME_NORMALISATION_SHORT,
@@ -566,6 +563,13 @@ fn get_setup() -> Setup {
         AP_PORT,
         "Connect to an AP with a specified port 1 - 65535. If no AP with that port is present a fallback AP will be used. Available ports are usually 80, 443 and 4070.",
         "PORT",
+    );
+
+    #[cfg(feature = "passthrough-decoder")]
+    opts.optflag(
+        PASSTHROUGH_SHORT,
+        PASSTHROUGH,
+        "Pass a raw stream to the output. Only works with the pipe and subprocess backends.",
     );
 
     let args: Vec<_> = std::env::args_os()
@@ -1505,7 +1509,10 @@ fn get_setup() -> Setup {
             },
         };
 
+        #[cfg(feature = "passthrough-decoder")]
         let passthrough = opt_present(PASSTHROUGH);
+        #[cfg(not(feature = "passthrough-decoder"))]
+        let passthrough = false;
 
         PlayerConfig {
             bitrate,
