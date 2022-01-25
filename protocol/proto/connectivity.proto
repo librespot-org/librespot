@@ -16,6 +16,7 @@ message PlatformSpecificData {
         NativeAndroidData android = 1;
         NativeIOSData ios = 2;
         NativeWindowsData windows = 4;
+        NativeDesktopLinuxData desktop_linux = 5;
     }
 }
 
@@ -50,6 +51,13 @@ message NativeWindowsData {
     // https://docs.microsoft.com/en-us/dotnet/api/system.reflection.portableexecutable.machine?view=net-6.0
     int32 pe_machine = 8;
     bool unknown_value_10 = 10;
+}
+
+message NativeDesktopLinuxData {
+    string system_name = 1;         //  uname -s
+    string system_release = 2;      //  -r
+    string system_version = 3;      //  -v
+    string hardware = 4;            //  -i
 }
 
 message Screen {
