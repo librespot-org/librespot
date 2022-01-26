@@ -31,7 +31,7 @@ use crate::{MS_PER_PAGE, NUM_CHANNELS, PAGES_PER_MS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
-pub const DBFS_RATIO: f64 = 1.0;
+pub const PCM_AT_0DBFS: f64 = 1.0;
 
 pub struct Player {
     commands: Option<mpsc::UnboundedSender<PlayerCommand>>,
@@ -259,19 +259,19 @@ impl NormalisationData {
             // For Basic Normalisation, factor = min(ratio of (ReplayGain + PreGain), 1.0 / peak level).
             // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_1.0_specification#Peak_amplitude
             // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_2.0_specification#Peak_amplitude
-            // We then limit that to 1.0 as not to exceed dBFS.
+            // We then limit that to 1.0 as not to exceed dBFS (0.0 dB).
             let factor = f64::min(
                 db_to_ratio(gain_db + config.normalisation_pregain_db),
-                DBFS_RATIO / gain_peak,
+                PCM_AT_0DBFS / gain_peak,
             );
 
-            if factor > DBFS_RATIO {
+            if factor > PCM_AT_0DBFS {
                 info!(
                     "Lowering gain by {:.2} dB for the duration of this track to avoid potentially exceeding dBFS.",
                     ratio_to_db(factor)
                 );
 
-                DBFS_RATIO
+                PCM_AT_0DBFS
             } else {
                 factor
             }
@@ -282,12 +282,13 @@ impl NormalisationData {
             let factor = db_to_ratio(gain_db + config.normalisation_pregain_db);
             let threshold_ratio = db_to_ratio(config.normalisation_threshold_dbfs);
 
-            if factor > DBFS_RATIO {
+            if factor > PCM_AT_0DBFS {
                 let factor_db = gain_db + config.normalisation_pregain_db;
+                let limiting_db = factor_db + config.normalisation_threshold_dbfs.abs();
 
                 warn!(
                     "This track may exceed dBFS by {:.2} dB and be subject to {:.2} dB of dynamic limiting at it's peak.",
-                    factor_db, factor_db + config.normalisation_threshold_dbfs.abs()
+                    factor_db, limiting_db
                 );
             } else if factor > threshold_ratio {
                 let limiting_db = gain_db
