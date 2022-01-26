@@ -111,11 +111,11 @@ where
             _ => Platform::PLATFORM_FREEBSD_X86,
         },
         "ios" => match ARCH {
-            "arm64" => Platform::PLATFORM_IPHONE_ARM64,
+            "aarch64" => Platform::PLATFORM_IPHONE_ARM64,
             _ => Platform::PLATFORM_IPHONE_ARM,
         },
         "linux" => match ARCH {
-            "arm" | "arm64" => Platform::PLATFORM_LINUX_ARM,
+            "arm" | "aarch64" => Platform::PLATFORM_LINUX_ARM,
             "blackfin" => Platform::PLATFORM_LINUX_BLACKFIN,
             "mips" => Platform::PLATFORM_LINUX_MIPS,
             "sh" => Platform::PLATFORM_LINUX_SH,
@@ -128,7 +128,7 @@ where
             _ => Platform::PLATFORM_OSX_X86,
         },
         "windows" => match ARCH {
-            "arm" => Platform::PLATFORM_WINDOWS_CE_ARM,
+            "arm" | "aarch64" => Platform::PLATFORM_WINDOWS_CE_ARM,
             "x86_64" => Platform::PLATFORM_WIN32_X86_64,
             _ => Platform::PLATFORM_WIN32_X86,
         },

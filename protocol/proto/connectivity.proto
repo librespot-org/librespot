@@ -15,7 +15,8 @@ message PlatformSpecificData {
     oneof data {
         NativeAndroidData android = 1;
         NativeIOSData ios = 2;
-        NativeWindowsData windows = 4;
+        NativeDesktopMacOSData desktop_macos = 3;
+        NativeDesktopWindowsData desktop_windows = 4;
         NativeDesktopLinuxData desktop_linux = 5;
     }
 }
@@ -32,6 +33,7 @@ message NativeAndroidData {
 }
 
 message NativeIOSData {
+    // https://developer.apple.com/documentation/uikit/uiuserinterfaceidiom
     int32 user_interface_idiom = 1;
     bool target_iphone_simulator = 2;
     string hw_machine = 3;
@@ -39,7 +41,7 @@ message NativeIOSData {
     string simulator_model_identifier = 5;
 }
 
-message NativeWindowsData {
+message NativeDesktopWindowsData {
     int32 os_version = 1;
     int32 os_build = 3;
     // https://docs.microsoft.com/en-us/dotnet/api/system.platformid?view=net-6.0
@@ -58,6 +60,12 @@ message NativeDesktopLinuxData {
     string system_release = 2;      //  -r
     string system_version = 3;      //  -v
     string hardware = 4;            //  -i
+}
+
+message NativeDesktopMacOSData {
+    string system_version = 1;
+    string hw_model = 2;
+    string compiled_cpu_type = 3;
 }
 
 message Screen {

@@ -122,14 +122,55 @@ impl SpClient {
         connectivity_data.set_device_id(self.session().device_id().to_string());
 
         let platform_data = connectivity_data.mut_platform_specific_data();
-        let windows_data = platform_data.mut_windows();
-        windows_data.set_os_version(10);
-        windows_data.set_os_build(21370);
-        windows_data.set_platform_id(2);
-        windows_data.set_unknown_value_6(9);
-        windows_data.set_image_file_machine(332);
-        windows_data.set_pe_machine(34404);
-        windows_data.set_unknown_value_10(true);
+
+        match std::env::consts::OS {
+            "windows" => {
+                let (pe, image_file) = match std::env::consts::ARCH {
+                    "arm" => (448, 452),
+                    "aarch64" => (43620, 452),
+                    "x86_64" => (34404, 34404),
+                    _ => (332, 332), // x86
+                };
+
+                let windows_data = platform_data.mut_desktop_windows();
+                windows_data.set_os_version(10);
+                windows_data.set_os_build(21370);
+                windows_data.set_platform_id(2);
+                windows_data.set_unknown_value_6(9);
+                windows_data.set_image_file_machine(image_file);
+                windows_data.set_pe_machine(pe);
+                windows_data.set_unknown_value_10(true);
+            }
+            "ios" => {
+                let ios_data = platform_data.mut_ios();
+                ios_data.set_user_interface_idiom(0);
+                ios_data.set_target_iphone_simulator(false);
+                ios_data.set_hw_machine("iPhone14,5".to_string());
+                ios_data.set_system_version("15.2.1".to_string());
+            }
+            "android" => {
+                let android_data = platform_data.mut_android();
+                android_data.set_android_version("12.0.0_r26".to_string());
+                android_data.set_api_version(31);
+                android_data.set_device_name("Pixel".to_owned());
+                android_data.set_model_str("GF5KQ".to_owned());
+                android_data.set_vendor("Google".to_owned());
+            }
+            "macos" => {
+                let macos_data = platform_data.mut_desktop_macos();
+                macos_data.set_system_version("Darwin Kernel Version 17.7.0: Fri Oct 30 13:34:27 PDT 2020; root:xnu-4570.71.82.8~1/RELEASE_X86_64".to_string());
+                macos_data.set_hw_model("iMac21,1".to_string());
+                macos_data.set_compiled_cpu_type(std::env::consts::ARCH.to_string());
+            }
+            _ => {
+                let linux_data = platform_data.mut_desktop_linux();
+                linux_data.set_system_name("Linux".to_string());
+                linux_data.set_system_release("5.4.0-56-generic".to_string());
+                linux_data
+                    .set_system_version("#62-Ubuntu SMP Mon Nov 23 19:20:19 UTC 2020".to_string());
+                linux_data.set_hardware(std::env::consts::ARCH.to_string());
+            }
+        }
 
         let body = message.write_to_bytes()?;
 

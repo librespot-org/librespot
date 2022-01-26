@@ -86,7 +86,7 @@ impl HttpClient {
 
         let spotify_platform = match OS {
             "android" => "Android/31",
-            "ios" => "iOS/15.2",
+            "ios" => "iOS/15.2.1",
             "macos" => "OSX/0",
             "windows" => "Win32/0",
             _ => "Linux/0",
