@@ -52,7 +52,7 @@ impl PlaylistAnnotation {
         let uri = format!(
             "hm://playlist-annotate/v1/annotation/user/{}/playlist/{}",
             username,
-            playlist_id.to_base62()
+            playlist_id.to_base62()?
         );
         <Self as MercuryRequest>::request(session, &uri).await
     }

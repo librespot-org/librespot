@@ -48,16 +48,17 @@ pub trait InnerAudioItem {
         restrictions: &Restrictions,
     ) -> AudioItemAvailability {
         let country = &user_data.country;
-        let user_catalogue = match user_data.attributes.get("catalogue") {
-            Some(catalogue) => catalogue,
-            None => "premium",
-        };
-
         for premium_restriction in restrictions.iter().filter(|restriction| {
             restriction
                 .catalogue_strs
                 .iter()
-                .any(|restricted_catalogue| restricted_catalogue == user_catalogue)
+                .any(|restricted_catalogue| {
+                    restricted_catalogue
+                        == user_data
+                            .attributes
+                            .get("catalogue")
+                            .unwrap_or(&"premium".to_string())
+                })
         }) {
             if let Some(allowed_countries) = &premium_restriction.countries_allowed {
                 // A restriction will specify either a whitelast *or* a blacklist,

@@ -354,7 +354,7 @@ impl SpClient {
     }
 
     pub async fn get_metadata(&self, scope: &str, id: SpotifyId) -> SpClientResult {
-        let endpoint = format!("/metadata/4/{}/{}", scope, id.to_base16());
+        let endpoint = format!("/metadata/4/{}/{}", scope, id.to_base16()?);
         self.request(&Method::GET, &endpoint, None, None).await
     }
 
@@ -379,7 +379,7 @@ impl SpClient {
     }
 
     pub async fn get_lyrics(&self, track_id: SpotifyId) -> SpClientResult {
-        let endpoint = format!("/color-lyrics/v1/track/{}", track_id.to_base62());
+        let endpoint = format!("/color-lyrics/v1/track/{}", track_id.to_base62()?);
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
             .await
@@ -392,7 +392,7 @@ impl SpClient {
     ) -> SpClientResult {
         let endpoint = format!(
             "/color-lyrics/v2/track/{}/image/spotify:image:{}",
-            track_id.to_base62(),
+            track_id.to_base62()?,
             image_id
         );
 
@@ -416,7 +416,7 @@ impl SpClient {
     pub async fn get_audio_storage(&self, file_id: FileId) -> SpClientResult {
         let endpoint = format!(
             "/storage-resolve/files/audio/interactive/{}",
-            file_id.to_base16()
+            file_id.to_base16()?
         );
         self.request(&Method::GET, &endpoint, None, None).await
     }
@@ -459,7 +459,7 @@ impl SpClient {
             .get_user_attribute(attribute)
             .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
 
-        let mut url = template.replace("{id}", &preview_id.to_base16());
+        let mut url = template.replace("{id}", &preview_id.to_base16()?);
         let separator = match url.find('?') {
             Some(_) => "&",
             None => "?",
@@ -477,7 +477,7 @@ impl SpClient {
             .get_user_attribute(attribute)
             .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
 
-        let url = template.replace("{file_id}", &file_id.to_base16());
+        let url = template.replace("{file_id}", &file_id.to_base16()?);
 
         self.request_url(url).await
     }
@@ -488,7 +488,7 @@ impl SpClient {
             .session()
             .get_user_attribute(attribute)
             .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
-        let url = template.replace("{file_id}", &image_id.to_base16());
+        let url = template.replace("{file_id}", &image_id.to_base16()?);
 
         self.request_url(url).await
     }

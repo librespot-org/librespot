@@ -2,7 +2,7 @@ use std::fmt;
 
 use librespot_protocol as protocol;
 
-use crate::spotify_id::to_base16;
+use crate::{spotify_id::to_base16, Error};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FileId(pub [u8; 20]);
@@ -14,7 +14,8 @@ impl FileId {
         FileId(dst)
     }
 
-    pub fn to_base16(&self) -> String {
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_base16(&self) -> Result<String, Error> {
         to_base16(&self.0, &mut [0u8; 40])
     }
 }
@@ -27,7 +28,7 @@ impl fmt::Debug for FileId {
 
 impl fmt::Display for FileId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.to_base16())
+        f.write_str(&self.to_base16().unwrap_or_default())
     }
 }
 
