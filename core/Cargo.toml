@@ -50,5 +50,5 @@ rand = "0.8"
 vergen = "3.0.4"
 
 [dev-dependencies]
-env_logger = "0.8"
+env_logger = "0.9"
 tokio = {version = "1.0", features = ["macros"] }

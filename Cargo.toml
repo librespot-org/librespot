@@ -50,7 +50,7 @@ version = "0.3.1"
 
 [dependencies]
 base64 = "0.13"
-env_logger =  {version = "0.8", default-features = false, features = ["termcolor","humantime","atty"]}
+env_logger =  {version = "0.9", default-features = false, features = ["termcolor","humantime","atty"]}
 futures-util = { version = "0.3", default_features = false }
 getopts = "0.2.21"
 hex = "0.4"
