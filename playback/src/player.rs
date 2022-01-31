@@ -47,6 +47,7 @@ use crate::SAMPLES_PER_SECOND;
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
+pub const PCM_AT_0DBFS: f64 = 1.0;
 
 // Spotify inserts a custom Ogg packet at the start with custom metadata values, that you would
 // otherwise expect in Vorbis comments. This packet isn't well-formed and players may balk at it.
@@ -264,7 +265,6 @@ impl Default for NormalisationData {
 impl NormalisationData {
     fn parse_from_ogg<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
-
         let newpos = file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
         if newpos != SPOTIFY_NORMALIZATION_HEADER_START_OFFSET {
             error!(
@@ -296,31 +296,62 @@ impl NormalisationData {
         }
 
         let (gain_db, gain_peak) = if config.normalisation_type == NormalisationType::Album {
-            (data.album_gain_db as f64, data.album_peak as f64)
+            (data.album_gain_db, data.album_peak)
         } else {
-            (data.track_gain_db as f64, data.track_peak as f64)
+            (data.track_gain_db, data.track_peak)
         };
 
-        let normalisation_power = gain_db + config.normalisation_pregain_db as f64;
-        let mut normalisation_factor = db_to_ratio(normalisation_power);
+        // As per the ReplayGain 1.0 & 2.0 (proposed) spec:
+        // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_1.0_specification#Clipping_prevention
+        // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_2.0_specification#Clipping_prevention
+        let normalisation_factor = if config.normalisation_method == NormalisationMethod::Basic {
+            // For Basic Normalisation, factor = min(ratio of (ReplayGain + PreGain), 1.0 / peak level).
+            // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_1.0_specification#Peak_amplitude
+            // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_2.0_specification#Peak_amplitude
+            // We then limit that to 1.0 as not to exceed dBFS (0.0 dB).
+            let factor = f64::min(
+                db_to_ratio(gain_db + config.normalisation_pregain_db),
+                PCM_AT_0DBFS / gain_peak,
+            );
 
-        if normalisation_power + ratio_to_db(gain_peak) > config.normalisation_threshold_dbfs {
-            let limited_normalisation_factor =
-                db_to_ratio(config.normalisation_threshold_dbfs as f64) / gain_peak;
-            let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
+            if factor > PCM_AT_0DBFS {
+                info!(
+                    "Lowering gain by {:.2} dB for the duration of this track to avoid potentially exceeding dBFS.",
+                    ratio_to_db(factor)
+                );
 
-            if config.normalisation_method == NormalisationMethod::Basic {
-                warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
-                normalisation_factor = limited_normalisation_factor;
+                PCM_AT_0DBFS
             } else {
+                factor
+            }
+        } else {
+            // For Dynamic Normalisation it's up to the player to decide,
+            // factor = ratio of (ReplayGain + PreGain).
+            // We then let the dynamic limiter handle gain reduction.
+            let factor = db_to_ratio(gain_db + config.normalisation_pregain_db);
+            let threshold_ratio = db_to_ratio(config.normalisation_threshold_dbfs);
+
+            if factor > PCM_AT_0DBFS {
+                let factor_db = gain_db + config.normalisation_pregain_db;
+                let limiting_db = factor_db + config.normalisation_threshold_dbfs.abs();
+
                 warn!(
-                    "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
-                    normalisation_power - limited_normalisation_power
+                    "This track may exceed dBFS by {:.2} dB and be subject to {:.2} dB of dynamic limiting at it's peak.",
+                    factor_db, limiting_db
+                );
+            } else if factor > threshold_ratio {
+                let limiting_db = gain_db
+                    + config.normalisation_pregain_db
+                    + config.normalisation_threshold_dbfs.abs();
+
+                info!(
+                    "This track may be subject to {:.2} dB of dynamic limiting at it's peak.",
+                    limiting_db
                 );
             }
 
-            warn!("Please lower pregain to avoid.");
-        }
+            factor
+        };
 
         debug!("Normalisation Data: {:?}", data);
         debug!(
@@ -1438,54 +1469,60 @@ impl PlayerInternal {
                                 // Engineering Society, 60, 399-408.
                                 if self.config.normalisation_method == NormalisationMethod::Dynamic
                                 {
-                                    // steps 1 + 2: half-wave rectification and conversion into dB
-                                    let abs_sample_db = ratio_to_db(sample.abs());
+                                    // Some tracks have samples that are precisely 0.0. That's silence
+                                    // and we know we don't need to limit that, in which we can spare
+                                    // the CPU cycles.
+                                    //
+                                    // Also, calling `ratio_to_db(0.0)` returns `inf` and would get the
+                                    // peak detector stuck. Also catch the unlikely case where a sample
+                                    // is decoded as `NaN` or some other non-normal value.
+                                    let limiter_db = if sample.is_normal() {
+                                        // step 1-2: half-wave rectification and conversion into dB
+                                        let abs_sample_db = ratio_to_db(sample.abs());
 
-                                    // Some tracks have samples that are precisely 0.0, but ratio_to_db(0.0)
-                                    // returns -inf and gets the peak detector stuck.
-                                    if !abs_sample_db.is_normal() {
-                                        continue;
-                                    }
+                                        // step 3-4: gain computer with soft knee and subtractor
+                                        let bias_db = abs_sample_db - threshold_db;
+                                        let knee_boundary_db = bias_db * 2.0;
 
-                                    // step 3: gain computer with soft knee
-                                    let biased_sample = abs_sample_db - threshold_db;
-                                    let limited_sample = if 2.0 * biased_sample < -knee_db {
-                                        abs_sample_db
-                                    } else if 2.0 * biased_sample.abs() <= knee_db {
-                                        abs_sample_db
-                                            - (biased_sample + knee_db / 2.0).powi(2)
-                                                / (2.0 * knee_db)
+                                        if knee_boundary_db < -knee_db {
+                                            0.0
+                                        } else if knee_boundary_db.abs() <= knee_db {
+                                            abs_sample_db
+                                                - (abs_sample_db
+                                                    - (bias_db + knee_db / 2.0).powi(2)
+                                                        / (2.0 * knee_db))
+                                        } else {
+                                            abs_sample_db - threshold_db
+                                        }
                                     } else {
-                                        threshold_db as f64
+                                        0.0
                                     };
 
-                                    // step 4: subtractor
-                                    let limiter_input = abs_sample_db - limited_sample;
-
-                                    // Spare the CPU unless the limiter is active or we are riding a peak.
-                                    if !(limiter_input > 0.0
+                                    // Spare the CPU unless (1) the limiter is engaged, (2) we
+                                    // were in attack or (3) we were in release, and that attack/
+                                    // release wasn't finished yet.
+                                    if limiter_db > 0.0
                                         || self.normalisation_integrator > 0.0
-                                        || self.normalisation_peak > 0.0)
+                                        || self.normalisation_peak > 0.0
                                     {
-                                        continue;
+                                        // step 5: smooth, decoupled peak detector
+                                        self.normalisation_integrator = f64::max(
+                                            limiter_db,
+                                            release_cf * self.normalisation_integrator
+                                                + (1.0 - release_cf) * limiter_db,
+                                        );
+                                        self.normalisation_peak = attack_cf
+                                            * self.normalisation_peak
+                                            + (1.0 - attack_cf) * self.normalisation_integrator;
+
+                                        // step 6: make-up gain applied later (volume attenuation)
+                                        // Applying the standard normalisation factor here won't work,
+                                        // because there are tracks with peaks as high as 6 dB above
+                                        // the default threshold, so that would clip.
+
+                                        // steps 7-8: conversion into level and multiplication into gain stage
+                                        *sample *= db_to_ratio(-self.normalisation_peak);
                                     }
-
-                                    // step 5: smooth, decoupled peak detector
-                                    self.normalisation_integrator = f64::max(
-                                        limiter_input,
-                                        release_cf * self.normalisation_integrator
-                                            + (1.0 - release_cf) * limiter_input,
-                                    );
-                                    self.normalisation_peak = attack_cf * self.normalisation_peak
-                                        + (1.0 - attack_cf) * self.normalisation_integrator;
-
-                                    // step 6: make-up gain applied later (volume attenuation)
-                                    // Applying the standard normalisation factor here won't work,
-                                    // because there are tracks with peaks as high as 6 dB above
-                                    // the default threshold, so that would clip.
-
-                                    // steps 7-8: conversion into level and multiplication into gain stage
-                                    *sample *= db_to_ratio(-self.normalisation_peak);
                                 }
                             }
                         }

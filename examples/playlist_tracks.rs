@@ -19,11 +19,13 @@ async fn main() {
     }
     let credentials = Credentials::with_password(&args[1], &args[2]);
 
-    let uri_split = args[3].split(':');
-    let uri_parts: Vec<&str> = uri_split.collect();
-    println!("{}, {}, {}", uri_parts[0], uri_parts[1], uri_parts[2]);
-
-    let plist_uri = SpotifyId::from_base62(uri_parts[2]).unwrap();
+    let plist_uri = SpotifyId::from_uri(&args[3]).unwrap_or_else(|_| {
+        eprintln!(
+            "PLAYLIST should be a playlist URI such as: \
+                \"spotify:playlist:37i9dQZF1DXec50AjHrNTq\""
+        );
+        exit(1);
+    });
 
     let session = Session::new(session_config, None);
     if let Err(e) = session.connect(credentials).await {
