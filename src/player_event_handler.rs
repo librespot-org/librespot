@@ -1,14 +1,16 @@
-use librespot::playback::player::PlayerEvent;
-use librespot::playback::player::SinkStatus;
 use log::info;
+
+use std::{
+    collections::HashMap,
+    io::{Error, ErrorKind, Result},
+    process::{Command, ExitStatus},
+};
+
 use tokio::process::{Child as AsyncChild, Command as AsyncCommand};
 
-use std::collections::HashMap;
-use std::io;
-use std::io::{Error, ErrorKind};
-use std::process::{Command, ExitStatus};
+use librespot::playback::player::{PlayerEvent, SinkStatus};
 
-pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Result<AsyncChild>> {
+pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<Result<AsyncChild>> {
     let mut env_vars = HashMap::new();
     match event {
         PlayerEvent::Changed {
@@ -68,7 +70,7 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
             Err(_) => {
                 return Some(Err(Error::new(
                     ErrorKind::InvalidData,
-                    "PlayerEvent::Playing: Invalid track id: {}",
+                    "PlayerEvent::Playing: Invalid track id",
                 )))
             }
             Ok(id) => {
@@ -101,7 +103,7 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
             Err(_) => {
                 return Some(Err(Error::new(
                     ErrorKind::InvalidData,
-                    "PlayerEvent::Preloading: Invalid track id:",
+                    "PlayerEvent::Preloading: Invalid track id",
                 )))
             }
             Ok(id) => {
@@ -126,7 +128,7 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<io::Re
     )
 }
 
-pub fn emit_sink_event(sink_status: SinkStatus, onevent: &str) -> io::Result<ExitStatus> {
+pub fn emit_sink_event(sink_status: SinkStatus, onevent: &str) -> Result<ExitStatus> {
     let mut env_vars = HashMap::new();
     env_vars.insert("PLAYER_EVENT", "sink".to_string());
     let sink_status = match sink_status {
