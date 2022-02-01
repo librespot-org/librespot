@@ -55,7 +55,8 @@ impl Open for GstreamerSink {
             .dynamic_cast::<gst::Pipeline>()
             .expect("couldn't cast pipeline element at runtime!");
         let bus = pipeline.bus().expect("couldn't get bus from pipeline");
-        let mainloop = glib::MainLoop::new(None, false);
+        let maincontext = glib::MainContext::new();
+        let mainloop = glib::MainLoop::new(Some(&maincontext), false);
         let appsrce: gst::Element = pipeline
             .by_name("appsrc0")
             .expect("couldn't get appsrc from pipeline");
