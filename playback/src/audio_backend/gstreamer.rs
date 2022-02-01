@@ -13,7 +13,6 @@ use crate::{
     config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS, SAMPLE_RATE,
 };
 
-#[allow(dead_code)]
 pub struct GstreamerSink {
     appsrc: gst_app::AppSrc,
     bufferpool: gst::BufferPool,
@@ -41,31 +40,33 @@ impl Open for GstreamerSink {
         let sample_size = format.size();
         let gst_bytes = NUM_CHANNELS as usize * 1024 * sample_size;
 
-        let pipeline_str_preamble = "appsrc block=true name=appsrc0 ";
-        // no need to dither twice; use librespot dithering instead
-        let pipeline_str_rest = r#" ! audioconvert dithering=none ! autoaudiosink"#;
-        let pipeline_str: String = match device {
-            Some(x) => format!("{}{}", pipeline_str_preamble, x),
-            None => format!("{}{}", pipeline_str_preamble, pipeline_str_rest),
-        };
-        info!("Pipeline: {}", pipeline_str);
+        let pipeline = gst::Pipeline::new(None);
+        let appsrc = gst::ElementFactory::make("appsrc", None)
+            .expect("Failed to create GStreamer appsrc element")
+            .downcast::<gst_app::AppSrc>()
+            .expect("couldn't cast AppSrc element at runtime!");
+        appsrc.set_caps(Some(&gst_caps));
+        appsrc.set_max_bytes(gst_bytes as u64);
+        appsrc.set_block(true);
 
-        let pipelinee = gst::parse_launch(&*pipeline_str).expect("Couldn't launch pipeline; likely a GStreamer issue or an error in the pipeline string you specified in the 'device' argument to librespot.");
-        let pipeline = pipelinee
-            .dynamic_cast::<gst::Pipeline>()
-            .expect("couldn't cast pipeline element at runtime!");
+        let sink = match device {
+            None => {
+                // no need to dither twice; use librespot dithering instead
+                gst::parse_bin_from_description("audioconvert dithering=none ! autoaudiosink", true)
+                    .expect("Failed to create default GStreamer sink")
+            },
+            Some(ref x) => {
+                gst::parse_bin_from_description(x, true)
+                    .expect("Failed to create custom GStreamer sink")
+            }
+        };
+        pipeline.add(&appsrc).expect("Failed to add GStreamer appsrc to pipeline");
+        pipeline.add(&sink).expect("Failed to add GStreamer sink to pipeline");
+        appsrc.link(&sink).expect("Failed to link GStreamer source to sink");
+
         let bus = pipeline.bus().expect("couldn't get bus from pipeline");
         let maincontext = glib::MainContext::new();
         let mainloop = glib::MainLoop::new(Some(&maincontext), false);
-        let appsrce: gst::Element = pipeline
-            .by_name("appsrc0")
-            .expect("couldn't get appsrc from pipeline");
-        let appsrc: gst_app::AppSrc = appsrce
-            .dynamic_cast::<gst_app::AppSrc>()
-            .expect("couldn't cast AppSrc element at runtime!");
-
-        appsrc.set_caps(Some(&gst_caps));
-        appsrc.set_max_bytes(gst_bytes as u64);
 
         let bufferpool = gst::BufferPool::new();
 
