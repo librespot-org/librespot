@@ -31,6 +31,7 @@ use crate::{MS_PER_PAGE, NUM_CHANNELS, PAGES_PER_MS, SAMPLES_PER_SECOND};
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
+pub const PCM_AT_0DBFS: f64 = 1.0;
 
 pub struct Player {
     commands: Option<mpsc::UnboundedSender<PlayerCommand>>,
@@ -251,26 +252,57 @@ impl NormalisationData {
             (data.track_gain_db, data.track_peak)
         };
 
-        let normalisation_power = gain_db + config.normalisation_pregain_db;
-        let mut normalisation_factor = db_to_ratio(normalisation_power);
+        // As per the ReplayGain 1.0 & 2.0 (proposed) spec:
+        // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_1.0_specification#Clipping_prevention
+        // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_2.0_specification#Clipping_prevention
+        let normalisation_factor = if config.normalisation_method == NormalisationMethod::Basic {
+            // For Basic Normalisation, factor = min(ratio of (ReplayGain + PreGain), 1.0 / peak level).
+            // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_1.0_specification#Peak_amplitude
+            // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_2.0_specification#Peak_amplitude
+            // We then limit that to 1.0 as not to exceed dBFS (0.0 dB).
+            let factor = f64::min(
+                db_to_ratio(gain_db + config.normalisation_pregain_db),
+                PCM_AT_0DBFS / gain_peak,
+            );
 
-        if normalisation_power + ratio_to_db(gain_peak) > config.normalisation_threshold_dbfs {
-            let limited_normalisation_factor =
-                db_to_ratio(config.normalisation_threshold_dbfs) / gain_peak;
-            let limited_normalisation_power = ratio_to_db(limited_normalisation_factor);
+            if factor > PCM_AT_0DBFS {
+                info!(
+                    "Lowering gain by {:.2} dB for the duration of this track to avoid potentially exceeding dBFS.",
+                    ratio_to_db(factor)
+                );
 
-            if config.normalisation_method == NormalisationMethod::Basic {
-                warn!("Limiting gain to {:.2} dB for the duration of this track to stay under normalisation threshold.", limited_normalisation_power);
-                normalisation_factor = limited_normalisation_factor;
+                PCM_AT_0DBFS
             } else {
+                factor
+            }
+        } else {
+            // For Dynamic Normalisation it's up to the player to decide,
+            // factor = ratio of (ReplayGain + PreGain).
+            // We then let the dynamic limiter handle gain reduction.
+            let factor = db_to_ratio(gain_db + config.normalisation_pregain_db);
+            let threshold_ratio = db_to_ratio(config.normalisation_threshold_dbfs);
+
+            if factor > PCM_AT_0DBFS {
+                let factor_db = gain_db + config.normalisation_pregain_db;
+                let limiting_db = factor_db + config.normalisation_threshold_dbfs.abs();
+
                 warn!(
-                    "This track will at its peak be subject to {:.2} dB of dynamic limiting.",
-                    normalisation_power - limited_normalisation_power
+                    "This track may exceed dBFS by {:.2} dB and be subject to {:.2} dB of dynamic limiting at it's peak.",
+                    factor_db, limiting_db
+                );
+            } else if factor > threshold_ratio {
+                let limiting_db = gain_db
+                    + config.normalisation_pregain_db
+                    + config.normalisation_threshold_dbfs.abs();
+
+                info!(
+                    "This track may be subject to {:.2} dB of dynamic limiting at it's peak.",
+                    limiting_db
                 );
             }
 
-            warn!("Please lower pregain to avoid.");
-        }
+            factor
+        };
 
         debug!("Normalisation Data: {:?}", data);
         debug!(

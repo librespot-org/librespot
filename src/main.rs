@@ -1293,12 +1293,7 @@ fn get_setup() -> Setup {
             normalisation_method = opt_str(NORMALISATION_METHOD)
                 .as_deref()
                 .map(|method| {
-                    warn!(
-                        "`--{}` / `-{}` will be deprecated in a future release.",
-                        NORMALISATION_METHOD, NORMALISATION_METHOD_SHORT
-                    );
-
-                    let method = NormalisationMethod::from_str(method).unwrap_or_else(|_| {
+                    NormalisationMethod::from_str(method).unwrap_or_else(|_| {
                         invalid_error_msg(
                             NORMALISATION_METHOD,
                             NORMALISATION_METHOD_SHORT,
@@ -1308,16 +1303,7 @@ fn get_setup() -> Setup {
                         );
 
                         exit(1);
-                    });
-
-                    if matches!(method, NormalisationMethod::Basic) {
-                        warn!(
-                            "`--{}` / `-{}` {:?} will be deprecated in a future release.",
-                            NORMALISATION_METHOD, NORMALISATION_METHOD_SHORT, method
-                        );
-                    }
-
-                    method
+                    })
                 })
                 .unwrap_or(player_default_config.normalisation_method);
 

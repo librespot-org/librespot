@@ -84,7 +84,7 @@ impl Mixer for AlsaMixer {
                     warn!("Alsa rounding error detected, setting maximum dB to {:.2} instead of {:.2}", ZERO_DB.to_db(), max_millibel.to_db());
                     max_millibel = ZERO_DB;
                 } else {
-                    warn!("Please manually set with `--volume-ctrl` if this is incorrect");
+                    warn!("Please manually set `--volume-range` if this is incorrect");
                 }
             }
             (min_millibel, max_millibel)
@@ -104,12 +104,23 @@ impl Mixer for AlsaMixer {
 
         let min_db = min_millibel.to_db() as f64;
         let max_db = max_millibel.to_db() as f64;
-        let db_range = f64::abs(max_db - min_db);
+        let mut db_range = f64::abs(max_db - min_db);
 
         // Synchronize the volume control dB range with the mixer control,
         // unless it was already set with a command line option.
         if !config.volume_ctrl.range_ok() {
+            if db_range > 100.0 {
+                debug!("Alsa mixer reported dB range > 100, which is suspect");
+                warn!("Please manually set `--volume-range` if this is incorrect");
+            }
             config.volume_ctrl.set_db_range(db_range);
+        } else {
+            let db_range_override = config.volume_ctrl.db_range();
+            debug!(
+                "Alsa dB volume range was detected as {} but overridden as {}",
+                db_range, db_range_override
+            );
+            db_range = db_range_override;
         }
 
         // For hardware controls with a small range (24 dB or less),
