@@ -36,6 +36,7 @@ jack            = { version = "0.8", optional = true }
 sdl2            = { version = "0.35", optional = true }
 gst             = { package = "gstreamer", version = "0.18", optional = true }
 gst-app         = { package = "gstreamer-app", version = "0.18", optional = true }
+gst-audio       = { package = "gstreamer-audio", version = "0.18", optional = true }
 glib            = { version = "0.15", optional = true }
 
 # Rodio dependencies
@@ -60,6 +61,6 @@ jackaudio-backend = ["jack"]
 rodio-backend = ["rodio", "cpal"]
 rodiojack-backend = ["rodio", "cpal/jack"]
 sdl-backend = ["sdl2"]
-gstreamer-backend = ["gst", "gst-app", "glib"]
+gstreamer-backend = ["gst", "gst-app", "gst-audio", "glib"]
 
 passthrough-decoder = ["ogg"]
