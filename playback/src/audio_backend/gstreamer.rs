@@ -29,11 +29,13 @@ impl Open for GstreamerSink {
             AudioFormat::F32 => gst_audio::AUDIO_FORMAT_F32,
             AudioFormat::S32 => gst_audio::AUDIO_FORMAT_S32,
             AudioFormat::S24 => gst_audio::AUDIO_FORMAT_S2432,
-            AudioFormat::S24_3 =>  gst_audio::AUDIO_FORMAT_S24,
+            AudioFormat::S24_3 => gst_audio::AUDIO_FORMAT_S24,
             AudioFormat::S16 => gst_audio::AUDIO_FORMAT_S16,
         };
 
-        let gst_info = gst_audio::AudioInfo::builder(gst_format, SAMPLE_RATE, NUM_CHANNELS as u32).build().expect("Failed to create GStreamer audio format");
+        let gst_info = gst_audio::AudioInfo::builder(gst_format, SAMPLE_RATE, NUM_CHANNELS as u32)
+            .build()
+            .expect("Failed to create GStreamer audio format");
         let gst_caps = gst_info.to_caps().expect("Failed to create GStreamer caps");
 
         let sample_size = format.size();
@@ -51,17 +53,24 @@ impl Open for GstreamerSink {
         let sink = match device {
             None => {
                 // no need to dither twice; use librespot dithering instead
-                gst::parse_bin_from_description("audioconvert dithering=none ! audioresample ! autoaudiosink", true)
-                    .expect("Failed to create default GStreamer sink")
-            },
-            Some(ref x) => {
-                gst::parse_bin_from_description(x, true)
-                    .expect("Failed to create custom GStreamer sink")
+                gst::parse_bin_from_description(
+                    "audioconvert dithering=none ! audioresample ! autoaudiosink",
+                    true,
+                )
+                .expect("Failed to create default GStreamer sink")
             }
+            Some(ref x) => gst::parse_bin_from_description(x, true)
+                .expect("Failed to create custom GStreamer sink"),
         };
-        pipeline.add(&appsrc).expect("Failed to add GStreamer appsrc to pipeline");
-        pipeline.add(&sink).expect("Failed to add GStreamer sink to pipeline");
-        appsrc.link(&sink).expect("Failed to link GStreamer source to sink");
+        pipeline
+            .add(&appsrc)
+            .expect("Failed to add GStreamer appsrc to pipeline");
+        pipeline
+            .add(&sink)
+            .expect("Failed to add GStreamer sink to pipeline");
+        appsrc
+            .link(&sink)
+            .expect("Failed to link GStreamer source to sink");
 
         let bus = pipeline.bus().expect("couldn't get bus from pipeline");
         let maincontext = glib::MainContext::new();
