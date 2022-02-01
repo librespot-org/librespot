@@ -52,7 +52,7 @@ impl Open for GstreamerSink {
         let sink = match device {
             None => {
                 // no need to dither twice; use librespot dithering instead
-                gst::parse_bin_from_description("audioconvert dithering=none ! autoaudiosink", true)
+                gst::parse_bin_from_description("audioconvert dithering=none ! audioresample ! autoaudiosink", true)
                     .expect("Failed to create default GStreamer sink")
             },
             Some(ref x) => {
