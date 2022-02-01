@@ -143,9 +143,6 @@ impl Sink for GstreamerSink {
 
 impl Drop for GstreamerSink {
     fn drop(&mut self) {
-        // Follow the state transitions documented at:
-        // https://gstreamer.freedesktop.org/documentation/additional/design/states.html?gi-language=c
-        let _ = self.pipeline.set_state(State::Ready);
         let _ = self.pipeline.set_state(State::Null);
     }
 }
