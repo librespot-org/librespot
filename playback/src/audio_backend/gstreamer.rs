@@ -1,5 +1,3 @@
-use std::{ops::Drop, thread};
-
 use gst::{
     event::{FlushStart, FlushStop},
     prelude::*,
@@ -73,8 +71,6 @@ impl Open for GstreamerSink {
             .expect("Failed to link GStreamer source to sink");
 
         let bus = pipeline.bus().expect("couldn't get bus from pipeline");
-        let maincontext = glib::MainContext::new();
-        let mainloop = glib::MainLoop::new(Some(&maincontext), false);
 
         let bufferpool = gst::BufferPool::new();
 
@@ -84,31 +80,23 @@ impl Open for GstreamerSink {
             .set_config(conf)
             .expect("couldn't configure the buffer pool");
 
-        thread::spawn(move || {
-            let thread_mainloop = mainloop;
-            let watch_mainloop = thread_mainloop.clone();
-            bus.add_watch(move |_, msg| {
-                match msg.view() {
-                    gst::MessageView::Eos(_) => {
-                        println!("gst signaled end of stream");
-                        watch_mainloop.quit();
-                    }
-                    gst::MessageView::Error(err) => {
-                        println!(
-                            "Error from {:?}: {} ({:?})",
-                            err.src().map(|s| s.path_string()),
-                            err.error(),
-                            err.debug()
-                        );
-                        watch_mainloop.quit();
-                    }
-                    _ => (),
-                };
+        bus.set_sync_handler(move |_bus, msg| {
+            match msg.view() {
+                gst::MessageView::Eos(_) => {
+                    println!("gst signaled end of stream");
+                }
+                gst::MessageView::Error(err) => {
+                    println!(
+                        "Error from {:?}: {} ({:?})",
+                        err.src().map(|s| s.path_string()),
+                        err.error(),
+                        err.debug()
+                    );
+                }
+                _ => (),
+            }
 
-                glib::Continue(true)
-            })
-            .expect("failed to add bus watch");
-            thread_mainloop.run();
+            gst::BusSyncReply::Drop
         });
 
         pipeline
