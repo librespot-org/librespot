@@ -52,7 +52,6 @@ impl Open for GstreamerSink {
         };
         info!("Pipeline: {}", pipeline_str);
 
-        gst::init().unwrap();
         let pipelinee = gst::parse_launch(&*pipeline_str).expect("Couldn't launch pipeline; likely a GStreamer issue or an error in the pipeline string you specified in the 'device' argument to librespot.");
         let pipeline = pipelinee
             .dynamic_cast::<gst::Pipeline>()
