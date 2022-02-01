@@ -5,7 +5,6 @@ use gst::{
     prelude::*,
     State,
 };
-use zerocopy::AsBytes;
 
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 
@@ -158,7 +157,7 @@ impl SinkAsBytes for GstreamerSink {
         let mutbuf = buffer.make_mut();
         mutbuf.set_size(data.len());
         mutbuf
-            .copy_from_slice(0, data.as_bytes())
+            .copy_from_slice(0, data)
             .expect("Failed to copy from slice");
 
         self.appsrc
