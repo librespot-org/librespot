@@ -26,24 +26,22 @@ impl Open for GstreamerSink {
         info!("Using GStreamer sink with format: {:?}", format);
         gst::init().expect("failed to init GStreamer!");
 
-        // GStreamer calls S24 and S24_3 different from the rest of the world
         let gst_format = match format {
-            AudioFormat::S24 => "S24_32".to_string(),
-            AudioFormat::S24_3 => "S24".to_string(),
-            _ => format!("{:?}", format),
+            AudioFormat::F64 => gst_audio::AUDIO_FORMAT_F64,
+            AudioFormat::F32 => gst_audio::AUDIO_FORMAT_F32,
+            AudioFormat::S32 => gst_audio::AUDIO_FORMAT_S32,
+            AudioFormat::S24 => gst_audio::AUDIO_FORMAT_S2432,
+            AudioFormat::S24_3 =>  gst_audio::AUDIO_FORMAT_S24,
+            AudioFormat::S16 => gst_audio::AUDIO_FORMAT_S16,
         };
+
+        let gst_info = gst_audio::AudioInfo::builder(gst_format, SAMPLE_RATE, NUM_CHANNELS as u32).build().expect("Failed to create GStreamer audio format");
+        let gst_caps = gst_info.to_caps().expect("Failed to create GStreamer caps");
+
         let sample_size = format.size();
         let gst_bytes = NUM_CHANNELS as usize * 1024 * sample_size;
 
-        #[cfg(target_endian = "little")]
-        const ENDIANNESS: &str = "LE";
-        #[cfg(target_endian = "big")]
-        const ENDIANNESS: &str = "BE";
-
-        let pipeline_str_preamble = format!(
-            "appsrc caps=\"audio/x-raw,format={}{},layout=interleaved,channels={},rate={}\" block=true max-bytes={} name=appsrc0 ",
-            gst_format, ENDIANNESS, NUM_CHANNELS, SAMPLE_RATE, gst_bytes
-        );
+        let pipeline_str_preamble = "appsrc block=true name=appsrc0 ";
         // no need to dither twice; use librespot dithering instead
         let pipeline_str_rest = r#" ! audioconvert dithering=none ! autoaudiosink"#;
         let pipeline_str: String = match device {
@@ -64,12 +62,14 @@ impl Open for GstreamerSink {
         let appsrc: gst_app::AppSrc = appsrce
             .dynamic_cast::<gst_app::AppSrc>()
             .expect("couldn't cast AppSrc element at runtime!");
-        let appsrc_caps = appsrc.caps().expect("couldn't get appsrc caps");
+
+        appsrc.set_caps(Some(&gst_caps));
+        appsrc.set_max_bytes(gst_bytes as u64);
 
         let bufferpool = gst::BufferPool::new();
 
         let mut conf = bufferpool.config();
-        conf.set_params(Some(&appsrc_caps), gst_bytes as u32, 0, 0);
+        conf.set_params(Some(&gst_caps), gst_bytes as u32, 0, 0);
         bufferpool
             .set_config(conf)
             .expect("couldn't configure the buffer pool");
