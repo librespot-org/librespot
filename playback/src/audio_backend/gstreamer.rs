@@ -1,8 +1,5 @@
 use std::{ops::Drop, thread};
 
-use gstreamer as gst;
-use gstreamer_app as gst_app;
-
 use gst::{
     event::{FlushStart, FlushStop},
     prelude::*,
