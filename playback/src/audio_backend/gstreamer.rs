@@ -117,7 +117,7 @@ impl Sink for GstreamerSink {
         self.appsrc.send_event(FlushStop::new(true));
         self.bufferpool
             .set_active(true)
-            .expect("couldn't activate buffer pool");
+            .map_err(|e| SinkError::StateChange(e.to_string()))?;
         self.pipeline
             .set_state(State::Playing)
             .map_err(|e| SinkError::StateChange(e.to_string()))?;
@@ -131,7 +131,7 @@ impl Sink for GstreamerSink {
             .map_err(|e| SinkError::StateChange(e.to_string()))?;
         self.bufferpool
             .set_active(false)
-            .expect("couldn't deactivate buffer pool");
+            .map_err(|e| SinkError::StateChange(e.to_string()))?;
         Ok(())
     }
 
@@ -155,7 +155,7 @@ impl SinkAsBytes for GstreamerSink {
         mutbuf.set_size(data.len());
         mutbuf
             .copy_from_slice(0, data)
-            .expect("Failed to copy from slice");
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
 
         self.appsrc
             .push_buffer(buffer)
