@@ -4,6 +4,8 @@ use gst::{
     State,
 };
 
+use std::sync::{Arc, Mutex};
+
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 
 use crate::{
@@ -15,6 +17,7 @@ pub struct GstreamerSink {
     bufferpool: gst::BufferPool,
     pipeline: gst::Pipeline,
     format: AudioFormat,
+    async_error: Arc<Mutex<Option<String>>>,
 }
 
 impl Open for GstreamerSink {
@@ -80,10 +83,16 @@ impl Open for GstreamerSink {
             .set_config(conf)
             .expect("couldn't configure the buffer pool");
 
+        let async_error = Arc::new(Mutex::new(None));
+        let async_error_clone = async_error.clone();
+
         bus.set_sync_handler(move |_bus, msg| {
             match msg.view() {
                 gst::MessageView::Eos(_) => {
                     println!("gst signaled end of stream");
+
+                    let mut async_error_storage = async_error_clone.lock().unwrap();
+                    *async_error_storage = Some(String::from("gst signaled end of stream"));
                 }
                 gst::MessageView::Error(err) => {
                     println!(
@@ -92,6 +101,14 @@ impl Open for GstreamerSink {
                         err.error(),
                         err.debug()
                     );
+
+                    let mut async_error_storage = async_error_clone.lock().unwrap();
+                    *async_error_storage = Some(format!(
+                        "Error from {:?}: {} ({:?})",
+                        err.src().map(|s| s.path_string()),
+                        err.error(),
+                        err.debug()
+                    ));
                 }
                 _ => (),
             }
@@ -108,12 +125,14 @@ impl Open for GstreamerSink {
             bufferpool,
             pipeline,
             format,
+            async_error,
         }
     }
 }
 
 impl Sink for GstreamerSink {
     fn start(&mut self) -> SinkResult<()> {
+        *self.async_error.lock().unwrap() = None;
         self.appsrc.send_event(FlushStop::new(true));
         self.bufferpool
             .set_active(true)
@@ -125,6 +144,7 @@ impl Sink for GstreamerSink {
     }
 
     fn stop(&mut self) -> SinkResult<()> {
+        *self.async_error.lock().unwrap() = None;
         self.appsrc.send_event(FlushStart::new());
         self.pipeline
             .set_state(State::Paused)
@@ -146,6 +166,10 @@ impl Drop for GstreamerSink {
 
 impl SinkAsBytes for GstreamerSink {
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
+        if let Some(async_error) = &*self.async_error.lock().unwrap() {
+            return Err(SinkError::OnWrite(async_error.to_string()));
+        }
+
         let mut buffer = self
             .bufferpool
             .acquire_buffer(None)
