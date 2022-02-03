@@ -2210,7 +2210,7 @@ impl<T: Read + Seek> Seek for Subfile<T> {
 
 impl<R> MediaSource for Subfile<R>
 where
-    R: Read + Seek + Send,
+    R: Read + Seek + Send + Sync,
 {
     fn is_seekable(&self) -> bool {
         true

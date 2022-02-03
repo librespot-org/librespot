@@ -5,7 +5,7 @@ use symphonia::{
         audio::SampleBuffer,
         codecs::{Decoder, DecoderOptions},
         errors::Error,
-        formats::{FormatReader, SeekMode, SeekTo},
+        formats::{FormatOptions, FormatReader, SeekMode, SeekTo},
         io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
         meta::{StandardTagKey, Value},
         units::Time,
@@ -40,7 +40,11 @@ impl SymphoniaDecoder {
         };
         let mss = MediaSourceStream::new(Box::new(input), mss_opts);
 
-        let format_opts = Default::default();
+        let format_opts = FormatOptions {
+            enable_gapless: true,
+            ..Default::default()
+        };
+
         let format: Box<dyn FormatReader> = if AudioFiles::is_ogg_vorbis(file_format) {
             Box::new(OggReader::try_new(mss, &format_opts)?)
         } else if AudioFiles::is_mp3(file_format) {
@@ -188,7 +192,7 @@ impl AudioDecoder for SymphoniaDecoder {
                 }
             };
 
-            let position_ms = self.ts_to_ms(packet.pts());
+            let position_ms = self.ts_to_ms(packet.ts());
             let packet_position = AudioPacketPosition {
                 position_ms,
                 skipped,
