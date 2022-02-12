@@ -760,7 +760,16 @@ impl PlayerTrackLoader {
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
         let audio = match AudioItem::get_audio_item(&self.session, spotify_id).await {
-            Ok(audio) => audio,
+            Ok(audio) => match self.find_available_alternative(audio).await {
+                Some(audio) => audio,
+                None => {
+                    warn!(
+                        "<{}> is not available",
+                        spotify_id.to_uri().unwrap_or_default()
+                    );
+                    return None;
+                }
+            },
             Err(e) => {
                 error!("Unable to load audio item: {:?}", e);
                 return None;
@@ -768,17 +777,6 @@ impl PlayerTrackLoader {
         };
 
         info!("Loading <{}> with Spotify URI <{}>", audio.name, audio.uri);
-
-        let audio = match self.find_available_alternative(audio).await {
-            Some(audio) => audio,
-            None => {
-                warn!(
-                    "<{}> is not available",
-                    spotify_id.to_uri().unwrap_or_default()
-                );
-                return None;
-            }
-        };
 
         if audio.duration < 0 {
             error!(
@@ -809,26 +807,24 @@ impl PlayerTrackLoader {
             ],
         };
 
-        let entry = formats.iter().find_map(|format| {
-            if let Some(&file_id) = audio.files.get(format) {
-                Some((*format, file_id))
-            } else {
-                None
-            }
-        });
-
-        let (format, file_id) = match entry {
-            Some(t) => t,
-            None => {
-                warn!("<{}> is not available in any supported format", audio.name);
-                return None;
-            }
-        };
+        let (format, file_id) =
+            match formats
+                .iter()
+                .find_map(|format| match audio.files.get(format) {
+                    Some(&file_id) => Some((*format, file_id)),
+                    _ => None,
+                }) {
+                Some(t) => t,
+                None => {
+                    warn!("<{}> is not available in any supported format", audio.name);
+                    return None;
+                }
+            };
 
         let bytes_per_second = self.stream_data_rate(format);
         let play_from_beginning = position_ms == 0;
 
-        // This is only a loop to be able to reload the file if an error occured
+        // This is only a loop to be able to reload the file if an error occurred
         // while opening a cached file.
         loop {
             let encrypted_file = AudioFile::open(
@@ -1916,15 +1912,8 @@ impl PlayerInternal {
     }
 
     fn send_event(&mut self, event: PlayerEvent) {
-        let mut index = 0;
-        while index < self.event_senders.len() {
-            match self.event_senders[index].send(event.clone()) {
-                Ok(_) => index += 1,
-                Err(_) => {
-                    self.event_senders.remove(index);
-                }
-            }
-        }
+        self.event_senders
+            .retain(|sender| sender.send(event.clone()).is_ok());
     }
 
     fn load_track(
@@ -2098,10 +2087,7 @@ impl<T: Read + Seek> Seek for Subfile<T> {
         };
 
         let newpos = self.stream.seek(pos)?;
-        if newpos > self.offset {
-            Ok(newpos - self.offset)
-        } else {
-            Ok(0)
-        }
+
+        Ok(newpos.saturating_sub(self.offset))
     }
 }
