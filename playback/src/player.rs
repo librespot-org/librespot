@@ -823,7 +823,16 @@ impl PlayerTrackLoader {
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
         let audio = match AudioItem::get_file(&self.session, spotify_id).await {
-            Ok(audio) => audio,
+            Ok(audio) => match self.find_available_alternative(audio).await {
+                Some(audio) => audio,
+                None => {
+                    warn!(
+                        "<{}> is not available",
+                        spotify_id.to_uri().unwrap_or_default()
+                    );
+                    return None;
+                }
+            },
             Err(e) => {
                 error!("Unable to load audio item: {:?}", e);
                 return None;
@@ -836,6 +845,7 @@ impl PlayerTrackLoader {
         );
 
         let is_explicit = audio.is_explicit;
+
         if is_explicit {
             if let Some(value) = self.session.get_user_attribute("filter-explicit-content") {
                 if &value == "1" {
@@ -845,17 +855,6 @@ impl PlayerTrackLoader {
             }
         }
 
-        let audio = match self.find_available_alternative(audio).await {
-            Some(audio) => audio,
-            None => {
-                error!(
-                    "<{}> is not available",
-                    spotify_id.to_uri().unwrap_or_default()
-                );
-                return None;
-            }
-        };
-
         if audio.duration < 0 {
             error!(
                 "Track duration for <{}> cannot be {}",
@@ -864,6 +863,7 @@ impl PlayerTrackLoader {
             );
             return None;
         }
+
         let duration_ms = audio.duration as u32;
 
         // (Most) podcasts seem to support only 96 kbps Ogg Vorbis, so fall back to it
@@ -897,25 +897,23 @@ impl PlayerTrackLoader {
             ],
         };
 
-        let entry = formats.iter().find_map(|format| {
-            if let Some(&file_id) = audio.files.get(format) {
-                Some((*format, file_id))
-            } else {
-                None
-            }
-        });
-
-        let (format, file_id) = match entry {
-            Some(t) => t,
-            None => {
-                error!("<{}> is not available in any supported format", audio.name);
-                return None;
-            }
-        };
+        let (format, file_id) =
+            match formats
+                .iter()
+                .find_map(|format| match audio.files.get(format) {
+                    Some(&file_id) => Some((*format, file_id)),
+                    _ => None,
+                }) {
+                Some(t) => t,
+                None => {
+                    warn!("<{}> is not available in any supported format", audio.name);
+                    return None;
+                }
+            };
 
         let bytes_per_second = self.stream_data_rate(format);
 
-        // This is only a loop to be able to reload the file if an error occured
+        // This is only a loop to be able to reload the file if an error occurred
         // while opening a cached file.
         loop {
             let encrypted_file = AudioFile::open(&self.session, file_id, bytes_per_second);
@@ -1450,25 +1448,30 @@ impl PlayerInternal {
                         // For the basic normalisation method, a normalisation factor of 1.0 indicates that
                         // there is nothing to normalise (all samples should pass unaltered). For the
                         // dynamic method, there may still be peaks that we want to shave off.
-                        if self.config.normalisation
-                            && !(f64::abs(normalisation_factor - 1.0) <= f64::EPSILON
-                                && self.config.normalisation_method == NormalisationMethod::Basic)
-                        {
-                            // zero-cost shorthands
-                            let threshold_db = self.config.normalisation_threshold_dbfs;
-                            let knee_db = self.config.normalisation_knee_db;
-                            let attack_cf = self.config.normalisation_attack_cf;
-                            let release_cf = self.config.normalisation_release_cf;
+                        if self.config.normalisation {
+                            if self.config.normalisation_method == NormalisationMethod::Basic
+                                && normalisation_factor < 1.0
+                            {
+                                for sample in data.iter_mut() {
+                                    *sample *= normalisation_factor;
+                                }
+                            } else if self.config.normalisation_method
+                                == NormalisationMethod::Dynamic
+                            {
+                                // zero-cost shorthands
+                                let threshold_db = self.config.normalisation_threshold_dbfs;
+                                let knee_db = self.config.normalisation_knee_db;
+                                let attack_cf = self.config.normalisation_attack_cf;
+                                let release_cf = self.config.normalisation_release_cf;
 
-                            for sample in data.iter_mut() {
-                                *sample *= normalisation_factor; // for both the basic and dynamic limiter
+                                for sample in data.iter_mut() {
+                                    *sample *= normalisation_factor;
 
-                                // Feedforward limiter in the log domain
-                                // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012). Digital Dynamic
-                                // Range Compressor Design—A Tutorial and Analysis. Journal of The Audio
-                                // Engineering Society, 60, 399-408.
-                                if self.config.normalisation_method == NormalisationMethod::Dynamic
-                                {
+                                    // Feedforward limiter in the log domain
+                                    // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012). Digital Dynamic
+                                    // Range Compressor Design—A Tutorial and Analysis. Journal of The Audio
+                                    // Engineering Society, 60, 399-408.
+
                                     // Some tracks have samples that are precisely 0.0. That's silence
                                     // and we know we don't need to limit that, in which we can spare
                                     // the CPU cycles.
@@ -1477,22 +1480,26 @@ impl PlayerInternal {
                                     // peak detector stuck. Also catch the unlikely case where a sample
                                     // is decoded as `NaN` or some other non-normal value.
                                     let limiter_db = if sample.is_normal() {
-                                        // step 1-2: half-wave rectification and conversion into dB
-                                        let abs_sample_db = ratio_to_db(sample.abs());
-
-                                        // step 3-4: gain computer with soft knee and subtractor
-                                        let bias_db = abs_sample_db - threshold_db;
+                                        // step 1-4: half-wave rectification and conversion into dB
+                                        // and gain computer with soft knee and subtractor
+                                        let bias_db = ratio_to_db(sample.abs()) - threshold_db;
                                         let knee_boundary_db = bias_db * 2.0;
 
                                         if knee_boundary_db < -knee_db {
                                             0.0
                                         } else if knee_boundary_db.abs() <= knee_db {
-                                            abs_sample_db
-                                                - (abs_sample_db
-                                                    - (bias_db + knee_db / 2.0).powi(2)
-                                                        / (2.0 * knee_db))
+                                            // The textbook equation:
+                                            // ratio_to_db(sample.abs()) - (ratio_to_db(sample.abs()) - (bias_db + knee_db / 2.0).powi(2) / (2.0 * knee_db))
+                                            // Simplifies to:
+                                            // ((2.0 * bias_db) + knee_db).powi(2) / (8.0 * knee_db)
+                                            // Which in our case further simplifies to:
+                                            // (knee_boundary_db + knee_db).powi(2) / (8.0 * knee_db)
+                                            // because knee_boundary_db is 2.0 * bias_db.
+                                            (knee_boundary_db + knee_db).powi(2) / (8.0 * knee_db)
                                         } else {
-                                            abs_sample_db - threshold_db
+                                            // Textbook:
+                                            // ratio_to_db(sample.abs()) - threshold_db, which is already our bias_db.
+                                            bias_db
                                         }
                                     } else {
                                         0.0
@@ -1506,14 +1513,24 @@ impl PlayerInternal {
                                         || self.normalisation_peak > 0.0
                                     {
                                         // step 5: smooth, decoupled peak detector
+                                        // Textbook:
+                                        // release_cf * self.normalisation_integrator + (1.0 - release_cf) * limiter_db
+                                        // Simplifies to:
+                                        // release_cf * self.normalisation_integrator - release_cf * limiter_db + limiter_db
                                         self.normalisation_integrator = f64::max(
                                             limiter_db,
                                             release_cf * self.normalisation_integrator
-                                                + (1.0 - release_cf) * limiter_db,
+                                                - release_cf * limiter_db
+                                                + limiter_db,
                                         );
+                                        // Textbook:
+                                        // attack_cf * self.normalisation_peak + (1.0 - attack_cf) * self.normalisation_integrator
+                                        // Simplifies to:
+                                        // attack_cf * self.normalisation_peak - attack_cf * self.normalisation_integrator + self.normalisation_integrator
                                         self.normalisation_peak = attack_cf
                                             * self.normalisation_peak
-                                            + (1.0 - attack_cf) * self.normalisation_integrator;
+                                            - attack_cf * self.normalisation_integrator
+                                            + self.normalisation_integrator;
 
                                         // step 6: make-up gain applied later (volume attenuation)
                                         // Applying the standard normalisation factor here won't work,
@@ -2021,15 +2038,8 @@ impl PlayerInternal {
     }
 
     fn send_event(&mut self, event: PlayerEvent) {
-        let mut index = 0;
-        while index < self.event_senders.len() {
-            match self.event_senders[index].send(event.clone()) {
-                Ok(_) => index += 1,
-                Err(_) => {
-                    self.event_senders.remove(index);
-                }
-            }
-        }
+        self.event_senders
+            .retain(|sender| sender.send(event.clone()).is_ok());
     }
 
     fn load_track(
