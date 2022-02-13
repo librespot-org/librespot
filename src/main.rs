@@ -671,6 +671,7 @@ fn get_setup() -> Setup {
             let opt = key.trim_start_matches('-');
 
             if index > 0
+                && key.starts_with('-')
                 && &args[index - 1] != key
                 && matches.opt_defined(opt)
                 && matches.opt_present(opt)
