@@ -3,7 +3,7 @@ use rand::SeedableRng;
 use rand_distr::{Distribution, Normal, Triangular, Uniform};
 use std::fmt;
 
-const NUM_CHANNELS: usize = 2;
+use crate::NUM_CHANNELS;
 
 // Dithering lowers digital-to-analog conversion ("requantization") error,
 // linearizing output, lowering distortion and replacing it with a constant,
@@ -102,7 +102,7 @@ impl GaussianDitherer {
 
 pub struct HighPassDitherer {
     active_channel: usize,
-    previous_noises: [f64; NUM_CHANNELS],
+    previous_noises: [f64; NUM_CHANNELS as usize],
     cached_rng: SmallRng,
     distribution: Uniform<f64>,
 }
@@ -111,7 +111,7 @@ impl Ditherer for HighPassDitherer {
     fn new() -> Self {
         Self {
             active_channel: 0,
-            previous_noises: [0.0; NUM_CHANNELS],
+            previous_noises: [0.0; NUM_CHANNELS as usize],
             cached_rng: create_rng(),
             distribution: Uniform::new_inclusive(-0.5, 0.5), // 1 LSB +/- 1 LSB (previous) = 2 LSB
         }
