@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
 - [main] Don't panic when parsing options. Instead list valid values and exit.
 - [main] `--alsa-mixer-device` and `--alsa-mixer-index` now fallback to the card and index specified in `--device`.
+- [core] Removed unsafe code (breaking)
+- [playback] Adhere to ReplayGain spec when calculating gain normalisation factor.
+- [playback] `alsa`: Use `--volume-range` overrides for softvol controls
+- [connect] Don't panic when activating shuffle without previous interaction.
 
 ### Removed
 - [playback] `alsamixer`: previously deprecated option `mixer-card` has been removed.

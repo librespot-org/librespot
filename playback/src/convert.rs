@@ -23,14 +23,15 @@ pub struct Converter {
 
 impl Converter {
     pub fn new(dither_config: Option<DithererBuilder>) -> Self {
-        if let Some(ref ditherer_builder) = dither_config {
-            let ditherer = (ditherer_builder)();
-            info!("Converting with ditherer: {}", ditherer.name());
-            Self {
-                ditherer: Some(ditherer),
+        match dither_config {
+            Some(ditherer_builder) => {
+                let ditherer = (ditherer_builder)();
+                info!("Converting with ditherer: {}", ditherer.name());
+                Self {
+                    ditherer: Some(ditherer),
+                }
             }
-        } else {
-            Self { ditherer: None }
+            None => Self { ditherer: None },
         }
     }
 
@@ -52,18 +53,15 @@ impl Converter {
     const SCALE_S16: f64 = 32768.;
 
     pub fn scale(&mut self, sample: f64, factor: f64) -> f64 {
-        let dither = match self.ditherer {
-            Some(ref mut d) => d.noise(),
-            None => 0.0,
-        };
-
         // From the many float to int conversion methods available, match what
         // the reference Vorbis implementation uses: sample * 32768 (for 16 bit)
-        let int_value = sample * factor + dither;
 
         // Casting float to integer rounds towards zero by default, i.e. it
         // truncates, and that generates larger error than rounding to nearest.
-        int_value.round()
+        match self.ditherer.as_mut() {
+            Some(d) => (sample * factor + d.noise()).round(),
+            None => (sample * factor).round(),
+        }
     }
 
     // Special case for samples packed in a word of greater bit depth (e.g.
@@ -79,11 +77,12 @@ impl Converter {
         let max = factor - 1.0;
 
         if int_value < min {
-            return min;
+            min
         } else if int_value > max {
-            return max;
+            max
+        } else {
+            int_value
         }
-        int_value
     }
 
     pub fn f64_to_f32(&mut self, samples: &[f64]) -> Vec<f32> {
@@ -109,12 +108,7 @@ impl Converter {
     pub fn f64_to_s24_3(&mut self, samples: &[f64]) -> Vec<i24> {
         samples
             .iter()
-            .map(|sample| {
-                // Not as DRY as calling f32_to_s24 first, but this saves iterating
-                // over all samples twice.
-                let int_value = self.clamping_scale(*sample, Self::SCALE_S24) as i32;
-                i24::from_s24(int_value)
-            })
+            .map(|sample| i24::from_s24(self.clamping_scale(*sample, Self::SCALE_S24) as i32))
             .collect()
     }
 

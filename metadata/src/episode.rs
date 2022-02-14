@@ -74,7 +74,7 @@ impl InnerAudioItem for Episode {
 
         Ok(AudioItem {
             id,
-            spotify_uri: id.to_uri(),
+            spotify_uri: id.to_uri()?,
             files: episode.audio,
             name: episode.name,
             duration: episode.duration,

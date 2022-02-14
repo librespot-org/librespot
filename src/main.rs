@@ -192,7 +192,7 @@ fn get_setup() -> Setup {
     const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
     const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
     const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=10.0;
-    const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f32> = -10.0..=10.0;
+    const VALID_NORMALISATION_PREGAIN_RANGE: RangeInclusive<f64> = -10.0..=10.0;
     const VALID_NORMALISATION_THRESHOLD_RANGE: RangeInclusive<f64> = -10.0..=0.0;
     const VALID_NORMALISATION_ATTACK_RANGE: RangeInclusive<u64> = 1..=500;
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
@@ -671,6 +671,7 @@ fn get_setup() -> Setup {
             let opt = key.trim_start_matches('-');
 
             if index > 0
+                && key.starts_with('-')
                 && &args[index - 1] != key
                 && matches.opt_defined(opt)
                 && matches.opt_present(opt)
@@ -1306,12 +1307,7 @@ fn get_setup() -> Setup {
             normalisation_method = opt_str(NORMALISATION_METHOD)
                 .as_deref()
                 .map(|method| {
-                    warn!(
-                        "`--{}` / `-{}` will be deprecated in a future release.",
-                        NORMALISATION_METHOD, NORMALISATION_METHOD_SHORT
-                    );
-
-                    let method = NormalisationMethod::from_str(method).unwrap_or_else(|_| {
+                    NormalisationMethod::from_str(method).unwrap_or_else(|_| {
                         invalid_error_msg(
                             NORMALISATION_METHOD,
                             NORMALISATION_METHOD_SHORT,
@@ -1321,16 +1317,7 @@ fn get_setup() -> Setup {
                         );
 
                         exit(1);
-                    });
-
-                    if matches!(method, NormalisationMethod::Basic) {
-                        warn!(
-                            "`--{}` / `-{}` {:?} will be deprecated in a future release.",
-                            NORMALISATION_METHOD, NORMALISATION_METHOD_SHORT, method
-                        );
-                    }
-
-                    method
+                    })
                 })
                 .unwrap_or(player_default_config.normalisation_method);
 
@@ -1352,7 +1339,7 @@ fn get_setup() -> Setup {
                 .unwrap_or(player_default_config.normalisation_type);
 
             normalisation_pregain_db = opt_str(NORMALISATION_PREGAIN)
-                .map(|pregain| match pregain.parse::<f32>() {
+                .map(|pregain| match pregain.parse::<f64>() {
                     Ok(value) if (VALID_NORMALISATION_PREGAIN_RANGE).contains(&value) => value,
                     _ => {
                         let valid_values = &format!(

@@ -104,7 +104,7 @@ impl Playlist {
         let uri = format!(
             "hm://playlist/user/{}/playlist/{}",
             username,
-            playlist_id.to_base62()
+            playlist_id.to_base62()?
         );
         <Self as MercuryRequest>::request(session, &uri).await
     }
@@ -152,7 +152,7 @@ impl Metadata for Playlist {
     type Message = protocol::playlist4_external::SelectedListContent;
 
     async fn request(session: &Session, playlist_id: SpotifyId) -> RequestResult {
-        let uri = format!("hm://playlist/v2/playlist/{}", playlist_id.to_base62());
+        let uri = format!("hm://playlist/v2/playlist/{}", playlist_id.to_base62()?);
         <Self as MercuryRequest>::request(session, &uri).await
     }
 

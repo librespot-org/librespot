@@ -191,7 +191,8 @@ impl SpotifyId {
 
     /// Returns the `SpotifyId` as a base16 (hex) encoded, `SpotifyId::SIZE_BASE16` (32)
     /// character long `String`.
-    pub fn to_base16(&self) -> String {
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_base16(&self) -> Result<String, Error> {
         to_base16(&self.to_raw(), &mut [0u8; Self::SIZE_BASE16])
     }
 
@@ -199,7 +200,9 @@ impl SpotifyId {
     /// character long `String`.
     ///
     /// [canonically]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn to_base62(&self) -> String {
+
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_base62(&self) -> Result<String, Error> {
         let mut dst = [0u8; 22];
         let mut i = 0;
         let n = self.id;
@@ -237,14 +240,12 @@ impl SpotifyId {
 
         dst.reverse();
 
-        unsafe {
-            // Safety: We are only dealing with ASCII characters.
-            String::from_utf8_unchecked(dst.to_vec())
-        }
+        String::from_utf8(dst.to_vec()).map_err(|_| SpotifyIdError::InvalidId.into())
     }
 
     /// Returns a copy of the `SpotifyId` as an array of `SpotifyId::SIZE` (16) bytes in
     /// big-endian order.
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_raw(&self) -> [u8; Self::SIZE] {
         self.id.to_be_bytes()
     }
@@ -257,7 +258,9 @@ impl SpotifyId {
     /// be encoded as `unknown`.
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn to_uri(&self) -> String {
+
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_uri(&self) -> Result<String, Error> {
         // 8 chars for the "spotify:" prefix + 1 colon + 22 chars base62 encoded ID  = 31
         // + unknown size item_type.
         let item_type: &str = self.item_type.into();
@@ -265,21 +268,24 @@ impl SpotifyId {
         dst.push_str("spotify:");
         dst.push_str(item_type);
         dst.push(':');
-        dst.push_str(&self.to_base62());
+        let base_62 = self.to_base62()?;
+        dst.push_str(&base_62);
 
-        dst
+        Ok(dst)
     }
 }
 
 impl fmt::Debug for SpotifyId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_tuple("SpotifyId").field(&self.to_uri()).finish()
+        f.debug_tuple("SpotifyId")
+            .field(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
+            .finish()
     }
 }
 
 impl fmt::Display for SpotifyId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.to_uri())
+        f.write_str(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
     }
 }
 
@@ -312,16 +318,17 @@ impl NamedSpotifyId {
         })
     }
 
-    pub fn to_uri(&self) -> String {
+    pub fn to_uri(&self) -> Result<String, Error> {
         let item_type: &str = self.inner_id.item_type.into();
         let mut dst = String::with_capacity(37 + self.username.len() + item_type.len());
         dst.push_str("spotify:user:");
         dst.push_str(&self.username);
         dst.push_str(item_type);
         dst.push(':');
-        dst.push_str(&self.to_base62());
+        let base_62 = self.to_base62()?;
+        dst.push_str(&base_62);
 
-        dst
+        Ok(dst)
     }
 
     pub fn from_spotify_id(id: SpotifyId, username: String) -> Self {
@@ -342,14 +349,24 @@ impl Deref for NamedSpotifyId {
 impl fmt::Debug for NamedSpotifyId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_tuple("NamedSpotifyId")
-            .field(&self.inner_id.to_uri())
+            .field(
+                &self
+                    .inner_id
+                    .to_uri()
+                    .unwrap_or_else(|_| "invalid id".into()),
+            )
             .finish()
     }
 }
 
 impl fmt::Display for NamedSpotifyId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.inner_id.to_uri())
+        f.write_str(
+            &self
+                .inner_id
+                .to_uri()
+                .unwrap_or_else(|_| "invalid id".into()),
+        )
     }
 }
 
@@ -495,7 +512,7 @@ impl TryFrom<&protocol::playlist_annotate3::TranscodedPicture> for SpotifyId {
     }
 }
 
-pub fn to_base16(src: &[u8], buf: &mut [u8]) -> String {
+pub fn to_base16(src: &[u8], buf: &mut [u8]) -> Result<String, Error> {
     let mut i = 0;
     for v in src {
         buf[i] = BASE16_DIGITS[(v >> 4) as usize];
@@ -503,10 +520,7 @@ pub fn to_base16(src: &[u8], buf: &mut [u8]) -> String {
         i += 2;
     }
 
-    unsafe {
-        // Safety: We are only dealing with ASCII characters.
-        String::from_utf8_unchecked(buf.to_vec())
-    }
+    String::from_utf8(buf.to_vec()).map_err(|_| SpotifyIdError::InvalidId.into())
 }
 
 #[cfg(test)]
@@ -623,7 +637,7 @@ mod tests {
                 item_type: c.kind,
             };
 
-            assert_eq!(id.to_base62(), c.base62);
+            assert_eq!(id.to_base62().unwrap(), c.base62);
         }
     }
 
@@ -646,7 +660,7 @@ mod tests {
                 item_type: c.kind,
             };
 
-            assert_eq!(id.to_base16(), c.base16);
+            assert_eq!(id.to_base16().unwrap(), c.base16);
         }
     }
 
@@ -672,7 +686,7 @@ mod tests {
                 item_type: c.kind,
             };
 
-            assert_eq!(id.to_uri(), c.uri);
+            assert_eq!(id.to_uri().unwrap(), c.uri);
         }
     }
 
