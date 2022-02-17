@@ -104,37 +104,35 @@ impl SymphoniaDecoder {
 
     pub fn normalisation_data(&mut self) -> Option<NormalisationData> {
         let mut metadata = self.format.metadata();
+
+        // Advance to the latest metadata revision.
+        // None means we hit the latest.
         loop {
-            if let Some(_discarded_revision) = metadata.pop() {
-                // Advance to the latest metadata revision.
-                continue;
-            } else {
-                let revision = metadata.current()?;
-                let tags = revision.tags();
-
-                if tags.is_empty() {
-                    // The latest metadata entry in the log is empty.
-                    return None;
-                }
-
-                let mut data = NormalisationData::default();
-                let mut i = 0;
-                while i < tags.len() {
-                    if let Value::Float(value) = tags[i].value {
-                        #[allow(non_snake_case)]
-                        match tags[i].std_key {
-                            Some(StandardTagKey::ReplayGainAlbumGain) => data.album_gain_db = value,
-                            Some(StandardTagKey::ReplayGainAlbumPeak) => data.album_peak = value,
-                            Some(StandardTagKey::ReplayGainTrackGain) => data.track_gain_db = value,
-                            Some(StandardTagKey::ReplayGainTrackPeak) => data.track_peak = value,
-                            _ => (),
-                        }
-                    }
-                    i += 1;
-                }
-
-                break Some(data);
+            if metadata.pop().is_none() {
+                break;
             }
+        }
+
+        let tags = metadata.current()?.tags();
+
+        if tags.is_empty() {
+            None
+        } else {
+            let mut data = NormalisationData::default();
+
+            for tag in tags {
+                if let Value::Float(value) = tag.value {
+                    match tag.std_key {
+                        Some(StandardTagKey::ReplayGainAlbumGain) => data.album_gain_db = value,
+                        Some(StandardTagKey::ReplayGainAlbumPeak) => data.album_peak = value,
+                        Some(StandardTagKey::ReplayGainTrackGain) => data.track_gain_db = value,
+                        Some(StandardTagKey::ReplayGainTrackPeak) => data.track_peak = value,
+                        _ => (),
+                    }
+                }
+            }
+
+            Some(data)
         }
     }
 
@@ -200,14 +198,15 @@ impl AudioDecoder for SymphoniaDecoder {
 
             match self.decoder.decode(&packet) {
                 Ok(decoded) => {
-                    if self.sample_buffer.is_none() {
-                        let spec = *decoded.spec();
-                        let duration = decoded.capacity() as u64;
-                        self.sample_buffer
-                            .replace(SampleBuffer::new(duration, spec));
-                    }
+                    let sample_buffer = match self.sample_buffer.as_mut() {
+                        Some(buffer) => buffer,
+                        None => {
+                            let spec = *decoded.spec();
+                            let duration = decoded.capacity() as u64;
+                            self.sample_buffer.insert(SampleBuffer::new(duration, spec))
+                        }
+                    };
 
-                    let sample_buffer = self.sample_buffer.as_mut().unwrap(); // guaranteed above
                     sample_buffer.copy_interleaved_ref(decoded);
                     let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
 
