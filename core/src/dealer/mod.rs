@@ -163,12 +163,7 @@ fn split_uri(s: &str) -> Option<impl Iterator<Item = &'_ str>> {
     };
 
     let rest = rest.trim_end_matches(sep);
-    let mut split = rest.split(sep);
-
-    #[cfg(debug_assertions)]
-    if rest.is_empty() {
-        assert_eq!(split.next(), Some(""));
-    }
+    let split = rest.split(sep);
 
     Some(iter::once(scheme).chain(split))
 }
