@@ -1,23 +1,29 @@
-use super::{Open, Sink, SinkAsBytes, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use gstreamer::{
+    event::{FlushStart, FlushStop},
+    prelude::*,
+    State,
+    
+};
 
 use gstreamer as gst;
 use gstreamer_app as gst_app;
+use gstreamer_audio as gst_audio;
 
-use gst::prelude::*;
-use zerocopy::AsBytes;
+use parking_lot::Mutex;
+use std::sync::Arc;
 
-use std::sync::mpsc::{sync_channel, SyncSender};
-use std::thread;
+use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 
-#[allow(dead_code)]
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS, SAMPLE_RATE,
+};
+
 pub struct GstreamerSink {
-    tx: SyncSender<Vec<u8>>,
+    appsrc: gst_app::AppSrc,
+    bufferpool: gst::BufferPool,
     pipeline: gst::Pipeline,
     format: AudioFormat,
+    async_error: Arc<Mutex<Option<String>>>,
 }
 
 impl Open for GstreamerSink {
@@ -25,117 +31,166 @@ impl Open for GstreamerSink {
         info!("Using GStreamer sink with format: {:?}", format);
         gst::init().expect("failed to init GStreamer!");
 
-        // GStreamer calls S24 and S24_3 different from the rest of the world
         let gst_format = match format {
-            AudioFormat::S24 => "S24_32".to_string(),
-            AudioFormat::S24_3 => "S24".to_string(),
-            _ => format!("{:?}", format),
+            AudioFormat::F64 => gst_audio::AUDIO_FORMAT_F64,
+            AudioFormat::F32 => gst_audio::AUDIO_FORMAT_F32,
+            AudioFormat::S32 => gst_audio::AUDIO_FORMAT_S32,
+            AudioFormat::S24 => gst_audio::AUDIO_FORMAT_S2432,
+            AudioFormat::S24_3 => gst_audio::AUDIO_FORMAT_S24,
+            AudioFormat::S16 => gst_audio::AUDIO_FORMAT_S16,
         };
+
+        let gst_info = gst_audio::AudioInfo::builder(gst_format, SAMPLE_RATE, NUM_CHANNELS as u32)
+            .build()
+            .expect("Failed to create GStreamer audio format");
+        let gst_caps = gst_info.to_caps().expect("Failed to create GStreamer caps");
+
         let sample_size = format.size();
-        let gst_bytes = 2048 * sample_size;
+        let gst_bytes = NUM_CHANNELS as usize * 1024 * sample_size;
 
-        #[cfg(target_endian = "little")]
-        const ENDIANNESS: &str = "LE";
-        #[cfg(target_endian = "big")]
-        const ENDIANNESS: &str = "BE";
-
-        let pipeline_str_preamble = format!(
-            "appsrc caps=\"audio/x-raw,format={}{},layout=interleaved,channels={},rate={}\" block=true max-bytes={} name=appsrc0 ",
-            gst_format, ENDIANNESS, NUM_CHANNELS, SAMPLE_RATE, gst_bytes
-        );
-        // no need to dither twice; use librespot dithering instead
-        let pipeline_str_rest = r#" ! audioconvert dithering=none ! autoaudiosink"#;
-        let pipeline_str: String = match device {
-            Some(x) => format!("{}{}", pipeline_str_preamble, x),
-            None => format!("{}{}", pipeline_str_preamble, pipeline_str_rest),
-        };
-        info!("Pipeline: {}", pipeline_str);
-
-        gst::init().unwrap();
-        let pipelinee = gst::parse_launch(&*pipeline_str).expect("Couldn't launch pipeline; likely a GStreamer issue or an error in the pipeline string you specified in the 'device' argument to librespot.");
-        let pipeline = pipelinee
-            .dynamic_cast::<gst::Pipeline>()
-            .expect("couldn't cast pipeline element at runtime!");
-        let bus = pipeline.get_bus().expect("couldn't get bus from pipeline");
-        let mainloop = glib::MainLoop::new(None, false);
-        let appsrce: gst::Element = pipeline
-            .get_by_name("appsrc0")
-            .expect("couldn't get appsrc from pipeline");
-        let appsrc: gst_app::AppSrc = appsrce
-            .dynamic_cast::<gst_app::AppSrc>()
+        let pipeline = gst::Pipeline::new(None);
+        let appsrc = gst::ElementFactory::make("appsrc", None)
+            .expect("Failed to create GStreamer appsrc element")
+            .downcast::<gst_app::AppSrc>()
             .expect("couldn't cast AppSrc element at runtime!");
+        appsrc.set_caps(Some(&gst_caps));
+        appsrc.set_max_bytes(gst_bytes as u64);
+        appsrc.set_block(true);
+
+        let sink = match device {
+            None => {
+                // no need to dither twice; use librespot dithering instead
+                gst::parse_bin_from_description(
+                    "audioconvert dithering=none ! audioresample ! autoaudiosink",
+                    true,
+                )
+                .expect("Failed to create default GStreamer sink")
+            }
+            Some(ref x) => gst::parse_bin_from_description(x, true)
+                .expect("Failed to create custom GStreamer sink"),
+        };
+        pipeline
+            .add(&appsrc)
+            .expect("Failed to add GStreamer appsrc to pipeline");
+        pipeline
+            .add(&sink)
+            .expect("Failed to add GStreamer sink to pipeline");
+        appsrc
+            .link(&sink)
+            .expect("Failed to link GStreamer source to sink");
+
+        let bus = pipeline.bus().expect("couldn't get bus from pipeline");
+
         let bufferpool = gst::BufferPool::new();
-        let appsrc_caps = appsrc.get_caps().expect("couldn't get appsrc caps");
-        let mut conf = bufferpool.get_config();
-        conf.set_params(Some(&appsrc_caps), 4096 * sample_size as u32, 0, 0);
+
+        let mut conf = bufferpool.config();
+        conf.set_params(Some(&gst_caps), gst_bytes as u32, 0, 0);
         bufferpool
             .set_config(conf)
             .expect("couldn't configure the buffer pool");
-        bufferpool
-            .set_active(true)
-            .expect("couldn't activate buffer pool");
 
-        let (tx, rx) = sync_channel::<Vec<u8>>(64 * sample_size);
-        thread::spawn(move || {
-            for data in rx {
-                let buffer = bufferpool.acquire_buffer(None);
-                if let Ok(mut buffer) = buffer {
-                    let mutbuf = buffer.make_mut();
-                    mutbuf.set_size(data.len());
-                    mutbuf
-                        .copy_from_slice(0, data.as_bytes())
-                        .expect("Failed to copy from slice");
-                    let _eat = appsrc.push_buffer(buffer);
+        let async_error = Arc::new(Mutex::new(None));
+        let async_error_clone = async_error.clone();
+
+        bus.set_sync_handler(move |_bus, msg| {
+            match msg.view() {
+                gst::MessageView::Eos(_) => {
+                    println!("gst signaled end of stream");
+
+                    let mut async_error_storage = async_error_clone.lock();
+                    *async_error_storage = Some(String::from("gst signaled end of stream"));
                 }
+                gst::MessageView::Error(err) => {
+                    println!(
+                        "Error from {:?}: {} ({:?})",
+                        err.src().map(|s| s.path_string()),
+                        err.error(),
+                        err.debug()
+                    );
+
+                    let mut async_error_storage = async_error_clone.lock();
+                    *async_error_storage = Some(format!(
+                        "Error from {:?}: {} ({:?})",
+                        err.src().map(|s| s.path_string()),
+                        err.error(),
+                        err.debug()
+                    ));
+                }
+                _ => (),
             }
-        });
 
-        thread::spawn(move || {
-            let thread_mainloop = mainloop;
-            let watch_mainloop = thread_mainloop.clone();
-            bus.add_watch(move |_, msg| {
-                match msg.view() {
-                    gst::MessageView::Eos(..) => watch_mainloop.quit(),
-                    gst::MessageView::Error(err) => {
-                        println!(
-                            "Error from {:?}: {} ({:?})",
-                            err.get_src().map(|s| s.get_path_string()),
-                            err.get_error(),
-                            err.get_debug()
-                        );
-                        watch_mainloop.quit();
-                    }
-                    _ => (),
-                };
-
-                glib::Continue(true)
-            })
-            .expect("failed to add bus watch");
-            thread_mainloop.run();
+            gst::BusSyncReply::Drop
         });
 
         pipeline
-            .set_state(gst::State::Playing)
-            .expect("unable to set the pipeline to the `Playing` state");
+            .set_state(State::Ready)
+            .expect("unable to set the pipeline to the `Ready` state");
 
         Self {
-            tx,
+            appsrc,
+            bufferpool,
             pipeline,
             format,
+            async_error,
         }
     }
 }
 
 impl Sink for GstreamerSink {
+    fn start(&mut self) -> SinkResult<()> {
+        *self.async_error.lock() = None;
+        self.appsrc.send_event(FlushStop::new(true));
+        self.bufferpool
+            .set_active(true)
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+        self.pipeline
+            .set_state(State::Playing)
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+        Ok(())
+    }
+
+    fn stop(&mut self) -> SinkResult<()> {
+        *self.async_error.lock() = None;
+        self.appsrc.send_event(FlushStart::new());
+        self.pipeline
+            .set_state(State::Paused)
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+        self.bufferpool
+            .set_active(false)
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+        Ok(())
+    }
+
     sink_as_bytes!();
+}
+
+impl Drop for GstreamerSink {
+    fn drop(&mut self) {
+        let _ = self.pipeline.set_state(State::Null);
+    }
 }
 
 impl SinkAsBytes for GstreamerSink {
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
-        // Copy expensively (in to_vec()) to avoid thread synchronization
-        self.tx
-            .send(data.to_vec())
-            .expect("tx send failed in write function");
+        if let Some(async_error) = &*self.async_error.lock() {
+            return Err(SinkError::OnWrite(async_error.to_string()));
+        }
+
+        let mut buffer = self
+            .bufferpool
+            .acquire_buffer(None)
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+
+        let mutbuf = buffer.make_mut();
+        mutbuf.set_size(data.len());
+        mutbuf
+            .copy_from_slice(0, data)
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+
+        self.appsrc
+            .push_buffer(buffer)
+            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+
         Ok(())
     }
 }
