@@ -46,7 +46,7 @@ impl Open for GstreamerSink {
         let gst_caps = gst_info.to_caps().expect("Failed to create GStreamer caps");
 
         let sample_size = format.size();
-        let gst_bytes = NUM_CHANNELS as usize * 1024 * sample_size;
+        let gst_bytes = NUM_CHANNELS as usize * 2048 * sample_size;
 
         let pipeline = gst::Pipeline::new(None);
         let appsrc = gst::ElementFactory::make("appsrc", None)
