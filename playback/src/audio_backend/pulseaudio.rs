@@ -5,10 +5,8 @@ use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use libpulse_binding::{self as pulse, error::PAErr, stream::Direction};
 use libpulse_simple_binding::Simple;
+use std::env;
 use thiserror::Error;
-
-const APP_NAME: &str = "librespot";
-const STREAM_NAME: &str = "Spotify endpoint";
 
 #[derive(Debug, Error)]
 enum PulseError {
@@ -47,13 +45,18 @@ impl From<PulseError> for SinkError {
 }
 
 pub struct PulseAudioSink {
-    s: Option<Simple>,
+    sink: Option<Simple>,
     device: Option<String>,
+    app_name: String,
+    stream_desc: String,
     format: AudioFormat,
 }
 
 impl Open for PulseAudioSink {
     fn open(device: Option<String>, format: AudioFormat) -> Self {
+        let app_name = env::var("PULSE_PROP_application.name").unwrap_or_default();
+        let stream_desc = env::var("PULSE_PROP_stream.description").unwrap_or_default();
+
         let mut actual_format = format;
 
         if actual_format == AudioFormat::F64 {
@@ -64,8 +67,10 @@ impl Open for PulseAudioSink {
         info!("Using PulseAudioSink with format: {:?}", actual_format);
 
         Self {
-            s: None,
+            sink: None,
             device,
+            app_name,
+            stream_desc,
             format: actual_format,
         }
     }
@@ -73,7 +78,7 @@ impl Open for PulseAudioSink {
 
 impl Sink for PulseAudioSink {
     fn start(&mut self) -> SinkResult<()> {
-        if self.s.is_none() {
+        if self.sink.is_none() {
             // PulseAudio calls S24 and S24_3 different from the rest of the world
             let pulse_format = match self.format {
                 AudioFormat::F32 => pulse::sample::Format::FLOAT32NE,
@@ -84,13 +89,13 @@ impl Sink for PulseAudioSink {
                 _ => unreachable!(),
             };
 
-            let ss = pulse::sample::Spec {
+            let sample_spec = pulse::sample::Spec {
                 format: pulse_format,
                 channels: NUM_CHANNELS,
                 rate: SAMPLE_RATE,
             };
 
-            if !ss.is_valid() {
+            if !sample_spec.is_valid() {
                 let pulse_error = PulseError::InvalidSampleSpec {
                     pulse_format,
                     format: self.format,
@@ -101,30 +106,28 @@ impl Sink for PulseAudioSink {
                 return Err(SinkError::from(pulse_error));
             }
 
-            let s = Simple::new(
+            let sink = Simple::new(
                 None,                   // Use the default server.
-                APP_NAME,               // Our application's name.
+                &self.app_name,         // Our application's name.
                 Direction::Playback,    // Direction.
                 self.device.as_deref(), // Our device (sink) name.
-                STREAM_NAME,            // Description of our stream.
-                &ss,                    // Our sample format.
+                &self.stream_desc,      // Description of our stream.
+                &sample_spec,           // Our sample format.
                 None,                   // Use default channel map.
                 None,                   // Use default buffering attributes.
             )
             .map_err(PulseError::ConnectionRefused)?;
 
-            self.s = Some(s);
+            self.sink = Some(sink);
         }
 
         Ok(())
     }
 
     fn stop(&mut self) -> SinkResult<()> {
-        let s = self.s.as_mut().ok_or(PulseError::NotConnected)?;
+        let sink = self.sink.take().ok_or(PulseError::NotConnected)?;
 
-        s.drain().map_err(PulseError::DrainFailure)?;
-
-        self.s = None;
+        sink.drain().map_err(PulseError::DrainFailure)?;
         Ok(())
     }
 
@@ -133,9 +136,9 @@ impl Sink for PulseAudioSink {
 
 impl SinkAsBytes for PulseAudioSink {
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
-        let s = self.s.as_mut().ok_or(PulseError::NotConnected)?;
+        let sink = self.sink.as_mut().ok_or(PulseError::NotConnected)?;
 
-        s.write(data).map_err(PulseError::OnWrite)?;
+        sink.write(data).map_err(PulseError::OnWrite)?;
 
         Ok(())
     }
