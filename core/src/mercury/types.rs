@@ -30,6 +30,14 @@ pub struct MercuryResponse {
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct MercuryError;
 
+impl std::fmt::Display for MercuryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for MercuryError {}
+
 impl ToString for MercuryMethod {
     fn to_string(&self) -> String {
         match *self {

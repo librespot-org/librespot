@@ -28,6 +28,14 @@ const ONE_SECOND_IN_MS: usize = 1000;
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct ChannelError;
 
+impl std::fmt::Display for ChannelError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for ChannelError {}
+
 pub struct Channel {
     receiver: mpsc::UnboundedReceiver<(u8, Bytes)>,
     state: ChannelState,

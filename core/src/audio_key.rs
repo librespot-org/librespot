@@ -13,6 +13,14 @@ pub struct AudioKey(pub [u8; 16]);
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct AudioKeyError;
 
+impl std::fmt::Display for AudioKeyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for AudioKeyError {}
+
 component! {
     AudioKeyManager : AudioKeyManagerInner {
         sequence: SeqGenerator<u32> = SeqGenerator::new(0),
