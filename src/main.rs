@@ -596,7 +596,7 @@ fn get_setup() -> Setup {
 
     let stripped_env_key = |k: &str| {
         k.trim_start_matches("LIBRESPOT_")
-            .replace("_", "-")
+            .replace('_', "-")
             .to_lowercase()
     };
 

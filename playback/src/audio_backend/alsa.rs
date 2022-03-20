@@ -144,7 +144,7 @@ fn list_compatible_devices() -> SinkResult<()> {
 
                                 println!(
                                     "\tDescription:\n\n\t\t{}\n",
-                                    a.desc.unwrap_or_default().replace("\n", "\n\t\t")
+                                    a.desc.unwrap_or_default().replace('\n', "\n\t\t")
                                 );
 
                                 println!(

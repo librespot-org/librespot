@@ -257,7 +257,7 @@ impl SpClient {
         let mut tries: usize = 0;
         let mut last_response;
 
-        let body = body.unwrap_or_else(String::new);
+        let body = body.unwrap_or_default();
 
         loop {
             tries += 1;
