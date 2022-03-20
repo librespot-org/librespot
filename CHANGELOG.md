@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [main] Add a `-q`, `--quiet` option that changes the logging level to warn.
 - [main] Add a short name for every flag and option.
 - [main] Add the ability to parse environment variables.
+- [playback] `pulseaudio`: set the PulseAudio name to match librespot's device name via `PULSE_PROP_application.name` environment variable (user set env var value takes precedence). (breaking)
+- [playback] `pulseaudio`: set icon to `audio-x-generic` so we get an icon instead of a placeholder via `PULSE_PROP_application.icon_name` environment variable (user set env var value takes precedence). (breaking)
+- [playback] `pulseaudio`: set values to: `PULSE_PROP_application.version`, `PULSE_PROP_application.process.binary`, `PULSE_PROP_stream.description`, `PULSE_PROP_media.software` and `PULSE_PROP_media.role` environment variables (user set env var values take precedence). (breaking)
 
 ### Fixed
 - [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
