@@ -1124,6 +1124,43 @@ fn get_setup() -> Setup {
             exit(1);
         }
 
+        #[cfg(feature = "pulseaudio-backend")]
+        {
+            if env::var("PULSE_PROP_application.name").is_err() {
+                let pulseaudio_name = if name != connect_default_config.name {
+                    format!("{} - {}", connect_default_config.name, name)
+                } else {
+                    name.clone()
+                };
+
+                env::set_var("PULSE_PROP_application.name", pulseaudio_name);
+            }
+
+            if env::var("PULSE_PROP_application.version").is_err() {
+                env::set_var("PULSE_PROP_application.version", version::SEMVER);
+            }
+
+            if env::var("PULSE_PROP_application.icon_name").is_err() {
+                env::set_var("PULSE_PROP_application.icon_name", "audio-x-generic");
+            }
+
+            if env::var("PULSE_PROP_application.process.binary").is_err() {
+                env::set_var("PULSE_PROP_application.process.binary", "librespot");
+            }
+
+            if env::var("PULSE_PROP_stream.description").is_err() {
+                env::set_var("PULSE_PROP_stream.description", "Spotify Connect endpoint");
+            }
+
+            if env::var("PULSE_PROP_media.software").is_err() {
+                env::set_var("PULSE_PROP_media.software", "Spotify");
+            }
+
+            if env::var("PULSE_PROP_media.role").is_err() {
+                env::set_var("PULSE_PROP_media.role", "music");
+            }
+        }
+
         let initial_volume = opt_str(INITIAL_VOLUME)
             .map(|initial_volume| {
                 let volume = match initial_volume.parse::<u16>() {
