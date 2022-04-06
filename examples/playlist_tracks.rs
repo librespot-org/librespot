@@ -27,7 +27,7 @@ async fn main() {
         process::exit(1);
     });
 
-    let session = Session::connect(session_config, credentials, None)
+    let (session, _) = Session::connect(session_config, credentials, None, false)
         .await
         .unwrap();
 

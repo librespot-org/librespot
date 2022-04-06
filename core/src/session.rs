@@ -66,7 +66,8 @@ impl Session {
         config: SessionConfig,
         credentials: Credentials,
         cache: Option<Cache>,
-    ) -> Result<Session, SessionError> {
+        store_credentials: bool,
+    ) -> Result<(Session, Credentials), SessionError> {
         let ap = apresolve(config.proxy.as_ref(), config.ap_port).await;
 
         info!("Connecting to AP \"{}\"", ap);
@@ -76,18 +77,20 @@ impl Session {
             connection::authenticate(&mut conn, credentials, &config.device_id).await?;
         info!("Authenticated as \"{}\" !", reusable_credentials.username);
         if let Some(cache) = &cache {
-            cache.save_credentials(&reusable_credentials);
+            if store_credentials {
+                cache.save_credentials(&reusable_credentials);
+            }
         }
 
         let session = Session::create(
             conn,
             config,
             cache,
-            reusable_credentials.username,
+            reusable_credentials.username.clone(),
             tokio::runtime::Handle::current(),
         );
 
-        Ok(session)
+        Ok((session, reusable_credentials))
     }
 
     fn create(
