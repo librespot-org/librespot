@@ -139,7 +139,7 @@ enum ControlFlow {
 }
 
 impl AudioFileFetch {
-    fn is_download_streaming(&mut self) -> bool {
+    fn is_download_streaming(&self) -> bool {
         self.shared.download_streaming.load(Ordering::Acquire)
     }
 

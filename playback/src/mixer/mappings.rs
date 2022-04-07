@@ -3,7 +3,7 @@ use crate::player::db_to_ratio;
 
 pub trait MappedCtrl {
     fn to_mapped(&self, volume: u16) -> f64;
-    fn from_mapped(&self, mapped_volume: f64) -> u16;
+    fn as_unmapped(&self, mapped_volume: f64) -> u16;
 
     fn db_range(&self) -> f64;
     fn set_db_range(&mut self, new_db_range: f64);
@@ -49,7 +49,7 @@ impl MappedCtrl for VolumeCtrl {
         mapped_volume
     }
 
-    fn from_mapped(&self, mapped_volume: f64) -> u16 {
+    fn as_unmapped(&self, mapped_volume: f64) -> u16 {
         // More than just an optimization, this ensures that zero mapped volume
         // is unmapped to non-negative real numbers (otherwise the log and cubic
         // equations would respectively return -inf and -1/9.)
