@@ -2,7 +2,6 @@ use gstreamer::{
     event::{FlushStart, FlushStop},
     prelude::*,
     State,
-    
 };
 
 use gstreamer as gst;
