@@ -51,12 +51,7 @@ struct SoftVolumeApplier {
 }
 
 impl AudioFilter for SoftVolumeApplier {
-    fn modify_stream(&self, data: &mut [f64]) {
-        let volume = f64::from_bits(self.volume.load(Ordering::Relaxed));
-        if volume < 1.0 {
-            for x in data.iter_mut() {
-                *x *= volume;
-            }
-        }
+    fn peek(&self) -> f64 {
+        f64::from_bits(self.volume.load(Ordering::Relaxed))
     }
 }
