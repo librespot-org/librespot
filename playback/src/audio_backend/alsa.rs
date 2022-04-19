@@ -90,11 +90,8 @@ impl From<AudioFormat> for Format {
             F32 => Format::float(),
             S32 => Format::s32(),
             S24 => Format::s24(),
+            S24_3 => Format::s24_3(),
             S16 => Format::s16(),
-            #[cfg(target_endian = "little")]
-            S24_3 => Format::S243LE,
-            #[cfg(target_endian = "big")]
-            S24_3 => Format::S243BE,
         }
     }
 }
