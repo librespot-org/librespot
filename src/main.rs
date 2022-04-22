@@ -1648,12 +1648,12 @@ async fn main() {
                     let player_config = setup.player_config.clone();
                     let connect_config = setup.connect_config.clone();
 
-                    let audio_filter = mixer.get_audio_filter();
+                    let soft_volume = mixer.get_soft_volume();
                     let format = setup.format;
                     let backend = setup.backend;
                     let device = setup.device.clone();
                     let (player, event_channel) =
-                        Player::new(player_config, session.clone(), audio_filter, move || {
+                        Player::new(player_config, session.clone(), soft_volume, move || {
                             (backend)(device, format)
                         });
 

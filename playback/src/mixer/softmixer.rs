@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use super::AudioFilter;
+use super::SoftVolume;
 use super::{MappedCtrl, VolumeCtrl};
 use super::{Mixer, MixerConfig};
 
@@ -35,7 +35,7 @@ impl Mixer for SoftMixer {
             .store(mapped_volume.to_bits(), Ordering::Relaxed)
     }
 
-    fn get_audio_filter(&self) -> Option<Box<dyn AudioFilter + Send>> {
+    fn get_soft_volume(&self) -> Option<Box<dyn SoftVolume + Send>> {
         Some(Box::new(SoftVolumeApplier {
             volume: self.volume.clone(),
         }))
@@ -50,8 +50,8 @@ struct SoftVolumeApplier {
     volume: Arc<AtomicU64>,
 }
 
-impl AudioFilter for SoftVolumeApplier {
-    fn peek(&self) -> f64 {
+impl SoftVolume for SoftVolumeApplier {
+    fn attenuation_factor(&self) -> f64 {
         f64::from_bits(self.volume.load(Ordering::Relaxed))
     }
 }

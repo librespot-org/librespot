@@ -11,13 +11,13 @@ pub trait Mixer: Send {
     fn set_volume(&self, volume: u16);
     fn volume(&self) -> u16;
 
-    fn get_audio_filter(&self) -> Option<Box<dyn AudioFilter + Send>> {
+    fn get_soft_volume(&self) -> Option<Box<dyn SoftVolume + Send>> {
         None
     }
 }
 
-pub trait AudioFilter {
-    fn peek(&self) -> f64;
+pub trait SoftVolume {
+    fn attenuation_factor(&self) -> f64;
 }
 
 pub mod softmixer;

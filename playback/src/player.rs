@@ -25,7 +25,7 @@ use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
 use crate::decoder::{AudioDecoder, AudioPacket, DecoderError, PassthroughDecoder, VorbisDecoder};
 use crate::metadata::{AudioItem, FileFormat};
-use crate::mixer::AudioFilter;
+use crate::mixer::SoftVolume;
 
 use crate::{MS_PER_PAGE, NUM_CHANNELS, PAGES_PER_MS, SAMPLES_PER_SECOND};
 
@@ -58,7 +58,7 @@ struct PlayerInternal {
     sink: Box<dyn Sink>,
     sink_status: SinkStatus,
     sink_event_callback: Option<SinkEventCallback>,
-    audio_filter: Option<Box<dyn AudioFilter + Send>>,
+    soft_volume: Option<Box<dyn SoftVolume + Send>>,
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
     converter: Converter,
 
@@ -319,7 +319,7 @@ impl Player {
     pub fn new<F>(
         config: PlayerConfig,
         session: Session,
-        audio_filter: Option<Box<dyn AudioFilter + Send>>,
+        soft_volume: Option<Box<dyn SoftVolume + Send>>,
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
     where
@@ -369,7 +369,7 @@ impl Player {
                 sink: sink_builder(),
                 sink_status: SinkStatus::Closed,
                 sink_event_callback: None,
-                audio_filter,
+                soft_volume,
                 event_senders: [event_sender].to_vec(),
                 converter,
 
@@ -1315,8 +1315,8 @@ impl PlayerInternal {
                 if !packet.is_empty() {
                     if let AudioPacket::Samples(ref mut data) = packet {
                         // Get the volume for the packet.
-                        let volume = if let Some(soft_vol) = self.audio_filter.as_mut() {
-                            soft_vol.peek()
+                        let volume = if let Some(soft_vol) = self.soft_volume.as_mut() {
+                            soft_vol.attenuation_factor()
                         } else {
                             1.0
                         };
