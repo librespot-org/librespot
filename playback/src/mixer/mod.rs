@@ -3,7 +3,7 @@ use crate::config::VolumeCtrl;
 pub mod mappings;
 use self::mappings::MappedCtrl;
 
-struct NoOpVolumeApplier;
+pub struct NoOpVolumeApplier;
 
 pub trait Mixer: Send {
     fn open(config: MixerConfig) -> Self
