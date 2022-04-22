@@ -58,7 +58,7 @@ struct PlayerInternal {
     sink: Box<dyn Sink>,
     sink_status: SinkStatus,
     sink_event_callback: Option<SinkEventCallback>,
-    soft_volume: Option<Box<dyn SoftVolume + Send>>,
+    soft_volume: Box<dyn SoftVolume + Send>,
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
     converter: Converter,
 
@@ -319,7 +319,7 @@ impl Player {
     pub fn new<F>(
         config: PlayerConfig,
         session: Session,
-        soft_volume: Option<Box<dyn SoftVolume + Send>>,
+        soft_volume: Box<dyn SoftVolume + Send>,
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
     where
@@ -1315,11 +1315,9 @@ impl PlayerInternal {
                 if !packet.is_empty() {
                     if let AudioPacket::Samples(ref mut data) = packet {
                         // Get the volume for the packet.
-                        let volume = if let Some(soft_vol) = self.soft_volume.as_mut() {
-                            soft_vol.attenuation_factor()
-                        } else {
-                            1.0
-                        };
+                        // In the case of hardware volume control this will
+                        // always be 1.0 (no change).
+                        let volume = self.soft_volume.attenuation_factor();
 
                         // For the basic normalisation method, a normalisation factor of 1.0 indicates that
                         // there is nothing to normalise (all samples should pass unaltered). For the

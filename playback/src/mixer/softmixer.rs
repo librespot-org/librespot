@@ -35,10 +35,10 @@ impl Mixer for SoftMixer {
             .store(mapped_volume.to_bits(), Ordering::Relaxed)
     }
 
-    fn get_soft_volume(&self) -> Option<Box<dyn SoftVolume + Send>> {
-        Some(Box::new(SoftVolumeApplier {
+    fn get_soft_volume(&self) -> Box<dyn SoftVolume + Send> {
+        Box::new(SoftVolumeApplier {
             volume: self.volume.clone(),
-        }))
+        })
     }
 }
 
