@@ -25,7 +25,7 @@ use crate::core::spotify_id::SpotifyId;
 use crate::core::util::SeqGenerator;
 use crate::decoder::{AudioDecoder, AudioPacket, DecoderError, PassthroughDecoder, VorbisDecoder};
 use crate::metadata::{AudioItem, FileFormat};
-use crate::mixer::SoftVolume;
+use crate::mixer::VolumeGetter;
 
 use crate::{MS_PER_PAGE, NUM_CHANNELS, PAGES_PER_MS, SAMPLES_PER_SECOND};
 
@@ -58,7 +58,7 @@ struct PlayerInternal {
     sink: Box<dyn Sink>,
     sink_status: SinkStatus,
     sink_event_callback: Option<SinkEventCallback>,
-    soft_volume: Box<dyn SoftVolume + Send>,
+    volume_getter: Box<dyn VolumeGetter + Send>,
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
     converter: Converter,
 
@@ -319,7 +319,7 @@ impl Player {
     pub fn new<F>(
         config: PlayerConfig,
         session: Session,
-        soft_volume: Box<dyn SoftVolume + Send>,
+        volume_getter: Box<dyn VolumeGetter + Send>,
         sink_builder: F,
     ) -> (Player, PlayerEventChannel)
     where
@@ -369,7 +369,7 @@ impl Player {
                 sink: sink_builder(),
                 sink_status: SinkStatus::Closed,
                 sink_event_callback: None,
-                soft_volume,
+                volume_getter,
                 event_senders: [event_sender].to_vec(),
                 converter,
 
@@ -1317,7 +1317,7 @@ impl PlayerInternal {
                         // Get the volume for the packet.
                         // In the case of hardware volume control this will
                         // always be 1.0 (no change).
-                        let volume = self.soft_volume.attenuation_factor();
+                        let volume = self.volume_getter.attenuation_factor();
 
                         // For the basic normalisation method, a normalisation factor of 1.0 indicates that
                         // there is nothing to normalise (all samples should pass unaltered). For the

@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use super::SoftVolume;
+use super::VolumeGetter;
 use super::{MappedCtrl, VolumeCtrl};
 use super::{Mixer, MixerConfig};
 
@@ -35,10 +35,8 @@ impl Mixer for SoftMixer {
             .store(mapped_volume.to_bits(), Ordering::Relaxed)
     }
 
-    fn get_soft_volume(&self) -> Box<dyn SoftVolume + Send> {
-        Box::new(SoftVolumeApplier {
-            volume: self.volume.clone(),
-        })
+    fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
+        Box::new(SoftVolume(self.volume.clone()))
     }
 }
 
@@ -46,12 +44,10 @@ impl SoftMixer {
     pub const NAME: &'static str = "softvol";
 }
 
-struct SoftVolumeApplier {
-    volume: Arc<AtomicU64>,
-}
+struct SoftVolume(Arc<AtomicU64>);
 
-impl SoftVolume for SoftVolumeApplier {
+impl VolumeGetter for SoftVolume {
     fn attenuation_factor(&self) -> f64 {
-        f64::from_bits(self.volume.load(Ordering::Relaxed))
+        f64::from_bits(self.0.load(Ordering::Relaxed))
     }
 }
