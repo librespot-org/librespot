@@ -1581,19 +1581,15 @@ async fn main() {
 
     if setup.enable_discovery {
         let device_id = setup.session_config.device_id.clone();
-
-        discovery = match librespot::discovery::Discovery::builder(device_id)
+        match librespot::discovery::Discovery::builder(device_id)
             .name(setup.connect_config.name.clone())
             .device_type(setup.connect_config.device_type)
             .port(setup.zeroconf_port)
             .launch()
         {
-            Ok(d) => Some(d),
-            Err(e) => {
-                error!("Discovery Error: {}", e);
-                exit(1);
-            }
-        }
+            Ok(d) => discovery = Some(d),
+            Err(err) => warn!("Could not initialise discovery: {}.", err),
+        };
     }
 
     if let Some(credentials) = setup.credentials {
@@ -1606,6 +1602,11 @@ async fn main() {
             )
             .fuse(),
         );
+    } else if discovery.is_none() {
+        error!(
+            "Discovery is unavailable and no credentials provided. Authentication is not possible."
+        );
+        exit(1);
     }
 
     loop {

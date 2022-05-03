@@ -111,8 +111,7 @@ impl Builder {
                     None,
                     port,
                     &["VERSION=1.0", "CPath=/"],
-                )
-                .unwrap();
+                ).map_err(|e| Error::DnsSdError(io::Error::new(io::ErrorKind::Unsupported, e)))?;
 
             } else {
                 let responder = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?;
