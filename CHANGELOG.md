@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `Sink`: `write()` now receives ownership of the packet (breaking).
 - [playback] `pipe`: create file if it doesn't already exist
 - [playback] More robust dynamic limiter for very wide dynamic range (breaking)
+- [build] The MSRV is now 1.53.
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
