@@ -6,6 +6,7 @@ use librespot::core::session::Session;
 use librespot::core::spotify_id::SpotifyId;
 use librespot::playback::audio_backend;
 use librespot::playback::config::{AudioFormat, PlayerConfig};
+use librespot::playback::mixer::NoOpVolume;
 use librespot::playback::player::Player;
 
 #[tokio::main]
@@ -30,7 +31,7 @@ async fn main() {
         .await
         .unwrap();
 
-    let (mut player, _) = Player::new(player_config, session, None, move || {
+    let (mut player, _) = Player::new(player_config, session, Box::new(NoOpVolume), move || {
         backend(None, audio_format)
     });
 
