@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Adhere to ReplayGain spec when calculating gain normalisation factor.
 - [playback] `alsa`: Use `--volume-range` overrides for softvol controls
 - [connect] Don't panic when activating shuffle without previous interaction.
+- [main] Fix crash when built with Avahi support but Avahi is locally unavailable.
 
 ### Removed
 - [playback] `alsamixer`: previously deprecated option `mixer-card` has been removed.
