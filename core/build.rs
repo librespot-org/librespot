@@ -1,5 +1,6 @@
 use rand::distributions::Alphanumeric;
 use rand::Rng;
+use std::env;
 use vergen::{generate_cargo_keys, ConstantsFlags};
 
 fn main() {
@@ -7,11 +8,17 @@ fn main() {
     flags.toggle(ConstantsFlags::REBUILD_ON_HEAD_CHANGE);
     generate_cargo_keys(ConstantsFlags::all()).expect("Unable to generate the cargo keys!");
 
-    let build_id: String = rand::thread_rng()
-        .sample_iter(Alphanumeric)
-        .take(8)
-        .map(char::from)
-        .collect();
+    let build_id: String;
+    match env::var("SOURCE_DATE_EPOCH") {
+        Ok(val) => build_id = val,
+        Err(_) => {
+            build_id = rand::thread_rng()
+                .sample_iter(Alphanumeric)
+                .take(8)
+                .map(char::from)
+                .collect()
+        }
+    }
 
     println!("cargo:rustc-env=LIBRESPOT_BUILD_ID={}", build_id);
 }
