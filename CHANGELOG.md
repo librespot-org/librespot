@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `Sink`: `write()` now receives ownership of the packet (breaking).
 - [playback] `pipe`: create file if it doesn't already exist
 - [playback] More robust dynamic limiter for very wide dynamic range (breaking)
+- [core] `Session`: `connect()` now returns the long-term credentials.
+- [core] `Session`: `connect()` now accespt a flag if the credentails should be stored via the cache.
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
