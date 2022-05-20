@@ -27,7 +27,7 @@ async fn main() {
     let backend = audio_backend::find(None).unwrap();
 
     println!("Connecting ..");
-    let session = Session::connect(session_config, credentials, None)
+    let (session, _) = Session::connect(session_config, credentials, None, false)
         .await
         .unwrap();
 
