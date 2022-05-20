@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] More robust dynamic limiter for very wide dynamic range (breaking)
 - [core] `Session`: `connect()` now returns the long-term credentials.
 - [core] `Session`: `connect()` now accespt a flag if the credentails should be stored via the cache.
+- [build] The MSRV is now 1.53.
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Adhere to ReplayGain spec when calculating gain normalisation factor.
 - [playback] `alsa`: Use `--volume-range` overrides for softvol controls
 - [connect] Don't panic when activating shuffle without previous interaction.
+- [main] Fix crash when built with Avahi support but Avahi is locally unavailable.
 
 ### Removed
 - [playback] `alsamixer`: previously deprecated option `mixer-card` has been removed.
