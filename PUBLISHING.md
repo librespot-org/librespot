@@ -2,7 +2,17 @@
 
 ## How To
 
-The bash script in the root of the project, named `publish.sh` can be used to publish a new version of librespot and it's corresponding crates. the command should be used as follows: `./publish 0.1.0` from the project root, substituting the new version number that you wish to publish. *Note the lack of a v prefix on the version number. This is important, do not add one.* The v prefix is added where appropriate by the script.
+Read through this paragraph in its entirety before running anything.
+
+The Bash script in the root of the project, named `publish.sh` can be used to publish a new version of librespot and it's corresponding crates. the command should be used as follows from the project root: `./publish 0.1.0` from the project root, substituting the new version number that you wish to publish. *Note the lack of a v prefix on the version number. This is important, do not add one.* The v prefix is added where appropriate by the script.
+
+Make sure that you are are starting from a clean working directory for both `dev` and `master`, completely up to date with remote and all local changes either committed and pushed or stashed.
+
+You will want to perform a dry run first: `./publish --dry-run 0.1.0`. Please make note of any errors or warnings. In particular, you may need to explicitly inform Git which remote you want to track for the `master` branch like so: `git --track origin/master` (or whatever you have called the `librespot-org` remote `master` branch).
+
+Depending on your system the script may fail to publish the main `librespot` crate after having published all the `librespot-xyz` sub-crates. If so then make sure the working directory is committed and pushed (watch `Cargo.toml`) and then run `cargo publish` manually after `publish.sh` finished.
+
+To publish the crates your GitHub account needs to be authorized on `crates.io` by `librespot-org`.
 
 ## What the script does
 
