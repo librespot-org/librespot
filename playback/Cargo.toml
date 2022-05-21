@@ -42,7 +42,7 @@ glib            = { version = "0.10", optional = true }
 
 # Rodio dependencies
 rodio           = { version = "0.14", optional = true, default-features = false }
-cpal            = { version = "0.13", optional = true }
+cpal            = { version = "<0.13.5", optional = true }
 
 # Decoder
 lewton = "0.10"
