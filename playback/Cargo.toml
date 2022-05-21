@@ -21,9 +21,10 @@ version = "0.3.1"
 futures-executor = "0.3"
 futures-util = { version = "0.3", default_features = false, features = ["alloc"] }
 log = "0.4"
+parking_lot = { version = "0.11", features = ["deadlock_detection"] }
 byteorder = "1.4"
 shell-words = "1.0.0"
-tokio = { version = "1", features = ["sync"] }
+tokio = { version = "1", features = ["sync", "parking_lot"] }
 zerocopy = { version = "0.3" }
 thiserror = { version = "1" }
 
@@ -34,8 +35,9 @@ libpulse-binding        = { version = "2", optional = true, default-features = f
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 jack            = { version = "0.7", optional = true }
 sdl2            = { version = "0.34.3", optional = true }
-gstreamer       = { version = "0.16", optional = true }
-gstreamer-app   = { version = "0.16", optional = true }
+gstreamer       = { version = "0.17", optional = true }
+gstreamer-app   = { version = "0.17", optional = true }
+gstreamer-audio = { version = "0.17", optional = true }
 glib            = { version = "0.10", optional = true }
 
 # Rodio dependencies
@@ -58,4 +60,4 @@ jackaudio-backend = ["jack"]
 rodio-backend = ["rodio", "cpal"]
 rodiojack-backend = ["rodio", "cpal/jack"]
 sdl-backend = ["sdl2"]
-gstreamer-backend = ["gstreamer", "gstreamer-app", "glib"]
+gstreamer-backend = ["gstreamer", "gstreamer-app", "gstreamer-audio", "glib"]

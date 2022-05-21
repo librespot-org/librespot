@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] More robust dynamic limiter for very wide dynamic range (breaking)
 - [core] `Session`: `connect()` now returns the long-term credentials.
 - [core] `Session`: `connect()` now accespt a flag if the credentails should be stored via the cache.
-- [build] The MSRV is now 1.53.
+- [chore] The MSRV is now 1.53.
+- [playback] `gstreamer`: create own context, set correct states and use sync handler
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
