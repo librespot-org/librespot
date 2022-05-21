@@ -26,7 +26,7 @@ impl Mixer for SoftMixer {
 
     fn volume(&self) -> u16 {
         let mapped_volume = f64::from_bits(self.volume.load(Ordering::Relaxed));
-        self.volume_ctrl.from_mapped(mapped_volume)
+        self.volume_ctrl.to_unmapped(mapped_volume)
     }
 
     fn set_volume(&self, volume: u16) {
