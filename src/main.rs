@@ -1124,6 +1124,43 @@ fn get_setup() -> Setup {
             exit(1);
         }
 
+        #[cfg(feature = "pulseaudio-backend")]
+        {
+            if env::var("PULSE_PROP_application.name").is_err() {
+                let pulseaudio_name = if name != connect_default_config.name {
+                    format!("{} - {}", connect_default_config.name, name)
+                } else {
+                    name.clone()
+                };
+
+                env::set_var("PULSE_PROP_application.name", pulseaudio_name);
+            }
+
+            if env::var("PULSE_PROP_application.version").is_err() {
+                env::set_var("PULSE_PROP_application.version", version::SEMVER);
+            }
+
+            if env::var("PULSE_PROP_application.icon_name").is_err() {
+                env::set_var("PULSE_PROP_application.icon_name", "audio-x-generic");
+            }
+
+            if env::var("PULSE_PROP_application.process.binary").is_err() {
+                env::set_var("PULSE_PROP_application.process.binary", "librespot");
+            }
+
+            if env::var("PULSE_PROP_stream.description").is_err() {
+                env::set_var("PULSE_PROP_stream.description", "Spotify Connect endpoint");
+            }
+
+            if env::var("PULSE_PROP_media.software").is_err() {
+                env::set_var("PULSE_PROP_media.software", "Spotify");
+            }
+
+            if env::var("PULSE_PROP_media.role").is_err() {
+                env::set_var("PULSE_PROP_media.role", "music");
+            }
+        }
+
         let initial_volume = opt_str(INITIAL_VOLUME)
             .map(|initial_volume| {
                 let volume = match initial_volume.parse::<u16>() {
@@ -1544,19 +1581,15 @@ async fn main() {
 
     if setup.enable_discovery {
         let device_id = setup.session_config.device_id.clone();
-
-        discovery = match librespot::discovery::Discovery::builder(device_id)
+        match librespot::discovery::Discovery::builder(device_id)
             .name(setup.connect_config.name.clone())
             .device_type(setup.connect_config.device_type)
             .port(setup.zeroconf_port)
             .launch()
         {
-            Ok(d) => Some(d),
-            Err(e) => {
-                error!("Discovery Error: {}", e);
-                exit(1);
-            }
-        }
+            Ok(d) => discovery = Some(d),
+            Err(err) => warn!("Could not initialise discovery: {}.", err),
+        };
     }
 
     if let Some(credentials) = setup.credentials {
@@ -1566,9 +1599,15 @@ async fn main() {
                 setup.session_config.clone(),
                 credentials,
                 setup.cache.clone(),
+                true,
             )
             .fuse(),
         );
+    } else if discovery.is_none() {
+        error!(
+            "Discovery is unavailable and no credentials provided. Authentication is not possible."
+        );
+        exit(1);
     }
 
     loop {
@@ -1596,6 +1635,7 @@ async fn main() {
                             setup.session_config.clone(),
                             credentials,
                             setup.cache.clone(),
+                            true,
                         ).fuse());
                     },
                     None => {
@@ -1605,18 +1645,18 @@ async fn main() {
                 }
             },
             session = &mut connecting, if !connecting.is_terminated() => match session {
-                Ok(session) => {
+                Ok((session,_)) => {
                     let mixer_config = setup.mixer_config.clone();
                     let mixer = (setup.mixer)(mixer_config);
                     let player_config = setup.player_config.clone();
                     let connect_config = setup.connect_config.clone();
 
-                    let audio_filter = mixer.get_audio_filter();
+                    let soft_volume = mixer.get_soft_volume();
                     let format = setup.format;
                     let backend = setup.backend;
                     let device = setup.device.clone();
                     let (player, event_channel) =
-                        Player::new(player_config, session.clone(), audio_filter, move || {
+                        Player::new(player_config, session.clone(), soft_volume, move || {
                             (backend)(device, format)
                         });
 
@@ -1673,6 +1713,7 @@ async fn main() {
                             setup.session_config.clone(),
                             credentials,
                             setup.cache.clone(),
+                            true
                         ).fuse());
                     },
                     _ => {

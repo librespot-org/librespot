@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `Sink`: `write()` now receives ownership of the packet (breaking).
 - [playback] `pipe`: create file if it doesn't already exist
 - [playback] More robust dynamic limiter for very wide dynamic range (breaking)
+- [core] `Session`: `connect()` now returns the long-term credentials.
+- [core] `Session`: `connect()` now accespt a flag if the credentails should be stored via the cache.
+- [chore] The MSRV is now 1.53.
 - [playback] `gstreamer`: create own context, set correct states and use sync handler
 
 ### Added
@@ -24,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [main] Add a `-q`, `--quiet` option that changes the logging level to warn.
 - [main] Add a short name for every flag and option.
 - [main] Add the ability to parse environment variables.
+- [playback] `pulseaudio`: set the PulseAudio name to match librespot's device name via `PULSE_PROP_application.name` environment variable (user set env var value takes precedence). (breaking)
+- [playback] `pulseaudio`: set icon to `audio-x-generic` so we get an icon instead of a placeholder via `PULSE_PROP_application.icon_name` environment variable (user set env var value takes precedence). (breaking)
+- [playback] `pulseaudio`: set values to: `PULSE_PROP_application.version`, `PULSE_PROP_application.process.binary`, `PULSE_PROP_stream.description`, `PULSE_PROP_media.software` and `PULSE_PROP_media.role` environment variables (user set env var values take precedence). (breaking)
 
 ### Fixed
 - [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
@@ -33,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Adhere to ReplayGain spec when calculating gain normalisation factor.
 - [playback] `alsa`: Use `--volume-range` overrides for softvol controls
 - [connect] Don't panic when activating shuffle without previous interaction.
+- [main] Fix crash when built with Avahi support but Avahi is locally unavailable.
 
 ### Removed
 - [playback] `alsamixer`: previously deprecated option `mixer-card` has been removed.
