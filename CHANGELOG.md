@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `Sink`: `write()` now receives ownership of the packet (breaking).
 - [playback] `pipe`: create file if it doesn't already exist
 - [playback] More robust dynamic limiter for very wide dynamic range (breaking)
+- [playback] `gstreamer`: create own context, set correct states and use sync handler
 
 ### Added
 - [cache] Add `disable-credential-cache` flag (breaking).
