@@ -16,7 +16,6 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use cfg_if::cfg_if;
 use futures_core::Stream;
 use librespot_core as core;
 use thiserror::Error;
@@ -100,29 +99,24 @@ impl Builder {
         let name = self.server_config.name.clone().into_owned();
         let server = DiscoveryServer::new(self.server_config, &mut port)?;
 
-        let svc;
+        #[cfg(feature = "with-dns-sd")]
+        let svc = dns_sd::DNSService::register(
+            Some(name.as_ref()),
+            "_spotify-connect._tcp",
+            None,
+            None,
+            port,
+            &["VERSION=1.0", "CPath=/"],
+        )
+        .map_err(|e| Error::DnsSdError(io::Error::new(io::ErrorKind::Unsupported, e)))?;
 
-        cfg_if! {
-            if #[cfg(feature = "with-dns-sd")] {
-                svc = dns_sd::DNSService::register(
-                    Some(name.as_ref()),
-                    "_spotify-connect._tcp",
-                    None,
-                    None,
-                    port,
-                    &["VERSION=1.0", "CPath=/"],
-                ).map_err(|e| Error::DnsSdError(io::Error::new(io::ErrorKind::Unsupported, e)))?;
-
-            } else {
-                let responder = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?;
-                svc = responder.register(
-                    "_spotify-connect._tcp".to_owned(),
-                    name,
-                    port,
-                    &["VERSION=1.0", "CPath=/"],
-                )
-            }
-        };
+        #[cfg(not(feature = "with-dns-sd"))]
+        let svc = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?.register(
+            "_spotify-connect._tcp".to_owned(),
+            name,
+            port,
+            &["VERSION=1.0", "CPath=/"],
+        );
 
         Ok(Discovery { server, _svc: svc })
     }
