@@ -2,8 +2,9 @@
 name = "librespot-audio"
 version = "0.4.0"
 authors = ["Paul Lietar <paul@lietar.net>"]
-description="The audio fetching and processing logic for librespot"
-license="MIT"
+description = "The audio fetching logic for librespot"
+license = "MIT"
+repository = "https://github.com/librespot-org/librespot"
 edition = "2018"
 
 [dependencies.librespot-core]
