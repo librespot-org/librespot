@@ -3,6 +3,7 @@ use crate::player::db_to_ratio;
 
 pub trait MappedCtrl {
     fn to_mapped(&self, volume: u16) -> f64;
+    #[allow(clippy::wrong_self_convention)]
     fn from_mapped(&self, mapped_volume: f64) -> u16;
 
     fn db_range(&self) -> f64;
