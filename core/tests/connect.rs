@@ -13,6 +13,7 @@ async fn test_connection() {
             SessionConfig::default(),
             Credentials::with_password("test", "test"),
             None,
+            false,
         )
         .await;
 

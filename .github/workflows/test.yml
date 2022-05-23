@@ -64,7 +64,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         toolchain:
-          - 1.48 # MSRV (Minimum supported rust version)
+          - 1.53 # MSRV (Minimum supported rust version)
           - stable
           - beta
         experimental: [false]
@@ -196,4 +196,4 @@ jobs:
       - name: Install cross
         run: cargo install cross || true
       - name: Build
-        run: cross build --locked --target ${{ matrix.target }} --no-default-features
+        run: cross build --target ${{ matrix.target }} --no-default-features

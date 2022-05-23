@@ -191,7 +191,7 @@ impl Mixer for AlsaMixer {
             mapped_volume = LogMapping::linear_to_mapped(mapped_volume, self.db_range);
         }
 
-        self.config.volume_ctrl.from_mapped(mapped_volume)
+        self.config.volume_ctrl.to_unmapped(mapped_volume)
     }
 
     fn set_volume(&self, volume: u16) {
