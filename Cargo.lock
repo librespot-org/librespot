@@ -1228,7 +1228,7 @@ dependencies = [
 
 [[package]]
 name = "librespot"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "base64",
  "env_logger",
@@ -1253,7 +1253,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-audio"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "aes-ctr",
  "byteorder",
@@ -1267,7 +1267,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-connect"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "form_urlencoded",
  "futures-util",
@@ -1286,7 +1286,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "aes",
  "base64",
@@ -1326,7 +1326,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-discovery"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "aes-ctr",
  "base64",
@@ -1350,7 +1350,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-metadata"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "async-trait",
  "byteorder",
@@ -1362,7 +1362,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-playback"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "alsa",
  "byteorder",
@@ -1396,7 +1396,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-protocol"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "glob",
  "protobuf",
