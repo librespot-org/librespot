@@ -21,11 +21,11 @@ version = "0.4.0"
 futures-executor = "0.3"
 futures-util = { version = "0.3", default_features = false, features = ["alloc"] }
 log = "0.4"
-parking_lot = { version = "0.11", features = ["deadlock_detection"] }
+parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 byteorder = "1.4"
 shell-words = "1.0.0"
 tokio = { version = "1", features = ["sync", "parking_lot"] }
-zerocopy = { version = "0.3" }
+zerocopy = { version = "0.6" }
 thiserror = { version = "1" }
 
 # Backends

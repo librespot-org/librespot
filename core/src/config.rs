@@ -12,7 +12,7 @@ pub struct SessionConfig {
 
 impl Default for SessionConfig {
     fn default() -> SessionConfig {
-        let device_id = uuid::Uuid::new_v4().to_hyphenated().to_string();
+        let device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
         SessionConfig {
             user_agent: crate::version::VERSION_STRING.to_string(),
             device_id,
