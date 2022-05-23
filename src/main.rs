@@ -1053,7 +1053,7 @@ fn get_setup() -> Setup {
                     Some(creds) if username == creds.username => Some(creds),
                     _ => {
                         let prompt = &format!("Password for {}: ", username);
-                        match rpassword::prompt_password_stderr(prompt) {
+                        match rpassword::prompt_password(prompt) {
                             Ok(password) => {
                                 if !password.is_empty() {
                                     Some(Credentials::with_password(username, password))
