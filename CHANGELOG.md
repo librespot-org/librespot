@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 ### Fixed
+- [playback] `alsamixer`: make `--volume-ctrl fixed` work as expected when combined with `--mixer alsa`
 
 ### Removed
 
