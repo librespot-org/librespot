@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+## [0.4.1] - 2022-05-23
+
+### Changed
+- [chore] The MSRV is now 1.56
+
+### Fixed
+- [playback] Fixed dependency issues when installing from crate
+
 ## [0.4.0] - 2022-05-21
 
 ### Changed
@@ -127,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2019-11-06
 
-[unreleased]: https://github.com/librespot-org/librespot/compare/v0.4.0..HEAD
+[unreleased]: https://github.com/librespot-org/librespot/compare/v0.4.1..HEAD
+[0.4.1]: https://github.com/librespot-org/librespot/compare/v0.4.0..v0.4.1
 [0.4.0]: https://github.com/librespot-org/librespot/compare/v0.3.1..v0.4.0
 [0.3.1]: https://github.com/librespot-org/librespot/compare/v0.3.0..v0.3.1
 [0.3.0]: https://github.com/librespot-org/librespot/compare/v0.2.0..v0.3.0

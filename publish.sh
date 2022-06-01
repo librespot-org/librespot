@@ -27,14 +27,17 @@ function updateVersion {
   do
     if [ "$CRATE" = "librespot" ]
     then
-      CRATE=''
+      CRATE_DIR=''
+    else
+      CRATE_DIR=$CRATE
     fi
-    crate_path="$WORKINGDIR/$CRATE/Cargo.toml"
+    crate_path="$WORKINGDIR/$CRATE_DIR/Cargo.toml"
     crate_path=${crate_path//\/\///}
     sed -i '' "s/^version.*/version = \"$1\"/g" "$crate_path"
     echo "Path is $crate_path"
     if [ "$CRATE" = "librespot" ]
     then
+      echo "Updating lockfile"
       if [ "$DRY_RUN" = 'true' ] ; then
         cargo update --dry-run
         git add . && git commit --dry-run -a -m "Update Cargo.lock"
