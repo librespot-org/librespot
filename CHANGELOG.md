@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- [playback] `pipe`: close & reopen file between songs when --disable-gapless is set
 
 ### Added
 

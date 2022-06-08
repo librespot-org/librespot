@@ -52,6 +52,12 @@ impl Sink for StdoutSink {
     }
 
     sink_as_bytes!();
+
+    fn stop(&mut self) -> SinkResult<()> {
+        self.output = None;
+
+        Ok(())
+    }
 }
 
 impl SinkAsBytes for StdoutSink {
