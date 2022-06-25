@@ -658,7 +658,15 @@ fn get_setup() -> Setup {
         trace!("Command line argument(s):");
 
         for (index, key) in args.iter().enumerate() {
-            let opt = key.trim_start_matches('-');
+            let opt = {
+                let key = key.trim_start_matches('-');
+
+                if let Some((s, _)) = key.split_once('=') {
+                    s
+                } else {
+                    key
+                }
+            };
 
             if index > 0
                 && key.starts_with('-')
@@ -668,13 +676,13 @@ fn get_setup() -> Setup {
             {
                 if matches!(opt, PASSWORD | PASSWORD_SHORT | USERNAME | USERNAME_SHORT) {
                     // Don't log creds.
-                    trace!("\t\t{} \"XXXXXXXX\"", key);
+                    trace!("\t\t{} \"XXXXXXXX\"", opt);
                 } else {
                     let value = matches.opt_str(opt).unwrap_or_else(|| "".to_string());
                     if value.is_empty() {
-                        trace!("\t\t{}", key);
+                        trace!("\t\t{}", opt);
                     } else {
-                        trace!("\t\t{} \"{}\"", key, value);
+                        trace!("\t\t{} \"{}\"", opt, value);
                     }
                 }
             }
