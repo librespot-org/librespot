@@ -29,11 +29,12 @@ impl Deref for Date {
 
 impl Date {
     pub fn as_timestamp(&self) -> i64 {
-        self.0.unix_timestamp()
+        (self.0.unix_timestamp_nanos() / 1_000_000) as i64
     }
 
     pub fn from_timestamp(timestamp: i64) -> Result<Self, Error> {
-        let date_time = OffsetDateTime::from_unix_timestamp(timestamp)?;
+        // the timestamp is in milliseconds
+        let date_time = OffsetDateTime::from_unix_timestamp_nanos(timestamp as i128 * 1_000_000)?;
         Ok(Self(date_time))
     }
 

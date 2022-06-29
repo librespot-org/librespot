@@ -7,7 +7,7 @@ use std::{
 
 use crate::{image::PictureSizes, util::from_repeated_enum};
 
-use librespot_core::{date::Date, SpotifyId};
+use librespot_core::date::Date;
 
 use librespot_protocol as protocol;
 use protocol::playlist4_external::FormatListAttribute as PlaylistFormatAttributeMessage;
@@ -24,7 +24,7 @@ use protocol::playlist4_external::UpdateListAttributes as PlaylistUpdateAttribut
 pub struct PlaylistAttributes {
     pub name: String,
     pub description: String,
-    pub picture: SpotifyId,
+    pub picture: Vec<u8>,
     pub is_collaborative: bool,
     pub pl3_version: String,
     pub is_deleted_by_owner: bool,
@@ -63,7 +63,7 @@ pub struct PlaylistItemAttributes {
     pub seen_at: Date,
     pub is_public: bool,
     pub format_attributes: PlaylistFormatAttribute,
-    pub item_id: SpotifyId,
+    pub item_id: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -113,7 +113,7 @@ impl TryFrom<&PlaylistAttributesMessage> for PlaylistAttributes {
         Ok(Self {
             name: attributes.get_name().to_owned(),
             description: attributes.get_description().to_owned(),
-            picture: attributes.get_picture().try_into()?,
+            picture: attributes.get_picture().to_owned(),
             is_collaborative: attributes.get_collaborative(),
             pl3_version: attributes.get_pl3_version().to_owned(),
             is_deleted_by_owner: attributes.get_deleted_by_owner(),
@@ -150,7 +150,7 @@ impl TryFrom<&PlaylistItemAttributesMessage> for PlaylistItemAttributes {
             seen_at: attributes.get_seen_at().try_into()?,
             is_public: attributes.get_public(),
             format_attributes: attributes.get_format_attributes().into(),
-            item_id: attributes.get_item_id().try_into()?,
+            item_id: attributes.get_item_id().to_owned(),
         })
     }
 }

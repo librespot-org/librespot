@@ -39,12 +39,12 @@ impl Deref for Geoblocks {
 #[derive(Debug, Clone)]
 pub struct Playlist {
     pub id: NamedSpotifyId,
-    pub revision: SpotifyId,
+    pub revision: Vec<u8>,
     pub length: i32,
     pub attributes: PlaylistAttributes,
     pub contents: PlaylistItemList,
-    pub diff: PlaylistDiff,
-    pub sync_result: PlaylistDiff,
+    pub diff: Option<PlaylistDiff>,
+    pub sync_result: Option<PlaylistDiff>,
     pub resulting_revisions: Playlists,
     pub has_multiple_heads: bool,
     pub is_up_to_date: bool,
@@ -77,12 +77,12 @@ impl Deref for RootPlaylist {
 
 #[derive(Debug, Clone)]
 pub struct SelectedListContent {
-    pub revision: SpotifyId,
+    pub revision: Vec<u8>,
     pub length: i32,
     pub attributes: PlaylistAttributes,
     pub contents: PlaylistItemList,
-    pub diff: PlaylistDiff,
-    pub sync_result: PlaylistDiff,
+    pub diff: Option<PlaylistDiff>,
+    pub sync_result: Option<PlaylistDiff>,
     pub resulting_revisions: Playlists,
     pub has_multiple_heads: bool,
     pub is_up_to_date: bool,
@@ -202,12 +202,16 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
     type Error = librespot_core::Error;
     fn try_from(playlist: &<Playlist as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
-            revision: playlist.get_revision().try_into()?,
+            revision: playlist.get_revision().to_owned(),
             length: playlist.get_length(),
             attributes: playlist.get_attributes().try_into()?,
             contents: playlist.get_contents().try_into()?,
-            diff: playlist.get_diff().try_into()?,
-            sync_result: playlist.get_sync_result().try_into()?,
+            diff: playlist.diff.as_ref().map(TryInto::try_into).transpose()?,
+            sync_result: playlist
+                .sync_result
+                .as_ref()
+                .map(TryInto::try_into)
+                .transpose()?,
             resulting_revisions: playlist.get_resulting_revisions().try_into()?,
             has_multiple_heads: playlist.get_multiple_heads(),
             is_up_to_date: playlist.get_up_to_date(),
