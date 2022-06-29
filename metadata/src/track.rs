@@ -18,7 +18,7 @@ use crate::{
     restriction::Restrictions,
     sale_period::SalePeriods,
     util::try_from_repeated_message,
-    Metadata, RequestResult,
+    Album, Metadata, RequestResult,
 };
 
 use librespot_core::{date::Date, Error, Session, SpotifyId};
@@ -28,7 +28,7 @@ use librespot_protocol as protocol;
 pub struct Track {
     pub id: SpotifyId,
     pub name: String,
-    pub album: SpotifyId,
+    pub album: Album,
     pub artists: Artists,
     pub number: i32,
     pub disc_number: i32,
