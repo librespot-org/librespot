@@ -1,5 +1,5 @@
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     ops::{Deref, DerefMut},
 };
 
@@ -152,7 +152,7 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
 
                     Ok(MaybeExpiringUrl(
                         cdn_url.to_owned(),
-                        Some(expiry.try_into()?),
+                        Some(Date::from_timestamp_ms(expiry * 1000)?),
                     ))
                 } else {
                     Ok(MaybeExpiringUrl(cdn_url.to_owned(), None))

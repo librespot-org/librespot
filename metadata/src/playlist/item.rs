@@ -94,7 +94,7 @@ impl TryFrom<&PlaylistMetaItemMessage> for PlaylistMetaItem {
             revision: item.try_into()?,
             attributes: item.get_attributes().try_into()?,
             length: item.get_length(),
-            timestamp: item.get_timestamp().try_into()?,
+            timestamp: Date::from_timestamp_ms(item.get_timestamp())?,
             owner_username: item.get_owner_username().to_owned(),
             has_abuse_reporting: item.get_abuse_reporting_enabled(),
             capabilities: item.get_capabilities().into(),

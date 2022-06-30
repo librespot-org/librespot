@@ -146,8 +146,8 @@ impl TryFrom<&PlaylistItemAttributesMessage> for PlaylistItemAttributes {
     fn try_from(attributes: &PlaylistItemAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             added_by: attributes.get_added_by().to_owned(),
-            timestamp: attributes.get_timestamp().try_into()?,
-            seen_at: attributes.get_seen_at().try_into()?,
+            timestamp: Date::from_timestamp_ms(attributes.get_timestamp())?,
+            seen_at: Date::from_timestamp_ms(attributes.get_seen_at())?,
             is_public: attributes.get_public(),
             format_attributes: attributes.get_format_attributes().into(),
             item_id: attributes.get_item_id().to_owned(),

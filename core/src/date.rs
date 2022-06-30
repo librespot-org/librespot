@@ -28,12 +28,11 @@ impl Deref for Date {
 }
 
 impl Date {
-    pub fn as_timestamp(&self) -> i64 {
+    pub fn as_timestamp_ms(&self) -> i64 {
         (self.0.unix_timestamp_nanos() / 1_000_000) as i64
     }
 
-    pub fn from_timestamp(timestamp: i64) -> Result<Self, Error> {
-        // the timestamp is in milliseconds
+    pub fn from_timestamp_ms(timestamp: i64) -> Result<Self, Error> {
         let date_time = OffsetDateTime::from_unix_timestamp_nanos(timestamp as i128 * 1_000_000)?;
         Ok(Self(date_time))
     }
@@ -78,12 +77,5 @@ impl TryFrom<&DateMessage> for Date {
 impl From<OffsetDateTime> for Date {
     fn from(datetime: OffsetDateTime) -> Self {
         Self(datetime)
-    }
-}
-
-impl TryFrom<i64> for Date {
-    type Error = crate::Error;
-    fn try_from(timestamp: i64) -> Result<Self, Self::Error> {
-        Self::from_timestamp(timestamp)
     }
 }

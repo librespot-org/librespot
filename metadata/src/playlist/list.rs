@@ -216,7 +216,7 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
             has_multiple_heads: playlist.get_multiple_heads(),
             is_up_to_date: playlist.get_up_to_date(),
             nonces: playlist.get_nonces().into(),
-            timestamp: playlist.get_timestamp().try_into()?,
+            timestamp: Date::from_timestamp_ms(playlist.get_timestamp())?,
             owner_username: playlist.get_owner_username().to_owned(),
             has_abuse_reporting: playlist.get_abuse_reporting_enabled(),
             capabilities: playlist.get_capabilities().into(),
