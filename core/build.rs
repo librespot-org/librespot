@@ -1,12 +1,18 @@
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use std::env;
-use vergen::{generate_cargo_keys, ConstantsFlags};
+use vergen::{vergen, Config, ShaKind, TimestampKind};
 
 fn main() {
-    let mut flags = ConstantsFlags::all();
-    flags.toggle(ConstantsFlags::REBUILD_ON_HEAD_CHANGE);
-    generate_cargo_keys(ConstantsFlags::all()).expect("Unable to generate the cargo keys!");
+    let mut config = Config::default();
+    let gitcfg = config.git_mut();
+    *gitcfg.sha_kind_mut() = ShaKind::Short;
+    *gitcfg.commit_timestamp_mut() = true;
+    *gitcfg.commit_timestamp_kind_mut() = TimestampKind::DateOnly;
+    *gitcfg.rerun_on_head_change_mut() = true;
+    *config.build_mut().kind_mut() = TimestampKind::DateOnly;
+
+    vergen(config).expect("Unable to generate the cargo keys!");
 
     let build_id = match env::var("SOURCE_DATE_EPOCH") {
         Ok(val) => val,
