@@ -478,6 +478,7 @@ impl SpircTask {
             }
             SpircCommand::Shutdown => {
                 CommandSender::new(self, MessageType::kMessageTypeGoodbye).send();
+                self.player.stop();
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()
