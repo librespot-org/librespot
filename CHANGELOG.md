@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- [playback] `subprocess`: Better error handling
+- [playback] `pipe`: Better error handling
 
 ### Added
+- [playback] `pipe`: Implement stop
 
 ### Fixed
 - [playback] `alsamixer`: make `--volume-ctrl fixed` work as expected when combined with `--mixer alsa`
+- [main] fix `--opt=value` line argument logging
 
 ### Removed
 
