@@ -8,6 +8,7 @@ use url::Url;
 
 const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
 const AP_FALLBACK: &str = "ap.spotify.com:443";
+const AP_BLACKLIST: [&str; 1] = ["ap-gew4.spotify.com"];
 
 #[derive(Clone, Debug, Deserialize)]
 struct ApResolveData {
@@ -42,8 +43,23 @@ async fn try_apresolve(
     let body = hyper::body::to_bytes(response.into_body()).await?;
     let data: ApResolveData = serde_json::from_slice(body.as_ref())?;
 
+    // filter APs that are known to cause channel errors
+    let aps: Vec<String> = data
+        .ap_list
+        .into_iter()
+        .filter_map(|ap| {
+            let host = ap.parse::<Uri>().ok()?.host()?.to_owned();
+            if !AP_BLACKLIST.iter().any(|&blacklisted| host == blacklisted) {
+                Some(ap)
+            } else {
+                None
+            }
+        })
+        .collect();
+
     let ap = if ap_port.is_some() || proxy.is_some() {
-        data.ap_list.into_iter().find_map(|ap| {
+        // filter on ports if specified on the command line...
+        aps.into_iter().find_map(|ap| {
             if ap.parse::<Uri>().ok()?.port()? == port {
                 Some(ap)
             } else {
@@ -51,7 +67,8 @@ async fn try_apresolve(
             }
         })
     } else {
-        data.ap_list.into_iter().next()
+        // ...or pick the first on the list
+        aps.into_iter().next()
     }
     .ok_or("empty AP List")?;
 
