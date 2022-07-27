@@ -8,11 +8,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use aes::{
-    cipher::generic_array::GenericArray,
-    cipher::{NewCipher, StreamCipher},
-    Aes128Ctr,
-};
+use aes::cipher::{KeyIvInit, StreamCipher};
 use futures_core::Stream;
 use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
@@ -31,6 +27,8 @@ use crate::{
     core::config::DeviceType,
     core::{authentication::Credentials, diffie_hellman::DhLocalKeys, Error},
 };
+
+type Aes128Ctr = ctr::Ctr128BE<aes::Aes128>;
 
 type Params<'a> = BTreeMap<Cow<'a, str>, Cow<'a, str>>;
 
@@ -151,10 +149,8 @@ impl RequestHandler {
 
         let decrypted = {
             let mut data = encrypted.to_vec();
-            let mut cipher = Aes128Ctr::new(
-                GenericArray::from_slice(&encryption_key[0..16]),
-                GenericArray::from_slice(iv),
-            );
+            let mut cipher = Aes128Ctr::new_from_slices(&encryption_key[0..16], iv)
+                .map_err(DiscoveryError::AesError)?;
             cipher.apply_keystream(&mut data);
             data
         };

@@ -7,7 +7,7 @@ use librespot_core::{authentication::Credentials, config::SessionConfig, session
 #[tokio::test]
 async fn test_connection() {
     timeout(Duration::from_secs(30), async {
-        let result = Session::new(SessionConfig::default(), None)
+        let result = Session::new(SessionConfig::default(), None, false)
             .connect(Credentials::with_password("test", "test"))
             .await;
 

@@ -15,7 +15,7 @@ pub struct SessionConfig {
 
 impl Default for SessionConfig {
     fn default() -> SessionConfig {
-        let device_id = uuid::Uuid::new_v4().to_hyphenated().to_string();
+        let device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
         SessionConfig {
             client_id: KEYMASTER_CLIENT_ID.to_owned(),
             device_id,

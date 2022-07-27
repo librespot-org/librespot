@@ -375,7 +375,7 @@ impl Cache {
                 path
             }),
             Err(e) => {
-                warn!("{}", e);
+                warn!("Invalid FileId: {}", e);
                 None
             }
         }

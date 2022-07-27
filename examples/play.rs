@@ -7,6 +7,7 @@ use librespot::{
     playback::{
         audio_backend,
         config::{AudioFormat, PlayerConfig},
+        mixer::NoOpVolume,
         player::Player,
     },
 };
@@ -30,12 +31,12 @@ async fn main() {
 
     println!("Connecting...");
     let session = Session::new(session_config, None);
-    if let Err(e) = session.connect(credentials).await {
+    if let Err(e) = session.connect(credentials, false).await {
         println!("Error connecting: {}", e);
         exit(1);
     }
 
-    let (mut player, _) = Player::new(player_config, session, None, move || {
+    let (mut player, _) = Player::new(player_config, session, Box::new(NoOpVolume), move || {
         backend(None, audio_format)
     });
 

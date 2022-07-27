@@ -1,6 +1,6 @@
 [package]
 name = "librespot-playback"
-version = "0.3.1"
+version = "0.4.1"
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
 description = "The audio playback logic for librespot"
 license = "MIT"
@@ -9,21 +9,21 @@ edition = "2018"
 
 [dependencies.librespot-audio]
 path = "../audio"
-version = "0.3.1"
+version = "0.4.1"
 [dependencies.librespot-core]
 path = "../core"
-version = "0.3.1"
+version = "0.4.1"
 [dependencies.librespot-metadata]
 path = "../metadata"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies]
 byteorder = "1"
 futures-util = "0.3"
 log = "0.4"
-parking_lot = { version = "0.11", features = ["deadlock_detection"] }
-shell-words = "1.0.0"
-thiserror = "1.0"
+parking_lot = { version = "0.12", features = ["deadlock_detection"] }
+shell-words = "1.1"
+thiserror = "1"
 tokio = { version = "1", features = ["parking_lot", "rt", "rt-multi-thread", "sync"] }
 zerocopy = "0.6"
 
@@ -32,11 +32,11 @@ alsa            = { version = "0.6", optional = true }
 portaudio-rs    = { version = "0.3", optional = true }
 libpulse-binding        = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
-jack            = { version = "0.8", optional = true }
+jack            = { version = "0.10", optional = true }
 sdl2            = { version = "0.35", optional = true }
-gst             = { package = "gstreamer", version = "0.18", optional = true }
-gst-app         = { package = "gstreamer-app", version = "0.18", optional = true }
-gst-audio       = { package = "gstreamer-audio", version = "0.18", optional = true }
+gstreamer       = { version = "0.18", optional = true }
+gstreamer-app   = { version = "0.18", optional = true }
+gstreamer-audio = { version = "0.18", optional = true }
 glib            = { version = "0.15", optional = true }
 
 # Rodio dependencies
@@ -61,6 +61,6 @@ jackaudio-backend = ["jack"]
 rodio-backend = ["rodio", "cpal"]
 rodiojack-backend = ["rodio", "cpal/jack"]
 sdl-backend = ["sdl2"]
-gstreamer-backend = ["gst", "gst-app", "gst-audio", "glib"]
+gstreamer-backend = ["gstreamer", "gstreamer-app", "gstreamer-audio", "glib"]
 
 passthrough-decoder = ["ogg"]

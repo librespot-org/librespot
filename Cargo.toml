@@ -1,6 +1,6 @@
 [package]
 name = "librespot"
-version = "0.3.1"
+version = "0.4.1"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
@@ -22,31 +22,31 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies.librespot-connect]
 path = "connect"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies.librespot-core]
 path = "core"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies.librespot-discovery]
 path = "discovery"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies.librespot-metadata]
 path = "metadata"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies.librespot-playback]
 path = "playback"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies.librespot-protocol]
 path = "protocol"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies]
 env_logger =  { version = "0.9", default-features = false, features = ["termcolor", "humantime", "atty"] }
@@ -54,8 +54,8 @@ futures-util = { version = "0.3", default_features = false }
 getopts = "0.2"
 hex = "0.4"
 log = "0.4"
-rpassword = "5.0"
-sha-1 = "0.10"
+rpassword = "7.0"
+sha1 = "0.10"
 thiserror = "1.0"
 tokio = { version = "1", features = ["rt", "macros", "signal", "sync", "parking_lot", "process"] }
 url = "2.2"

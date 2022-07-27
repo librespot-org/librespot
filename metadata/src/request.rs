@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use crate::MetadataError;
 
 use librespot_core::{Error, Session};
@@ -13,10 +15,10 @@ pub trait MercuryRequest {
             Some(_) => "&",
             None => "?",
         };
-        metrics_uri.push_str(&format!("{}country={}", separator, session.country()));
+        let _ = write!(metrics_uri, "{}country={}", separator, session.country());
 
         if let Some(product) = session.get_user_attribute("type") {
-            metrics_uri.push_str(&format!("&product={}", product));
+            let _ = write!(metrics_uri, "&product={}", product);
         }
 
         trace!("Requesting {}", metrics_uri);

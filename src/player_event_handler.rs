@@ -17,17 +17,17 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<Result
             old_track_id,
             new_track_id,
         } => match old_track_id.to_base62() {
-            Err(_) => {
+            Err(e) => {
                 return Some(Err(Error::new(
                     ErrorKind::InvalidData,
-                    "PlayerEvent::Changed: Invalid old track id",
+                    format!("PlayerEvent::Changed: Invalid old track id: {}", e),
                 )))
             }
             Ok(old_id) => match new_track_id.to_base62() {
-                Err(_) => {
+                Err(e) => {
                     return Some(Err(Error::new(
                         ErrorKind::InvalidData,
-                        "PlayerEvent::Changed: Invalid new track id",
+                        format!("PlayerEvent::Changed: Invalid old track id: {}", e),
                     )))
                 }
                 Ok(new_id) => {
@@ -38,10 +38,10 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<Result
             },
         },
         PlayerEvent::Started { track_id, .. } => match track_id.to_base62() {
-            Err(_) => {
+            Err(e) => {
                 return Some(Err(Error::new(
                     ErrorKind::InvalidData,
-                    "PlayerEvent::Started: Invalid track id",
+                    format!("PlayerEvent::Started: Invalid track id: {}", e),
                 )))
             }
             Ok(id) => {
@@ -50,10 +50,10 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<Result
             }
         },
         PlayerEvent::Stopped { track_id, .. } => match track_id.to_base62() {
-            Err(_) => {
+            Err(e) => {
                 return Some(Err(Error::new(
                     ErrorKind::InvalidData,
-                    "PlayerEvent::Stopped: Invalid track id",
+                    format!("PlayerEvent::Stopped: Invalid track id: {}", e),
                 )))
             }
             Ok(id) => {
@@ -67,10 +67,10 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<Result
             position_ms,
             ..
         } => match track_id.to_base62() {
-            Err(_) => {
+            Err(e) => {
                 return Some(Err(Error::new(
                     ErrorKind::InvalidData,
-                    "PlayerEvent::Playing: Invalid track id",
+                    format!("PlayerEvent::Playing: Invalid track id: {}", e),
                 )))
             }
             Ok(id) => {
@@ -86,10 +86,10 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<Result
             position_ms,
             ..
         } => match track_id.to_base62() {
-            Err(_) => {
+            Err(e) => {
                 return Some(Err(Error::new(
                     ErrorKind::InvalidData,
-                    "PlayerEvent::Paused: Invalid track id",
+                    format!("PlayerEvent::Paused: Invalid track id: {}", e),
                 )))
             }
             Ok(id) => {
@@ -100,10 +100,10 @@ pub fn run_program_on_events(event: PlayerEvent, onevent: &str) -> Option<Result
             }
         },
         PlayerEvent::Preloading { track_id, .. } => match track_id.to_base62() {
-            Err(_) => {
+            Err(e) => {
                 return Some(Err(Error::new(
                     ErrorKind::InvalidData,
-                    "PlayerEvent::Preloading: Invalid track id",
+                    format!("PlayerEvent::Preloading: Invalid track id: {}", e),
                 )))
             }
             Ok(id) => {

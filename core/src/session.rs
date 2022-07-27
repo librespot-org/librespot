@@ -126,7 +126,11 @@ impl Session {
         }))
     }
 
-    pub async fn connect(&self, credentials: Credentials) -> Result<(), Error> {
+    pub async fn connect(
+        &self,
+        credentials: Credentials,
+        store_credentials: bool,
+    ) -> Result<(), Error> {
         let ap = self.apresolver().resolve("accesspoint").await?;
         info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
         let mut transport = connection::connect(&ap.0, ap.1, self.config().proxy.as_ref()).await?;
@@ -136,7 +140,9 @@ impl Session {
         info!("Authenticated as \"{}\" !", reusable_credentials.username);
         self.set_username(&reusable_credentials.username);
         if let Some(cache) = self.cache() {
-            cache.save_credentials(&reusable_credentials);
+            if store_credentials {
+                cache.save_credentials(&reusable_credentials);
+            }
         }
 
         let (tx_connection, rx_connection) = mpsc::unbounded_channel();

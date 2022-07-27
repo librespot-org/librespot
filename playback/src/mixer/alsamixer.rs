@@ -104,23 +104,33 @@ impl Mixer for AlsaMixer {
 
         let min_db = min_millibel.to_db() as f64;
         let max_db = max_millibel.to_db() as f64;
-        let mut db_range = f64::abs(max_db - min_db);
+        let reported_db_range = f64::abs(max_db - min_db);
 
         // Synchronize the volume control dB range with the mixer control,
         // unless it was already set with a command line option.
-        if !config.volume_ctrl.range_ok() {
-            if db_range > 100.0 {
-                debug!("Alsa mixer reported dB range > 100, which is suspect");
-                warn!("Please manually set `--volume-range` if this is incorrect");
-            }
-            config.volume_ctrl.set_db_range(db_range);
-        } else {
+        let db_range = if config.volume_ctrl.range_ok() {
             let db_range_override = config.volume_ctrl.db_range();
+            if db_range_override.is_normal() {
+                db_range_override
+            } else {
+                reported_db_range
+            }
+        } else {
+            config.volume_ctrl.set_db_range(reported_db_range);
+            reported_db_range
+        };
+
+        if reported_db_range == db_range {
+            debug!("Alsa dB volume range was reported as {}", reported_db_range);
+            if reported_db_range > 100.0 {
+                debug!("Alsa mixer reported dB range > 100, which is suspect");
+                debug!("Please manually set `--volume-range` if this is incorrect");
+            }
+        } else {
             debug!(
-                "Alsa dB volume range was detected as {} but overridden as {}",
-                db_range, db_range_override
+                "Alsa dB volume range was reported as {} but overridden to {}",
+                reported_db_range, db_range
             );
-            db_range = db_range_override;
         }
 
         // For hardware controls with a small range (24 dB or less),

@@ -52,13 +52,13 @@ pub struct Builder {
 /// Errors that can occur while setting up a [`Discovery`] instance.
 #[derive(Debug, Error)]
 pub enum DiscoveryError {
-    /// Setting up service discovery via DNS-SD failed.
+    #[error("Creating SHA1 block cipher failed")]
+    AesError(#[from] aes::cipher::InvalidLength),
     #[error("Setting up dns-sd failed: {0}")]
     DnsSdError(#[from] io::Error),
-    /// Setting up the http server failed.
     #[error("Creating SHA1 HMAC failed for base key {0:?}")]
     HmacError(Vec<u8>),
-    #[error("Setting up the http server failed: {0}")]
+    #[error("Setting up the HTTP server failed: {0}")]
     HttpServerError(#[from] hyper::Error),
     #[error("Missing params for key {0}")]
     ParamsError(&'static str),
@@ -67,6 +67,7 @@ pub enum DiscoveryError {
 impl From<DiscoveryError> for Error {
     fn from(err: DiscoveryError) -> Self {
         match err {
+            DiscoveryError::AesError(_) => Error::unavailable(err),
             DiscoveryError::DnsSdError(_) => Error::unavailable(err),
             DiscoveryError::HmacError(_) => Error::invalid_argument(err),
             DiscoveryError::HttpServerError(_) => Error::unavailable(err),

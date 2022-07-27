@@ -19,7 +19,7 @@ async fn main() {
     let credentials = Credentials::with_password(&args[1], &args[2]);
     let session = Session::new(session_config, None);
 
-    match session.connect(credentials).await {
+    match session.connect(credentials, false).await {
         Ok(()) => println!(
             "Token: {:#?}",
             session.token_provider().get_token(SCOPES).await.unwrap()

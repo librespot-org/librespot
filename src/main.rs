@@ -668,7 +668,15 @@ fn get_setup() -> Setup {
         trace!("Command line argument(s):");
 
         for (index, key) in args.iter().enumerate() {
-            let opt = key.trim_start_matches('-');
+            let opt = {
+                let key = key.trim_start_matches('-');
+
+                if let Some((s, _)) = key.split_once('=') {
+                    s
+                } else {
+                    key
+                }
+            };
 
             if index > 0
                 && key.starts_with('-')
@@ -678,13 +686,13 @@ fn get_setup() -> Setup {
             {
                 if matches!(opt, PASSWORD | PASSWORD_SHORT | USERNAME | USERNAME_SHORT) {
                     // Don't log creds.
-                    trace!("\t\t{} \"XXXXXXXX\"", key);
+                    trace!("\t\t{} \"XXXXXXXX\"", opt);
                 } else {
                     let value = matches.opt_str(opt).unwrap_or_else(|| "".to_string());
                     if value.is_empty() {
-                        trace!("\t\t{}", key);
+                        trace!("\t\t{}", opt);
                     } else {
-                        trace!("\t\t{} \"{}\"", key, value);
+                        trace!("\t\t{} \"{}\"", opt, value);
                     }
                 }
             }
@@ -1072,7 +1080,7 @@ fn get_setup() -> Setup {
                     Some(creds) if username == creds.username => Some(creds),
                     _ => {
                         let prompt = &format!("Password for {}: ", username);
-                        match rpassword::prompt_password_stderr(prompt) {
+                        match rpassword::prompt_password(prompt) {
                             Ok(password) => {
                                 if !password.is_empty() {
                                     Some(Credentials::with_password(username, password))
@@ -1599,24 +1607,25 @@ async fn main() {
 
     if setup.enable_discovery {
         let device_id = setup.session_config.device_id.clone();
-
-        discovery = match librespot::discovery::Discovery::builder(device_id)
+        match librespot::discovery::Discovery::builder(device_id)
             .name(setup.connect_config.name.clone())
             .device_type(setup.connect_config.device_type)
             .port(setup.zeroconf_port)
             .launch()
         {
-            Ok(d) => Some(d),
-            Err(e) => {
-                error!("Discovery Error: {}", e);
-                exit(1);
-            }
-        }
+            Ok(d) => discovery = Some(d),
+            Err(err) => warn!("Could not initialise discovery: {}.", err),
+        };
     }
 
     if let Some(credentials) = setup.credentials {
         last_credentials = Some(credentials);
         connecting = true;
+    } else if discovery.is_none() {
+        error!(
+            "Discovery is unavailable and no credentials provided. Authentication is not possible."
+        );
+        exit(1);
     }
 
     loop {
@@ -1656,12 +1665,12 @@ async fn main() {
                 let player_config = setup.player_config.clone();
                 let connect_config = setup.connect_config.clone();
 
-                let audio_filter = mixer.get_audio_filter();
+                let soft_volume = mixer.get_soft_volume();
                 let format = setup.format;
                 let backend = setup.backend;
                 let device = setup.device.clone();
                 let (player, event_channel) =
-                    Player::new(player_config, session.clone(), audio_filter, move || {
+                    Player::new(player_config, session.clone(), soft_volume, move || {
                         (backend)(device, format)
                     });
 

@@ -191,7 +191,7 @@ jobs:
       - name: Install cross
         run: cargo install cross || true
       - name: Build
-        run: cross build --locked --target ${{ matrix.target }} --no-default-features
+        run: cross build --target ${{ matrix.target }} --no-default-features
 
   clippy:
     needs: [test-cross-arm, test-windows]

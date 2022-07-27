@@ -1,6 +1,6 @@
 use std::io::{self, Read};
 
-use aes::{Aes192, BlockDecrypt};
+use aes::Aes192;
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
@@ -106,13 +106,12 @@ impl Credentials {
 
         // decrypt data using ECB mode without padding
         let blob = {
-            use aes::cipher::generic_array::typenum::Unsigned;
             use aes::cipher::generic_array::GenericArray;
-            use aes::cipher::{BlockCipher, NewBlockCipher};
+            use aes::cipher::{BlockDecrypt, BlockSizeUser, KeyInit};
 
             let mut data = base64::decode(encrypted_blob)?;
             let cipher = Aes192::new(GenericArray::from_slice(&key));
-            let block_size = <Aes192 as BlockCipher>::BlockSize::to_usize();
+            let block_size = Aes192::block_size();
 
             for chunk in data.chunks_exact_mut(block_size) {
                 cipher.decrypt_block(GenericArray::from_mut_slice(chunk));

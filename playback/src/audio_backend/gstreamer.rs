@@ -1,8 +1,12 @@
-use gst::{
+use gstreamer::{
     event::{FlushStart, FlushStop},
     prelude::*,
     State,
 };
+
+use gstreamer as gst;
+use gstreamer_app as gst_app;
+use gstreamer_audio as gst_audio;
 
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -41,7 +45,7 @@ impl Open for GstreamerSink {
         let gst_caps = gst_info.to_caps().expect("Failed to create GStreamer caps");
 
         let sample_size = format.size();
-        let gst_bytes = NUM_CHANNELS as usize * 1024 * sample_size;
+        let gst_bytes = NUM_CHANNELS as usize * 2048 * sample_size;
 
         let pipeline = gst::Pipeline::new(None);
         let appsrc = gst::ElementFactory::make("appsrc", None)

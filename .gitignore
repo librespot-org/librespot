@@ -5,5 +5,4 @@ spotify_appkey.key
 .project
 .history
 *.save
-
-
+*.*~

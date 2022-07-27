@@ -1,6 +1,6 @@
 [package]
 name = "librespot-connect"
-version = "0.3.1"
+version = "0.4.1"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The discovery and Spotify Connect logic for librespot"
 license = "MIT"
@@ -21,12 +21,12 @@ tokio-stream = "0.1"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies.librespot-playback]
 path = "../playback"
-version = "0.3.1"
+version = "0.4.1"
 
 [dependencies.librespot-protocol]
 path = "../protocol"
-version = "0.3.1"
+version = "0.4.1"

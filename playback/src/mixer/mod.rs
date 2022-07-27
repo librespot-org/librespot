@@ -3,6 +3,8 @@ use crate::config::VolumeCtrl;
 pub mod mappings;
 use self::mappings::MappedCtrl;
 
+pub struct NoOpVolume;
+
 pub trait Mixer: Send {
     fn open(config: MixerConfig) -> Self
     where
@@ -11,13 +13,19 @@ pub trait Mixer: Send {
     fn set_volume(&self, volume: u16);
     fn volume(&self) -> u16;
 
-    fn get_audio_filter(&self) -> Option<Box<dyn AudioFilter + Send>> {
-        None
+    fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
+        Box::new(NoOpVolume)
     }
 }
 
-pub trait AudioFilter {
-    fn modify_stream(&self, data: &mut [f64]);
+pub trait VolumeGetter {
+    fn attenuation_factor(&self) -> f64;
+}
+
+impl VolumeGetter for NoOpVolume {
+    fn attenuation_factor(&self) -> f64 {
+        1.0
+    }
 }
 
 pub mod softmixer;

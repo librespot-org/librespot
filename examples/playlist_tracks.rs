@@ -28,7 +28,7 @@ async fn main() {
     });
 
     let session = Session::new(session_config, None);
-    if let Err(e) = session.connect(credentials).await {
+    if let Err(e) = session.connect(credentials, false).await {
         println!("Error connecting: {}", e);
         exit(1);
     }

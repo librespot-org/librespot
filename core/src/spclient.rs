@@ -1,5 +1,6 @@
 use std::{
     convert::TryInto,
+    fmt::Write,
     time::{Duration, Instant},
 };
 
@@ -273,7 +274,7 @@ impl SpClient {
                 Some(_) => "&",
                 None => "?",
             };
-            url.push_str(&format!("{}product=0", separator));
+            let _ = write!(url, "{}product=0", separator);
 
             let mut request = Request::builder()
                 .method(method)
@@ -464,7 +465,7 @@ impl SpClient {
             Some(_) => "&",
             None => "?",
         };
-        url.push_str(&format!("{}cid={}", separator, self.session().client_id()));
+        let _ = write!(url, "{}cid={}", separator, self.session().client_id());
 
         self.request_url(url).await
     }

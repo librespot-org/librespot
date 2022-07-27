@@ -13,11 +13,14 @@ fn main() {
 
     vergen(config).expect("Unable to generate the cargo keys!");
 
-    let build_id: String = rand::thread_rng()
-        .sample_iter(Alphanumeric)
-        .take(8)
-        .map(char::from)
-        .collect();
+    let build_id = match std::env::var("SOURCE_DATE_EPOCH") {
+        Ok(val) => val,
+        Err(_) => rand::thread_rng()
+            .sample_iter(Alphanumeric)
+            .take(8)
+            .map(char::from)
+            .collect(),
+    };
 
     println!("cargo:rustc-env=LIBRESPOT_BUILD_ID={}", build_id);
 }

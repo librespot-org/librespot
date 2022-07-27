@@ -331,7 +331,7 @@ impl Spirc {
         );
 
         // Connect *after* all message listeners are registered
-        session.connect(credentials).await?;
+        session.connect(credentials, true).await?;
 
         let canonical_username = &session.username();
         debug!("canonical_username: {}", canonical_username);
@@ -612,6 +612,7 @@ impl SpircTask {
             }
             SpircCommand::Shutdown => {
                 CommandSender::new(self, MessageType::kMessageTypeGoodbye).send()?;
+                self.player.stop();
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
                     rx.close()

@@ -200,7 +200,6 @@ impl SpotifyId {
     /// character long `String`.
     ///
     /// [canonically]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-
     #[allow(clippy::wrong_self_convention)]
     pub fn to_base62(&self) -> Result<String, Error> {
         let mut dst = [0u8; 22];
@@ -258,7 +257,6 @@ impl SpotifyId {
     /// be encoded as `unknown`.
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-
     #[allow(clippy::wrong_self_convention)]
     pub fn to_uri(&self) -> Result<String, Error> {
         // 8 chars for the "spotify:" prefix + 1 colon + 22 chars base62 encoded ID  = 31

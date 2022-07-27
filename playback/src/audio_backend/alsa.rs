@@ -6,7 +6,6 @@ use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, ValueOr};
-use std::cmp::min;
 use std::process::exit;
 use thiserror::Error;
 
@@ -467,7 +466,7 @@ impl SinkAsBytes for AlsaSink {
         loop {
             let data_left = data_len - start_index;
             let space_left = capacity - self.period_buffer.len();
-            let data_to_buffer = min(data_left, space_left);
+            let data_to_buffer = data_left.min(space_left);
             let end_index = start_index + data_to_buffer;
 
             self.period_buffer

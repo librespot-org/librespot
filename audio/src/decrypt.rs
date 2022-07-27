@@ -1,9 +1,8 @@
 use std::io;
 
-use aes::{
-    cipher::{generic_array::GenericArray, NewCipher, StreamCipher, StreamCipherSeek},
-    Aes128Ctr,
-};
+use aes::cipher::{KeyIvInit, StreamCipher, StreamCipherSeek};
+
+type Aes128Ctr = ctr::Ctr128BE<aes::Aes128>;
 
 use librespot_core::audio_key::AudioKey;
 
@@ -19,12 +18,12 @@ pub struct AudioDecrypt<T: io::Read> {
 
 impl<T: io::Read> AudioDecrypt<T> {
     pub fn new(key: Option<AudioKey>, reader: T) -> AudioDecrypt<T> {
-        let cipher = key.map(|key| {
-            Aes128Ctr::new(
-                GenericArray::from_slice(&key.0),
-                GenericArray::from_slice(&AUDIO_AESIV),
-            )
-        });
+        let cipher = if let Some(key) = key {
+            Aes128Ctr::new_from_slices(&key.0, &AUDIO_AESIV).ok()
+        } else {
+            // some files are unencrypted
+            None
+        };
 
         AudioDecrypt { cipher, reader }
     }

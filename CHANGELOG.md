@@ -8,38 +8,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- [main] Enforce reasonable ranges for option values (breaking).
-- [main] Don't evaluate options that would otherwise have no effect.
-- [playback] `alsa`: Improve `--device ?` functionality for the alsa backend.
-- [contrib] Hardened security of the systemd service units
-- [main] Verbose logging mode (`-v`, `--verbose`) now logs all parsed environment variables and command line arguments (credentials are redacted).
-- [playback] `Sink`: `write()` now receives ownership of the packet (breaking).
-- [playback] `pipe`: create file if it doesn't already exist
-- [playback] More robust dynamic limiter for very wide dynamic range (breaking)
+- [playback] `subprocess`: Better error handling
+- [playback] `pipe`: Better error handling
 
 ### Added
-- [cache] Add `disable-credential-cache` flag (breaking).
-- [main] Use different option descriptions and error messages based on what backends are enabled at build time.
-- [main] Add a `-q`, `--quiet` option that changes the logging level to warn.
-- [main] Add a short name for every flag and option.
-- [main] Add the ability to parse environment variables.
-- [playback] `pulseaudio`: set the PulseAudio name to match librespot's device name via `PULSE_PROP_application.name` environment variable (user set env var value takes precedence). (breaking)
-- [playback] `pulseaudio`: set icon to `audio-x-generic` so we get an icon instead of a placeholder via `PULSE_PROP_application.icon_name` environment variable (user set env var value takes precedence). (breaking)
-- [playback] `pulseaudio`: set values to: `PULSE_PROP_application.version`, `PULSE_PROP_application.process.binary`, `PULSE_PROP_stream.description`, `PULSE_PROP_media.software` and `PULSE_PROP_media.role` environment variables (user set env var values take precedence). (breaking)
+- [playback] `pipe`: Implement stop
 
 ### Fixed
-- [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given.
-- [main] Don't panic when parsing options. Instead list valid values and exit.
-- [main] `--alsa-mixer-device` and `--alsa-mixer-index` now fallback to the card and index specified in `--device`.
-- [core] Removed unsafe code (breaking)
-- [playback] Adhere to ReplayGain spec when calculating gain normalisation factor.
-- [playback] `alsa`: Use `--volume-range` overrides for softvol controls
-- [connect] Don't panic when activating shuffle without previous interaction.
+- [playback] `alsamixer`: make `--volume-ctrl fixed` work as expected when combined with `--mixer alsa`
+- [main] fix `--opt=value` line argument logging
 
 ### Removed
-- [playback] `alsamixer`: previously deprecated option `mixer-card` has been removed.
-- [playback] `alsamixer`: previously deprecated option `mixer-name` has been removed.
-- [playback] `alsamixer`: previously deprecated option `mixer-index` has been removed.
+
+## [0.4.1] - 2022-05-23
+
+### Changed
+- [chore] The MSRV is now 1.56
+
+### Fixed
+- [playback] Fixed dependency issues when installing from crate
+
+## [0.4.0] - 2022-05-21
+
+### Changed
+- [chore] The MSRV is now 1.53
+- [contrib] Hardened security of the `systemd` service units
+- [core] `Session`: `connect()` now returns the long-term credentials
+- [core] `Session`: `connect()` now accepts a flag if the credentails should be stored via the cache
+- [main] Different option descriptions and error messages based on what backends are enabled at build time
+- [playback] More robust dynamic limiter for very wide dynamic range (breaking)
+- [playback] `alsa`: improve `--device ?` output for the Alsa backend
+- [playback] `gstreamer`: create own context, set correct states and use sync handler
+- [playback] `pipe`: create file if it doesn't already exist
+- [playback] `Sink`: `write()` now receives ownership of the packet (breaking)
+
+### Added
+- [main] Enforce reasonable ranges for option values (breaking)
+- [main] Add the ability to parse environment variables
+- [main] Log now emits warning when trying to use options that would otherwise have no effect
+- [main] Verbose logging now logs all parsed environment variables and command line arguments (credentials are redacted)
+- [main] Add a `-q`, `--quiet` option that changes the logging level to WARN
+- [main] Add `disable-credential-cache` flag (breaking)
+- [main] Add a short name for every flag and option
+- [playback] `pulseaudio`: set the PulseAudio name to match librespot's device name via `PULSE_PROP_application.name` environment variable (user set env var value takes precedence) (breaking)
+- [playback] `pulseaudio`: set icon to `audio-x-generic` so we get an icon instead of a placeholder via `PULSE_PROP_application.icon_name` environment variable (user set env var value takes precedence) (breaking)
+- [playback] `pulseaudio`: set values to: `PULSE_PROP_application.version`, `PULSE_PROP_application.process.binary`, `PULSE_PROP_stream.description`, `PULSE_PROP_media.software` and `PULSE_PROP_media.role` environment variables (user set env var values take precedence) (breaking)
+
+### Fixed
+- [connect] Don't panic when activating shuffle without previous interaction
+- [core] Removed unsafe code (breaking)
+- [main] Fix crash when built with Avahi support but Avahi is locally unavailable
+- [main] Prevent hang when discovery is disabled and there are no credentials or when bad credentials are given
+- [main] Don't panic when parsing options, instead list valid values and exit
+- [main] `--alsa-mixer-device` and `--alsa-mixer-index` now fallback to the card and index specified in `--device`.
+- [playback] Adhere to ReplayGain spec when calculating gain normalisation factor
+- [playback] `alsa`: make `--volume-range` overrides apply to Alsa softvol controls
+
+### Removed
+- [playback] `alsamixer`: previously deprecated options `mixer-card`, `mixer-name` and `mixer-index` have been removed
 
 ## [0.3.1] - 2021-10-24
 
@@ -90,7 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - [connect] Fix step size on volume up/down events
 - [connect] Fix looping back to the first track after the last track of an album or playlist
-- [playback] Incorrect `PlayerConfig::default().normalisation_threshold` caused distortion when using dynamic volume normalisation downstream 
+- [playback] Incorrect `PlayerConfig::default().normalisation_threshold` caused distortion when using dynamic volume normalisation downstream
 - [playback] Fix `log` and `cubic` volume controls to be mute at zero volume
 - [playback] Fix `S24_3` format on big-endian systems
 - [playback] `alsamixer`: make `cubic` consistent between cards that report minimum volume as mute, and cards that report some dB value
@@ -114,7 +140,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2019-11-06
 
-[unreleased]: https://github.com/librespot-org/librespot/compare/v0.3.1..HEAD
+[unreleased]: https://github.com/librespot-org/librespot/compare/v0.4.1..HEAD
+[0.4.1]: https://github.com/librespot-org/librespot/compare/v0.4.0..v0.4.1
+[0.4.0]: https://github.com/librespot-org/librespot/compare/v0.3.1..v0.4.0
 [0.3.1]: https://github.com/librespot-org/librespot/compare/v0.3.0..v0.3.1
 [0.3.0]: https://github.com/librespot-org/librespot/compare/v0.2.0..v0.3.0
 [0.2.0]: https://github.com/librespot-org/librespot/compare/v0.1.6..v0.2.0
