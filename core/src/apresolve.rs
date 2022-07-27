@@ -52,6 +52,7 @@ async fn try_apresolve(
             if !AP_BLACKLIST.iter().any(|&blacklisted| host == blacklisted) {
                 Some(ap)
             } else {
+                warn!("Ignoring blacklisted access point {}", ap);
                 None
             }
         })
@@ -70,7 +71,7 @@ async fn try_apresolve(
         // ...or pick the first on the list
         aps.into_iter().next()
     }
-    .ok_or("empty AP List")?;
+    .ok_or("Unable to resolve any viable access points.")?;
 
     Ok(ap)
 }
