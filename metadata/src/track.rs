@@ -132,7 +132,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Track {
             sale_periods: track.get_sale_period().try_into()?,
             previews: track.get_preview().into(),
             tags: track.get_tags().to_vec(),
-            earliest_live_timestamp: track.get_earliest_live_timestamp().try_into()?,
+            earliest_live_timestamp: Date::from_timestamp_ms(track.get_earliest_live_timestamp())?,
             has_lyrics: track.get_has_lyrics(),
             availability: track.get_availability().try_into()?,
             licensor: Uuid::from_slice(track.get_licensor().get_uuid())
