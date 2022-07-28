@@ -117,4 +117,4 @@ functionality.
 - [ncspot](https://github.com/hrkfdn/ncspot) - Cross-platform ncurses Spotify client.
 - [ansible-role-librespot](https://github.com/xMordax/ansible-role-librespot/tree/master) - Ansible role that will build, install and configure Librespot.
 - [Spot](https://github.com/xou816/spot) - Gtk/Rust native Spotify client for the GNOME desktop. 
-- [Snapcast](https://github.com/badaix/snapcast) - syncronised multi-room audio player that uses librespot as its source for Spotify content
+- [Snapcast](https://github.com/badaix/snapcast) - synchronised multi-room audio player that uses librespot as its source for Spotify content
