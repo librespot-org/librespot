@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `pipe`: Better error handling
 
 ### Added
+- [core] `apresolve`: Blacklist ap-gew4 access point that causes channel errors
 - [playback] `pipe`: Implement stop
 
 ### Fixed
@@ -116,7 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - [connect] Fix step size on volume up/down events
 - [connect] Fix looping back to the first track after the last track of an album or playlist
-- [playback] Incorrect `PlayerConfig::default().normalisation_threshold` caused distortion when using dynamic volume normalisation downstream 
+- [playback] Incorrect `PlayerConfig::default().normalisation_threshold` caused distortion when using dynamic volume normalisation downstream
 - [playback] Fix `log` and `cubic` volume controls to be mute at zero volume
 - [playback] Fix `S24_3` format on big-endian systems
 - [playback] `alsamixer`: make `cubic` consistent between cards that report minimum volume as mute, and cards that report some dB value
