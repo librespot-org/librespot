@@ -7,11 +7,7 @@ In order to compile librespot, you will first need to set up a suitable Rust bui
 ### Install Rust
 The easiest, and recommended way to get Rust is to use [rustup](https://rustup.rs). Once that’s installed, Rust's standard tools should be set up and ready to use.
 
-<<<<<<< HEAD
-*Note: The current minimum required Rust version at the time of writing is 1.56.*
-=======
-*Note: The current minimum required Rust version at the time of writing is 1.56, you can find the current minimum version specified in the `.github/workflow/test.yml` file.*
->>>>>>> dev
+*Note: The current minimum supported Rust version at the time of writing is 1.60.*
 
 #### Additional Rust tools - `rustfmt`
 To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-lang/rustfmt) and [`clippy`](https://github.com/rust-lang/rust-clippy), which are installed by default with `rustup` these days, else they can be installed manually with:
@@ -22,8 +18,8 @@ rustup component add clippy
 Using `cargo fmt` and `cargo clippy` is not optional, as our CI checks against this repo's rules.
 
 ### General dependencies
-Along with Rust, you will also require a C compiler. 
- 
+Along with Rust, you will also require a C compiler.
+
 On Debian/Ubuntu, install with:
 ```shell
 sudo apt-get install build-essential
@@ -31,10 +27,10 @@ sudo apt-get install build-essential
 ```
 On Fedora systems, install with:
 ```shell
-sudo dnf install gcc 
+sudo dnf install gcc
 ```
 ### Audio library dependencies
-Depending on the chosen backend, specific development libraries are required. 
+Depending on the chosen backend, specific development libraries are required.
 
 *_Note this is an non-exhaustive list, open a PR to add to it!_*
 

@@ -55,7 +55,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         toolchain:
-          - 1.56 # MSRV (Minimum supported rust version)
+          - "1.60" # MSRV (Minimum supported rust version)
           - stable
         experimental: [false]
         # Ignore failures in beta
@@ -113,7 +113,7 @@ jobs:
       matrix:
         os: [windows-latest]
         toolchain:
-          - 1.56 # MSRV (Minimum supported rust version)
+          - "1.60" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code
@@ -160,7 +160,7 @@ jobs:
         os: [ubuntu-latest]
         target: [armv7-unknown-linux-gnueabihf]
         toolchain:
-          - 1.56 # MSRV (Minimum supported rust version)
+          - "1.60" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code
