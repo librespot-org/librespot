@@ -7,7 +7,7 @@ In order to compile librespot, you will first need to set up a suitable Rust bui
 ### Install Rust
 The easiest, and recommended way to get Rust is to use [rustup](https://rustup.rs). Once that’s installed, Rust's standard tools should be set up and ready to use.
 
-*Note: The current minimum supported Rust version at the time of writing is 1.60.*
+*Note: The current minimum supported Rust version at the time of writing is 1.61.*
 
 #### Additional Rust tools - `rustfmt`
 To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-lang/rustfmt) and [`clippy`](https://github.com/rust-lang/rust-clippy), which are installed by default with `rustup` these days, else they can be installed manually with:
