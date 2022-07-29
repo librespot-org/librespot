@@ -33,7 +33,7 @@ function updateVersion {
     fi
     crate_path="$WORKINGDIR/$CRATE_DIR/Cargo.toml"
     crate_path=${crate_path//\/\///}
-    sed -i '' "s/^version.*/version = \"$1\"/g" "$crate_path"
+    sed -i "s/^version.*/version = \"$1\"/g" "$crate_path"
     echo "Path is $crate_path"
     if [ "$CRATE" = "librespot" ]
     then
