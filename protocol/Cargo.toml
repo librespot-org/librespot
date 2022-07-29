@@ -9,8 +9,8 @@ repository = "https://github.com/librespot-org/librespot"
 edition = "2018"
 
 [dependencies]
-protobuf = "2.14.0"
+protobuf = "2"
 
 [build-dependencies]
-protobuf-codegen-pure = "2.14.0"
-glob = "0.3.0"
+glob = "0.3"
+protobuf-codegen-pure = "2"

@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+option optimize_for = CODE_SIZE;
+
+message ResumePoint {
+    required bool is_fully_played = 1;
+    required int64 position = 2;
+    required int64 timestamp = 3;
+}
+
+message ResumePointsRules {
+    map<string, ResumePoint> resume_points = 1;
+}

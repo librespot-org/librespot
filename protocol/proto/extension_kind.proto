@@ -1,0 +1,54 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.extendedmetadata;
+
+option objc_class_prefix = "SPTExtendedMetadata";
+option cc_enable_arenas = true;
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.extendedmetadata.proto";
+
+enum ExtensionKind {
+    UNKNOWN_EXTENSION = 0;
+    CANVAZ = 1;
+    STORYLINES = 2;
+    PODCAST_TOPICS = 3;
+    PODCAST_SEGMENTS = 4;
+    AUDIO_FILES = 5;
+    TRACK_DESCRIPTOR = 6;
+    ARTIST_V4 = 8;
+    ALBUM_V4 = 9;
+    TRACK_V4 = 10;
+    SHOW_V4 = 11;
+    EPISODE_V4 = 12;
+    PODCAST_HTML_DESCRIPTION = 13;
+    PODCAST_QUOTES = 14;
+    USER_PROFILE = 15;
+    CANVAS_V1 = 16;
+    SHOW_V4_BASE = 17;
+    SHOW_V4_EPISODES_ASSOC = 18;
+    TRACK_DESCRIPTOR_SIGNATURES = 19;
+    PODCAST_AD_SEGMENTS = 20;
+    EPISODE_TRANSCRIPTS = 21;
+    PODCAST_SUBSCRIPTIONS = 22;
+    EXTRACTED_COLOR = 23;
+    PODCAST_VIRALITY = 24;
+    IMAGE_SPARKLES_HACK = 25;
+    PODCAST_POPULARITY_HACK = 26;
+    AUTOMIX_MODE = 27;
+    CUEPOINTS = 28;
+    PODCAST_POLL = 29;
+    EPISODE_ACCESS = 30;
+    SHOW_ACCESS = 31;
+    PODCAST_QNA = 32;
+    CLIPS = 33;
+    PODCAST_CTA_CARDS = 36;
+    PODCAST_RATING = 37;
+    DISPLAY_SEGMENTS = 38;
+    GREENROOM = 39;
+    USER_CREATED = 40;
+    CLIENT_CONFIG = 48;
+    AUDIOBOOK_SPECIFICS = 52;
+}

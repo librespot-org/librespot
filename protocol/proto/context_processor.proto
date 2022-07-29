@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "context.proto";
+import "context_view.proto";
+import "skip_to_track.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ContextProcessor {
+    optional Context context = 1;
+    optional context_view.proto.ContextView context_view = 2;
+    optional SkipToTrack pending_skip_to = 3;
+    optional string shuffle_seed = 4;
+    optional int32 index = 5;
+}

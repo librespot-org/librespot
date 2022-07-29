@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.playlist.cosmos.proto;
+
+import "playlist_permission.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.proto";
+
+message SetBasePermissionRequest {
+    optional playlist_permission.proto.PermissionLevel permission_level = 1;
+    optional uint32 timeout_ms = 2;
+}
+
+message SetBasePermissionResponse {
+    optional playlist_permission.proto.Permission base_permission = 1;
+}

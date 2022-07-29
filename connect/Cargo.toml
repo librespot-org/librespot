@@ -9,14 +9,15 @@ edition = "2018"
 
 [dependencies]
 form_urlencoded = "1.0"
-futures-util = { version = "0.3.5", default_features = false }
+futures-util = "0.3"
 log = "0.4"
-protobuf = "2.14.0"
+protobuf = "2"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1.0", features = ["macros", "sync"] }
-tokio-stream = "0.1.1"
+thiserror = "1.0"
+tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }
+tokio-stream = "0.1"
 
 [dependencies.librespot-core]
 path = "../core"
@@ -29,10 +30,3 @@ version = "0.4.2"
 [dependencies.librespot-protocol]
 path = "../protocol"
 version = "0.4.2"
-
-[dependencies.librespot-discovery]
-path = "../discovery"
-version = "0.4.2"
-
-[features]
-with-dns-sd = ["librespot-discovery/with-dns-sd"]

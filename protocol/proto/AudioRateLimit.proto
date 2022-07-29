@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AudioRateLimit {
+    optional string driver_name = 1;
+    optional string output_device_name = 2;
+    optional string output_device_category = 3;
+    optional int64 max_size = 4;
+    optional int64 refill_per_milliseconds = 5;
+    optional int64 frames_requested = 6;
+    optional int64 frames_acquired = 7;
+    optional bytes playback_id = 8;
+}

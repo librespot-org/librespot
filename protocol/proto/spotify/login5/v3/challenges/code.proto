@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.1.33.569 (Windows)
+
+syntax = "proto3";
+
+package spotify.login5.v3.challenges;
+
+option objc_class_prefix = "SPTLogin5";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.login5.v3.challenges.proto";
+
+message CodeChallenge {
+    Method method = 1;
+    enum Method {
+        UNKNOWN = 0;
+        SMS = 1;
+    }
+    
+    int32 code_length = 2;
+    int32 expires_in = 3;
+    string canonical_phone_number = 4;
+}
+
+message CodeSolution {
+    string code = 1;
+}

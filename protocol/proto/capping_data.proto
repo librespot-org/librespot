@@ -1,0 +1,30 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.capper3;
+
+option java_multiple_files = true;
+option java_package = "com.spotify.capper3.proto";
+
+message ConsumeTokensRequest {
+    uint32 tokens = 1;
+}
+
+message CappingData {
+    uint32 remaining_tokens = 1;
+    uint32 capacity = 2;
+    uint32 seconds_until_next_refill = 3;
+    uint32 refill_amount = 4;
+}
+
+message ConsumeTokensResponse {
+    uint32 seconds_until_next_update = 1;
+    PlayCappingType capping_type = 2;
+    CappingData capping_data = 3;
+}
+
+enum PlayCappingType {
+    NONE = 0;
+    LINEAR = 1;
+}

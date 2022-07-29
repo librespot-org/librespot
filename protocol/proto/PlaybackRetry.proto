@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PlaybackRetry {
+    optional string track = 1;
+    optional bytes playback_id = 2;
+    optional string method = 3;
+    optional string status = 4;
+    optional string reason = 5;
+}

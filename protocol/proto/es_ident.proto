@@ -1,0 +1,11 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.connectivity.pubsub.esperanto.proto;
+
+option java_package = "com.spotify.connectivity.pubsub.esperanto.proto";
+
+message Ident {
+    string Ident = 1;
+}

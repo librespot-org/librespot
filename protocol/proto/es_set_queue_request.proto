@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+import "es_command_options.proto";
+import "es_provided_track.proto";
+import "es_logging_params.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message SetQueueRequest {
+    repeated ProvidedTrack next_tracks = 1;
+    repeated ProvidedTrack prev_tracks = 2;
+    uint64 queue_revision = 3;
+    CommandOptions options = 4;
+    LoggingParams logging_params = 5;
+}

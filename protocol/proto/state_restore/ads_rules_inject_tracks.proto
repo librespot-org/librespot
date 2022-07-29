@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "state_restore/provided_track.proto";
+
+option optimize_for = CODE_SIZE;
+
+message AdsRulesInjectTracks {
+    repeated ProvidedTrack ads = 1;
+    optional bool is_playing_slot = 2;
+}

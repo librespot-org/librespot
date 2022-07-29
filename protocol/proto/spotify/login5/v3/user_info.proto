@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.1.33.569 (Windows)
+
+syntax = "proto3";
+
+package spotify.login5.v3;
+
+option objc_class_prefix = "SPTLogin5";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.login5.v3.proto";
+
+message UserInfo {
+    string name = 1;
+    string email = 2;
+    bool email_verified = 3;
+    string birthdate = 4;
+    
+    Gender gender = 5;
+    enum Gender {
+        UNKNOWN = 0;
+        MALE = 1;
+        FEMALE = 2;
+        NEUTRAL = 3;
+    }
+    
+    string phone_number = 6;
+    bool phone_number_verified = 7;
+    bool email_already_registered = 8;
+}

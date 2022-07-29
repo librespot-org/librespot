@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.extendedmetadata.config.v1;
+
+option optimize_for = CODE_SIZE;
+
+message ClientConfig {
+    uint32 log_sampling_rate = 1;
+    uint32 avg_log_messages_per_minute = 2;
+    uint32 log_messages_burst_size = 3;
+}

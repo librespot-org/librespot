@@ -186,6 +186,17 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
 }
 
 impl Sink for RodioSink {
+    fn start(&mut self) -> SinkResult<()> {
+        self.rodio_sink.play();
+        Ok(())
+    }
+
+    fn stop(&mut self) -> SinkResult<()> {
+        self.rodio_sink.sleep_until_end();
+        self.rodio_sink.pause();
+        Ok(())
+    }
+
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {
         let samples = packet
             .samples()

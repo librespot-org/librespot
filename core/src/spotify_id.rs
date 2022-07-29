@@ -1,44 +1,81 @@
-#![allow(clippy::wrong_self_convention)]
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+    ops::Deref,
+};
 
-use std::convert::TryInto;
-use std::fmt;
-use std::string::FromUtf8Error;
+use thiserror::Error;
+
+use crate::Error;
+
+use librespot_protocol as protocol;
+
+// re-export FileId for historic reasons, when it was part of this mod
+pub use crate::FileId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SpotifyAudioType {
+pub enum SpotifyItemType {
+    Album,
+    Artist,
+    Episode,
+    Playlist,
+    Show,
     Track,
-    Podcast,
-    NonPlayable,
+    Unknown,
 }
 
-impl From<&str> for SpotifyAudioType {
+impl From<&str> for SpotifyItemType {
     fn from(v: &str) -> Self {
         match v {
-            "track" => SpotifyAudioType::Track,
-            "episode" => SpotifyAudioType::Podcast,
-            _ => SpotifyAudioType::NonPlayable,
+            "album" => Self::Album,
+            "artist" => Self::Artist,
+            "episode" => Self::Episode,
+            "playlist" => Self::Playlist,
+            "show" => Self::Show,
+            "track" => Self::Track,
+            _ => Self::Unknown,
         }
     }
 }
 
-impl From<SpotifyAudioType> for &str {
-    fn from(audio_type: SpotifyAudioType) -> &'static str {
-        match audio_type {
-            SpotifyAudioType::Track => "track",
-            SpotifyAudioType::Podcast => "episode",
-            SpotifyAudioType::NonPlayable => "unknown",
+impl From<SpotifyItemType> for &str {
+    fn from(item_type: SpotifyItemType) -> &'static str {
+        match item_type {
+            SpotifyItemType::Album => "album",
+            SpotifyItemType::Artist => "artist",
+            SpotifyItemType::Episode => "episode",
+            SpotifyItemType::Playlist => "playlist",
+            SpotifyItemType::Show => "show",
+            SpotifyItemType::Track => "track",
+            _ => "unknown",
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SpotifyId {
     pub id: u128,
-    pub audio_type: SpotifyAudioType,
+    pub item_type: SpotifyItemType,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct SpotifyIdError;
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum SpotifyIdError {
+    #[error("ID cannot be parsed")]
+    InvalidId,
+    #[error("not a valid Spotify URI")]
+    InvalidFormat,
+    #[error("URI does not belong to Spotify")]
+    InvalidRoot,
+}
+
+impl From<SpotifyIdError> for Error {
+    fn from(err: SpotifyIdError) -> Self {
+        Error::invalid_argument(err)
+    }
+}
+
+pub type SpotifyIdResult = Result<SpotifyId, Error>;
+pub type NamedSpotifyIdResult = Result<NamedSpotifyId, Error>;
 
 const BASE62_DIGITS: &[u8; 62] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &[u8; 16] = b"0123456789abcdef";
@@ -48,11 +85,12 @@ impl SpotifyId {
     const SIZE_BASE16: usize = 32;
     const SIZE_BASE62: usize = 22;
 
-    fn track(n: u128) -> SpotifyId {
-        SpotifyId {
-            id: n,
-            audio_type: SpotifyAudioType::Track,
-        }
+    /// Returns whether this `SpotifyId` is for a playable audio item, if known.
+    pub fn is_playable(&self) -> bool {
+        return matches!(
+            self.item_type,
+            SpotifyItemType::Episode | SpotifyItemType::Track
+        );
     }
 
     /// Parses a base16 (hex) encoded [Spotify ID] into a `SpotifyId`.
@@ -60,29 +98,32 @@ impl SpotifyId {
     /// `src` is expected to be 32 bytes long and encoded using valid characters.
     ///
     /// [Spotify ID]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn from_base16(src: &str) -> Result<SpotifyId, SpotifyIdError> {
+    pub fn from_base16(src: &str) -> SpotifyIdResult {
         let mut dst: u128 = 0;
 
         for c in src.as_bytes() {
             let p = match c {
                 b'0'..=b'9' => c - b'0',
                 b'a'..=b'f' => c - b'a' + 10,
-                _ => return Err(SpotifyIdError),
+                _ => return Err(SpotifyIdError::InvalidId.into()),
             } as u128;
 
             dst <<= 4;
             dst += p;
         }
 
-        Ok(SpotifyId::track(dst))
+        Ok(Self {
+            id: dst,
+            item_type: SpotifyItemType::Unknown,
+        })
     }
 
-    /// Parses a base62 encoded [Spotify ID] into a `SpotifyId`.
+    /// Parses a base62 encoded [Spotify ID] into a `u128`.
     ///
     /// `src` is expected to be 22 bytes long and encoded using valid characters.
     ///
     /// [Spotify ID]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn from_base62(src: &str) -> Result<SpotifyId, SpotifyIdError> {
+    pub fn from_base62(src: &str) -> SpotifyIdResult {
         let mut dst: u128 = 0;
 
         for c in src.as_bytes() {
@@ -90,23 +131,29 @@ impl SpotifyId {
                 b'0'..=b'9' => c - b'0',
                 b'a'..=b'z' => c - b'a' + 10,
                 b'A'..=b'Z' => c - b'A' + 36,
-                _ => return Err(SpotifyIdError),
+                _ => return Err(SpotifyIdError::InvalidId.into()),
             } as u128;
 
             dst *= 62;
             dst += p;
         }
 
-        Ok(SpotifyId::track(dst))
+        Ok(Self {
+            id: dst,
+            item_type: SpotifyItemType::Unknown,
+        })
     }
 
-    /// Creates a `SpotifyId` from a copy of `SpotifyId::SIZE` (16) bytes in big-endian order.
+    /// Creates a `u128` from a copy of `SpotifyId::SIZE` (16) bytes in big-endian order.
     ///
-    /// The resulting `SpotifyId` will default to a `SpotifyAudioType::TRACK`.
-    pub fn from_raw(src: &[u8]) -> Result<SpotifyId, SpotifyIdError> {
+    /// The resulting `SpotifyId` will default to a `SpotifyItemType::Unknown`.
+    pub fn from_raw(src: &[u8]) -> SpotifyIdResult {
         match src.try_into() {
-            Ok(dst) => Ok(SpotifyId::track(u128::from_be_bytes(dst))),
-            Err(_) => Err(SpotifyIdError),
+            Ok(dst) => Ok(Self {
+                id: u128::from_be_bytes(dst),
+                item_type: SpotifyItemType::Unknown,
+            }),
+            Err(_) => Err(SpotifyIdError::InvalidId.into()),
         }
     }
 
@@ -115,37 +162,46 @@ impl SpotifyId {
     /// `uri` is expected to be in the canonical form `spotify:{type}:{id}`, where `{type}`
     /// can be arbitrary while `{id}` is a 22-character long, base62 encoded Spotify ID.
     ///
+    /// Note that this should not be used for playlists, which have the form of
+    /// `spotify:user:{owner_username}:playlist:{id}`.
+    ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn from_uri(src: &str) -> Result<SpotifyId, SpotifyIdError> {
-        let src = src.strip_prefix("spotify:").ok_or(SpotifyIdError)?;
+    pub fn from_uri(src: &str) -> SpotifyIdResult {
+        let mut uri_parts: Vec<&str> = src.split(':').collect();
 
-        if src.len() <= SpotifyId::SIZE_BASE62 {
-            return Err(SpotifyIdError);
+        // At minimum, should be `spotify:{type}:{id}`
+        if uri_parts.len() < 3 {
+            return Err(SpotifyIdError::InvalidFormat.into());
         }
 
-        let colon_index = src.len() - SpotifyId::SIZE_BASE62 - 1;
-
-        if src.as_bytes()[colon_index] != b':' {
-            return Err(SpotifyIdError);
+        if uri_parts[0] != "spotify" {
+            return Err(SpotifyIdError::InvalidRoot.into());
         }
 
-        let mut id = SpotifyId::from_base62(&src[colon_index + 1..])?;
-        id.audio_type = src[..colon_index].into();
+        let id = uri_parts.pop().unwrap_or_default();
+        if id.len() != Self::SIZE_BASE62 {
+            return Err(SpotifyIdError::InvalidId.into());
+        }
 
-        Ok(id)
+        Ok(Self {
+            item_type: uri_parts.pop().unwrap_or_default().into(),
+            ..Self::from_base62(id)?
+        })
     }
 
     /// Returns the `SpotifyId` as a base16 (hex) encoded, `SpotifyId::SIZE_BASE16` (32)
     /// character long `String`.
-    pub fn to_base16(&self) -> Result<String, FromUtf8Error> {
-        to_base16(&self.to_raw(), &mut [0u8; SpotifyId::SIZE_BASE16])
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_base16(&self) -> Result<String, Error> {
+        to_base16(&self.to_raw(), &mut [0u8; Self::SIZE_BASE16])
     }
 
     /// Returns the `SpotifyId` as a [canonically] base62 encoded, `SpotifyId::SIZE_BASE62` (22)
     /// character long `String`.
     ///
     /// [canonically]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn to_base62(&self) -> Result<String, FromUtf8Error> {
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_base62(&self) -> Result<String, Error> {
         let mut dst = [0u8; 22];
         let mut i = 0;
         let n = self.id;
@@ -183,12 +239,13 @@ impl SpotifyId {
 
         dst.reverse();
 
-        String::from_utf8(dst.to_vec())
+        String::from_utf8(dst.to_vec()).map_err(|_| SpotifyIdError::InvalidId.into())
     }
 
     /// Returns a copy of the `SpotifyId` as an array of `SpotifyId::SIZE` (16) bytes in
     /// big-endian order.
-    pub fn to_raw(&self) -> [u8; SpotifyId::SIZE] {
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_raw(&self) -> [u8; Self::SIZE] {
         self.id.to_be_bytes()
     }
 
@@ -200,44 +257,260 @@ impl SpotifyId {
     /// be encoded as `unknown`.
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn to_uri(&self) -> Result<String, FromUtf8Error> {
+    #[allow(clippy::wrong_self_convention)]
+    pub fn to_uri(&self) -> Result<String, Error> {
         // 8 chars for the "spotify:" prefix + 1 colon + 22 chars base62 encoded ID  = 31
-        // + unknown size audio_type.
-        let audio_type: &str = self.audio_type.into();
-        let mut dst = String::with_capacity(31 + audio_type.len());
+        // + unknown size item_type.
+        let item_type: &str = self.item_type.into();
+        let mut dst = String::with_capacity(31 + item_type.len());
         dst.push_str("spotify:");
-        dst.push_str(audio_type);
+        dst.push_str(item_type);
         dst.push(':');
-        let base62 = self.to_base62()?;
-        dst.push_str(&base62);
+        let base_62 = self.to_base62()?;
+        dst.push_str(&base_62);
 
         Ok(dst)
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FileId(pub [u8; 20]);
-
-impl FileId {
-    pub fn to_base16(&self) -> Result<String, FromUtf8Error> {
-        to_base16(&self.0, &mut [0u8; 40])
-    }
-}
-
-impl fmt::Debug for FileId {
+impl fmt::Debug for SpotifyId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_tuple("FileId").field(&self.to_base16()).finish()
+        f.debug_tuple("SpotifyId")
+            .field(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
+            .finish()
     }
 }
 
-impl fmt::Display for FileId {
+impl fmt::Display for SpotifyId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.to_base16().unwrap_or_default())
+        f.write_str(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
     }
 }
 
-#[inline]
-fn to_base16(src: &[u8], buf: &mut [u8]) -> Result<String, FromUtf8Error> {
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct NamedSpotifyId {
+    pub inner_id: SpotifyId,
+    pub username: String,
+}
+
+impl NamedSpotifyId {
+    pub fn from_uri(src: &str) -> NamedSpotifyIdResult {
+        let uri_parts: Vec<&str> = src.split(':').collect();
+
+        // At minimum, should be `spotify:user:{username}:{type}:{id}`
+        if uri_parts.len() < 5 {
+            return Err(SpotifyIdError::InvalidFormat.into());
+        }
+
+        if uri_parts[0] != "spotify" {
+            return Err(SpotifyIdError::InvalidRoot.into());
+        }
+
+        if uri_parts[1] != "user" {
+            return Err(SpotifyIdError::InvalidFormat.into());
+        }
+
+        Ok(Self {
+            inner_id: SpotifyId::from_uri(src)?,
+            username: uri_parts[2].to_owned(),
+        })
+    }
+
+    pub fn to_uri(&self) -> Result<String, Error> {
+        let item_type: &str = self.inner_id.item_type.into();
+        let mut dst = String::with_capacity(37 + self.username.len() + item_type.len());
+        dst.push_str("spotify:user:");
+        dst.push_str(&self.username);
+        dst.push_str(item_type);
+        dst.push(':');
+        let base_62 = self.to_base62()?;
+        dst.push_str(&base_62);
+
+        Ok(dst)
+    }
+
+    pub fn from_spotify_id(id: SpotifyId, username: String) -> Self {
+        Self {
+            inner_id: id,
+            username,
+        }
+    }
+}
+
+impl Deref for NamedSpotifyId {
+    type Target = SpotifyId;
+    fn deref(&self) -> &Self::Target {
+        &self.inner_id
+    }
+}
+
+impl fmt::Debug for NamedSpotifyId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("NamedSpotifyId")
+            .field(
+                &self
+                    .inner_id
+                    .to_uri()
+                    .unwrap_or_else(|_| "invalid id".into()),
+            )
+            .finish()
+    }
+}
+
+impl fmt::Display for NamedSpotifyId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(
+            &self
+                .inner_id
+                .to_uri()
+                .unwrap_or_else(|_| "invalid id".into()),
+        )
+    }
+}
+
+impl TryFrom<&[u8]> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(src: &[u8]) -> Result<Self, Self::Error> {
+        Self::from_raw(src)
+    }
+}
+
+impl TryFrom<&str> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(src: &str) -> Result<Self, Self::Error> {
+        Self::from_base62(src)
+    }
+}
+
+impl TryFrom<String> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        Self::try_from(src.as_str())
+    }
+}
+
+impl TryFrom<&Vec<u8>> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(src: &Vec<u8>) -> Result<Self, Self::Error> {
+        Self::try_from(src.as_slice())
+    }
+}
+
+impl TryFrom<&protocol::spirc::TrackRef> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(track: &protocol::spirc::TrackRef) -> Result<Self, Self::Error> {
+        match SpotifyId::from_raw(track.get_gid()) {
+            Ok(mut id) => {
+                id.item_type = SpotifyItemType::Track;
+                Ok(id)
+            }
+            Err(_) => SpotifyId::from_uri(track.get_uri()),
+        }
+    }
+}
+
+impl TryFrom<&protocol::metadata::Album> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(album: &protocol::metadata::Album) -> Result<Self, Self::Error> {
+        Ok(Self {
+            item_type: SpotifyItemType::Album,
+            ..Self::from_raw(album.get_gid())?
+        })
+    }
+}
+
+impl TryFrom<&protocol::metadata::Artist> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(artist: &protocol::metadata::Artist) -> Result<Self, Self::Error> {
+        Ok(Self {
+            item_type: SpotifyItemType::Artist,
+            ..Self::from_raw(artist.get_gid())?
+        })
+    }
+}
+
+impl TryFrom<&protocol::metadata::Episode> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(episode: &protocol::metadata::Episode) -> Result<Self, Self::Error> {
+        Ok(Self {
+            item_type: SpotifyItemType::Episode,
+            ..Self::from_raw(episode.get_gid())?
+        })
+    }
+}
+
+impl TryFrom<&protocol::metadata::Track> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(track: &protocol::metadata::Track) -> Result<Self, Self::Error> {
+        Ok(Self {
+            item_type: SpotifyItemType::Track,
+            ..Self::from_raw(track.get_gid())?
+        })
+    }
+}
+
+impl TryFrom<&protocol::metadata::Show> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(show: &protocol::metadata::Show) -> Result<Self, Self::Error> {
+        Ok(Self {
+            item_type: SpotifyItemType::Show,
+            ..Self::from_raw(show.get_gid())?
+        })
+    }
+}
+
+impl TryFrom<&protocol::metadata::ArtistWithRole> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(artist: &protocol::metadata::ArtistWithRole) -> Result<Self, Self::Error> {
+        Ok(Self {
+            item_type: SpotifyItemType::Artist,
+            ..Self::from_raw(artist.get_artist_gid())?
+        })
+    }
+}
+
+impl TryFrom<&protocol::playlist4_external::Item> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(item: &protocol::playlist4_external::Item) -> Result<Self, Self::Error> {
+        Ok(Self {
+            item_type: SpotifyItemType::Track,
+            ..Self::from_uri(item.get_uri())?
+        })
+    }
+}
+
+// Note that this is the unique revision of an item's metadata on a playlist,
+// not the ID of that item or playlist.
+impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(item: &protocol::playlist4_external::MetaItem) -> Result<Self, Self::Error> {
+        Self::try_from(item.get_revision())
+    }
+}
+
+// Note that this is the unique revision of a playlist, not the ID of that playlist.
+impl TryFrom<&protocol::playlist4_external::SelectedListContent> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(
+        playlist: &protocol::playlist4_external::SelectedListContent,
+    ) -> Result<Self, Self::Error> {
+        Self::try_from(playlist.get_revision())
+    }
+}
+
+// TODO: check meaning and format of this field in the wild. This might be a FileId,
+// which is why we now don't create a separate `Playlist` enum value yet and choose
+// to discard any item type.
+impl TryFrom<&protocol::playlist_annotate3::TranscodedPicture> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(
+        picture: &protocol::playlist_annotate3::TranscodedPicture,
+    ) -> Result<Self, Self::Error> {
+        Self::from_base62(picture.get_uri())
+    }
+}
+
+pub fn to_base16(src: &[u8], buf: &mut [u8]) -> Result<String, Error> {
     let mut i = 0;
     for v in src {
         buf[i] = BASE16_DIGITS[(v >> 4) as usize];
@@ -245,7 +518,7 @@ fn to_base16(src: &[u8], buf: &mut [u8]) -> Result<String, FromUtf8Error> {
         i += 2;
     }
 
-    String::from_utf8(buf.to_vec())
+    String::from_utf8(buf.to_vec()).map_err(|_| SpotifyIdError::InvalidId.into())
 }
 
 #[cfg(test)]
@@ -254,7 +527,7 @@ mod tests {
 
     struct ConversionCase {
         id: u128,
-        kind: SpotifyAudioType,
+        kind: SpotifyItemType,
         uri: &'static str,
         base16: &'static str,
         base62: &'static str,
@@ -264,7 +537,7 @@ mod tests {
     static CONV_VALID: [ConversionCase; 4] = [
         ConversionCase {
             id: 238762092608182713602505436543891614649,
-            kind: SpotifyAudioType::Track,
+            kind: SpotifyItemType::Track,
             uri: "spotify:track:5sWHDYs0csV6RS48xBl0tH",
             base16: "b39fe8081e1f4c54be38e8d6f9f12bb9",
             base62: "5sWHDYs0csV6RS48xBl0tH",
@@ -274,7 +547,7 @@ mod tests {
         },
         ConversionCase {
             id: 204841891221366092811751085145916697048,
-            kind: SpotifyAudioType::Track,
+            kind: SpotifyItemType::Track,
             uri: "spotify:track:4GNcXTGWmnZ3ySrqvol3o4",
             base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
@@ -284,7 +557,7 @@ mod tests {
         },
         ConversionCase {
             id: 204841891221366092811751085145916697048,
-            kind: SpotifyAudioType::Podcast,
+            kind: SpotifyItemType::Episode,
             uri: "spotify:episode:4GNcXTGWmnZ3ySrqvol3o4",
             base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
@@ -294,8 +567,8 @@ mod tests {
         },
         ConversionCase {
             id: 204841891221366092811751085145916697048,
-            kind: SpotifyAudioType::NonPlayable,
-            uri: "spotify:unknown:4GNcXTGWmnZ3ySrqvol3o4",
+            kind: SpotifyItemType::Show,
+            uri: "spotify:show:4GNcXTGWmnZ3ySrqvol3o4",
             base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
             raw: &[
@@ -307,7 +580,7 @@ mod tests {
     static CONV_INVALID: [ConversionCase; 3] = [
         ConversionCase {
             id: 0,
-            kind: SpotifyAudioType::NonPlayable,
+            kind: SpotifyItemType::Unknown,
             // Invalid ID in the URI.
             uri: "spotify:arbitrarywhatever:5sWHDYs0Bl0tH",
             base16: "ZZZZZ8081e1f4c54be38e8d6f9f12bb9",
@@ -319,7 +592,7 @@ mod tests {
         },
         ConversionCase {
             id: 0,
-            kind: SpotifyAudioType::NonPlayable,
+            kind: SpotifyItemType::Unknown,
             // Missing colon between ID and type.
             uri: "spotify:arbitrarywhatever5sWHDYs0csV6RS48xBl0tH",
             base16: "--------------------",
@@ -331,7 +604,7 @@ mod tests {
         },
         ConversionCase {
             id: 0,
-            kind: SpotifyAudioType::NonPlayable,
+            kind: SpotifyItemType::Unknown,
             // Uri too short
             uri: "spotify:azb:aRS48xBl0tH",
             base16: "--------------------",
@@ -350,7 +623,7 @@ mod tests {
         }
 
         for c in &CONV_INVALID {
-            assert_eq!(SpotifyId::from_base62(c.base62), Err(SpotifyIdError));
+            assert!(SpotifyId::from_base62(c.base62).is_err(),);
         }
     }
 
@@ -359,7 +632,7 @@ mod tests {
         for c in &CONV_VALID {
             let id = SpotifyId {
                 id: c.id,
-                audio_type: c.kind,
+                item_type: c.kind,
             };
 
             assert_eq!(id.to_base62().unwrap(), c.base62);
@@ -373,7 +646,7 @@ mod tests {
         }
 
         for c in &CONV_INVALID {
-            assert_eq!(SpotifyId::from_base16(c.base16), Err(SpotifyIdError));
+            assert!(SpotifyId::from_base16(c.base16).is_err(),);
         }
     }
 
@@ -382,7 +655,7 @@ mod tests {
         for c in &CONV_VALID {
             let id = SpotifyId {
                 id: c.id,
-                audio_type: c.kind,
+                item_type: c.kind,
             };
 
             assert_eq!(id.to_base16().unwrap(), c.base16);
@@ -395,11 +668,11 @@ mod tests {
             let actual = SpotifyId::from_uri(c.uri).unwrap();
 
             assert_eq!(actual.id, c.id);
-            assert_eq!(actual.audio_type, c.kind);
+            assert_eq!(actual.item_type, c.kind);
         }
 
         for c in &CONV_INVALID {
-            assert_eq!(SpotifyId::from_uri(c.uri), Err(SpotifyIdError));
+            assert!(SpotifyId::from_uri(c.uri).is_err());
         }
     }
 
@@ -408,7 +681,7 @@ mod tests {
         for c in &CONV_VALID {
             let id = SpotifyId {
                 id: c.id,
-                audio_type: c.kind,
+                item_type: c.kind,
             };
 
             assert_eq!(id.to_uri().unwrap(), c.uri);
@@ -422,7 +695,7 @@ mod tests {
         }
 
         for c in &CONV_INVALID {
-            assert_eq!(SpotifyId::from_raw(c.raw), Err(SpotifyIdError));
+            assert!(SpotifyId::from_raw(c.raw).is_err());
         }
     }
 }

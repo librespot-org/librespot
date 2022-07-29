@@ -1,0 +1,94 @@
+// Extracted from: Spotify 1.1.33.569 (Windows)
+
+syntax = "proto3";
+
+package spotify.login5.v3;
+
+import "spotify/login5/v3/client_info.proto";
+import "spotify/login5/v3/user_info.proto";
+import "spotify/login5/v3/challenges/code.proto";
+import "spotify/login5/v3/challenges/hashcash.proto";
+import "spotify/login5/v3/credentials/credentials.proto";
+import "spotify/login5/v3/identifiers/identifiers.proto";
+
+option objc_class_prefix = "SPTLogin5";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.login5.v3.proto";
+
+message Challenges {
+    repeated Challenge challenges = 1;
+}
+
+message Challenge {
+    oneof challenge {
+        challenges.HashcashChallenge hashcash = 1;
+        challenges.CodeChallenge code = 2;
+    }
+}
+
+message ChallengeSolutions {
+    repeated ChallengeSolution solutions = 1;
+}
+
+message ChallengeSolution {
+    oneof solution {
+        challenges.HashcashSolution hashcash = 1;
+        challenges.CodeSolution code = 2;
+    }
+}
+
+message LoginRequest {
+    ClientInfo client_info = 1;
+    bytes login_context = 2;
+    ChallengeSolutions challenge_solutions = 3;
+    
+    oneof login_method {
+        credentials.StoredCredential stored_credential = 100;
+        credentials.Password password = 101;
+        credentials.FacebookAccessToken facebook_access_token = 102;
+        identifiers.PhoneNumber phone_number = 103;
+        credentials.OneTimeToken one_time_token = 104;
+        credentials.ParentChildCredential parent_child_credential = 105;
+        credentials.AppleSignInCredential apple_sign_in_credential = 106;
+        credentials.SamsungSignInCredential samsung_sign_in_credential = 107;
+        credentials.GoogleSignInCredential google_sign_in_credential = 108;
+    }
+}
+
+message LoginOk {
+    string username = 1;
+    string access_token = 2;
+    bytes stored_credential = 3;
+    int32 access_token_expires_in = 4;
+}
+
+message LoginResponse {
+    repeated Warnings warnings = 4;
+    enum Warnings {
+        UNKNOWN_WARNING = 0;
+        DEPRECATED_PROTOCOL_VERSION = 1;
+    }
+    
+    bytes login_context = 5;
+    string identifier_token = 6;
+    UserInfo user_info = 7;
+    
+    oneof response {
+        LoginOk ok = 1;
+        LoginError error = 2;
+        Challenges challenges = 3;
+    }
+}
+
+enum LoginError {
+    UNKNOWN_ERROR = 0;
+    INVALID_CREDENTIALS = 1;
+    BAD_REQUEST = 2;
+    UNSUPPORTED_LOGIN_PROTOCOL = 3;
+    TIMEOUT = 4;
+    UNKNOWN_IDENTIFIER = 5;
+    TOO_MANY_ATTEMPTS = 6;
+    INVALID_PHONENUMBER = 7;
+    TRY_AGAIN_LATER = 8;
+}

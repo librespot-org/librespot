@@ -7,20 +7,22 @@
 //! This library uses mDNS and DNS-SD so that other devices can find it,
 //! and spawns an http server to answer requests of Spotify clients.
 
-#![warn(clippy::all, missing_docs, rust_2018_idioms)]
-
 mod server;
 
-use std::borrow::Cow;
-use std::io;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    borrow::Cow,
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 use futures_core::Stream;
-use librespot_core as core;
 use thiserror::Error;
 
 use self::server::DiscoveryServer;
+
+pub use crate::core::Error;
+use librespot_core as core;
 
 /// Credentials to be used in [`librespot`](`librespot_core`).
 pub use crate::core::authentication::Credentials;
@@ -49,13 +51,29 @@ pub struct Builder {
 
 /// Errors that can occur while setting up a [`Discovery`] instance.
 #[derive(Debug, Error)]
-pub enum Error {
-    /// Setting up service discovery via DNS-SD failed.
+pub enum DiscoveryError {
+    #[error("Creating SHA1 block cipher failed")]
+    AesError(#[from] aes::cipher::InvalidLength),
     #[error("Setting up dns-sd failed: {0}")]
     DnsSdError(#[from] io::Error),
-    /// Setting up the http server failed.
-    #[error("Setting up the http server failed: {0}")]
+    #[error("Creating SHA1 HMAC failed for base key {0:?}")]
+    HmacError(Vec<u8>),
+    #[error("Setting up the HTTP server failed: {0}")]
     HttpServerError(#[from] hyper::Error),
+    #[error("Missing params for key {0}")]
+    ParamsError(&'static str),
+}
+
+impl From<DiscoveryError> for Error {
+    fn from(err: DiscoveryError) -> Self {
+        match err {
+            DiscoveryError::AesError(_) => Error::unavailable(err),
+            DiscoveryError::DnsSdError(_) => Error::unavailable(err),
+            DiscoveryError::HmacError(_) => Error::invalid_argument(err),
+            DiscoveryError::HttpServerError(_) => Error::unavailable(err),
+            DiscoveryError::ParamsError(_) => Error::invalid_argument(err),
+        }
+    }
 }
 
 impl Builder {
@@ -97,7 +115,7 @@ impl Builder {
     pub fn launch(self) -> Result<Discovery, Error> {
         let mut port = self.port;
         let name = self.server_config.name.clone().into_owned();
-        let server = DiscoveryServer::new(self.server_config, &mut port)?;
+        let server = DiscoveryServer::new(self.server_config, &mut port)??;
 
         #[cfg(feature = "with-dns-sd")]
         let svc = dns_sd::DNSService::register(
@@ -107,8 +125,7 @@ impl Builder {
             None,
             port,
             &["VERSION=1.0", "CPath=/"],
-        )
-        .map_err(|e| Error::DnsSdError(io::Error::new(io::ErrorKind::Unsupported, e)))?;
+        )?;
 
         #[cfg(not(feature = "with-dns-sd"))]
         let svc = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?.register(

@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message LocalFilesError {
+    optional int64 error_code = 1;
+    optional string context = 2;
+    optional string info = 3;
+}

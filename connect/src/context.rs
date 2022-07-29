@@ -1,7 +1,12 @@
+// TODO : move to metadata
+
 use crate::core::spotify_id::SpotifyId;
 use crate::protocol::spirc::TrackRef;
 
-use serde::Deserialize;
+use serde::{
+    de::{Error, Unexpected},
+    Deserialize,
+};
 
 #[derive(Deserialize, Debug)]
 pub struct StationContext {
@@ -72,17 +77,23 @@ where
     D: serde::Deserializer<'d>,
 {
     let v: Vec<TrackContext> = serde::Deserialize::deserialize(de)?;
-    let track_vec = v
-        .iter()
+    v.iter()
         .map(|v| {
             let mut t = TrackRef::new();
             //  This has got to be the most round about way of doing this.
-            t.set_gid(SpotifyId::from_base62(&v.gid).unwrap().to_raw().to_vec());
+            t.set_gid(
+                SpotifyId::from_base62(&v.gid)
+                    .map_err(|_| {
+                        D::Error::invalid_value(
+                            Unexpected::Str(&v.gid),
+                            &"a Base-62 encoded Spotify ID",
+                        )
+                    })?
+                    .to_raw()
+                    .to_vec(),
+            );
             t.set_uri(v.uri.to_owned());
-
-            t
+            Ok(t)
         })
-        .collect::<Vec<TrackRef>>();
-
-    Ok(track_vec)
+        .collect::<Result<Vec<TrackRef>, D::Error>>()
 }

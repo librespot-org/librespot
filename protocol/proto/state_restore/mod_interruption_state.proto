@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "context_track.proto";
+import "state_restore/provided_track.proto";
+
+option optimize_for = CODE_SIZE;
+
+message StoredInterruption {
+    required ContextTrack context_track = 1;
+    required int64 fetched_at = 2;
+}
+
+message ModInterruptionState {
+    optional string context_uri = 1;
+    optional ProvidedTrack last_track = 2;
+    map<string, int32> active_play_count = 3;
+    repeated StoredInterruption active_play_interruptions = 4;
+    repeated StoredInterruption repeat_play_interruptions = 5;
+}

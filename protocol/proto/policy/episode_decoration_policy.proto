@@ -1,0 +1,64 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.cosmos_util.proto;
+
+import "extension_kind.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.policy.proto";
+
+message EpisodeDecorationPolicy {
+    bool link = 1;
+    bool length = 2;
+    bool name = 3;
+    bool manifest_id = 4;
+    bool preview_id = 5;
+    bool preview_manifest_id = 6;
+    bool description = 7;
+    bool publish_date = 8;
+    bool covers = 9;
+    bool freeze_frames = 10;
+    bool language = 11;
+    bool available = 12;
+    bool media_type_enum = 13;
+    bool number = 14;
+    bool backgroundable = 15;
+    bool is_explicit = 16;
+    bool type = 17;
+    bool is_music_and_talk = 18;
+    PodcastSegmentsPolicy podcast_segments = 19;
+    bool podcast_subscription = 20;
+    repeated extendedmetadata.ExtensionKind extension = 21;
+    bool is_19_plus_only = 22;
+    bool is_book_chapter = 23;
+}
+
+message EpisodeCollectionDecorationPolicy {
+    bool is_following_show = 1;
+    bool is_in_listen_later = 2;
+    bool is_new = 3;
+}
+
+message EpisodeSyncDecorationPolicy {
+    bool offline = 1;
+    bool sync_progress = 2;
+}
+
+message EpisodePlayedStateDecorationPolicy {
+    bool time_left = 1;
+    bool is_played = 2;
+    bool playable = 3;
+    bool playability_restriction = 4;
+    bool last_played_at = 5;
+}
+
+message PodcastSegmentsPolicy {
+    bool playback_segments = 1;
+    bool embedded_segments = 2;
+    bool can_upsell = 3;
+    bool album_mosaic_uri = 4;
+    bool artists = 5;
+}

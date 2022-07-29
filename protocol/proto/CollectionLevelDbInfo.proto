@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CollectionLevelDbInfo {
+    optional string bucket = 1;
+    optional bool use_leveldb = 2;
+    optional bool migration_from_file_ok = 3;
+    optional bool index_check_ok = 4;
+    optional bool leveldb_works = 5;
+    optional bool already_migrated = 6;
+}

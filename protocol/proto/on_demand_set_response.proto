@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.on_demand_set_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.on_demand_set.proto";
+
+message ResponseStatus {
+    int32 status_code = 1;
+    string reason = 2;
+}

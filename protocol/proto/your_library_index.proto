@@ -1,0 +1,43 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.your_library.proto;
+
+option optimize_for = CODE_SIZE;
+
+message YourLibraryRootlistPlaylist {
+    string image_uri = 1;
+    bool is_loading = 3;
+    int32 rootlist_index = 4;
+    bool can_view = 5;
+}
+
+message YourLibraryRootlistFolder {
+    int32 number_of_playlists = 1;
+    int32 number_of_folders = 2;
+    int32 rootlist_index = 3;
+}
+
+message YourLibraryRootlistCollection {
+    Kind kind = 1;
+    enum Kind {
+        LIKED_SONGS = 0;
+        YOUR_EPISODES = 1;
+        NEW_EPISODES = 2;
+        LOCAL_FILES = 3;
+    }
+}
+
+message YourLibraryRootlistEntity {
+    string uri = 1;
+    string name = 2;
+    string creator_name = 3;
+    int64 add_time = 4;
+    
+    oneof entity {
+        YourLibraryRootlistPlaylist playlist = 5;
+        YourLibraryRootlistFolder folder = 6;
+        YourLibraryRootlistCollection collection = 7;
+    }
+}

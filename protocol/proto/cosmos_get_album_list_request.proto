@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.collection_cosmos.album_list_request.proto;
+
+import "collection/album_collection_state.proto";
+import "sync/album_sync_state.proto";
+import "metadata/album_metadata.proto";
+
+option objc_class_prefix = "SPTCollectionCosmosAlbumList";
+option optimize_for = CODE_SIZE;
+
+message Item {
+    optional string header_field = 1;
+    optional uint32 index = 2;
+    optional uint32 add_time = 3;
+    optional cosmos_util.proto.AlbumMetadata album_metadata = 4;
+    optional cosmos_util.proto.AlbumCollectionState album_collection_state = 5;
+    optional cosmos_util.proto.AlbumSyncState album_offline_state = 6;
+    optional string group_label = 7;
+}
+
+message GroupHeader {
+    optional string header_field = 1;
+    optional uint32 index = 2;
+    optional uint32 length = 3;
+}
+
+message Response {
+    repeated Item item = 1;
+    optional uint32 unfiltered_length = 2;
+    optional uint32 unranged_length = 3;
+    optional bool loading_contents = 4;
+    optional string offline = 5;
+    optional uint32 sync_progress = 6;
+    repeated GroupHeader group_index = 7;
+}

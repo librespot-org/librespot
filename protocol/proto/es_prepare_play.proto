@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+import "es_context.proto";
+import "es_play_origin.proto";
+import "es_prepare_play_options.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message PreparePlayRequest {
+    Context context = 1;
+    PreparePlayOptions options = 2;
+    PlayOrigin play_origin = 3;
+}

@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message RequestAccounting {
+    optional string request = 1;
+    optional int64 downloaded = 2;
+    optional int64 uploaded = 3;
+    optional int64 num_requests = 4;
+    optional string connection = 5;
+    optional string source_identifier = 6;
+    optional string reason = 7;
+    optional int64 duration_ms = 8;
+}

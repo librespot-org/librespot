@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.perf_metrics.esperanto.proto;
+
+option java_package = "com.spotify.perf_metrics.esperanto.proto";
+
+service PerfMetricsService {
+    rpc TerminateState(PerfMetricsRequest) returns (PerfMetricsResponse);
+}
+
+message PerfMetricsRequest {
+    string terminal_state = 1;
+    bool foreground_startup = 2;
+}
+
+message PerfMetricsResponse {
+    bool success = 1;
+}

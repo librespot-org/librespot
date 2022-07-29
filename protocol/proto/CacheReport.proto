@@ -1,0 +1,32 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CacheReport {
+    optional bytes cache_id = 1;
+    optional string cache_path = 21;
+    optional string volatile_path = 22;
+    optional int64 max_cache_size = 2;
+    optional int64 free_space = 3;
+    optional int64 total_space = 4;
+    optional int64 cache_age = 5;
+    optional int64 num_users_with_locked_entries = 6;
+    optional int64 permanent_files = 7;
+    optional int64 permanent_size_kb = 8;
+    optional int64 unknown_permanent_files = 9;
+    optional int64 unknown_permanent_size_kb = 10;
+    optional int64 volatile_files = 11;
+    optional int64 volatile_size_kb = 12;
+    optional int64 unknown_volatile_files = 13;
+    optional int64 unknown_volatile_size_kb = 14;
+    optional int64 num_entries = 15;
+    optional int64 num_locked_entries = 16;
+    optional int64 num_locked_entries_current_user = 17;
+    optional int64 num_full_entries = 18;
+    optional int64 size_kb = 19;
+    optional int64 locked_size_kb = 20;
+}

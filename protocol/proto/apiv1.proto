@@ -1,0 +1,108 @@
+// No longer present in Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.offline.proto;
+
+import "google/protobuf/timestamp.proto";
+import "offline.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ListDevicesRequest {
+    string user_id = 1;
+}
+
+message ListDevicesResponse {
+    repeated Device devices = 1;
+}
+
+message PutDeviceRequest {
+    string user_id = 1;
+    
+    Body body = 2;
+    message Body {
+        Device device = 1;
+    }
+}
+
+message BasicDeviceRequest {
+    DeviceKey key = 1;
+}
+
+message GetDeviceResponse {
+    Device device = 1;
+}
+
+message RemoveDeviceRequest {
+    DeviceKey key = 1;
+    bool is_force_remove = 2;
+}
+
+message OfflineEnableDeviceResponse {
+    Restrictions restrictions = 1;
+}
+
+message ListResourcesResponse {
+    repeated Resource resources = 1;
+    google.protobuf.Timestamp server_time = 2;
+}
+
+message WriteResourcesRequest {
+    DeviceKey key = 1;
+    
+    Body body = 2;
+    message Body {
+        repeated ResourceOperation operations = 1;
+        string source_device_id = 2;
+        string source_cache_id = 3;
+    }
+}
+
+message ResourcesUpdate {
+    string source_device_id = 1;
+    string source_cache_id = 2;
+}
+
+message DeltaResourcesRequest {
+    DeviceKey key = 1;
+    
+    Body body = 2;
+    message Body {
+        google.protobuf.Timestamp last_known_server_time = 1;
+    }
+}
+
+message DeltaResourcesResponse {
+    bool delta_update_possible = 1;
+    repeated ResourceOperation operations = 2;
+    google.protobuf.Timestamp server_time = 3;
+}
+
+message GetResourceRequest {
+    DeviceKey key = 1;
+    string uri = 2;
+}
+
+message GetResourceResponse {
+    Resource resource = 1;
+}
+
+message WriteResourcesDetailsRequest {
+    DeviceKey key = 1;
+    
+    Body body = 2;
+    message Body {
+        repeated Resource resources = 1;
+    }
+}
+
+message GetResourceForDevicesRequest {
+    string user_id = 1;
+    string uri = 2;
+}
+
+message GetResourceForDevicesResponse {
+    repeated Device devices = 1;
+    repeated ResourceForDevice resources = 2;
+}

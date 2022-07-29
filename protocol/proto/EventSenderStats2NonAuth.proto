@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message EventSenderStats2NonAuth {
+    repeated bytes sequence_ids = 1;
+    repeated string event_names = 2;
+    repeated int32 loss_stats_num_entries_per_sequence_id = 3;
+    repeated int32 loss_stats_event_name_index = 4;
+    repeated int64 loss_stats_storage_sizes = 5;
+    repeated int64 loss_stats_sequence_number_mins = 6;
+    repeated int64 loss_stats_sequence_number_nexts = 7;
+    repeated int32 ratelimiter_stats_event_name_index = 8;
+    repeated int64 ratelimiter_stats_drop_count = 9;
+    repeated int32 drop_list_num_entries_per_sequence_id = 10;
+    repeated int32 drop_list_event_name_index = 11;
+    repeated int64 drop_list_counts_total = 12;
+    repeated int64 drop_list_counts_unreported = 13;
+}

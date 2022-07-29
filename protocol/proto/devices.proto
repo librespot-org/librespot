@@ -1,0 +1,35 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.connectstate.devices;
+
+option java_package = "com.spotify.common.proto";
+
+message DeviceAlias {
+    uint32 id = 1;
+    string display_name = 2;
+    bool is_group = 3;
+}
+
+enum DeviceType {
+    UNKNOWN = 0;
+    COMPUTER = 1;
+    TABLET = 2;
+    SMARTPHONE = 3;
+    SPEAKER = 4;
+    TV = 5;
+    AVR = 6;
+    STB = 7;
+    AUDIO_DONGLE = 8;
+    GAME_CONSOLE = 9;
+    CAST_VIDEO = 10;
+    CAST_AUDIO = 11;
+    AUTOMOBILE = 12;
+    SMARTWATCH = 13;
+    CHROMEBOOK = 14;
+    UNKNOWN_SPOTIFY = 100;
+    CAR_THING = 101;
+    OBSERVER = 102;
+    HOME_THING = 103;
+}

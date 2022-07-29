@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message ResponseWithReasons {
+    Error error = 1;
+    enum Error {
+        OK = 0;
+        FORBIDDEN = 1;
+        NOT_FOUND = 2;
+        CONFLICT = 3;
+    }
+    
+    string reasons = 2;
+}

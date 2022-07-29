@@ -1,0 +1,63 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.cosmos_util.proto;
+
+import "metadata/extension.proto";
+import "metadata/image_group.proto";
+import "podcast_segments.proto";
+import "podcast_subscription.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.proto";
+
+message EpisodeShowMetadata {
+    optional string link = 1;
+    optional string name = 2;
+    optional string publisher = 3;
+    optional ImageGroup covers = 4;
+}
+
+message EpisodeMetadata {
+    optional EpisodeShowMetadata show = 1;
+    optional string link = 2;
+    optional string name = 3;
+    optional uint32 length = 4;
+    optional ImageGroup covers = 5;
+    optional string manifest_id = 6;
+    optional string description = 7;
+    optional int64 publish_date = 8;
+    optional ImageGroup freeze_frames = 9;
+    optional string language = 10;
+    optional bool available = 11;
+    
+    optional MediaType media_type_enum = 12;
+    enum MediaType {
+        VODCAST = 0;
+        AUDIO = 1;
+        VIDEO = 2;
+    }
+    
+    optional int32 number = 13;
+    optional bool backgroundable = 14;
+    optional string preview_manifest_id = 15;
+    optional bool is_explicit = 16;
+    optional string preview_id = 17;
+    
+    optional EpisodeType episode_type = 18;
+    enum EpisodeType {
+        UNKNOWN = 0;
+        FULL = 1;
+        TRAILER = 2;
+        BONUS = 3;
+    }
+    
+    optional bool is_music_and_talk = 19;
+    optional podcast_segments.PodcastSegments podcast_segments = 20;
+    optional podcast_paywalls.PodcastSubscription podcast_subscription = 21;
+    repeated Extension extension = 22;
+    optional bool is_19_plus_only = 23;
+    optional bool is_book_chapter = 24;
+}

@@ -1,0 +1,46 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.playlist.cosmos.rootlist_request.proto;
+
+import "playlist_folder_state.proto";
+import "playlist_permission.proto";
+import "playlist_playlist_state.proto";
+import "protobuf_delta.proto";
+
+option objc_class_prefix = "SPTPlaylistCosmosRootlist";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.proto";
+
+message Playlist {
+    optional string row_id = 1;
+    optional cosmos.proto.PlaylistMetadata playlist_metadata = 2;
+    optional cosmos.proto.PlaylistOfflineState playlist_offline_state = 3;
+    optional uint32 add_time = 4;
+    optional bool is_on_demand_in_free = 5;
+    optional string group_label = 6;
+    optional playlist_permission.proto.Capabilities capabilities = 7;
+}
+
+message Item {
+    optional string header_field = 1;
+    optional Folder folder = 2;
+    optional Playlist playlist = 3;
+    optional protobuf_deltas.proto.Delta delta = 4;
+}
+
+message Folder {
+    repeated Item item = 1;
+    optional cosmos.proto.FolderMetadata folder_metadata = 2;
+    optional string row_id = 3;
+    optional uint32 add_time = 4;
+    optional string group_label = 5;
+}
+
+message Response {
+    optional Folder root = 1;
+    optional int32 unfiltered_length = 2;
+    optional int32 unranged_length = 3;
+    optional bool is_loading_contents = 4;
+}

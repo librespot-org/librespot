@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.collection_cosmos.proto;
+
+option objc_class_prefix = "SPTCollectionCosmos";
+option optimize_for = CODE_SIZE;
+
+message TrackListMetadata {
+    optional uint32 unfiltered_length = 1;
+    optional uint32 length = 2;
+    optional string offline = 3;
+    optional uint32 sync_progress = 4;
+}

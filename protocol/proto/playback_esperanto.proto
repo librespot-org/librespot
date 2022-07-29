@@ -1,0 +1,122 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.playback_esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playback_esperanto.proto";
+
+message GetVolumeResponse {
+    Status status = 1;
+    double volume = 2;
+}
+
+message SubVolumeResponse {
+    Status status = 1;
+    double volume = 2;
+    VolumeChangeSource source = 3;
+}
+
+message SetVolumeRequest {
+    VolumeChangeSource source = 1;
+    double volume = 2;
+}
+
+message NudgeVolumeRequest {
+    VolumeChangeSource source = 1;
+}
+
+message PlaybackInfoResponse {
+    Status status = 1;
+    uint64 length_ms = 2;
+    uint64 position_ms = 3;
+    bool playing = 4;
+    bool buffering = 5;
+    int32 error = 6;
+    string file_id = 7;
+    string file_type = 8;
+    string resolved_content_url = 9;
+    int32 file_bitrate = 10;
+    string codec_name = 11;
+    double playback_speed = 12;
+    float gain_adjustment = 13;
+    bool has_loudness = 14;
+    float loudness = 15;
+    string strategy = 17;
+    int32 target_bitrate = 18;
+    int32 advised_bitrate = 19;
+    bool target_file_available = 20;
+    
+    reserved 16;
+}
+
+message GetFormatsResponse {
+    repeated Format formats = 1;
+    message Format {
+        string enum_key = 1;
+        uint32 enum_value = 2;
+        bool supported = 3;
+        uint32 bitrate = 4;
+        string mime_type = 5;
+    }
+}
+
+message SubPositionRequest {
+    uint64 position = 1;
+}
+
+message SubPositionResponse {
+    Status status = 1;
+    uint64 position = 2;
+}
+
+message GetFilesRequest {
+    string uri = 1;
+}
+
+message GetFilesResponse {
+    GetFilesStatus status = 1;
+    
+    repeated File files = 2;
+    message File {
+        string file_id = 1;
+        string format = 2;
+        uint32 bitrate = 3;
+        uint32 format_enum = 4;
+    }
+}
+
+message DuckRequest {
+    Action action = 2;
+    enum Action {
+        START = 0;
+        STOP = 1;
+    }
+    
+    double volume = 3;
+    uint32 fade_duration_ms = 4;
+}
+
+message DuckResponse {
+    Status status = 1;
+}
+
+enum Status {
+    OK = 0;
+    NOT_AVAILABLE = 1;
+}
+
+enum GetFilesStatus {
+    GETFILES_OK = 0;
+    METADATA_CLIENT_NOT_AVAILABLE = 1;
+    FILES_NOT_FOUND = 2;
+    TRACK_NOT_AVAILABLE = 3;
+    EXTENDED_METADATA_ERROR = 4;
+}
+
+enum VolumeChangeSource {
+    USER = 0;
+    SYSTEM = 1;
+}

@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message BoomboxPlaybackInstrumentation {
+    optional bytes playback_id = 1;
+    optional bool was_playback_paused = 2;
+    repeated string dimensions = 3;
+    map<string, int64> total_buffer_size = 4;
+    map<string, int64> number_of_calls = 5;
+    map<string, int64> total_duration = 6;
+    map<string, int64> first_call_time = 7;
+    map<string, int64> last_call_time = 8;
+}

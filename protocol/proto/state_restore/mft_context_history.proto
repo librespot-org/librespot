@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "context_track.proto";
+
+option optimize_for = CODE_SIZE;
+
+message MftContextHistoryEntry {
+    required ContextTrack track = 1;
+    required int64 timestamp = 2;
+    optional int64 position = 3;
+}
+
+message MftContextHistory {
+    map<string, MftContextHistoryEntry> lookup = 1;
+}

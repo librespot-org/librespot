@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.collection_cosmos.show_list_request.proto;
+
+import "collection/show_collection_state.proto";
+import "played_state/show_played_state.proto";
+import "metadata/show_metadata.proto";
+
+option objc_class_prefix = "SPTCollectionCosmosShowList";
+option optimize_for = CODE_SIZE;
+
+message Item {
+    optional string header_field = 1;
+    optional cosmos_util.proto.ShowMetadata show_metadata = 2;
+    optional cosmos_util.proto.ShowCollectionState show_collection_state = 3;
+    optional cosmos_util.proto.ShowPlayState show_play_state = 4;
+    optional uint32 headerless_index = 5;
+    optional uint32 add_time = 6;
+    optional bool has_new_episodes = 7;
+    optional uint64 latest_published_episode_date = 8;
+}
+
+message Response {
+    repeated Item item = 1;
+    optional uint32 num_offlined_episodes = 2;
+    optional uint32 unfiltered_length = 3;
+    optional uint32 unranged_length = 4;
+    optional bool loading_contents = 5;
+}

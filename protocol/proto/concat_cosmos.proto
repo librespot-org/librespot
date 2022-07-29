@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.concat_cosmos.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ConcatRequest {
+    string a = 1;
+    string b = 2;
+}
+
+message ConcatWithSeparatorRequest {
+    string a = 1;
+    string b = 2;
+    string separator = 3;
+}
+
+message ConcatResponse {
+    string concatenated = 1;
+}

@@ -1,0 +1,33 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.context_track_exts.canvas;
+
+message Artist {
+    string uri = 1;
+    string name = 2;
+    string avatar = 3;
+}
+
+message CanvasRecord {
+    string id = 1;
+    string url = 2;
+    string file_id = 3;
+    Type type = 4;
+    string entity_uri = 5;
+    Artist artist = 6;
+    bool explicit = 7;
+    string uploaded_by = 8;
+    string etag = 9;
+    string canvas_uri = 11;
+    string storylines_id = 12;
+}
+
+enum Type {
+    IMAGE = 0;
+    VIDEO = 1;
+    VIDEO_LOOPING = 2;
+    VIDEO_LOOPING_RANDOM = 3;
+    GIF = 4;
+}

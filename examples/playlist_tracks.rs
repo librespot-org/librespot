@@ -1,11 +1,11 @@
-use std::env;
-use std::process;
+use std::{env, process::exit};
 
-use librespot::core::authentication::Credentials;
-use librespot::core::config::SessionConfig;
-use librespot::core::session::Session;
-use librespot::core::spotify_id::SpotifyId;
-use librespot::metadata::{Metadata, Playlist, Track};
+use librespot::{
+    core::{
+        authentication::Credentials, config::SessionConfig, session::Session, spotify_id::SpotifyId,
+    },
+    metadata::{Metadata, Playlist, Track},
+};
 
 #[tokio::main]
 async fn main() {
@@ -24,16 +24,18 @@ async fn main() {
             "PLAYLIST should be a playlist URI such as: \
                 \"spotify:playlist:37i9dQZF1DXec50AjHrNTq\""
         );
-        process::exit(1);
+        exit(1);
     });
 
-    let (session, _) = Session::connect(session_config, credentials, None, false)
-        .await
-        .unwrap();
+    let session = Session::new(session_config, None);
+    if let Err(e) = session.connect(credentials, false).await {
+        println!("Error connecting: {}", e);
+        exit(1);
+    }
 
     let plist = Playlist::get(&session, plist_uri).await.unwrap();
     println!("{:?}", plist);
-    for track_id in plist.tracks {
+    for track_id in plist.tracks() {
         let plist_track = Track::get(&session, track_id).await.unwrap();
         println!("track: {} ", plist_track.name);
     }

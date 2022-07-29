@@ -1,0 +1,48 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.cosmos_util.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.policy.proto";
+
+message TrackDecorationPolicy {
+    bool has_lyrics = 1;
+    bool link = 2;
+    bool name = 3;
+    bool length = 4;
+    bool playable = 5;
+    bool is_available_in_metadata_catalogue = 6;
+    bool locally_playable = 7;
+    bool playable_local_track = 8;
+    bool disc_number = 9;
+    bool track_number = 10;
+    bool is_explicit = 11;
+    bool preview_id = 12;
+    bool is_local = 13;
+    bool is_premium_only = 14;
+    bool playable_track_link = 15;
+    bool popularity = 16;
+    bool is_19_plus_only = 17;
+    bool track_descriptors = 18;
+}
+
+message TrackPlayedStateDecorationPolicy {
+    bool playable = 1;
+    bool is_currently_playable = 2;
+    bool playability_restriction = 3;
+}
+
+message TrackCollectionDecorationPolicy {
+    bool is_in_collection = 1;
+    bool can_add_to_collection = 2;
+    bool is_banned = 3;
+    bool can_ban = 4;
+}
+
+message TrackSyncDecorationPolicy {
+    bool offline_state = 1;
+    bool sync_progress = 2;
+}

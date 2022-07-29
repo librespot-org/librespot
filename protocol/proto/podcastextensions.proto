@@ -1,0 +1,29 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.podcast.extensions;
+
+option objc_class_prefix = "SPT";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "PodcastExtensionsProto";
+option java_package = "com.spotify.podcastextensions.proto";
+
+message PodcastTopics {
+    repeated PodcastTopic topics = 1;
+}
+
+message PodcastTopic {
+    string uri = 1;
+    string title = 2;
+}
+
+message PodcastHtmlDescription {
+    Header header = 1;
+    message Header {
+        
+    }
+    
+    string html_description = 2;
+}

@@ -1,0 +1,63 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.playlist.cosmos.proto;
+
+import "extension_kind.proto";
+import "policy/user_decoration_policy.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.policy.proto";
+
+message PlaylistAllowsDecorationPolicy {
+    bool insert = 1;
+    bool remove = 2;
+}
+
+message PlaylistDecorationPolicy {
+    bool row_id = 1;
+    bool link = 2;
+    bool name = 3;
+    bool load_state = 4;
+    bool loaded = 5;
+    bool collaborative = 6;
+    bool length = 7;
+    bool last_modification = 8;
+    bool total_length = 9;
+    bool duration = 10;
+    bool description = 11;
+    bool picture = 12;
+    bool playable = 13;
+    bool description_from_annotate = 14;
+    bool picture_from_annotate = 15;
+    bool can_report_annotation_abuse = 16;
+    bool followed = 17;
+    bool followers = 18;
+    bool owned_by_self = 19;
+    bool offline = 20;
+    bool sync_progress = 21;
+    bool published = 22;
+    bool browsable_offline = 23;
+    bool format_list_type = 24;
+    bool format_list_attributes = 25;
+    bool has_explicit_content = 26;
+    bool contains_spotify_tracks = 27;
+    bool contains_tracks = 28;
+    bool contains_episodes = 29;
+    bool contains_audio_episodes = 30;
+    bool only_contains_explicit = 31;
+    bool is_on_demand_in_free = 32;
+    UserDecorationPolicy owner = 33;
+    UserDecorationPolicy made_for = 34;
+    PlaylistAllowsDecorationPolicy allows = 35;
+    bool number_of_episodes = 36;
+    bool number_of_tracks = 37;
+    bool prefer_linear_playback = 38;
+    bool on_demand_in_free_reason = 39;
+    CollaboratingUsersDecorationPolicy collaborating_users = 40;
+    bool base_permission = 41;
+    bool user_capabilities = 42;
+    repeated extendedmetadata.ExtensionKind extension = 43;
+}

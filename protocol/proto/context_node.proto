@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "context_processor.proto";
+import "play_origin.proto";
+import "prepare_play_options.proto";
+import "track_instance.proto";
+import "track_instantiator.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ContextNode {
+    optional TrackInstance current_track = 2;
+    optional TrackInstantiator instantiate = 3;
+    optional PreparePlayOptions prepare_options = 4;
+    optional PlayOrigin play_origin = 5;
+    optional ContextProcessor context_processor = 6;
+    optional string session_id = 7;
+    optional sint32 iteration = 8;
+    optional bool pending_pause = 9;
+}

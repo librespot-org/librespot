@@ -1,38 +1,43 @@
-use futures_util::{future, FutureExt, StreamExt};
-use librespot_playback::player::PlayerEvent;
+use std::{
+    env,
+    fs::create_dir_all,
+    ops::RangeInclusive,
+    path::{Path, PathBuf},
+    pin::Pin,
+    process::exit,
+    str::FromStr,
+    time::{Duration, Instant},
+};
+
+use futures_util::StreamExt;
 use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
-use librespot::connect::spirc::Spirc;
-use librespot::core::authentication::Credentials;
-use librespot::core::cache::Cache;
-use librespot::core::config::{ConnectConfig, DeviceType, SessionConfig};
-use librespot::core::session::Session;
-use librespot::core::version;
-use librespot::playback::audio_backend::{self, SinkBuilder, BACKENDS};
-use librespot::playback::config::{
-    AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
+use librespot::{
+    connect::{config::ConnectConfig, spirc::Spirc},
+    core::{
+        authentication::Credentials, cache::Cache, config::DeviceType, version, Session,
+        SessionConfig,
+    },
+    playback::{
+        audio_backend::{self, SinkBuilder, BACKENDS},
+        config::{
+            AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
+        },
+        dither,
+        mixer::{self, MixerConfig, MixerFn},
+        player::{coefficient_to_duration, duration_to_coefficient, Player, PlayerEvent},
+    },
 };
-use librespot::playback::dither;
+
 #[cfg(feature = "alsa-backend")]
 use librespot::playback::mixer::alsamixer::AlsaMixer;
-use librespot::playback::mixer::{self, MixerConfig, MixerFn};
-use librespot::playback::player::{coefficient_to_duration, duration_to_coefficient, Player};
 
 mod player_event_handler;
 use player_event_handler::{emit_sink_event, run_program_on_events};
-
-use std::env;
-use std::ops::RangeInclusive;
-use std::path::Path;
-use std::pin::Pin;
-use std::process::exit;
-use std::str::FromStr;
-use std::time::Duration;
-use std::time::Instant;
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -193,7 +198,6 @@ fn get_setup() -> Setup {
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
 
     const AP_PORT: &str = "ap-port";
-    const AUTOPLAY: &str = "autoplay";
     const BACKEND: &str = "backend";
     const BITRATE: &str = "bitrate";
     const CACHE: &str = "cache";
@@ -223,11 +227,13 @@ fn get_setup() -> Setup {
     const NORMALISATION_RELEASE: &str = "normalisation-release";
     const NORMALISATION_THRESHOLD: &str = "normalisation-threshold";
     const ONEVENT: &str = "onevent";
+    #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
     const PASSWORD: &str = "password";
     const PROXY: &str = "proxy";
     const QUIET: &str = "quiet";
     const SYSTEM_CACHE: &str = "system-cache";
+    const TEMP_DIR: &str = "tmp";
     const USERNAME: &str = "username";
     const VERBOSE: &str = "verbose";
     const VERSION: &str = "version";
@@ -236,7 +242,6 @@ fn get_setup() -> Setup {
     const ZEROCONF_PORT: &str = "zeroconf-port";
 
     // Mostly arbitrary.
-    const AUTOPLAY_SHORT: &str = "A";
     const AP_PORT_SHORT: &str = "a";
     const BACKEND_SHORT: &str = "B";
     const BITRATE_SHORT: &str = "b";
@@ -258,6 +263,7 @@ fn get_setup() -> Setup {
     const NAME_SHORT: &str = "n";
     const DISABLE_DISCOVERY_SHORT: &str = "O";
     const ONEVENT_SHORT: &str = "o";
+    #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH_SHORT: &str = "P";
     const PASSWORD_SHORT: &str = "p";
     const EMIT_SINK_EVENTS_SHORT: &str = "Q";
@@ -266,6 +272,7 @@ fn get_setup() -> Setup {
     const ALSA_MIXER_DEVICE_SHORT: &str = "S";
     const ALSA_MIXER_INDEX_SHORT: &str = "s";
     const ALSA_MIXER_CONTROL_SHORT: &str = "T";
+    const TEMP_DIR_SHORT: &str = "t";
     const NORMALISATION_ATTACK_SHORT: &str = "U";
     const USERNAME_SHORT: &str = "u";
     const VERSION_SHORT: &str = "V";
@@ -279,7 +286,7 @@ fn get_setup() -> Setup {
     const NORMALISATION_THRESHOLD_SHORT: &str = "Z";
     const ZEROCONF_PORT_SHORT: &str = "z";
 
-    // Options that have different desc's
+    // Options that have different descriptions
     // depending on what backends were enabled at build time.
     #[cfg(feature = "alsa-backend")]
     const MIXER_TYPE_DESC: &str = "Mixer to use {alsa|softvol}. Defaults to softvol.";
@@ -367,16 +374,6 @@ fn get_setup() -> Setup {
         "Run PROGRAM set by `--onevent` before the sink is opened and after it is closed.",
     )
     .optflag(
-        AUTOPLAY_SHORT,
-        AUTOPLAY,
-        "Automatically play similar songs when your music ends.",
-    )
-    .optflag(
-        PASSTHROUGH_SHORT,
-        PASSTHROUGH,
-        "Pass a raw stream to the output. Only works with the pipe and subprocess backends.",
-    )
-    .optflag(
         ENABLE_VOLUME_NORMALISATION_SHORT,
         ENABLE_VOLUME_NORMALISATION,
         "Play all tracks at approximately the same apparent volume.",
@@ -412,9 +409,15 @@ fn get_setup() -> Setup {
         "TYPE",
     )
     .optopt(
+        TEMP_DIR_SHORT,
+        TEMP_DIR,
+        "Path to a directory where files will be temporarily stored while downloading.",
+        "PATH",
+    )
+    .optopt(
         CACHE_SHORT,
         CACHE,
-        "Path to a directory where files will be cached.",
+        "Path to a directory where files will be cached after downloading.",
         "PATH",
     )
     .optopt(
@@ -560,6 +563,13 @@ fn get_setup() -> Setup {
         AP_PORT,
         "Connect to an AP with a specified port 1 - 65535. If no AP with that port is present a fallback AP will be used. Available ports are usually 80, 443 and 4070.",
         "PORT",
+    );
+
+    #[cfg(feature = "passthrough-decoder")]
+    opts.optflag(
+        PASSTHROUGH_SHORT,
+        PASSTHROUGH,
+        "Pass a raw stream to the output. Only works with the pipe and subprocess backends.",
     );
 
     let args: Vec<_> = std::env::args_os()
@@ -988,6 +998,15 @@ fn get_setup() -> Setup {
         }
     };
 
+    let tmp_dir = opt_str(TEMP_DIR).map_or(SessionConfig::default().tmp_dir, |p| {
+        let tmp_dir = PathBuf::from(p);
+        if let Err(e) = create_dir_all(&tmp_dir) {
+            error!("could not create or access specified tmp directory: {}", e);
+            exit(1);
+        }
+        tmp_dir
+    });
+
     let cache = {
         let volume_dir = opt_str(SYSTEM_CACHE)
             .or_else(|| opt_str(CACHE))
@@ -1236,38 +1255,30 @@ fn get_setup() -> Setup {
             .unwrap_or_default();
 
         let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
-        let autoplay = opt_present(AUTOPLAY);
 
         ConnectConfig {
             name,
             device_type,
             initial_volume,
             has_volume_ctrl,
-            autoplay,
         }
     };
 
     let session_config = SessionConfig {
-        user_agent: version::VERSION_STRING.to_string(),
         device_id: device_id(&connect_config.name),
         proxy: opt_str(PROXY).or_else(|| std::env::var("http_proxy").ok()).map(
             |s| {
                 match Url::parse(&s) {
                     Ok(url) => {
                         if url.host().is_none() || url.port_or_known_default().is_none() {
-                            error!("Invalid proxy url, only URLs on the format \"http://host:port\" are allowed");
-                            exit(1);
-                        }
-
-                        if url.scheme() != "http" {
-                            error!("Only unsecure http:// proxies are supported");
+                            error!("Invalid proxy url, only URLs on the format \"http(s)://host:port\" are allowed");
                             exit(1);
                         }
 
                         url
                     },
                     Err(e) => {
-                        error!("Invalid proxy URL: \"{}\", only URLs in the format \"http://host:port\" are allowed", e);
+                        error!("Invalid proxy URL: \"{}\", only URLs in the format \"http(s)://host:port\" are allowed", e);
                         exit(1);
                     }
                 }
@@ -1282,6 +1293,8 @@ fn get_setup() -> Setup {
                 exit(1);
             }
         }),
+		tmp_dir,
+        ..SessionConfig::default()
     };
 
     let player_config = {
@@ -1528,7 +1541,10 @@ fn get_setup() -> Setup {
             },
         };
 
+        #[cfg(feature = "passthrough-decoder")]
         let passthrough = opt_present(PASSTHROUGH);
+        #[cfg(not(feature = "passthrough-decoder"))]
+        let passthrough = false;
 
         PlayerConfig {
             bitrate,
@@ -1585,7 +1601,9 @@ async fn main() {
     let mut player_event_channel: Option<UnboundedReceiver<PlayerEvent>> = None;
     let mut auto_connect_times: Vec<Instant> = vec![];
     let mut discovery = None;
-    let mut connecting: Pin<Box<dyn future::FusedFuture<Output = _>>> = Box::pin(future::pending());
+    let mut connecting = false;
+
+    let session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
     if setup.enable_discovery {
         let device_id = setup.session_config.device_id.clone();
@@ -1601,16 +1619,8 @@ async fn main() {
     }
 
     if let Some(credentials) = setup.credentials {
-        last_credentials = Some(credentials.clone());
-        connecting = Box::pin(
-            Session::connect(
-                setup.session_config.clone(),
-                credentials,
-                setup.cache.clone(),
-                true,
-            )
-            .fuse(),
-        );
+        last_credentials = Some(credentials);
+        connecting = true;
     } else if discovery.is_none() {
         error!(
             "Discovery is unavailable and no credentials provided. Authentication is not possible."
@@ -1632,19 +1642,16 @@ async fn main() {
                         auto_connect_times.clear();
 
                         if let Some(spirc) = spirc.take() {
-                            spirc.shutdown();
+                            if let Err(e) = spirc.shutdown() {
+                                error!("error sending spirc shutdown message: {}", e);
+                            }
                         }
                         if let Some(spirc_task) = spirc_task.take() {
                             // Continue shutdown in its own task
                             tokio::spawn(spirc_task);
                         }
 
-                        connecting = Box::pin(Session::connect(
-                            setup.session_config.clone(),
-                            credentials,
-                            setup.cache.clone(),
-                            true,
-                        ).fuse());
+                        connecting = true;
                     },
                     None => {
                         error!("Discovery stopped unexpectedly");
@@ -1652,58 +1659,59 @@ async fn main() {
                     }
                 }
             },
-            session = &mut connecting, if !connecting.is_terminated() => match session {
-                Ok((session,_)) => {
-                    let mixer_config = setup.mixer_config.clone();
-                    let mixer = (setup.mixer)(mixer_config);
-                    let player_config = setup.player_config.clone();
-                    let connect_config = setup.connect_config.clone();
+            _ = async {}, if connecting && last_credentials.is_some() => {
+                let mixer_config = setup.mixer_config.clone();
+                let mixer = (setup.mixer)(mixer_config);
+                let player_config = setup.player_config.clone();
+                let connect_config = setup.connect_config.clone();
 
-                    let soft_volume = mixer.get_soft_volume();
-                    let format = setup.format;
-                    let backend = setup.backend;
-                    let device = setup.device.clone();
-                    let (player, event_channel) =
-                        Player::new(player_config, session.clone(), soft_volume, move || {
-                            (backend)(device, format)
-                        });
+                let soft_volume = mixer.get_soft_volume();
+                let format = setup.format;
+                let backend = setup.backend;
+                let device = setup.device.clone();
+                let (player, event_channel) =
+                    Player::new(player_config, session.clone(), soft_volume, move || {
+                        (backend)(device, format)
+                    });
 
-                    if setup.emit_sink_events {
-                        if let Some(player_event_program) = setup.player_event_program.clone() {
-                            player.set_sink_event_callback(Some(Box::new(move |sink_status| {
-                                match emit_sink_event(sink_status, &player_event_program) {
-                                    Ok(e) if e.success() => (),
-                                    Ok(e) => {
-                                        if let Some(code) = e.code() {
-                                            warn!("Sink event program returned exit code {}", code);
-                                        } else {
-                                            warn!("Sink event program returned failure");
-                                        }
-                                    },
-                                    Err(e) => {
-                                        warn!("Emitting sink event failed: {}", e);
-                                    },
-                                }
-                            })));
-                        }
-                    };
+                if setup.emit_sink_events {
+                    if let Some(player_event_program) = setup.player_event_program.clone() {
+                        player.set_sink_event_callback(Some(Box::new(move |sink_status| {
+                            match emit_sink_event(sink_status, &player_event_program) {
+                                Ok(e) if e.success() => (),
+                                Ok(e) => {
+                                    if let Some(code) = e.code() {
+                                        warn!("Sink event program returned exit code {}", code);
+                                    } else {
+                                        warn!("Sink event program returned failure");
+                                    }
+                                },
+                                Err(e) => {
+                                    warn!("Emitting sink event failed: {}", e);
+                                },
+                            }
+                        })));
+                    }
+                };
 
-                    let (spirc_, spirc_task_) = Spirc::new(connect_config, session, player, mixer);
+                let (spirc_, spirc_task_) = match Spirc::new(connect_config, session.clone(), last_credentials.clone().unwrap(), player, mixer).await {
+                    Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
+                    Err(e) => {
+                        error!("could not initialize spirc: {}", e);
+                        exit(1);
+                    }
+                };
+                spirc = Some(spirc_);
+                spirc_task = Some(Box::pin(spirc_task_));
+                player_event_channel = Some(event_channel);
 
-                    spirc = Some(spirc_);
-                    spirc_task = Some(Box::pin(spirc_task_));
-                    player_event_channel = Some(event_channel);
-                },
-                Err(e) => {
-                    error!("Connection failed: {}", e);
-                    exit(1);
-                }
+                connecting = false;
             },
             _ = async {
                 if let Some(task) = spirc_task.as_mut() {
                     task.await;
                 }
-            }, if spirc_task.is_some() => {
+            }, if spirc_task.is_some() && !connecting => {
                 spirc_task = None;
 
                 warn!("Spirc shut down unexpectedly");
@@ -1714,15 +1722,9 @@ async fn main() {
                 };
 
                 match last_credentials.clone() {
-                    Some(credentials) if !reconnect_exceeds_rate_limit() => {
+                    Some(_) if !reconnect_exceeds_rate_limit() => {
                         auto_connect_times.push(Instant::now());
-
-                        connecting = Box::pin(Session::connect(
-                            setup.session_config.clone(),
-                            credentials,
-                            setup.cache.clone(),
-                            true
-                        ).fuse());
+                        connecting = true;
                     },
                     _ => {
                         error!("Spirc shut down too often. Not reconnecting automatically.");
@@ -1776,7 +1778,9 @@ async fn main() {
 
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
-        spirc.shutdown();
+        if let Err(e) = spirc.shutdown() {
+            error!("error sending spirc shutdown message: {}", e);
+        }
 
         if let Some(mut spirc_task) = spirc_task {
             tokio::select! {

@@ -1,0 +1,239 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.connectstate;
+
+import "player.proto";
+import "devices.proto";
+
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.connectstate.model";
+
+message ClusterUpdate {
+    Cluster cluster = 1;
+    ClusterUpdateReason update_reason = 2;
+    string ack_id = 3;
+    repeated string devices_that_changed = 4;
+}
+
+message PostCommandResponse {
+    string ack_id = 1;
+}
+
+message Device {
+    DeviceInfo device_info = 1;
+    PlayerState player_state = 2;
+    PrivateDeviceInfo private_device_info = 3;
+    bytes transfer_data = 4;
+}
+
+message Cluster {
+    int64 changed_timestamp_ms = 1;
+    string active_device_id = 2;
+    PlayerState player_state = 3;
+    map<string, DeviceInfo> device = 4;
+    bytes transfer_data = 5;
+    uint64 transfer_data_timestamp = 6;
+    int64 not_playing_since_timestamp = 7;
+    bool need_full_player_state = 8;
+    int64 server_timestamp_ms = 9;
+}
+
+message PutStateRequest {
+    string callback_url = 1;
+    Device device = 2;
+    MemberType member_type = 3;
+    bool is_active = 4;
+    PutStateReason put_state_reason = 5;
+    uint32 message_id = 6;
+    string last_command_sent_by_device_id = 7;
+    uint32 last_command_message_id = 8;
+    uint64 started_playing_at = 9;
+    uint64 has_been_playing_for_ms = 11;
+    uint64 client_side_timestamp = 12;
+    bool only_write_player_state = 13;
+}
+
+message PrivateDeviceInfo {
+    string platform = 1;
+}
+
+message SubscribeRequest {
+    string callback_url = 1;
+}
+
+message DeviceInfo {
+    bool can_play = 1;
+    uint32 volume = 2;
+    string name = 3;
+    Capabilities capabilities = 4;
+    repeated DeviceMetadata metadata = 5;
+    string device_software_version = 6;
+    spotify.connectstate.devices.DeviceType device_type = 7;
+    string spirc_version = 9;
+    string device_id = 10;
+    bool is_private_session = 11;
+    bool is_social_connect = 12;
+    string client_id = 13;
+    string brand = 14;
+    string model = 15;
+    map<string, string> metadata_map = 16;
+    string product_id = 17;
+    string deduplication_id = 18;
+    uint32 selected_alias_id = 19;
+    map<uint32, spotify.connectstate.devices.DeviceAlias> device_aliases = 20;
+    bool is_offline = 21;
+    string public_ip = 22;
+    string license = 23;
+    bool is_group = 25;
+    bool is_dynamic_device = 26;
+    repeated string disallow_playback_reasons = 27;
+    repeated string disallow_transfer_reasons = 28;
+    
+    oneof _audio_output_device_info {
+        AudioOutputDeviceInfo audio_output_device_info = 24;
+    }
+}
+
+message AudioOutputDeviceInfo {
+    oneof _audio_output_device_type {
+        AudioOutputDeviceType audio_output_device_type = 1;
+    }
+    
+    oneof _device_name {
+        string device_name = 2;
+    }
+}
+
+message DeviceMetadata {
+    option deprecated = true;
+    string type = 1;
+    string metadata = 2;
+}
+
+message Capabilities {
+    bool can_be_player = 2;
+    bool restrict_to_local = 3;
+    bool gaia_eq_connect_id = 5;
+    bool supports_logout = 6;
+    bool is_observable = 7;
+    int32 volume_steps = 8;
+    repeated string supported_types = 9;
+    bool command_acks = 10;
+    bool supports_rename = 11;
+    bool hidden = 12;
+    bool disable_volume = 13;
+    bool connect_disabled = 14;
+    bool supports_playlist_v2 = 15;
+    bool is_controllable = 16;
+    bool supports_external_episodes = 17;
+    bool supports_set_backend_metadata = 18;
+    bool supports_transfer_command = 19;
+    bool supports_command_request = 20;
+    bool is_voice_enabled = 21;
+    bool needs_full_player_state = 22;
+    bool supports_gzip_pushes = 23;
+    bool supports_set_options_command = 25;
+    CapabilitySupportDetails supports_hifi = 26;
+    string connect_capabilities = 27;
+    
+	//reserved 1, 4, 24, "supported_contexts", "supports_lossless_audio";
+}
+
+message CapabilitySupportDetails {
+    bool fully_supported = 1;
+    bool user_eligible = 2;
+    bool device_supported = 3;
+}
+
+message ConnectCommandOptions {
+    int32 message_id = 1;
+    uint32 target_alias_id = 3;
+}
+
+message LogoutCommand {
+    ConnectCommandOptions command_options = 1;
+}
+
+message SetVolumeCommand {
+    int32 volume = 1;
+    ConnectCommandOptions command_options = 2;
+}
+
+message RenameCommand {
+    string rename_to = 1;
+    ConnectCommandOptions command_options = 2;
+}
+
+message ConnectPlayerCommand {
+    string player_command_json = 1;
+    ConnectCommandOptions command_options = 2;
+}
+
+message SetBackendMetadataCommand {
+    map<string, string> metadata = 1;
+}
+
+message CommandAndSourceDevice {
+    string command = 1;
+    DeviceInfo source_device_info = 2;
+}
+
+message ActiveDeviceUpdate {
+    string device_id = 1;
+}
+
+message StartedPlayingEvent {
+    bytes user_info_header = 1;
+    string device_id = 2;
+}
+
+enum AudioOutputDeviceType {
+    UNKNOWN_AUDIO_OUTPUT_DEVICE_TYPE = 0;
+    BUILT_IN_SPEAKER = 1;
+    LINE_OUT = 2;
+    BLUETOOTH = 3;
+    AIRPLAY = 4;
+}
+
+enum PutStateReason {
+    UNKNOWN_PUT_STATE_REASON = 0;
+    SPIRC_HELLO = 1;
+    SPIRC_NOTIFY = 2;
+    NEW_DEVICE = 3;
+    PLAYER_STATE_CHANGED = 4;
+    VOLUME_CHANGED = 5;
+    PICKER_OPENED = 6;
+    BECAME_INACTIVE = 7;
+    ALIAS_CHANGED = 8;
+}
+
+enum MemberType {
+    SPIRC_V2 = 0;
+    SPIRC_V3 = 1;
+    CONNECT_STATE = 2;
+    CONNECT_STATE_EXTENDED = 5;
+    ACTIVE_DEVICE_TRACKER = 6;
+    PLAY_TOKEN = 7;
+}
+
+enum ClusterUpdateReason {
+    UNKNOWN_CLUSTER_UPDATE_REASON = 0;
+    DEVICES_DISAPPEARED = 1;
+    DEVICE_STATE_CHANGED = 2;
+    NEW_DEVICE_APPEARED = 3;
+    DEVICE_VOLUME_CHANGED = 4;
+    DEVICE_ALIAS_CHANGED = 5;
+}
+
+enum SendCommandResult {
+    UNKNOWN_SEND_COMMAND_RESULT = 0;
+    SUCCESS = 1;
+    DEVICE_NOT_FOUND = 2;
+    CONTEXT_PLAYER_ERROR = 3;
+    DEVICE_DISAPPEARED = 4;
+    UPSTREAM_ERROR = 5;
+    DEVICE_DOES_NOT_SUPPORT_COMMAND = 6;
+    RATE_LIMITED = 7;
+}

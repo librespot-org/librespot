@@ -1,0 +1,37 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.playlist.cosmos.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.proto";
+
+message ModificationRequest {
+    optional string operation = 1;
+    optional string before = 2;
+    optional string after = 3;
+    optional string name = 4;
+    optional bool playlist = 5;
+    
+    optional Attributes attributes = 6;
+    message Attributes {
+        optional bool published = 1;
+        optional bool collaborative = 2;
+        optional string name = 3;
+        optional string description = 4;
+        optional string imageUri = 5;
+        optional string picture = 6;
+    }
+    
+    repeated string uris = 7;
+    repeated string rows = 8;
+    optional bool contents = 9;
+    optional string item_id = 10;
+}
+
+message ModificationResponse {
+    optional bool success = 1;
+    optional string uri = 2;
+}

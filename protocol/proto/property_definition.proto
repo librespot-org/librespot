@@ -1,0 +1,44 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.remote_config.ucs.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PropertyDefinition {
+    Identifier id = 1;
+    message Identifier {
+        string scope = 1;
+        string name = 2;
+    }
+    
+    Metadata metadata = 4;
+    message Metadata {
+        string component_id = 1;
+        string description = 2;
+    }
+    
+    oneof specification {
+        BoolSpec bool_spec = 5;
+        IntSpec int_spec = 6;
+        EnumSpec enum_spec = 7;
+    }
+    
+    //reserved 2, "hash";
+    
+    message BoolSpec {
+        bool default = 1;
+    }
+    
+    message IntSpec {
+        int32 default = 1;
+        int32 lower = 2;
+        int32 upper = 3;
+    }
+    
+    message EnumSpec {
+        string default = 1;
+        repeated string values = 2;
+    }
+}

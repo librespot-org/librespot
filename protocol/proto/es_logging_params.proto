@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+import "es_optional.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message LoggingParams {
+    OptionalInt64 command_initiated_time = 1;
+    OptionalInt64 command_received_time = 2;
+    repeated string page_instance_ids = 3;
+    repeated string interaction_ids = 4;
+}

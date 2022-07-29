@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+import "context_page.proto";
+import "restrictions.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Context {
+    optional string uri = 1;
+    optional string url = 2;
+    map<string, string> metadata = 3;
+    optional Restrictions restrictions = 4;
+    repeated ContextPage pages = 5;
+    optional bool loading = 6;
+}

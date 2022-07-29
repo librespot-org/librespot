@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CacheRealmReport {
+    optional bytes cache_id = 1;
+    optional int64 realm_id = 2;
+    optional int64 num_entries = 3;
+    optional int64 num_locked_entries = 4;
+    optional int64 num_locked_entries_current_user = 5;
+    optional int64 num_full_entries = 6;
+    optional int64 size_kb = 7;
+    optional int64 locked_size_kb = 8;
+}

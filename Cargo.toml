@@ -49,18 +49,16 @@ path = "protocol"
 version = "0.4.2"
 
 [dependencies]
-base64 = "0.13"
-env_logger =  {version = "0.9", default-features = false, features = ["termcolor","humantime","atty"]}
+env_logger =  { version = "0.9", default-features = false, features = ["termcolor", "humantime", "atty"] }
 futures-util = { version = "0.3", default_features = false }
-getopts = "0.2.21"
+getopts = "0.2"
 hex = "0.4"
-hyper = "0.14"
 log = "0.4"
-rpassword = "6.0"
+rpassword = "7.0"
+sha1 = "0.10"
 thiserror = "1.0"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "signal", "sync", "process"] }
+tokio = { version = "1", features = ["rt", "macros", "signal", "sync", "parking_lot", "process"] }
 url = "2.2"
-sha-1 = "0.9"
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
@@ -72,7 +70,9 @@ rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
-with-dns-sd = ["librespot-discovery/with-dns-sd"]
+with-dns-sd = ["librespot-core/with-dns-sd", "librespot-discovery/with-dns-sd"]
+
+passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
 default = ["rodio-backend"]
 

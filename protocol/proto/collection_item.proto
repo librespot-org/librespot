@@ -1,0 +1,48 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.collection_cosmos.proto;
+
+import "metadata/album_metadata.proto";
+import "metadata/artist_metadata.proto";
+import "metadata/track_metadata.proto";
+import "collection/artist_collection_state.proto";
+import "collection/album_collection_state.proto";
+import "collection/track_collection_state.proto";
+import "sync/artist_sync_state.proto";
+import "sync/album_sync_state.proto";
+import "sync/track_sync_state.proto";
+import "played_state/track_played_state.proto";
+
+option optimize_for = CODE_SIZE;
+
+message CollectionTrack {
+    uint32 index = 1;
+    uint32 add_time = 2;
+    cosmos_util.proto.TrackMetadata track_metadata = 3;
+    cosmos_util.proto.TrackCollectionState track_collection_state = 4;
+    cosmos_util.proto.TrackPlayState track_play_state = 5;
+    cosmos_util.proto.TrackSyncState track_sync_state = 6;
+    bool decorated = 7;
+    CollectionAlbum album = 8;
+    string cover = 9;
+}
+
+message CollectionAlbum {
+    uint32 add_time = 1;
+    cosmos_util.proto.AlbumMetadata album_metadata = 2;
+    cosmos_util.proto.AlbumCollectionState album_collection_state = 3;
+    cosmos_util.proto.AlbumSyncState album_sync_state = 4;
+    bool decorated = 5;
+    string album_type = 6;
+    repeated CollectionTrack track = 7;
+}
+
+message CollectionArtist {
+    cosmos_util.proto.ArtistMetadata artist_metadata = 1;
+    cosmos_util.proto.ArtistCollectionState artist_collection_state = 2;
+    cosmos_util.proto.ArtistSyncState artist_sync_state = 3;
+    bool decorated = 4;
+    repeated CollectionAlbum album = 5;
+}

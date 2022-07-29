@@ -1,0 +1,34 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.ads.formats;
+
+option objc_class_prefix = "SPT";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "PodcastAdsProto";
+option java_package = "com.spotify.ads.formats.proto";
+
+message PodcastAds {
+    repeated string file_ids = 1;
+    repeated string manifest_ids = 2;
+    repeated Segment segments = 3;
+}
+
+message Segment {
+    Slot slot = 1;
+    int32 start_ms = 2;
+    int32 stop_ms = 3;
+}
+
+enum Slot {
+    UNKNOWN = 0;
+    PODCAST_PREROLL = 1;
+    PODCAST_POSTROLL = 2;
+    PODCAST_MIDROLL_1 = 3;
+    PODCAST_MIDROLL_2 = 4;
+    PODCAST_MIDROLL_3 = 5;
+    PODCAST_MIDROLL_4 = 6;
+    PODCAST_MIDROLL_5 = 7;
+}

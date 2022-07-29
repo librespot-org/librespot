@@ -1,0 +1,58 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.media_manifest.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AudioFile {
+    enum Format {
+        OGG_VORBIS_96 = 0;
+        OGG_VORBIS_160 = 1;
+        OGG_VORBIS_320 = 2;
+        MP3_256 = 3;
+        MP3_320 = 4;
+        MP3_160 = 5;
+        MP3_96 = 6;
+        MP3_160_ENC = 7;
+        AAC_24 = 8;
+        AAC_48 = 9;
+        FLAC_FLAC = 16;
+    }
+}
+
+message File {
+    int32 bitrate = 3;
+    string mime_type = 4;
+    
+    oneof file {
+        ExternalFile external_file = 1;
+        FileIdFile file_id_file = 2;
+    }
+    
+    message ExternalFile {
+        string method = 1;
+        bytes body = 4;
+        
+        oneof endpoint {
+            string url = 2;
+            string service = 3;
+        }
+    }
+    
+    message FileIdFile {
+        string file_id_hex = 1;
+        AudioFile.Format download_format = 2;
+        EncryptionType encryption = 3;
+    }
+}
+
+message Files {
+    repeated File files = 1;
+}
+
+enum EncryptionType {
+    NONE = 0;
+    AES = 1;
+}

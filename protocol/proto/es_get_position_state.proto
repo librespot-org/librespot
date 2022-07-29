@@ -1,0 +1,25 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message GetPositionStateRequest {
+    
+}
+
+message GetPositionStateResponse {
+    Error error = 1;
+    enum Error {
+        OK = 0;
+        NOT_FOUND = 1;
+    }
+    
+    uint64 timestamp = 2;
+    uint64 position = 3;
+    double playback_speed = 4;
+}
