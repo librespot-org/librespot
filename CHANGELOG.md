@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] `pipe`: Better error handling
 
 ### Added
-- [core] `apresolve`: Blacklist ap-gew4 access point that causes channel errors
+- [core] `apresolve`: Blacklist ap-gew4 and ap-gue1 access points that cause channel errors
 - [playback] `pipe`: Implement stop
 
 ### Fixed

@@ -8,7 +8,7 @@ use url::Url;
 
 const APRESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com:80";
 const AP_FALLBACK: &str = "ap.spotify.com:443";
-const AP_BLACKLIST: [&str; 1] = ["ap-gew4.spotify.com"];
+const AP_BLACKLIST: [&str; 2] = ["ap-gew4.spotify.com", "ap-gue1.spotify.com"];
 
 #[derive(Clone, Debug, Deserialize)]
 struct ApResolveData {
