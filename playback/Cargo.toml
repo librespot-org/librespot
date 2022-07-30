@@ -1,6 +1,6 @@
 [package]
 name = "librespot-playback"
-version = "0.4.2"
+version = "0.5.0-dev"
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
 description = "The audio playback logic for librespot"
 license = "MIT"
@@ -9,13 +9,13 @@ edition = "2018"
 
 [dependencies.librespot-audio]
 path = "../audio"
-version = "0.4.2"
+version = "0.5.0-dev"
 [dependencies.librespot-core]
 path = "../core"
-version = "0.4.2"
+version = "0.5.0-dev"
 [dependencies.librespot-metadata]
 path = "../metadata"
-version = "0.4.2"
+version = "0.5.0-dev"
 
 [dependencies]
 byteorder = "1"

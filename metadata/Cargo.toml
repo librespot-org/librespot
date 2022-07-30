@@ -1,6 +1,6 @@
 [package]
 name = "librespot-metadata"
-version = "0.4.2"
+version = "0.5.0-dev"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The metadata logic for librespot"
 license = "MIT"
@@ -18,8 +18,8 @@ uuid = { version = "1", default-features = false }
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.4.2"
+version = "0.5.0-dev"
 
 [dependencies.librespot-protocol]
 path = "../protocol"
-version = "0.4.2"
+version = "0.5.0-dev"
