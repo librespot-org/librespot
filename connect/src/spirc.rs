@@ -431,7 +431,7 @@ impl SpircTask {
                     Some(result) => match result {
                         Ok((username, frame)) => {
                             if username != self.session.username() {
-                                error!("could not dispatch remote update: frame was intended for {}", username);
+                                warn!("could not dispatch remote update: frame was intended for {}", username);
                             } else if let Err(e) = self.handle_remote_update(frame) {
                                 error!("could not dispatch remote update: {}", e);
                             }
@@ -475,7 +475,7 @@ impl SpircTask {
                 },
                 cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
                     if let Err(e) = self.handle_command(cmd) {
-                        error!("could not dispatch command: {}", e);
+                        warn!("could not dispatch command: {}", e);
                     }
                 },
                 event = async { player_events?.recv().await }, if player_events.is_some() => if let Some(event) = event {

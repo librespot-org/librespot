@@ -301,7 +301,7 @@ impl Session {
                         }
                         Ok(Event::Eof) => break,
                         Ok(_) => (),
-                        Err(e) => error!(
+                        Err(e) => warn!(
                             "Error parsing XML at position {}: {:?}",
                             reader.buffer_position(),
                             e
