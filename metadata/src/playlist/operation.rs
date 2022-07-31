@@ -29,7 +29,7 @@ pub struct PlaylistOperation {
     pub update_list_attributes: PlaylistUpdateAttributes,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PlaylistOperations(pub Vec<PlaylistOperation>);
 
 impl Deref for PlaylistOperations {

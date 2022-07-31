@@ -6,7 +6,7 @@ use librespot_protocol as protocol;
 use protocol::metadata::AudioFile as AudioFileMessage;
 pub use protocol::metadata::AudioFile_Format as AudioFileFormat;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AudioFiles(pub HashMap<AudioFileFormat, FileId>);
 
 impl Deref for AudioFiles {

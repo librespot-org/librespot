@@ -22,7 +22,7 @@ pub struct Image {
     pub height: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Images(pub Vec<Image>);
 
 impl Deref for Images {
@@ -38,7 +38,7 @@ pub struct PictureSize {
     pub url: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PictureSizes(pub Vec<PictureSize>);
 
 impl Deref for PictureSizes {

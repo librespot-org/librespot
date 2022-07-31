@@ -11,7 +11,7 @@ pub struct ExternalId {
     pub id: String, // this can be anything from a URL to a ISRC, EAN or UPC
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ExternalIds(pub Vec<ExternalId>);
 
 impl Deref for ExternalIds {

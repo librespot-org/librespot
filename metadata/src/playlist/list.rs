@@ -26,7 +26,7 @@ use librespot_core::{
 use librespot_protocol as protocol;
 use protocol::playlist4_external::GeoblockBlockingType as Geoblock;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Geoblocks(Vec<Geoblock>);
 
 impl Deref for Geoblocks {
@@ -55,7 +55,7 @@ pub struct Playlist {
     pub geoblocks: Geoblocks,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Playlists(pub Vec<SpotifyId>);
 
 impl Deref for Playlists {

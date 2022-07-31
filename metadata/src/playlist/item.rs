@@ -24,7 +24,7 @@ pub struct PlaylistItem {
     pub attributes: PlaylistItemAttributes,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PlaylistItems(pub Vec<PlaylistItem>);
 
 impl Deref for PlaylistItems {
@@ -53,7 +53,7 @@ pub struct PlaylistMetaItem {
     pub capabilities: Capabilities,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PlaylistMetaItems(pub Vec<PlaylistMetaItem>);
 
 impl Deref for PlaylistMetaItems {

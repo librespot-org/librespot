@@ -20,7 +20,7 @@ pub struct Artist {
     pub top_tracks: CountryTopTracks,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Artists(pub Vec<SpotifyId>);
 
 impl Deref for Artists {
@@ -37,7 +37,7 @@ pub struct ArtistWithRole {
     pub role: ArtistRole,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ArtistsWithRole(pub Vec<ArtistWithRole>);
 
 impl Deref for ArtistsWithRole {
@@ -53,7 +53,7 @@ pub struct TopTracks {
     pub tracks: Tracks,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CountryTopTracks(pub Vec<TopTracks>);
 
 impl Deref for CountryTopTracks {
