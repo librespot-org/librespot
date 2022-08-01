@@ -4,20 +4,51 @@ use std::{
     ops::Deref,
 };
 
-use crate::{request::RequestResult, track::Tracks, util::try_from_repeated_message, Metadata};
+use crate::{
+    album::Albums,
+    availability::Availabilities,
+    external_id::ExternalIds,
+    image::Images,
+    request::RequestResult,
+    restriction::Restrictions,
+    sale_period::SalePeriods,
+    track::Tracks,
+    util::{from_repeated_message, try_from_repeated_message},
+    Metadata,
+};
 
 use librespot_core::{Error, Session, SpotifyId};
 
 use librespot_protocol as protocol;
-use protocol::metadata::ArtistWithRole as ArtistWithRoleMessage;
 pub use protocol::metadata::ArtistWithRole_ArtistRole as ArtistRole;
+
+use protocol::metadata::ActivityPeriod as ActivityPeriodMessage;
+use protocol::metadata::AlbumGroup as AlbumGroupMessage;
+use protocol::metadata::ArtistWithRole as ArtistWithRoleMessage;
+use protocol::metadata::Biography as BiographyMessage;
 use protocol::metadata::TopTracks as TopTracksMessage;
 
 #[derive(Debug, Clone)]
 pub struct Artist {
     pub id: SpotifyId,
     pub name: String,
+    pub popularity: i32,
     pub top_tracks: CountryTopTracks,
+    pub albums: AlbumGroups,
+    pub singles: AlbumGroups,
+    pub compilations: AlbumGroups,
+    pub appears_on_albums: AlbumGroups,
+    pub genre: Vec<String>,
+    pub external_ids: ExternalIds,
+    pub portraits: Images,
+    pub biographies: Biographies,
+    pub activity_periods: ActivityPeriods,
+    pub restrictions: Restrictions,
+    pub related: Artists,
+    pub is_portrait_album_cover: bool,
+    pub portrait_group: Images,
+    pub sales_periods: SalePeriods,
+    pub availabilities: Availabilities,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -63,6 +94,60 @@ impl Deref for CountryTopTracks {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct AlbumGroup(pub Albums);
+
+impl Deref for AlbumGroup {
+    type Target = Albums;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct AlbumGroups(pub Vec<AlbumGroup>);
+
+impl Deref for AlbumGroups {
+    type Target = Vec<AlbumGroup>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Biography {
+    pub text: String,
+    pub portraits: Images,
+    pub portrait_group: Vec<Images>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Biographies(pub Vec<Biography>);
+
+impl Deref for Biographies {
+    type Target = Vec<Biography>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ActivityPeriod {
+    pub start_year: i32,
+    pub end_year: i32,
+    pub decade: i32,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ActivityPeriods(pub Vec<ActivityPeriod>);
+
+impl Deref for ActivityPeriods {
+    type Target = Vec<ActivityPeriod>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl CountryTopTracks {
     pub fn for_country(&self, country: &str) -> Tracks {
         if let Some(country) = self.0.iter().find(|top_track| top_track.country == country) {
@@ -96,7 +181,23 @@ impl TryFrom<&<Self as Metadata>::Message> for Artist {
         Ok(Self {
             id: artist.try_into()?,
             name: artist.get_name().to_owned(),
+            popularity: artist.get_popularity(),
             top_tracks: artist.get_top_track().try_into()?,
+            albums: artist.get_album_group().try_into()?,
+            singles: artist.get_single_group().try_into()?,
+            compilations: artist.get_compilation_group().try_into()?,
+            appears_on_albums: artist.get_appears_on_group().try_into()?,
+            genre: artist.get_genre().to_vec(),
+            external_ids: artist.get_external_id().into(),
+            portraits: artist.get_portrait().into(),
+            biographies: artist.get_biography().into(),
+            activity_periods: artist.get_activity_period().into(),
+            restrictions: artist.get_restriction().into(),
+            related: artist.get_related().try_into()?,
+            is_portrait_album_cover: artist.get_is_portrait_album_cover(),
+            portrait_group: artist.get_portrait_group().get_image().into(),
+            sales_periods: artist.get_sale_period().try_into()?,
+            availabilities: artist.get_availability().try_into()?,
         })
     }
 }
@@ -127,3 +228,42 @@ impl TryFrom<&TopTracksMessage> for TopTracks {
 }
 
 try_from_repeated_message!(TopTracksMessage, CountryTopTracks);
+
+impl TryFrom<&AlbumGroupMessage> for AlbumGroup {
+    type Error = librespot_core::Error;
+    fn try_from(album_groups: &AlbumGroupMessage) -> Result<Self, Self::Error> {
+        Ok(Self(album_groups.get_album().try_into()?))
+    }
+}
+
+try_from_repeated_message!(AlbumGroupMessage, AlbumGroups);
+
+impl From<&BiographyMessage> for Biography {
+    fn from(biography: &BiographyMessage) -> Self {
+        let portrait_group = biography
+            .get_portrait_group()
+            .iter()
+            .map(|it| it.get_image().into())
+            .collect();
+
+        Self {
+            text: biography.get_text().to_owned(),
+            portraits: biography.get_portrait().into(),
+            portrait_group,
+        }
+    }
+}
+
+from_repeated_message!(BiographyMessage, Biographies);
+
+impl From<&ActivityPeriodMessage> for ActivityPeriod {
+    fn from(activity_periode: &ActivityPeriodMessage) -> Self {
+        Self {
+            start_year: activity_periode.get_start_year(),
+            end_year: activity_periode.get_end_year(),
+            decade: activity_periode.get_decade(),
+        }
+    }
+}
+
+from_repeated_message!(ActivityPeriodMessage, ActivityPeriods);
