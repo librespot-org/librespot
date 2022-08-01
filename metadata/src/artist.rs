@@ -104,6 +104,15 @@ impl Deref for AlbumGroup {
     }
 }
 
+/// `AlbumGroups` contains collections of album variants (different releases of the same album).
+/// Ignoring the wrapping types it is structured roughly like this:
+/// ```text
+/// AlbumGroups [
+///     [Album1], [Album2-relelease, Album2-older-release], [Album3]
+/// ]
+/// ```
+/// In most cases only the current variant of each album is needed. A list of every album in it's
+/// current release variant can be obtained by using [`AlbumGroups::current_releases`]
 #[derive(Debug, Clone, Default)]
 pub struct AlbumGroups(pub Vec<AlbumGroup>);
 
@@ -163,18 +172,31 @@ impl CountryTopTracks {
 }
 
 impl Artist {
+    /// Get the full list of albums, not containing duplicate variants of the same albums.
+    ///
+    /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
     pub fn albums_current(&self) -> Albums {
         self.albums.current_releases()
     }
 
+    /// Get the full list of singles, not containing duplicate variants of the same singles.
+    ///
+    /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
     pub fn singles_current(&self) -> Albums {
         self.singles.current_releases()
     }
 
+    /// Get the full list of compilations, not containing duplicate variants of the same
+    /// compilations.
+    ///
+    /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
     pub fn compilations_current(&self) -> Albums {
         self.compilations.current_releases()
     }
 
+    /// Get the full list of albums, not containing duplicate variants of the same albums.
+    ///
+    /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
     pub fn appears_on_albums_current(&self) -> Albums {
         self.appears_on_albums.current_releases()
     }
@@ -255,6 +277,9 @@ impl TryFrom<&AlbumGroupMessage> for AlbumGroup {
 }
 
 impl AlbumGroups {
+    /// Get the contained albums. This will only use the latest release / variant of an album if
+    /// multiple variants are available. This should be used if multiple variants of the same album
+    /// are not explicitely desired.
     pub fn current_releases(&self) -> Albums {
         let albums = self
             .iter()
