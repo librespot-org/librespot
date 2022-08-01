@@ -52,7 +52,7 @@ pub struct Episode {
     pub is_audiobook_chapter: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Episodes(pub Vec<SpotifyId>);
 
 impl Deref for Episodes {

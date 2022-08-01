@@ -17,7 +17,7 @@ pub struct Restriction {
     pub countries_forbidden: Option<Vec<String>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Restrictions(pub Vec<Restriction>);
 
 impl Deref for Restrictions {

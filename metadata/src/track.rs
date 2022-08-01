@@ -53,7 +53,7 @@ pub struct Track {
     pub artists_with_role: ArtistsWithRole,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Tracks(pub Vec<SpotifyId>);
 
 impl Deref for Tracks {

@@ -18,7 +18,7 @@ pub struct SalePeriod {
     pub end: Date,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct SalePeriods(pub Vec<SalePeriod>);
 
 impl Deref for SalePeriods {

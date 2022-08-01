@@ -16,7 +16,7 @@ pub struct Capabilities {
     pub can_cancel_membership: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PermissionLevels(pub Vec<PermissionLevel>);
 
 impl Deref for PermissionLevels {

@@ -21,7 +21,7 @@ pub struct Availability {
     pub start: Date,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Availabilities(pub Vec<Availability>);
 
 impl Deref for Availabilities {
