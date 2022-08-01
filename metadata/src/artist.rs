@@ -21,10 +21,10 @@ pub struct Artist {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Artists(pub Vec<SpotifyId>);
+pub struct Artists(pub Vec<Artist>);
 
 impl Deref for Artists {
-    type Target = Vec<SpotifyId>;
+    type Target = Vec<Artist>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
