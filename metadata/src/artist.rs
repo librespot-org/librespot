@@ -162,6 +162,24 @@ impl CountryTopTracks {
     }
 }
 
+impl Artist {
+    pub fn albums_current(&self) -> Albums {
+        self.albums.current_releases()
+    }
+
+    pub fn singles_current(&self) -> Albums {
+        self.singles.current_releases()
+    }
+
+    pub fn compilations_current(&self) -> Albums {
+        self.compilations.current_releases()
+    }
+
+    pub fn appears_on_albums_current(&self) -> Albums {
+        self.appears_on_albums.current_releases()
+    }
+}
+
 #[async_trait]
 impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
@@ -233,6 +251,17 @@ impl TryFrom<&AlbumGroupMessage> for AlbumGroup {
     type Error = librespot_core::Error;
     fn try_from(album_groups: &AlbumGroupMessage) -> Result<Self, Self::Error> {
         Ok(Self(album_groups.get_album().try_into()?))
+    }
+}
+
+impl AlbumGroups {
+    pub fn current_releases(&self) -> Albums {
+        let albums = self
+            .iter()
+            .filter_map(|agrp| agrp.first())
+            .cloned()
+            .collect();
+        Albums(albums)
     }
 }
 
