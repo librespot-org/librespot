@@ -12,7 +12,7 @@ pub struct Copyright {
     pub text: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Copyrights(pub Vec<Copyright>);
 
 impl Deref for Copyrights {

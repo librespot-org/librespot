@@ -34,7 +34,7 @@ pub struct PlaylistAttributes {
     pub picture_sizes: PictureSizes,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PlaylistAttributeKinds(pub Vec<PlaylistAttributeKind>);
 
 impl Deref for PlaylistAttributeKinds {
@@ -46,7 +46,7 @@ impl Deref for PlaylistAttributeKinds {
 
 from_repeated_enum!(PlaylistAttributeKind, PlaylistAttributeKinds);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PlaylistFormatAttribute(pub HashMap<String, String>);
 
 impl Deref for PlaylistFormatAttribute {
@@ -66,7 +66,7 @@ pub struct PlaylistItemAttributes {
     pub item_id: Vec<u8>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PlaylistItemAttributeKinds(pub Vec<PlaylistItemAttributeKind>);
 
 impl Deref for PlaylistItemAttributeKinds {

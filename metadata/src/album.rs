@@ -41,7 +41,7 @@ pub struct Album {
     pub availability: Availabilities,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Albums(pub Vec<SpotifyId>);
 
 impl Deref for Albums {
@@ -58,7 +58,7 @@ pub struct Disc {
     pub tracks: Tracks,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Discs(pub Vec<Disc>);
 
 impl Deref for Discs {

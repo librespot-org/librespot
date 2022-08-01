@@ -11,7 +11,7 @@ pub struct ContentRating {
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ContentRatings(pub Vec<ContentRating>);
 
 impl Deref for ContentRatings {

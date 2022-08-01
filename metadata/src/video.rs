@@ -7,7 +7,7 @@ use librespot_core::FileId;
 use librespot_protocol as protocol;
 use protocol::metadata::VideoFile as VideoFileMessage;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VideoFiles(pub Vec<FileId>);
 
 impl Deref for VideoFiles {
