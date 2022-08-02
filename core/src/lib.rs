@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate log;
-extern crate num_derive;
 
 use librespot_protocol as protocol;
 

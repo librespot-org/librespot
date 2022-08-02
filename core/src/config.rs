@@ -109,7 +109,7 @@ impl From<DeviceType> for &str {
 }
 
 impl fmt::Display for DeviceType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let str: &str = self.into();
         f.write_str(str)
     }

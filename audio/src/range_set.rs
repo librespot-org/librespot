@@ -60,7 +60,7 @@ impl RangeSet {
         self.ranges[index]
     }
 
-    pub fn iter(&self) -> Iter<Range> {
+    pub fn iter(&self) -> Iter<'_, Range> {
         self.ranges.iter()
     }
 

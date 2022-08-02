@@ -274,7 +274,7 @@ impl SpotifyId {
 }
 
 impl fmt::Debug for SpotifyId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("SpotifyId")
             .field(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
             .finish()
@@ -282,7 +282,7 @@ impl fmt::Debug for SpotifyId {
 }
 
 impl fmt::Display for SpotifyId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
     }
 }
@@ -345,7 +345,7 @@ impl Deref for NamedSpotifyId {
 }
 
 impl fmt::Debug for NamedSpotifyId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("NamedSpotifyId")
             .field(
                 &self
@@ -358,7 +358,7 @@ impl fmt::Debug for NamedSpotifyId {
 }
 
 impl fmt::Display for NamedSpotifyId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(
             &self
                 .inner_id
