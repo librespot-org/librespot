@@ -31,10 +31,19 @@ impl AccessPoints {
         }
     }
 
-    fn extend(&mut self, other: Self) {
-        self.accesspoint.extend(other.accesspoint);
-        self.dealer.extend(other.dealer);
-        self.spclient.extend(other.spclient);
+    fn extend_filter_port(&mut self, other: Self, port: Option<u16>) {
+        if let Some(port) = port {
+            self.accesspoint
+                .extend(other.accesspoint.into_iter().filter(|(_, p)| *p == port));
+            self.dealer
+                .extend(other.dealer.into_iter().filter(|(_, p)| *p == port));
+            self.spclient
+                .extend(other.spclient.into_iter().filter(|(_, p)| *p == port));
+        } else {
+            self.accesspoint.extend(other.accesspoint);
+            self.dealer.extend(other.dealer);
+            self.spclient.extend(other.spclient);
+        }
     }
 }
 
@@ -55,7 +64,7 @@ impl ApResolver {
         }
     }
 
-    fn process_data(&self, data: Vec<String>) -> Vec<SocketAddress> {
+    fn process_ap_strings(&self, data: Vec<String>) -> Vec<SocketAddress> {
         data.into_iter()
             .filter_map(|ap| {
                 let mut split = ap.rsplitn(2, ':');
@@ -93,9 +102,9 @@ impl ApResolver {
                 Err(e) => (ApResolveData::default(), Some(e)),
             };
 
-            inner.data.accesspoint = self.process_data(data.accesspoint);
-            inner.data.dealer = self.process_data(data.dealer);
-            inner.data.spclient = self.process_data(data.spclient);
+            inner.data.accesspoint = self.process_ap_strings(data.accesspoint);
+            inner.data.dealer = self.process_ap_strings(data.dealer);
+            inner.data.spclient = self.process_ap_strings(data.spclient);
 
             if self.is_any_empty() {
                 if let Some(error) = error {
@@ -106,7 +115,9 @@ impl ApResolver {
                 } else {
                     warn!("Failed to resolve all access points, using fallbacks");
                 }
-                inner.data.extend(AccessPoints::fallback());
+                inner
+                    .data
+                    .extend_filter_port(AccessPoints::fallback(), self.port_config());
             }
         })
     }
