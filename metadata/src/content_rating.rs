@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::util::{from_repeated_message, impl_deref_wrapped};
+use crate::util::{impl_deref_wrapped, impl_from_repeated};
 
 use librespot_protocol as protocol;
 use protocol::metadata::ContentRating as ContentRatingMessage;
@@ -28,4 +28,4 @@ impl From<&ContentRatingMessage> for ContentRating {
     }
 }
 
-from_repeated_message!(ContentRatingMessage, ContentRatings);
+impl_from_repeated!(ContentRatingMessage, ContentRatings);

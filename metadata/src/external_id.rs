@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::util::{from_repeated_message, impl_deref_wrapped};
+use crate::util::{impl_deref_wrapped, impl_from_repeated};
 
 use librespot_protocol as protocol;
 use protocol::metadata::ExternalId as ExternalIdMessage;
@@ -28,4 +28,4 @@ impl From<&ExternalIdMessage> for ExternalId {
     }
 }
 
-from_repeated_message!(ExternalIdMessage, ExternalIds);
+impl_from_repeated!(ExternalIdMessage, ExternalIds);

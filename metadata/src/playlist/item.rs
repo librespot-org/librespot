@@ -4,7 +4,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::util::{impl_deref_wrapped, try_from_repeated_message};
+use crate::util::{impl_deref_wrapped, impl_try_from_repeated};
 
 use super::{
     attribute::{PlaylistAttributes, PlaylistItemAttributes},
@@ -63,7 +63,7 @@ impl TryFrom<&PlaylistItemMessage> for PlaylistItem {
     }
 }
 
-try_from_repeated_message!(PlaylistItemMessage, PlaylistItems);
+impl_try_from_repeated!(PlaylistItemMessage, PlaylistItems);
 
 impl TryFrom<&PlaylistItemsMessage> for PlaylistItemList {
     type Error = librespot_core::Error;
@@ -92,4 +92,4 @@ impl TryFrom<&PlaylistMetaItemMessage> for PlaylistMetaItem {
     }
 }
 
-try_from_repeated_message!(PlaylistMetaItemMessage, PlaylistMetaItems);
+impl_try_from_repeated!(PlaylistMetaItemMessage, PlaylistMetaItems);

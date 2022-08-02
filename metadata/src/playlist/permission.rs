@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::util::{from_repeated_enum, impl_deref_wrapped};
+use crate::util::{impl_deref_wrapped, impl_from_repeated_copy};
 
 use librespot_protocol as protocol;
 use protocol::playlist_permission::Capabilities as CapabilitiesMessage;
@@ -37,4 +37,4 @@ impl From<&CapabilitiesMessage> for Capabilities {
     }
 }
 
-from_repeated_enum!(PermissionLevel, PermissionLevels);
+impl_from_repeated_copy!(PermissionLevel, PermissionLevels);

@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::util::impl_deref_wrapped;
-use crate::util::{from_repeated_enum, from_repeated_message};
+use crate::util::{impl_from_repeated, impl_from_repeated_copy};
 
 use protocol::metadata::Restriction as RestrictionMessage;
 
@@ -68,8 +68,8 @@ impl From<&RestrictionMessage> for Restriction {
     }
 }
 
-from_repeated_message!(RestrictionMessage, Restrictions);
-from_repeated_enum!(RestrictionCatalogue, RestrictionCatalogues);
+impl_from_repeated!(RestrictionMessage, Restrictions);
+impl_from_repeated_copy!(RestrictionCatalogue, RestrictionCatalogues);
 
 struct StrChunks<'s>(&'s str, usize);
 

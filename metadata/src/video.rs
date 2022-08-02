@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::util::{from_repeated_message, impl_deref_wrapped};
+use crate::util::{impl_deref_wrapped, impl_from_repeated};
 
 use librespot_core::FileId;
 
@@ -15,4 +15,4 @@ pub struct VideoFiles(pub Vec<FileId>);
 
 impl_deref_wrapped!(VideoFiles, Vec<FileId>);
 
-from_repeated_message!(VideoFileMessage, VideoFiles);
+impl_from_repeated!(VideoFileMessage, VideoFiles);

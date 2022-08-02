@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     image::PictureSizes,
-    util::{from_repeated_enum, impl_deref_wrapped},
+    util::{impl_deref_wrapped, impl_from_repeated_copy},
 };
 
 use librespot_core::date::Date;
@@ -42,7 +42,7 @@ pub struct PlaylistAttributeKinds(pub Vec<PlaylistAttributeKind>);
 
 impl_deref_wrapped!(PlaylistAttributeKinds, Vec<PlaylistAttributeKind>);
 
-from_repeated_enum!(PlaylistAttributeKind, PlaylistAttributeKinds);
+impl_from_repeated_copy!(PlaylistAttributeKind, PlaylistAttributeKinds);
 
 #[derive(Debug, Clone, Default)]
 pub struct PlaylistFormatAttribute(pub HashMap<String, String>);
@@ -64,7 +64,7 @@ pub struct PlaylistItemAttributeKinds(pub Vec<PlaylistItemAttributeKind>);
 
 impl_deref_wrapped!(PlaylistItemAttributeKinds, Vec<PlaylistItemAttributeKind>);
 
-from_repeated_enum!(PlaylistItemAttributeKind, PlaylistItemAttributeKinds);
+impl_from_repeated_copy!(PlaylistItemAttributeKind, PlaylistItemAttributeKinds);
 
 #[derive(Debug, Clone)]
 pub struct PlaylistPartialAttributes {

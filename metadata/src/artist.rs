@@ -13,7 +13,7 @@ use crate::{
     restriction::Restrictions,
     sale_period::SalePeriods,
     track::Tracks,
-    util::{from_repeated_message, impl_deref_wrapped, try_from_repeated_message},
+    util::{impl_deref_wrapped, impl_from_repeated, impl_try_from_repeated},
     Metadata,
 };
 
@@ -207,7 +207,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Artist {
     }
 }
 
-try_from_repeated_message!(<Artist as Metadata>::Message, Artists);
+impl_try_from_repeated!(<Artist as Metadata>::Message, Artists);
 
 impl TryFrom<&ArtistWithRoleMessage> for ArtistWithRole {
     type Error = librespot_core::Error;
@@ -220,7 +220,7 @@ impl TryFrom<&ArtistWithRoleMessage> for ArtistWithRole {
     }
 }
 
-try_from_repeated_message!(ArtistWithRoleMessage, ArtistsWithRole);
+impl_try_from_repeated!(ArtistWithRoleMessage, ArtistsWithRole);
 
 impl TryFrom<&TopTracksMessage> for TopTracks {
     type Error = librespot_core::Error;
@@ -232,7 +232,7 @@ impl TryFrom<&TopTracksMessage> for TopTracks {
     }
 }
 
-try_from_repeated_message!(TopTracksMessage, CountryTopTracks);
+impl_try_from_repeated!(TopTracksMessage, CountryTopTracks);
 
 impl TryFrom<&AlbumGroupMessage> for AlbumGroup {
     type Error = librespot_core::Error;
@@ -255,7 +255,7 @@ impl AlbumGroups {
     }
 }
 
-try_from_repeated_message!(AlbumGroupMessage, AlbumGroups);
+impl_try_from_repeated!(AlbumGroupMessage, AlbumGroups);
 
 impl From<&BiographyMessage> for Biography {
     fn from(biography: &BiographyMessage) -> Self {
@@ -273,7 +273,7 @@ impl From<&BiographyMessage> for Biography {
     }
 }
 
-from_repeated_message!(BiographyMessage, Biographies);
+impl_from_repeated!(BiographyMessage, Biographies);
 
 impl From<&ActivityPeriodMessage> for ActivityPeriod {
     fn from(activity_periode: &ActivityPeriodMessage) -> Self {
@@ -285,4 +285,4 @@ impl From<&ActivityPeriodMessage> for ActivityPeriod {
     }
 }
 
-from_repeated_message!(ActivityPeriodMessage, ActivityPeriods);
+impl_from_repeated!(ActivityPeriodMessage, ActivityPeriods);

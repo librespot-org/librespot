@@ -8,7 +8,7 @@ use protobuf::Message;
 
 use crate::{
     request::{MercuryRequest, RequestResult},
-    util::{from_repeated_enum, impl_deref_wrapped, try_from_repeated_message},
+    util::{impl_deref_wrapped, impl_from_repeated_copy, impl_try_from_repeated},
     Metadata,
 };
 
@@ -210,5 +210,5 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
     }
 }
 
-from_repeated_enum!(Geoblock, Geoblocks);
-try_from_repeated_message!(Vec<u8>, Playlists);
+impl_from_repeated_copy!(Geoblock, Geoblocks);
+impl_try_from_repeated!(Vec<u8>, Playlists);

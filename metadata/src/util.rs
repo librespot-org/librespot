@@ -1,4 +1,4 @@
-macro_rules! from_repeated_message {
+macro_rules! impl_from_repeated {
     ($src:ty, $dst:ty) => {
         impl From<&[$src]> for $dst {
             fn from(src: &[$src]) -> Self {
@@ -9,22 +9,22 @@ macro_rules! from_repeated_message {
     };
 }
 
-pub(crate) use from_repeated_message;
+pub(crate) use impl_from_repeated;
 
-macro_rules! from_repeated_enum {
+macro_rules! impl_from_repeated_copy {
     ($src:ty, $dst:ty) => {
         impl From<&[$src]> for $dst {
             fn from(src: &[$src]) -> Self {
-                let result = src.iter().map(|x| <$src>::from(*x)).collect();
+                let result = src.iter().copied().collect();
                 Self(result)
             }
         }
     };
 }
 
-pub(crate) use from_repeated_enum;
+pub(crate) use impl_from_repeated_copy;
 
-macro_rules! try_from_repeated_message {
+macro_rules! impl_try_from_repeated {
     ($src:ty, $dst:ty) => {
         impl TryFrom<&[$src]> for $dst {
             type Error = librespot_core::Error;
@@ -36,7 +36,7 @@ macro_rules! try_from_repeated_message {
     };
 }
 
-pub(crate) use try_from_repeated_message;
+pub(crate) use impl_try_from_repeated;
 
 macro_rules! impl_deref_wrapped {
     ($wrapper:ty, $inner:ty) => {

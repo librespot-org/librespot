@@ -14,7 +14,7 @@ use crate::{
     restriction::Restrictions,
     sale_period::SalePeriods,
     track::Tracks,
-    util::{impl_deref_wrapped, try_from_repeated_message},
+    util::{impl_deref_wrapped, impl_try_from_repeated},
     Metadata,
 };
 
@@ -119,7 +119,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Album {
     }
 }
 
-try_from_repeated_message!(<Album as Metadata>::Message, Albums);
+impl_try_from_repeated!(<Album as Metadata>::Message, Albums);
 
 impl TryFrom<&DiscMessage> for Disc {
     type Error = librespot_core::Error;
@@ -132,4 +132,4 @@ impl TryFrom<&DiscMessage> for Disc {
     }
 }
 
-try_from_repeated_message!(DiscMessage, Discs);
+impl_try_from_repeated!(DiscMessage, Discs);

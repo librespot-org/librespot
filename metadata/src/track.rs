@@ -17,7 +17,7 @@ use crate::{
     external_id::ExternalIds,
     restriction::Restrictions,
     sale_period::SalePeriods,
-    util::{impl_deref_wrapped, try_from_repeated_message},
+    util::{impl_deref_wrapped, impl_try_from_repeated},
     Album, Metadata, RequestResult,
 };
 
@@ -141,4 +141,4 @@ impl TryFrom<&<Self as Metadata>::Message> for Track {
     }
 }
 
-try_from_repeated_message!(<Track as Metadata>::Message, Tracks);
+impl_try_from_repeated!(<Track as Metadata>::Message, Tracks);

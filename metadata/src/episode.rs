@@ -14,7 +14,7 @@ use crate::{
     image::Images,
     request::RequestResult,
     restriction::Restrictions,
-    util::{impl_deref_wrapped, try_from_repeated_message},
+    util::{impl_deref_wrapped, impl_try_from_repeated},
     video::VideoFiles,
     Metadata,
 };
@@ -125,4 +125,4 @@ impl TryFrom<&<Self as Metadata>::Message> for Episode {
     }
 }
 
-try_from_repeated_message!(<Episode as Metadata>::Message, Episodes);
+impl_try_from_repeated!(<Episode as Metadata>::Message, Episodes);

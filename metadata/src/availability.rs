@@ -6,7 +6,7 @@ use std::{
 
 use thiserror::Error;
 
-use crate::util::{impl_deref_wrapped, try_from_repeated_message};
+use crate::util::{impl_deref_wrapped, impl_try_from_repeated};
 
 use librespot_core::date::Date;
 
@@ -48,4 +48,4 @@ impl TryFrom<&AvailabilityMessage> for Availability {
     }
 }
 
-try_from_repeated_message!(AvailabilityMessage, Availabilities);
+impl_try_from_repeated!(AvailabilityMessage, Availabilities);

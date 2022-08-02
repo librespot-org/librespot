@@ -4,7 +4,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::util::{from_repeated_message, impl_deref_wrapped, try_from_repeated_message};
+use crate::util::{impl_deref_wrapped, impl_from_repeated, impl_try_from_repeated};
 
 use librespot_core::{FileId, SpotifyId};
 
@@ -60,7 +60,7 @@ impl From<&ImageMessage> for Image {
     }
 }
 
-from_repeated_message!(ImageMessage, Images);
+impl_from_repeated!(ImageMessage, Images);
 
 impl From<&PictureSizeMessage> for PictureSize {
     fn from(size: &PictureSizeMessage) -> Self {
@@ -71,7 +71,7 @@ impl From<&PictureSizeMessage> for PictureSize {
     }
 }
 
-from_repeated_message!(PictureSizeMessage, PictureSizes);
+impl_from_repeated!(PictureSizeMessage, PictureSizes);
 
 impl TryFrom<&TranscodedPictureMessage> for TranscodedPicture {
     type Error = librespot_core::Error;
@@ -83,4 +83,4 @@ impl TryFrom<&TranscodedPictureMessage> for TranscodedPicture {
     }
 }
 
-try_from_repeated_message!(TranscodedPictureMessage, TranscodedPictures);
+impl_try_from_repeated!(TranscodedPictureMessage, TranscodedPictures);

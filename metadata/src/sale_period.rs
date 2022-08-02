@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     restriction::Restrictions,
-    util::{impl_deref_wrapped, try_from_repeated_message},
+    util::{impl_deref_wrapped, impl_try_from_repeated},
 };
 
 use librespot_core::date::Date;
@@ -37,4 +37,4 @@ impl TryFrom<&SalePeriodMessage> for SalePeriod {
     }
 }
 
-try_from_repeated_message!(SalePeriodMessage, SalePeriods);
+impl_try_from_repeated!(SalePeriodMessage, SalePeriods);

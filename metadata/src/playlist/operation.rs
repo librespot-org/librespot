@@ -9,7 +9,7 @@ use crate::{
         attribute::{PlaylistUpdateAttributes, PlaylistUpdateItemAttributes},
         item::PlaylistItems,
     },
-    util::{impl_deref_wrapped, try_from_repeated_message},
+    util::{impl_deref_wrapped, impl_try_from_repeated},
 };
 
 use librespot_protocol as protocol;
@@ -71,7 +71,7 @@ impl TryFrom<&PlaylistOperationMessage> for PlaylistOperation {
     }
 }
 
-try_from_repeated_message!(PlaylistOperationMessage, PlaylistOperations);
+impl_try_from_repeated!(PlaylistOperationMessage, PlaylistOperations);
 
 impl TryFrom<&PlaylistAddMessage> for PlaylistOperationAdd {
     type Error = librespot_core::Error;
