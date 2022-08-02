@@ -12,23 +12,29 @@ pub struct AccessPoints {
     spclient: Vec<SocketAddress>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 pub struct ApResolveData {
     accesspoint: Vec<String>,
     dealer: Vec<String>,
     spclient: Vec<String>,
 }
 
-// These addresses probably do some geo-location based traffic management or at least DNS-based
-// load balancing. They are known to fail when the normal resolvers are up, so that's why they
-// should only be used as fallback.
-impl Default for ApResolveData {
-    fn default() -> Self {
+impl AccessPoints {
+    // These addresses probably do some geo-location based traffic management or at least DNS-based
+    // load balancing. They are known to fail when the normal resolvers are up, so that's why they
+    // should only be used as fallback.
+    fn fallback() -> Self {
         Self {
-            accesspoint: vec![String::from("ap.spotify.com:443")],
-            dealer: vec![String::from("dealer.spotify.com:443")],
-            spclient: vec![String::from("spclient.wg.spotify.com:443")],
+            accesspoint: vec![("ap.spotify.com".to_string(), 443)],
+            dealer: vec![("dealer.spotify.com".to_string(), 443)],
+            spclient: vec![("spclient.wg.spotify.com".to_string(), 443)],
         }
+    }
+
+    fn extend(&mut self, other: Self) {
+        self.accesspoint.extend(other.accesspoint);
+        self.dealer.extend(other.dealer);
+        self.spclient.extend(other.spclient);
     }
 }
 
@@ -69,7 +75,7 @@ impl ApResolver {
     pub async fn try_apresolve(&self) -> Result<ApResolveData, Error> {
         let req = Request::builder()
             .method(Method::GET)
-            .uri("http://apresolve.spotify.com/?type=accesspoint&type=dealer&type=spclient")
+            .uri("https://apresolve.spotify.com/?type=accesspoint&type=dealer&type=spclient")
             .body(Body::empty())?;
 
         let body = self.session().http_client().request_body(req).await?;
@@ -82,21 +88,30 @@ impl ApResolver {
         let result = self.try_apresolve().await;
 
         self.lock(|inner| {
-            let data = match result {
-                Ok(data) => data,
-                Err(e) => {
-                    warn!("Failed to resolve access points, using fallbacks: {}", e);
-                    ApResolveData::default()
-                }
+            let (data, error) = match result {
+                Ok(data) => (data, None),
+                Err(e) => (ApResolveData::default(), Some(e)),
             };
 
             inner.data.accesspoint = self.process_data(data.accesspoint);
             inner.data.dealer = self.process_data(data.dealer);
             inner.data.spclient = self.process_data(data.spclient);
+
+            if self.is_any_empty() {
+                if let Some(error) = error {
+                    warn!(
+                        "Failed to resolve all access points, using fallbacks: {}",
+                        error
+                    );
+                } else {
+                    warn!("Failed to resolve all access points, using fallbacks");
+                }
+                inner.data.extend(AccessPoints::fallback());
+            }
         })
     }
 
-    fn is_empty(&self) -> bool {
+    fn is_any_empty(&self) -> bool {
         self.lock(|inner| {
             inner.data.accesspoint.is_empty()
                 || inner.data.dealer.is_empty()
@@ -105,7 +120,7 @@ impl ApResolver {
     }
 
     pub async fn resolve(&self, endpoint: &str) -> Result<SocketAddress, Error> {
-        if self.is_empty() {
+        if self.is_any_empty() {
             self.apresolve().await;
         }
 
@@ -114,9 +129,9 @@ impl ApResolver {
                 // take the first position instead of the last with `pop`, because Spotify returns
                 // access points with ports 4070, 443 and 80 in order of preference from highest
                 // to lowest.
-                "accesspoint" => inner.data.accesspoint.remove(0),
-                "dealer" => inner.data.dealer.remove(0),
-                "spclient" => inner.data.spclient.remove(0),
+                "accesspoint" => inner.data.accesspoint.first(),
+                "dealer" => inner.data.dealer.first(),
+                "spclient" => inner.data.spclient.first(),
                 _ => {
                     return Err(Error::unimplemented(format!(
                         "No implementation to resolve access point {}",
@@ -124,6 +139,11 @@ impl ApResolver {
                     )))
                 }
             };
+
+            let access_point = access_point.cloned().ok_or(Error::unavailable(format!(
+                "No access point available for endpoint {}",
+                endpoint
+            )))?;
 
             Ok(access_point)
         })
