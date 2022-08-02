@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use hyper::{Body, Method, Request};
 use serde::Deserialize;
 
@@ -7,9 +9,9 @@ pub type SocketAddress = (String, u16);
 
 #[derive(Default)]
 pub struct AccessPoints {
-    accesspoint: Vec<SocketAddress>,
-    dealer: Vec<SocketAddress>,
-    spclient: Vec<SocketAddress>,
+    accesspoint: VecDeque<SocketAddress>,
+    dealer: VecDeque<SocketAddress>,
+    spclient: VecDeque<SocketAddress>,
 }
 
 #[derive(Deserialize, Default)]
@@ -19,33 +21,20 @@ pub struct ApResolveData {
     spclient: Vec<String>,
 }
 
-impl AccessPoints {
+impl ApResolveData {
     // These addresses probably do some geo-location based traffic management or at least DNS-based
     // load balancing. They are known to fail when the normal resolvers are up, so that's why they
     // should only be used as fallback.
     fn fallback() -> Self {
         Self {
-            accesspoint: vec![("ap.spotify.com".to_string(), 443)],
-            dealer: vec![("dealer.spotify.com".to_string(), 443)],
-            spclient: vec![("spclient.wg.spotify.com".to_string(), 443)],
+            accesspoint: vec![String::from("ap.spotify.com:443")],
+            dealer: vec![String::from("dealer.spotify.com:443")],
+            spclient: vec![String::from("spclient.wg.spotify.com:443")],
         }
     }
+}
 
-    fn extend_filter_port(&mut self, other: Self, port: Option<u16>) {
-        if let Some(port) = port {
-            self.accesspoint
-                .extend(other.accesspoint.into_iter().filter(|(_, p)| *p == port));
-            self.dealer
-                .extend(other.dealer.into_iter().filter(|(_, p)| *p == port));
-            self.spclient
-                .extend(other.spclient.into_iter().filter(|(_, p)| *p == port));
-        } else {
-            self.accesspoint.extend(other.accesspoint);
-            self.dealer.extend(other.dealer);
-            self.spclient.extend(other.spclient);
-        }
-    }
-
+impl AccessPoints {
     fn is_any_empty(&self) -> bool {
         self.accesspoint.is_empty() || self.dealer.is_empty() || self.spclient.is_empty()
     }
@@ -68,21 +57,28 @@ impl ApResolver {
         }
     }
 
-    fn process_ap_strings(&self, data: Vec<String>) -> Vec<SocketAddress> {
+    fn process_ap_strings(&self, data: Vec<String>) -> VecDeque<SocketAddress> {
+        let filter_port = self.port_config();
         data.into_iter()
             .filter_map(|ap| {
                 let mut split = ap.rsplitn(2, ':');
                 let port = split.next()?;
-                let host = split.next()?.to_owned();
                 let port: u16 = port.parse().ok()?;
-                if let Some(p) = self.port_config() {
-                    if p != port {
-                        return None;
-                    }
+                let host = split.next()?.to_owned();
+                match filter_port {
+                    Some(filter_port) if filter_port != port => None,
+                    _ => Some((host, port)),
                 }
-                Some((host, port))
             })
             .collect()
+    }
+
+    fn parse_resolve_to_access_points(&self, resolve: ApResolveData) -> AccessPoints {
+        AccessPoints {
+            accesspoint: self.process_ap_strings(resolve.accesspoint),
+            dealer: self.process_ap_strings(resolve.dealer),
+            spclient: self.process_ap_strings(resolve.spclient),
+        }
     }
 
     pub async fn try_apresolve(&self) -> Result<ApResolveData, Error> {
@@ -106,22 +102,18 @@ impl ApResolver {
                 Err(e) => (ApResolveData::default(), Some(e)),
             };
 
-            inner.data.accesspoint = self.process_ap_strings(data.accesspoint);
-            inner.data.dealer = self.process_ap_strings(data.dealer);
-            inner.data.spclient = self.process_ap_strings(data.spclient);
+            inner.data = self.parse_resolve_to_access_points(data);
 
             if inner.data.is_any_empty() {
+                warn!("Failed to resolve all access points, using fallbacks");
                 if let Some(error) = error {
-                    warn!(
-                        "Failed to resolve all access points, using fallbacks: {}",
-                        error
-                    );
-                } else {
-                    warn!("Failed to resolve all access points, using fallbacks");
+                    warn!("Resolve access points error: {}", error);
                 }
-                inner
-                    .data
-                    .extend_filter_port(AccessPoints::fallback(), self.port_config());
+
+                let fallback = self.parse_resolve_to_access_points(ApResolveData::fallback());
+                inner.data.accesspoint.extend(fallback.accesspoint);
+                inner.data.dealer.extend(fallback.dealer);
+                inner.data.spclient.extend(fallback.spclient);
             }
         })
     }
@@ -140,9 +132,9 @@ impl ApResolver {
                 // take the first position instead of the last with `pop`, because Spotify returns
                 // access points with ports 4070, 443 and 80 in order of preference from highest
                 // to lowest.
-                "accesspoint" => inner.data.accesspoint.first(),
-                "dealer" => inner.data.dealer.first(),
-                "spclient" => inner.data.spclient.first(),
+                "accesspoint" => inner.data.accesspoint.pop_front(),
+                "dealer" => inner.data.dealer.pop_front(),
+                "spclient" => inner.data.spclient.pop_front(),
                 _ => {
                     return Err(Error::unimplemented(format!(
                         "No implementation to resolve access point {}",
@@ -151,10 +143,12 @@ impl ApResolver {
                 }
             };
 
-            let access_point = access_point.cloned().ok_or(Error::unavailable(format!(
-                "No access point available for endpoint {}",
-                endpoint
-            )))?;
+            let access_point = access_point.ok_or_else(|| {
+                Error::unavailable(format!(
+                    "No access point available for endpoint {}",
+                    endpoint
+                ))
+            })?;
 
             Ok(access_point)
         })
