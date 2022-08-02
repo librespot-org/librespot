@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::Error;
+use crate::{config::KEYMASTER_CLIENT_ID, Error};
 
 component! {
     TokenProvider : TokenProviderInner {
@@ -65,7 +65,7 @@ impl TokenProvider {
 
     // scopes must be comma-separated
     pub async fn get_token(&self, scopes: &str) -> Result<Token, Error> {
-        let client_id = self.session().client_id();
+        let client_id = KEYMASTER_CLIENT_ID;
         if client_id.is_empty() {
             return Err(Error::invalid_argument("Client ID cannot be empty"));
         }
@@ -115,7 +115,7 @@ impl Token {
     }
 
     pub fn is_expired(&self) -> bool {
-        self.timestamp + (self.expires_in - Self::EXPIRY_THRESHOLD) < Instant::now()
+        self.timestamp + (self.expires_in.saturating_sub(Self::EXPIRY_THRESHOLD)) < Instant::now()
     }
 
     pub fn in_scope(&self, scope: &str) -> bool {

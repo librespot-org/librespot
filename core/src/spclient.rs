@@ -9,7 +9,7 @@ use futures_util::future::IntoStream;
 use http::header::HeaderValue;
 use hyper::{
     client::ResponseFuture,
-    header::{ACCEPT, AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE, RANGE},
+    header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_ENCODING, CONTENT_TYPE, RANGE},
     Body, HeaderMap, Method, Request,
 };
 use protobuf::Message;
@@ -19,6 +19,7 @@ use thiserror::Error;
 use crate::{
     apresolve::SocketAddress,
     cdn_url::CdnUrl,
+    config::KEYMASTER_CLIENT_ID,
     error::ErrorKind,
     protocol::{
         canvaz::EntityCanvazRequest,
@@ -39,6 +40,9 @@ component! {
 }
 
 pub type SpClientResult = Result<Bytes, Error>;
+
+#[allow(clippy::declare_interior_mutable_const)]
+const CLIENT_TOKEN: HeaderName = HeaderName::from_static("client-token");
 
 #[derive(Debug, Error)]
 pub enum SpClientError {
@@ -116,7 +120,7 @@ impl SpClient {
         message.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
 
         let client_data = message.mut_client_data();
-        client_data.set_client_id(self.session().client_id());
+        client_data.set_client_id(KEYMASTER_CLIENT_ID.to_string());
         client_data.set_client_version(version::SEMVER.to_string());
 
         let connectivity_data = client_data.mut_connectivity_sdk_data();
@@ -287,6 +291,7 @@ impl SpClient {
                 .token_provider()
                 .get_token("playlist-read")
                 .await?;
+            let client_token = self.client_token().await?;
 
             let headers_mut = request.headers_mut();
             if let Some(ref hdrs) = headers {
@@ -296,6 +301,7 @@ impl SpClient {
                 AUTHORIZATION,
                 HeaderValue::from_str(&format!("{} {}", token.token_type, token.access_token,))?,
             );
+            headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
 
             last_response = self.session().http_client().request_body(request).await;
 
