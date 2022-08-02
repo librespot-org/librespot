@@ -45,6 +45,10 @@ impl AccessPoints {
             self.spclient.extend(other.spclient);
         }
     }
+
+    fn is_any_empty(&self) -> bool {
+        self.accesspoint.is_empty() || self.dealer.is_empty() || self.spclient.is_empty()
+    }
 }
 
 component! {
@@ -106,7 +110,7 @@ impl ApResolver {
             inner.data.dealer = self.process_ap_strings(data.dealer);
             inner.data.spclient = self.process_ap_strings(data.spclient);
 
-            if self.is_any_empty() {
+            if inner.data.is_any_empty() {
                 if let Some(error) = error {
                     warn!(
                         "Failed to resolve all access points, using fallbacks: {}",
@@ -123,11 +127,7 @@ impl ApResolver {
     }
 
     fn is_any_empty(&self) -> bool {
-        self.lock(|inner| {
-            inner.data.accesspoint.is_empty()
-                || inner.data.dealer.is_empty()
-                || inner.data.spclient.is_empty()
-        })
+        self.lock(|inner| inner.data.is_any_empty())
     }
 
     pub async fn resolve(&self, endpoint: &str) -> Result<SocketAddress, Error> {
