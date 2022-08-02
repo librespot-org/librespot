@@ -1,10 +1,13 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
-use crate::{restriction::Restrictions, util::try_from_repeated_message};
+use crate::{
+    restriction::Restrictions,
+    util::{impl_deref_wrapped, impl_try_from_repeated},
+};
 
 use librespot_core::date::Date;
 
@@ -21,12 +24,7 @@ pub struct SalePeriod {
 #[derive(Debug, Clone, Default)]
 pub struct SalePeriods(pub Vec<SalePeriod>);
 
-impl Deref for SalePeriods {
-    type Target = Vec<SalePeriod>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(SalePeriods, Vec<SalePeriod>);
 
 impl TryFrom<&SalePeriodMessage> for SalePeriod {
     type Error = librespot_core::Error;
@@ -39,4 +37,4 @@ impl TryFrom<&SalePeriodMessage> for SalePeriod {
     }
 }
 
-try_from_repeated_message!(SalePeriodMessage, SalePeriods);
+impl_try_from_repeated!(SalePeriodMessage, SalePeriods);

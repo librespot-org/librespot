@@ -1,6 +1,9 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
-use crate::util::from_repeated_message;
+use crate::util::{impl_deref_wrapped, impl_from_repeated};
 
 use librespot_protocol as protocol;
 use protocol::metadata::ContentRating as ContentRatingMessage;
@@ -14,12 +17,7 @@ pub struct ContentRating {
 #[derive(Debug, Clone, Default)]
 pub struct ContentRatings(pub Vec<ContentRating>);
 
-impl Deref for ContentRatings {
-    type Target = Vec<ContentRating>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(ContentRatings, Vec<ContentRating>);
 
 impl From<&ContentRatingMessage> for ContentRating {
     fn from(content_rating: &ContentRatingMessage) -> Self {
@@ -30,4 +28,4 @@ impl From<&ContentRatingMessage> for ContentRating {
     }
 }
 
-from_repeated_message!(ContentRatingMessage, ContentRatings);
+impl_from_repeated!(ContentRatingMessage, ContentRatings);

@@ -1,7 +1,7 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
         attribute::{PlaylistUpdateAttributes, PlaylistUpdateItemAttributes},
         item::PlaylistItems,
     },
-    util::try_from_repeated_message,
+    util::{impl_deref_wrapped, impl_try_from_repeated},
 };
 
 use librespot_protocol as protocol;
@@ -32,12 +32,7 @@ pub struct PlaylistOperation {
 #[derive(Debug, Clone, Default)]
 pub struct PlaylistOperations(pub Vec<PlaylistOperation>);
 
-impl Deref for PlaylistOperations {
-    type Target = Vec<PlaylistOperation>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(PlaylistOperations, Vec<PlaylistOperation>);
 
 #[derive(Debug, Clone)]
 pub struct PlaylistOperationAdd {
@@ -76,7 +71,7 @@ impl TryFrom<&PlaylistOperationMessage> for PlaylistOperation {
     }
 }
 
-try_from_repeated_message!(PlaylistOperationMessage, PlaylistOperations);
+impl_try_from_repeated!(PlaylistOperationMessage, PlaylistOperations);
 
 impl TryFrom<&PlaylistAddMessage> for PlaylistOperationAdd {
     type Error = librespot_core::Error;

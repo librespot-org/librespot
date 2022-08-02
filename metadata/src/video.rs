@@ -1,6 +1,9 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
-use crate::util::from_repeated_message;
+use crate::util::{impl_deref_wrapped, impl_from_repeated};
 
 use librespot_core::FileId;
 
@@ -10,11 +13,6 @@ use protocol::metadata::VideoFile as VideoFileMessage;
 #[derive(Debug, Clone, Default)]
 pub struct VideoFiles(pub Vec<FileId>);
 
-impl Deref for VideoFiles {
-    type Target = Vec<FileId>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(VideoFiles, Vec<FileId>);
 
-from_repeated_message!(VideoFileMessage, VideoFiles);
+impl_from_repeated!(VideoFileMessage, VideoFiles);

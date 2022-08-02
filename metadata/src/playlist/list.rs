@@ -1,14 +1,14 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
 use protobuf::Message;
 
 use crate::{
     request::{MercuryRequest, RequestResult},
-    util::{from_repeated_enum, try_from_repeated_message},
+    util::{impl_deref_wrapped, impl_from_repeated_copy, impl_try_from_repeated},
     Metadata,
 };
 
@@ -29,12 +29,7 @@ use protocol::playlist4_external::GeoblockBlockingType as Geoblock;
 #[derive(Debug, Clone, Default)]
 pub struct Geoblocks(Vec<Geoblock>);
 
-impl Deref for Geoblocks {
-    type Target = Vec<Geoblock>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Geoblocks, Vec<Geoblock>);
 
 #[derive(Debug, Clone)]
 pub struct Playlist {
@@ -58,22 +53,12 @@ pub struct Playlist {
 #[derive(Debug, Clone, Default)]
 pub struct Playlists(pub Vec<SpotifyId>);
 
-impl Deref for Playlists {
-    type Target = Vec<SpotifyId>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Playlists, Vec<SpotifyId>);
 
 #[derive(Debug, Clone)]
 pub struct RootPlaylist(pub SelectedListContent);
 
-impl Deref for RootPlaylist {
-    type Target = SelectedListContent;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(RootPlaylist, SelectedListContent);
 
 #[derive(Debug, Clone)]
 pub struct SelectedListContent {
@@ -225,5 +210,5 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
     }
 }
 
-from_repeated_enum!(Geoblock, Geoblocks);
-try_from_repeated_message!(Vec<u8>, Playlists);
+impl_from_repeated_copy!(Geoblock, Geoblocks);
+impl_try_from_repeated!(Vec<u8>, Playlists);

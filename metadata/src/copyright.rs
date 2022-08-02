@@ -1,6 +1,9 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
-use crate::util::from_repeated_message;
+use crate::util::{impl_deref_wrapped, impl_from_repeated};
 
 use librespot_protocol as protocol;
 use protocol::metadata::Copyright as CopyrightMessage;
@@ -15,12 +18,7 @@ pub struct Copyright {
 #[derive(Debug, Clone, Default)]
 pub struct Copyrights(pub Vec<Copyright>);
 
-impl Deref for Copyrights {
-    type Target = Vec<Copyright>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Copyrights, Vec<Copyright>);
 
 impl From<&CopyrightMessage> for Copyright {
     fn from(copyright: &CopyrightMessage) -> Self {
@@ -31,4 +29,4 @@ impl From<&CopyrightMessage> for Copyright {
     }
 }
 
-from_repeated_message!(CopyrightMessage, Copyrights);
+impl_from_repeated!(CopyrightMessage, Copyrights);
