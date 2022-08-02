@@ -1,6 +1,9 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
-use crate::util::from_repeated_enum;
+use crate::util::{from_repeated_enum, impl_deref_wrapped};
 
 use librespot_protocol as protocol;
 use protocol::playlist_permission::Capabilities as CapabilitiesMessage;
@@ -19,12 +22,7 @@ pub struct Capabilities {
 #[derive(Debug, Clone, Default)]
 pub struct PermissionLevels(pub Vec<PermissionLevel>);
 
-impl Deref for PermissionLevels {
-    type Target = Vec<PermissionLevel>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(PermissionLevels, Vec<PermissionLevel>);
 
 impl From<&CapabilitiesMessage> for Capabilities {
     fn from(playlist: &CapabilitiesMessage) -> Self {

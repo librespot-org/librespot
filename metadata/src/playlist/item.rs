@@ -1,10 +1,10 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
-use crate::util::try_from_repeated_message;
+use crate::util::{impl_deref_wrapped, try_from_repeated_message};
 
 use super::{
     attribute::{PlaylistAttributes, PlaylistItemAttributes},
@@ -27,12 +27,7 @@ pub struct PlaylistItem {
 #[derive(Debug, Clone, Default)]
 pub struct PlaylistItems(pub Vec<PlaylistItem>);
 
-impl Deref for PlaylistItems {
-    type Target = Vec<PlaylistItem>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(PlaylistItems, Vec<PlaylistItem>);
 
 #[derive(Debug, Clone)]
 pub struct PlaylistItemList {
@@ -56,12 +51,7 @@ pub struct PlaylistMetaItem {
 #[derive(Debug, Clone, Default)]
 pub struct PlaylistMetaItems(pub Vec<PlaylistMetaItem>);
 
-impl Deref for PlaylistMetaItems {
-    type Target = Vec<PlaylistMetaItem>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(PlaylistMetaItems, Vec<PlaylistMetaItem>);
 
 impl TryFrom<&PlaylistItemMessage> for PlaylistItem {
     type Error = librespot_core::Error;

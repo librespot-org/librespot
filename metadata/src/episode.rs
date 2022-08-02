@@ -1,7 +1,7 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
 use crate::{
@@ -14,7 +14,7 @@ use crate::{
     image::Images,
     request::RequestResult,
     restriction::Restrictions,
-    util::try_from_repeated_message,
+    util::{impl_deref_wrapped, try_from_repeated_message},
     video::VideoFiles,
     Metadata,
 };
@@ -55,12 +55,7 @@ pub struct Episode {
 #[derive(Debug, Clone, Default)]
 pub struct Episodes(pub Vec<SpotifyId>);
 
-impl Deref for Episodes {
-    type Target = Vec<SpotifyId>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Episodes, Vec<SpotifyId>);
 
 #[async_trait]
 impl InnerAudioItem for Episode {

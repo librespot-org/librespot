@@ -37,3 +37,22 @@ macro_rules! try_from_repeated_message {
 }
 
 pub(crate) use try_from_repeated_message;
+
+macro_rules! impl_deref_wrapped {
+    ($wrapper:ty, $inner:ty) => {
+        impl Deref for $wrapper {
+            type Target = $inner;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl DerefMut for $wrapper {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.0
+            }
+        }
+    };
+}
+
+pub(crate) use impl_deref_wrapped;

@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Debug, ops::Deref};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use librespot_core::FileId;
 
@@ -6,15 +10,12 @@ use librespot_protocol as protocol;
 use protocol::metadata::AudioFile as AudioFileMessage;
 pub use protocol::metadata::AudioFile_Format as AudioFileFormat;
 
+use crate::util::impl_deref_wrapped;
+
 #[derive(Debug, Clone, Default)]
 pub struct AudioFiles(pub HashMap<AudioFileFormat, FileId>);
 
-impl Deref for AudioFiles {
-    type Target = HashMap<AudioFileFormat, FileId>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(AudioFiles, HashMap<AudioFileFormat, FileId>);
 
 impl AudioFiles {
     pub fn is_ogg_vorbis(format: AudioFileFormat) -> bool {

@@ -2,10 +2,13 @@ use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
-use crate::{image::PictureSizes, util::from_repeated_enum};
+use crate::{
+    image::PictureSizes,
+    util::{from_repeated_enum, impl_deref_wrapped},
+};
 
 use librespot_core::date::Date;
 
@@ -37,24 +40,14 @@ pub struct PlaylistAttributes {
 #[derive(Debug, Clone, Default)]
 pub struct PlaylistAttributeKinds(pub Vec<PlaylistAttributeKind>);
 
-impl Deref for PlaylistAttributeKinds {
-    type Target = Vec<PlaylistAttributeKind>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(PlaylistAttributeKinds, Vec<PlaylistAttributeKind>);
 
 from_repeated_enum!(PlaylistAttributeKind, PlaylistAttributeKinds);
 
 #[derive(Debug, Clone, Default)]
 pub struct PlaylistFormatAttribute(pub HashMap<String, String>);
 
-impl Deref for PlaylistFormatAttribute {
-    type Target = HashMap<String, String>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(PlaylistFormatAttribute, HashMap<String, String>);
 
 #[derive(Debug, Clone)]
 pub struct PlaylistItemAttributes {
@@ -69,12 +62,7 @@ pub struct PlaylistItemAttributes {
 #[derive(Debug, Clone, Default)]
 pub struct PlaylistItemAttributeKinds(pub Vec<PlaylistItemAttributeKind>);
 
-impl Deref for PlaylistItemAttributeKinds {
-    type Target = Vec<PlaylistItemAttributeKind>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(PlaylistItemAttributeKinds, Vec<PlaylistItemAttributeKind>);
 
 from_repeated_enum!(PlaylistItemAttributeKind, PlaylistItemAttributeKinds);
 

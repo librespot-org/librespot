@@ -1,5 +1,9 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
+use crate::util::impl_deref_wrapped;
 use crate::util::{from_repeated_enum, from_repeated_message};
 
 use protocol::metadata::Restriction as RestrictionMessage;
@@ -20,22 +24,12 @@ pub struct Restriction {
 #[derive(Debug, Clone, Default)]
 pub struct Restrictions(pub Vec<Restriction>);
 
-impl Deref for Restrictions {
-    type Target = Vec<Restriction>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Restrictions, Vec<Restriction>);
 
 #[derive(Debug, Clone)]
 pub struct RestrictionCatalogues(pub Vec<RestrictionCatalogue>);
 
-impl Deref for RestrictionCatalogues {
-    type Target = Vec<RestrictionCatalogue>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(RestrictionCatalogues, Vec<RestrictionCatalogue>);
 
 impl Restriction {
     fn parse_country_codes(country_codes: &str) -> Vec<String> {

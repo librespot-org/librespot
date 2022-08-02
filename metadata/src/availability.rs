@@ -1,12 +1,12 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
 use thiserror::Error;
 
-use crate::util::try_from_repeated_message;
+use crate::util::{impl_deref_wrapped, try_from_repeated_message};
 
 use librespot_core::date::Date;
 
@@ -24,12 +24,7 @@ pub struct Availability {
 #[derive(Debug, Clone, Default)]
 pub struct Availabilities(pub Vec<Availability>);
 
-impl Deref for Availabilities {
-    type Target = Vec<Availability>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Availabilities, Vec<Availability>);
 
 #[derive(Debug, Copy, Clone, Error)]
 pub enum UnavailabilityReason {

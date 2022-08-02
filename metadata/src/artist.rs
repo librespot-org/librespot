@@ -1,7 +1,7 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
     restriction::Restrictions,
     sale_period::SalePeriods,
     track::Tracks,
-    util::{from_repeated_message, try_from_repeated_message},
+    util::{from_repeated_message, impl_deref_wrapped, try_from_repeated_message},
     Metadata,
 };
 
@@ -54,12 +54,7 @@ pub struct Artist {
 #[derive(Debug, Clone, Default)]
 pub struct Artists(pub Vec<Artist>);
 
-impl Deref for Artists {
-    type Target = Vec<Artist>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Artists, Vec<Artist>);
 
 #[derive(Debug, Clone)]
 pub struct ArtistWithRole {
@@ -71,12 +66,7 @@ pub struct ArtistWithRole {
 #[derive(Debug, Clone, Default)]
 pub struct ArtistsWithRole(pub Vec<ArtistWithRole>);
 
-impl Deref for ArtistsWithRole {
-    type Target = Vec<ArtistWithRole>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(ArtistsWithRole, Vec<ArtistWithRole>);
 
 #[derive(Debug, Clone)]
 pub struct TopTracks {
@@ -87,22 +77,12 @@ pub struct TopTracks {
 #[derive(Debug, Clone, Default)]
 pub struct CountryTopTracks(pub Vec<TopTracks>);
 
-impl Deref for CountryTopTracks {
-    type Target = Vec<TopTracks>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(CountryTopTracks, Vec<TopTracks>);
 
 #[derive(Debug, Clone, Default)]
 pub struct AlbumGroup(pub Albums);
 
-impl Deref for AlbumGroup {
-    type Target = Albums;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(AlbumGroup, Albums);
 
 /// `AlbumGroups` contains collections of album variants (different releases of the same album).
 /// Ignoring the wrapping types it is structured roughly like this:
@@ -116,12 +96,7 @@ impl Deref for AlbumGroup {
 #[derive(Debug, Clone, Default)]
 pub struct AlbumGroups(pub Vec<AlbumGroup>);
 
-impl Deref for AlbumGroups {
-    type Target = Vec<AlbumGroup>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(AlbumGroups, Vec<AlbumGroup>);
 
 #[derive(Debug, Clone)]
 pub struct Biography {
@@ -133,12 +108,7 @@ pub struct Biography {
 #[derive(Debug, Clone, Default)]
 pub struct Biographies(pub Vec<Biography>);
 
-impl Deref for Biographies {
-    type Target = Vec<Biography>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Biographies, Vec<Biography>);
 
 #[derive(Debug, Clone)]
 pub struct ActivityPeriod {
@@ -150,12 +120,7 @@ pub struct ActivityPeriod {
 #[derive(Debug, Clone, Default)]
 pub struct ActivityPeriods(pub Vec<ActivityPeriod>);
 
-impl Deref for ActivityPeriods {
-    type Target = Vec<ActivityPeriod>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(ActivityPeriods, Vec<ActivityPeriod>);
 
 impl CountryTopTracks {
     pub fn for_country(&self, country: &str) -> Tracks {

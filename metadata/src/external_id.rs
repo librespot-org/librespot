@@ -1,6 +1,9 @@
-use std::{fmt::Debug, ops::Deref};
+use std::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
-use crate::util::from_repeated_message;
+use crate::util::{from_repeated_message, impl_deref_wrapped};
 
 use librespot_protocol as protocol;
 use protocol::metadata::ExternalId as ExternalIdMessage;
@@ -14,12 +17,7 @@ pub struct ExternalId {
 #[derive(Debug, Clone, Default)]
 pub struct ExternalIds(pub Vec<ExternalId>);
 
-impl Deref for ExternalIds {
-    type Target = Vec<ExternalId>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(ExternalIds, Vec<ExternalId>);
 
 impl From<&ExternalIdMessage> for ExternalId {
     fn from(external_id: &ExternalIdMessage) -> Self {

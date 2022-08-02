@@ -1,7 +1,7 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
 use uuid::Uuid;
@@ -17,7 +17,7 @@ use crate::{
     external_id::ExternalIds,
     restriction::Restrictions,
     sale_period::SalePeriods,
-    util::try_from_repeated_message,
+    util::{impl_deref_wrapped, try_from_repeated_message},
     Album, Metadata, RequestResult,
 };
 
@@ -56,12 +56,7 @@ pub struct Track {
 #[derive(Debug, Clone, Default)]
 pub struct Tracks(pub Vec<SpotifyId>);
 
-impl Deref for Tracks {
-    type Target = Vec<SpotifyId>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Tracks, Vec<SpotifyId>);
 
 #[async_trait]
 impl InnerAudioItem for Track {

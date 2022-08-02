@@ -1,10 +1,10 @@
 use std::{
     convert::{TryFrom, TryInto},
     fmt::Debug,
-    ops::Deref,
+    ops::{Deref, DerefMut},
 };
 
-use crate::util::{from_repeated_message, try_from_repeated_message};
+use crate::util::{from_repeated_message, impl_deref_wrapped, try_from_repeated_message};
 
 use librespot_core::{FileId, SpotifyId};
 
@@ -25,12 +25,7 @@ pub struct Image {
 #[derive(Debug, Clone, Default)]
 pub struct Images(pub Vec<Image>);
 
-impl Deref for Images {
-    type Target = Vec<Image>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(Images, Vec<Image>);
 
 #[derive(Debug, Clone)]
 pub struct PictureSize {
@@ -41,12 +36,7 @@ pub struct PictureSize {
 #[derive(Debug, Clone, Default)]
 pub struct PictureSizes(pub Vec<PictureSize>);
 
-impl Deref for PictureSizes {
-    type Target = Vec<PictureSize>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(PictureSizes, Vec<PictureSize>);
 
 #[derive(Debug, Clone)]
 pub struct TranscodedPicture {
@@ -57,12 +47,7 @@ pub struct TranscodedPicture {
 #[derive(Debug, Clone)]
 pub struct TranscodedPictures(pub Vec<TranscodedPicture>);
 
-impl Deref for TranscodedPictures {
-    type Target = Vec<TranscodedPicture>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+impl_deref_wrapped!(TranscodedPictures, Vec<TranscodedPicture>);
 
 impl From<&ImageMessage> for Image {
     fn from(image: &ImageMessage) -> Self {
