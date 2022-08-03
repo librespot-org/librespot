@@ -67,13 +67,8 @@ pub struct Discs(pub Vec<Disc>);
 impl_deref_wrapped!(Discs, Vec<Disc>);
 
 impl Album {
-    pub fn tracks(&self) -> Tracks {
-        let result = self
-            .discs
-            .iter()
-            .flat_map(|disc| disc.tracks.deref().clone())
-            .collect();
-        Tracks(result)
+    pub fn tracks(&self) -> impl Iterator<Item = &SpotifyId> {
+        self.discs.iter().flat_map(|disc| disc.tracks.iter())
     }
 }
 

@@ -105,13 +105,8 @@ impl Playlist {
         Self::parse(&msg, playlist_id)
     }
 
-    pub fn tracks(&self) -> Vec<SpotifyId> {
-        let tracks = self
-            .contents
-            .items
-            .iter()
-            .map(|item| item.id)
-            .collect::<Vec<_>>();
+    pub fn tracks(&self) -> impl ExactSizeIterator<Item = &SpotifyId> {
+        let tracks = self.contents.items.iter().map(|item| &item.id);
 
         let length = tracks.len();
         let expected_length = self.length as usize;
