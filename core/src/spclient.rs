@@ -408,7 +408,7 @@ impl SpClient {
     }
 
     pub async fn get_playlist(&self, playlist_id: &SpotifyId) -> SpClientResult {
-        let endpoint = format!("/playlist/v2/playlist/{}", playlist_id);
+        let endpoint = format!("/playlist/v2/playlist/{:?}", playlist_id.to_base62());
 
         self.request(&Method::GET, &endpoint, None, None).await
     }
@@ -454,7 +454,7 @@ impl SpClient {
             .await
     }
 
-    pub async fn get_radio_for_track(&self, track_id: SpotifyId) -> SpClientResult {
+    pub async fn get_radio_for_track(&self, track_id: &SpotifyId) -> SpClientResult {
         let endpoint = format!(
             "/inspiredby-mix/v2/seed_to_playlist/{}?response-format=json",
             track_id.to_uri()?
