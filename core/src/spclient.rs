@@ -386,7 +386,7 @@ impl SpClient {
     }
 
     pub async fn get_lyrics(&self, track_id: SpotifyId) -> SpClientResult {
-        let endpoint = format!("/color-lyrics/v1/track/{}", track_id.to_base62()?);
+        let endpoint = format!("/color-lyrics/v2/track/{}", track_id.to_base62()?);
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
             .await
@@ -401,6 +401,87 @@ impl SpClient {
             "/color-lyrics/v2/track/{}/image/spotify:image:{}",
             track_id.to_base62()?,
             image_id
+        );
+
+        self.request_as_json(&Method::GET, &endpoint, None, None)
+            .await
+    }
+
+    pub async fn get_playlist(&self, playlist_id: SpotifyId) -> SpClientResult {
+        let endpoint = format!("/playlist/v2/playlist/{}", playlist_id);
+
+        self.request(&Method::GET, &endpoint, None, None).await
+    }
+
+    pub async fn get_user_profile(
+        &self,
+        username: String,
+        playlist_limit: Option<u32>,
+        artist_limit: Option<u32>,
+    ) -> SpClientResult {
+        let mut endpoint = format!("/user-profile-view/v3/profile/{}", username);
+
+        if playlist_limit.is_some() || artist_limit.is_some() {
+            let _ = write!(endpoint, "?");
+
+            if let Some(limit) = playlist_limit {
+                let _ = write!(endpoint, "playlist_limit={}", limit);
+                if artist_limit.is_some() {
+                    let _ = write!(endpoint, "&");
+                }
+            }
+
+            if let Some(limit) = artist_limit {
+                let _ = write!(endpoint, "artist_limit={}", limit);
+            }
+        }
+
+        self.request_as_json(&Method::GET, &endpoint, None, None)
+            .await
+    }
+
+    pub async fn get_user_followers(&self, username: String) -> SpClientResult {
+        let endpoint = format!("/user-profile-view/v3/profile/{}/followers", username);
+
+        self.request_as_json(&Method::GET, &endpoint, None, None)
+            .await
+    }
+
+    pub async fn get_user_following(&self, username: String) -> SpClientResult {
+        let endpoint = format!("/user-profile-view/v3/profile/{}/following", username);
+
+        self.request_as_json(&Method::GET, &endpoint, None, None)
+            .await
+    }
+
+    pub async fn get_radio_for_track(&self, track_id: SpotifyId) -> SpClientResult {
+        let endpoint = format!(
+            "/inspiredby-mix/v2/seed_to_playlist/{}?response-format=json",
+            track_id.to_uri()?
+        );
+
+        self.request_as_json(&Method::GET, &endpoint, None, None)
+            .await
+    }
+
+    pub async fn get_apollo_station(
+        &self,
+        context: SpotifyId,
+        count: u32,
+        previous_tracks: Vec<SpotifyId>,
+        autoplay: bool,
+    ) -> SpClientResult {
+        let previous_track_str = previous_tracks
+            .iter()
+            .map(|track| track.to_uri())
+            .collect::<Result<Vec<_>, _>>()?
+            .join(",");
+        let endpoint = format!(
+            "/radio-apollo/v3/stations/{}?count={}&prev_tracks={}&autoplay={}",
+            context.to_uri()?,
+            count,
+            previous_track_str,
+            autoplay,
         );
 
         self.request_as_json(&Method::GET, &endpoint, None, None)

@@ -163,7 +163,7 @@ impl SpotifyId {
     /// can be arbitrary while `{id}` is a 22-character long, base62 encoded Spotify ID.
     ///
     /// Note that this should not be used for playlists, which have the form of
-    /// `spotify:user:{owner_username}:playlist:{id}`.
+    /// `spotify:playlist:{id}`.
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
     pub fn from_uri(src: &str) -> SpotifyIdResult {
