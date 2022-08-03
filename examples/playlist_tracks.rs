@@ -33,10 +33,10 @@ async fn main() {
         exit(1);
     }
 
-    let plist = Playlist::get(&session, plist_uri).await.unwrap();
+    let plist = Playlist::get(&session, &plist_uri).await.unwrap();
     println!("{:?}", plist);
     for track_id in plist.tracks() {
-        let plist_track = Track::get(&session, *track_id).await.unwrap();
+        let plist_track = Track::get(&session, track_id).await.unwrap();
         println!("track: {} ", plist_track.name);
     }
 }
