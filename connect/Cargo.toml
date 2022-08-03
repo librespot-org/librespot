@@ -6,7 +6,7 @@ authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The discovery and Spotify Connect logic for librespot"
 license = "MIT"
 repository = "https://github.com/librespot-org/librespot"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 form_urlencoded = "1.0"

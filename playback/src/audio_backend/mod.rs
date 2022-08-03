@@ -126,7 +126,7 @@ pub const BACKENDS: &[(&str, SinkBuilder)] = &[
     #[cfg(feature = "alsa-backend")]
     (AlsaSink::NAME, mk_sink::<AlsaSink>),
     #[cfg(feature = "portaudio-backend")]
-    (PortAudioSink::NAME, mk_sink::<PortAudioSink>),
+    (PortAudioSink::NAME, mk_sink::<PortAudioSink<'_>>),
     #[cfg(feature = "pulseaudio-backend")]
     (PulseAudioSink::NAME, mk_sink::<PulseAudioSink>),
     #[cfg(feature = "jackaudio-backend")]

@@ -8,7 +8,7 @@ description = "An open source client library for Spotify, with support for Spoti
 keywords = ["spotify"]
 repository = "https://github.com/librespot-org/librespot"
 readme = "README.md"
-edition = "2018"
+edition = "2021"
 
 [workspace]
 

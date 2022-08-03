@@ -74,11 +74,11 @@ impl_from_repeated_copy!(RestrictionCatalogue, RestrictionCatalogues);
 struct StrChunks<'s>(&'s str, usize);
 
 trait StrChunksExt {
-    fn chunks(&self, size: usize) -> StrChunks;
+    fn chunks(&self, size: usize) -> StrChunks<'_>;
 }
 
 impl StrChunksExt for str {
-    fn chunks(&self, size: usize) -> StrChunks {
+    fn chunks(&self, size: usize) -> StrChunks<'_> {
         StrChunks(self, size)
     }
 }
