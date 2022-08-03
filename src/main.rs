@@ -561,7 +561,7 @@ fn get_setup() -> Setup {
     .optopt(
         AP_PORT_SHORT,
         AP_PORT,
-        "Connect to an AP with a specified port 1 - 65535. If no AP with that port is present a fallback AP will be used. Available ports are usually 80, 443 and 4070.",
+        "Connect to an AP with a specified port 1 - 65535. Available ports are usually 80, 443 and 4070.",
         "PORT",
     );
 
