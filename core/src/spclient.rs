@@ -235,7 +235,7 @@ impl SpClient {
             HeaderValue::from_static("application/x-protobuf"),
         );
 
-        self.request(method, endpoint, Some(headers), Some(body))
+        self.request(method, endpoint, Some(headers), Some(&body))
             .await
     }
 
@@ -244,7 +244,7 @@ impl SpClient {
         method: &Method,
         endpoint: &str,
         headers: Option<HeaderMap>,
-        body: Option<String>,
+        body: Option<&str>,
     ) -> SpClientResult {
         let mut headers = headers.unwrap_or_else(HeaderMap::new);
         headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
@@ -257,7 +257,7 @@ impl SpClient {
         method: &Method,
         endpoint: &str,
         headers: Option<HeaderMap>,
-        body: Option<String>,
+        body: Option<&str>,
     ) -> SpClientResult {
         let mut tries: usize = 0;
         let mut last_response;
@@ -283,7 +283,7 @@ impl SpClient {
             let mut request = Request::builder()
                 .method(method)
                 .uri(url)
-                .body(Body::from(body.clone()))?;
+                .body(Body::from(body.to_owned()))?;
 
             // Reconnection logic: keep getting (cached) tokens because they might have expired.
             let token = self
@@ -348,44 +348,44 @@ impl SpClient {
 
     pub async fn put_connect_state(
         &self,
-        connection_id: String,
-        state: PutStateRequest,
+        connection_id: &str,
+        state: &PutStateRequest,
     ) -> SpClientResult {
         let endpoint = format!("/connect-state/v1/devices/{}", self.session().device_id());
 
         let mut headers = HeaderMap::new();
         headers.insert("X-Spotify-Connection-Id", connection_id.parse()?);
 
-        self.request_with_protobuf(&Method::PUT, &endpoint, Some(headers), &state)
+        self.request_with_protobuf(&Method::PUT, &endpoint, Some(headers), state)
             .await
     }
 
-    pub async fn get_metadata(&self, scope: &str, id: SpotifyId) -> SpClientResult {
+    pub async fn get_metadata(&self, scope: &str, id: &SpotifyId) -> SpClientResult {
         let endpoint = format!("/metadata/4/{}/{}", scope, id.to_base16()?);
         self.request(&Method::GET, &endpoint, None, None).await
     }
 
-    pub async fn get_track_metadata(&self, track_id: SpotifyId) -> SpClientResult {
+    pub async fn get_track_metadata(&self, track_id: &SpotifyId) -> SpClientResult {
         self.get_metadata("track", track_id).await
     }
 
-    pub async fn get_episode_metadata(&self, episode_id: SpotifyId) -> SpClientResult {
+    pub async fn get_episode_metadata(&self, episode_id: &SpotifyId) -> SpClientResult {
         self.get_metadata("episode", episode_id).await
     }
 
-    pub async fn get_album_metadata(&self, album_id: SpotifyId) -> SpClientResult {
+    pub async fn get_album_metadata(&self, album_id: &SpotifyId) -> SpClientResult {
         self.get_metadata("album", album_id).await
     }
 
-    pub async fn get_artist_metadata(&self, artist_id: SpotifyId) -> SpClientResult {
+    pub async fn get_artist_metadata(&self, artist_id: &SpotifyId) -> SpClientResult {
         self.get_metadata("artist", artist_id).await
     }
 
-    pub async fn get_show_metadata(&self, show_id: SpotifyId) -> SpClientResult {
+    pub async fn get_show_metadata(&self, show_id: &SpotifyId) -> SpClientResult {
         self.get_metadata("show", show_id).await
     }
 
-    pub async fn get_lyrics(&self, track_id: SpotifyId) -> SpClientResult {
+    pub async fn get_lyrics(&self, track_id: &SpotifyId) -> SpClientResult {
         let endpoint = format!("/color-lyrics/v2/track/{}", track_id.to_base62()?);
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
@@ -394,8 +394,8 @@ impl SpClient {
 
     pub async fn get_lyrics_for_image(
         &self,
-        track_id: SpotifyId,
-        image_id: FileId,
+        track_id: &SpotifyId,
+        image_id: &FileId,
     ) -> SpClientResult {
         let endpoint = format!(
             "/color-lyrics/v2/track/{}/image/spotify:image:{}",
@@ -407,7 +407,7 @@ impl SpClient {
             .await
     }
 
-    pub async fn get_playlist(&self, playlist_id: SpotifyId) -> SpClientResult {
+    pub async fn get_playlist(&self, playlist_id: &SpotifyId) -> SpClientResult {
         let endpoint = format!("/playlist/v2/playlist/{}", playlist_id);
 
         self.request(&Method::GET, &endpoint, None, None).await
@@ -415,7 +415,7 @@ impl SpClient {
 
     pub async fn get_user_profile(
         &self,
-        username: String,
+        username: &str,
         playlist_limit: Option<u32>,
         artist_limit: Option<u32>,
     ) -> SpClientResult {
@@ -440,14 +440,14 @@ impl SpClient {
             .await
     }
 
-    pub async fn get_user_followers(&self, username: String) -> SpClientResult {
+    pub async fn get_user_followers(&self, username: &str) -> SpClientResult {
         let endpoint = format!("/user-profile-view/v3/profile/{}/followers", username);
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
             .await
     }
 
-    pub async fn get_user_following(&self, username: String) -> SpClientResult {
+    pub async fn get_user_following(&self, username: &str) -> SpClientResult {
         let endpoint = format!("/user-profile-view/v3/profile/{}/following", username);
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
@@ -466,9 +466,9 @@ impl SpClient {
 
     pub async fn get_apollo_station(
         &self,
-        context: SpotifyId,
+        context_uri: &str,
         count: u32,
-        previous_tracks: Vec<SpotifyId>,
+        previous_tracks: Vec<&SpotifyId>,
         autoplay: bool,
     ) -> SpClientResult {
         let previous_track_str = previous_tracks
@@ -478,10 +478,7 @@ impl SpClient {
             .join(",");
         let endpoint = format!(
             "/radio-apollo/v3/stations/{}?count={}&prev_tracks={}&autoplay={}",
-            context.to_uri()?,
-            count,
-            previous_track_str,
-            autoplay,
+            context_uri, count, previous_track_str, autoplay,
         );
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
@@ -501,7 +498,7 @@ impl SpClient {
             .await
     }
 
-    pub async fn get_audio_storage(&self, file_id: FileId) -> SpClientResult {
+    pub async fn get_audio_storage(&self, file_id: &FileId) -> SpClientResult {
         let endpoint = format!(
             "/storage-resolve/files/audio/interactive/{}",
             file_id.to_base16()?
@@ -530,7 +527,7 @@ impl SpClient {
         Ok(stream)
     }
 
-    pub async fn request_url(&self, url: String) -> SpClientResult {
+    pub async fn request_url(&self, url: &str) -> SpClientResult {
         let request = Request::builder()
             .method(&Method::GET)
             .uri(url)
@@ -554,11 +551,11 @@ impl SpClient {
         };
         let _ = write!(url, "{}cid={}", separator, self.session().client_id());
 
-        self.request_url(url).await
+        self.request_url(&url).await
     }
 
     // The first 128 kB of a track, unencrypted
-    pub async fn get_head_file(&self, file_id: FileId) -> SpClientResult {
+    pub async fn get_head_file(&self, file_id: &FileId) -> SpClientResult {
         let attribute = "head-files-url";
         let template = self
             .session()
@@ -567,10 +564,10 @@ impl SpClient {
 
         let url = template.replace("{file_id}", &file_id.to_base16()?);
 
-        self.request_url(url).await
+        self.request_url(&url).await
     }
 
-    pub async fn get_image(&self, image_id: FileId) -> SpClientResult {
+    pub async fn get_image(&self, image_id: &FileId) -> SpClientResult {
         let attribute = "image-url";
         let template = self
             .session()
@@ -578,6 +575,6 @@ impl SpClient {
             .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
         let url = template.replace("{file_id}", &image_id.to_base16()?);
 
-        self.request_url(url).await
+        self.request_url(&url).await
     }
 }

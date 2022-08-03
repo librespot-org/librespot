@@ -76,11 +76,11 @@ impl Album {
 impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
-    async fn request(session: &Session, album_id: SpotifyId) -> RequestResult {
+    async fn request(session: &Session, album_id: &SpotifyId) -> RequestResult {
         session.spclient().get_album_metadata(album_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

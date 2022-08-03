@@ -61,7 +61,7 @@ impl_deref_wrapped!(Tracks, Vec<SpotifyId>);
 #[async_trait]
 impl InnerAudioItem for Track {
     async fn get_audio_item(session: &Session, id: SpotifyId) -> AudioItemResult {
-        let track = Self::get(session, id).await?;
+        let track = Self::get(session, &id).await?;
         let alternatives = {
             if track.alternatives.is_empty() {
                 None
@@ -98,11 +98,11 @@ impl InnerAudioItem for Track {
 impl Metadata for Track {
     type Message = protocol::metadata::Track;
 
-    async fn request(session: &Session, track_id: SpotifyId) -> RequestResult {
+    async fn request(session: &Session, track_id: &SpotifyId) -> RequestResult {
         session.spclient().get_track_metadata(track_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

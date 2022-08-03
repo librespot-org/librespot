@@ -67,7 +67,7 @@ impl CdnUrl {
 
     pub async fn resolve_audio(&self, session: &Session) -> Result<Self, Error> {
         let file_id = self.file_id;
-        let response = session.spclient().get_audio_storage(file_id).await?;
+        let response = session.spclient().get_audio_storage(&file_id).await?;
         let msg = CdnUrlMessage::parse_from_bytes(&response)?;
         let urls = MaybeExpiringUrls::try_from(msg)?;
 

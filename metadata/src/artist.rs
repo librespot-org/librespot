@@ -171,11 +171,11 @@ impl Artist {
 impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
-    async fn request(session: &Session, artist_id: SpotifyId) -> RequestResult {
+    async fn request(session: &Session, artist_id: &SpotifyId) -> RequestResult {
         session.spclient().get_artist_metadata(artist_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

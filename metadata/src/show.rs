@@ -39,11 +39,11 @@ pub struct Show {
 impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
-    async fn request(session: &Session, show_id: SpotifyId) -> RequestResult {
+    async fn request(session: &Session, show_id: &SpotifyId) -> RequestResult {
         session.spclient().get_show_metadata(show_id).await
     }
 
-    fn parse(msg: &Self::Message, _: SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

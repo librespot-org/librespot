@@ -329,10 +329,10 @@ impl NamedSpotifyId {
         Ok(dst)
     }
 
-    pub fn from_spotify_id(id: SpotifyId, username: String) -> Self {
+    pub fn from_spotify_id(id: SpotifyId, username: &str) -> Self {
         Self {
             inner_id: id,
-            username,
+            username: username.to_owned(),
         }
     }
 }
