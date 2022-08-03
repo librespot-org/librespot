@@ -140,14 +140,14 @@ impl Artist {
     /// Get the full list of albums, not containing duplicate variants of the same albums.
     ///
     /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
-    pub fn albums_current(&self) -> Albums {
+    pub fn albums_current(&self) -> impl Iterator<Item = &SpotifyId> {
         self.albums.current_releases()
     }
 
     /// Get the full list of singles, not containing duplicate variants of the same singles.
     ///
     /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
-    pub fn singles_current(&self) -> Albums {
+    pub fn singles_current(&self) -> impl Iterator<Item = &SpotifyId> {
         self.singles.current_releases()
     }
 
@@ -155,14 +155,14 @@ impl Artist {
     /// compilations.
     ///
     /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
-    pub fn compilations_current(&self) -> Albums {
+    pub fn compilations_current(&self) -> impl Iterator<Item = &SpotifyId> {
         self.compilations.current_releases()
     }
 
     /// Get the full list of albums, not containing duplicate variants of the same albums.
     ///
     /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
-    pub fn appears_on_albums_current(&self) -> Albums {
+    pub fn appears_on_albums_current(&self) -> impl Iterator<Item = &SpotifyId> {
         self.appears_on_albums.current_releases()
     }
 }
@@ -245,13 +245,8 @@ impl AlbumGroups {
     /// Get the contained albums. This will only use the latest release / variant of an album if
     /// multiple variants are available. This should be used if multiple variants of the same album
     /// are not explicitely desired.
-    pub fn current_releases(&self) -> Albums {
-        let albums = self
-            .iter()
-            .filter_map(|agrp| agrp.first())
-            .cloned()
-            .collect();
-        Albums(albums)
+    pub fn current_releases(&self) -> impl Iterator<Item = &SpotifyId> {
+        self.iter().filter_map(|agrp| agrp.first())
     }
 }
 
