@@ -408,7 +408,7 @@ impl SpClient {
     }
 
     pub async fn get_playlist(&self, playlist_id: &SpotifyId) -> SpClientResult {
-        let endpoint = format!("/playlist/v2/playlist/{:?}", playlist_id.to_base62());
+        let endpoint = format!("/playlist/v2/playlist/{}", playlist_id.to_base62()?);
 
         self.request(&Method::GET, &endpoint, None, None).await
     }
