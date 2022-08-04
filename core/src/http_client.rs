@@ -2,7 +2,7 @@ use std::env::consts::OS;
 
 use bytes::Bytes;
 use futures_util::{future::IntoStream, FutureExt};
-use http::header::HeaderValue;
+use http::{header::HeaderValue, Uri};
 use hyper::{
     client::{HttpConnector, ResponseFuture},
     header::USER_AGENT,
@@ -10,6 +10,7 @@ use hyper::{
 };
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use once_cell::sync::OnceCell;
 use thiserror::Error;
 use url::Url;
 
@@ -70,15 +71,17 @@ impl From<HttpClientError> for Error {
     }
 }
 
+type HyperClient = Client<ProxyConnector<HttpsConnector<HttpConnector>>, Body>;
+
 #[derive(Clone)]
 pub struct HttpClient {
     user_agent: HeaderValue,
-    proxy: Option<Url>,
-    https_connector: HttpsConnector<HttpConnector>,
+    proxy_url: Option<Url>,
+    hyper_client: OnceCell<HyperClient>,
 }
 
 impl HttpClient {
-    pub fn new(proxy: Option<&Url>) -> Self {
+    pub fn new(proxy_url: Option<&Url>) -> Self {
         let spotify_version = match OS {
             "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
             _ => SPOTIFY_VERSION.to_string(),
@@ -102,6 +105,14 @@ impl HttpClient {
             HeaderValue::from_static(FALLBACK_USER_AGENT)
         });
 
+        Self {
+            user_agent,
+            proxy_url: proxy_url.cloned(),
+            hyper_client: OnceCell::new(),
+        }
+    }
+
+    fn try_create_hyper_client(proxy_url: Option<&Url>) -> Result<HyperClient, Error> {
         // configuring TLS is expensive and should be done once per process
         let https_connector = HttpsConnectorBuilder::new()
             .with_native_roots()
@@ -110,11 +121,23 @@ impl HttpClient {
             .enable_http2()
             .build();
 
-        Self {
-            user_agent,
-            proxy: proxy.cloned(),
-            https_connector,
-        }
+        // When not using a proxy a dummy proxy is configured that will not intercept any traffic.
+        // This prevents needing to carry the Client Connector generics through the whole project
+        let proxy = match &proxy_url {
+            Some(proxy_url) => Proxy::new(Intercept::All, proxy_url.to_string().parse()?),
+            None => Proxy::new(Intercept::None, Uri::from_static("0.0.0.0")),
+        };
+        let proxy_connector = ProxyConnector::from_proxy(https_connector, proxy)?;
+
+        let client = Client::builder()
+            .http2_adaptive_window(true)
+            .build(proxy_connector);
+        Ok(client)
+    }
+
+    fn hyper_client(&self) -> Result<&HyperClient, Error> {
+        self.hyper_client
+            .get_or_try_init(|| Self::try_create_hyper_client(self.proxy_url.as_ref()))
     }
 
     pub async fn request(&self, req: Request<Body>) -> Result<Response<Body>, Error> {
@@ -146,19 +169,7 @@ impl HttpClient {
         let headers_mut = req.headers_mut();
         headers_mut.insert(USER_AGENT, self.user_agent.clone());
 
-        let request = if let Some(url) = &self.proxy {
-            let proxy_uri = url.to_string().parse()?;
-            let proxy = Proxy::new(Intercept::All, proxy_uri);
-            let proxy_connector = ProxyConnector::from_proxy(self.https_connector.clone(), proxy)?;
-
-            Client::builder().build(proxy_connector).request(req)
-        } else {
-            Client::builder()
-                .http2_adaptive_window(true)
-                .build(self.https_connector.clone())
-                .request(req)
-        };
-
+        let request = self.hyper_client()?.request(req);
         Ok(request)
     }
 }
