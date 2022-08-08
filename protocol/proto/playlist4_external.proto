@@ -1,0 +1,292 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.playlist4.proto;
+
+import "playlist_permission.proto";
+
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "Playlist4ApiProto";
+option java_package = "com.spotify.playlist4.proto";
+
+message Item {
+    required string uri = 1;
+    optional ItemAttributes attributes = 2;
+}
+
+message MetaItem {
+    optional bytes revision = 1;
+    optional ListAttributes attributes = 2;
+    optional int32 length = 3;
+    optional int64 timestamp = 4;
+    optional string owner_username = 5;
+    optional bool abuse_reporting_enabled = 6;
+    optional spotify.playlist_permission.proto.Capabilities capabilities = 7;
+}
+
+message ListItems {
+    required int32 pos = 1;
+    required bool truncated = 2;
+    repeated Item items = 3;
+    repeated MetaItem meta_items = 4;
+}
+
+message FormatListAttribute {
+    optional string key = 1;
+    optional string value = 2;
+}
+
+message PictureSize {
+    optional string target_name = 1;
+    optional string url = 2;
+}
+
+message ListAttributes {
+    optional string name = 1;
+    optional string description = 2;
+    optional bytes picture = 3;
+    optional bool collaborative = 4;
+    optional string pl3_version = 5;
+    optional bool deleted_by_owner = 6;
+    optional string client_id = 10;
+    optional string format = 11;
+    repeated FormatListAttribute format_attributes = 12;
+    repeated PictureSize picture_size = 13;
+}
+
+message ItemAttributes {
+    optional string added_by = 1;
+    optional int64 timestamp = 2;
+    optional int64 seen_at = 9;
+    optional bool public = 10;
+    repeated FormatListAttribute format_attributes = 11;
+    optional bytes item_id = 12;
+}
+
+message Add {
+    optional int32 from_index = 1;
+    repeated Item items = 2;
+    optional bool add_last = 4;
+    optional bool add_first = 5;
+}
+
+message Rem {
+    optional int32 from_index = 1;
+    optional int32 length = 2;
+    repeated Item items = 3;
+    optional bool items_as_key = 7;
+}
+
+message Mov {
+    required int32 from_index = 1;
+    required int32 length = 2;
+    required int32 to_index = 3;
+}
+
+message ItemAttributesPartialState {
+    required ItemAttributes values = 1;
+    repeated ItemAttributeKind no_value = 2;
+}
+
+message ListAttributesPartialState {
+    required ListAttributes values = 1;
+    repeated ListAttributeKind no_value = 2;
+}
+
+message UpdateItemAttributes {
+    required int32 index = 1;
+    required ItemAttributesPartialState new_attributes = 2;
+    optional ItemAttributesPartialState old_attributes = 3;
+}
+
+message UpdateListAttributes {
+    required ListAttributesPartialState new_attributes = 1;
+    optional ListAttributesPartialState old_attributes = 2;
+}
+
+message Op {
+    required Kind kind = 1;
+    enum Kind {
+        KIND_UNKNOWN = 0;
+        ADD = 2;
+        REM = 3;
+        MOV = 4;
+        UPDATE_ITEM_ATTRIBUTES = 5;
+        UPDATE_LIST_ATTRIBUTES = 6;
+    }
+    
+    optional Add add = 2;
+    optional Rem rem = 3;
+    optional Mov mov = 4;
+    optional UpdateItemAttributes update_item_attributes = 5;
+    optional UpdateListAttributes update_list_attributes = 6;
+}
+
+message OpList {
+    repeated Op ops = 1;
+}
+
+message ChangeInfo {
+    optional string user = 1;
+    optional int64 timestamp = 2;
+    optional bool admin = 3;
+    optional bool undo = 4;
+    optional bool redo = 5;
+    optional bool merge = 6;
+    optional bool compressed = 7;
+    optional bool migration = 8;
+    optional int32 split_id = 9;
+    optional SourceInfo source = 10;
+}
+
+message SourceInfo {
+    optional Client client = 1;
+    enum Client {
+        CLIENT_UNKNOWN = 0;
+        NATIVE_HERMES = 1;
+        CLIENT = 2;
+        PYTHON = 3;
+        JAVA = 4;
+        WEBPLAYER = 5;
+        LIBSPOTIFY = 6;
+    }
+    
+    optional string app = 3;
+    optional string source = 4;
+    optional string version = 5;
+}
+
+message Delta {
+    optional bytes base_version = 1;
+    repeated Op ops = 2;
+    optional ChangeInfo info = 4;
+}
+
+message Diff {
+    required bytes from_revision = 1;
+    repeated Op ops = 2;
+    required bytes to_revision = 3;
+}
+
+message ListChanges {
+    optional bytes base_revision = 1;
+    repeated Delta deltas = 2;
+    optional bool want_resulting_revisions = 3;
+    optional bool want_sync_result = 4;
+    repeated int64 nonces = 6;
+}
+
+message SelectedListContent {
+    optional bytes revision = 1;
+    optional int32 length = 2;
+    optional ListAttributes attributes = 3;
+    optional ListItems contents = 5;
+    optional Diff diff = 6;
+    optional Diff sync_result = 7;
+    repeated bytes resulting_revisions = 8;
+    optional bool multiple_heads = 9;
+    optional bool up_to_date = 10;
+    repeated int64 nonces = 14;
+    optional int64 timestamp = 15;
+    optional string owner_username = 16;
+    optional bool abuse_reporting_enabled = 17;
+    optional spotify.playlist_permission.proto.Capabilities capabilities = 18;
+    repeated GeoblockBlockingType geoblock = 19;
+}
+
+message CreateListReply {
+    required string uri = 1;
+    optional bytes revision = 2;
+}
+
+message PlaylistV1UriRequest {
+    repeated string v2_uris = 1;
+}
+
+message PlaylistV1UriReply {
+    map<string, string> v2_uri_to_v1_uri = 1;
+}
+
+message ListUpdateRequest {
+    optional bytes base_revision = 1;
+    optional ListAttributes attributes = 2;
+    repeated Item items = 3;
+    optional ChangeInfo info = 4;
+}
+
+message RegisterPlaylistImageRequest {
+    optional string upload_token = 1;
+}
+
+message RegisterPlaylistImageResponse {
+    optional bytes picture = 1;
+}
+
+message ResolvedPersonalizedPlaylist {
+    optional string uri = 1;
+    optional string tag = 2;
+}
+
+message PlaylistUriResolverResponse {
+    repeated ResolvedPersonalizedPlaylist resolved_playlists = 1;
+}
+
+message SubscribeRequest {
+    repeated bytes uris = 1;
+}
+
+message UnsubscribeRequest {
+    repeated bytes uris = 1;
+}
+
+message PlaylistModificationInfo {
+    optional bytes uri = 1;
+    optional bytes new_revision = 2;
+    optional bytes parent_revision = 3;
+    repeated Op ops = 4;
+}
+
+message RootlistModificationInfo {
+    optional bytes new_revision = 1;
+    optional bytes parent_revision = 2;
+    repeated Op ops = 3;
+}
+
+message FollowerUpdate {
+    optional string uri = 1;
+    optional string username = 2;
+    optional bool is_following = 3;
+    optional uint64 timestamp = 4;
+}
+
+enum ListAttributeKind {
+    LIST_UNKNOWN = 0;
+    LIST_NAME = 1;
+    LIST_DESCRIPTION = 2;
+    LIST_PICTURE = 3;
+    LIST_COLLABORATIVE = 4;
+    LIST_PL3_VERSION = 5;
+    LIST_DELETED_BY_OWNER = 6;
+    LIST_CLIENT_ID = 10;
+    LIST_FORMAT = 11;
+    LIST_FORMAT_ATTRIBUTES = 12;
+    LIST_PICTURE_SIZE = 13;
+}
+
+enum ItemAttributeKind {
+    ITEM_UNKNOWN = 0;
+    ITEM_ADDED_BY = 1;
+    ITEM_TIMESTAMP = 2;
+    ITEM_SEEN_AT = 9;
+    ITEM_PUBLIC = 10;
+    ITEM_FORMAT_ATTRIBUTES = 11;
+    ITEM_ID = 12;
+}
+
+enum GeoblockBlockingType {
+    GEOBLOCK_BLOCKING_TYPE_UNSPECIFIED = 0;
+    GEOBLOCK_BLOCKING_TYPE_TITLE = 1;
+    GEOBLOCK_BLOCKING_TYPE_DESCRIPTION = 2;
+    GEOBLOCK_BLOCKING_TYPE_IMAGE = 3;
+}

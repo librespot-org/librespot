@@ -1,0 +1,106 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.playback_cosmos.proto;
+
+option optimize_for = CODE_SIZE;
+
+message VolumeRequest {
+    oneof source_or_system {
+        VolumeChangeSource source = 1;
+        bool system_initiated = 4;
+    }
+    
+    oneof action {
+        double volume = 2;
+        Step step = 3;
+    }
+    
+    enum Step {
+        option allow_alias = true;
+        up = 0;
+        UP = 0;
+        down = 1;
+        DOWN = 1;
+    }
+}
+
+message VolumeResponse {
+    double volume = 1;
+}
+
+message VolumeSubResponse {
+    double volume = 1;
+    VolumeChangeSource source = 2;
+    bool system_initiated = 3;
+}
+
+message PositionResponseV1 {
+    int32 position = 1;
+}
+
+message PositionResponseV2 {
+    int64 position = 1;
+}
+
+message InfoResponse {
+    bool has_info = 1;
+    uint64 length_ms = 2;
+    uint64 position_ms = 3;
+    bool playing = 4;
+    bool buffering = 5;
+    int32 error = 6;
+    string file_id = 7;
+    string file_type = 8;
+    string resolved_content_url = 9;
+    int32 file_bitrate = 10;
+    string codec_name = 11;
+    double playback_speed = 12;
+    float gain_adjustment = 13;
+    bool has_loudness = 14;
+    float loudness = 15;
+    string strategy = 17;
+    int32 target_bitrate = 18;
+    int32 advised_bitrate = 19;
+    bool target_file_available = 20;
+    
+    reserved 16;
+}
+
+message FormatsResponse {
+    repeated Format formats = 1;
+    message Format {
+        string enum_key = 1;
+        uint32 enum_value = 2;
+        bool supported = 3;
+        uint32 bitrate = 4;
+        string mime_type = 5;
+    }
+}
+
+message GetFilesResponse {
+    repeated File files = 1;
+    message File {
+        string file_id = 1;
+        string format = 2;
+        uint32 bitrate = 3;
+        uint32 format_enum = 4;
+    }
+}
+
+message DuckRequest {
+    Action action = 2;
+    enum Action {
+        START = 0;
+        STOP = 1;
+    }
+    
+    double volume = 3;
+    uint32 fade_duration_ms = 4;
+}
+
+enum VolumeChangeSource {
+    USER = 0;
+    SYSTEM = 1;
+}

@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+option optimize_for = CODE_SIZE;
+
+message EventList {
+    repeated int64 event_times = 1;
+}
+
+message LastEvent {
+    required string uri = 1;
+    required int32 when = 2;
+}
+
+message History {
+    map<string, EventList> when = 1;
+    required LastEvent last = 2;
+}
+
+message MftState {
+    required History track = 1;
+    required History social_track = 2;
+    required History album = 3;
+    required History artist = 4;
+    required EventList skip = 5;
+    required int32 time = 6;
+    required bool did_skip = 7;
+}

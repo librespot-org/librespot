@@ -1,0 +1,17 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PlayOrigin {
+    optional string feature_identifier = 1;
+    optional string feature_version = 2;
+    optional string view_uri = 3;
+    optional string external_referrer = 4;
+    optional string referrer_identifier = 5;
+    optional string device_identifier = 6;
+    repeated string feature_classes = 7;
+}

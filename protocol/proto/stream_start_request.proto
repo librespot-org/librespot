@@ -1,0 +1,44 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+import "media_type.proto";
+import "play_reason.proto";
+import "streaming_rule.proto";
+
+option objc_class_prefix = "ESP";
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+message StreamStartRequest {
+    string playback_id = 1;
+    string parent_playback_id = 2;
+    string parent_play_track = 3;
+    string video_session_id = 4;
+    string play_context = 5;
+    string uri = 6;
+    string displayed_uri = 7;
+    string feature_identifier = 8;
+    string feature_version = 9;
+    string view_uri = 10;
+    string provider = 11;
+    string referrer = 12;
+    string referrer_version = 13;
+    string referrer_vendor = 14;
+    StreamingRule streaming_rule = 15;
+    string connect_controller_device_id = 16;
+    string page_instance_id = 17;
+    string interaction_id = 18;
+    string source_start = 19;
+    PlayReason reason_start = 20;
+    bool is_shuffle = 23;
+    bool is_incognito = 25;
+    string media_id = 28;
+    MediaType media_type = 29;
+    uint64 playback_start_time = 30;
+    uint64 start_position = 31;
+    bool is_live = 32;
+    bool stream_was_offlined = 33;
+    bool client_offline = 34;
+}

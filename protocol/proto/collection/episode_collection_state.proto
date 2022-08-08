@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.cosmos_util.proto;
+
+option objc_class_prefix = "SPTCosmosUtil";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.proto";
+
+message EpisodeCollectionState {
+    optional bool is_following_show = 1;
+    optional bool is_new = 2;
+    optional bool is_in_listen_later = 3;
+}

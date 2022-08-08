@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto;
+
+option optimize_for = CODE_SIZE;
+
+message ContextPlayerOptions {
+    optional bool shuffling_context = 1;
+    optional bool repeating_context = 2;
+    optional bool repeating_track = 3;
+}
+
+message ContextPlayerOptionOverrides {
+    optional bool shuffling_context = 1;
+    optional bool repeating_context = 2;
+    optional bool repeating_track = 3;
+}

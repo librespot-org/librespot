@@ -1,0 +1,62 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message LegacyEndSong {
+    optional int64 sequence_number = 1;
+    optional string sequence_id = 2;
+    optional bytes playback_id = 3;
+    optional bytes parent_playback_id = 4;
+    optional string source_start = 5;
+    optional string reason_start = 6;
+    optional string source_end = 7;
+    optional string reason_end = 8;
+    optional int64 bytes_played = 9;
+    optional int64 bytes_in_song = 10;
+    optional int64 ms_played = 11;
+    optional int64 ms_nominal_played = 12;
+    optional int64 ms_total_est = 13;
+    optional int64 ms_rcv_latency = 14;
+    optional int64 ms_overlapping = 15;
+    optional int64 n_seekback = 16;
+    optional int64 ms_seekback = 17;
+    optional int64 n_seekfwd = 18;
+    optional int64 ms_seekfwd = 19;
+    optional int64 ms_latency = 20;
+    optional int64 ui_latency = 21;
+    optional string player_id = 22;
+    optional int64 ms_key_latency = 23;
+    optional bool offline_key = 24;
+    optional bool cached_key = 25;
+    optional int64 n_stutter = 26;
+    optional int64 p_lowbuffer = 27;
+    optional bool shuffle = 28;
+    optional int64 max_continous = 29;
+    optional int64 union_played = 30;
+    optional int64 artificial_delay = 31;
+    optional int64 bitrate = 32;
+    optional string play_context = 33;
+    optional string audiocodec = 34;
+    optional string play_track = 35;
+    optional string display_track = 36;
+    optional bool offline = 37;
+    optional int64 offline_timestamp = 38;
+    optional bool incognito_mode = 39;
+    optional string provider = 40;
+    optional string referer = 41;
+    optional string referrer_version = 42;
+    optional string referrer_vendor = 43;
+    optional string transition = 44;
+    optional string streaming_rule = 45;
+    optional string gaia_dev_id = 46;
+    optional string accepted_tc = 47;
+    optional string promotion_type = 48;
+    optional string page_instance_id = 49;
+    optional string interaction_id = 50;
+    optional string parent_play_track = 51;
+    optional int64 core_version = 52;
+}

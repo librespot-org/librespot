@@ -1,0 +1,52 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.playlist.cosmos.proto;
+
+import "metadata/extension.proto";
+import "metadata/image_group.proto";
+import "playlist_user_state.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.proto";
+
+message FormatListAttribute {
+    optional string key = 1;
+    optional string value = 2;
+}
+
+message Allows {
+    optional bool can_insert = 1;
+    optional bool can_remove = 2;
+}
+
+message PlaylistMetadata {
+    optional string link = 1;
+    optional string name = 2;
+    optional User owner = 3;
+    optional bool owned_by_self = 4;
+    optional bool collaborative = 5;
+    optional uint32 total_length = 6;
+    optional string description = 7;
+    optional cosmos_util.proto.ImageGroup pictures = 8;
+    optional bool followed = 9;
+    optional bool published = 10;
+    optional bool browsable_offline = 11;
+    optional bool description_from_annotate = 12;
+    optional bool picture_from_annotate = 13;
+    optional string format_list_type = 14;
+    repeated FormatListAttribute format_list_attributes = 15;
+    optional bool can_report_annotation_abuse = 16;
+    optional bool is_loaded = 17;
+    optional Allows allows = 18;
+    optional string load_state = 19;
+    optional User made_for = 20;
+    repeated cosmos_util.proto.Extension extension = 21;
+}
+
+message PlaylistOfflineState {
+    optional string offline = 1;
+    optional uint32 sync_progress = 2;
+}

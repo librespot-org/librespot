@@ -1,0 +1,52 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message RawCoreStream {
+    optional bytes playback_id = 1;
+    optional bytes parent_playback_id = 2;
+    optional string video_session_id = 3;
+    optional bytes media_id = 4;
+    optional string media_type = 5;
+    optional string feature_identifier = 6;
+    optional string feature_version = 7;
+    optional string view_uri = 8;
+    optional string source_start = 9;
+    optional string reason_start = 10;
+    optional string source_end = 11;
+    optional string reason_end = 12;
+    optional int64 playback_start_time = 13;
+    optional int32 ms_played = 14;
+    optional int32 ms_played_nominal = 15;
+    optional int32 ms_played_overlapping = 16;
+    optional int32 ms_played_video = 17;
+    optional int32 ms_played_background = 18;
+    optional int32 ms_played_fullscreen = 19;
+    optional bool live = 20;
+    optional bool shuffle = 21;
+    optional string audio_format = 22;
+    optional string play_context = 23;
+    optional string content_uri = 24;
+    optional string displayed_content_uri = 25;
+    optional bool content_is_downloaded = 26;
+    optional bool incognito_mode = 27;
+    optional string provider = 28;
+    optional string referrer = 29;
+    optional string referrer_version = 30;
+    optional string referrer_vendor = 31;
+    optional string streaming_rule = 32;
+    optional string connect_controller_device_id = 33;
+    optional string page_instance_id = 34;
+    optional string interaction_id = 35;
+    optional string parent_content_uri = 36;
+    optional int64 core_version = 37;
+    optional string core_bundle = 38;
+    optional bool is_assumed_premium = 39;
+    optional int32 ms_played_external = 40;
+    optional string local_content_uri = 41;
+    optional bool client_offline_at_stream_start = 42;
+}

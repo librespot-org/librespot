@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AudioOffliningSettingsReport {
+    optional string default_sync_bitrate_product_state = 1;
+    optional int64 user_selected_sync_bitrate = 2;
+    optional int64 sync_bitrate = 3;
+    optional bool sync_over_cellular = 4;
+    optional string primary_resource_type = 5;
+}

@@ -1,0 +1,55 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message ContextPlayerError {
+    ErrorCode code = 1;
+    enum ErrorCode {
+        SUCCESS = 0;
+        PLAYBACK_STUCK = 1;
+        PLAYBACK_ERROR = 2;
+        LICENSE_CHANGE = 3;
+        PLAY_RESTRICTED = 4;
+        STOP_RESTRICTED = 5;
+        UPDATE_RESTRICTED = 6;
+        PAUSE_RESTRICTED = 7;
+        RESUME_RESTRICTED = 8;
+        SKIP_TO_PREV_RESTRICTED = 9;
+        SKIP_TO_NEXT_RESTRICTED = 10;
+        SKIP_TO_NON_EXISTENT_TRACK = 11;
+        SEEK_TO_RESTRICTED = 12;
+        TOGGLE_REPEAT_CONTEXT_RESTRICTED = 13;
+        TOGGLE_REPEAT_TRACK_RESTRICTED = 14;
+        SET_OPTIONS_RESTRICTED = 15;
+        TOGGLE_SHUFFLE_RESTRICTED = 16;
+        SET_QUEUE_RESTRICTED = 17;
+        INTERRUPT_PLAYBACK_RESTRICTED = 18;
+        ONE_TRACK_UNPLAYABLE = 19;
+        ONE_TRACK_UNPLAYABLE_AUTO_STOPPED = 20;
+        ALL_TRACKS_UNPLAYABLE_AUTO_STOPPED = 21;
+        SKIP_TO_NON_EXISTENT_TRACK_AUTO_STOPPED = 22;
+        QUEUE_REVISION_MISMATCH = 23;
+        VIDEO_PLAYBACK_ERROR = 24;
+        VIDEO_GEOGRAPHICALLY_RESTRICTED = 25;
+        VIDEO_UNSUPPORTED_PLATFORM_VERSION = 26;
+        VIDEO_UNSUPPORTED_CLIENT_VERSION = 27;
+        VIDEO_UNSUPPORTED_KEY_SYSTEM = 28;
+        VIDEO_MANIFEST_DELETED = 29;
+        VIDEO_COUNTRY_RESTRICTED = 30;
+        VIDEO_UNAVAILABLE = 31;
+        VIDEO_CATALOGUE_RESTRICTED = 32;
+        INVALID = 33;
+        TIMEOUT = 34;
+        PLAYBACK_REPORTING_ERROR = 35;
+        UNKNOWN = 36;
+    }
+    
+    string message = 2;
+    map<string, string> data = 3;
+}

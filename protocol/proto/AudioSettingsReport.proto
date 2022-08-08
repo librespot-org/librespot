@@ -1,0 +1,30 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AudioSettingsReport {
+    optional bool offline_mode = 1;
+    optional string default_play_bitrate_product_state = 2;
+    optional int64 user_selected_bitrate = 3;
+    optional int64 play_bitrate = 4;
+    optional bool low_bitrate_on_cellular = 5;
+    optional string default_sync_bitrate_product_state = 6;
+    optional int64 user_selected_sync_bitrate = 7;
+    optional int64 sync_bitrate = 8;
+    optional bool sync_over_cellular = 9;
+    optional string enable_gapless_product_state = 10;
+    optional bool enable_gapless = 11;
+    optional string enable_crossfade_product_state = 12;
+    optional bool enable_crossfade = 13;
+    optional int64 crossfade_time = 14;
+    optional bool enable_normalization = 15;
+    optional int64 playback_speed = 16;
+    optional string audio_loudness_level = 17;
+    optional bool enable_automix = 18;
+    optional bool enable_silence_trimmer = 19;
+    optional bool enable_mono_downmixer = 20;
+}

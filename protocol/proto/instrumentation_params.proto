@@ -1,0 +1,12 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto.transfer;
+
+option optimize_for = CODE_SIZE;
+
+message InstrumentationParams {
+    repeated string interaction_ids = 6;
+    repeated string page_instance_ids = 7;
+}

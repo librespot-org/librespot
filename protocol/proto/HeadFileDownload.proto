@@ -1,0 +1,27 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message HeadFileDownload {
+    optional bytes file_id = 1;
+    optional bytes playback_id = 2;
+    optional string cdn_uri_scheme = 3;
+    optional string cdn_domain = 4;
+    optional int64 head_file_size = 5;
+    optional int64 bytes_downloaded = 6;
+    optional int64 bytes_wasted = 7;
+    optional int64 http_latency = 8;
+    optional int64 http_64k_latency = 9;
+    optional int64 total_time = 10;
+    optional int64 http_result = 11;
+    optional int64 error_code = 12;
+    optional int64 cached_bytes = 13;
+    optional int64 bytes_from_cache = 14;
+    optional string socket_reuse = 15;
+    optional string request_type = 16;
+    optional string initial_disk_state = 17;
+}

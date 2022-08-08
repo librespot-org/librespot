@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.netfortune.proto;
+
+option optimize_for = CODE_SIZE;
+
+message NetFortuneResponse {
+    int32 advised_audio_bitrate = 1;
+}
+
+message NetFortuneV2Response {
+    string predict_id = 1;
+    int32 estimated_max_bitrate = 2;
+}

@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.mdata.proto.storage;
+
+import "extension_kind.proto";
+import "google/protobuf/any.proto";
+
+option cc_enable_arenas = true;
+option optimize_for = CODE_SIZE;
+
+message CacheEntry {
+    extendedmetadata.ExtensionKind kind = 1;
+    google.protobuf.Any extension_data = 2;
+}
+
+message CacheInfo {
+    int32 status_code = 1;
+    bool is_empty = 2;
+    uint64 cache_expiry = 3;
+    uint64 offline_expiry = 4;
+    string etag = 5;
+    fixed64 cache_checksum_lo = 6;
+    fixed64 cache_checksum_hi = 7;
+}
+
+message OfflineLock {
+    uint64 lock_expiry = 1;
+}
+
+message AudioFiles {
+    string file_id = 1;
+}
+
+message TrackDescriptor {
+    int32 track_id = 1;
+}

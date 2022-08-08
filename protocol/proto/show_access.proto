@@ -1,0 +1,50 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.podcast_paywalls;
+
+option objc_class_prefix = "SPT";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "ShowAccessProto";
+option java_package = "com.spotify.podcast.access.proto";
+
+message ShowAccess {
+    AccountLinkPrompt prompt = 5;
+    
+    oneof explanation {
+        NoExplanation none = 1;
+        LegacyExplanation legacy = 2;
+        BasicExplanation basic = 3;
+        UpsellLinkExplanation upsellLink = 4;
+    }
+}
+
+message BasicExplanation {
+    string title = 1;
+    string body = 2;
+    string cta = 3;
+}
+
+message LegacyExplanation {
+    
+}
+
+message NoExplanation {
+    
+}
+
+message UpsellLinkExplanation {
+    string title = 1;
+    string body = 2;
+    string cta = 3;
+    string url = 4;
+}
+
+message AccountLinkPrompt {
+    string title = 1;
+    string body = 2;
+    string cta = 3;
+    string url = 4;
+}

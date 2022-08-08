@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AudioStreamingSettingsReport {
+    optional string default_play_bitrate_product_state = 1;
+    optional int64 user_selected_play_bitrate_cellular = 2;
+    optional int64 user_selected_play_bitrate_wifi = 3;
+    optional int64 play_bitrate_cellular = 4;
+    optional int64 play_bitrate_wifi = 5;
+    optional bool allow_downgrade = 6;
+}

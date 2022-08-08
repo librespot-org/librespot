@@ -1,0 +1,28 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AdEvent {
+    optional string request_id = 1;
+    optional string app_startup_id = 2;
+    optional string ad_id = 3;
+    optional string lineitem_id = 4;
+    optional string creative_id = 5;
+    optional string slot = 6;
+    optional string format = 7;
+    optional string type = 8;
+    optional bool skippable = 9;
+    optional string event = 10;
+    optional string event_source = 11;
+    optional string event_reason = 12;
+    optional int32 event_sequence_num = 13;
+    optional int32 position = 14;
+    optional int32 duration = 15;
+    optional bool in_focus = 16;
+    optional float volume = 17;
+    optional string product_name = 18;
+}

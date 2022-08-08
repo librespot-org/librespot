@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.collection.proto;
+
+option optimize_for = CODE_SIZE;
+
+message IndexRepairerState {
+    bytes last_checked_uri = 1;
+    int64 last_full_check_finished_at = 2;
+}
+
+message CollectionTrackEntry {
+    string uri = 1;
+    string track_name = 2;
+    string album_uri = 3;
+    string album_name = 4;
+    int32 disc_number = 5;
+    int32 track_number = 6;
+    string artist_uri = 7;
+    repeated string artist_name = 8;
+    int64 add_time = 9;
+}
+
+message CollectionAlbumLikeEntry {
+    string uri = 1;
+    string album_name = 2;
+    string creator_uri = 4;
+    string creator_name = 5;
+    int64 add_time = 6;
+}
+
+message CollectionArtistEntry {
+    string uri = 1;
+    string artist_name = 2;
+    int64 add_time = 4;
+}

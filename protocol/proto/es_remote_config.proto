@@ -1,0 +1,21 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.remote_config.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option java_package = "com.spotify.remoteconfig.esperanto.proto";
+
+service RemoteConfig {
+    rpc lookupBool(LookupRequest) returns (BoolResponse);
+}
+
+message LookupRequest {
+    string component_id = 1;
+    string key = 2;
+}
+
+message BoolResponse {
+    bool value = 1;
+}

@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.show_cosmos.proto;
+
+option optimize_for = CODE_SIZE;
+
+message EpisodeCollectionState {
+    optional bool is_following_show = 1;
+    optional bool is_new = 2;
+    optional bool is_in_listen_later = 3;
+}
+
+message EpisodeOfflineState {
+    optional string offline_state = 1;
+    optional uint32 sync_progress = 2;
+}

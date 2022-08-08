@@ -1,0 +1,25 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+import "es_command_options.proto";
+import "es_logging_params.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message SeekToRequest {
+    CommandOptions options = 1;
+    LoggingParams logging_params = 2;
+    int64 position = 3;
+    
+    Relative relative = 4;
+    enum Relative {
+        BEGINNING = 0;
+        END = 1;
+        CURRENT = 2;
+    }
+}

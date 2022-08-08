@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.context_view.proto;
+
+import "context_track.proto";
+import "context_view_cyclic_list.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ContextView {
+    map<string, player.proto.ContextTrack> patch_map = 1;
+    optional uint32 iteration_size = 2;
+    optional cyclic_list.proto.CyclicEntryKeyList cyclic_list = 3;
+    
+    reserved 4;
+}

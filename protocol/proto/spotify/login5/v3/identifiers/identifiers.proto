@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.33.569 (Windows)
+
+syntax = "proto3";
+
+package spotify.login5.v3.identifiers;
+
+option objc_class_prefix = "SPTLogin5";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.login5.v3.identifiers.proto";
+
+message PhoneNumber {
+    string number = 1;
+    string iso_country_code = 2;
+    string country_calling_code = 3;
+}

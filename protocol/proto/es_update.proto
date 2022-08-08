@@ -1,0 +1,38 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+import "es_context.proto";
+import "es_context_page.proto";
+import "es_context_track.proto";
+import "es_logging_params.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message UpdateContextRequest {
+    string session_id = 1;
+    Context context = 2;
+    LoggingParams logging_params = 3;
+}
+
+message UpdateContextPageRequest {
+    string session_id = 1;
+    ContextPage context_page = 2;
+    LoggingParams logging_params = 3;
+}
+
+message UpdateContextTrackRequest {
+    string session_id = 1;
+    ContextTrack context_track = 2;
+    LoggingParams logging_params = 3;
+}
+
+message UpdateViewUriRequest {
+    string session_id = 1;
+    string view_uri = 2;
+    LoggingParams logging_params = 3;
+}

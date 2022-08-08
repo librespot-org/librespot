@@ -1,0 +1,33 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message Restrictions {
+    repeated string disallow_pausing_reasons = 1;
+    repeated string disallow_resuming_reasons = 2;
+    repeated string disallow_seeking_reasons = 3;
+    repeated string disallow_peeking_prev_reasons = 4;
+    repeated string disallow_peeking_next_reasons = 5;
+    repeated string disallow_skipping_prev_reasons = 6;
+    repeated string disallow_skipping_next_reasons = 7;
+    repeated string disallow_toggling_repeat_context_reasons = 8;
+    repeated string disallow_toggling_repeat_track_reasons = 9;
+    repeated string disallow_toggling_shuffle_reasons = 10;
+    repeated string disallow_set_queue_reasons = 11;
+    repeated string disallow_interrupting_playback_reasons = 12;
+    repeated string disallow_transferring_playback_reasons = 13;
+    repeated string disallow_remote_control_reasons = 14;
+    repeated string disallow_inserting_into_next_tracks_reasons = 15;
+    repeated string disallow_inserting_into_context_tracks_reasons = 16;
+    repeated string disallow_reordering_in_next_tracks_reasons = 17;
+    repeated string disallow_reordering_in_context_tracks_reasons = 18;
+    repeated string disallow_removing_from_next_tracks_reasons = 19;
+    repeated string disallow_removing_from_context_tracks_reasons = 20;
+    repeated string disallow_updating_context_reasons = 21;
+}

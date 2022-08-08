@@ -1,0 +1,37 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.identity.v3;
+
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/wrappers.proto";
+
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "IdentityV3";
+option java_package = "com.spotify.identity.proto.v3";
+
+message Image {
+    int32 max_width = 1;
+    int32 max_height = 2;
+    string url = 3;
+}
+
+message UserProfile {
+    google.protobuf.StringValue username = 1;
+    google.protobuf.StringValue name = 2;
+    repeated Image images = 3;
+    google.protobuf.BoolValue verified = 4;
+    google.protobuf.BoolValue edit_profile_disabled = 5;
+    google.protobuf.BoolValue report_abuse_disabled = 6;
+    google.protobuf.BoolValue abuse_reported_name = 7;
+    google.protobuf.BoolValue abuse_reported_image = 8;
+    google.protobuf.BoolValue has_spotify_name = 9;
+    google.protobuf.BoolValue has_spotify_image = 10;
+    google.protobuf.Int32Value color = 11;
+}
+
+message UserProfileUpdateRequest {
+    google.protobuf.FieldMask mask = 1;
+    UserProfile user_profile = 2;
+}

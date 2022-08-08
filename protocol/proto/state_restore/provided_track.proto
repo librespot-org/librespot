@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "restrictions.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ProvidedTrack {
+    optional string uid = 1;
+    optional string uri = 2;
+    map<string, string> metadata = 3;
+    optional string provider = 4;
+    repeated string removed = 5;
+    repeated string blocked = 6;
+    map<string, string> internal_metadata = 7;
+    optional Restrictions restrictions = 8;
+}

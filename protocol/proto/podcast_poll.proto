@@ -1,0 +1,48 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.polls;
+
+option objc_class_prefix = "SPT";
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_outer_classname = "PollMetadataProto";
+option java_package = "com.spotify.podcastcreatorinteractivity.v1";
+
+message PodcastPoll {
+    Poll poll = 1;
+}
+
+message Poll {
+    int32 id = 1;
+    string opening_date = 2;
+    string closing_date = 3;
+    int32 entity_timestamp_ms = 4;
+    string entity_uri = 5;
+    string name = 6;
+    string question = 7;
+    PollType type = 8;
+    repeated PollOption options = 9;
+    PollStatus status = 10;
+}
+
+message PollOption {
+    string option = 1;
+    int32 total_votes = 2;
+    int32 poll_id = 3;
+    int32 option_id = 4;
+}
+
+enum PollType {
+    MULTIPLE_CHOICE = 0;
+    SINGLE_CHOICE = 1;
+}
+
+enum PollStatus {
+    DRAFT = 0;
+    SCHEDULED = 1;
+    LIVE = 2;
+    CLOSED = 3;
+    BLOCKED = 4;
+}

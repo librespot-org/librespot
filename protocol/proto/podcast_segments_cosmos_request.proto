@@ -1,0 +1,37 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.podcast_segments.cosmos.proto;
+
+import "policy/album_decoration_policy.proto";
+import "policy/artist_decoration_policy.proto";
+import "policy/episode_decoration_policy.proto";
+import "policy/track_decoration_policy.proto";
+import "policy/show_decoration_policy.proto";
+
+option optimize_for = CODE_SIZE;
+
+message SegmentsRequest {
+    repeated string episode_uris = 1;
+    TrackDecorationPolicy track_decoration_policy = 2;
+    SegmentsPolicy segments_policy = 3;
+    EpisodeDecorationPolicy episode_decoration_policy = 4;
+}
+
+message TrackDecorationPolicy {
+    cosmos_util.proto.TrackDecorationPolicy track_policy = 1;
+    cosmos_util.proto.ArtistDecorationPolicy artists_policy = 2;
+    cosmos_util.proto.AlbumDecorationPolicy album_policy = 3;
+    cosmos_util.proto.ArtistDecorationPolicy album_artist_policy = 4;
+}
+
+message SegmentsPolicy {
+    bool playback = 1;
+    bool embedded = 2;
+}
+
+message EpisodeDecorationPolicy {
+    cosmos_util.proto.EpisodeDecorationPolicy episode_policy = 1;
+    cosmos_util.proto.ShowDecorationPolicy show_decoration_policy = 2;
+}

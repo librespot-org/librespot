@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.playlist.cosmos.proto;
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.proto";
+
+message OptionalLimit {
+    uint32 value = 1;
+}
+
+message PlaylistMembersRequest {
+    string uri = 1;
+    OptionalLimit limit = 2;
+}

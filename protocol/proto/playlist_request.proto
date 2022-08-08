@@ -1,0 +1,91 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.playlist.cosmos.playlist_request.proto;
+
+import "collection/episode_collection_state.proto";
+import "metadata/episode_metadata.proto";
+import "played_state/track_played_state.proto";
+import "played_state/episode_played_state.proto";
+import "sync/episode_sync_state.proto";
+import "metadata/image_group.proto";
+import "on_demand_in_free_reason.proto";
+import "playlist_permission.proto";
+import "playlist_playlist_state.proto";
+import "playlist_track_state.proto";
+import "playlist_user_state.proto";
+import "metadata/track_metadata.proto";
+
+option objc_class_prefix = "SPTPlaylistCosmosPlaylist";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.playlist.proto";
+
+message Item {
+    optional string header_field = 1;
+    optional uint32 add_time = 2;
+    optional cosmos.proto.User added_by = 3;
+    optional cosmos_util.proto.TrackMetadata track_metadata = 4;
+    optional cosmos.proto.TrackCollectionState track_collection_state = 5;
+    optional cosmos.proto.TrackOfflineState track_offline_state = 6;
+    optional string row_id = 7;
+    optional cosmos_util.proto.TrackPlayState track_play_state = 8;
+    repeated cosmos.proto.FormatListAttribute format_list_attributes = 9;
+    optional cosmos_util.proto.EpisodeMetadata episode_metadata = 10;
+    optional cosmos_util.proto.EpisodeSyncState episode_offline_state = 11;
+    optional cosmos_util.proto.EpisodeCollectionState episode_collection_state = 12;
+    optional cosmos_util.proto.EpisodePlayState episode_play_state = 13;
+    optional cosmos_util.proto.ImageGroup display_covers = 14;
+}
+
+message Playlist {
+    optional cosmos.proto.PlaylistMetadata playlist_metadata = 1;
+    optional cosmos.proto.PlaylistOfflineState playlist_offline_state = 2;
+}
+
+message RecommendationItem {
+    optional cosmos_util.proto.TrackMetadata track_metadata = 1;
+    optional cosmos.proto.TrackCollectionState track_collection_state = 2;
+    optional cosmos.proto.TrackOfflineState track_offline_state = 3;
+    optional cosmos_util.proto.TrackPlayState track_play_state = 4;
+}
+
+message Collaborator {
+    optional cosmos.proto.User user = 1;
+    optional uint32 number_of_items = 2;
+    optional uint32 number_of_tracks = 3;
+    optional uint32 number_of_episodes = 4;
+    optional bool is_owner = 5;
+}
+
+message Collaborators {
+    optional uint32 count = 1;
+    repeated Collaborator collaborator = 2;
+}
+
+message Response {
+    repeated Item item = 1;
+    optional Playlist playlist = 2;
+    optional uint32 unfiltered_length = 3;
+    optional uint32 unranged_length = 4;
+    optional uint64 duration = 5;
+    optional bool loading_contents = 6;
+    optional uint64 last_modification = 7;
+    optional uint32 num_followers = 8;
+    optional bool playable = 9;
+    repeated RecommendationItem recommendations = 10;
+    optional bool has_explicit_content = 11;
+    optional bool contains_spotify_tracks = 12;
+    optional bool contains_episodes = 13;
+    optional bool only_contains_explicit = 14;
+    optional bool contains_audio_episodes = 15;
+    optional bool contains_tracks = 16;
+    optional bool is_on_demand_in_free = 17;
+    optional uint32 number_of_tracks = 18;
+    optional uint32 number_of_episodes = 19;
+    optional bool prefer_linear_playback = 20;
+    optional on_demand_set.proto.OnDemandInFreeReason on_demand_in_free_reason = 21;
+    optional Collaborators collaborators = 22;
+    optional playlist_permission.proto.Permission base_permission = 23;
+    optional playlist_permission.proto.Capabilities user_capabilities = 24;
+}

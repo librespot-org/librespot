@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message SequenceNumberEntity {
+    uint32 file_format_version = 1;
+    string event_name = 2;
+    bytes sequence_id = 3;
+    uint64 sequence_number_next = 4;
+}

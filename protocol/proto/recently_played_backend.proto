@@ -1,0 +1,18 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.recently_played_backend.proto;
+
+option optimize_for = CODE_SIZE;
+
+message Context {
+    optional string uri = 1;
+    optional int64 lastPlayedTime = 2;
+}
+
+message RecentlyPlayed {
+    repeated Context contexts = 1;
+    optional int32 offset = 2;
+    optional int32 total = 3;
+}

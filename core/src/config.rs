@@ -1,23 +1,27 @@
-use std::fmt;
-use std::str::FromStr;
+use std::{fmt, path::PathBuf, str::FromStr};
+
 use url::Url;
+
+pub const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
-    pub user_agent: String,
+    pub client_id: String,
     pub device_id: String,
     pub proxy: Option<Url>,
     pub ap_port: Option<u16>,
+    pub tmp_dir: PathBuf,
 }
 
 impl Default for SessionConfig {
     fn default() -> SessionConfig {
         let device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
         SessionConfig {
-            user_agent: crate::version::VERSION_STRING.to_string(),
+            client_id: KEYMASTER_CLIENT_ID.to_owned(),
             device_id,
             proxy: None,
             ap_port: None,
+            tmp_dir: std::env::temp_dir(),
         }
     }
 }
@@ -105,7 +109,7 @@ impl From<DeviceType> for &str {
 }
 
 impl fmt::Display for DeviceType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let str: &str = self.into();
         f.write_str(str)
     }
@@ -114,26 +118,5 @@ impl fmt::Display for DeviceType {
 impl Default for DeviceType {
     fn default() -> DeviceType {
         DeviceType::Speaker
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ConnectConfig {
-    pub name: String,
-    pub device_type: DeviceType,
-    pub initial_volume: Option<u16>,
-    pub has_volume_ctrl: bool,
-    pub autoplay: bool,
-}
-
-impl Default for ConnectConfig {
-    fn default() -> ConnectConfig {
-        ConnectConfig {
-            name: "Librespot".to_string(),
-            device_type: DeviceType::default(),
-            initial_volume: Some(50),
-            has_volume_ctrl: true,
-            autoplay: false,
-        }
     }
 }

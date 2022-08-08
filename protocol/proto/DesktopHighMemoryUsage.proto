@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopHighMemoryUsage {
+    optional bool is_continuation_event = 1;
+    optional double sample_time_interval_seconds = 2;
+    optional int64 win_committed_bytes = 3;
+    optional int64 win_peak_committed_bytes = 4;
+    optional int64 win_working_set_bytes = 5;
+    optional int64 win_peak_working_set_bytes = 6;
+    optional int64 mac_virtual_size_bytes = 7;
+    optional int64 mac_resident_size_bytes = 8;
+    optional int64 mac_footprint_bytes = 9;
+}

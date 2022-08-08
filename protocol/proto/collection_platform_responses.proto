@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.collection_platform.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CollectionPlatformSimpleResponse {
+    string error_msg = 1;
+}
+
+message CollectionPlatformItem {
+    string uri = 1;
+    int64 add_time = 2;
+}
+
+message CollectionPlatformItemsResponse {
+    repeated CollectionPlatformItem items = 1;
+}
+
+message CollectionPlatformContainsResponse {
+    repeated bool found = 1;
+}

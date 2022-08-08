@@ -1,0 +1,15 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message DesktopUpdateResponse {
+    optional int64 status_code = 1;
+    optional int64 request_time_ms = 2;
+    optional int64 payload_size = 3;
+    optional bool is_employee = 4;
+    optional string error_message = 5;
+}

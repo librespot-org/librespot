@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.your_library.proto;
+
+import "your_library_decorated_entity.proto";
+
+option optimize_for = CODE_SIZE;
+
+message YourLibraryResponseHeader {
+    int32 remaining_entities = 9;
+    bool is_loading = 12;
+    YourLibraryAvailableEntityTypes has = 13;
+    YourLibraryAvailableEntityTypes has_downloaded = 14;
+    string folder_name = 15;
+}
+
+message YourLibraryResponse {
+    YourLibraryResponseHeader header = 1;
+    repeated YourLibraryDecoratedEntity entity = 2;
+    string error = 99;
+}

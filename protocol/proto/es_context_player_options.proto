@@ -1,0 +1,23 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+import "es_optional.proto";
+
+option objc_class_prefix = "ESP";
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.player.esperanto.proto";
+
+message ContextPlayerOptions {
+    bool shuffling_context = 1;
+    bool repeating_context = 2;
+    bool repeating_track = 3;
+}
+
+message ContextPlayerOptionOverrides {
+    OptionalBoolean shuffling_context = 1;
+    OptionalBoolean repeating_context = 2;
+    OptionalBoolean repeating_track = 3;
+}

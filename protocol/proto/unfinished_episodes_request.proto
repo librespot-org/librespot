@@ -1,0 +1,26 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.show_cosmos.unfinished_episodes_request.proto;
+
+import "metadata/episode_metadata.proto";
+import "played_state/episode_played_state.proto";
+import "show_episode_state.proto";
+
+option objc_class_prefix = "SPTShowCosmosUnfinshedEpisodes";
+option optimize_for = CODE_SIZE;
+
+message Episode {
+    optional cosmos_util.proto.EpisodeMetadata episode_metadata = 1;
+    optional show_cosmos.proto.EpisodeCollectionState episode_collection_state = 2;
+    optional show_cosmos.proto.EpisodeOfflineState episode_offline_state = 3;
+    optional cosmos_util.proto.EpisodePlayState episode_play_state = 4;
+    optional string link = 5;
+}
+
+message Response {
+    repeated Episode episode = 2;
+    
+    reserved 1;
+}

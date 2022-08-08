@@ -1,0 +1,141 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.offline.proto;
+
+import "google/protobuf/any.proto";
+import "extension_kind.proto";
+import "resource_type.proto";
+
+option optimize_for = CODE_SIZE;
+
+message PluginRegistry {
+    repeated Entry plugins = 1;
+    message Entry {
+        string id = 1;
+        repeated LinkType supported_link_types = 2;
+        ResourceType resource_type = 3;
+        repeated extendedmetadata.ExtensionKind extension_kinds = 4;
+    }
+    
+    enum LinkType {
+        EMPTY = 0;
+        TRACK = 1;
+        EPISODE = 2;
+    }
+}
+
+message PluginInit {
+    string id = 1;
+}
+
+message TargetFormat {
+    int32 bitrate = 1;
+}
+
+message Metadata {
+    Header header = 1;
+    message Header {
+        int32 status_code = 1;
+        bool is_empty = 2;
+    }
+    
+    google.protobuf.Any extension_data = 2;
+}
+
+message IdentifyCommand {
+    Header header = 3;
+    message Header {
+        TargetFormat target_format = 1;
+    }
+    
+    repeated Query query = 4;
+    message Query {
+        string link = 1;
+        map<int32, Metadata> metadata = 2;
+    }
+}
+
+message IdentifyResponse {
+    map<string, Result> results = 1;
+    
+    message Result {
+        Status status = 1;
+        enum Status {
+            UNKNOWN = 0;
+            MISSING = 1;
+            COMPLETE = 2;
+            NOT_APPLICABLE = 3;
+        }
+        
+        int64 estimated_file_size = 2;
+    }
+}
+
+message DownloadCommand {
+    string link = 1;
+    TargetFormat target_format = 2;
+    map<int32, Metadata> metadata = 3;
+}
+
+message DownloadResponse {
+    string link = 1;
+    bool complete = 2;
+    int64 file_size = 3;
+    int64 bytes_downloaded = 4;
+    
+    Error error = 5;
+    enum Error {
+        OK = 0;
+        TEMPORARY_ERROR = 1;
+        PERMANENT_ERROR = 2;
+        DISK_FULL = 3;
+    }
+}
+
+message StopDownloadCommand {
+    string link = 1;
+}
+
+message StopDownloadResponse {
+    
+}
+
+message RemoveCommand {
+    Header header = 2;
+    message Header {
+        
+    }
+    
+    repeated Query query = 3;
+    message Query {
+        string link = 1;
+    }
+}
+
+message RemoveResponse {
+    
+}
+
+message PluginCommand {
+    string id = 1;
+    
+    oneof command {
+        IdentifyCommand identify = 2;
+        DownloadCommand download = 3;
+        RemoveCommand remove = 4;
+        StopDownloadCommand stop_download = 5;
+    }
+}
+
+message PluginResponse {
+    string id = 1;
+    
+    oneof response {
+        IdentifyResponse identify = 2;
+        DownloadResponse download = 3;
+        RemoveResponse remove = 4;
+        StopDownloadResponse stop_download = 5;
+    }
+}

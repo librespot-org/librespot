@@ -1,0 +1,53 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.narration_injection.proto;
+
+option optimize_for = CODE_SIZE;
+
+service TtsResolveService {
+    rpc Resolve(ResolveRequest) returns (ResolveResponse);
+}
+
+message ResolveRequest {
+    AudioFormat audio_format = 3;
+    enum AudioFormat {
+        UNSPECIFIED = 0;
+        WAV = 1;
+        PCM = 2;
+        OPUS = 3;
+        VORBIS = 4;
+        MP3 = 5;
+    }
+    
+    string language = 4;
+    
+    TtsVoice tts_voice = 5;
+    enum TtsVoice {
+        UNSET_TTS_VOICE = 0;
+        VOICE1 = 1;
+        VOICE2 = 2;
+        VOICE3 = 3;
+    }
+    
+    TtsProvider tts_provider = 6;
+    enum TtsProvider {
+        UNSET_TTS_PROVIDER = 0;
+        CLOUD_TTS = 1;
+        READSPEAKER = 2;
+        POLLY = 3;
+        WELL_SAID = 4;
+    }
+    
+    int32 sample_rate_hz = 7;
+    
+    oneof prompt {
+        string text = 1;
+        string ssml = 2;
+    }
+}
+
+message ResolveResponse {
+    string url = 1;
+}

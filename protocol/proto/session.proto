@@ -1,0 +1,22 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.player.proto.transfer;
+
+import "context.proto";
+import "context_player_options.proto";
+import "play_origin.proto";
+import "suppressions.proto";
+import "instrumentation_params.proto";
+
+option optimize_for = CODE_SIZE;
+
+message Session {
+    optional PlayOrigin play_origin = 1;
+    optional Context context = 2;
+    optional string current_uid = 3;
+    optional ContextPlayerOptionOverrides option_overrides = 4;
+    optional Suppressions suppressions = 5;
+    optional InstrumentationParams instrumentation_params = 6;
+}

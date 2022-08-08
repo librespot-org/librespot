@@ -8,6 +8,17 @@ cd $WORKINGDIR
 
 crates=( "protocol" "core" "discovery" "audio" "metadata" "playback" "connect" "librespot" )
 
+OS=`uname`
+function replace_in_file() {
+    if [ "$OS" == 'darwin' ]; then
+        # for MacOS
+        sed -i '' -e "$1" "$2"
+    else
+        # for Linux and Windows
+        sed -i'' -e "$1" "$2"
+    fi
+}
+
 function switchBranch {
   if [ "$SKIP_MERGE" = 'false' ] ; then
     # You are expected to have committed/stashed your changes before running this.
@@ -33,7 +44,7 @@ function updateVersion {
     fi
     crate_path="$WORKINGDIR/$CRATE_DIR/Cargo.toml"
     crate_path=${crate_path//\/\///}
-    sed -i '' "s/^version.*/version = \"$1\"/g" "$crate_path"
+    $(replace_in_file "s/^version.*/version = \"$1\"/g" "$crate_path")
     echo "Path is $crate_path"
     if [ "$CRATE" = "librespot" ]
     then

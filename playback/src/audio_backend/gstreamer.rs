@@ -141,10 +141,10 @@ impl Sink for GstreamerSink {
         self.appsrc.send_event(FlushStop::new(true));
         self.bufferpool
             .set_active(true)
-            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+            .map_err(|e| SinkError::StateChange(e.to_string()))?;
         self.pipeline
             .set_state(State::Playing)
-            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+            .map_err(|e| SinkError::StateChange(e.to_string()))?;
         Ok(())
     }
 
@@ -153,10 +153,10 @@ impl Sink for GstreamerSink {
         self.appsrc.send_event(FlushStart::new());
         self.pipeline
             .set_state(State::Paused)
-            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+            .map_err(|e| SinkError::StateChange(e.to_string()))?;
         self.bufferpool
             .set_active(false)
-            .map_err(|e| SinkError::OnWrite(e.to_string()))?;
+            .map_err(|e| SinkError::StateChange(e.to_string()))?;
         Ok(())
     }
 

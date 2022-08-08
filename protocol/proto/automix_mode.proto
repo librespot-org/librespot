@@ -1,0 +1,41 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.automix.proto;
+
+option optimize_for = CODE_SIZE;
+
+message AutomixConfig {
+    TransitionType transition_type = 1;
+    string fade_out_curves = 2;
+    string fade_in_curves = 3;
+    int32 beats_min = 4;
+    int32 beats_max = 5;
+    int32 fade_duration_max_ms = 6;
+}
+
+message AutomixMode {
+    AutomixStyle style = 1;
+    AutomixConfig config = 2;
+    AutomixConfig ml_config = 3;
+    AutomixConfig shuffle_config = 4;
+    AutomixConfig shuffle_ml_config = 5;
+}
+
+enum AutomixStyle {
+    NONE = 0;
+    DEFAULT = 1;
+    REGULAR = 2;
+    AIRBAG = 3;
+    RADIO_AIRBAG = 4;
+    SLEEP = 5;
+    MIXED = 6;
+    CUSTOM = 7;
+}
+
+enum TransitionType {
+    CUEPOINTS = 0;
+    CROSSFADE = 1;
+    GAPLESS = 2;
+}

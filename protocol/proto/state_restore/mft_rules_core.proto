@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "state_restore/mft_context_switch_rules.proto";
+import "state_restore/mft_rules_inject_filler_tracks.proto";
+
+option optimize_for = CODE_SIZE;
+
+message MftRulesCore {
+    required MftRulesInjectFillerTracks inject_filler_tracks = 1;
+    required MftContextSwitchRules context_switch_rules = 2;
+    repeated string feature_classes = 3;
+}

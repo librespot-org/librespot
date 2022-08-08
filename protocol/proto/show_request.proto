@@ -1,0 +1,79 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.show_cosmos.proto;
+
+import "metadata/episode_metadata.proto";
+import "metadata/show_metadata.proto";
+import "played_state/episode_played_state.proto";
+import "show_episode_state.proto";
+import "show_show_state.proto";
+import "podcast_virality.proto";
+import "transcripts.proto";
+import "podcastextensions.proto";
+import "clips_cover.proto";
+import "show_access.proto";
+import "podcast_ratings.proto";
+import "greenroom_extension.proto";
+
+option objc_class_prefix = "SPTShowCosmos";
+option optimize_for = CODE_SIZE;
+
+message Item {
+    optional string header_field = 1;
+    optional cosmos_util.proto.EpisodeMetadata episode_metadata = 2;
+    optional EpisodeCollectionState episode_collection_state = 3;
+    optional EpisodeOfflineState episode_offline_state = 4;
+    optional cosmos_util.proto.EpisodePlayState episode_play_state = 5;
+    optional corex.transcripts.metadata.EpisodeTranscript episode_transcripts = 7;
+    optional podcastvirality.v1.PodcastVirality episode_virality = 8;
+    optional clips.ClipsCover episode_clips = 9;
+    
+    reserved 6;
+}
+
+message Header {
+    optional cosmos_util.proto.ShowMetadata show_metadata = 1;
+    optional ShowCollectionState show_collection_state = 2;
+    optional ShowPlayState show_play_state = 3;
+}
+
+message Response {
+    repeated Item item = 1;
+    optional Header header = 2;
+    optional uint32 unfiltered_length = 4;
+    optional uint32 length = 5;
+    optional bool loading_contents = 6;
+    optional uint32 unranged_length = 7;
+    optional AuxiliarySections auxiliary_sections = 8;
+    optional podcast_paywalls.ShowAccess access_info = 9;
+    optional uint32 range_offset = 10;
+    
+    reserved 3, "online_data";
+}
+
+message AuxiliarySections {
+    optional ContinueListeningSection continue_listening = 1;
+    optional podcast.extensions.PodcastTopics topics_section = 2;
+    optional TrailerSection trailer_section = 3;
+    optional podcast.extensions.PodcastHtmlDescription html_description_section = 5;
+    optional clips.ClipsCover clips_section = 6;
+    optional ratings.PodcastRating rating_section = 7;
+    optional greenroom.api.extendedmetadata.v1.GreenroomSection greenroom_section = 8;
+    optional LatestUnplayedEpisodeSection latest_unplayed_episode_section = 9;
+    
+    reserved 4;
+}
+
+message ContinueListeningSection {
+    optional Item item = 1;
+}
+
+message TrailerSection {
+    optional Item item = 1;
+}
+
+message LatestUnplayedEpisodeSection {
+    optional Item item = 1;
+}

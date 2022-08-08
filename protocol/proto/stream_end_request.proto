@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+import "stream_handle.proto";
+import "play_reason.proto";
+import "media_format.proto";
+
+option objc_class_prefix = "ESP";
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+
+message StreamEndRequest {
+    StreamHandle stream_handle = 1;
+    string source_end = 2;
+    PlayReason reason_end = 3;
+    MediaFormat format = 4;
+}

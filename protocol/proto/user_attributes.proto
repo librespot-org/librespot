@@ -1,0 +1,29 @@
+// Custom protobuf crafted from spotify:user:attributes:mutated response:
+//
+// 1 {
+//   1: "filter-explicit-content"
+// }
+// 2 {
+//   1: 1639087299
+//   2: 418909000
+// }
+
+syntax = "proto3";
+
+package spotify.user_attributes.proto;
+
+option optimize_for = CODE_SIZE;
+
+message UserAttributesMutation {
+	repeated MutatedField fields = 1;
+	MutationCommand cmd = 2;
+}
+
+message MutatedField {
+	string name = 1;
+}
+
+message MutationCommand {
+	int64 timestamp = 1;
+	int32 unknown = 2;
+}

@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message CacheError {
+    optional int64 error_code = 1;
+    optional int64 os_error_code = 2;
+    optional string realm = 3;
+    optional bytes file_id = 4;
+    optional int64 num_errors = 5;
+    optional string cache_path = 6;
+    optional int64 size = 7;
+    optional int64 range_start = 8;
+    optional int64 range_end = 9;
+}

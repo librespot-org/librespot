@@ -1,0 +1,31 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.cosmos_util.proto;
+
+import "metadata/extension.proto";
+import "metadata/image_group.proto";
+
+option java_multiple_files = true;
+option optimize_for = CODE_SIZE;
+option java_package = "com.spotify.cosmos.util.proto";
+
+message ShowMetadata {
+    optional string link = 1;
+    optional string name = 2;
+    optional string description = 3;
+    optional uint32 popularity = 4;
+    optional string publisher = 5;
+    optional string language = 6;
+    optional bool is_explicit = 7;
+    optional ImageGroup covers = 8;
+    optional uint32 num_episodes = 9;
+    optional string consumption_order = 10;
+    optional int32 media_type_enum = 11;
+    repeated string copyright = 12;
+    optional string trailer_uri = 13;
+    optional bool is_music_and_talk = 14;
+    repeated Extension extension = 15;
+    optional bool is_book = 16;
+}

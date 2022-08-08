@@ -1,0 +1,14 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message WindowSize {
+    optional int64 width = 1;
+    optional int64 height = 2;
+    optional int64 mode = 3;
+    optional int64 duration = 4;
+}

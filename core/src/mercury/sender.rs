@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 
-use super::*;
+use super::{MercuryFuture, MercuryManager, MercuryResponse};
+
+use crate::Error;
 
 pub struct MercurySender {
     mercury: MercuryManager,
@@ -23,12 +25,13 @@ impl MercurySender {
         self.buffered_future.is_none() && self.pending.is_empty()
     }
 
-    pub fn send(&mut self, item: Vec<u8>) {
-        let task = self.mercury.send(self.uri.clone(), item);
+    pub fn send(&mut self, item: Vec<u8>) -> Result<(), Error> {
+        let task = self.mercury.send(self.uri.clone(), item)?;
         self.pending.push_back(task);
+        Ok(())
     }
 
-    pub async fn flush(&mut self) -> Result<(), MercuryError> {
+    pub async fn flush(&mut self) -> Result<(), Error> {
         if self.buffered_future.is_none() {
             self.buffered_future = self.pending.pop_front();
         }

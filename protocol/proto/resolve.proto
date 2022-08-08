@@ -1,0 +1,116 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.remote_config.ucs.proto;
+
+import "property_definition.proto";
+
+option optimize_for = CODE_SIZE;
+
+message ResolveRequest {
+    string property_set_id = 1;
+    Fetch fetch_type = 2;
+    Context context = 11;
+    
+    oneof resolution_context {
+        BackendContext backend_context = 12 [deprecated = true];
+    }
+    
+    //reserved 4, 5, "custom_context", "projection";
+}
+
+message ResolveResponse {
+    Configuration configuration = 1;
+}
+
+message Configuration {
+    string configuration_assignment_id = 1;
+    int64 fetch_time_millis = 2;
+    
+    repeated AssignedValue assigned_values = 3;
+    message AssignedValue {
+        PropertyDefinition.Identifier property_id = 1;
+        
+        Metadata metadata = 2;
+        message Metadata {
+            int64 policy_id = 1;
+            string external_realm = 2;
+            int64 external_realm_id = 3;
+        }
+        
+        oneof structured_value {
+            BoolValue bool_value = 3;
+            IntValue int_value = 4;
+            EnumValue enum_value = 5;
+        }
+        
+        message BoolValue {
+            bool value = 1;
+        }
+        
+        message IntValue {
+            int32 value = 1;
+        }
+        
+        message EnumValue {
+            string value = 1;
+        }
+    }
+}
+
+message Fetch {
+    Type type = 1;
+    enum Type {
+        BLOCKING = 0;
+        BACKGROUND_SYNC = 1;
+        ASYNC = 2;
+        PUSH_INITIATED = 3;
+        RECONNECT = 4;
+    }
+}
+
+message Context {
+    repeated ContextEntry context = 1;
+    message ContextEntry {
+        string value = 10;
+        
+        oneof context {
+            DynamicContext.KnownContext known_context = 1;
+        }
+    }
+}
+
+message BackendContext {
+    string system = 1 [deprecated = true];
+    string service_name = 2 [deprecated = true];
+    
+    StaticContext static_context = 3;
+    message StaticContext {
+        string system = 1;
+        string service_name = 2;
+    }
+    
+    DynamicContext dynamic_context = 4;
+    
+    SurfaceMetadata surface_metadata = 10;
+    message SurfaceMetadata {
+        string backend_sdk_version = 1;
+    }
+}
+
+message DynamicContext {
+    repeated ContextDefinition context_definition = 1;
+    message ContextDefinition {
+        oneof context {
+            KnownContext known_context = 1;
+        }
+    }
+    
+    enum KnownContext {
+        KNOWN_CONTEXT_INVALID = 0;
+        KNOWN_CONTEXT_USER_ID = 1;
+        KNOWN_CONTEXT_INSTALLATION_ID = 2;
+        KNOWN_CONTEXT_VERSION = 3;
+    }
+}

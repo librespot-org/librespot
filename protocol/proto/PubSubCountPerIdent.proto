@@ -1,0 +1,13 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message PubSubCountPerIdent {
+    optional string ident_filter = 1;
+    optional int32 no_of_messages_received = 2;
+    optional int32 no_of_failed_conversions = 3;
+}

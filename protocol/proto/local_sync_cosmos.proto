@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.local_sync_cosmos.proto;
+
+option optimize_for = CODE_SIZE;
+
+message GetDevicesResponse {
+    repeated Device devices = 1;
+    message Device {
+        string name = 1;
+        string id = 2;
+        string endpoint = 3;
+    }
+}

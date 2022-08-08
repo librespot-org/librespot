@@ -1,4 +1,1 @@
-# max_width = 105
-reorder_imports = true
-reorder_modules = true
-edition = "2018"
+edition = "2021"

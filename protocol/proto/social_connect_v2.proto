@@ -1,0 +1,77 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto3";
+
+package socialconnect;
+
+option optimize_for = CODE_SIZE;
+
+message Session {
+    int64 timestamp = 1;
+    string session_id = 2;
+    string join_session_token = 3;
+    string join_session_url = 4;
+    string session_owner_id = 5;
+    repeated SessionMember session_members = 6;
+    string join_session_uri = 7;
+    bool is_session_owner = 9;
+    bool is_listening = 10;
+    bool is_controlling = 11;
+    bool is_discoverable = 12;
+    SessionType initial_session_type = 13;
+    
+    oneof _host_active_device_id {
+        string host_active_device_id = 14;
+    }
+    
+    reserved 8;
+}
+
+message SessionMember {
+    int64 timestamp = 1;
+    string id = 2;
+    string username = 3;
+    string display_name = 4;
+    string image_url = 5;
+    string large_image_url = 6;
+    bool is_listening = 7;
+    bool is_controlling = 8;
+}
+
+message SessionUpdate {
+    Session session = 1;
+    SessionUpdateReason reason = 2;
+    repeated SessionMember updated_session_members = 3;
+}
+
+message DevicesExposure {
+    int64 timestamp = 1;
+    map<string, DeviceExposureStatus> devices_exposure = 2;
+}
+
+enum SessionType {
+    UNKNOWN_SESSION_TYPE = 0;
+    IN_PERSON = 3;
+    REMOTE = 4;
+    REMOTE_V2 = 5;
+}
+
+enum SessionUpdateReason {
+    UNKNOWN_UPDATE_TYPE = 0;
+    NEW_SESSION = 1;
+    USER_JOINED = 2;
+    USER_LEFT = 3;
+    SESSION_DELETED = 4;
+    YOU_LEFT = 5;
+    YOU_WERE_KICKED = 6;
+    YOU_JOINED = 7;
+    PARTICIPANT_PROMOTED_TO_HOST = 8;
+    DISCOVERABILITY_CHANGED = 9;
+    USER_KICKED = 10;
+}
+
+enum DeviceExposureStatus {
+    NOT_EXPOSABLE = 0;
+    NOT_EXPOSED = 1;
+    EXPOSED = 2;
+}

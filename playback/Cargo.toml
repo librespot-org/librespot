@@ -1,32 +1,34 @@
 [package]
 name = "librespot-playback"
-version = "0.4.1"
+version = "0.5.0-dev"
+rust-version = "1.61"
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
 description = "The audio playback logic for librespot"
 license = "MIT"
 repository = "https://github.com/librespot-org/librespot"
-edition = "2018"
+edition = "2021"
 
 [dependencies.librespot-audio]
 path = "../audio"
-version = "0.4.1"
+version = "0.5.0-dev"
+
 [dependencies.librespot-core]
 path = "../core"
-version = "0.4.1"
+version = "0.5.0-dev"
+
 [dependencies.librespot-metadata]
 path = "../metadata"
-version = "0.4.1"
+version = "0.5.0-dev"
 
 [dependencies]
-futures-executor = "0.3"
-futures-util = { version = "0.3", default_features = false, features = ["alloc"] }
+byteorder = "1"
+futures-util = "0.3"
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
-byteorder = "1.4"
-shell-words = "1.0.0"
-tokio = { version = "1", features = ["sync", "parking_lot"] }
-zerocopy = { version = "0.6" }
-thiserror = { version = "1" }
+shell-words = "1.1"
+thiserror = "1"
+tokio = { version = "1", features = ["parking_lot", "rt", "rt-multi-thread", "sync"] }
+zerocopy = "0.6"
 
 # Backends
 alsa            = { version = "0.6", optional = true }
@@ -44,9 +46,11 @@ glib            = { version = "0.15", optional = true }
 rodio           = { version = "0.15", optional = true, default-features = false }
 cpal            = { version = "0.13", optional = true }
 
-# Decoder
-lewton = "0.10"
-ogg = "0.8"
+# Container and audio decoder
+symphonia = { version = "0.5", default-features = false, features = ["mp3", "ogg", "vorbis"] }
+
+# Legacy Ogg container decoder for the passthrough decoder
+ogg = { version = "0.8", optional = true }
 
 # Dithering
 rand = { version = "0.8", features = ["small_rng"] }
@@ -61,3 +65,5 @@ rodio-backend = ["rodio", "cpal"]
 rodiojack-backend = ["rodio", "cpal/jack"]
 sdl-backend = ["sdl2"]
 gstreamer-backend = ["gstreamer", "gstreamer-app", "gstreamer-audio", "glib"]
+
+passthrough-decoder = ["ogg"]

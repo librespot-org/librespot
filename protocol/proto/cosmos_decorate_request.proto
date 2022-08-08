@@ -1,0 +1,71 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.collection_cosmos.decorate_request.proto;
+
+import "collection/album_collection_state.proto";
+import "collection/artist_collection_state.proto";
+import "collection/episode_collection_state.proto";
+import "collection/show_collection_state.proto";
+import "collection/track_collection_state.proto";
+import "played_state/episode_played_state.proto";
+import "played_state/show_played_state.proto";
+import "played_state/track_played_state.proto";
+import "sync/album_sync_state.proto";
+import "sync/artist_sync_state.proto";
+import "sync/episode_sync_state.proto";
+import "sync/track_sync_state.proto";
+import "metadata/album_metadata.proto";
+import "metadata/artist_metadata.proto";
+import "metadata/episode_metadata.proto";
+import "metadata/show_metadata.proto";
+import "metadata/track_metadata.proto";
+
+option objc_class_prefix = "SPTCollectionCosmosDecorate";
+option optimize_for = CODE_SIZE;
+
+message Album {
+    optional cosmos_util.proto.AlbumMetadata album_metadata = 1;
+    optional cosmos_util.proto.AlbumCollectionState album_collection_state = 2;
+    optional cosmos_util.proto.AlbumSyncState album_offline_state = 3;
+    optional string link = 4;
+}
+
+message Artist {
+    optional cosmos_util.proto.ArtistMetadata artist_metadata = 1;
+    optional cosmos_util.proto.ArtistCollectionState artist_collection_state = 2;
+    optional cosmos_util.proto.ArtistSyncState artist_offline_state = 3;
+    optional string link = 4;
+}
+
+message Episode {
+    optional cosmos_util.proto.EpisodeMetadata episode_metadata = 1;
+    optional cosmos_util.proto.EpisodeCollectionState episode_collection_state = 2;
+    optional cosmos_util.proto.EpisodeSyncState episode_offline_state = 3;
+    optional cosmos_util.proto.EpisodePlayState episode_play_state = 4;
+    optional string link = 5;
+}
+
+message Show {
+    optional cosmos_util.proto.ShowMetadata show_metadata = 1;
+    optional cosmos_util.proto.ShowCollectionState show_collection_state = 2;
+    optional cosmos_util.proto.ShowPlayState show_play_state = 3;
+    optional string link = 4;
+}
+
+message Track {
+    optional cosmos_util.proto.TrackMetadata track_metadata = 1;
+    optional cosmos_util.proto.TrackSyncState track_offline_state = 2;
+    optional cosmos_util.proto.TrackPlayState track_play_state = 3;
+    optional cosmos_util.proto.TrackCollectionState track_collection_state = 4;
+    optional string link = 5;
+}
+
+message Response {
+    repeated Show show = 1;
+    repeated Episode episode = 2;
+    repeated Album album = 3;
+    repeated Artist artist = 4;
+    repeated Track track = 5;
+}

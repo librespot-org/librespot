@@ -1,0 +1,24 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.context_track_color;
+
+message ColorResult {
+    Color color_raw = 1;
+    Color color_light = 2;
+    Color color_dark = 3;
+    Status status = 5;
+}
+
+message Color {
+    int32 rgb = 1;
+    bool is_fallback = 2;
+}
+
+enum Status {
+    OK = 0;
+    IN_PROGRESS = 1;
+    INVALID_URL = 2;
+    INTERNAL = 3;
+}

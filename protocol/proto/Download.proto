@@ -1,0 +1,55 @@
+// Extracted from: Spotify 1.1.73.517 (macOS)
+
+syntax = "proto2";
+
+package spotify.event_sender.proto;
+
+option optimize_for = CODE_SIZE;
+
+message Download {
+    optional bytes file_id = 1;
+    optional bytes playback_id = 2;
+    optional int64 bytes_from_ap = 3;
+    optional int64 waste_from_ap = 4;
+    optional int64 reqs_from_ap = 5;
+    optional int64 error_from_ap = 6;
+    optional int64 bytes_from_cdn = 7;
+    optional int64 waste_from_cdn = 8;
+    optional int64 bytes_from_cache = 9;
+    optional int64 content_size = 10;
+    optional string content_type = 11;
+    optional int64 ap_initial_latency = 12;
+    optional int64 ap_max_latency = 13;
+    optional int64 ap_min_latency = 14;
+    optional double ap_avg_latency = 15;
+    optional int64 ap_median_latency = 16;
+    optional double ap_avg_bw = 17;
+    optional int64 cdn_initial_latency = 18;
+    optional int64 cdn_max_latency = 19;
+    optional int64 cdn_min_latency = 20;
+    optional double cdn_avg_latency = 21;
+    optional int64 cdn_median_latency = 22;
+    optional int64 cdn_64k_initial_latency = 23;
+    optional int64 cdn_64k_max_latency = 24;
+    optional int64 cdn_64k_min_latency = 25;
+    optional double cdn_64k_avg_latency = 26;
+    optional int64 cdn_64k_median_latency = 27;
+    optional double cdn_avg_bw = 28;
+    optional double cdn_initial_bw_estimate = 29;
+    optional string cdn_uri_scheme = 30;
+    optional string cdn_domain = 31;
+    optional string cdn_socket_reuse = 32;
+    optional int64 num_cache_error = 33;
+    optional int64 bytes_from_carrier = 34;
+    optional int64 bytes_from_unknown = 35;
+    optional int64 bytes_from_wifi = 36;
+    optional int64 bytes_from_ethernet = 37;
+    optional string request_type = 38;
+    optional int64 total_time = 39;
+    optional int64 bitrate = 40;
+    optional int64 reqs_from_cdn = 41;
+    optional int64 error_from_cdn = 42;
+    optional string file_origin = 43;
+    optional string initial_disk_state = 44;
+    optional bool locked = 45;
+}

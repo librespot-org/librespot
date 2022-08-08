@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.1.61.583 (Windows)
+
+syntax = "proto3";
+
+package spotify.download.proto;
+
+option optimize_for = CODE_SIZE;
+
+message StorageResolveResponse {
+    Result result = 1;
+    enum Result {
+        CDN = 0;
+        STORAGE = 1;
+        RESTRICTED = 3;
+    }
+    
+    repeated string cdnurl = 2;
+    bytes fileid = 4;
+}
