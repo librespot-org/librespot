@@ -61,7 +61,7 @@ pub struct Player {
     play_request_id_generator: SeqGenerator<u64>,
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SinkStatus {
     Running,
     Closed,
