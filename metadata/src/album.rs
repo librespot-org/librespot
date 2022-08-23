@@ -97,7 +97,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Album {
             date: album.get_date().try_into()?,
             popularity: album.get_popularity(),
             genres: album.get_genre().to_vec(),
-            covers: album.get_cover().into(),
+            covers: album.get_cover_group().into(),
             external_ids: album.get_external_id().into(),
             discs: album.get_disc().try_into()?,
             reviews: album.get_review().to_vec(),

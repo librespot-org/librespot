@@ -73,6 +73,9 @@ pub struct UserData {
 #[derive(Debug, Clone, Default)]
 struct SessionData {
     client_id: String,
+    client_name: String,
+    client_brand_name: String,
+    client_model_name: String,
     connection_id: String,
     time_delta: i64,
     invalid: bool,
@@ -383,6 +386,30 @@ impl Session {
         self.0.data.write().client_id = client_id.to_owned();
     }
 
+    pub fn client_name(&self) -> String {
+        self.0.data.read().client_name.clone()
+    }
+
+    pub fn set_client_name(&self, client_name: &str) {
+        self.0.data.write().client_name = client_name.to_owned();
+    }
+
+    pub fn client_brand_name(&self) -> String {
+        self.0.data.read().client_brand_name.clone()
+    }
+
+    pub fn set_client_brand_name(&self, client_brand_name: &str) {
+        self.0.data.write().client_brand_name = client_brand_name.to_owned();
+    }
+
+    pub fn client_model_name(&self) -> String {
+        self.0.data.read().client_model_name.clone()
+    }
+
+    pub fn set_client_model_name(&self, client_model_name: &str) {
+        self.0.data.write().client_model_name = client_model_name.to_owned();
+    }
+
     pub fn connection_id(&self) -> String {
         self.0.data.read().connection_id.clone()
     }
@@ -401,6 +428,20 @@ impl Session {
 
     pub fn country(&self) -> String {
         self.0.data.read().user_data.country.clone()
+    }
+
+    pub fn filter_explicit_content(&self) -> bool {
+        match self.get_user_attribute("filter-explicit-content") {
+            Some(value) => matches!(&*value, "1"),
+            None => false,
+        }
+    }
+
+    pub fn autoplay(&self) -> bool {
+        match self.get_user_attribute("autoplay") {
+            Some(value) => matches!(&*value, "1"),
+            None => false,
+        }
     }
 
     pub fn set_user_attribute(&self, key: &str, value: &str) -> Option<String> {

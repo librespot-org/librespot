@@ -44,6 +44,8 @@ use crate::{
 pub enum SpircError {
     #[error("response payload empty")]
     NoData,
+    #[error("playback of local files is not supported")]
+    UnsupportedLocalPlayBack,
     #[error("message addressed at another ident: {0}")]
     Ident(String),
     #[error("message pushed for another URI")]
@@ -52,10 +54,10 @@ pub enum SpircError {
 
 impl From<SpircError> for Error {
     fn from(err: SpircError) -> Self {
+        use SpircError::*;
         match err {
-            SpircError::NoData => Error::unavailable(err),
-            SpircError::Ident(_) => Error::aborted(err),
-            SpircError::InvalidUri(_) => Error::aborted(err),
+            NoData | UnsupportedLocalPlayBack => Error::unavailable(err),
+            Ident(_) | InvalidUri(_) => Error::aborted(err),
         }
     }
 }
@@ -113,6 +115,7 @@ struct SpircTask {
 
 static SPIRC_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Debug)]
 pub enum SpircCommand {
     Play,
     PlayPause,
@@ -122,7 +125,11 @@ pub enum SpircCommand {
     VolumeUp,
     VolumeDown,
     Shutdown,
-    Shuffle,
+    Shuffle(bool),
+    Repeat(bool),
+    Disconnect,
+    SetPosition(u32),
+    SetVolume(u16),
 }
 
 const CONTEXT_TRACKS_HISTORY: usize = 10;
@@ -243,10 +250,8 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
                 msg.set_typ(protocol::spirc::CapabilityType::kSupportedTypes);
                 {
                     let repeated = msg.mut_stringValue();
-                    repeated.push(::std::convert::Into::into("audio/local"));
                     repeated.push(::std::convert::Into::into("audio/track"));
                     repeated.push(::std::convert::Into::into("audio/episode"));
-                    repeated.push(::std::convert::Into::into("local"));
                     repeated.push(::std::convert::Into::into("track"))
                 };
                 msg
@@ -416,8 +421,20 @@ impl Spirc {
     pub fn shutdown(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Shutdown)?)
     }
-    pub fn shuffle(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::Shuffle)?)
+    pub fn shuffle(&self, shuffle: bool) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Shuffle(shuffle))?)
+    }
+    pub fn repeat(&self, repeat: bool) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Repeat(repeat))?)
+    }
+    pub fn set_volume(&self, volume: u16) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::SetVolume(volume))?)
+    }
+    pub fn set_position_ms(&self, position_ms: u32) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::SetPosition(position_ms))?)
+    }
+    pub fn disconnect(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Disconnect)?)
     }
 }
 
@@ -552,76 +569,71 @@ impl SpircTask {
     }
 
     fn handle_command(&mut self, cmd: SpircCommand) -> Result<(), Error> {
-        let active = self.device.get_is_active();
-        match cmd {
-            SpircCommand::Play => {
-                if active {
+        if matches!(cmd, SpircCommand::Shutdown) {
+            trace!("Received SpircCommand::Shutdown");
+            CommandSender::new(self, MessageType::kMessageTypeGoodbye).send()?;
+            self.handle_disconnect();
+            self.shutdown = true;
+            if let Some(rx) = self.commands.as_mut() {
+                rx.close()
+            }
+            Ok(())
+        } else if self.device.get_is_active() {
+            trace!("Received SpircCommand::{:?}", cmd);
+            match cmd {
+                SpircCommand::Play => {
                     self.handle_play();
                     self.notify(None)
-                } else {
-                    CommandSender::new(self, MessageType::kMessageTypePlay).send()
                 }
-            }
-            SpircCommand::PlayPause => {
-                if active {
+                SpircCommand::PlayPause => {
                     self.handle_play_pause();
                     self.notify(None)
-                } else {
-                    CommandSender::new(self, MessageType::kMessageTypePlayPause).send()
                 }
-            }
-            SpircCommand::Pause => {
-                if active {
+                SpircCommand::Pause => {
                     self.handle_pause();
                     self.notify(None)
-                } else {
-                    CommandSender::new(self, MessageType::kMessageTypePause).send()
                 }
-            }
-            SpircCommand::Prev => {
-                if active {
+                SpircCommand::Prev => {
                     self.handle_prev();
                     self.notify(None)
-                } else {
-                    CommandSender::new(self, MessageType::kMessageTypePrev).send()
                 }
-            }
-            SpircCommand::Next => {
-                if active {
+                SpircCommand::Next => {
                     self.handle_next();
                     self.notify(None)
-                } else {
-                    CommandSender::new(self, MessageType::kMessageTypeNext).send()
                 }
-            }
-            SpircCommand::VolumeUp => {
-                if active {
+                SpircCommand::VolumeUp => {
                     self.handle_volume_up();
                     self.notify(None)
-                } else {
-                    CommandSender::new(self, MessageType::kMessageTypeVolumeUp).send()
                 }
-            }
-            SpircCommand::VolumeDown => {
-                if active {
+                SpircCommand::VolumeDown => {
                     self.handle_volume_down();
                     self.notify(None)
-                } else {
-                    CommandSender::new(self, MessageType::kMessageTypeVolumeDown).send()
                 }
-            }
-            SpircCommand::Shutdown => {
-                CommandSender::new(self, MessageType::kMessageTypeGoodbye).send()?;
-                self.player.stop();
-                self.shutdown = true;
-                if let Some(rx) = self.commands.as_mut() {
-                    rx.close()
+                SpircCommand::Disconnect => {
+                    self.handle_disconnect();
+                    self.notify(None)
                 }
-                Ok(())
+                SpircCommand::Shuffle(shuffle) => {
+                    self.state.set_shuffle(shuffle);
+                    self.notify(None)
+                }
+                SpircCommand::Repeat(repeat) => {
+                    self.state.set_repeat(repeat);
+                    self.notify(None)
+                }
+                SpircCommand::SetPosition(position) => {
+                    self.handle_seek(position);
+                    self.notify(None)
+                }
+                SpircCommand::SetVolume(volume) => {
+                    self.set_volume(volume);
+                    self.notify(None)
+                }
+                _ => Ok(()),
             }
-            SpircCommand::Shuffle => {
-                CommandSender::new(self, MessageType::kMessageTypeShuffle).send()
-            }
+        } else {
+            warn!("SpircCommand::{:?} will be ignored while Not Active", cmd);
+            Ok(())
         }
     }
 
@@ -635,11 +647,28 @@ impl SpircTask {
                 match event {
                     PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track(),
                     PlayerEvent::Loading { .. } => {
-                        trace!("==> kPlayStatusLoading");
-                        self.state.set_status(PlayStatus::kPlayStatusLoading);
+                        match self.play_status {
+                            SpircPlayStatus::LoadingPlay { position_ms } => {
+                                self.update_state_position(position_ms);
+                                self.state.set_status(PlayStatus::kPlayStatusPlay);
+                                trace!("==> kPlayStatusPlay");
+                            }
+                            SpircPlayStatus::LoadingPause { position_ms } => {
+                                self.update_state_position(position_ms);
+                                self.state.set_status(PlayStatus::kPlayStatusPause);
+                                trace!("==> kPlayStatusPause");
+                            }
+                            _ => {
+                                self.state.set_status(PlayStatus::kPlayStatusLoading);
+                                self.update_state_position(0);
+                                trace!("==> kPlayStatusLoading");
+                            }
+                        }
                         self.notify(None)
                     }
-                    PlayerEvent::Playing { position_ms, .. } => {
+                    PlayerEvent::Playing { position_ms, .. }
+                    | PlayerEvent::PositionCorrection { position_ms, .. }
+                    | PlayerEvent::Seeked { position_ms, .. } => {
                         trace!("==> kPlayStatusPlay");
                         let new_nominal_start_time = self.now_ms() - position_ms as i64;
                         match self.play_status {
@@ -674,17 +703,14 @@ impl SpircTask {
                     } => {
                         trace!("==> kPlayStatusPause");
                         match self.play_status {
-                            SpircPlayStatus::Paused {
-                                ref mut position_ms,
-                                ..
-                            } => {
-                                if *position_ms != new_position_ms {
-                                    *position_ms = new_position_ms;
-                                    self.update_state_position(new_position_ms);
-                                    self.notify(None)
-                                } else {
-                                    Ok(())
-                                }
+                            SpircPlayStatus::Paused { .. } | SpircPlayStatus::Playing { .. } => {
+                                self.state.set_status(PlayStatus::kPlayStatusPause);
+                                self.update_state_position(new_position_ms);
+                                self.play_status = SpircPlayStatus::Paused {
+                                    position_ms: new_position_ms,
+                                    preloading_of_next_track_triggered: false,
+                                };
+                                self.notify(None)
                             }
                             SpircPlayStatus::LoadingPlay { .. }
                             | SpircPlayStatus::LoadingPause { .. } => {
@@ -762,7 +788,13 @@ impl SpircTask {
                 );
 
                 if key == "filter-explicit-content" && new_value == "1" {
-                    self.player.skip_explicit_content();
+                    self.player
+                        .emit_filter_explicit_content_changed_event(matches!(new_value, "1"));
+                }
+
+                if key == "autoplay" && old_value != new_value {
+                    self.player
+                        .emit_auto_play_changed_event(matches!(new_value, "1"));
                 }
             } else {
                 trace!(
@@ -785,11 +817,29 @@ impl SpircTask {
             return Err(SpircError::Ident(ident.to_string()).into());
         }
 
+        let old_client_id = self.session.client_id();
+
         for entry in update.get_device_state().get_metadata().iter() {
-            if entry.get_field_type() == "client_id" {
-                self.session.set_client_id(entry.get_metadata());
-                break;
+            match entry.get_field_type() {
+                "client-id" => self.session.set_client_id(entry.get_metadata()),
+                "brand_display_name" => self.session.set_client_brand_name(entry.get_metadata()),
+                "model_display_name" => self.session.set_client_model_name(entry.get_metadata()),
+                _ => (),
             }
+        }
+
+        self.session
+            .set_client_name(update.get_device_state().get_name());
+
+        let new_client_id = self.session.client_id();
+
+        if self.device.get_is_active() && new_client_id != old_client_id {
+            self.player.emit_session_client_changed_event(
+                new_client_id,
+                self.session.client_name(),
+                self.session.client_brand_name(),
+                self.session.client_model_name(),
+            );
         }
 
         match update.get_typ() {
@@ -800,6 +850,40 @@ impl SpircTask {
                     let now = self.now_ms();
                     self.device.set_is_active(true);
                     self.device.set_became_active_at(now);
+                    self.player.emit_session_connected_event(
+                        self.session.connection_id(),
+                        self.session.username(),
+                    );
+                    self.player.emit_session_client_changed_event(
+                        self.session.client_id(),
+                        self.session.client_name(),
+                        self.session.client_brand_name(),
+                        self.session.client_model_name(),
+                    );
+
+                    self.player
+                        .emit_volume_changed_event(self.device.get_volume() as u16);
+
+                    self.player
+                        .emit_auto_play_changed_event(self.session.autoplay());
+
+                    self.player.emit_filter_explicit_content_changed_event(
+                        self.session.filter_explicit_content(),
+                    );
+
+                    self.player
+                        .emit_shuffle_changed_event(self.state.get_shuffle());
+
+                    self.player
+                        .emit_repeat_changed_event(self.state.get_repeat());
+                }
+
+                let context_uri = update.get_state().get_context_uri().to_owned();
+
+                // completely ignore local playback.
+                if context_uri.starts_with("spotify:local-files") {
+                    self.notify(None)?;
+                    return Err(SpircError::UnsupportedLocalPlayBack.into());
                 }
 
                 self.update_tracks(&update);
@@ -852,12 +936,17 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeRepeat => {
-                self.state.set_repeat(update.get_state().get_repeat());
+                let repeat = update.get_state().get_repeat();
+                self.state.set_repeat(repeat);
+
+                self.player.emit_repeat_changed_event(repeat);
+
                 self.notify(None)
             }
 
             MessageType::kMessageTypeShuffle => {
-                self.state.set_shuffle(update.get_state().get_shuffle());
+                let shuffle = update.get_state().get_shuffle();
+                self.state.set_shuffle(shuffle);
                 if self.state.get_shuffle() {
                     let current_index = self.state.get_playing_track_index();
                     let tracks = self.state.mut_track();
@@ -873,6 +962,9 @@ impl SpircTask {
                     let context = self.state.get_context_uri();
                     debug!("{:?}", context);
                 }
+
+                self.player.emit_shuffle_changed_event(shuffle);
+
                 self.notify(None)
             }
 
@@ -882,6 +974,14 @@ impl SpircTask {
             }
 
             MessageType::kMessageTypeReplace => {
+                let context_uri = update.get_state().get_context_uri().to_owned();
+
+                // completely ignore local playback.
+                if context_uri.starts_with("spotify:local-files") {
+                    self.notify(None)?;
+                    return Err(SpircError::UnsupportedLocalPlayBack.into());
+                }
+
                 self.update_tracks(&update);
 
                 if let SpircPlayStatus::Playing {
@@ -915,14 +1015,21 @@ impl SpircTask {
                     && self.device.get_became_active_at()
                         <= update.get_device_state().get_became_active_at()
                 {
-                    self.device.set_is_active(false);
-                    self.handle_stop();
+                    self.handle_disconnect();
                 }
-                Ok(())
+                self.notify(None)
             }
 
             _ => Ok(()),
         }
+    }
+
+    fn handle_disconnect(&mut self) {
+        self.device.set_is_active(false);
+        self.handle_stop();
+
+        self.player
+            .emit_session_disconnected_event(self.session.connection_id(), self.session.username());
     }
 
     fn handle_stop(&mut self) {
@@ -1100,17 +1207,7 @@ impl SpircTask {
         }
 
         if new_index >= tracks_len {
-            let autoplay = self
-                .session
-                .get_user_attribute("autoplay")
-                .unwrap_or_else(|| {
-                    warn!(
-                        "Unable to get autoplay user attribute. Continuing with autoplay disabled."
-                    );
-                    "0".into()
-                });
-
-            if autoplay == "1" {
+            if self.session.autoplay() {
                 // Extend the playlist
                 debug!("Extending playlist <{}>", context_uri);
                 self.update_tracks_from_context();
@@ -1282,12 +1379,10 @@ impl SpircTask {
             || context_uri.starts_with("spotify:dailymix:")
         {
             self.context_fut = self.resolve_station(&context_uri);
-        } else if let Some(autoplay) = self.session.get_user_attribute("autoplay") {
-            if &autoplay == "1" {
-                info!("Fetching autoplay context uri");
-                // Get autoplay_station_uri for regular playlists
-                self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
-            }
+        } else if self.session.autoplay() {
+            info!("Fetching autoplay context uri");
+            // Get autoplay_station_uri for regular playlists
+            self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
         }
 
         self.player
@@ -1422,12 +1517,18 @@ impl SpircTask {
     }
 
     fn set_volume(&mut self, volume: u16) {
-        self.device.set_volume(volume as u32);
-        self.mixer.set_volume(volume);
-        if let Some(cache) = self.session.cache() {
-            cache.save_volume(volume)
+        let old_volume = self.device.get_volume();
+        let new_volume = volume as u32;
+        if old_volume != new_volume {
+            self.device.set_volume(new_volume);
+            self.mixer.set_volume(volume);
+            if let Some(cache) = self.session.cache() {
+                cache.save_volume(volume)
+            }
+            if self.device.get_is_active() {
+                self.player.emit_volume_changed_event(volume);
+            }
         }
-        self.player.emit_volume_set_event(volume);
     }
 }
 

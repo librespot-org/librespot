@@ -13,7 +13,6 @@ use futures_util::StreamExt;
 use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
-use tokio::sync::mpsc::UnboundedReceiver;
 use url::Url;
 
 use librespot::{
@@ -29,7 +28,7 @@ use librespot::{
         },
         dither,
         mixer::{self, MixerConfig, MixerFn},
-        player::{coefficient_to_duration, duration_to_coefficient, Player, PlayerEvent},
+        player::{coefficient_to_duration, duration_to_coefficient, Player},
     },
 };
 
@@ -37,7 +36,7 @@ use librespot::{
 use librespot::playback::mixer::alsamixer::AlsaMixer;
 
 mod player_event_handler;
-use player_event_handler::{emit_sink_event, run_program_on_events};
+use player_event_handler::{run_program_on_sink_events, EventHandler};
 
 fn device_id(name: &str) -> String {
     hex::encode(Sha1::digest(name.as_bytes()))
@@ -1598,10 +1597,10 @@ async fn main() {
     let mut last_credentials = None;
     let mut spirc: Option<Spirc> = None;
     let mut spirc_task: Option<Pin<_>> = None;
-    let mut player_event_channel: Option<UnboundedReceiver<PlayerEvent>> = None;
     let mut auto_connect_times: Vec<Instant> = vec![];
     let mut discovery = None;
     let mut connecting = false;
+    let mut _event_handler: Option<EventHandler> = None;
 
     let session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
@@ -1669,32 +1668,21 @@ async fn main() {
                 let format = setup.format;
                 let backend = setup.backend;
                 let device = setup.device.clone();
-                let (player, event_channel) =
-                    Player::new(player_config, session.clone(), soft_volume, move || {
-                        (backend)(device, format)
-                    });
+                let player = Player::new(player_config, session.clone(), soft_volume, move || {
+                    (backend)(device, format)
+                });
 
-                if setup.emit_sink_events {
-                    if let Some(player_event_program) = setup.player_event_program.clone() {
+                if let Some(player_event_program) = setup.player_event_program.clone() {
+                    _event_handler = Some(EventHandler::new(player.get_player_event_channel(), &player_event_program));
+
+                    if setup.emit_sink_events {
                         player.set_sink_event_callback(Some(Box::new(move |sink_status| {
-                            match emit_sink_event(sink_status, &player_event_program) {
-                                Ok(e) if e.success() => (),
-                                Ok(e) => {
-                                    if let Some(code) = e.code() {
-                                        warn!("Sink event program returned exit code {}", code);
-                                    } else {
-                                        warn!("Sink event program returned failure");
-                                    }
-                                },
-                                Err(e) => {
-                                    warn!("Emitting sink event failed: {}", e);
-                                },
-                            }
+                            run_program_on_sink_events(sink_status, &player_event_program)
                         })));
                     }
                 };
 
-                let (spirc_, spirc_task_) = match Spirc::new(connect_config, session.clone(), last_credentials.clone().unwrap(), player, mixer).await {
+                let (spirc_, spirc_task_) = match Spirc::new(connect_config, session.clone(), last_credentials.clone().unwrap_or_default(), player, mixer).await {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
                     Err(e) => {
                         error!("could not initialize spirc: {}", e);
@@ -1703,7 +1691,6 @@ async fn main() {
                 };
                 spirc = Some(spirc_);
                 spirc_task = Some(Box::pin(spirc_task_));
-                player_event_channel = Some(event_channel);
 
                 connecting = false;
             },
@@ -1730,41 +1717,6 @@ async fn main() {
                         error!("Spirc shut down too often. Not reconnecting automatically.");
                         exit(1);
                     },
-                }
-            },
-            event = async {
-                match player_event_channel.as_mut() {
-                    Some(p) => p.recv().await,
-                    _ => None
-                }
-            }, if player_event_channel.is_some() => match event {
-                Some(event) => {
-                    if let Some(program) = &setup.player_event_program {
-                        if let Some(child) = run_program_on_events(event, program) {
-                            if let Ok(mut child) = child {
-                                tokio::spawn(async move {
-                                    match child.wait().await {
-                                        Ok(e) if e.success() => (),
-                                        Ok(e) => {
-                                            if let Some(code) = e.code() {
-                                                warn!("On event program returned exit code {}", code);
-                                            } else {
-                                                warn!("On event program returned failure");
-                                            }
-                                        },
-                                        Err(e) => {
-                                            warn!("On event program failed: {}", e);
-                                        },
-                                    }
-                                });
-                            } else {
-                                warn!("On event program failed to start");
-                            }
-                        }
-                    }
-                },
-                None => {
-                    player_event_channel = None;
                 }
             },
             _ = tokio::signal::ctrl_c() => {
