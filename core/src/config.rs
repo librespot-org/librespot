@@ -2,7 +2,7 @@ use std::{fmt, path::PathBuf, str::FromStr};
 
 use url::Url;
 
-pub const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
+const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 
 #[derive(Clone, Debug)]
 pub struct SessionConfig {

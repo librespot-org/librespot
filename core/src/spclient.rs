@@ -19,7 +19,6 @@ use thiserror::Error;
 use crate::{
     apresolve::SocketAddress,
     cdn_url::CdnUrl,
-    config::KEYMASTER_CLIENT_ID,
     error::ErrorKind,
     protocol::{
         canvaz::EntityCanvazRequest,
@@ -120,7 +119,7 @@ impl SpClient {
         message.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
 
         let client_data = message.mut_client_data();
-        client_data.set_client_id(KEYMASTER_CLIENT_ID.to_string());
+        client_data.set_client_id(self.session().client_id());
         client_data.set_client_version(version::SEMVER.to_string());
 
         let connectivity_data = client_data.mut_connectivity_sdk_data();
