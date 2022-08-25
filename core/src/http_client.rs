@@ -15,7 +15,7 @@ use thiserror::Error;
 use url::Url;
 
 use crate::{
-    version::{FALLBACK_USER_AGENT, SPOTIFY_MOBILE_VERSION, SPOTIFY_VERSION, VERSION_STRING},
+    version::{spotify_version, FALLBACK_USER_AGENT, VERSION_STRING},
     Error,
 };
 
@@ -82,11 +82,6 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub fn new(proxy_url: Option<&Url>) -> Self {
-        let spotify_version = match OS {
-            "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
-            _ => SPOTIFY_VERSION.to_string(),
-        };
-
         let spotify_platform = match OS {
             "android" => "Android/31",
             "ios" => "iOS/15.2.1",
@@ -97,7 +92,9 @@ impl HttpClient {
 
         let user_agent_str = &format!(
             "Spotify/{} {} ({})",
-            spotify_version, spotify_platform, VERSION_STRING
+            spotify_version(),
+            spotify_platform,
+            VERSION_STRING
         );
 
         let user_agent = HeaderValue::from_str(user_agent_str).unwrap_or_else(|err| {

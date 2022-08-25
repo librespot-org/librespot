@@ -22,6 +22,7 @@ dns-sd = { version = "0.1", optional = true }
 form_urlencoded = "1.0"
 futures-core = "0.3"
 futures-util = { version = "0.3", features = ["alloc", "bilock", "sink", "unstable"] }
+hex = "0.4"
 hmac = "0.12"
 httparse = "1.7"
 http = "0.2"
@@ -53,7 +54,7 @@ tokio-stream = "0.1"
 tokio-tungstenite = { version = "*", default-features = false, features = ["rustls-tls-native-roots"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 url = "2"
-uuid = { version = "1", default-features = false, features = ["v4"] }
+uuid = { version = "1", default-features = false, features = ["fast-rng", "v4"] }
 
 [build-dependencies]
 rand = "0.8"
