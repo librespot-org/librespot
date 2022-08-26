@@ -16,6 +16,7 @@ use hyper::{
 use protobuf::{Message, ProtobufEnum};
 use rand::Rng;
 use sha1::{Digest, Sha1};
+use sysinfo::{System, SystemExt};
 use thiserror::Error;
 
 use crate::{
@@ -173,8 +174,15 @@ impl SpClient {
 
         let platform_data = connectivity_data.mut_platform_specific_data();
 
+        let sys = System::new();
+        let os_version = sys.os_version().unwrap_or_else(|| String::from("0"));
+        let kernel_version = sys.kernel_version().unwrap_or_else(|| String::from("0"));
+
         match std::env::consts::OS {
             "windows" => {
+                let os_version = os_version.parse::<f32>().unwrap_or(10.) as i32;
+                let kernel_version = kernel_version.parse::<i32>().unwrap_or(21370);
+
                 let (pe, image_file) = match std::env::consts::ARCH {
                     "arm" => (448, 452),
                     "aarch64" => (43620, 452),
@@ -183,8 +191,8 @@ impl SpClient {
                 };
 
                 let windows_data = platform_data.mut_desktop_windows();
-                windows_data.set_os_version(10);
-                windows_data.set_os_build(21370);
+                windows_data.set_os_version(os_version);
+                windows_data.set_os_build(kernel_version);
                 windows_data.set_platform_id(2);
                 windows_data.set_unknown_value_6(9);
                 windows_data.set_image_file_machine(image_file);
@@ -196,11 +204,11 @@ impl SpClient {
                 ios_data.set_user_interface_idiom(0);
                 ios_data.set_target_iphone_simulator(false);
                 ios_data.set_hw_machine("iPhone14,5".to_string());
-                ios_data.set_system_version("15.2.1".to_string());
+                ios_data.set_system_version(os_version);
             }
             "android" => {
                 let android_data = platform_data.mut_android();
-                android_data.set_android_version("12.0.0_r26".to_string());
+                android_data.set_android_version(os_version);
                 android_data.set_api_version(31);
                 android_data.set_device_name("Pixel".to_owned());
                 android_data.set_model_str("GF5KQ".to_owned());
@@ -208,17 +216,15 @@ impl SpClient {
             }
             "macos" => {
                 let macos_data = platform_data.mut_desktop_macos();
-                macos_data.set_system_version("Darwin Kernel Version 17.7.0: Fri Oct 30 13:34:27 PDT 2020; root:xnu-4570.71.82.8~1/RELEASE_X86_64".to_string());
+                macos_data.set_system_version(os_version);
                 macos_data.set_hw_model("iMac21,1".to_string());
                 macos_data.set_compiled_cpu_type(std::env::consts::ARCH.to_string());
             }
             _ => {
                 let linux_data = platform_data.mut_desktop_linux();
                 linux_data.set_system_name("Linux".to_string());
-                linux_data.set_system_release("5.15.0-46-generic".to_string());
-                linux_data.set_system_version(
-                    "#49~20.04.1-Ubuntu SMP Thu Aug 4 19:15:44 UTC 2022".to_string(),
-                );
+                linux_data.set_system_release(kernel_version);
+                linux_data.set_system_version(os_version);
                 linux_data.set_hardware(std::env::consts::ARCH.to_string());
             }
         }

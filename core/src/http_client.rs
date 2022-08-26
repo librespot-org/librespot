@@ -11,6 +11,7 @@ use hyper::{
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use once_cell::sync::OnceCell;
+use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use url::Url;
 
@@ -82,18 +83,24 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub fn new(proxy_url: Option<&Url>) -> Self {
-        let spotify_platform = match OS {
-            "android" => "Android/31",
-            "ios" => "iOS/15.2.1",
-            "macos" => "OSX/0",
-            "windows" => "Win32/0",
-            _ => "Linux/0",
+        let zero_str = String::from("0");
+        let os_version = System::new()
+            .os_version()
+            .unwrap_or_else(|| zero_str.clone());
+
+        let (spotify_platform, os_version) = match OS {
+            "android" => ("Android", os_version),
+            "ios" => ("iOS", os_version),
+            "macos" => ("OSX", zero_str),
+            "windows" => ("Win32", zero_str),
+            _ => ("Linux", zero_str),
         };
 
         let user_agent_str = &format!(
-            "Spotify/{} {} ({})",
+            "Spotify/{} {}/{} ({})",
             spotify_version(),
             spotify_platform,
+            os_version,
             VERSION_STRING
         );
 
