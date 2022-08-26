@@ -3,6 +3,8 @@ use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
 
 pub(crate) const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
+pub(crate) const ANDROID_CLIENT_ID: &str = "9a8d2f0ce77a4e248bb71fefcb557637";
+pub(crate) const IOS_CLIENT_ID: &str = "58bd3c95768941ea9eb4350aaa033eb3";
 
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
@@ -16,8 +18,15 @@ pub struct SessionConfig {
 impl Default for SessionConfig {
     fn default() -> SessionConfig {
         let device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
+        let client_id = match std::env::consts::OS {
+            "android" => ANDROID_CLIENT_ID,
+            "ios" => IOS_CLIENT_ID,
+            _ => KEYMASTER_CLIENT_ID,
+        }
+        .to_owned();
+
         SessionConfig {
-            client_id: KEYMASTER_CLIENT_ID.to_owned(),
+            client_id,
             device_id,
             proxy: None,
             ap_port: None,

@@ -1,5 +1,6 @@
 use std::{
     convert::TryInto,
+    env::consts::OS,
     fmt::Write,
     time::{Duration, Instant},
 };
@@ -22,7 +23,7 @@ use thiserror::Error;
 use crate::{
     apresolve::SocketAddress,
     cdn_url::CdnUrl,
-    config::KEYMASTER_CLIENT_ID,
+    config::SessionConfig,
     error::ErrorKind,
     protocol::{
         canvaz::EntityCanvazRequest,
@@ -165,9 +166,17 @@ impl SpClient {
         let client_data = message.mut_client_data();
         client_data.set_client_version(spotify_version());
 
-        // using 9a8d2f0ce77a4e248bb71fefcb557637 on Android
-        // instead of the keymaster ID presents a hash cash challenge
-        client_data.set_client_id(KEYMASTER_CLIENT_ID.to_string());
+        // Current state of affairs: keymaster ID works on all tested platforms, but may be phased out,
+        // so it seems a good idea to mimick the real clients. `self.session().client_id()` returns the
+        // ID of the client that last connected, but requesting a client token with this ID only works
+        // on macOS and Windows. On Android and iOS we can send a platform-specific client ID and are
+        // then presented with a hash cash challenge. On Linux, we have to pass the old keymaster ID.
+        // We delegate most of this logic to `SessionConfig`.
+        let client_id = match OS {
+            "macos" | "windows" => self.session().client_id(),
+            _ => SessionConfig::default().client_id,
+        };
+        client_data.set_client_id(client_id);
 
         let connectivity_data = client_data.mut_connectivity_sdk_data();
         connectivity_data.set_device_id(self.session().device_id().to_string());
@@ -178,7 +187,7 @@ impl SpClient {
         let os_version = sys.os_version().unwrap_or_else(|| String::from("0"));
         let kernel_version = sys.kernel_version().unwrap_or_else(|| String::from("0"));
 
-        match std::env::consts::OS {
+        match OS {
             "windows" => {
                 let os_version = os_version.parse::<f32>().unwrap_or(10.) as i32;
                 let kernel_version = kernel_version.parse::<i32>().unwrap_or(21370);
@@ -238,7 +247,7 @@ impl SpClient {
                 // or are presented a hash cash challenge to solve first
                 Some(ClientTokenResponseType::RESPONSE_GRANTED_TOKEN_RESPONSE) => break message,
                 Some(ClientTokenResponseType::RESPONSE_CHALLENGES_RESPONSE) => {
-                    trace!("received a hash cash challenge");
+                    trace!("received a hash cash challenge, solving...");
 
                     let challenges = message.get_challenges().clone();
                     let state = challenges.get_state();
@@ -248,7 +257,7 @@ impl SpClient {
                         let ctx = vec![];
                         let prefix = hex::decode(&hash_cash_challenge.prefix).map_err(|e| {
                             Error::failed_precondition(format!(
-                                "unable to decode Hashcash challenge: {}",
+                                "unable to decode hash cash challenge: {}",
                                 e
                             ))
                         })?;
@@ -274,7 +283,16 @@ impl SpClient {
                         challenge_answers.state = state.to_string();
                         challenge_answers.answers.push(challenge_answer);
 
-                        response = self.client_token_request(&answer_message).await?;
+                        trace!("answering hash cash challenge");
+                        match self.client_token_request(&answer_message).await {
+                            Ok(token) => response = token,
+                            Err(e) => {
+                                return Err(Error::failed_precondition(format!(
+                                    "unable to solve this challenge: {}",
+                                    e
+                                )))
+                            }
+                        }
 
                         // we should have been granted a token now
                         continue;
