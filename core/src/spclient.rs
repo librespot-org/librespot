@@ -162,8 +162,11 @@ impl SpClient {
         message.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
 
         let client_data = message.mut_client_data();
-        client_data.set_client_id(KEYMASTER_CLIENT_ID.to_string());
         client_data.set_client_version(spotify_version());
+
+        // using 9a8d2f0ce77a4e248bb71fefcb557637 on Android
+        // instead of the keymaster ID presents a hash cash challenge
+        client_data.set_client_id(KEYMASTER_CLIENT_ID.to_string());
 
         let connectivity_data = client_data.mut_connectivity_sdk_data();
         connectivity_data.set_device_id(self.session().device_id().to_string());
@@ -308,7 +311,7 @@ impl SpClient {
             inner.client_token = Some(client_token);
         });
 
-        trace!("Got client token: {:?}", client_token);
+        trace!("Got client token: {:?}", granted_token);
 
         Ok(access_token)
     }
