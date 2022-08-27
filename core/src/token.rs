@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::{config::KEYMASTER_CLIENT_ID, Error};
+use crate::Error;
 
 component! {
     TokenProvider : TokenProviderInner {
@@ -65,7 +65,7 @@ impl TokenProvider {
 
     // scopes must be comma-separated
     pub async fn get_token(&self, scopes: &str) -> Result<Token, Error> {
-        let client_id = KEYMASTER_CLIENT_ID;
+        let client_id = self.session().client_id();
         if client_id.is_empty() {
             return Err(Error::invalid_argument("Client ID cannot be empty"));
         }

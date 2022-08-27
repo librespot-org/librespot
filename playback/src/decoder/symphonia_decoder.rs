@@ -144,7 +144,7 @@ impl SymphoniaDecoder {
                 (time.seconds as f64 + time.frac) * 1000.
             }
             // Fallback in the unexpected case that the format has no base time set.
-            None => (ts as f64 * PAGES_PER_MS),
+            None => ts as f64 * PAGES_PER_MS,
         };
         seeked_to_ms as u32
     }

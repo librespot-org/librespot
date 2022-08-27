@@ -478,7 +478,7 @@ where
             };
 
             if let Err(e) = session.dispatch(cmd, data) {
-                error!("could not dispatch command: {}", e);
+                debug!("could not dispatch command: {}", e);
             }
         }
     }

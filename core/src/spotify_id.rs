@@ -87,10 +87,10 @@ impl SpotifyId {
 
     /// Returns whether this `SpotifyId` is for a playable audio item, if known.
     pub fn is_playable(&self) -> bool {
-        return matches!(
+        matches!(
             self.item_type,
             SpotifyItemType::Episode | SpotifyItemType::Track
-        );
+        )
     }
 
     /// Parses a base16 (hex) encoded [Spotify ID] into a `SpotifyId`.
