@@ -108,13 +108,29 @@ impl SpClient {
         Ok(format!("https://{}:{}", ap.0, ap.1))
     }
 
-    fn solve_hash_cash(ctx: &[u8], prefix: &[u8], length: i32, dst: &mut [u8]) {
+    fn solve_hash_cash(
+        ctx: &[u8],
+        prefix: &[u8],
+        length: i32,
+        dst: &mut [u8],
+    ) -> Result<(), Error> {
+        // after a certain number of seconds, the challenge expires
+        const TIMEOUT: u64 = 5; // seconds
+        let now = Instant::now();
+
         let md = Sha1::digest(ctx);
 
         let mut counter: i64 = 0;
         let target: i64 = BigEndian::read_i64(&md[12..20]);
 
         let suffix = loop {
+            if now.elapsed().as_secs() >= TIMEOUT {
+                return Err(Error::deadline_exceeded(format!(
+                    "{} seconds expired",
+                    TIMEOUT
+                )));
+            }
+
             let suffix = [(target + counter).to_be_bytes(), counter.to_be_bytes()].concat();
 
             let mut hasher = Sha1::new();
@@ -130,6 +146,8 @@ impl SpClient {
         };
 
         dst.copy_from_slice(&suffix);
+
+        Ok(())
     }
 
     async fn client_token_request(&self, message: &dyn Message) -> Result<Bytes, Error> {
@@ -160,10 +178,10 @@ impl SpClient {
 
         trace!("Client token unavailable or expired, requesting new token.");
 
-        let mut message = ClientTokenRequest::new();
-        message.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
+        let mut request = ClientTokenRequest::new();
+        request.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
 
-        let client_data = message.mut_client_data();
+        let client_data = request.mut_client_data();
         client_data.set_client_version(spotify_version());
 
         // Current state of affairs: keymaster ID works on all tested platforms, but may be phased out,
@@ -238,16 +256,21 @@ impl SpClient {
             }
         }
 
-        let mut response = self.client_token_request(&message).await?;
+        let mut response = self.client_token_request(&request).await?;
+        let mut count = 0;
+        const MAX_TRIES: u8 = 3;
 
         let token_response = loop {
+            count += 1;
+
             let message = ClientTokenResponse::parse_from_bytes(&response)?;
+
             match ClientTokenResponseType::from_i32(message.response_type.value()) {
                 // depending on the platform, you're either given a token immediately
                 // or are presented a hash cash challenge to solve first
                 Some(ClientTokenResponseType::RESPONSE_GRANTED_TOKEN_RESPONSE) => break message,
                 Some(ClientTokenResponseType::RESPONSE_CHALLENGES_RESPONSE) => {
-                    trace!("received a hash cash challenge, solving...");
+                    trace!("Received a hash cash challenge, solving...");
 
                     let challenges = message.get_challenges().clone();
                     let state = challenges.get_state();
@@ -257,57 +280,78 @@ impl SpClient {
                         let ctx = vec![];
                         let prefix = hex::decode(&hash_cash_challenge.prefix).map_err(|e| {
                             Error::failed_precondition(format!(
-                                "unable to decode hash cash challenge: {}",
+                                "Unable to decode hash cash challenge: {}",
                                 e
                             ))
                         })?;
                         let length = hash_cash_challenge.length;
 
                         let mut suffix = vec![0; 0x10];
-                        Self::solve_hash_cash(&ctx, &prefix, length, &mut suffix);
+                        let answer = Self::solve_hash_cash(&ctx, &prefix, length, &mut suffix);
 
-                        // the suffix must be in uppercase
-                        let suffix = hex::encode(suffix).to_uppercase();
+                        match answer {
+                            Ok(_) => {
+                                // the suffix must be in uppercase
+                                let suffix = hex::encode(suffix).to_uppercase();
 
-                        let mut answer_message = ClientTokenRequest::new();
-                        answer_message.set_request_type(
-                            ClientTokenRequestType::REQUEST_CHALLENGE_ANSWERS_REQUEST,
-                        );
+                                let mut answer_message = ClientTokenRequest::new();
+                                answer_message.set_request_type(
+                                    ClientTokenRequestType::REQUEST_CHALLENGE_ANSWERS_REQUEST,
+                                );
 
-                        let challenge_answers = answer_message.mut_challenge_answers();
+                                let challenge_answers = answer_message.mut_challenge_answers();
 
-                        let mut challenge_answer = ChallengeAnswer::new();
-                        challenge_answer.mut_hash_cash().suffix = suffix.to_string();
-                        challenge_answer.ChallengeType = ChallengeType::CHALLENGE_HASH_CASH;
+                                let mut challenge_answer = ChallengeAnswer::new();
+                                challenge_answer.mut_hash_cash().suffix = suffix.to_string();
+                                challenge_answer.ChallengeType = ChallengeType::CHALLENGE_HASH_CASH;
 
-                        challenge_answers.state = state.to_string();
-                        challenge_answers.answers.push(challenge_answer);
+                                challenge_answers.state = state.to_string();
+                                challenge_answers.answers.push(challenge_answer);
 
-                        trace!("answering hash cash challenge");
-                        match self.client_token_request(&answer_message).await {
-                            Ok(token) => response = token,
-                            Err(e) => {
-                                return Err(Error::failed_precondition(format!(
-                                    "unable to solve this challenge: {}",
-                                    e
-                                )))
+                                trace!("Answering hash cash challenge");
+                                match self.client_token_request(&answer_message).await {
+                                    Ok(token) => {
+                                        response = token;
+                                        continue;
+                                    }
+                                    Err(e) => {
+                                        trace!(
+                                            "Answer not accepted {}/{}: {}",
+                                            count,
+                                            MAX_TRIES,
+                                            e
+                                        );
+                                    }
+                                }
                             }
+                            Err(e) => trace!(
+                                "Unable to solve hash cash challenge {}/{}: {}",
+                                count,
+                                MAX_TRIES,
+                                e
+                            ),
                         }
 
-                        // we should have been granted a token now
-                        continue;
+                        if count < MAX_TRIES {
+                            response = self.client_token_request(&request).await?;
+                        } else {
+                            return Err(Error::failed_precondition(format!(
+                                "Unable to solve any of {} hash cash challenges",
+                                MAX_TRIES
+                            )));
+                        }
                     } else {
-                        return Err(Error::failed_precondition("no challenges found"));
+                        return Err(Error::failed_precondition("No challenges found"));
                     }
                 }
 
                 Some(unknown) => {
                     return Err(Error::unimplemented(format!(
-                        "unknown client token response type: {:?}",
+                        "Unknown client token response type: {:?}",
                         unknown
                     )))
                 }
-                None => return Err(Error::failed_precondition("no client token response type")),
+                None => return Err(Error::failed_precondition("No client token response type")),
             }
         };
 
@@ -411,7 +455,6 @@ impl SpClient {
                 .token_provider()
                 .get_token("playlist-read")
                 .await?;
-            let client_token = self.client_token().await?;
 
             let headers_mut = request.headers_mut();
             if let Some(ref hdrs) = headers {
@@ -421,7 +464,13 @@ impl SpClient {
                 AUTHORIZATION,
                 HeaderValue::from_str(&format!("{} {}", token.token_type, token.access_token,))?,
             );
-            headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
+
+            if let Ok(client_token) = self.client_token().await {
+                headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
+            } else {
+                // currently these endpoints seem to work fine without it
+                warn!("Unable to get client token. Trying to continue without...");
+            }
 
             last_response = self.session().http_client().request_body(request).await;
 
