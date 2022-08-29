@@ -23,8 +23,8 @@ fn login_error_message(code: &ErrorCode) -> &'static str {
     pub use ErrorCode::*;
     match code {
         ProtocolError => "Protocol error",
-        TryAnotherAP => "Try another AP",
-        BadConnectionId => "Bad connection id",
+        TryAnotherAP => "Try another access point",
+        BadConnectionId => "Bad connection ID",
         TravelRestriction => "Travel restriction",
         PremiumAccountRequired => "Premium account required",
         BadCredentials => "Bad credentials",

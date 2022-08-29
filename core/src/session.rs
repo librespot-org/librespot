@@ -32,6 +32,7 @@ use crate::{
     http_client::HttpClient,
     mercury::MercuryManager,
     packet::PacketType,
+    protocol::keyexchange::ErrorCode,
     spclient::SpClient,
     token::TokenProvider,
     Error,
@@ -131,12 +132,33 @@ impl Session {
         credentials: Credentials,
         store_credentials: bool,
     ) -> Result<(), Error> {
-        let ap = self.apresolver().resolve("accesspoint").await?;
-        info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
-        let mut transport = connection::connect(&ap.0, ap.1, self.config().proxy.as_ref()).await?;
+        let (reusable_credentials, transport) = loop {
+            let ap = self.apresolver().resolve("accesspoint").await?;
+            info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
+            let mut transport =
+                connection::connect(&ap.0, ap.1, self.config().proxy.as_ref()).await?;
 
-        let reusable_credentials =
-            connection::authenticate(&mut transport, credentials, &self.config().device_id).await?;
+            match connection::authenticate(
+                &mut transport,
+                credentials.clone(),
+                &self.config().device_id,
+            )
+            .await
+            {
+                Ok(creds) => break (creds, transport),
+                Err(e) => {
+                    if let Some(AuthenticationError::LoginFailed(ErrorCode::TryAnotherAP)) =
+                        e.error.downcast_ref::<AuthenticationError>()
+                    {
+                        warn!("Instructed to try another access point...");
+                        continue;
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+        };
+
         info!("Authenticated as \"{}\" !", reusable_credentials.username);
         self.set_username(&reusable_credentials.username);
         if let Some(cache) = self.cache() {
