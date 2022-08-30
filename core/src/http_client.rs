@@ -1,7 +1,13 @@
-use std::env::consts::OS;
+use std::{env::consts::OS, time::Duration};
 
 use bytes::Bytes;
 use futures_util::{future::IntoStream, FutureExt};
+use governor::{
+    clock::MonotonicClock,
+    middleware::NoOpMiddleware,
+    state::{InMemoryState, NotKeyed},
+    Jitter, Quota, RateLimiter,
+};
 use http::{header::HeaderValue, Uri};
 use hyper::{
     client::{HttpConnector, ResponseFuture},
@@ -10,6 +16,7 @@ use hyper::{
 };
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use nonzero_ext::nonzero;
 use once_cell::sync::OnceCell;
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
@@ -19,6 +26,12 @@ use crate::{
     version::{spotify_version, FALLBACK_USER_AGENT, VERSION_STRING},
     Error,
 };
+
+// The 30 seconds interval is documented by Spotify, but the calls per interval
+// is a guesstimate and probably subject to licensing (purchasing extra calls)
+// and may change at any time.
+pub const RATE_LIMIT_INTERVAL: u64 = 30; // seconds
+pub const RATE_LIMIT_CALLS_PER_INTERVAL: u32 = 300;
 
 #[derive(Debug, Error)]
 pub enum HttpClientError {
@@ -74,11 +87,11 @@ impl From<HttpClientError> for Error {
 
 type HyperClient = Client<ProxyConnector<HttpsConnector<HttpConnector>>, Body>;
 
-#[derive(Clone)]
 pub struct HttpClient {
     user_agent: HeaderValue,
     proxy_url: Option<Url>,
     hyper_client: OnceCell<HyperClient>,
+    rate_limiter: RateLimiter<NotKeyed, InMemoryState, MonotonicClock, NoOpMiddleware>,
 }
 
 impl HttpClient {
@@ -109,10 +122,18 @@ impl HttpClient {
             HeaderValue::from_static(FALLBACK_USER_AGENT)
         });
 
+        let replenish_interval_ns = Duration::from_secs(RATE_LIMIT_INTERVAL).as_nanos()
+            / RATE_LIMIT_CALLS_PER_INTERVAL as u128;
+        let quota = Quota::with_period(Duration::from_nanos(replenish_interval_ns as u64))
+            .expect("replenish interval should be valid")
+            .allow_burst(nonzero![RATE_LIMIT_CALLS_PER_INTERVAL]);
+        let rate_limiter = RateLimiter::direct(quota);
+
         Self {
             user_agent,
             proxy_url: proxy_url.cloned(),
             hyper_client: OnceCell::new(),
+            rate_limiter,
         }
     }
 
@@ -147,17 +168,54 @@ impl HttpClient {
     pub async fn request(&self, req: Request<Body>) -> Result<Response<Body>, Error> {
         debug!("Requesting {}", req.uri().to_string());
 
-        let request = self.request_fut(req)?;
-        let response = request.await;
+        // `Request` does not implement `Clone` because its `Body` may be a single-shot stream.
+        // As correct as that may be technically, we now need all this boilerplate to clone it
+        // ourselves, as any `Request` is moved in the loop.
+        let (parts, body) = req.into_parts();
+        let body_as_bytes = hyper::body::to_bytes(body)
+            .await
+            .unwrap_or_else(|_| Bytes::new());
 
-        if let Ok(response) = &response {
-            let code = response.status();
-            if code != StatusCode::OK {
-                return Err(HttpClientError::StatusCode(code).into());
+        loop {
+            let mut req = Request::new(Body::from(body_as_bytes.clone()));
+            *req.method_mut() = parts.method.clone();
+            *req.uri_mut() = parts.uri.clone();
+            *req.version_mut() = parts.version;
+            *req.headers_mut() = parts.headers.clone();
+
+            // For rate limiting we cannot *just* depend on Spotify sending us HTTP/429
+            // Retry-After headers. For example, when there is a service interruption
+            // and HTTP/500 is returned, we don't want to DoS the Spotify infrastructure.
+            self.rate_limiter
+                .until_ready_with_jitter(Jitter::up_to(Duration::from_secs(5)))
+                .await;
+
+            let request = self.request_fut(req)?;
+            let response = request.await;
+
+            if let Ok(response) = &response {
+                let code = response.status();
+
+                if code == StatusCode::TOO_MANY_REQUESTS {
+                    if let Some(retry_after) = response.headers().get("Retry-After") {
+                        if let Ok(retry_after_str) = retry_after.to_str() {
+                            if let Ok(retry_after_secs) = retry_after_str.parse::<u64>() {
+                                warn!("Rate limiting, retrying in {} seconds...", retry_after_secs);
+                                let duration = Duration::from_secs(retry_after_secs);
+                                tokio::time::sleep(duration).await;
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                if code != StatusCode::OK {
+                    return Err(HttpClientError::StatusCode(code).into());
+                }
             }
-        }
 
-        Ok(response?)
+            return Ok(response?);
+        }
     }
 
     pub async fn request_body(&self, req: Request<Body>) -> Result<Bytes, Error> {

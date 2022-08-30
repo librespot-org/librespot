@@ -15,7 +15,6 @@ use hyper::{
     Body, HeaderMap, Method, Request,
 };
 use protobuf::{Message, ProtobufEnum};
-use rand::Rng;
 use sha1::{Digest, Sha1};
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
@@ -176,7 +175,7 @@ impl SpClient {
             return Ok(client_token.access_token);
         }
 
-        trace!("Client token unavailable or expired, requesting new token.");
+        debug!("Client token unavailable or expired, requesting new token.");
 
         let mut request = ClientTokenRequest::new();
         request.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
@@ -270,7 +269,7 @@ impl SpClient {
                 // or are presented a hash cash challenge to solve first
                 Some(ClientTokenResponseType::RESPONSE_GRANTED_TOKEN_RESPONSE) => break message,
                 Some(ClientTokenResponseType::RESPONSE_CHALLENGES_RESPONSE) => {
-                    trace!("Received a hash cash challenge, solving...");
+                    debug!("Received a hash cash challenge, solving...");
 
                     let challenges = message.get_challenges().clone();
                     let state = challenges.get_state();
@@ -500,16 +499,7 @@ impl SpClient {
                 }
             }
 
-            // When retrying, avoid hammering the Spotify infrastructure by sleeping a while.
-            // The backoff time is chosen randomly from an ever-increasing range.
-            let max_seconds = u64::pow(tries as u64, 2) * 3;
-            let backoff = Duration::from_secs(rand::thread_rng().gen_range(1..=max_seconds));
-            warn!(
-                "Unable to complete API request, waiting {} seconds before retrying...",
-                backoff.as_secs(),
-            );
             debug!("Error was: {:?}", last_response);
-            tokio::time::sleep(backoff).await;
         }
 
         last_response
