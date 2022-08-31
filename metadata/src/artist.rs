@@ -111,10 +111,12 @@ pub struct Biographies(pub Vec<Biography>);
 impl_deref_wrapped!(Biographies, Vec<Biography>);
 
 #[derive(Debug, Clone)]
-pub struct ActivityPeriod {
-    pub start_year: i32,
-    pub end_year: i32,
-    pub decade: i32,
+pub enum ActivityPeriod {
+    Timespan {
+        start_year: i32,
+        end_year: Option<i32>,
+    },
+    Decade(i32),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -271,11 +273,20 @@ impl From<&BiographyMessage> for Biography {
 impl_from_repeated!(BiographyMessage, Biographies);
 
 impl From<&ActivityPeriodMessage> for ActivityPeriod {
-    fn from(activity_periode: &ActivityPeriodMessage) -> Self {
-        Self {
-            start_year: activity_periode.get_start_year(),
-            end_year: activity_periode.get_end_year(),
-            decade: activity_periode.get_decade(),
+    fn from(activity_period: &ActivityPeriodMessage) -> Self {
+        // only one variant must exist
+        debug_assert!(activity_period.has_decade() ^ activity_period.has_start_year());
+        // there must be a start year, if there is an end year
+        debug_assert!(activity_period.has_start_year() || !activity_period.has_end_year());
+        if activity_period.has_decade() {
+            Self::Decade(activity_period.get_decade())
+        } else {
+            Self::Timespan {
+                start_year: activity_period.get_start_year(),
+                end_year: activity_period
+                    .has_end_year()
+                    .then(|| activity_period.get_end_year()),
+            }
         }
     }
 }
