@@ -30,7 +30,8 @@ use crate::{
 // The 30 seconds interval is documented by Spotify, but the calls per interval
 // is a guesstimate and probably subject to licensing (purchasing extra calls)
 // and may change at any time.
-pub const RATE_LIMIT_INTERVAL: u64 = 30; // seconds
+pub const RATE_LIMIT_INTERVAL: Duration = Duration::from_secs(30);
+pub const RATE_LIMIT_MAX_WAIT: Duration = Duration::from_secs(10);
 pub const RATE_LIMIT_CALLS_PER_INTERVAL: u32 = 300;
 
 #[derive(Debug, Error)]
@@ -122,8 +123,8 @@ impl HttpClient {
             HeaderValue::from_static(FALLBACK_USER_AGENT)
         });
 
-        let replenish_interval_ns = Duration::from_secs(RATE_LIMIT_INTERVAL).as_nanos()
-            / RATE_LIMIT_CALLS_PER_INTERVAL as u128;
+        let replenish_interval_ns =
+            RATE_LIMIT_INTERVAL.as_nanos() / RATE_LIMIT_CALLS_PER_INTERVAL as u128;
         let quota = Quota::with_period(Duration::from_nanos(replenish_interval_ns as u64))
             .expect("replenish interval should be valid")
             .allow_burst(nonzero![RATE_LIMIT_CALLS_PER_INTERVAL]);
@@ -200,10 +201,17 @@ impl HttpClient {
                     if let Some(retry_after) = response.headers().get("Retry-After") {
                         if let Ok(retry_after_str) = retry_after.to_str() {
                             if let Ok(retry_after_secs) = retry_after_str.parse::<u64>() {
-                                warn!("Rate limiting, retrying in {} seconds...", retry_after_secs);
                                 let duration = Duration::from_secs(retry_after_secs);
-                                tokio::time::sleep(duration).await;
-                                continue;
+                                if duration <= RATE_LIMIT_MAX_WAIT {
+                                    warn!(
+                                        "Rate limiting, retrying in {} seconds...",
+                                        retry_after_secs
+                                    );
+                                    tokio::time::sleep(duration).await;
+                                    continue;
+                                } else {
+                                    debug!("Not going to wait {} seconds", retry_after_secs);
+                                }
                             }
                         }
                     }
