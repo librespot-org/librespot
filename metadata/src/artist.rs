@@ -113,10 +113,10 @@ impl_deref_wrapped!(Biographies, Vec<Biography>);
 #[derive(Debug, Clone)]
 pub enum ActivityPeriod {
     Timespan {
-        start_year: i32,
-        end_year: Option<i32>,
+        start_year: u16,
+        end_year: Option<u16>,
     },
-    Decade(i32),
+    Decade(u16),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -282,10 +282,12 @@ impl TryFrom<&ActivityPeriodMessage> for ActivityPeriod {
             period.has_end_year(),
         ) {
             // (decade, start_year, end_year)
-            (true, false, false) => Self::Decade(period.get_decade()),
+            (true, false, false) => Self::Decade(period.get_decade().try_into()?),
             (false, true, closed_period) => Self::Timespan {
-                start_year: period.get_start_year(),
-                end_year: closed_period.then(|| period.get_end_year()),
+                start_year: period.get_start_year().try_into()?,
+                end_year: closed_period
+                    .then(|| period.get_end_year().try_into())
+                    .transpose()?,
             },
             _ => {
                 return Err(librespot_core::Error::failed_precondition(

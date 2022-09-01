@@ -1,4 +1,9 @@
-use std::{error, fmt, num::ParseIntError, str::Utf8Error, string::FromUtf8Error};
+use std::{
+    error, fmt,
+    num::{ParseIntError, TryFromIntError},
+    str::Utf8Error,
+    string::FromUtf8Error,
+};
 
 use base64::DecodeError;
 use http::{
@@ -409,6 +414,12 @@ impl From<ParseError> for Error {
 
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
+        Self::new(ErrorKind::FailedPrecondition, err)
+    }
+}
+
+impl From<TryFromIntError> for Error {
+    fn from(err: TryFromIntError) -> Self {
         Self::new(ErrorKind::FailedPrecondition, err)
     }
 }
