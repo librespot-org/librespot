@@ -21,7 +21,7 @@ mod dealer;
 pub mod diffie_hellman;
 pub mod error;
 pub mod file_id;
-mod http_client;
+pub mod http_client;
 pub mod mercury;
 pub mod packet;
 mod proxytunnel;

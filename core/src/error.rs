@@ -342,6 +342,12 @@ impl From<hyper::Error> for Error {
     }
 }
 
+impl From<time::error::Parse> for Error {
+    fn from(err: time::error::Parse) -> Self {
+        Self::new(ErrorKind::FailedPrecondition, err)
+    }
+}
+
 impl From<quick_xml::Error> for Error {
     fn from(err: quick_xml::Error) -> Self {
         Self::new(ErrorKind::FailedPrecondition, err)

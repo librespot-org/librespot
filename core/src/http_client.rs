@@ -1,28 +1,31 @@
-use std::{env::consts::OS, time::Duration};
+use std::{
+    collections::HashMap,
+    env::consts::OS,
+    time::{Duration, Instant},
+};
 
 use bytes::Bytes;
 use futures_util::{future::IntoStream, FutureExt};
 use governor::{
-    clock::MonotonicClock,
-    middleware::NoOpMiddleware,
-    state::{InMemoryState, NotKeyed},
-    Jitter, Quota, RateLimiter,
+    clock::MonotonicClock, middleware::NoOpMiddleware, state::InMemoryState, Quota, RateLimiter,
 };
 use http::{header::HeaderValue, Uri};
 use hyper::{
     client::{HttpConnector, ResponseFuture},
     header::USER_AGENT,
-    Body, Client, Request, Response, StatusCode,
+    Body, Client, HeaderMap, Request, Response, StatusCode,
 };
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use nonzero_ext::nonzero;
 use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use url::Url;
 
 use crate::{
+    date::Date,
     version::{spotify_version, FALLBACK_USER_AGENT, VERSION_STRING},
     Error,
 };
@@ -92,7 +95,11 @@ pub struct HttpClient {
     user_agent: HeaderValue,
     proxy_url: Option<Url>,
     hyper_client: OnceCell<HyperClient>,
-    rate_limiter: RateLimiter<NotKeyed, InMemoryState, MonotonicClock, NoOpMiddleware>,
+
+    // while the DashMap variant is more performant, our level of concurrency
+    // is pretty low so we can save pulling in that extra dependency
+    rate_limiter:
+        RateLimiter<String, Mutex<HashMap<String, InMemoryState>>, MonotonicClock, NoOpMiddleware>,
 }
 
 impl HttpClient {
@@ -128,7 +135,7 @@ impl HttpClient {
         let quota = Quota::with_period(Duration::from_nanos(replenish_interval_ns as u64))
             .expect("replenish interval should be valid")
             .allow_burst(nonzero![RATE_LIMIT_CALLS_PER_INTERVAL]);
-        let rate_limiter = RateLimiter::direct(quota);
+        let rate_limiter = RateLimiter::keyed(quota);
 
         Self {
             user_agent,
@@ -178,18 +185,12 @@ impl HttpClient {
             .unwrap_or_else(|_| Bytes::new());
 
         loop {
-            let mut req = Request::new(Body::from(body_as_bytes.clone()));
-            *req.method_mut() = parts.method.clone();
-            *req.uri_mut() = parts.uri.clone();
-            *req.version_mut() = parts.version;
+            let mut req = Request::builder()
+                .method(parts.method.clone())
+                .uri(parts.uri.clone())
+                .version(parts.version)
+                .body(Body::from(body_as_bytes.clone()))?;
             *req.headers_mut() = parts.headers.clone();
-
-            // For rate limiting we cannot *just* depend on Spotify sending us HTTP/429
-            // Retry-After headers. For example, when there is a service interruption
-            // and HTTP/500 is returned, we don't want to DoS the Spotify infrastructure.
-            self.rate_limiter
-                .until_ready_with_jitter(Jitter::up_to(Duration::from_secs(5)))
-                .await;
 
             let request = self.request_fut(req)?;
             let response = request.await;
@@ -198,22 +199,13 @@ impl HttpClient {
                 let code = response.status();
 
                 if code == StatusCode::TOO_MANY_REQUESTS {
-                    if let Some(retry_after) = response.headers().get("Retry-After") {
-                        if let Ok(retry_after_str) = retry_after.to_str() {
-                            if let Ok(retry_after_secs) = retry_after_str.parse::<u64>() {
-                                let duration = Duration::from_secs(retry_after_secs);
-                                if duration <= RATE_LIMIT_MAX_WAIT {
-                                    warn!(
-                                        "Rate limiting, retrying in {} seconds...",
-                                        retry_after_secs
-                                    );
-                                    tokio::time::sleep(duration).await;
-                                    continue;
-                                } else {
-                                    debug!("Not going to wait {} seconds", retry_after_secs);
-                                }
-                            }
-                        }
+                    if let Some(duration) = Self::get_retry_after(response.headers()) {
+                        warn!(
+                            "Rate limited by service, retrying in {} seconds...",
+                            duration.as_secs()
+                        );
+                        tokio::time::sleep(duration).await;
+                        continue;
                     }
                 }
 
@@ -239,7 +231,71 @@ impl HttpClient {
         let headers_mut = req.headers_mut();
         headers_mut.insert(USER_AGENT, self.user_agent.clone());
 
-        let request = self.hyper_client()?.request(req);
-        Ok(request)
+        // For rate limiting we cannot *just* depend on Spotify sending us HTTP/429
+        // Retry-After headers. For example, when there is a service interruption
+        // and HTTP/500 is returned, we don't want to DoS the Spotify infrastructure.
+        let domain = match req.uri().host() {
+            Some(host) => {
+                // strip the prefix from *.domain.tld (assume rate limit is per domain, not subdomain)
+                let mut parts = host
+                    .split('.')
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>();
+                let n = parts.len().saturating_sub(2);
+                parts.drain(n..).collect()
+            }
+            None => String::from(""),
+        };
+        self.rate_limiter.check_key(&domain).map_err(|e| {
+            Error::resource_exhausted(format!(
+                "rate limited for at least another {} seconds",
+                e.wait_time_from(Instant::now()).as_secs()
+            ))
+        })?;
+
+        Ok(self.hyper_client()?.request(req))
+    }
+
+    pub fn get_retry_after(headers: &HeaderMap<HeaderValue>) -> Option<Duration> {
+        let now = Date::now_utc().as_timestamp_ms();
+
+        let mut retry_after_ms = None;
+        if let Some(header_val) = headers.get("X-RateLimit-Next") {
+            // *.akamaized.net (Akamai)
+            if let Ok(date_str) = header_val.to_str() {
+                if let Ok(target) = Date::from_iso8601(date_str) {
+                    retry_after_ms = Some(target.as_timestamp_ms().saturating_sub(now))
+                }
+            }
+        } else if let Some(header_val) = headers.get("Fastly-RateLimit-Reset") {
+            // *.scdn.co (Fastly)
+            if let Ok(timestamp) = header_val.to_str() {
+                if let Ok(target) = timestamp.parse::<i64>() {
+                    retry_after_ms = Some(target.saturating_sub(now))
+                }
+            }
+        } else if let Some(header_val) = headers.get("Retry-After") {
+            // Generic RFC compliant (including *.spotify.com)
+            if let Ok(retry_after) = header_val.to_str() {
+                if let Ok(duration) = retry_after.parse::<i64>() {
+                    retry_after_ms = Some(duration * 1000)
+                }
+            }
+        }
+
+        if let Some(retry_after) = retry_after_ms {
+            let duration = Duration::from_millis(retry_after as u64);
+            if duration <= RATE_LIMIT_MAX_WAIT {
+                return Some(duration);
+            } else {
+                debug!(
+                    "Waiting {} seconds would exceed {} second limit",
+                    duration.as_secs(),
+                    RATE_LIMIT_MAX_WAIT.as_secs()
+                );
+            }
+        }
+
+        None
     }
 }
