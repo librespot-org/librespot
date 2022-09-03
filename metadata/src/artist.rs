@@ -111,10 +111,12 @@ pub struct Biographies(pub Vec<Biography>);
 impl_deref_wrapped!(Biographies, Vec<Biography>);
 
 #[derive(Debug, Clone)]
-pub struct ActivityPeriod {
-    pub start_year: i32,
-    pub end_year: i32,
-    pub decade: i32,
+pub enum ActivityPeriod {
+    Timespan {
+        start_year: u16,
+        end_year: Option<u16>,
+    },
+    Decade(u16),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -196,7 +198,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Artist {
             external_ids: artist.get_external_id().into(),
             portraits: artist.get_portrait().into(),
             biographies: artist.get_biography().into(),
-            activity_periods: artist.get_activity_period().into(),
+            activity_periods: artist.get_activity_period().try_into()?,
             restrictions: artist.get_restriction().into(),
             related: artist.get_related().try_into()?,
             is_portrait_album_cover: artist.get_is_portrait_album_cover(),
@@ -270,14 +272,31 @@ impl From<&BiographyMessage> for Biography {
 
 impl_from_repeated!(BiographyMessage, Biographies);
 
-impl From<&ActivityPeriodMessage> for ActivityPeriod {
-    fn from(activity_periode: &ActivityPeriodMessage) -> Self {
-        Self {
-            start_year: activity_periode.get_start_year(),
-            end_year: activity_periode.get_end_year(),
-            decade: activity_periode.get_decade(),
-        }
+impl TryFrom<&ActivityPeriodMessage> for ActivityPeriod {
+    type Error = librespot_core::Error;
+
+    fn try_from(period: &ActivityPeriodMessage) -> Result<Self, Self::Error> {
+        let activity_period = match (
+            period.has_decade(),
+            period.has_start_year(),
+            period.has_end_year(),
+        ) {
+            // (decade, start_year, end_year)
+            (true, false, false) => Self::Decade(period.get_decade().try_into()?),
+            (false, true, closed_period) => Self::Timespan {
+                start_year: period.get_start_year().try_into()?,
+                end_year: closed_period
+                    .then(|| period.get_end_year().try_into())
+                    .transpose()?,
+            },
+            _ => {
+                return Err(librespot_core::Error::failed_precondition(
+                    "ActivityPeriod is expected to be either a decade or timespan",
+                ))
+            }
+        };
+        Ok(activity_period)
     }
 }
 
-impl_from_repeated!(ActivityPeriodMessage, ActivityPeriods);
+impl_try_from_repeated!(ActivityPeriodMessage, ActivityPeriods);

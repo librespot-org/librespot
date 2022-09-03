@@ -4,7 +4,10 @@ use std::{
     ops::Deref,
 };
 
-use time::{error::ComponentRange, Date as _Date, OffsetDateTime, PrimitiveDateTime, Time};
+use time::{
+    error::ComponentRange, format_description::well_known::Iso8601, Date as _Date, OffsetDateTime,
+    PrimitiveDateTime, Time,
+};
 
 use crate::Error;
 
@@ -47,6 +50,11 @@ impl Date {
 
     pub fn now_utc() -> Self {
         Self(OffsetDateTime::now_utc())
+    }
+
+    pub fn from_iso8601(input: &str) -> Result<Self, Error> {
+        let date_time = OffsetDateTime::parse(input, &Iso8601::DEFAULT)?;
+        Ok(Self(date_time))
     }
 }
 

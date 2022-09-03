@@ -1,4 +1,9 @@
-use std::{error, fmt, num::ParseIntError, str::Utf8Error, string::FromUtf8Error};
+use std::{
+    error, fmt,
+    num::{ParseIntError, TryFromIntError},
+    str::Utf8Error,
+    string::FromUtf8Error,
+};
 
 use base64::DecodeError;
 use http::{
@@ -342,6 +347,12 @@ impl From<hyper::Error> for Error {
     }
 }
 
+impl From<time::error::Parse> for Error {
+    fn from(err: time::error::Parse) -> Self {
+        Self::new(ErrorKind::FailedPrecondition, err)
+    }
+}
+
 impl From<quick_xml::Error> for Error {
     fn from(err: quick_xml::Error) -> Self {
         Self::new(ErrorKind::FailedPrecondition, err)
@@ -409,6 +420,12 @@ impl From<ParseError> for Error {
 
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
+        Self::new(ErrorKind::FailedPrecondition, err)
+    }
+}
+
+impl From<TryFromIntError> for Error {
+    fn from(err: TryFromIntError) -> Self {
         Self::new(ErrorKind::FailedPrecondition, err)
     }
 }
