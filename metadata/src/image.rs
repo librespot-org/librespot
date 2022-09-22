@@ -10,6 +10,7 @@ use librespot_core::{FileId, SpotifyId};
 
 use librespot_protocol as protocol;
 use protocol::metadata::Image as ImageMessage;
+use protocol::metadata::ImageGroup;
 pub use protocol::metadata::Image_Size as ImageSize;
 use protocol::playlist4_external::PictureSize as PictureSizeMessage;
 use protocol::playlist_annotate3::TranscodedPicture as TranscodedPictureMessage;
@@ -24,6 +25,12 @@ pub struct Image {
 
 #[derive(Debug, Clone, Default)]
 pub struct Images(pub Vec<Image>);
+
+impl From<&ImageGroup> for Images {
+    fn from(image_group: &ImageGroup) -> Self {
+        Self(image_group.image.iter().map(|i| i.into()).collect())
+    }
+}
 
 impl_deref_wrapped!(Images, Vec<Image>);
 

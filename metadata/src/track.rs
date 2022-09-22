@@ -8,11 +8,8 @@ use uuid::Uuid;
 
 use crate::{
     artist::{Artists, ArtistsWithRole},
-    audio::{
-        file::AudioFiles,
-        item::{AudioItem, AudioItemResult, InnerAudioItem},
-    },
-    availability::{Availabilities, UnavailabilityReason},
+    audio::file::AudioFiles,
+    availability::Availabilities,
     content_rating::ContentRatings,
     external_id::ExternalIds,
     restriction::Restrictions,
@@ -57,42 +54,6 @@ pub struct Track {
 pub struct Tracks(pub Vec<SpotifyId>);
 
 impl_deref_wrapped!(Tracks, Vec<SpotifyId>);
-
-#[async_trait]
-impl InnerAudioItem for Track {
-    async fn get_audio_item(session: &Session, id: SpotifyId) -> AudioItemResult {
-        let track = Self::get(session, &id).await?;
-        let alternatives = {
-            if track.alternatives.is_empty() {
-                None
-            } else {
-                Some(track.alternatives.clone())
-            }
-        };
-
-        // TODO: check meaning of earliest_live_timestamp in
-        let availability = if Date::now_utc() < track.earliest_live_timestamp {
-            Err(UnavailabilityReason::Embargo)
-        } else {
-            Self::available_for_user(
-                &session.user_data(),
-                &track.availability,
-                &track.restrictions,
-            )
-        };
-
-        Ok(AudioItem {
-            id,
-            spotify_uri: id.to_uri()?,
-            files: track.files,
-            name: track.name,
-            duration: track.duration,
-            availability,
-            alternatives,
-            is_explicit: track.is_explicit,
-        })
-    }
-}
 
 #[async_trait]
 impl Metadata for Track {
