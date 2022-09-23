@@ -79,9 +79,20 @@ https://github.com/librespot-org/librespot
   disabled such content. Applications that use librespot as a library without
   Connect should use the 'filter-explicit-content' user attribute in the session.
 - [metadata] All metadata fields in the protobufs are now exposed (breaking)
+- [connect] Add session events
+- [playback] Add metadata support via a `TrackChanged` event
+- [main] Add all player events to `player_event_handler.rs`
+- [contrib] Add `event_handler_example.py`
+- [connect] Add `repeat`, `set_position_ms` and `set_volume` to `spirc.rs`
+- [main] Add an event worker thread that runs async to the main thread(s) but sync to itself to prevent potential data races for event consumers
 
 ### Fixed
 
+- [connect] Set `PlayStatus` to the correct value when Player is loading to avoid blanking out the controls when `self.play_status` is `LoadingPlay` or `LoadingPause` in `spirc.rs`
+- [connect] Handle attempts to play local files better by basically ignoring attempts to load them in `handle_remote_update` in `spirc.rs`
+- [playback] Handle invalid track start positions by just starting the track from the beginning
+- [playback, connect] Clean up and de-noise events and event firing
+- [playback] Handle disappearing and invalid devices better 
 ### Removed
 
 - [main] `autoplay` is no longer a command-line option. Instead, librespot now

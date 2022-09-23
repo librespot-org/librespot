@@ -5,10 +5,7 @@ use std::{
 };
 
 use crate::{
-    audio::{
-        file::AudioFiles,
-        item::{AudioItem, AudioItemResult, InnerAudioItem},
-    },
+    audio::file::AudioFiles,
     availability::Availabilities,
     content_rating::ContentRatings,
     image::Images,
@@ -36,7 +33,7 @@ pub struct Episode {
     pub covers: Images,
     pub language: String,
     pub is_explicit: bool,
-    pub show: SpotifyId,
+    pub show_name: String,
     pub videos: VideoFiles,
     pub video_previews: VideoFiles,
     pub audio_previews: AudioFiles,
@@ -56,29 +53,6 @@ pub struct Episode {
 pub struct Episodes(pub Vec<SpotifyId>);
 
 impl_deref_wrapped!(Episodes, Vec<SpotifyId>);
-
-#[async_trait]
-impl InnerAudioItem for Episode {
-    async fn get_audio_item(session: &Session, id: SpotifyId) -> AudioItemResult {
-        let episode = Self::get(session, &id).await?;
-        let availability = Self::available_for_user(
-            &session.user_data(),
-            &episode.availability,
-            &episode.restrictions,
-        );
-
-        Ok(AudioItem {
-            id,
-            spotify_uri: id.to_uri()?,
-            files: episode.audio,
-            name: episode.name,
-            duration: episode.duration,
-            availability,
-            alternatives: None,
-            is_explicit: episode.is_explicit,
-        })
-    }
-}
 
 #[async_trait]
 impl Metadata for Episode {
@@ -107,7 +81,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Episode {
             covers: episode.get_cover_image().get_image().into(),
             language: episode.get_language().to_owned(),
             is_explicit: episode.get_explicit().to_owned(),
-            show: episode.get_show().try_into()?,
+            show_name: episode.get_show().get_name().to_owned(),
             videos: episode.get_video().into(),
             video_previews: episode.get_video_preview().into(),
             audio_previews: episode.get_audio_preview().into(),
