@@ -54,12 +54,7 @@ struct TokenData {
 impl TokenProvider {
     fn find_token(&self, scopes: Vec<&str>) -> Option<usize> {
         self.lock(|inner| {
-            for i in 0..inner.tokens.len() {
-                if inner.tokens[i].in_scopes(scopes.clone()) {
-                    return Some(i);
-                }
-            }
-            None
+            (0..inner.tokens.len()).find(|&i| inner.tokens[i].in_scopes(scopes.clone()))
         })
     }
 
