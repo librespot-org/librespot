@@ -49,6 +49,10 @@ https://github.com/librespot-org/librespot
 - [core] Cache resolved access points during runtime (breaking)
 - [core] `FileId` is moved out of `SpotifyId`. For now it will be re-exported.
 - [core] Report actual platform data on login
+- [main] `autoplay {on|off}` now acts as an override. If unspecified, `librespot`
+  now follows the setting in the Connect client that controls it. (breaking)
+- [metadata] Most metadata is now retrieved with the `spclient` (breaking)
+- [metadata] Playlists are moved to the `playlist4_external` protobuf (breaking)
 - [playback] The audio decoder has been switched from `lewton` to `Symphonia`.
   This improves the Vorbis sound quality, adds support for MP3 as well as for
   FLAC in the future. (breaking)
@@ -56,8 +60,6 @@ https://github.com/librespot-org/librespot
 - [playback] The passthrough decoder is now feature-gated (breaking)
 - [playback] `rodio`: call play and pause
 - [protocol] protobufs have been updated
-- [metadata] Most metadata is now retrieved with the `spclient` (breaking)
-- [metadata] Playlists are moved to the `playlist4_external` protobuf (breaking)
 
 ### Added
 
@@ -99,13 +101,6 @@ https://github.com/librespot-org/librespot
   from the beginning
 - [playback] Handle disappearing and invalid devices better
 - [playback] Handle seek, pause, and play commands while loading
-
-### Removed
-
-- [main] `autoplay` is no longer a command-line option. Instead, librespot now
-  follows the setting in the Connect client that controls it. Applications that
-  use librespot as a library without Connect should now instead use the
-  'autoplay' user attribute in the session.
 
 ## [0.4.2] - 2022-07-29
 

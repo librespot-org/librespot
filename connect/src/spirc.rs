@@ -772,6 +772,12 @@ impl SpircTask {
     fn handle_user_attributes_mutation(&mut self, mutation: UserAttributesMutation) {
         for attribute in mutation.get_fields().iter() {
             let key = attribute.get_name();
+
+            if key == "autoplay" && self.session.config().autoplay.is_some() {
+                trace!("Autoplay override active. Ignoring mutation.");
+                continue;
+            }
+
             if let Some(old_value) = self.session.user_data().attributes.get(key) {
                 let new_value = match old_value.as_ref() {
                     "0" => "1",
