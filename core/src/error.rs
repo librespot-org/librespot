@@ -14,7 +14,9 @@ use http::{
 };
 use protobuf::ProtobufError;
 use thiserror::Error;
-use tokio::sync::{mpsc::error::SendError, oneshot::error::RecvError};
+use tokio::sync::{
+    mpsc::error::SendError, oneshot::error::RecvError, AcquireError, TryAcquireError,
+};
 use url::ParseError;
 
 #[cfg(feature = "with-dns-sd")]
@@ -446,6 +448,24 @@ impl<T> From<SendError<T>> for Error {
     fn from(err: SendError<T>) -> Self {
         Self {
             kind: ErrorKind::Internal,
+            error: ErrorMessage(err.to_string()).into(),
+        }
+    }
+}
+
+impl From<AcquireError> for Error {
+    fn from(err: AcquireError) -> Self {
+        Self {
+            kind: ErrorKind::ResourceExhausted,
+            error: ErrorMessage(err.to_string()).into(),
+        }
+    }
+}
+
+impl From<TryAcquireError> for Error {
+    fn from(err: TryAcquireError) -> Self {
+        Self {
+            kind: ErrorKind::ResourceExhausted,
             error: ErrorMessage(err.to_string()).into(),
         }
     }

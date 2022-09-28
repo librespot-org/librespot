@@ -1,5 +1,4 @@
 use std::{
-    cmp::max,
     collections::HashMap,
     fmt,
     future::Future,
@@ -28,8 +27,7 @@ use tokio::sync::{mpsc, oneshot};
 use crate::{
     audio::{
         AudioDecrypt, AudioFile, StreamLoaderController, READ_AHEAD_BEFORE_PLAYBACK,
-        READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS, READ_AHEAD_DURING_PLAYBACK,
-        READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS,
+        READ_AHEAD_DURING_PLAYBACK,
     },
     audio_backend::Sink,
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
@@ -1096,7 +1094,7 @@ impl PlayerTrackLoader {
             // If the position is invalid just start from
             // the beginning of the track.
             let position_ms = if position_ms > duration_ms {
-                warn!("Invalid start position of {}ms exceeds track's duration of {}ms, starting track from the beginning", position_ms, duration_ms);
+                warn!("Invalid start position of {} ms exceeds track's duration of {} ms, starting track from the beginning", position_ms, duration_ms);
                 0
             } else {
                 position_ms
@@ -1475,22 +1473,28 @@ impl PlayerInternal {
     }
 
     fn handle_play(&mut self) {
-        if let PlayerState::Paused {
-            track_id,
-            play_request_id,
-            stream_position_ms,
-            ..
-        } = self.state
-        {
-            self.state.paused_to_playing();
-            self.send_event(PlayerEvent::Playing {
+        match self.state {
+            PlayerState::Paused {
                 track_id,
                 play_request_id,
-                position_ms: stream_position_ms,
-            });
-            self.ensure_sink_running();
-        } else {
-            error!("Player::play called from invalid state: {:?}", self.state);
+                stream_position_ms,
+                ..
+            } => {
+                self.state.paused_to_playing();
+                self.send_event(PlayerEvent::Playing {
+                    track_id,
+                    play_request_id,
+                    position_ms: stream_position_ms,
+                });
+                self.ensure_sink_running();
+            }
+            PlayerState::Loading {
+                ref mut start_playback,
+                ..
+            } => {
+                *start_playback = true;
+            }
+            _ => error!("Player::play called from invalid state: {:?}", self.state),
         }
     }
 
@@ -1511,6 +1515,12 @@ impl PlayerInternal {
                     play_request_id,
                     position_ms: stream_position_ms,
                 });
+            }
+            PlayerState::Loading {
+                ref mut start_playback,
+                ..
+            } => {
+                *start_playback = false;
             }
             _ => error!("Player::pause called from invalid state: {:?}", self.state),
         }
@@ -1980,6 +1990,25 @@ impl PlayerInternal {
     }
 
     fn handle_command_seek(&mut self, position_ms: u32) -> PlayerResult {
+        // When we are still loading, the user may immediately ask to
+        // seek to another position yet the decoder won't be ready for
+        // that. In this case just restart the loading process but
+        // with the requested position.
+        if let PlayerState::Loading {
+            track_id,
+            play_request_id,
+            start_playback,
+            ..
+        } = self.state
+        {
+            return self.handle_command_load(
+                track_id,
+                play_request_id,
+                start_playback,
+                position_ms,
+            );
+        }
+
         if let Some(decoder) = self.state.decoder() {
             match decoder.seek(position_ms) {
                 Ok(new_position_ms) => {
@@ -2178,21 +2207,14 @@ impl PlayerInternal {
             ..
         } = self.state
         {
-            let ping_time = stream_loader_controller.ping_time().as_secs_f32();
-
             // Request our read ahead range
-            let request_data_length = max(
-                (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS * ping_time * bytes_per_second as f32)
-                    as usize,
-                (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
-            );
+            let request_data_length =
+                (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize;
 
             // Request the part we want to wait for blocking. This effectively means we wait for the previous request to partially complete.
-            let wait_for_data_length = max(
-                (READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS * ping_time * bytes_per_second as f32)
-                    as usize,
-                (READ_AHEAD_BEFORE_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize,
-            );
+            let wait_for_data_length =
+                (READ_AHEAD_BEFORE_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize;
+
             stream_loader_controller
                 .fetch_next_and_wait(request_data_length, wait_for_data_length)
                 .map_err(Into::into)

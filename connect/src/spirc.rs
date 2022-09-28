@@ -1502,13 +1502,17 @@ impl SpircTask {
     }
 
     fn notify(&mut self, recipient: Option<&str>) -> Result<(), Error> {
-        let status_string = match self.state.get_status() {
-            PlayStatus::kPlayStatusLoading => "kPlayStatusLoading",
-            PlayStatus::kPlayStatusPause => "kPlayStatusPause",
-            PlayStatus::kPlayStatusStop => "kPlayStatusStop",
-            PlayStatus::kPlayStatusPlay => "kPlayStatusPlay",
-        };
-        trace!("Sending status to server: [{}]", status_string);
+        let status = self.state.get_status();
+
+        // When in loading state, the Spotify UI is disabled for interaction.
+        // On desktop this isn't so bad but on mobile it means that the bottom
+        // control disappears entirely. This is very confusing, so don't notify
+        // in this case.
+        if status == PlayStatus::kPlayStatusLoading {
+            return Ok(());
+        }
+
+        trace!("Sending status to server: [{:?}]", status);
         let mut cs = CommandSender::new(self, MessageType::kMessageTypeNotify);
         if let Some(s) = recipient {
             cs = cs.recipient(s);
