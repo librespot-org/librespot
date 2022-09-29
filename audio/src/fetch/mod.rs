@@ -1,14 +1,14 @@
 mod receive;
 
 use std::{
-    cmp::{max, min},
+    cmp::min,
     fs,
     io::{self, Read, Seek, SeekFrom},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use futures_util::{future::IntoStream, StreamExt, TryFutureExt};
@@ -16,7 +16,7 @@ use hyper::{client::ResponseFuture, header::CONTENT_RANGE, Body, Response, Statu
 use parking_lot::{Condvar, Mutex};
 use tempfile::NamedTempFile;
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, Semaphore};
 
 use librespot_core::{cdn_url::CdnUrl, Error, FileId, Session};
 
@@ -59,17 +59,11 @@ impl From<AudioFileError> for Error {
 /// This is the block size that is typically requested while doing a `seek()` on a file.
 /// The Symphonia decoder requires this to be a power of 2 and > 32 kB.
 /// Note: smaller requests can happen if part of the block is downloaded already.
-pub const MINIMUM_DOWNLOAD_SIZE: usize = 1024 * 128;
+pub const MINIMUM_DOWNLOAD_SIZE: usize = 64 * 1024;
 
 /// The minimum network throughput that we expect. Together with the minimum download size,
 /// this will determine the time we will wait for a response.
-pub const MINIMUM_THROUGHPUT: usize = 8192;
-
-/// The amount of data that is requested when initially opening a file.
-/// Note: if the file is opened to play from the beginning, the amount of data to
-/// read ahead is requested in addition to this amount. If the file is opened to seek to
-/// another position, then only this amount is requested on the first request.
-pub const INITIAL_DOWNLOAD_SIZE: usize = 1024 * 8;
+pub const MINIMUM_THROUGHPUT: usize = 8 * 1024;
 
 /// The ping time that is used for calculations before a ping time was actually measured.
 pub const INITIAL_PING_TIME_ESTIMATE: Duration = Duration::from_millis(500);
@@ -83,44 +77,16 @@ pub const MAXIMUM_ASSUMED_PING_TIME: Duration = Duration::from_millis(1500);
 /// of audio data may be larger or smaller.
 pub const READ_AHEAD_BEFORE_PLAYBACK: Duration = Duration::from_secs(1);
 
-/// Same as `READ_AHEAD_BEFORE_PLAYBACK`, but the time is taken as a factor of the ping
-/// time to the Spotify server. Both `READ_AHEAD_BEFORE_PLAYBACK` and
-/// `READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS` are obeyed.
-/// Note: the calculations are done using the nominal bitrate of the file. The actual amount
-/// of audio data may be larger or smaller.
-pub const READ_AHEAD_BEFORE_PLAYBACK_ROUNDTRIPS: f32 = 2.0;
-
 /// While playing back, this many seconds of data ahead of the current read position are
 /// requested.
 /// Note: the calculations are done using the nominal bitrate of the file. The actual amount
 /// of audio data may be larger or smaller.
 pub const READ_AHEAD_DURING_PLAYBACK: Duration = Duration::from_secs(5);
 
-/// Same as `READ_AHEAD_DURING_PLAYBACK`, but the time is taken as a factor of the ping
-/// time to the Spotify server.
-/// Note: the calculations are done using the nominal bitrate of the file. The actual amount
-/// of audio data may be larger or smaller.
-pub const READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS: f32 = 10.0;
-
 /// If the amount of data that is pending (requested but not received) is less than a certain amount,
 /// data is pre-fetched in addition to the read ahead settings above. The threshold for requesting more
 /// data is calculated as `<pending bytes> < PREFETCH_THRESHOLD_FACTOR * <ping time> * <nominal data rate>`
 pub const PREFETCH_THRESHOLD_FACTOR: f32 = 4.0;
-
-/// Similar to `PREFETCH_THRESHOLD_FACTOR`, but it also takes the current download rate into account.
-/// The formula used is `<pending bytes> < FAST_PREFETCH_THRESHOLD_FACTOR * <ping time> * <measured download rate>`
-/// This mechanism allows for fast downloading of the remainder of the file. The number should be larger
-/// than `1.0` so the download rate ramps up until the bandwidth is saturated. The larger the value, the faster
-/// the download rate ramps up. However, this comes at the cost that it might hurt ping time if a seek is
-/// performed while downloading. Values smaller than `1.0` cause the download rate to collapse and effectively
-/// only `PREFETCH_THRESHOLD_FACTOR` is in effect. Thus, set to `0.0` if bandwidth saturation is not wanted.
-pub const FAST_PREFETCH_THRESHOLD_FACTOR: f32 = 1.5;
-
-/// Limit the number of requests that are pending simultaneously before pre-fetching data. Pending
-/// requests share bandwidth. Thus, having too many requests can lead to the one that is needed next
-/// for playback to be delayed leading to a buffer underrun. This limit has the effect that a new
-/// pre-fetch request is only sent if less than `MAX_PREFETCH_REQUESTS` are pending.
-pub const MAX_PREFETCH_REQUESTS: usize = 4;
 
 /// The time we will wait to obtain status updates on downloading.
 pub const DOWNLOAD_TIMEOUT: Duration =
@@ -137,15 +103,12 @@ pub struct StreamingRequest {
     initial_response: Option<Response<Body>>,
     offset: usize,
     length: usize,
-    request_time: Instant,
 }
 
 #[derive(Debug)]
 pub enum StreamLoaderCommand {
-    Fetch(Range),     // signal the stream loader to fetch a range of the file
-    RandomAccessMode, // optimise download strategy for random access
-    StreamMode,       // optimise download strategy for streaming
-    Close,            // terminate and don't load any more data
+    Fetch(Range), // signal the stream loader to fetch a range of the file
+    Close,        // terminate and don't load any more data
 }
 
 #[derive(Clone)]
@@ -182,17 +145,15 @@ impl StreamLoaderController {
     pub fn range_to_end_available(&self) -> bool {
         match self.stream_shared {
             Some(ref shared) => {
-                let read_position = shared.read_position.load(Ordering::Acquire);
+                let read_position = shared.read_position();
                 self.range_available(Range::new(read_position, self.len() - read_position))
             }
             None => true,
         }
     }
 
-    pub fn ping_time(&self) -> Duration {
-        Duration::from_millis(self.stream_shared.as_ref().map_or(0, |shared| {
-            shared.ping_time_ms.load(Ordering::Relaxed) as u64
-        }))
+    pub fn ping_time(&self) -> Option<Duration> {
+        self.stream_shared.as_ref().map(|shared| shared.ping_time())
     }
 
     fn send_stream_loader_command(&self, command: StreamLoaderCommand) {
@@ -252,31 +213,6 @@ impl StreamLoaderController {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn fetch_next(&self, length: usize) {
-        if let Some(ref shared) = self.stream_shared {
-            let range = Range {
-                start: shared.read_position.load(Ordering::Acquire),
-                length,
-            };
-            self.fetch(range);
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn fetch_next_blocking(&self, length: usize) -> AudioFileResult {
-        match self.stream_shared {
-            Some(ref shared) => {
-                let range = Range {
-                    start: shared.read_position.load(Ordering::Acquire),
-                    length,
-                };
-                self.fetch_blocking(range)
-            }
-            None => Ok(()),
-        }
-    }
-
     pub fn fetch_next_and_wait(
         &self,
         request_length: usize,
@@ -284,7 +220,7 @@ impl StreamLoaderController {
     ) -> AudioFileResult {
         match self.stream_shared {
             Some(ref shared) => {
-                let start = shared.read_position.load(Ordering::Acquire);
+                let start = shared.read_position();
 
                 let request_range = Range {
                     start,
@@ -304,12 +240,16 @@ impl StreamLoaderController {
 
     pub fn set_random_access_mode(&self) {
         // optimise download strategy for random access
-        self.send_stream_loader_command(StreamLoaderCommand::RandomAccessMode);
+        if let Some(ref shared) = self.stream_shared {
+            shared.set_download_streaming(false)
+        }
     }
 
     pub fn set_stream_mode(&self) {
         // optimise download strategy for streaming
-        self.send_stream_loader_command(StreamLoaderCommand::StreamMode);
+        if let Some(ref shared) = self.stream_shared {
+            shared.set_download_streaming(true)
+        }
     }
 
     pub fn close(&self) {
@@ -337,9 +277,51 @@ struct AudioFileShared {
     cond: Condvar,
     download_status: Mutex<AudioFileDownloadStatus>,
     download_streaming: AtomicBool,
-    number_of_open_requests: AtomicUsize,
+    download_slots: Semaphore,
     ping_time_ms: AtomicUsize,
     read_position: AtomicUsize,
+    throughput: AtomicUsize,
+}
+
+impl AudioFileShared {
+    fn is_download_streaming(&self) -> bool {
+        self.download_streaming.load(Ordering::Acquire)
+    }
+
+    fn set_download_streaming(&self, streaming: bool) {
+        self.download_streaming.store(streaming, Ordering::Release)
+    }
+
+    fn ping_time(&self) -> Duration {
+        let ping_time_ms = self.ping_time_ms.load(Ordering::Acquire);
+        if ping_time_ms > 0 {
+            Duration::from_millis(ping_time_ms as u64)
+        } else {
+            INITIAL_PING_TIME_ESTIMATE
+        }
+    }
+
+    fn set_ping_time(&self, duration: Duration) {
+        self.ping_time_ms
+            .store(duration.as_millis() as usize, Ordering::Release)
+    }
+
+    fn throughput(&self) -> usize {
+        self.throughput.load(Ordering::Acquire)
+    }
+
+    fn set_throughput(&self, throughput: usize) {
+        self.throughput.store(throughput, Ordering::Release)
+    }
+
+    fn read_position(&self) -> usize {
+        self.read_position.load(Ordering::Acquire)
+    }
+
+    fn set_read_position(&self, position: u64) {
+        self.read_position
+            .store(position as usize, Ordering::Release)
+    }
 }
 
 impl AudioFile {
@@ -420,12 +402,11 @@ impl AudioFileStreaming {
         let mut streamer =
             session
                 .spclient()
-                .stream_from_cdn(&cdn_url, 0, INITIAL_DOWNLOAD_SIZE)?;
+                .stream_from_cdn(&cdn_url, 0, MINIMUM_DOWNLOAD_SIZE)?;
 
         // Get the first chunk with the headers to get the file size.
         // The remainder of that chunk with possibly also a response body is then
         // further processed in `audio_file_fetch`.
-        let request_time = Instant::now();
         let response = streamer.next().await.ok_or(AudioFileError::NoData)??;
 
         let code = response.status();
@@ -452,7 +433,6 @@ impl AudioFileStreaming {
             initial_response: Some(response),
             offset: 0,
             length: upper_bound + 1,
-            request_time,
         };
 
         let shared = Arc::new(AudioFileShared {
@@ -464,10 +444,11 @@ impl AudioFileStreaming {
                 requested: RangeSet::new(),
                 downloaded: RangeSet::new(),
             }),
-            download_streaming: AtomicBool::new(true),
-            number_of_open_requests: AtomicUsize::new(0),
-            ping_time_ms: AtomicUsize::new(INITIAL_PING_TIME_ESTIMATE.as_millis() as usize),
+            download_streaming: AtomicBool::new(false),
+            download_slots: Semaphore::new(1),
+            ping_time_ms: AtomicUsize::new(0),
             read_position: AtomicUsize::new(0),
+            throughput: AtomicUsize::new(0),
         });
 
         let write_file = NamedTempFile::new_in(session.config().tmp_dir.clone())?;
@@ -509,20 +490,12 @@ impl Read for AudioFileStreaming {
             return Ok(0);
         }
 
-        let length_to_request = if self.shared.download_streaming.load(Ordering::Acquire) {
-            // Due to the read-ahead stuff, we potentially request more than the actual request demanded.
-            let ping_time_seconds =
-                Duration::from_millis(self.shared.ping_time_ms.load(Ordering::Relaxed) as u64)
-                    .as_secs_f32();
-
+        let length_to_request = if self.shared.is_download_streaming() {
             let length_to_request = length
-                + max(
-                    (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * self.shared.bytes_per_second as f32)
-                        as usize,
-                    (READ_AHEAD_DURING_PLAYBACK_ROUNDTRIPS
-                        * ping_time_seconds
-                        * self.shared.bytes_per_second as f32) as usize,
-                );
+                + (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * self.shared.bytes_per_second as f32)
+                    as usize;
+
+            // Due to the read-ahead stuff, we potentially request more than the actual request demanded.
             min(length_to_request, self.shared.file_size - offset)
         } else {
             length
@@ -566,9 +539,7 @@ impl Read for AudioFileStreaming {
         let read_len = self.read_file.read(&mut output[..read_len])?;
 
         self.position += read_len as u64;
-        self.shared
-            .read_position
-            .store(self.position as usize, Ordering::Release);
+        self.shared.set_read_position(self.position);
 
         Ok(read_len)
     }
@@ -601,23 +572,17 @@ impl Seek for AudioFileStreaming {
             // Ensure random access mode if we need to download this part.
             // Checking whether we are streaming now is a micro-optimization
             // to save an atomic load.
-            was_streaming = self.shared.download_streaming.load(Ordering::Acquire);
+            was_streaming = self.shared.is_download_streaming();
             if was_streaming {
-                self.shared
-                    .download_streaming
-                    .store(false, Ordering::Release);
+                self.shared.set_download_streaming(false);
             }
         }
 
         self.position = self.read_file.seek(pos)?;
-        self.shared
-            .read_position
-            .store(self.position as usize, Ordering::Release);
+        self.shared.set_read_position(self.position);
 
         if !available && was_streaming {
-            self.shared
-                .download_streaming
-                .store(true, Ordering::Release);
+            self.shared.set_download_streaming(true);
         }
 
         Ok(self.position)

@@ -197,6 +197,7 @@ fn get_setup() -> Setup {
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
 
     const AP_PORT: &str = "ap-port";
+    const AUTOPLAY: &str = "autoplay";
     const BACKEND: &str = "backend";
     const BITRATE: &str = "bitrate";
     const CACHE: &str = "cache";
@@ -242,6 +243,7 @@ fn get_setup() -> Setup {
 
     // Mostly arbitrary.
     const AP_PORT_SHORT: &str = "a";
+    const AUTOPLAY_SHORT: &str = "A";
     const BACKEND_SHORT: &str = "B";
     const BITRATE_SHORT: &str = "b";
     const SYSTEM_CACHE_SHORT: &str = "C";
@@ -562,6 +564,12 @@ fn get_setup() -> Setup {
         AP_PORT,
         "Connect to an AP with a specified port 1 - 65535. Available ports are usually 80, 443 and 4070.",
         "PORT",
+    )
+    .optopt(
+        AUTOPLAY_SHORT,
+        AUTOPLAY,
+        "Explicitly set autoplay {on|off}. Defaults to following the client setting.",
+        "OVERRIDE",
     );
 
     #[cfg(feature = "passthrough-decoder")]
@@ -1140,6 +1148,26 @@ fn get_setup() -> Setup {
         0
     };
 
+    // #1046: not all connections are supplied an `autoplay` user attribute to run statelessly.
+    // This knob allows for a manual override.
+    let autoplay = match opt_str(AUTOPLAY) {
+        Some(value) => match value.as_ref() {
+            "on" => Some(true),
+            "off" => Some(false),
+            _ => {
+                invalid_error_msg(
+                    AUTOPLAY,
+                    AUTOPLAY_SHORT,
+                    &opt_str(AUTOPLAY).unwrap_or_default(),
+                    "on, off",
+                    "",
+                );
+                exit(1);
+            }
+        },
+        None => SessionConfig::default().autoplay,
+    };
+
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
@@ -1293,7 +1321,8 @@ fn get_setup() -> Setup {
             }
         }),
 		tmp_dir,
-        ..SessionConfig::default()
+		autoplay,
+		..SessionConfig::default()
     };
 
     let player_config = {

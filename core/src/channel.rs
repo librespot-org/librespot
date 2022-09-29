@@ -3,7 +3,7 @@ use std::{
     fmt,
     pin::Pin,
     task::{Context, Poll},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use byteorder::{BigEndian, ByteOrder};
@@ -27,7 +27,7 @@ component! {
     }
 }
 
-const ONE_SECOND_IN_MS: usize = 1000;
+const ONE_SECOND: Duration = Duration::from_secs(1);
 
 #[derive(Debug, Error, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct ChannelError;
@@ -92,10 +92,8 @@ impl ChannelManager {
         self.lock(|inner| {
             let current_time = Instant::now();
             if let Some(download_measurement_start) = inner.download_measurement_start {
-                if (current_time - download_measurement_start).as_millis()
-                    > ONE_SECOND_IN_MS as u128
-                {
-                    inner.download_rate_estimate = ONE_SECOND_IN_MS
+                if (current_time - download_measurement_start) > ONE_SECOND {
+                    inner.download_rate_estimate = ONE_SECOND.as_millis() as usize
                         * inner.download_measurement_bytes
                         / (current_time - download_measurement_start).as_millis() as usize;
                     inner.download_measurement_start = Some(current_time);

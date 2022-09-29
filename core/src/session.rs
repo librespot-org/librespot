@@ -438,6 +438,10 @@ impl Session {
     }
 
     pub fn autoplay(&self) -> bool {
+        if let Some(overide) = self.config().autoplay {
+            return overide;
+        }
+
         match self.get_user_attribute("autoplay") {
             Some(value) => matches!(&*value, "1"),
             None => false,

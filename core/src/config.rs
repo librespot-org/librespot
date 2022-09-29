@@ -13,6 +13,7 @@ pub struct SessionConfig {
     pub proxy: Option<Url>,
     pub ap_port: Option<u16>,
     pub tmp_dir: PathBuf,
+    pub autoplay: Option<bool>,
 }
 
 impl Default for SessionConfig {
@@ -31,6 +32,7 @@ impl Default for SessionConfig {
             proxy: None,
             ap_port: None,
             tmp_dir: std::env::temp_dir(),
+            autoplay: None,
         }
     }
 }
