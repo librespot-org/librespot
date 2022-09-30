@@ -6,11 +6,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use futures_util::{
-    future::{self, FusedFuture},
-    stream::FusedStream,
-    FutureExt, StreamExt,
-};
+use futures_util::{stream::FusedStream, FutureExt, StreamExt};
 
 use protobuf::{self, Message};
 use rand::seq::SliceRandom;
@@ -20,13 +16,10 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
     config::ConnectConfig,
-    context::StationContext,
+    context::{PageContext, StationContext},
     core::{
-        authentication::Credentials,
-        mercury::{MercuryError, MercurySender},
-        session::UserAttributes,
-        util::SeqGenerator,
-        version, Error, Session, SpotifyId,
+        authentication::Credentials, mercury::MercurySender, session::UserAttributes,
+        util::SeqGenerator, version, Error, Session, SpotifyId,
     },
     playback::{
         mixer::Mixer,
@@ -81,7 +74,6 @@ enum SpircPlayStatus {
     },
 }
 
-type BoxedFuture<T> = Pin<Box<dyn FusedFuture<Output = T> + Send>>;
 type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
 
 struct SpircTask {
@@ -106,8 +98,8 @@ struct SpircTask {
 
     shutdown: bool,
     session: Session,
-    context_fut: BoxedFuture<Result<serde_json::Value, Error>>,
-    autoplay_fut: BoxedFuture<Result<String, Error>>,
+    resolve_context: Option<String>,
+    autoplay_context: bool,
     context: Option<StationContext>,
 
     spirc_id: usize,
@@ -132,6 +124,7 @@ pub enum SpircCommand {
     SetVolume(u16),
 }
 
+const CONTEXT_TRACKS_COUNT: usize = 50;
 const CONTEXT_TRACKS_HISTORY: usize = 10;
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
 
@@ -376,8 +369,8 @@ impl Spirc {
             shutdown: false,
             session,
 
-            context_fut: Box::pin(future::pending()),
-            autoplay_fut: Box::pin(future::pending()),
+            resolve_context: None,
+            autoplay_context: false,
             context: None,
 
             spirc_id,
@@ -504,10 +497,35 @@ impl SpircTask {
                     error!("Cannot flush spirc event sender.");
                     break;
                 },
-                context = &mut self.context_fut, if !self.context_fut.is_terminated() => {
+                context_uri = async { self.resolve_context.take() }, if self.resolve_context.is_some() => {
+                    let context_uri = context_uri.unwrap();
+                    let is_next_page = context_uri.starts_with("hm://");
+
+                    let context = if is_next_page {
+                        self.session.spclient().get_next_page(&context_uri).await
+                    } else {
+                        let previous_tracks = self.state.get_track().iter().filter_map(|t| SpotifyId::try_from(t).ok()).collect();
+                        self.session.spclient().get_apollo_station(&context_uri, CONTEXT_TRACKS_COUNT, previous_tracks, self.autoplay_context).await
+                    };
+
                     match context {
                         Ok(value) => {
-                            let r_context = serde_json::from_value::<StationContext>(value);
+                            let r_context = if is_next_page {
+                                match serde_json::from_slice::<PageContext>(&value) {
+                                    Ok(page_context) => {
+                                        // page contexts don't have the stations full metadata, so decorate it
+                                        let mut station_context = self.context.clone().unwrap_or_default();
+                                        station_context.tracks = page_context.tracks;
+                                        station_context.next_page_url = page_context.next_page_url;
+                                        station_context.correlation_id = page_context.correlation_id;
+                                        Ok(station_context)
+                                    },
+                                    Err(e) => Err(e),
+                                }
+                            } else {
+                                serde_json::from_slice::<StationContext>(&value)
+                            };
+
                             self.context = match r_context {
                                 Ok(context) => {
                                     info!(
@@ -522,25 +540,9 @@ impl SpircTask {
                                     None
                                 }
                             };
-                            // It needn't be so verbose - can be as simple as
-                            // if let Some(ref context) = r_context {
-                            //     info!("Got {:?} tracks from <{}>", context.tracks.len(), context.uri);
-                            // }
-                            // self.context = r_context;
                         },
                         Err(err) => {
                             error!("ContextError: {:?}", err)
-                        }
-                    }
-                },
-                autoplay = &mut self.autoplay_fut, if !self.autoplay_fut.is_terminated() => {
-                    match autoplay {
-                        Ok(autoplay_station_uri) => {
-                            info!("Autoplay uri resolved to <{:?}>", autoplay_station_uri);
-                            self.context_fut = self.resolve_station(&autoplay_station_uri);
-                        },
-                        Err(err) => {
-                            error!("AutoplayError: {:?}", err)
                         }
                     }
                 },
@@ -953,7 +955,7 @@ impl SpircTask {
             MessageType::kMessageTypeShuffle => {
                 let shuffle = update.get_state().get_shuffle();
                 self.state.set_shuffle(shuffle);
-                if self.state.get_shuffle() {
+                if shuffle {
                     let current_index = self.state.get_playing_track_index();
                     let tracks = self.state.mut_track();
                     if !tracks.is_empty() {
@@ -964,11 +966,7 @@ impl SpircTask {
                         }
                         self.state.set_playing_track_index(0);
                     }
-                } else {
-                    let context = self.state.get_context_uri();
-                    debug!("{:?}", context);
                 }
-
                 self.player.emit_shuffle_changed_event(shuffle);
 
                 self.notify(None)
@@ -1191,40 +1189,41 @@ impl SpircTask {
     }
 
     fn handle_next(&mut self) {
+        let context_uri = self.state.get_context_uri().to_owned();
+        let mut tracks_len = self.state.get_track().len() as u32;
         let mut new_index = self.consume_queued_track() as u32;
-        let mut continue_playing = true;
-        let tracks_len = self.state.get_track().len() as u32;
+        let mut continue_playing = self.state.get_status() == PlayStatus::kPlayStatusPlay;
+
+        let update_tracks =
+            self.autoplay_context && tracks_len - new_index < CONTEXT_FETCH_THRESHOLD;
+
         debug!(
             "At track {:?} of {:?} <{:?}> update [{}]",
             new_index + 1,
             tracks_len,
-            self.state.get_context_uri(),
-            tracks_len - new_index < CONTEXT_FETCH_THRESHOLD
+            context_uri,
+            update_tracks,
         );
-        let context_uri = self.state.get_context_uri().to_owned();
-        if (context_uri.starts_with("spotify:station:")
-            || context_uri.starts_with("spotify:dailymix:")
-            // spotify:user:xxx:collection
-            || context_uri.starts_with(&format!("spotify:user:{}:collection",url_encode(&self.session.username()))))
-            && ((self.state.get_track().len() as u32) - new_index) < CONTEXT_FETCH_THRESHOLD
-        {
-            self.context_fut = self.resolve_station(&context_uri);
+
+        // When in autoplay, keep topping up the playlist when it nears the end
+        if update_tracks {
             self.update_tracks_from_context();
+            new_index = self.state.get_playing_track_index();
+            tracks_len = self.state.get_track().len() as u32;
         }
 
+        // When not in autoplay, either start autoplay or loop back to the start
         if new_index >= tracks_len {
             if self.session.autoplay() {
                 // Extend the playlist
-                debug!("Extending playlist <{}>", context_uri);
+                debug!("Starting autoplay for <{}>", context_uri);
+                self.autoplay_context = true;
                 self.update_tracks_from_context();
                 self.player.set_auto_normalise_as_album(false);
             } else {
                 new_index = 0;
-                continue_playing = self.state.get_repeat();
-                debug!(
-                    "Looping around back to start, repeat is {}",
-                    continue_playing
-                );
+                continue_playing &= self.state.get_repeat();
+                debug!("Looping back to start, repeat is {}", continue_playing);
             }
         }
 
@@ -1271,7 +1270,8 @@ impl SpircTask {
 
             self.state.set_playing_track_index(new_index);
 
-            self.load_track(true, 0);
+            let start_playing = self.state.get_status() == PlayStatus::kPlayStatusPlay;
+            self.load_track(start_playing, 0);
         } else {
             self.handle_seek(0);
         }
@@ -1304,50 +1304,16 @@ impl SpircTask {
         }
     }
 
-    fn resolve_station(&self, uri: &str) -> BoxedFuture<Result<serde_json::Value, Error>> {
-        let radio_uri = format!("hm://radio-apollo/v3/stations/{}", uri);
-
-        self.resolve_uri(&radio_uri)
-    }
-
-    fn resolve_autoplay_uri(&self, uri: &str) -> BoxedFuture<Result<String, Error>> {
-        let query_uri = format!("hm://autoplay-enabled/query?uri={}", uri);
-        let request = self.session.mercury().get(query_uri);
-        Box::pin(
-            async {
-                let response = request?.await?;
-
-                if response.status_code == 200 {
-                    let data = response.payload.first().ok_or(SpircError::NoData)?.to_vec();
-                    Ok(String::from_utf8(data)?)
-                } else {
-                    warn!("No autoplay_uri found");
-                    Err(MercuryError::Response(response).into())
-                }
-            }
-            .fuse(),
-        )
-    }
-
-    fn resolve_uri(&self, uri: &str) -> BoxedFuture<Result<serde_json::Value, Error>> {
-        let request = self.session.mercury().get(uri);
-
-        Box::pin(
-            async move {
-                let response = request?.await?;
-
-                let data = response.payload.first().ok_or(SpircError::NoData)?;
-                let response: serde_json::Value = serde_json::from_slice(data)?;
-
-                Ok(response)
-            }
-            .fuse(),
-        )
-    }
-
     fn update_tracks_from_context(&mut self) {
         if let Some(ref context) = self.context {
-            self.context_fut = self.resolve_uri(&context.next_page_url);
+            self.resolve_context =
+                if !self.autoplay_context || context.next_page_url.contains("autoplay=true") {
+                    Some(context.next_page_url.to_owned())
+                } else {
+                    // this arm means: we need to resolve for autoplay,
+                    // and were previously resolving for the original context
+                    Some(context.uri.to_owned())
+                };
 
             let new_tracks = &context.tracks;
             debug!("Adding {:?} tracks from context to frame", new_tracks.len());
@@ -1381,15 +1347,10 @@ impl SpircTask {
 
         trace!("Frame has {:?} tracks", tracks.len());
 
-        if context_uri.starts_with("spotify:station:")
-            || context_uri.starts_with("spotify:dailymix:")
-        {
-            self.context_fut = self.resolve_station(&context_uri);
-        } else if self.session.autoplay() {
-            info!("Fetching autoplay context uri");
-            // Get autoplay_station_uri for regular playlists
-            self.autoplay_fut = self.resolve_autoplay_uri(&context_uri);
-        }
+        // First the tracks from the requested context, without autoplay.
+        // We will transition into autoplay after the latest track of this context.
+        self.autoplay_context = false;
+        self.resolve_context = Some(context_uri.clone());
 
         self.player
             .set_auto_normalise_as_album(context_uri.starts_with("spotify:album:"));

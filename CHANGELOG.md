@@ -40,6 +40,9 @@ https://github.com/librespot-org/librespot
 - [audio] Improve file opening and seeking performance (breaking)
 - [chore] MSRV is now 1.61 (breaking)
 - [connect] `DeviceType` moved out of `connect` into `core` (breaking)
+- [connect] Update and expose all `spirc` context fields (breaking)
+- [connect] Add `Clone, Defaut` traits to `spirc` contexts
+- [connect] Autoplay contexts are now retrieved with the `spclient` (breaking)
 - [core] Message listeners are registered before authenticating. As a result
   there now is a separate `Session::new` and subsequent `session.connect`.
   (breaking)
@@ -96,6 +99,8 @@ https://github.com/librespot-org/librespot
   `LoadingPause` in `spirc.rs`
 - [connect] Handle attempts to play local files better by basically ignoring
   attempts to load them in `handle_remote_update` in `spirc.rs`
+- [connect] Loading previous or next tracks, or looping back on repeat, will
+  only start playback when we were already playing
 - [connect, playback] Clean up and de-noise events and event firing
 - [playback] Handle invalid track start positions by just starting the track
   from the beginning
