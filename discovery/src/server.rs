@@ -36,10 +36,12 @@ pub struct Config {
     pub name: Cow<'static, str>,
     pub device_type: DeviceType,
     pub device_id: String,
+    pub client_id: String,
 }
 
 struct RequestHandler {
     config: Config,
+    username: Option<String>,
     keys: DhLocalKeys,
     tx: mpsc::UnboundedSender<Credentials>,
 }
@@ -50,6 +52,7 @@ impl RequestHandler {
 
         let discovery = Self {
             config,
+            username: None,
             keys: DhLocalKeys::random(&mut rand::thread_rng()),
             tx,
         };
@@ -60,24 +63,45 @@ impl RequestHandler {
     fn handle_get_info(&self) -> Response<hyper::Body> {
         let public_key = base64::encode(&self.keys.public_key());
         let device_type: &str = self.config.device_type.into();
+        let mut active_user = String::new();
+        if let Some(username) = &self.username {
+            active_user = username.to_string();
+        }
 
+        // See: https://developer.spotify.com/documentation/commercial-hardware/implementation/guides/zeroconf/
         let body = json!({
             "status": 101,
-            "statusString": "ERROR-OK",
+            "statusString": "OK",
             "spotifyError": 0,
-            "version": crate::core::version::SEMVER,
+            // departing from the Spotify documentation, Google Cast uses "5.0.0"
+            "version": "2.9.0",
             "deviceID": (self.config.device_id),
-            "remoteName": (self.config.name),
-            "activeUser": "",
-            "publicKey": (public_key),
             "deviceType": (device_type),
-            "libraryVersion": crate::core::version::SEMVER,
-            "accountReq": "PREMIUM",
+            "remoteName": (self.config.name),
+            // valid value seen in the wild: "empty"
+            "publicKey": (public_key),
             "brandDisplayName": "librespot",
             "modelDisplayName": "librespot",
-            "resolverVersion": "0",
+            "libraryVersion": crate::core::version::SEMVER,
+            "resolverVersion": "1",
             "groupStatus": "NONE",
-            "voiceSupport": "NO",
+            // valid value documented & seen in the wild: "accesstoken"
+            // Using it will cause clients to fail to connect.
+            "tokenType": "default",
+            "clientID": (self.config.client_id),
+            "productID": 0,
+            // Other known scope: client-authorization-universal
+            // Comma-separated.
+            "scope": "streaming",
+            "availability": "",
+            "supported_drm_media_formats": [],
+            // TODO: bitmask but what are the flags?
+            "supported_capabilities": 1,
+            // undocumented but should still work
+            "accountReq": "PREMIUM",
+            "activeUser": active_user,
+            // others seen-in-the-wild:
+            // - "deviceAPI_isGroup": False
         })
         .to_string();
 
@@ -162,7 +186,7 @@ impl RequestHandler {
         let result = json!({
             "status": 101,
             "spotifyError": 0,
-            "statusString": "ERROR-OK"
+            "statusString": "OK",
         });
 
         let body = result.to_string();
