@@ -15,6 +15,7 @@ use hyper::{
     Body, HeaderMap, Method, Request,
 };
 use protobuf::{Message, ProtobufEnum};
+use rand::RngCore;
 use sha1::{Digest, Sha1};
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
@@ -435,13 +436,26 @@ impl SpClient {
             let mut url = self.base_url().await?;
             url.push_str(endpoint);
 
-            // Add metrics. There is also an optional `partner` key with a value like
-            // `vodafone-uk` but we've yet to discover how we can find that value.
             let separator = match url.find('?') {
                 Some(_) => "&",
                 None => "?",
             };
-            let _ = write!(url, "{}product=0", separator);
+
+            // Add metrics. There is also an optional `partner` key with a value like
+            // `vodafone-uk` but we've yet to discover how we can find that value.
+            // For the sake of documentation you could also do "product=free" but
+            // we only support premium anyway.
+            let _ = write!(
+                url,
+                "{}product=0&country={}",
+                separator,
+                self.session().country()
+            );
+
+            // Defeat caches. Spotify-generated URLs already contain this.
+            if !url.contains("salt=") {
+                let _ = write!(url, "&salt={}", rand::thread_rng().next_u32());
+            }
 
             let mut request = Request::builder()
                 .method(method)
@@ -616,29 +630,49 @@ impl SpClient {
     pub async fn get_radio_for_track(&self, track_id: &SpotifyId) -> SpClientResult {
         let endpoint = format!(
             "/inspiredby-mix/v2/seed_to_playlist/{}?response-format=json",
-            track_id.to_base62()?
+            track_id.to_uri()?
         );
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
             .await
     }
 
+    // Known working scopes: stations, tracks
+    // For others see: https://gist.github.com/roderickvd/62df5b74d2179a12de6817a37bb474f9
+    //
+    // Seen-in-the-wild but unimplemented query parameters:
+    // - image_style=gradient_overlay
+    // - excludeClusters=true
+    // - language=en
+    // - count_tracks=0
+    // - market=from_token
     pub async fn get_apollo_station(
         &self,
+        scope: &str,
         context_uri: &str,
-        count: usize,
+        count: Option<usize>,
         previous_tracks: Vec<SpotifyId>,
         autoplay: bool,
     ) -> SpClientResult {
+        let mut endpoint = format!(
+            "/radio-apollo/v3/{}/{}?autoplay={}",
+            scope, context_uri, autoplay,
+        );
+
+        // Spotify has a default of 50
+        if let Some(count) = count {
+            let _ = write!(endpoint, "&count={}", count);
+        }
+
         let previous_track_str = previous_tracks
             .iter()
             .map(|track| track.to_base62())
             .collect::<Result<Vec<_>, _>>()?
             .join(",");
-        let endpoint = format!(
-            "/radio-apollo/v3/stations/{}?count={}&prev_tracks={}&autoplay={}",
-            context_uri, count, previous_track_str, autoplay,
-        );
+        // better than checking `previous_tracks.len() > 0` because the `filter_map` could still return 0 items
+        if !previous_track_str.is_empty() {
+            let _ = write!(endpoint, "&prev_tracks={}", previous_track_str);
+        }
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
             .await
@@ -649,6 +683,9 @@ impl SpClient {
         self.request_as_json(&Method::GET, endpoint, None, None)
             .await
     }
+
+    // TODO: Seen-in-the-wild but unimplemented endpoints
+    // - /presence-view/v1/buddylist
 
     // TODO: Find endpoint for newer canvas.proto and upgrade to that.
     pub async fn get_canvases(&self, request: EntityCanvazRequest) -> SpClientResult {

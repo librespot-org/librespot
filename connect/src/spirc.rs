@@ -16,7 +16,7 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
     config::ConnectConfig,
-    context::{PageContext, StationContext},
+    context::PageContext,
     core::{
         authentication::Credentials, mercury::MercurySender, session::UserAttributes,
         util::SeqGenerator, version, Error, Session, SpotifyId,
@@ -100,7 +100,7 @@ struct SpircTask {
     session: Session,
     resolve_context: Option<String>,
     autoplay_context: bool,
-    context: Option<StationContext>,
+    context: Option<PageContext>,
 
     spirc_id: usize,
 }
@@ -124,7 +124,6 @@ pub enum SpircCommand {
     SetVolume(u16),
 }
 
-const CONTEXT_TRACKS_COUNT: usize = 50;
 const CONTEXT_TRACKS_HISTORY: usize = 10;
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
 
@@ -184,6 +183,7 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
             };
             {
                 let msg = repeated.push_default();
+                // TODO: implement logout
                 msg.set_typ(protocol::spirc::CapabilityType::kSupportsLogout);
                 {
                     let repeated = msg.mut_intValue();
@@ -224,17 +224,51 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
             };
             {
                 let msg = repeated.push_default();
-                msg.set_typ(protocol::spirc::CapabilityType::kSupportedContexts);
+                msg.set_typ(protocol::spirc::CapabilityType::kSupportsExternalEpisodes);
                 {
-                    let repeated = msg.mut_stringValue();
-                    repeated.push(::std::convert::Into::into("album"));
-                    repeated.push(::std::convert::Into::into("playlist"));
-                    repeated.push(::std::convert::Into::into("search"));
-                    repeated.push(::std::convert::Into::into("inbox"));
-                    repeated.push(::std::convert::Into::into("toplist"));
-                    repeated.push(::std::convert::Into::into("starred"));
-                    repeated.push(::std::convert::Into::into("publishedstarred"));
-                    repeated.push(::std::convert::Into::into("track"))
+                    let repeated = msg.mut_intValue();
+                    repeated.push(1)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                // TODO: how would such a rename command be triggered? Handle it.
+                msg.set_typ(protocol::spirc::CapabilityType::kSupportsRename);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(1)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                msg.set_typ(protocol::spirc::CapabilityType::kCommandAcks);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(0)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                // TODO: does this mean local files or the local network?
+                // LAN may be an interesting privacy toggle.
+                msg.set_typ(protocol::spirc::CapabilityType::kRestrictToLocal);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(0)
+                };
+                msg
+            };
+            {
+                let msg = repeated.push_default();
+                // TODO: what does this hide, or who do we hide from?
+                // May be an interesting privacy toggle.
+                msg.set_typ(protocol::spirc::CapabilityType::kHidden);
+                {
+                    let repeated = msg.mut_intValue();
+                    repeated.push(0)
                 };
                 msg
             };
@@ -243,9 +277,15 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
                 msg.set_typ(protocol::spirc::CapabilityType::kSupportedTypes);
                 {
                     let repeated = msg.mut_stringValue();
-                    repeated.push(::std::convert::Into::into("audio/track"));
-                    repeated.push(::std::convert::Into::into("audio/episode"));
-                    repeated.push(::std::convert::Into::into("track"))
+                    repeated.push("audio/episode".to_string());
+                    repeated.push("audio/episode+track".to_string());
+                    repeated.push("audio/track".to_string());
+                    // other known types:
+                    // - "audio/ad"
+                    // - "audio/interruption"
+                    // - "audio/local"
+                    // - "video/ad"
+                    // - "video/episode"
                 };
                 msg
             };
@@ -498,35 +538,30 @@ impl SpircTask {
                     break;
                 },
                 context_uri = async { self.resolve_context.take() }, if self.resolve_context.is_some() => {
-                    let context_uri = context_uri.unwrap();
-                    let is_next_page = context_uri.starts_with("hm://");
+                    let context_uri = context_uri.unwrap(); // guaranteed above
+                    if context_uri.contains("spotify:show:") || context_uri.contains("spotify:episode:") {
+                        continue; // not supported by apollo stations
+                    }
 
-                    let context = if is_next_page {
+                    let context = if context_uri.starts_with("hm://") {
                         self.session.spclient().get_next_page(&context_uri).await
                     } else {
-                        let previous_tracks = self.state.get_track().iter().filter_map(|t| SpotifyId::try_from(t).ok()).collect();
-                        self.session.spclient().get_apollo_station(&context_uri, CONTEXT_TRACKS_COUNT, previous_tracks, self.autoplay_context).await
+                        // only send previous tracks that were before the current playback position
+                        let current_position = self.state.get_playing_track_index() as usize;
+                        let previous_tracks = self.state.get_track()[..current_position].iter().filter_map(|t| SpotifyId::try_from(t).ok()).collect();
+
+                        let scope = if self.autoplay_context {
+                            "stations" // this returns a `StationContext` but we deserialize it into a `PageContext`
+                        } else {
+                            "tracks" // this returns a `PageContext`
+                        };
+
+                        self.session.spclient().get_apollo_station(scope, &context_uri, None, previous_tracks, self.autoplay_context).await
                     };
 
                     match context {
                         Ok(value) => {
-                            let r_context = if is_next_page {
-                                match serde_json::from_slice::<PageContext>(&value) {
-                                    Ok(page_context) => {
-                                        // page contexts don't have the stations full metadata, so decorate it
-                                        let mut station_context = self.context.clone().unwrap_or_default();
-                                        station_context.tracks = page_context.tracks;
-                                        station_context.next_page_url = page_context.next_page_url;
-                                        station_context.correlation_id = page_context.correlation_id;
-                                        Ok(station_context)
-                                    },
-                                    Err(e) => Err(e),
-                                }
-                            } else {
-                                serde_json::from_slice::<StationContext>(&value)
-                            };
-
-                            self.context = match r_context {
+                            self.context = match serde_json::from_slice::<PageContext>(&value) {
                                 Ok(context) => {
                                     info!(
                                         "Resolved {:?} tracks from <{:?}>",
@@ -829,7 +864,7 @@ impl SpircTask {
 
         for entry in update.get_device_state().get_metadata().iter() {
             match entry.get_field_type() {
-                "client-id" => self.session.set_client_id(entry.get_metadata()),
+                "client_id" => self.session.set_client_id(entry.get_metadata()),
                 "brand_display_name" => self.session.set_client_brand_name(entry.get_metadata()),
                 "model_display_name" => self.session.set_client_model_name(entry.get_metadata()),
                 _ => (),
@@ -1207,17 +1242,23 @@ impl SpircTask {
 
         // When in autoplay, keep topping up the playlist when it nears the end
         if update_tracks {
-            self.update_tracks_from_context();
-            new_index = self.state.get_playing_track_index();
-            tracks_len = self.state.get_track().len() as u32;
+            if let Some(ref context) = self.context {
+                self.resolve_context = Some(context.next_page_url.to_owned());
+                self.update_tracks_from_context();
+                tracks_len = self.state.get_track().len() as u32;
+            }
         }
 
         // When not in autoplay, either start autoplay or loop back to the start
         if new_index >= tracks_len {
-            if self.session.autoplay() {
+            // for some contexts there is no autoplay, such as shows and episodes
+            // in such cases there is no context in librespot.
+            if self.context.is_some() && self.session.autoplay() {
                 // Extend the playlist
                 debug!("Starting autoplay for <{}>", context_uri);
+                // force reloading the current context with an autoplay context
                 self.autoplay_context = true;
+                self.resolve_context = Some(self.state.get_context_uri().to_owned());
                 self.update_tracks_from_context();
                 self.player.set_auto_normalise_as_album(false);
             } else {
@@ -1306,17 +1347,10 @@ impl SpircTask {
 
     fn update_tracks_from_context(&mut self) {
         if let Some(ref context) = self.context {
-            self.resolve_context =
-                if !self.autoplay_context || context.next_page_url.contains("autoplay=true") {
-                    Some(context.next_page_url.to_owned())
-                } else {
-                    // this arm means: we need to resolve for autoplay,
-                    // and were previously resolving for the original context
-                    Some(context.uri.to_owned())
-                };
-
             let new_tracks = &context.tracks;
+
             debug!("Adding {:?} tracks from context to frame", new_tracks.len());
+
             let mut track_vec = self.state.take_track().into_vec();
             if let Some(head) = track_vec.len().checked_sub(CONTEXT_TRACKS_HISTORY) {
                 track_vec.drain(0..head);
@@ -1342,7 +1376,7 @@ impl SpircTask {
         trace!("State: {:#?}", frame.get_state());
 
         let index = frame.get_state().get_playing_track_index();
-        let context_uri = frame.get_state().get_context_uri().to_owned();
+        let context_uri = frame.get_state().get_context_uri();
         let tracks = frame.get_state().get_track();
 
         trace!("Frame has {:?} tracks", tracks.len());
@@ -1350,14 +1384,14 @@ impl SpircTask {
         // First the tracks from the requested context, without autoplay.
         // We will transition into autoplay after the latest track of this context.
         self.autoplay_context = false;
-        self.resolve_context = Some(context_uri.clone());
+        self.resolve_context = Some(context_uri.to_owned());
 
         self.player
             .set_auto_normalise_as_album(context_uri.starts_with("spotify:album:"));
 
         self.state.set_playing_track_index(index);
         self.state.set_track(tracks.iter().cloned().collect());
-        self.state.set_context_uri(context_uri);
+        self.state.set_context_uri(context_uri.to_owned());
         // has_shuffle/repeat seem to always be true in these replace msgs,
         // but to replicate the behaviour of the Android client we have to
         // ignore false values.
@@ -1517,8 +1551,11 @@ struct CommandSender<'a> {
 impl<'a> CommandSender<'a> {
     fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender<'_> {
         let mut frame = protocol::spirc::Frame::new();
+        // frame version
         frame.set_version(1);
-        frame.set_protocol_version(::std::convert::Into::into("2.0.0"));
+        // Latest known Spirc version is 3.2.6, but we need another interface to announce support for Spirc V3.
+        // Setting anything higher than 2.0.0 here just seems to limit it to 2.0.0.
+        frame.set_protocol_version("2.0.0".to_string());
         frame.set_ident(spirc.ident.clone());
         frame.set_seq_nr(spirc.sequence.get());
         frame.set_typ(cmd);
