@@ -616,7 +616,7 @@ impl SpClient {
     pub async fn get_radio_for_track(&self, track_id: &SpotifyId) -> SpClientResult {
         let endpoint = format!(
             "/inspiredby-mix/v2/seed_to_playlist/{}?response-format=json",
-            track_id.to_uri()?
+            track_id.to_base62()?
         );
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
@@ -626,13 +626,13 @@ impl SpClient {
     pub async fn get_apollo_station(
         &self,
         context_uri: &str,
-        count: u32,
-        previous_tracks: Vec<&SpotifyId>,
+        count: usize,
+        previous_tracks: Vec<SpotifyId>,
         autoplay: bool,
     ) -> SpClientResult {
         let previous_track_str = previous_tracks
             .iter()
-            .map(|track| track.to_uri())
+            .map(|track| track.to_base62())
             .collect::<Result<Vec<_>, _>>()?
             .join(",");
         let endpoint = format!(
@@ -641,6 +641,12 @@ impl SpClient {
         );
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
+            .await
+    }
+
+    pub async fn get_next_page(&self, next_page_uri: &str) -> SpClientResult {
+        let endpoint = next_page_uri.trim_start_matches("hm:/");
+        self.request_as_json(&Method::GET, endpoint, None, None)
             .await
     }
 

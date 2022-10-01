@@ -8,67 +8,89 @@ use serde::{
     Deserialize,
 };
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct StationContext {
-    pub uri: Option<String>,
-    pub next_page_url: String,
-    #[serde(deserialize_with = "deserialize_protobuf_TrackRef")]
-    pub tracks: Vec<TrackRef>,
-    // Not required for core functionality
-    // pub seeds: Vec<String>,
-    // #[serde(rename = "imageUri")]
-    // pub image_uri: String,
-    // pub subtitle: Option<String>,
-    // pub subtitles: Vec<String>,
-    // #[serde(rename = "subtitleUri")]
-    // pub subtitle_uri: Option<String>,
-    // pub title: String,
-    // #[serde(rename = "titleUri")]
-    // pub title_uri: String,
-    // pub related_artists: Vec<ArtistContext>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct PageContext {
     pub uri: String,
-    pub next_page_url: String,
+    pub title: String,
+    #[serde(rename = "titleUri")]
+    pub title_uri: String,
+    pub subtitles: Vec<SubtitleContext>,
+    #[serde(rename = "imageUri")]
+    pub image_uri: String,
+    pub seeds: Vec<String>,
     #[serde(deserialize_with = "deserialize_protobuf_TrackRef")]
     pub tracks: Vec<TrackRef>,
-    // Not required for core functionality
-    // pub url: String,
-    // // pub restrictions:
+    pub next_page_url: String,
+    pub correlation_id: String,
+    pub related_artists: Vec<ArtistContext>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default, Clone)]
+pub struct PageContext {
+    #[serde(deserialize_with = "deserialize_protobuf_TrackRef")]
+    pub tracks: Vec<TrackRef>,
+    pub next_page_url: String,
+    pub correlation_id: String,
+}
+
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct TrackContext {
-    #[serde(rename = "original_gid")]
-    pub gid: String,
     pub uri: String,
     pub uid: String,
-    // Not required for core functionality
-    // pub album_uri: String,
-    // pub artist_uri: String,
-    // pub metadata: MetadataContext,
+    pub artist_uri: String,
+    pub album_uri: String,
+    #[serde(rename = "original_gid")]
+    pub gid: String,
+    pub metadata: MetadataContext,
+    pub name: String,
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtistContext {
+    #[serde(rename = "artistName")]
     artist_name: String,
-    artist_uri: String,
+    #[serde(rename = "imageUri")]
     image_uri: String,
+    #[serde(rename = "artistUri")]
+    artist_uri: String,
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub struct MetadataContext {
     album_title: String,
     artist_name: String,
     artist_uri: String,
     image_url: String,
     title: String,
-    uid: String,
+    #[serde(deserialize_with = "bool_from_string")]
+    is_explicit: bool,
+    #[serde(deserialize_with = "bool_from_string")]
+    is_promotional: bool,
+    decision_id: String,
+}
+
+#[allow(dead_code)]
+#[derive(Deserialize, Debug, Default, Clone)]
+pub struct SubtitleContext {
+    name: String,
+    uri: String,
+}
+
+fn bool_from_string<'de, D>(de: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    match String::deserialize(de)?.as_ref() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        other => Err(D::Error::invalid_value(
+            Unexpected::Str(other),
+            &"true or false",
+        )),
+    }
 }
 
 #[allow(non_snake_case)]
