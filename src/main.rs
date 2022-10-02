@@ -1635,7 +1635,8 @@ async fn main() {
 
     if setup.enable_discovery {
         let device_id = setup.session_config.device_id.clone();
-        match librespot::discovery::Discovery::builder(device_id)
+        let client_id = setup.session_config.client_id.clone();
+        match librespot::discovery::Discovery::builder(device_id, client_id)
             .name(setup.connect_config.name.clone())
             .device_type(setup.connect_config.device_type)
             .port(setup.zeroconf_port)

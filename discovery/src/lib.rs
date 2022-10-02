@@ -77,13 +77,14 @@ impl From<DiscoveryError> for Error {
 }
 
 impl Builder {
-    /// Starts a new builder using the provided device id.
-    pub fn new(device_id: impl Into<String>) -> Self {
+    /// Starts a new builder using the provided device and client IDs.
+    pub fn new<T: Into<String>>(device_id: T, client_id: T) -> Self {
         Self {
             server_config: server::Config {
                 name: "Librespot".into(),
                 device_type: DeviceType::default(),
                 device_id: device_id.into(),
+                client_id: client_id.into(),
             },
             port: 0,
         }
@@ -141,13 +142,13 @@ impl Builder {
 
 impl Discovery {
     /// Starts a [`Builder`] with the provided device id.
-    pub fn builder(device_id: impl Into<String>) -> Builder {
-        Builder::new(device_id)
+    pub fn builder<T: Into<String>>(device_id: T, client_id: T) -> Builder {
+        Builder::new(device_id, client_id)
     }
 
     /// Create a new instance with the specified device id and default paramaters.
-    pub fn new(device_id: impl Into<String>) -> Result<Self, Error> {
-        Self::builder(device_id).launch()
+    pub fn new<T: Into<String>>(device_id: T, client_id: T) -> Result<Self, Error> {
+        Self::builder(device_id, client_id).launch()
     }
 }
 

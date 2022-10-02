@@ -1,4 +1,5 @@
 use futures::StreamExt;
+use librespot_core::SessionConfig;
 use librespot_discovery::DeviceType;
 use sha1::{Digest, Sha1};
 
@@ -7,11 +8,12 @@ async fn main() {
     let name = "Librespot";
     let device_id = hex::encode(Sha1::digest(name.as_bytes()));
 
-    let mut server = librespot_discovery::Discovery::builder(device_id)
-        .name(name)
-        .device_type(DeviceType::Computer)
-        .launch()
-        .unwrap();
+    let mut server =
+        librespot_discovery::Discovery::builder(device_id, SessionConfig::default().client_id)
+            .name(name)
+            .device_type(DeviceType::Computer)
+            .launch()
+            .unwrap();
 
     while let Some(x) = server.next().await {
         println!("Received {:?}", x);
