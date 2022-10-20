@@ -77,9 +77,11 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     })?;
 
     let hash = Sha1::digest(&remote_key);
-    let padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(rsa::hash::Hash::SHA1));
+    let padding = PaddingScheme(rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(
+        rsa::hash::Hash::SHA1,
+    )));
     public_key
-        .verify(padding, &hash, &remote_signature)
+        .verify(padding.0, &hash, &remote_signature)
         .map_err(|_| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -96,6 +98,13 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
 
     Ok(codec.framed(connection))
 }
+
+// Workaround for https://github.com/RustCrypto/RSA/issues/214
+struct PaddingScheme(rsa::padding::PaddingScheme);
+
+/// # Safety
+/// The `rsa::padding::PaddingScheme` variant we use is actually `Send`.
+unsafe impl Send for PaddingScheme {}
 
 async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>
 where
