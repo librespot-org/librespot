@@ -47,14 +47,12 @@ impl Open for GstreamerSink {
         let sample_size = format.size();
         let gst_bytes = NUM_CHANNELS as usize * 2048 * sample_size;
 
-        let pipeline = gst::Pipeline::new(None);
-        let appsrc = gst::ElementFactory::make("appsrc", None)
-            .expect("Failed to create GStreamer appsrc element")
-            .downcast::<gst_app::AppSrc>()
-            .expect("couldn't cast AppSrc element at runtime!");
-        appsrc.set_caps(Some(&gst_caps));
-        appsrc.set_max_bytes(gst_bytes as u64);
-        appsrc.set_block(true);
+        let pipeline = gst::Pipeline::default();
+        let appsrc = gst_app::AppSrc::builder()
+            .caps(&gst_caps)
+            .max_bytes(gst_bytes as u64)
+            .block(true)
+            .build();
 
         let sink = match device {
             None => {
