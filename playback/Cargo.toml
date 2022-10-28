@@ -29,7 +29,7 @@ zerocopy = { version = "0.6" }
 thiserror = { version = "1" }
 
 # Backends
-alsa            = { version = "0.6", optional = true }
+alsa            = { version = "0.7", optional = true }
 portaudio-rs    = { version = "0.3", optional = true }
 libpulse-binding        = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }

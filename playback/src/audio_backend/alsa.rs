@@ -18,7 +18,7 @@ const MIN_PERIOD_DIVISOR: Frames = 10;
 
 #[derive(Debug, Error)]
 enum AlsaError {
-    #[error("<AlsaSink> Device {device} Unsupported Format {alsa_format:?} ({format:?}), {e}")]
+    #[error("<AlsaSink> Device {device} Unsupported Format {alsa_format} ({format:?}), {e}")]
     UnsupportedFormat {
         device: String,
         alsa_format: Format,

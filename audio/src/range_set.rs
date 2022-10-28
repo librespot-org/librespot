@@ -10,7 +10,7 @@ pub struct Range {
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        return write!(f, "[{}, {}]", self.start, self.start + self.length - 1);
+        write!(f, "[{}, {}]", self.start, self.start + self.length - 1)
     }
 }
 
