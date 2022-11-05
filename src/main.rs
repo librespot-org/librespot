@@ -185,6 +185,7 @@ struct Setup {
     zeroconf_port: u16,
     player_event_program: Option<String>,
     emit_sink_events: bool,
+    bind_ips: Vec<std::net::IpAddr>,
 }
 
 fn get_setup() -> Setup {
@@ -240,6 +241,7 @@ fn get_setup() -> Setup {
     const VOLUME_CTRL: &str = "volume-ctrl";
     const VOLUME_RANGE: &str = "volume-range";
     const ZEROCONF_PORT: &str = "zeroconf-port";
+    const BIND_IP: &str = "bind-ip";
 
     // Mostly arbitrary.
     const AP_PORT_SHORT: &str = "a";
@@ -258,6 +260,7 @@ fn get_setup() -> Setup {
     const DISABLE_GAPLESS_SHORT: &str = "g";
     const DISABLE_CREDENTIAL_CACHE_SHORT: &str = "H";
     const HELP_SHORT: &str = "h";
+    const BIND_IP_SHORT: &str = "i";
     const CACHE_SIZE_LIMIT_SHORT: &str = "M";
     const MIXER_TYPE_SHORT: &str = "m";
     const ENABLE_VOLUME_NORMALISATION_SHORT: &str = "N";
@@ -570,6 +573,12 @@ fn get_setup() -> Setup {
         AUTOPLAY,
         "Explicitly set autoplay {on|off}. Defaults to following the client setting.",
         "OVERRIDE",
+    )
+    .optopt(
+        BIND_IP_SHORT,
+        BIND_IP,
+        "Interface IP address wo which mDNS will bind. Defaults to any interface",
+        "IP"
     );
 
     #[cfg(feature = "passthrough-decoder")]
@@ -1168,6 +1177,25 @@ fn get_setup() -> Setup {
         None => SessionConfig::default().autoplay,
     };
 
+    let bind_ips: Vec<std::net::IpAddr> = if opt_present(BIND_IP) {
+        if let Some(bind_ip) = opt_str(BIND_IP) {
+            bind_ip
+                .split(',')
+                .map(|s| {
+                    s.trim().parse::<std::net::IpAddr>().unwrap_or_else(|_| {
+                        invalid_error_msg(BIND_IP, BIND_IP_SHORT, s, "IPv4 and IPv6 addresses", "");
+                        exit(1);
+                    })
+                })
+                .collect()
+        } else {
+            println!("Unable to use bind-ip option, default to all interfaces.");
+            vec![]
+        }
+    } else {
+        vec![]
+    };
+
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
@@ -1608,6 +1636,7 @@ fn get_setup() -> Setup {
         zeroconf_port,
         player_event_program,
         emit_sink_events,
+        bind_ips,
     }
 }
 
@@ -1640,6 +1669,7 @@ async fn main() {
             .name(setup.connect_config.name.clone())
             .device_type(setup.connect_config.device_type)
             .port(setup.zeroconf_port)
+            .bind_ips(setup.bind_ips)
             .launch()
         {
             Ok(d) => discovery = Some(d),
