@@ -241,7 +241,7 @@ fn get_setup() -> Setup {
     const VOLUME_CTRL: &str = "volume-ctrl";
     const VOLUME_RANGE: &str = "volume-range";
     const ZEROCONF_PORT: &str = "zeroconf-port";
-    const BIND_IP: &str = "bind-ip";
+    const BIND_IP: &str = "zeroconf-interface";
 
     // Mostly arbitrary.
     const AP_PORT_SHORT: &str = "a";
@@ -1189,7 +1189,7 @@ fn get_setup() -> Setup {
                 })
                 .collect()
         } else {
-            println!("Unable to use bind-ip option, default to all interfaces.");
+            warn!("Unable to use zeroconf-interface option, default to all interfaces.");
             vec![]
         }
     } else {
