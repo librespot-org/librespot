@@ -138,21 +138,21 @@ impl Builder {
         )?;
 
         #[cfg(not(feature = "with-dns-sd"))]
-        let svc = if !_bind_ips.is_empty() {
-            libmdns::Responder::spawn_with_ip_list(&tokio::runtime::Handle::current(), _bind_ips)
+        let _svc = if !_bind_ips.is_empty() {
+            libmdns::Responder::spawn_with_ip_list(&tokio::runtime::Handle::current(), _bind_ips)?
         } else {
-            libmdns::Responder::spawn(&tokio::runtime::Handle::current())
+            libmdns::Responder::spawn(&tokio::runtime::Handle::current())?
         };
 
-        Ok(Discovery {
-            server,
-            _svc: svc?.register(
-                "_spotify-connect._tcp".to_owned(),
-                name,
-                port,
-                &["VERSION=1.0", "CPath=/"],
-            ),
-        })
+        #[cfg(not(feature = "with-dns-sd"))]
+        let svc = _svc.register(
+            "_spotify-connect._tcp".to_owned(),
+            name,
+            port,
+            &["VERSION=1.0", "CPath=/"],
+        );
+
+        Ok(Discovery { server, _svc: svc })
     }
 }
 
