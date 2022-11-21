@@ -47,7 +47,7 @@ pub struct Discovery {
 pub struct Builder {
     server_config: server::Config,
     port: u16,
-    bind_ips: Vec<std::net::IpAddr>,
+    zeroconf_ip: Vec<std::net::IpAddr>,
 }
 
 /// Errors that can occur while setting up a [`Discovery`] instance.
@@ -88,7 +88,7 @@ impl Builder {
                 client_id: client_id.into(),
             },
             port: 0,
-            bind_ips: vec![],
+            zeroconf_ip: vec![],
         }
     }
 
@@ -105,8 +105,8 @@ impl Builder {
     }
 
     /// Set the ip addresses on which the mdns service should bind
-    pub fn bind_ips(mut self, bind_ips: Vec<std::net::IpAddr>) -> Self {
-        self.bind_ips = bind_ips;
+    pub fn zeroconf_ip(mut self, zeroconf_ip: Vec<std::net::IpAddr>) -> Self {
+        self.zeroconf_ip = zeroconf_ip;
         self
     }
 
@@ -125,7 +125,7 @@ impl Builder {
         let mut port = self.port;
         let name = self.server_config.name.clone().into_owned();
         let server = DiscoveryServer::new(self.server_config, &mut port)??;
-        let _bind_ips = self.bind_ips;
+        let _zeroconf_ip = self.zeroconf_ip;
 
         #[cfg(feature = "with-dns-sd")]
         let svc = dns_sd::DNSService::register(
@@ -138,8 +138,11 @@ impl Builder {
         )?;
 
         #[cfg(not(feature = "with-dns-sd"))]
-        let _svc = if !_bind_ips.is_empty() {
-            libmdns::Responder::spawn_with_ip_list(&tokio::runtime::Handle::current(), _bind_ips)?
+        let _svc = if !_zeroconf_ip.is_empty() {
+            libmdns::Responder::spawn_with_ip_list(
+                &tokio::runtime::Handle::current(),
+                _zeroconf_ip,
+            )?
         } else {
             libmdns::Responder::spawn(&tokio::runtime::Handle::current())?
         };
