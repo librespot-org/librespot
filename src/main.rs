@@ -678,7 +678,7 @@ fn get_setup() -> Setup {
                     // Don't log creds.
                     trace!("\t\t{} \"XXXXXXXX\"", opt);
                 } else {
-                    let value = matches.opt_str(opt).unwrap_or_else(|| "".to_string());
+                    let value = matches.opt_str(opt).unwrap_or_default();
                     if value.is_empty() {
                         trace!("\t\t{}", opt);
                     } else {
