@@ -286,7 +286,7 @@ fn run_program(env_vars: HashMap<&str, String>, onevent: &str) {
         onevent, env_vars
     );
 
-    match Command::new(&v.remove(0))
+    match Command::new(v.remove(0))
         .args(&v)
         .envs(env_vars.iter())
         .spawn()
