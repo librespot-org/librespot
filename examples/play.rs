@@ -2,7 +2,10 @@ use std::{env, process::exit};
 
 use librespot::{
     core::{
-        authentication::Credentials, config::SessionConfig, session::Session, spotify_id::{SpotifyId, SpotifyItemType},
+        authentication::Credentials,
+        config::SessionConfig,
+        session::Session,
+        spotify_id::{SpotifyId, SpotifyItemType},
     },
     playback::{
         audio_backend,
