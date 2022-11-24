@@ -577,7 +577,7 @@ fn get_setup() -> Setup {
     .optopt(
         ZEROCONF_INTERFACE_SHORT,
         ZEROCONF_INTERFACE,
-        "Interface IP address wo which mDNS will bind. Defaults to any interface",
+        "Comma-separated interface IP addresses on which zeroconf will bind. Defaults to all interfaces. Ignored by DNS-SD.",
         "IP"
     );
 

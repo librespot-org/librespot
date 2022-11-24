@@ -104,7 +104,7 @@ impl Builder {
         self
     }
 
-    /// Set the ip addresses on which the mdns service should bind
+    /// Set the ip addresses on which it should listen to incoming connections. The default is all interfaces.
     pub fn zeroconf_ip(mut self, zeroconf_ip: Vec<std::net::IpAddr>) -> Self {
         self.zeroconf_ip = zeroconf_ip;
         self
@@ -126,34 +126,37 @@ impl Builder {
         let name = self.server_config.name.clone().into_owned();
         let server = DiscoveryServer::new(self.server_config, &mut port)??;
         let _zeroconf_ip = self.zeroconf_ip;
+        let svc;
 
         #[cfg(feature = "with-dns-sd")]
-        let svc = dns_sd::DNSService::register(
-            Some(name.as_ref()),
-            "_spotify-connect._tcp",
-            None,
-            None,
-            port,
-            &["VERSION=1.0", "CPath=/"],
-        )?;
+        {
+            svc = dns_sd::DNSService::register(
+                Some(name.as_ref()),
+                "_spotify-connect._tcp",
+                None,
+                None,
+                port,
+                &["VERSION=1.0", "CPath=/"],
+            )?;
+        }
 
         #[cfg(not(feature = "with-dns-sd"))]
-        let _svc = if !_zeroconf_ip.is_empty() {
-            libmdns::Responder::spawn_with_ip_list(
-                &tokio::runtime::Handle::current(),
-                _zeroconf_ip,
-            )?
-        } else {
-            libmdns::Responder::spawn(&tokio::runtime::Handle::current())?
-        };
-
-        #[cfg(not(feature = "with-dns-sd"))]
-        let svc = _svc.register(
-            "_spotify-connect._tcp".to_owned(),
-            name,
-            port,
-            &["VERSION=1.0", "CPath=/"],
-        );
+        {
+            let _svc = if !_zeroconf_ip.is_empty() {
+                libmdns::Responder::spawn_with_ip_list(
+                    &tokio::runtime::Handle::current(),
+                    _zeroconf_ip,
+                )?
+            } else {
+                libmdns::Responder::spawn(&tokio::runtime::Handle::current())?
+            };
+            svc = _svc.register(
+                "_spotify-connect._tcp".to_owned(),
+                name,
+                port,
+                &["VERSION=1.0", "CPath=/"],
+            );
+        }
 
         Ok(Discovery { server, _svc: svc })
     }
