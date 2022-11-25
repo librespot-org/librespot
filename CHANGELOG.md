@@ -68,6 +68,7 @@ https://github.com/librespot-org/librespot
 
 - [all] Check that array indexes are within bounds (panic safety)
 - [all] Wrap errors in librespot `Error` type (breaking)
+- [connect] Add option on which zeroconf will bind. Defaults to all interfaces. Ignored by DNS-SD.
 - [connect] Add session events
 - [connect] Add `repeat`, `set_position_ms` and `set_volume` to `spirc.rs`
 - [contrib] Add `event_handler_example.py`
