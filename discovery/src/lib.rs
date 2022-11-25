@@ -47,6 +47,7 @@ pub struct Discovery {
 pub struct Builder {
     server_config: server::Config,
     port: u16,
+    zeroconf_ip: Vec<std::net::IpAddr>,
 }
 
 /// Errors that can occur while setting up a [`Discovery`] instance.
@@ -87,6 +88,7 @@ impl Builder {
                 client_id: client_id.into(),
             },
             port: 0,
+            zeroconf_ip: vec![],
         }
     }
 
@@ -99,6 +101,12 @@ impl Builder {
     /// Sets the device type which is visible as icon in other Spotify clients. Default is `Speaker`.
     pub fn device_type(mut self, device_type: DeviceType) -> Self {
         self.server_config.device_type = device_type;
+        self
+    }
+
+    /// Set the ip addresses on which it should listen to incoming connections. The default is all interfaces.
+    pub fn zeroconf_ip(mut self, zeroconf_ip: Vec<std::net::IpAddr>) -> Self {
+        self.zeroconf_ip = zeroconf_ip;
         self
     }
 
@@ -117,24 +125,38 @@ impl Builder {
         let mut port = self.port;
         let name = self.server_config.name.clone().into_owned();
         let server = DiscoveryServer::new(self.server_config, &mut port)??;
+        let _zeroconf_ip = self.zeroconf_ip;
+        let svc;
 
         #[cfg(feature = "with-dns-sd")]
-        let svc = dns_sd::DNSService::register(
-            Some(name.as_ref()),
-            "_spotify-connect._tcp",
-            None,
-            None,
-            port,
-            &["VERSION=1.0", "CPath=/"],
-        )?;
+        {
+            svc = dns_sd::DNSService::register(
+                Some(name.as_ref()),
+                "_spotify-connect._tcp",
+                None,
+                None,
+                port,
+                &["VERSION=1.0", "CPath=/"],
+            )?;
+        }
 
         #[cfg(not(feature = "with-dns-sd"))]
-        let svc = libmdns::Responder::spawn(&tokio::runtime::Handle::current())?.register(
-            "_spotify-connect._tcp".to_owned(),
-            name,
-            port,
-            &["VERSION=1.0", "CPath=/"],
-        );
+        {
+            let _svc = if !_zeroconf_ip.is_empty() {
+                libmdns::Responder::spawn_with_ip_list(
+                    &tokio::runtime::Handle::current(),
+                    _zeroconf_ip,
+                )?
+            } else {
+                libmdns::Responder::spawn(&tokio::runtime::Handle::current())?
+            };
+            svc = _svc.register(
+                "_spotify-connect._tcp".to_owned(),
+                name,
+                port,
+                &["VERSION=1.0", "CPath=/"],
+            );
+        }
 
         Ok(Discovery { server, _svc: svc })
     }
