@@ -122,6 +122,36 @@ pub enum SpircCommand {
     Disconnect,
     SetPosition(u32),
     SetVolume(u16),
+    Activate,
+    Load(SpircLoadCommand),
+}
+
+#[derive(Debug)]
+pub struct SpircLoadCommand {
+    pub context_uri: String,
+    /// Whether the given tracks should immediately start playing, or just be initially loaded.
+    pub start_playing: bool,
+    pub shuffle: bool,
+    pub repeat: bool,
+    pub playing_track_index: u32,
+    pub tracks: Vec<TrackRef>,
+}
+
+impl From<SpircLoadCommand> for State {
+    fn from(command: SpircLoadCommand) -> Self {
+        let mut state = State::new();
+        state.set_context_uri(command.context_uri);
+        state.set_status(if command.start_playing {
+            PlayStatus::kPlayStatusPlay
+        } else {
+            PlayStatus::kPlayStatusStop
+        });
+        state.set_shuffle(command.shuffle);
+        state.set_repeat(command.repeat);
+        state.set_playing_track_index(command.playing_track_index);
+        state.set_track(command.tracks.into());
+        state
+    }
 }
 
 const CONTEXT_TRACKS_HISTORY: usize = 10;
@@ -469,6 +499,12 @@ impl Spirc {
     pub fn disconnect(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Disconnect)?)
     }
+    pub fn activate(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Activate)?)
+    }
+    pub fn load(&self, command: SpircLoadCommand) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Load(command))?)
+    }
 }
 
 impl SpircTask {
@@ -666,11 +702,24 @@ impl SpircTask {
                     self.set_volume(volume);
                     self.notify(None)
                 }
+                SpircCommand::Load(command) => {
+                    self.handle_load(&command.into())?;
+                    self.notify(None)
+                }
                 _ => Ok(()),
             }
         } else {
-            warn!("SpircCommand::{:?} will be ignored while Not Active", cmd);
-            Ok(())
+            match cmd {
+                SpircCommand::Activate => {
+                    trace!("Received SpircCommand::{:?}", cmd);
+                    self.handle_activate();
+                    self.notify(None)
+                }
+                _ => {
+                    warn!("SpircCommand::{:?} will be ignored while Not Active", cmd);
+                    Ok(())
+                }
+            }
         }
     }
 
@@ -889,57 +938,7 @@ impl SpircTask {
             MessageType::kMessageTypeHello => self.notify(Some(ident)),
 
             MessageType::kMessageTypeLoad => {
-                if !self.device.get_is_active() {
-                    let now = self.now_ms();
-                    self.device.set_is_active(true);
-                    self.device.set_became_active_at(now);
-                    self.player.emit_session_connected_event(
-                        self.session.connection_id(),
-                        self.session.username(),
-                    );
-                    self.player.emit_session_client_changed_event(
-                        self.session.client_id(),
-                        self.session.client_name(),
-                        self.session.client_brand_name(),
-                        self.session.client_model_name(),
-                    );
-
-                    self.player
-                        .emit_volume_changed_event(self.device.get_volume() as u16);
-
-                    self.player
-                        .emit_auto_play_changed_event(self.session.autoplay());
-
-                    self.player.emit_filter_explicit_content_changed_event(
-                        self.session.filter_explicit_content(),
-                    );
-
-                    self.player
-                        .emit_shuffle_changed_event(self.state.get_shuffle());
-
-                    self.player
-                        .emit_repeat_changed_event(self.state.get_repeat());
-                }
-
-                let context_uri = update.get_state().get_context_uri().to_owned();
-
-                // completely ignore local playback.
-                if context_uri.starts_with("spotify:local-files") {
-                    self.notify(None)?;
-                    return Err(SpircError::UnsupportedLocalPlayBack.into());
-                }
-
-                self.update_tracks(&update);
-
-                if !self.state.get_track().is_empty() {
-                    let start_playing =
-                        update.get_state().get_status() == PlayStatus::kPlayStatusPlay;
-                    self.load_track(start_playing, update.get_state().get_position_ms());
-                } else {
-                    info!("No more tracks left in queue");
-                    self.handle_stop();
-                }
-
+                self.handle_load(update.get_state())?;
                 self.notify(None)
             }
 
@@ -1021,7 +1020,7 @@ impl SpircTask {
                     return Err(SpircError::UnsupportedLocalPlayBack.into());
                 }
 
-                self.update_tracks(&update);
+                self.update_tracks(update.get_state());
 
                 if let SpircPlayStatus::Playing {
                     preloading_of_next_track_triggered,
@@ -1073,6 +1072,60 @@ impl SpircTask {
 
     fn handle_stop(&mut self) {
         self.player.stop();
+    }
+
+    fn handle_activate(&mut self) {
+        let now = self.now_ms();
+        self.device.set_is_active(true);
+        self.device.set_became_active_at(now);
+        self.player
+            .emit_session_connected_event(self.session.connection_id(), self.session.username());
+        self.player.emit_session_client_changed_event(
+            self.session.client_id(),
+            self.session.client_name(),
+            self.session.client_brand_name(),
+            self.session.client_model_name(),
+        );
+
+        self.player
+            .emit_volume_changed_event(self.device.get_volume() as u16);
+
+        self.player
+            .emit_auto_play_changed_event(self.session.autoplay());
+
+        self.player
+            .emit_filter_explicit_content_changed_event(self.session.filter_explicit_content());
+
+        self.player
+            .emit_shuffle_changed_event(self.state.get_shuffle());
+
+        self.player
+            .emit_repeat_changed_event(self.state.get_repeat());
+    }
+
+    fn handle_load(&mut self, state: &State) -> Result<(), Error> {
+        if !self.device.get_is_active() {
+            self.handle_activate();
+        }
+
+        let context_uri = state.get_context_uri().to_owned();
+
+        // completely ignore local playback.
+        if context_uri.starts_with("spotify:local-files") {
+            self.notify(None)?;
+            return Err(SpircError::UnsupportedLocalPlayBack.into());
+        }
+
+        self.update_tracks(state);
+
+        if !self.state.get_track().is_empty() {
+            let start_playing = state.get_status() == PlayStatus::kPlayStatusPlay;
+            self.load_track(start_playing, state.get_position_ms());
+        } else {
+            info!("No more tracks left in queue");
+            self.handle_stop();
+        }
+        Ok(())
     }
 
     fn handle_play(&mut self) {
@@ -1372,12 +1425,12 @@ impl SpircTask {
         }
     }
 
-    fn update_tracks(&mut self, frame: &protocol::spirc::Frame) {
-        trace!("State: {:#?}", frame.get_state());
+    fn update_tracks(&mut self, state: &State) {
+        trace!("State: {:#?}", state);
 
-        let index = frame.get_state().get_playing_track_index();
-        let context_uri = frame.get_state().get_context_uri();
-        let tracks = frame.get_state().get_track();
+        let index = state.get_playing_track_index();
+        let context_uri = state.get_context_uri();
+        let tracks = state.get_track();
 
         trace!("Frame has {:?} tracks", tracks.len());
 
@@ -1395,7 +1448,7 @@ impl SpircTask {
         // has_shuffle/repeat seem to always be true in these replace msgs,
         // but to replicate the behaviour of the Android client we have to
         // ignore false values.
-        let state = frame.get_state();
+        let state = state;
         if state.get_repeat() {
             self.state.set_repeat(true);
         }

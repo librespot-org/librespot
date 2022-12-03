@@ -84,6 +84,7 @@ https://github.com/librespot-org/librespot
   It supports a lot of functionality, including audio previews and image
   downloads even if librespot doesn't use that for playback itself.
 - [core] Support downloading of lyrics
+- [core] Support parsing `SpotifyId` for local files
 - [main] Add all player events to `player_event_handler.rs`
 - [main] Add an event worker thread that runs async to the main thread(s) but
   sync to itself to prevent potential data races for event consumers
@@ -92,6 +93,7 @@ https://github.com/librespot-org/librespot
   disabled such content. Applications that use librespot as a library without
   Connect should use the 'filter-explicit-content' user attribute in the session.
 - [playback] Add metadata support via a `TrackChanged` event
+- [connect] Add `activate` and `load` functions to `Spirc`, allowing control over local connect sessions
 
 ### Fixed
 
