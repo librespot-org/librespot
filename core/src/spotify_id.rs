@@ -21,6 +21,7 @@ pub enum SpotifyItemType {
     Playlist,
     Show,
     Track,
+    Local,
     Unknown,
 }
 
@@ -33,6 +34,7 @@ impl From<&str> for SpotifyItemType {
             "playlist" => Self::Playlist,
             "show" => Self::Show,
             "track" => Self::Track,
+            "local" => Self::Local,
             _ => Self::Unknown,
         }
     }
@@ -47,6 +49,7 @@ impl From<SpotifyItemType> for &str {
             SpotifyItemType::Playlist => "playlist",
             SpotifyItemType::Show => "show",
             SpotifyItemType::Track => "track",
+            SpotifyItemType::Local => "local",
             _ => "unknown",
         }
     }
@@ -167,24 +170,30 @@ impl SpotifyId {
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
     pub fn from_uri(src: &str) -> SpotifyIdResult {
-        let mut uri_parts: Vec<&str> = src.split(':').collect();
-
         // At minimum, should be `spotify:{type}:{id}`
-        if uri_parts.len() < 3 {
-            return Err(SpotifyIdError::InvalidFormat.into());
-        }
+        let (scheme, tail) = src.split_once(':').ok_or(SpotifyIdError::InvalidFormat)?;
+        let (item_type, id) = tail.split_once(':').ok_or(SpotifyIdError::InvalidFormat)?;
 
-        if uri_parts[0] != "spotify" {
+        if scheme != "spotify" {
             return Err(SpotifyIdError::InvalidRoot.into());
         }
 
-        let id = uri_parts.pop().unwrap_or_default();
+        let item_type = item_type.into();
+
+        // Local files have a variable-length ID: https://developer.spotify.com/documentation/general/guides/local-files-spotify-playlists/
+        // TODO: find a way to add this local file ID to SpotifyId.
+        // One possible solution would be to copy the contents of `id` to a new String field in SpotifyId,
+        // but then we would need to remove the derived Copy trait, which would be a breaking change.
+        if item_type == SpotifyItemType::Local {
+            return Ok(Self { item_type, id: 0 });
+        }
+
         if id.len() != Self::SIZE_BASE62 {
             return Err(SpotifyIdError::InvalidId.into());
         }
 
         Ok(Self {
-            item_type: uri_parts.pop().unwrap_or_default().into(),
+            item_type,
             ..Self::from_base62(id)?
         })
     }
@@ -534,7 +543,7 @@ mod tests {
         raw: &'static [u8],
     }
 
-    static CONV_VALID: [ConversionCase; 4] = [
+    static CONV_VALID: [ConversionCase; 5] = [
         ConversionCase {
             id: 238762092608182713602505436543891614649,
             kind: SpotifyItemType::Track,
@@ -574,6 +583,14 @@ mod tests {
             raw: &[
                 154, 27, 28, 251, 198, 242, 68, 86, 154, 224, 53, 108, 119, 187, 233, 216,
             ],
+        },
+        ConversionCase {
+            id: 0,
+            kind: SpotifyItemType::Local,
+            uri: "spotify:local:0000000000000000000000",
+            base16: "00000000000000000000000000000000",
+            base62: "0000000000000000000000",
+            raw: &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         },
     ];
 
@@ -674,6 +691,14 @@ mod tests {
         for c in &CONV_INVALID {
             assert!(SpotifyId::from_uri(c.uri).is_err());
         }
+    }
+
+    #[test]
+    fn from_local_uri() {
+        let actual = SpotifyId::from_uri("spotify:local:xyz:123").unwrap();
+
+        assert_eq!(actual.id, 0);
+        assert_eq!(actual.item_type, SpotifyItemType::Local);
     }
 
     #[test]
