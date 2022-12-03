@@ -91,6 +91,7 @@ https://github.com/librespot-org/librespot
   disabled such content. Applications that use librespot as a library without
   Connect should use the 'filter-explicit-content' user attribute in the session.
 - [playback] Add metadata support via a `TrackChanged` event
+- [connect] Add `activate` and `load` functions to `Spirc`, allowing control over local connect sessions
 
 ### Fixed
 
