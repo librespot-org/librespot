@@ -71,7 +71,13 @@ impl TryFrom<&PlaylistItemsMessage> for PlaylistItemList {
         Ok(Self {
             position: list_items.get_pos(),
             is_truncated: list_items.get_truncated(),
-            items: list_items.get_items().try_into()?,
+            items: PlaylistItems(
+                list_items
+                    .get_items()
+                    .iter()
+                    .filter_map(|i| i.try_into().ok())
+                    .collect(),
+            ),
             meta_items: list_items.get_meta_items().try_into()?,
         })
     }

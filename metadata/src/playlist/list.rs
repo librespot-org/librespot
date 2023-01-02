@@ -79,7 +79,8 @@ impl Playlist {
         let length = tracks.len();
         let expected_length = self.length as usize;
         if length != expected_length {
-            warn!(
+            // likely caused by some invalid (local) track IDs
+            info!(
                 "Got {} tracks, but the list should contain {} tracks.",
                 length, expected_length,
             );
