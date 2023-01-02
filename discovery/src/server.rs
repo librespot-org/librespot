@@ -61,7 +61,7 @@ impl RequestHandler {
     }
 
     fn handle_get_info(&self) -> Response<hyper::Body> {
-        let public_key = base64::encode(&self.keys.public_key());
+        let public_key = base64::encode(self.keys.public_key());
         let device_type: &str = self.config.device_type.into();
         let mut active_user = String::new();
         if let Some(username) = &self.username {
@@ -139,7 +139,7 @@ impl RequestHandler {
         let encrypted = &encrypted_blob[16..encrypted_blob_len - 20];
         let cksum = &encrypted_blob[encrypted_blob_len - 20..encrypted_blob_len];
 
-        let base_key = Sha1::digest(&shared_key);
+        let base_key = Sha1::digest(shared_key);
         let base_key = &base_key[..16];
 
         let checksum_key = {
@@ -179,7 +179,7 @@ impl RequestHandler {
             data
         };
 
-        let credentials = Credentials::with_blob(username, &decrypted, &self.config.device_id)?;
+        let credentials = Credentials::with_blob(username, decrypted, &self.config.device_id)?;
 
         self.tx.send(credentials)?;
 

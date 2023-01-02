@@ -109,7 +109,7 @@ impl AudioItem {
                     )
                 };
 
-                let popularity = track.popularity.max(0).min(100) as u8;
+                let popularity = track.popularity.clamp(0, 100) as u8;
                 let number = track.number.max(0) as u32;
                 let disc_number = track.disc_number.max(0) as u32;
 

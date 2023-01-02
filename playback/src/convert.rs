@@ -76,13 +76,7 @@ impl Converter {
         let min = -factor;
         let max = factor - 1.0;
 
-        if int_value < min {
-            min
-        } else if int_value > max {
-            max
-        } else {
-            int_value
-        }
+        int_value.clamp(min, max)
     }
 
     pub fn f64_to_f32(&mut self, samples: &[f64]) -> Vec<f32> {
