@@ -170,9 +170,24 @@ impl SpotifyId {
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
     pub fn from_uri(src: &str) -> SpotifyIdResult {
-        // At minimum, should be `spotify:{type}:{id}`
-        let (scheme, tail) = src.split_once(':').ok_or(SpotifyIdError::InvalidFormat)?;
-        let (item_type, id) = tail.split_once(':').ok_or(SpotifyIdError::InvalidFormat)?;
+        // Basic: `spotify:{type}:{id}`
+        // Named: `spotify:user:{user}:{type}:{id}`
+        // Local: `spotify:local:{artist}:{album_title}:{track_title}:{duration_in_seconds}`
+        let mut parts = src.split(':');
+
+        let scheme = parts.next().ok_or(SpotifyIdError::InvalidFormat)?;
+
+        let item_type = {
+            let next = parts.next().ok_or(SpotifyIdError::InvalidFormat)?;
+            if next == "user" {
+                let _username = parts.next().ok_or(SpotifyIdError::InvalidFormat)?;
+                parts.next().ok_or(SpotifyIdError::InvalidFormat)?
+            } else {
+                next
+            }
+        };
+
+        let id = parts.next().ok_or(SpotifyIdError::InvalidFormat)?;
 
         if scheme != "spotify" {
             return Err(SpotifyIdError::InvalidRoot.into());
@@ -699,6 +714,17 @@ mod tests {
 
         assert_eq!(actual.id, 0);
         assert_eq!(actual.item_type, SpotifyItemType::Local);
+    }
+
+    #[test]
+    fn from_named_uri() {
+        let actual =
+            NamedSpotifyId::from_uri("spotify:user:spotify:playlist:37i9dQZF1DWSw8liJZcPOI")
+                .unwrap();
+
+        assert_eq!(actual.id, 136159921382084734723401526672209703396);
+        assert_eq!(actual.item_type, SpotifyItemType::Playlist);
+        assert_eq!(actual.username, "spotify");
     }
 
     #[test]
