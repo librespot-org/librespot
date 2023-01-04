@@ -85,6 +85,7 @@ https://github.com/librespot-org/librespot
   downloads even if librespot doesn't use that for playback itself.
 - [core] Support downloading of lyrics
 - [core] Support parsing `SpotifyId` for local files
+- [core] Support parsing `SpotifyId` for named playlists
 - [main] Add all player events to `player_event_handler.rs`
 - [main] Add an event worker thread that runs async to the main thread(s) but
   sync to itself to prevent potential data races for event consumers
