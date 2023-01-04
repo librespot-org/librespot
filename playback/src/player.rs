@@ -1311,7 +1311,7 @@ impl Future for PlayerInternal {
                                                 self.send_event(PlayerEvent::PositionCorrection {
                                                     play_request_id,
                                                     track_id,
-                                                    position_ms: new_stream_position_ms as u32,
+                                                    position_ms: new_stream_position_ms,
                                                 });
                                             }
                                         }

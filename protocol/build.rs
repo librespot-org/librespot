@@ -9,7 +9,7 @@ fn out_dir() -> PathBuf {
 }
 
 fn cleanup() {
-    let _ = fs::remove_dir_all(&out_dir());
+    let _ = fs::remove_dir_all(out_dir());
 }
 
 fn compile() {

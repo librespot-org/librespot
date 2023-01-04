@@ -1138,7 +1138,7 @@ impl SpircTask {
                 self.state.set_status(PlayStatus::kPlayStatusPlay);
                 self.update_state_position(position_ms);
                 self.play_status = SpircPlayStatus::Playing {
-                    nominal_start_time: self.now_ms() as i64 - position_ms as i64,
+                    nominal_start_time: self.now_ms() - position_ms as i64,
                     preloading_of_next_track_triggered,
                 };
             }
