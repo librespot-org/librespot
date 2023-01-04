@@ -130,8 +130,7 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
     type Error = librespot_core::Error;
     fn try_from(playlist: &<Playlist as Metadata>::Message) -> Result<Self, Self::Error> {
         let timestamp = playlist.get_timestamp();
-
-        let timestamp = if timestamp > 1672809484000 {
+        let timestamp = if timestamp > 9295169800000 {
             // timestamp is way out of range for milliseconds. Some seem to be in microseconds?
             // Observed on playlists where:
             //   format: "artist-mix-reader"
