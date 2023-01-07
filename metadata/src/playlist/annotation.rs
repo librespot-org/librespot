@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::fmt::Debug;
 
 use protobuf::Message;
@@ -34,11 +34,11 @@ impl Metadata for PlaylistAnnotation {
 
     fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
         Ok(Self {
-            description: msg.get_description().to_owned(),
-            picture: msg.get_picture().to_owned(), // TODO: is this a URL or Spotify URI?
-            transcoded_pictures: msg.get_transcoded_picture().try_into()?,
-            has_abuse_reporting: msg.get_is_abuse_reporting_enabled(),
-            abuse_report_state: msg.get_abuse_report_state(),
+            description: msg.description().to_owned(),
+            picture: msg.picture().to_owned(), // TODO: is this a URL or Spotify URI?
+            transcoded_pictures: msg.transcoded_picture.as_slice().try_into()?,
+            has_abuse_reporting: msg.is_abuse_reporting_enabled(),
+            abuse_report_state: msg.abuse_report_state(),
         })
     }
 }
@@ -77,11 +77,11 @@ impl TryFrom<&<PlaylistAnnotation as Metadata>::Message> for PlaylistAnnotation 
         annotation: &<PlaylistAnnotation as Metadata>::Message,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
-            description: annotation.get_description().to_owned(),
-            picture: annotation.get_picture().to_owned(),
-            transcoded_pictures: annotation.get_transcoded_picture().try_into()?,
-            has_abuse_reporting: annotation.get_is_abuse_reporting_enabled(),
-            abuse_report_state: annotation.get_abuse_report_state(),
+            description: annotation.description().to_owned(),
+            picture: annotation.picture().to_owned(),
+            transcoded_pictures: annotation.transcoded_picture.as_slice().try_into()?,
+            has_abuse_reporting: annotation.is_abuse_reporting_enabled(),
+            abuse_report_state: annotation.abuse_report_state(),
         })
     }
 }

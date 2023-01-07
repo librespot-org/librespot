@@ -11,8 +11,8 @@ use crate::{
 use librespot_core::{Error, Session, SpotifyId};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::Show_ConsumptionOrder as ShowConsumptionOrder;
-pub use protocol::metadata::Show_MediaType as ShowMediaType;
+pub use protocol::metadata::show::ConsumptionOrder as ShowConsumptionOrder;
+pub use protocol::metadata::show::MediaType as ShowMediaType;
 
 #[derive(Debug, Clone)]
 pub struct Show {
@@ -53,22 +53,22 @@ impl TryFrom<&<Self as Metadata>::Message> for Show {
     fn try_from(show: &<Self as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
             id: show.try_into()?,
-            name: show.get_name().to_owned(),
-            description: show.get_description().to_owned(),
-            publisher: show.get_publisher().to_owned(),
-            language: show.get_language().to_owned(),
-            is_explicit: show.get_explicit(),
-            covers: show.get_cover_image().get_image().into(),
-            episodes: show.get_episode().try_into()?,
-            copyrights: show.get_copyright().into(),
-            restrictions: show.get_restriction().into(),
-            keywords: show.get_keyword().to_vec(),
-            media_type: show.get_media_type(),
-            consumption_order: show.get_consumption_order(),
-            availability: show.get_availability().try_into()?,
-            trailer_uri: SpotifyId::from_uri(show.get_trailer_uri())?,
-            has_music_and_talk: show.get_music_and_talk(),
-            is_audiobook: show.get_is_audiobook(),
+            name: show.name().to_owned(),
+            description: show.description().to_owned(),
+            publisher: show.publisher().to_owned(),
+            language: show.language().to_owned(),
+            is_explicit: show.explicit(),
+            covers: show.cover_image.image.as_slice().into(),
+            episodes: show.episode.as_slice().try_into()?,
+            copyrights: show.copyright.as_slice().into(),
+            restrictions: show.restriction.as_slice().into(),
+            keywords: show.keyword.to_vec(),
+            media_type: show.media_type(),
+            consumption_order: show.consumption_order(),
+            availability: show.availability.as_slice().try_into()?,
+            trailer_uri: SpotifyId::from_uri(show.trailer_uri())?,
+            has_music_and_talk: show.music_and_talk(),
+            is_audiobook: show.is_audiobook(),
         })
     }
 }

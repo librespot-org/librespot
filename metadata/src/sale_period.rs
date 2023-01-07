@@ -1,5 +1,5 @@
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
@@ -30,9 +30,9 @@ impl TryFrom<&SalePeriodMessage> for SalePeriod {
     type Error = librespot_core::Error;
     fn try_from(sale_period: &SalePeriodMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            restrictions: sale_period.get_restriction().into(),
-            start: sale_period.get_start().try_into()?,
-            end: sale_period.get_end().try_into()?,
+            restrictions: sale_period.restriction.as_slice().into(),
+            start: sale_period.start.get_or_default().try_into()?,
+            end: sale_period.end.get_or_default().try_into()?,
         })
     }
 }

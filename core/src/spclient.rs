@@ -1,6 +1,5 @@
 use std::{
-    convert::TryInto,
-    env::consts::OS,
+        env::consts::OS,
     fmt::Write,
     time::{Duration, Instant},
 };
@@ -14,7 +13,7 @@ use hyper::{
     header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
     Body, HeaderMap, Method, Request,
 };
-use protobuf::{Message, ProtobufEnum};
+use protobuf::{Message, MessageFull, Enum};
 use rand::RngCore;
 use sha1::{Digest, Sha1};
 use sysinfo::{System, SystemExt};
@@ -150,7 +149,7 @@ impl SpClient {
         Ok(())
     }
 
-    async fn client_token_request(&self, message: &dyn Message) -> Result<Bytes, Error> {
+    async fn client_token_request<M: Message>(&self, message: &M) -> Result<Bytes, Error> {
         let body = message.write_to_bytes()?;
 
         let request = Request::builder()
@@ -179,10 +178,11 @@ impl SpClient {
         debug!("Client token unavailable or expired, requesting new token.");
 
         let mut request = ClientTokenRequest::new();
-        request.set_request_type(ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST);
+        request.request_type = ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST.into();
 
         let client_data = request.mut_client_data();
-        client_data.set_client_version(spotify_version());
+
+        client_data.client_version = spotify_version();
 
         // Current state of affairs: keymaster ID works on all tested platforms, but may be phased out,
         // so it seems a good idea to mimick the real clients. `self.session().client_id()` returns the
@@ -194,12 +194,12 @@ impl SpClient {
             "macos" | "windows" => self.session().client_id(),
             _ => SessionConfig::default().client_id,
         };
-        client_data.set_client_id(client_id);
+        client_data.client_id = client_id;
 
         let connectivity_data = client_data.mut_connectivity_sdk_data();
-        connectivity_data.set_device_id(self.session().device_id().to_string());
+        connectivity_data.device_id = self.session().device_id().to_string();
 
-        let platform_data = connectivity_data.mut_platform_specific_data();
+        let platform_data = connectivity_data.platform_specific_data.mut_or_insert_default();
 
         let sys = System::new();
         let os_version = sys.os_version().unwrap_or_else(|| String::from("0"));
@@ -218,41 +218,41 @@ impl SpClient {
                 };
 
                 let windows_data = platform_data.mut_desktop_windows();
-                windows_data.set_os_version(os_version);
-                windows_data.set_os_build(kernel_version);
-                windows_data.set_platform_id(2);
-                windows_data.set_unknown_value_6(9);
-                windows_data.set_image_file_machine(image_file);
-                windows_data.set_pe_machine(pe);
-                windows_data.set_unknown_value_10(true);
+                windows_data.os_version = os_version;
+                windows_data.os_build = kernel_version;
+                windows_data.platform_id = 2;
+                windows_data.unknown_value_6 = 9;
+                windows_data.image_file_machine = image_file;
+                windows_data.pe_machine = pe;
+                windows_data.unknown_value_10 = true;
             }
             "ios" => {
                 let ios_data = platform_data.mut_ios();
-                ios_data.set_user_interface_idiom(0);
-                ios_data.set_target_iphone_simulator(false);
-                ios_data.set_hw_machine("iPhone14,5".to_string());
-                ios_data.set_system_version(os_version);
+                ios_data.user_interface_idiom = 0;
+                ios_data.target_iphone_simulator = false;
+                ios_data.hw_machine = "iPhone14,5".to_string();
+                ios_data.system_version = os_version;
             }
             "android" => {
                 let android_data = platform_data.mut_android();
-                android_data.set_android_version(os_version);
-                android_data.set_api_version(31);
-                android_data.set_device_name("Pixel".to_owned());
-                android_data.set_model_str("GF5KQ".to_owned());
-                android_data.set_vendor("Google".to_owned());
+                android_data.android_version = os_version;
+                android_data.api_version = 31;
+                android_data.device_name = "Pixel".to_owned();
+                android_data.model_str = "GF5KQ".to_owned();
+                android_data.vendor = "Google".to_owned();
             }
             "macos" => {
                 let macos_data = platform_data.mut_desktop_macos();
-                macos_data.set_system_version(os_version);
-                macos_data.set_hw_model("iMac21,1".to_string());
-                macos_data.set_compiled_cpu_type(std::env::consts::ARCH.to_string());
+                macos_data.system_version = os_version;
+                macos_data.hw_model = "iMac21,1".to_string();
+                macos_data.compiled_cpu_type = std::env::consts::ARCH.to_string();
             }
             _ => {
                 let linux_data = platform_data.mut_desktop_linux();
-                linux_data.set_system_name("Linux".to_string());
-                linux_data.set_system_release(kernel_version);
-                linux_data.set_system_version(os_version);
-                linux_data.set_hardware(std::env::consts::ARCH.to_string());
+                linux_data.system_name = "Linux".to_string();
+                linux_data.system_release = kernel_version;
+                linux_data.system_version = os_version;
+                linux_data.hardware = std::env::consts::ARCH.to_string();
             }
         }
 
@@ -272,10 +272,10 @@ impl SpClient {
                 Some(ClientTokenResponseType::RESPONSE_CHALLENGES_RESPONSE) => {
                     debug!("Received a hash cash challenge, solving...");
 
-                    let challenges = message.get_challenges().clone();
-                    let state = challenges.get_state();
+                    let challenges = message.challenges().clone();
+                    let state = challenges.state;
                     if let Some(challenge) = challenges.challenges.first() {
-                        let hash_cash_challenge = challenge.get_evaluate_hashcash_parameters();
+                        let hash_cash_challenge = challenge.evaluate_hashcash_parameters();
 
                         let ctx = vec![];
                         let prefix = hex::decode(&hash_cash_challenge.prefix).map_err(|e| {
@@ -295,15 +295,13 @@ impl SpClient {
                                 let suffix = hex::encode(suffix).to_uppercase();
 
                                 let mut answer_message = ClientTokenRequest::new();
-                                answer_message.set_request_type(
-                                    ClientTokenRequestType::REQUEST_CHALLENGE_ANSWERS_REQUEST,
-                                );
+                                answer_message.request_type = ClientTokenRequestType::REQUEST_CHALLENGE_ANSWERS_REQUEST.into();
 
                                 let challenge_answers = answer_message.mut_challenge_answers();
 
                                 let mut challenge_answer = ChallengeAnswer::new();
                                 challenge_answer.mut_hash_cash().suffix = suffix.to_string();
-                                challenge_answer.ChallengeType = ChallengeType::CHALLENGE_HASH_CASH;
+                                challenge_answer.ChallengeType = ChallengeType::CHALLENGE_HASH_CASH.into();
 
                                 challenge_answers.state = state.to_string();
                                 challenge_answers.answers.push(challenge_answer);
@@ -355,21 +353,21 @@ impl SpClient {
             }
         };
 
-        let granted_token = token_response.get_granted_token();
-        let access_token = granted_token.get_token().to_owned();
+        let granted_token = token_response.granted_token();
+        let access_token = granted_token.token.to_owned();
 
         self.lock(|inner| {
             let client_token = Token {
                 access_token: access_token.clone(),
                 expires_in: Duration::from_secs(
                     granted_token
-                        .get_refresh_after_seconds()
+                        .refresh_after_seconds
                         .try_into()
                         .unwrap_or(7200),
                 ),
                 token_type: "client-token".to_string(),
                 scopes: granted_token
-                    .get_domains()
+                    .domains
                     .iter()
                     .map(|d| d.domain.clone())
                     .collect(),
@@ -384,12 +382,12 @@ impl SpClient {
         Ok(access_token)
     }
 
-    pub async fn request_with_protobuf(
+    pub async fn request_with_protobuf<M: Message + MessageFull>(
         &self,
         method: &Method,
         endpoint: &str,
         headers: Option<HeaderMap>,
-        message: &dyn Message,
+        message: &M,
     ) -> SpClientResult {
         let body = protobuf::text_format::print_to_string(message);
 

@@ -4,7 +4,7 @@ use aes::Aes192;
 use byteorder::{BigEndian, ByteOrder};
 use hmac::Hmac;
 use pbkdf2::pbkdf2;
-use protobuf::ProtobufEnum;
+use protobuf::Enum;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
@@ -145,7 +145,7 @@ impl Credentials {
 
 fn serialize_protobuf_enum<T, S>(v: &T, ser: S) -> Result<S::Ok, S::Error>
 where
-    T: ProtobufEnum,
+    T: Enum,
     S: serde::Serializer,
 {
     serde::Serialize::serialize(&v.value(), ser)
@@ -153,7 +153,7 @@ where
 
 fn deserialize_protobuf_enum<'de, T, D>(de: D) -> Result<T, D::Error>
 where
-    T: ProtobufEnum,
+    T: Enum,
     D: serde::Deserializer<'de>,
 {
     let v: i32 = serde::Deserialize::deserialize(de)?;

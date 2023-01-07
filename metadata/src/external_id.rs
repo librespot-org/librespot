@@ -22,8 +22,8 @@ impl_deref_wrapped!(ExternalIds, Vec<ExternalId>);
 impl From<&ExternalIdMessage> for ExternalId {
     fn from(external_id: &ExternalIdMessage) -> Self {
         Self {
-            external_type: external_id.get_field_type().to_owned(),
-            id: external_id.get_id().to_owned(),
+            external_type: external_id.type_().to_owned(),
+            id: external_id.id().to_owned(),
         }
     }
 }

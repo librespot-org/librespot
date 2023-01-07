@@ -21,7 +21,7 @@ use crate::{
 use librespot_core::{date::Date, Error, Session, SpotifyId};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::Album_Type as AlbumType;
+pub use protocol::metadata::album::Type as AlbumType;
 use protocol::metadata::Disc as DiscMessage;
 
 #[derive(Debug, Clone)]
@@ -90,26 +90,26 @@ impl TryFrom<&<Self as Metadata>::Message> for Album {
     fn try_from(album: &<Self as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
             id: album.try_into()?,
-            name: album.get_name().to_owned(),
-            artists: album.get_artist().try_into()?,
-            album_type: album.get_field_type(),
-            label: album.get_label().to_owned(),
-            date: album.get_date().try_into()?,
-            popularity: album.get_popularity(),
-            genres: album.get_genre().to_vec(),
-            covers: album.get_cover_group().into(),
-            external_ids: album.get_external_id().into(),
-            discs: album.get_disc().try_into()?,
-            reviews: album.get_review().to_vec(),
-            copyrights: album.get_copyright().into(),
-            restrictions: album.get_restriction().into(),
-            related: album.get_related().try_into()?,
-            sale_periods: album.get_sale_period().try_into()?,
-            cover_group: album.get_cover_group().get_image().into(),
-            original_title: album.get_original_title().to_owned(),
-            version_title: album.get_version_title().to_owned(),
-            type_str: album.get_type_str().to_owned(),
-            availability: album.get_availability().try_into()?,
+            name: album.name().to_owned(),
+            artists: album.artist.as_slice().try_into()?,
+            album_type: album.type_(),
+            label: album.label().to_owned(),
+            date: album.date.get_or_default().try_into()?,
+            popularity: album.popularity(),
+            genres: album.genre.to_vec(),
+            covers: album.cover_group.get_or_default().into(),
+            external_ids: album.external_id.as_slice().into(),
+            discs: album.disc.as_slice().try_into()?,
+            reviews: album.review.to_vec(),
+            copyrights: album.copyright.as_slice().into(),
+            restrictions: album.restriction.as_slice().into(),
+            related: album.related.as_slice().try_into()?,
+            sale_periods: album.sale_period.as_slice().try_into()?,
+            cover_group: album.cover_group.image.as_slice().into(),
+            original_title: album.original_title().to_owned(),
+            version_title: album.version_title().to_owned(),
+            type_str: album.type_str().to_owned(),
+            availability: album.availability.as_slice().try_into()?,
         })
     }
 }
@@ -120,9 +120,9 @@ impl TryFrom<&DiscMessage> for Disc {
     type Error = librespot_core::Error;
     fn try_from(disc: &DiscMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            number: disc.get_number(),
-            name: disc.get_name().to_owned(),
-            tracks: disc.get_track().try_into()?,
+            number: disc.number(),
+            name: disc.name().to_owned(),
+            tracks: disc.track.as_slice().try_into()?,
         })
     }
 }
