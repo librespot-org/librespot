@@ -29,7 +29,7 @@ impl From<&CapabilitiesMessage> for Capabilities {
         Self {
             can_view: playlist.can_view(),
             can_administrate_permissions: playlist.can_administrate_permissions(),
-            grantable_levels: PermissionLevels(playlist.grantable_level.iter().map(|l| l.unwrap()).collect()),
+            grantable_levels: PermissionLevels(playlist.grantable_level.iter().map(|l| l.enum_value_or_default()).collect()),
             can_edit_metadata: playlist.can_edit_metadata(),
             can_edit_items: playlist.can_edit_items(),
             can_cancel_membership: playlist.can_cancel_membership(),

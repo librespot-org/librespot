@@ -147,7 +147,7 @@ impl TryFrom<&PlaylistPartialAttributesMessage> for PlaylistPartialAttributes {
     fn try_from(attributes: &PlaylistPartialAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             values: attributes.values.get_or_default().try_into()?,
-            no_value: attributes.no_value.iter().map(|v| v.unwrap()).collect::<Vec<PlaylistAttributeKind>>().as_slice().into(),
+            no_value: attributes.no_value.iter().map(|v| v.enum_value_or_default()).collect::<Vec<PlaylistAttributeKind>>().as_slice().into(),
         })
     }
 }
@@ -157,7 +157,7 @@ impl TryFrom<&PlaylistPartialItemAttributesMessage> for PlaylistPartialItemAttri
     fn try_from(attributes: &PlaylistPartialItemAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             values: attributes.values.get_or_default().try_into()?,
-            no_value: attributes.no_value.iter().map(|v| v.unwrap()).collect::<Vec<PlaylistItemAttributeKind>>().as_slice().into(),
+            no_value: attributes.no_value.iter().map(|v| v.enum_value_or_default()).collect::<Vec<PlaylistItemAttributeKind>>().as_slice().into(),
         })
     }
 }

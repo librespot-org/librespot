@@ -164,7 +164,7 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
             owner_username: playlist.owner_username().to_owned(),
             has_abuse_reporting: playlist.abuse_reporting_enabled(),
             capabilities: playlist.capabilities.get_or_default().into(),
-            geoblocks: Geoblocks(playlist.geoblock.iter().map(|b| b.unwrap()).collect()),
+            geoblocks: Geoblocks(playlist.geoblock.iter().map(|b| b.enum_value_or_default()).collect()),
         })
     }
 }

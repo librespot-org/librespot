@@ -100,7 +100,7 @@ impl CdnUrl {
 impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
     type Error = crate::Error;
     fn try_from(msg: CdnUrlMessage) -> Result<Self, Self::Error> {
-        if !matches!(msg.result.unwrap(), StorageResolveResponse_Result::CDN) {
+        if !matches!(msg.result.enum_value_or_default(), StorageResolveResponse_Result::CDN) {
             return Err(CdnUrlError::Storage.into());
         }
 

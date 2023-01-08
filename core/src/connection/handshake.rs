@@ -54,15 +54,15 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     let mut accumulator = client_hello(&mut connection, gc).await?;
     let message: APResponseMessage = recv_packet(&mut connection, &mut accumulator).await?;
     let remote_key = message
-        .challenge.as_ref().unwrap()
-        .login_crypto_challenge.as_ref().unwrap()
-        .diffie_hellman.as_ref().unwrap()
+        .challenge.get_or_default()
+        .login_crypto_challenge.get_or_default()
+        .diffie_hellman.get_or_default()
         .gs()
         .to_owned();
     let remote_signature = message
-        .challenge.unwrap()
-        .login_crypto_challenge.unwrap()
-        .diffie_hellman.unwrap()
+        .challenge.get_or_default()
+        .login_crypto_challenge.get_or_default()
+        .diffie_hellman.get_or_default()
         .gs_signature()
         .to_owned();
 
