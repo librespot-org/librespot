@@ -41,7 +41,7 @@ impl Credentials {
             auth_data: password.into().into_bytes(),
         }
     }
-    
+
     pub fn with_access_token(username: impl Into<String>, token: impl Into<String>) -> Credentials {
         Credentials {
             username: username.into(),
