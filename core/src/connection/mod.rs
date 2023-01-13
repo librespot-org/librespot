@@ -133,6 +133,7 @@ pub async fn authenticate(
     let cmd = PacketType::Login;
     let data = packet.write_to_bytes()?;
 
+    debug!("Authenticating with AP using {:?}", credentials.auth_type);
     transport.send((cmd as u8, data)).await?;
     let (cmd, data) = transport
         .next()

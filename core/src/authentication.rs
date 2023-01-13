@@ -50,11 +50,19 @@ impl Credentials {
     ///
     /// let creds = Credentials::with_password("my account", "my password");
     /// ```
-    pub fn with_password(username: impl Into<String>, password: impl Into<String>) -> Credentials {
-        Credentials {
+    pub fn with_password(username: impl Into<String>, password: impl Into<String>) -> Self {
+        Self {
             username: username.into(),
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
             auth_data: password.into().into_bytes(),
+        }
+    }
+
+    pub fn with_access_token(username: impl Into<String>, token: impl Into<String>) -> Self {
+        Self {
+            username: username.into(),
+            auth_type: AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN,
+            auth_data: token.into().into_bytes(),
         }
     }
 
@@ -62,7 +70,7 @@ impl Credentials {
         username: impl Into<String>,
         encrypted_blob: impl AsRef<[u8]>,
         device_id: impl AsRef<[u8]>,
-    ) -> Result<Credentials, Error> {
+    ) -> Result<Self, Error> {
         fn read_u8<R: Read>(stream: &mut R) -> io::Result<u8> {
             let mut data = [0u8];
             stream.read_exact(&mut data)?;
@@ -136,7 +144,7 @@ impl Credentials {
         read_u8(&mut cursor)?;
         let auth_data = read_bytes(&mut cursor)?;
 
-        Ok(Credentials {
+        Ok(Self {
             username,
             auth_type,
             auth_data,
