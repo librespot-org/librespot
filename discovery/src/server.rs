@@ -77,62 +77,72 @@ impl RequestHandler {
     }
 
     fn handle_add_user(&self, params: &Params<'_>) -> Response<hyper::Body> {
-        let username = params.get("userName").unwrap().as_ref();
-        let encrypted_blob = params.get("blob").unwrap();
-        let client_key = params.get("clientKey").unwrap();
+        let is_accesstoken_type_auth = params
+            .get("tokenType")
+            .map(|tokentype_option| tokentype_option.as_ref().to_owned().eq("accesstoken"))
+            .unwrap_or(false);
+        let credentials = if is_accesstoken_type_auth {
+            let username = params.get("userName").unwrap().as_ref();
+            let accesstoken = params.get("blob").unwrap().as_ref();
+            Credentials::with_access_token(username, accesstoken)
+        } else {
+            let username = params.get("userName").unwrap().as_ref();
+            let encrypted_blob = params.get("blob").unwrap();
+            let client_key = params.get("clientKey").unwrap();
 
-        let encrypted_blob = base64::decode(encrypted_blob.as_bytes()).unwrap();
+            let encrypted_blob = base64::decode(encrypted_blob.as_bytes()).unwrap();
 
-        let client_key = base64::decode(client_key.as_bytes()).unwrap();
-        let shared_key = self.keys.shared_secret(&client_key);
+            let client_key = base64::decode(client_key.as_bytes()).unwrap();
+            let shared_key = self.keys.shared_secret(&client_key);
 
-        let iv = &encrypted_blob[0..16];
-        let encrypted = &encrypted_blob[16..encrypted_blob.len() - 20];
-        let cksum = &encrypted_blob[encrypted_blob.len() - 20..encrypted_blob.len()];
+            let iv = &encrypted_blob[0..16];
+            let encrypted = &encrypted_blob[16..encrypted_blob.len() - 20];
+            let cksum = &encrypted_blob[encrypted_blob.len() - 20..encrypted_blob.len()];
 
-        let base_key = Sha1::digest(&shared_key);
-        let base_key = &base_key[..16];
+            let base_key = Sha1::digest(&shared_key);
+            let base_key = &base_key[..16];
 
-        let checksum_key = {
+            let checksum_key = {
+                let mut h =
+                    Hmac::<Sha1>::new_from_slice(base_key).expect("HMAC can take key of any size");
+                h.update(b"checksum");
+                h.finalize().into_bytes()
+            };
+
+            let encryption_key = {
+                let mut h =
+                    Hmac::<Sha1>::new_from_slice(base_key).expect("HMAC can take key of any size");
+                h.update(b"encryption");
+                h.finalize().into_bytes()
+            };
+
             let mut h =
-                Hmac::<Sha1>::new_from_slice(base_key).expect("HMAC can take key of any size");
-            h.update(b"checksum");
-            h.finalize().into_bytes()
+                Hmac::<Sha1>::new_from_slice(&checksum_key).expect("HMAC can take key of any size");
+            h.update(encrypted);
+            if h.verify(cksum).is_err() {
+                warn!("Login error for user {:?}: MAC mismatch", username);
+                let result = json!({
+                    "status": 102,
+                    "spotifyError": 1,
+                    "statusString": "ERROR-MAC"
+                });
+
+                let body = result.to_string();
+                return Response::new(Body::from(body));
+            }
+
+            let decrypted = {
+                let mut data = encrypted.to_vec();
+                let mut cipher = Aes128Ctr::new(
+                    GenericArray::from_slice(&encryption_key[0..16]),
+                    GenericArray::from_slice(iv),
+                );
+                cipher.apply_keystream(&mut data);
+                data
+            };
+
+            Credentials::with_blob(username, &decrypted, &self.config.device_id)
         };
-
-        let encryption_key = {
-            let mut h =
-                Hmac::<Sha1>::new_from_slice(base_key).expect("HMAC can take key of any size");
-            h.update(b"encryption");
-            h.finalize().into_bytes()
-        };
-
-        let mut h =
-            Hmac::<Sha1>::new_from_slice(&checksum_key).expect("HMAC can take key of any size");
-        h.update(encrypted);
-        if h.verify(cksum).is_err() {
-            warn!("Login error for user {:?}: MAC mismatch", username);
-            let result = json!({
-                "status": 102,
-                "spotifyError": 1,
-                "statusString": "ERROR-MAC"
-            });
-
-            let body = result.to_string();
-            return Response::new(Body::from(body));
-        }
-
-        let decrypted = {
-            let mut data = encrypted.to_vec();
-            let mut cipher = Aes128Ctr::new(
-                GenericArray::from_slice(&encryption_key[0..16]),
-                GenericArray::from_slice(iv),
-            );
-            cipher.apply_keystream(&mut data);
-            data
-        };
-
-        let credentials = Credentials::with_blob(username, &decrypted, &self.config.device_id);
 
         self.tx.send(credentials).unwrap();
 

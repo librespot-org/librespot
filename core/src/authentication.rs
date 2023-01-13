@@ -41,6 +41,14 @@ impl Credentials {
             auth_data: password.into().into_bytes(),
         }
     }
+    
+    pub fn with_access_token(username: impl Into<String>, token: impl Into<String>) -> Credentials {
+        Credentials {
+            username: username.into(),
+            auth_type: AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN,
+            auth_data: token.into().into_bytes(),
+        }
+    }
 
     pub fn with_blob(
         username: impl Into<String>,
