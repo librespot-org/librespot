@@ -156,7 +156,13 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
                 .as_ref()
                 .map(TryInto::try_into)
                 .transpose()?,
-            resulting_revisions: Playlists(playlist.resulting_revisions.iter().map(|p| p.try_into()).collect::<Result<Vec<SpotifyId>, Error>>()?),
+            resulting_revisions: Playlists(
+                playlist
+                    .resulting_revisions
+                    .iter()
+                    .map(|p| p.try_into())
+                    .collect::<Result<Vec<SpotifyId>, Error>>()?,
+            ),
             has_multiple_heads: playlist.multiple_heads(),
             is_up_to_date: playlist.up_to_date(),
             nonces: playlist.nonces.clone(),
@@ -164,7 +170,13 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
             owner_username: playlist.owner_username().to_owned(),
             has_abuse_reporting: playlist.abuse_reporting_enabled(),
             capabilities: playlist.capabilities.get_or_default().into(),
-            geoblocks: Geoblocks(playlist.geoblock.iter().map(|b| b.enum_value_or_default()).collect()),
+            geoblocks: Geoblocks(
+                playlist
+                    .geoblock
+                    .iter()
+                    .map(|b| b.enum_value_or_default())
+                    .collect(),
+            ),
         })
     }
 }

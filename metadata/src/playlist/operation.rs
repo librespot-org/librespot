@@ -13,10 +13,10 @@ use crate::{
 };
 
 use librespot_protocol as protocol;
+pub use protocol::playlist4_external::op::Kind as PlaylistOperationKind;
 use protocol::playlist4_external::Add as PlaylistAddMessage;
 use protocol::playlist4_external::Mov as PlaylistMoveMessage;
 use protocol::playlist4_external::Op as PlaylistOperationMessage;
-pub use protocol::playlist4_external::op::Kind as PlaylistOperationKind;
 use protocol::playlist4_external::Rem as PlaylistRemoveMessage;
 
 #[derive(Debug, Clone)]
@@ -65,8 +65,14 @@ impl TryFrom<&PlaylistOperationMessage> for PlaylistOperation {
             add: operation.add.get_or_default().try_into()?,
             rem: operation.rem.get_or_default().try_into()?,
             mov: operation.mov.get_or_default().into(),
-            update_item_attributes: operation.update_item_attributes.get_or_default().try_into()?,
-            update_list_attributes: operation.update_list_attributes.get_or_default().try_into()?,
+            update_item_attributes: operation
+                .update_item_attributes
+                .get_or_default()
+                .try_into()?,
+            update_list_attributes: operation
+                .update_list_attributes
+                .get_or_default()
+                .try_into()?,
         })
     }
 }

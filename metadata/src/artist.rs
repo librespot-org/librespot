@@ -20,7 +20,7 @@ use crate::{
 use librespot_core::{Error, Session, SpotifyId};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::artist_with_role::ArtistRole as ArtistRole;
+pub use protocol::metadata::artist_with_role::ArtistRole;
 
 use protocol::metadata::ActivityPeriod as ActivityPeriodMessage;
 use protocol::metadata::AlbumGroup as AlbumGroupMessage;
@@ -202,7 +202,12 @@ impl TryFrom<&<Self as Metadata>::Message> for Artist {
             restrictions: artist.restriction.as_slice().into(),
             related: artist.related.as_slice().try_into()?,
             is_portrait_album_cover: artist.is_portrait_album_cover(),
-            portrait_group: artist.portrait_group.get_or_default().image.as_slice().into(),
+            portrait_group: artist
+                .portrait_group
+                .get_or_default()
+                .image
+                .as_slice()
+                .into(),
             sales_periods: artist.sale_period.as_slice().try_into()?,
             availabilities: artist.availability.as_slice().try_into()?,
         })

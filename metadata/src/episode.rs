@@ -19,7 +19,7 @@ use crate::{
 use librespot_core::{date::Date, Error, Session, SpotifyId};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::episode::EpisodeType as EpisodeType;
+pub use protocol::metadata::episode::EpisodeType;
 
 #[derive(Debug, Clone)]
 pub struct Episode {

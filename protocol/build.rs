@@ -47,7 +47,7 @@ fn compile() {
     fs::create_dir(&out_dir).expect("create_dir");
 
     protobuf_codegen::Codegen::new()
-    .pure()
+        .pure()
         .out_dir(&out_dir)
         .inputs(&slices)
         .include(&proto_dir)

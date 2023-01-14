@@ -7,8 +7,8 @@ use std::{
 use librespot_core::FileId;
 
 use librespot_protocol as protocol;
-use protocol::metadata::AudioFile as AudioFileMessage;
 pub use protocol::metadata::audio_file::Format as AudioFileFormat;
+use protocol::metadata::AudioFile as AudioFileMessage;
 
 use crate::util::impl_deref_wrapped;
 

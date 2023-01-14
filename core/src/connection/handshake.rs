@@ -54,15 +54,21 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     let mut accumulator = client_hello(&mut connection, gc).await?;
     let message: APResponseMessage = recv_packet(&mut connection, &mut accumulator).await?;
     let remote_key = message
-        .challenge.get_or_default()
-        .login_crypto_challenge.get_or_default()
-        .diffie_hellman.get_or_default()
+        .challenge
+        .get_or_default()
+        .login_crypto_challenge
+        .get_or_default()
+        .diffie_hellman
+        .get_or_default()
         .gs()
         .to_owned();
     let remote_signature = message
-        .challenge.get_or_default()
-        .login_crypto_challenge.get_or_default()
-        .diffie_hellman.get_or_default()
+        .challenge
+        .get_or_default()
+        .login_crypto_challenge
+        .get_or_default()
+        .diffie_hellman
+        .get_or_default()
         .gs_signature()
         .to_owned();
 
@@ -151,28 +157,38 @@ where
 
     let mut packet = ClientHello::new();
     packet
-        .build_info.mut_or_insert_default()
+        .build_info
+        .mut_or_insert_default()
         // ProductInfo won't push autoplay and perhaps other settings
         // when set to anything else than PRODUCT_CLIENT
         .set_product(protocol::keyexchange::Product::PRODUCT_CLIENT);
     packet
-        .build_info.mut_or_insert_default()
+        .build_info
+        .mut_or_insert_default()
         .product_flags
         .push(PRODUCT_FLAGS.into());
-    packet.build_info.mut_or_insert_default().set_platform(platform);
     packet
-        .build_info.mut_or_insert_default()
+        .build_info
+        .mut_or_insert_default()
+        .set_platform(platform);
+    packet
+        .build_info
+        .mut_or_insert_default()
         .set_version(version::SPOTIFY_VERSION);
     packet
         .cryptosuites_supported
         .push(protocol::keyexchange::Cryptosuite::CRYPTO_SUITE_SHANNON.into());
     packet
-        .login_crypto_hello.mut_or_insert_default()
-        .diffie_hellman.mut_or_insert_default()
+        .login_crypto_hello
+        .mut_or_insert_default()
+        .diffie_hellman
+        .mut_or_insert_default()
         .set_gc(gc);
     packet
-        .login_crypto_hello.mut_or_insert_default()
-        .diffie_hellman.mut_or_insert_default()
+        .login_crypto_hello
+        .mut_or_insert_default()
+        .diffie_hellman
+        .mut_or_insert_default()
         .set_server_keys_known(1);
     packet.set_client_nonce(client_nonce);
     packet.set_padding(vec![0x1e]);
@@ -192,10 +208,12 @@ where
 {
     let mut packet = ClientResponsePlaintext::new();
     packet
-        .login_crypto_response.mut_or_insert_default()
-        .diffie_hellman.mut_or_insert_default()
+        .login_crypto_response
+        .mut_or_insert_default()
+        .diffie_hellman
+        .mut_or_insert_default()
         .set_hmac(challenge);
-    
+
     let mut buffer = vec![];
     let size = 4 + packet.compute_size();
     <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size.try_into().unwrap())?;

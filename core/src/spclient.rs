@@ -1,5 +1,5 @@
 use std::{
-        env::consts::OS,
+    env::consts::OS,
     fmt::Write,
     time::{Duration, Instant},
 };
@@ -13,7 +13,7 @@ use hyper::{
     header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
     Body, HeaderMap, Method, Request,
 };
-use protobuf::{Message, MessageFull, Enum};
+use protobuf::{Enum, Message, MessageFull};
 use rand::RngCore;
 use sha1::{Digest, Sha1};
 use sysinfo::{System, SystemExt};
@@ -199,7 +199,9 @@ impl SpClient {
         let connectivity_data = client_data.mut_connectivity_sdk_data();
         connectivity_data.device_id = self.session().device_id().to_string();
 
-        let platform_data = connectivity_data.platform_specific_data.mut_or_insert_default();
+        let platform_data = connectivity_data
+            .platform_specific_data
+            .mut_or_insert_default();
 
         let sys = System::new();
         let os_version = sys.os_version().unwrap_or_else(|| String::from("0"));
@@ -295,13 +297,16 @@ impl SpClient {
                                 let suffix = hex::encode(suffix).to_uppercase();
 
                                 let mut answer_message = ClientTokenRequest::new();
-                                answer_message.request_type = ClientTokenRequestType::REQUEST_CHALLENGE_ANSWERS_REQUEST.into();
+                                answer_message.request_type =
+                                    ClientTokenRequestType::REQUEST_CHALLENGE_ANSWERS_REQUEST
+                                        .into();
 
                                 let challenge_answers = answer_message.mut_challenge_answers();
 
                                 let mut challenge_answer = ChallengeAnswer::new();
                                 challenge_answer.mut_hash_cash().suffix = suffix.to_string();
-                                challenge_answer.ChallengeType = ChallengeType::CHALLENGE_HASH_CASH.into();
+                                challenge_answer.ChallengeType =
+                                    ChallengeType::CHALLENGE_HASH_CASH.into();
 
                                 challenge_answers.state = state.to_string();
                                 challenge_answers.answers.push(challenge_answer);

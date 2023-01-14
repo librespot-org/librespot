@@ -188,28 +188,70 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
     msg.set_can_play(true);
     msg.set_volume(0);
     msg.set_name(config.name);
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kCanBePlayer, 1));
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kDeviceType, config.device_type as i64));
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kGaiaEqConnectId, 1));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kCanBePlayer,
+        1,
+    ));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kDeviceType,
+        config.device_type as i64,
+    ));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kGaiaEqConnectId,
+        1,
+    ));
     // TODO: implement logout
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kSupportsLogout, 0));
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kIsObservable, 1));
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kVolumeSteps, if config.has_volume_ctrl { VOLUME_STEPS } else { 0 }));
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kSupportsPlaylistV2, 1));
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kSupportsExternalEpisodes, 1));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kSupportsLogout,
+        0,
+    ));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kIsObservable,
+        1,
+    ));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kVolumeSteps,
+        if config.has_volume_ctrl {
+            VOLUME_STEPS
+        } else {
+            0
+        },
+    ));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kSupportsPlaylistV2,
+        1,
+    ));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kSupportsExternalEpisodes,
+        1,
+    ));
     // TODO: how would such a rename command be triggered? Handle it.
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kSupportsRename, 1));
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kCommandAcks, 0));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kSupportsRename,
+        1,
+    ));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kCommandAcks,
+        0,
+    ));
     // TODO: does this mean local files or the local network?
     // LAN may be an interesting privacy toggle.
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kRestrictToLocal, 0));
+    msg.capabilities.push(int_capability(
+        protocol::spirc::CapabilityType::kRestrictToLocal,
+        0,
+    ));
     // TODO: what does this hide, or who do we hide from?
     // May be an interesting privacy toggle.
-    msg.capabilities.push(int_capability(protocol::spirc::CapabilityType::kHidden, 0));
+    msg.capabilities
+        .push(int_capability(protocol::spirc::CapabilityType::kHidden, 0));
     let mut supported_types = protocol::spirc::Capability::new();
     supported_types.set_typ(protocol::spirc::CapabilityType::kSupportedTypes);
-    supported_types.stringValue.push("audio/episode".to_string());
-    supported_types.stringValue.push("audio/episode+track".to_string());
+    supported_types
+        .stringValue
+        .push("audio/episode".to_string());
+    supported_types
+        .stringValue
+        .push("audio/episode+track".to_string());
     supported_types.stringValue.push("audio/track".to_string());
     // other known types:
     // - "audio/ad"
@@ -817,8 +859,7 @@ impl SpircTask {
             }
         }
 
-        self.session
-            .set_client_name(update.device_state.name());
+        self.session.set_client_name(update.device_state.name());
 
         let new_client_id = self.session.client_id();
 
@@ -947,8 +988,7 @@ impl SpircTask {
             MessageType::kMessageTypeNotify => {
                 if self.device.is_active()
                     && update.device_state.is_active()
-                    && self.device.became_active_at()
-                        <= update.device_state.became_active_at()
+                    && self.device.became_active_at() <= update.device_state.became_active_at()
                 {
                     self.handle_disconnect();
                 }
@@ -993,11 +1033,9 @@ impl SpircTask {
         self.player
             .emit_filter_explicit_content_changed_event(self.session.filter_explicit_content());
 
-        self.player
-            .emit_shuffle_changed_event(self.state.shuffle());
+        self.player.emit_shuffle_changed_event(self.state.shuffle());
 
-        self.player
-            .emit_repeat_changed_event(self.state.repeat());
+        self.player.emit_repeat_changed_event(self.state.repeat());
     }
 
     fn handle_load(&mut self, state: &State) -> Result<(), Error> {
@@ -1114,9 +1152,7 @@ impl SpircTask {
         // Removes current track if it is queued
         // Returns the index of the next track
         let current_index = self.state.playing_track_index() as usize;
-        if (current_index < self.state.track.len())
-            && self.state.track[current_index].queued()
-        {
+        if (current_index < self.state.track.len()) && self.state.track[current_index].queued() {
             self.state.track.remove(current_index);
             current_index
         } else {
@@ -1160,14 +1196,10 @@ impl SpircTask {
             unplayable_track_ref.set_gid(self.state.track[index].gid().to_vec());
             // Misuse context field to flag the track
             unplayable_track_ref.set_context(String::from("NonPlayable"));
-            std::mem::swap(
-                &mut self.state.track[index],
-                &mut unplayable_track_ref,
-            );
+            std::mem::swap(&mut self.state.track[index], &mut unplayable_track_ref);
             debug!(
                 "Marked <{:?}> at {:?} as NonPlayable",
-                self.state.track[index],
-                index,
+                self.state.track[index], index,
             );
         }
         self.handle_preload_next_track();
@@ -1306,8 +1338,7 @@ impl SpircTask {
                 track_vec.drain(0..head);
             }
             track_vec.extend_from_slice(new_tracks);
-            self.state
-                .track = track_vec;
+            self.state.track = track_vec;
 
             // Update playing index
             if let Some(new_index) = self

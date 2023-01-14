@@ -100,25 +100,33 @@ pub async fn authenticate(
 
     let mut packet = ClientResponseEncrypted::new();
     packet
-        .login_credentials.mut_or_insert_default()
+        .login_credentials
+        .mut_or_insert_default()
         .set_username(credentials.username);
     packet
-        .login_credentials.mut_or_insert_default()
+        .login_credentials
+        .mut_or_insert_default()
         .set_typ(credentials.auth_type);
     packet
-        .login_credentials.mut_or_insert_default()
+        .login_credentials
+        .mut_or_insert_default()
         .set_auth_data(credentials.auth_data);
-    packet.system_info.mut_or_insert_default().set_cpu_family(cpu_family);
+    packet
+        .system_info
+        .mut_or_insert_default()
+        .set_cpu_family(cpu_family);
     packet.system_info.mut_or_insert_default().set_os(os);
     packet
-        .system_info.mut_or_insert_default()
+        .system_info
+        .mut_or_insert_default()
         .set_system_information_string(format!(
             "librespot-{}-{}",
             version::SHA_SHORT,
             version::BUILD_ID
         ));
     packet
-        .system_info.mut_or_insert_default()
+        .system_info
+        .mut_or_insert_default()
         .set_device_id(device_id.to_string());
     packet.set_version_string(format!("librespot {}", version::SEMVER));
 

@@ -43,24 +43,29 @@ impl Restriction {
 impl From<&RestrictionMessage> for Restriction {
     fn from(restriction: &RestrictionMessage) -> Self {
         let countries_allowed = if restriction.has_countries_allowed() {
-            Some(Self::parse_country_codes(
-                restriction.countries_allowed(),
-            ))
+            Some(Self::parse_country_codes(restriction.countries_allowed()))
         } else {
             None
         };
 
         let countries_forbidden = if restriction.has_countries_forbidden() {
-            Some(Self::parse_country_codes(
-                restriction.countries_forbidden(),
-            ))
+            Some(Self::parse_country_codes(restriction.countries_forbidden()))
         } else {
             None
         };
 
         Self {
-            catalogues: restriction.catalogue.iter().map(|c| c.enum_value_or_default()).collect::<Vec<RestrictionCatalogue>>().as_slice().into(),
-            restriction_type: restriction.type_.unwrap_or_default().enum_value_or_default(),
+            catalogues: restriction
+                .catalogue
+                .iter()
+                .map(|c| c.enum_value_or_default())
+                .collect::<Vec<RestrictionCatalogue>>()
+                .as_slice()
+                .into(),
+            restriction_type: restriction
+                .type_
+                .unwrap_or_default()
+                .enum_value_or_default(),
             catalogue_strs: restriction.catalogue_str.to_vec(),
             countries_allowed,
             countries_forbidden,

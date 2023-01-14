@@ -91,8 +91,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Track {
             earliest_live_timestamp: Date::from_timestamp_ms(track.earliest_live_timestamp())?,
             has_lyrics: track.has_lyrics(),
             availability: track.availability.as_slice().try_into()?,
-            licensor: Uuid::from_slice(track.licensor.uuid())
-                .unwrap_or_else(|_| Uuid::nil()),
+            licensor: Uuid::from_slice(track.licensor.uuid()).unwrap_or_else(|_| Uuid::nil()),
             language_of_performance: track.language_of_performance.to_vec(),
             content_ratings: track.content_rating.as_slice().into(),
             original_title: track.original_title().to_owned(),
