@@ -99,10 +99,12 @@ pub async fn authenticate(
     };
 
     let mut packet = ClientResponseEncrypted::new();
-    packet
-        .login_credentials
-        .mut_or_insert_default()
-        .set_username(credentials.username);
+    if let Some(username) = credentials.username {
+        packet
+            .login_credentials
+            .mut_or_insert_default()
+            .set_username(username);
+    }
     packet
         .login_credentials
         .mut_or_insert_default()
@@ -144,7 +146,7 @@ pub async fn authenticate(
             let welcome_data = APWelcome::parse_from_bytes(data.as_ref())?;
 
             let reusable_credentials = Credentials {
-                username: welcome_data.canonical_username().to_owned(),
+                username: Some(welcome_data.canonical_username().to_owned()),
                 auth_type: welcome_data.reusable_auth_credentials_type(),
                 auth_data: welcome_data.reusable_auth_credentials().to_owned(),
             };

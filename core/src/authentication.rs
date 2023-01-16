@@ -28,7 +28,7 @@ impl From<AuthenticationError> for Error {
 /// The credentials are used to log into the Spotify API.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Credentials {
-    pub username: String,
+    pub username: Option<String>,
 
     #[serde(serialize_with = "serialize_protobuf_enum")]
     #[serde(deserialize_with = "deserialize_protobuf_enum")]
@@ -51,15 +51,15 @@ impl Credentials {
     /// ```
     pub fn with_password(username: impl Into<String>, password: impl Into<String>) -> Self {
         Self {
-            username: username.into(),
+            username: Some(username.into()),
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
             auth_data: password.into().into_bytes(),
         }
     }
 
-    pub fn with_access_token(username: impl Into<String>, token: impl Into<String>) -> Self {
+    pub fn with_access_token(token: impl Into<String>) -> Self {
         Self {
-            username: username.into(),
+            username: None,
             auth_type: AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN,
             auth_data: token.into().into_bytes(),
         }
@@ -144,9 +144,9 @@ impl Credentials {
         let auth_data = read_bytes(&mut cursor)?;
 
         Ok(Self {
-            username,
-            auth_type,
-            auth_data,
+            username: Some(username),
+            auth_type: auth_type,
+            auth_data: auth_data,
         })
     }
 }
