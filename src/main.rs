@@ -1095,7 +1095,7 @@ fn get_setup() -> Setup {
                 Some(Credentials::with_password(username, password))
             } else {
                 match cached_creds {
-                    Some(creds) if username == creds.username => Some(creds),
+                    Some(creds) if Some(&username) == creds.username.as_ref() => Some(creds),
                     _ => {
                         let prompt = &format!("Password for {username}: ");
                         match rpassword::prompt_password(prompt) {

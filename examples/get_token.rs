@@ -36,7 +36,7 @@ async fn main() {
 
     // Now create a new session with that token.
     let session = Session::new(session_config, None);
-    let credentials = Credentials::with_access_token(username, token.access_token);
+    let credentials = Credentials::with_access_token(token.access_token);
     println!("Connecting with token..");
     match session.connect(credentials, false).await {
         Ok(()) => println!("Session username: {:#?}", session.username()),
