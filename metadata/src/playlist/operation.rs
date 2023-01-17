@@ -1,5 +1,5 @@
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
@@ -13,10 +13,10 @@ use crate::{
 };
 
 use librespot_protocol as protocol;
+pub use protocol::playlist4_external::op::Kind as PlaylistOperationKind;
 use protocol::playlist4_external::Add as PlaylistAddMessage;
 use protocol::playlist4_external::Mov as PlaylistMoveMessage;
 use protocol::playlist4_external::Op as PlaylistOperationMessage;
-pub use protocol::playlist4_external::Op_Kind as PlaylistOperationKind;
 use protocol::playlist4_external::Rem as PlaylistRemoveMessage;
 
 #[derive(Debug, Clone)]
@@ -61,12 +61,18 @@ impl TryFrom<&PlaylistOperationMessage> for PlaylistOperation {
     type Error = librespot_core::Error;
     fn try_from(operation: &PlaylistOperationMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            kind: operation.get_kind(),
-            add: operation.get_add().try_into()?,
-            rem: operation.get_rem().try_into()?,
-            mov: operation.get_mov().into(),
-            update_item_attributes: operation.get_update_item_attributes().try_into()?,
-            update_list_attributes: operation.get_update_list_attributes().try_into()?,
+            kind: operation.kind(),
+            add: operation.add.get_or_default().try_into()?,
+            rem: operation.rem.get_or_default().try_into()?,
+            mov: operation.mov.get_or_default().into(),
+            update_item_attributes: operation
+                .update_item_attributes
+                .get_or_default()
+                .try_into()?,
+            update_list_attributes: operation
+                .update_list_attributes
+                .get_or_default()
+                .try_into()?,
         })
     }
 }
@@ -77,10 +83,10 @@ impl TryFrom<&PlaylistAddMessage> for PlaylistOperationAdd {
     type Error = librespot_core::Error;
     fn try_from(add: &PlaylistAddMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            from_index: add.get_from_index(),
-            items: add.get_items().try_into()?,
-            add_last: add.get_add_last(),
-            add_first: add.get_add_first(),
+            from_index: add.from_index(),
+            items: add.items.as_slice().try_into()?,
+            add_last: add.add_last(),
+            add_first: add.add_first(),
         })
     }
 }
@@ -88,9 +94,9 @@ impl TryFrom<&PlaylistAddMessage> for PlaylistOperationAdd {
 impl From<&PlaylistMoveMessage> for PlaylistOperationMove {
     fn from(mov: &PlaylistMoveMessage) -> Self {
         Self {
-            from_index: mov.get_from_index(),
-            length: mov.get_length(),
-            to_index: mov.get_to_index(),
+            from_index: mov.from_index(),
+            length: mov.length(),
+            to_index: mov.to_index(),
         }
     }
 }
@@ -99,10 +105,10 @@ impl TryFrom<&PlaylistRemoveMessage> for PlaylistOperationRemove {
     type Error = librespot_core::Error;
     fn try_from(remove: &PlaylistRemoveMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            from_index: remove.get_from_index(),
-            length: remove.get_length(),
-            items: remove.get_items().try_into()?,
-            has_items_as_key: remove.get_items_as_key(),
+            from_index: remove.from_index(),
+            length: remove.length(),
+            items: remove.items.as_slice().try_into()?,
+            has_items_as_key: remove.items_as_key(),
         })
     }
 }

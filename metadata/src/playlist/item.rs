@@ -58,7 +58,7 @@ impl TryFrom<&PlaylistItemMessage> for PlaylistItem {
     fn try_from(item: &PlaylistItemMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             id: item.try_into()?,
-            attributes: item.get_attributes().try_into()?,
+            attributes: item.attributes.get_or_default().try_into()?,
         })
     }
 }
@@ -69,10 +69,10 @@ impl TryFrom<&PlaylistItemsMessage> for PlaylistItemList {
     type Error = librespot_core::Error;
     fn try_from(list_items: &PlaylistItemsMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            position: list_items.get_pos(),
-            is_truncated: list_items.get_truncated(),
-            items: list_items.get_items().try_into()?,
-            meta_items: list_items.get_meta_items().try_into()?,
+            position: list_items.pos(),
+            is_truncated: list_items.truncated(),
+            items: list_items.items.as_slice().try_into()?,
+            meta_items: list_items.meta_items.as_slice().try_into()?,
         })
     }
 }
@@ -82,12 +82,12 @@ impl TryFrom<&PlaylistMetaItemMessage> for PlaylistMetaItem {
     fn try_from(item: &PlaylistMetaItemMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             revision: item.try_into()?,
-            attributes: item.get_attributes().try_into()?,
-            length: item.get_length(),
-            timestamp: Date::from_timestamp_ms(item.get_timestamp())?,
-            owner_username: item.get_owner_username().to_owned(),
-            has_abuse_reporting: item.get_abuse_reporting_enabled(),
-            capabilities: item.get_capabilities().into(),
+            attributes: item.attributes.get_or_default().try_into()?,
+            length: item.length(),
+            timestamp: Date::from_timestamp_ms(item.timestamp())?,
+            owner_username: item.owner_username().to_owned(),
+            has_abuse_reporting: item.abuse_reporting_enabled(),
+            capabilities: item.capabilities.get_or_default().into(),
         })
     }
 }

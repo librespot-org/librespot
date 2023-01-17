@@ -9,8 +9,8 @@ use crate::util::{impl_from_repeated, impl_from_repeated_copy};
 use protocol::metadata::Restriction as RestrictionMessage;
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::Restriction_Catalogue as RestrictionCatalogue;
-pub use protocol::metadata::Restriction_Type as RestrictionType;
+pub use protocol::metadata::restriction::Catalogue as RestrictionCatalogue;
+pub use protocol::metadata::restriction::Type as RestrictionType;
 
 #[derive(Debug, Clone)]
 pub struct Restriction {
@@ -43,25 +43,30 @@ impl Restriction {
 impl From<&RestrictionMessage> for Restriction {
     fn from(restriction: &RestrictionMessage) -> Self {
         let countries_allowed = if restriction.has_countries_allowed() {
-            Some(Self::parse_country_codes(
-                restriction.get_countries_allowed(),
-            ))
+            Some(Self::parse_country_codes(restriction.countries_allowed()))
         } else {
             None
         };
 
         let countries_forbidden = if restriction.has_countries_forbidden() {
-            Some(Self::parse_country_codes(
-                restriction.get_countries_forbidden(),
-            ))
+            Some(Self::parse_country_codes(restriction.countries_forbidden()))
         } else {
             None
         };
 
         Self {
-            catalogues: restriction.get_catalogue().into(),
-            restriction_type: restriction.get_field_type(),
-            catalogue_strs: restriction.get_catalogue_str().to_vec(),
+            catalogues: restriction
+                .catalogue
+                .iter()
+                .map(|c| c.enum_value_or_default())
+                .collect::<Vec<RestrictionCatalogue>>()
+                .as_slice()
+                .into(),
+            restriction_type: restriction
+                .type_
+                .unwrap_or_default()
+                .enum_value_or_default(),
+            catalogue_strs: restriction.catalogue_str.to_vec(),
             countries_allowed,
             countries_forbidden,
         }

@@ -41,7 +41,7 @@ pub use track::Track;
 
 #[async_trait]
 pub trait Metadata: Send + Sized + 'static {
-    type Message: protobuf::Message;
+    type Message: protobuf::Message + std::fmt::Debug;
 
     // Request a protobuf
     async fn request(session: &Session, id: &SpotifyId) -> RequestResult;

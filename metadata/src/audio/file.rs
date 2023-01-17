@@ -7,8 +7,8 @@ use std::{
 use librespot_core::FileId;
 
 use librespot_protocol as protocol;
+pub use protocol::metadata::audio_file::Format as AudioFileFormat;
 use protocol::metadata::AudioFile as AudioFileMessage;
-pub use protocol::metadata::AudioFile_Format as AudioFileFormat;
 
 use crate::util::impl_deref_wrapped;
 
@@ -45,12 +45,12 @@ impl AudioFiles {
 
 impl From<&[AudioFileMessage]> for AudioFiles {
     fn from(files: &[AudioFileMessage]) -> Self {
-        let audio_files = files
+        let audio_files: HashMap<AudioFileFormat, FileId> = files
             .iter()
             .filter_map(|file| {
-                let file_id = FileId::from(file.get_file_id());
+                let file_id = FileId::from(file.file_id());
                 if file.has_format() {
-                    Some((file.get_format(), file_id))
+                    Some((file.format(), file_id))
                 } else {
                     trace!("Ignoring file <{}> with unspecified format", file_id);
                     None

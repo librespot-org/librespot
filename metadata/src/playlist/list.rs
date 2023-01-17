@@ -129,7 +129,7 @@ impl Metadata for Playlist {
 impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
     type Error = librespot_core::Error;
     fn try_from(playlist: &<Playlist as Metadata>::Message) -> Result<Self, Self::Error> {
-        let timestamp = playlist.get_timestamp();
+        let timestamp = playlist.timestamp();
         let timestamp = if timestamp > 9295169800000 {
             // timestamp is way out of range for milliseconds. Some seem to be in microseconds?
             // Observed on playlists where:
@@ -146,25 +146,37 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
         let timestamp = Date::from_timestamp_ms(timestamp)?;
 
         Ok(Self {
-            revision: playlist.get_revision().to_owned(),
-            length: playlist.get_length(),
-            attributes: playlist.get_attributes().try_into()?,
-            contents: playlist.get_contents().try_into()?,
+            revision: playlist.revision().to_owned(),
+            length: playlist.length(),
+            attributes: playlist.attributes.get_or_default().try_into()?,
+            contents: playlist.contents.get_or_default().try_into()?,
             diff: playlist.diff.as_ref().map(TryInto::try_into).transpose()?,
             sync_result: playlist
                 .sync_result
                 .as_ref()
                 .map(TryInto::try_into)
                 .transpose()?,
-            resulting_revisions: playlist.get_resulting_revisions().try_into()?,
-            has_multiple_heads: playlist.get_multiple_heads(),
-            is_up_to_date: playlist.get_up_to_date(),
-            nonces: playlist.get_nonces().into(),
+            resulting_revisions: Playlists(
+                playlist
+                    .resulting_revisions
+                    .iter()
+                    .map(|p| p.try_into())
+                    .collect::<Result<Vec<SpotifyId>, Error>>()?,
+            ),
+            has_multiple_heads: playlist.multiple_heads(),
+            is_up_to_date: playlist.up_to_date(),
+            nonces: playlist.nonces.clone(),
             timestamp,
-            owner_username: playlist.get_owner_username().to_owned(),
-            has_abuse_reporting: playlist.get_abuse_reporting_enabled(),
-            capabilities: playlist.get_capabilities().into(),
-            geoblocks: playlist.get_geoblock().into(),
+            owner_username: playlist.owner_username().to_owned(),
+            has_abuse_reporting: playlist.abuse_reporting_enabled(),
+            capabilities: playlist.capabilities.get_or_default().into(),
+            geoblocks: Geoblocks(
+                playlist
+                    .geoblock
+                    .iter()
+                    .map(|b| b.enum_value_or_default())
+                    .collect(),
+            ),
         })
     }
 }

@@ -1,5 +1,5 @@
 use std::{
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
@@ -42,8 +42,8 @@ impl TryFrom<&AvailabilityMessage> for Availability {
     type Error = librespot_core::Error;
     fn try_from(availability: &AvailabilityMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            catalogue_strs: availability.get_catalogue_str().to_vec(),
-            start: availability.get_start().try_into()?,
+            catalogue_strs: availability.catalogue_str.to_vec(),
+            start: availability.start.get_or_default().try_into()?,
         })
     }
 }

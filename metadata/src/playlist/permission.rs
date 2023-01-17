@@ -27,12 +27,18 @@ impl_deref_wrapped!(PermissionLevels, Vec<PermissionLevel>);
 impl From<&CapabilitiesMessage> for Capabilities {
     fn from(playlist: &CapabilitiesMessage) -> Self {
         Self {
-            can_view: playlist.get_can_view(),
-            can_administrate_permissions: playlist.get_can_administrate_permissions(),
-            grantable_levels: playlist.get_grantable_level().into(),
-            can_edit_metadata: playlist.get_can_edit_metadata(),
-            can_edit_items: playlist.get_can_edit_items(),
-            can_cancel_membership: playlist.get_can_cancel_membership(),
+            can_view: playlist.can_view(),
+            can_administrate_permissions: playlist.can_administrate_permissions(),
+            grantable_levels: PermissionLevels(
+                playlist
+                    .grantable_level
+                    .iter()
+                    .map(|l| l.enum_value_or_default())
+                    .collect(),
+            ),
+            can_edit_metadata: playlist.can_edit_metadata(),
+            can_edit_items: playlist.can_edit_items(),
+            can_cancel_membership: playlist.can_cancel_membership(),
         }
     }
 }

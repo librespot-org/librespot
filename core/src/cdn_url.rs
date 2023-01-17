@@ -10,8 +10,8 @@ use url::Url;
 use super::{date::Date, Error, FileId, Session};
 
 use librespot_protocol as protocol;
+use protocol::storage_resolve::storage_resolve_response::Result as StorageResolveResponse_Result;
 use protocol::storage_resolve::StorageResolveResponse as CdnUrlMessage;
-use protocol::storage_resolve::StorageResolveResponse_Result;
 
 #[derive(Debug, Clone)]
 pub struct MaybeExpiringUrl(pub String, pub Option<Date>);
@@ -100,14 +100,17 @@ impl CdnUrl {
 impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
     type Error = crate::Error;
     fn try_from(msg: CdnUrlMessage) -> Result<Self, Self::Error> {
-        if !matches!(msg.get_result(), StorageResolveResponse_Result::CDN) {
+        if !matches!(
+            msg.result.enum_value_or_default(),
+            StorageResolveResponse_Result::CDN
+        ) {
             return Err(CdnUrlError::Storage.into());
         }
 
-        let is_expiring = !msg.get_fileid().is_empty();
+        let is_expiring = !msg.fileid.is_empty();
 
         let result = msg
-            .get_cdnurl()
+            .cdnurl
             .iter()
             .map(|cdn_url| {
                 let url = Url::parse(cdn_url)?;

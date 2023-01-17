@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    convert::{TryFrom, TryInto},
+    convert::TryFrom,
     fmt::Debug,
     ops::{Deref, DerefMut},
 };
@@ -99,16 +99,16 @@ impl TryFrom<&PlaylistAttributesMessage> for PlaylistAttributes {
     type Error = librespot_core::Error;
     fn try_from(attributes: &PlaylistAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            name: attributes.get_name().to_owned(),
-            description: attributes.get_description().to_owned(),
-            picture: attributes.get_picture().to_owned(),
-            is_collaborative: attributes.get_collaborative(),
-            pl3_version: attributes.get_pl3_version().to_owned(),
-            is_deleted_by_owner: attributes.get_deleted_by_owner(),
-            client_id: attributes.get_client_id().to_owned(),
-            format: attributes.get_format().to_owned(),
-            format_attributes: attributes.get_format_attributes().into(),
-            picture_sizes: attributes.get_picture_size().into(),
+            name: attributes.name().to_owned(),
+            description: attributes.description().to_owned(),
+            picture: attributes.picture().to_owned(),
+            is_collaborative: attributes.collaborative(),
+            pl3_version: attributes.pl3_version().to_owned(),
+            is_deleted_by_owner: attributes.deleted_by_owner(),
+            client_id: attributes.client_id().to_owned(),
+            format: attributes.format().to_owned(),
+            format_attributes: attributes.format_attributes.as_slice().into(),
+            picture_sizes: attributes.picture_size.as_slice().into(),
         })
     }
 }
@@ -117,12 +117,7 @@ impl From<&[PlaylistFormatAttributeMessage]> for PlaylistFormatAttribute {
     fn from(attributes: &[PlaylistFormatAttributeMessage]) -> Self {
         let format_attributes = attributes
             .iter()
-            .map(|attribute| {
-                (
-                    attribute.get_key().to_owned(),
-                    attribute.get_value().to_owned(),
-                )
-            })
+            .map(|attribute| (attribute.key().to_owned(), attribute.value().to_owned()))
             .collect();
 
         PlaylistFormatAttribute(format_attributes)
@@ -133,12 +128,12 @@ impl TryFrom<&PlaylistItemAttributesMessage> for PlaylistItemAttributes {
     type Error = librespot_core::Error;
     fn try_from(attributes: &PlaylistItemAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            added_by: attributes.get_added_by().to_owned(),
-            timestamp: Date::from_timestamp_ms(attributes.get_timestamp())?,
-            seen_at: Date::from_timestamp_ms(attributes.get_seen_at())?,
-            is_public: attributes.get_public(),
-            format_attributes: attributes.get_format_attributes().into(),
-            item_id: attributes.get_item_id().to_owned(),
+            added_by: attributes.added_by().to_owned(),
+            timestamp: Date::from_timestamp_ms(attributes.timestamp())?,
+            seen_at: Date::from_timestamp_ms(attributes.seen_at())?,
+            is_public: attributes.public(),
+            format_attributes: attributes.format_attributes.as_slice().into(),
+            item_id: attributes.item_id().to_owned(),
         })
     }
 }
@@ -146,8 +141,14 @@ impl TryFrom<&PlaylistPartialAttributesMessage> for PlaylistPartialAttributes {
     type Error = librespot_core::Error;
     fn try_from(attributes: &PlaylistPartialAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            values: attributes.get_values().try_into()?,
-            no_value: attributes.get_no_value().into(),
+            values: attributes.values.get_or_default().try_into()?,
+            no_value: attributes
+                .no_value
+                .iter()
+                .map(|v| v.enum_value_or_default())
+                .collect::<Vec<PlaylistAttributeKind>>()
+                .as_slice()
+                .into(),
         })
     }
 }
@@ -156,8 +157,14 @@ impl TryFrom<&PlaylistPartialItemAttributesMessage> for PlaylistPartialItemAttri
     type Error = librespot_core::Error;
     fn try_from(attributes: &PlaylistPartialItemAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            values: attributes.get_values().try_into()?,
-            no_value: attributes.get_no_value().into(),
+            values: attributes.values.get_or_default().try_into()?,
+            no_value: attributes
+                .no_value
+                .iter()
+                .map(|v| v.enum_value_or_default())
+                .collect::<Vec<PlaylistItemAttributeKind>>()
+                .as_slice()
+                .into(),
         })
     }
 }
@@ -166,8 +173,8 @@ impl TryFrom<&PlaylistUpdateAttributesMessage> for PlaylistUpdateAttributes {
     type Error = librespot_core::Error;
     fn try_from(update: &PlaylistUpdateAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            new_attributes: update.get_new_attributes().try_into()?,
-            old_attributes: update.get_old_attributes().try_into()?,
+            new_attributes: update.new_attributes.get_or_default().try_into()?,
+            old_attributes: update.old_attributes.get_or_default().try_into()?,
         })
     }
 }
@@ -176,9 +183,9 @@ impl TryFrom<&PlaylistUpdateItemAttributesMessage> for PlaylistUpdateItemAttribu
     type Error = librespot_core::Error;
     fn try_from(update: &PlaylistUpdateItemAttributesMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            index: update.get_index(),
-            new_attributes: update.get_new_attributes().try_into()?,
-            old_attributes: update.get_old_attributes().try_into()?,
+            index: update.index(),
+            new_attributes: update.new_attributes.get_or_default().try_into()?,
+            old_attributes: update.old_attributes.get_or_default().try_into()?,
         })
     }
 }

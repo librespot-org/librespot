@@ -19,7 +19,7 @@ use crate::{
 use librespot_core::{date::Date, Error, Session, SpotifyId};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::Episode_EpisodeType as EpisodeType;
+pub use protocol::metadata::episode::EpisodeType;
 
 #[derive(Debug, Clone)]
 pub struct Episode {
@@ -72,29 +72,29 @@ impl TryFrom<&<Self as Metadata>::Message> for Episode {
     fn try_from(episode: &<Self as Metadata>::Message) -> Result<Self, Self::Error> {
         Ok(Self {
             id: episode.try_into()?,
-            name: episode.get_name().to_owned(),
-            duration: episode.get_duration().to_owned(),
-            audio: episode.get_audio().into(),
-            description: episode.get_description().to_owned(),
-            number: episode.get_number(),
-            publish_time: episode.get_publish_time().try_into()?,
-            covers: episode.get_cover_image().get_image().into(),
-            language: episode.get_language().to_owned(),
-            is_explicit: episode.get_explicit().to_owned(),
-            show_name: episode.get_show().get_name().to_owned(),
-            videos: episode.get_video().into(),
-            video_previews: episode.get_video_preview().into(),
-            audio_previews: episode.get_audio_preview().into(),
-            restrictions: episode.get_restriction().into(),
-            freeze_frames: episode.get_freeze_frame().get_image().into(),
-            keywords: episode.get_keyword().to_vec(),
-            allow_background_playback: episode.get_allow_background_playback(),
-            availability: episode.get_availability().try_into()?,
-            external_url: episode.get_external_url().to_owned(),
-            episode_type: episode.get_field_type(),
-            has_music_and_talk: episode.get_music_and_talk(),
-            content_rating: episode.get_content_rating().into(),
-            is_audiobook_chapter: episode.get_is_audiobook_chapter(),
+            name: episode.name().to_owned(),
+            duration: episode.duration().to_owned(),
+            audio: episode.audio.as_slice().into(),
+            description: episode.description().to_owned(),
+            number: episode.number(),
+            publish_time: episode.publish_time.get_or_default().try_into()?,
+            covers: episode.cover_image.image.as_slice().into(),
+            language: episode.language().to_owned(),
+            is_explicit: episode.explicit().to_owned(),
+            show_name: episode.show.name().to_owned(),
+            videos: episode.video.as_slice().into(),
+            video_previews: episode.video_preview.as_slice().into(),
+            audio_previews: episode.audio_preview.as_slice().into(),
+            restrictions: episode.restriction.as_slice().into(),
+            freeze_frames: episode.freeze_frame.image.as_slice().into(),
+            keywords: episode.keyword.to_vec(),
+            allow_background_playback: episode.allow_background_playback(),
+            availability: episode.availability.as_slice().try_into()?,
+            external_url: episode.external_url().to_owned(),
+            episode_type: episode.type_(),
+            has_music_and_talk: episode.music_and_talk(),
+            content_rating: episode.content_rating.as_slice().into(),
+            is_audiobook_chapter: episode.is_audiobook_chapter(),
         })
     }
 }

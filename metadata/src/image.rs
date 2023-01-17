@@ -9,9 +9,9 @@ use crate::util::{impl_deref_wrapped, impl_from_repeated, impl_try_from_repeated
 use librespot_core::{FileId, SpotifyId};
 
 use librespot_protocol as protocol;
+pub use protocol::metadata::image::Size as ImageSize;
 use protocol::metadata::Image as ImageMessage;
 use protocol::metadata::ImageGroup;
-pub use protocol::metadata::Image_Size as ImageSize;
 use protocol::playlist4_external::PictureSize as PictureSizeMessage;
 use protocol::playlist_annotate3::TranscodedPicture as TranscodedPictureMessage;
 
@@ -60,9 +60,9 @@ impl From<&ImageMessage> for Image {
     fn from(image: &ImageMessage) -> Self {
         Self {
             id: image.into(),
-            size: image.get_size(),
-            width: image.get_width(),
-            height: image.get_height(),
+            size: image.size(),
+            width: image.width(),
+            height: image.height(),
         }
     }
 }
@@ -72,8 +72,8 @@ impl_from_repeated!(ImageMessage, Images);
 impl From<&PictureSizeMessage> for PictureSize {
     fn from(size: &PictureSizeMessage) -> Self {
         Self {
-            target_name: size.get_target_name().to_owned(),
-            url: size.get_url().to_owned(),
+            target_name: size.target_name().to_owned(),
+            url: size.url().to_owned(),
         }
     }
 }
@@ -84,7 +84,7 @@ impl TryFrom<&TranscodedPictureMessage> for TranscodedPicture {
     type Error = librespot_core::Error;
     fn try_from(picture: &TranscodedPictureMessage) -> Result<Self, Self::Error> {
         Ok(Self {
-            target_name: picture.get_target_name().to_owned(),
+            target_name: picture.target_name().to_owned(),
             uri: picture.try_into()?,
         })
     }

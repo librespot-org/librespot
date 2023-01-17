@@ -39,18 +39,18 @@ impl From<&[u8]> for FileId {
 }
 impl From<&protocol::metadata::Image> for FileId {
     fn from(image: &protocol::metadata::Image) -> Self {
-        Self::from(image.get_file_id())
+        Self::from(image.file_id())
     }
 }
 
 impl From<&protocol::metadata::AudioFile> for FileId {
     fn from(file: &protocol::metadata::AudioFile) -> Self {
-        Self::from(file.get_file_id())
+        Self::from(file.file_id())
     }
 }
 
 impl From<&protocol::metadata::VideoFile> for FileId {
     fn from(video: &protocol::metadata::VideoFile) -> Self {
-        Self::from(video.get_file_id())
+        Self::from(video.file_id())
     }
 }
