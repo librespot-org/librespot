@@ -214,6 +214,9 @@ where
         .mut_or_insert_default()
         .set_hmac(challenge);
 
+    packet.pow_response.mut_or_insert_default();
+    packet.crypto_response.mut_or_insert_default();
+
     let mut buffer = vec![];
     let size = 4 + packet.compute_size();
     <Vec<u8> as WriteBytesExt>::write_u32::<BigEndian>(&mut buffer, size.try_into().unwrap())?;
