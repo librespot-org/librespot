@@ -4,6 +4,7 @@ extern crate log;
 use librespot_audio as audio;
 use librespot_core as core;
 use librespot_metadata as metadata;
+use librespot_protocol as protocol;
 
 pub mod audio_backend;
 pub mod config;

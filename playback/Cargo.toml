@@ -20,6 +20,10 @@ version = "0.5.0-dev"
 path = "../metadata"
 version = "0.5.0-dev"
 
+[dependencies.librespot-protocol]
+path = "../protocol"
+version = "0.5.0-dev"
+
 [dependencies]
 byteorder = "1"
 futures-util = "0.3"

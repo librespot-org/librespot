@@ -1358,15 +1358,15 @@ fn get_setup() -> Setup {
     let player_config = {
         let player_default_config = PlayerConfig::default();
 
-        let bitrate = opt_str(BITRATE)
+        let file_formats = opt_str(BITRATE)
             .as_deref()
             .map(|bitrate| {
                 Bitrate::from_str(bitrate).unwrap_or_else(|_| {
                     invalid_error_msg(BITRATE, BITRATE_SHORT, bitrate, "96, 160, 320", "160");
                     exit(1);
-                })
+                }).file_formats()
             })
-            .unwrap_or(player_default_config.bitrate);
+            .unwrap_or(player_default_config.file_formats);
 
         let gapless = !opt_present(DISABLE_GAPLESS);
 
@@ -1605,7 +1605,7 @@ fn get_setup() -> Setup {
         let passthrough = false;
 
         PlayerConfig {
-            bitrate,
+            file_formats,
             gapless,
             passthrough,
             normalisation,

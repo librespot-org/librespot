@@ -2,12 +2,48 @@ use std::{mem, str::FromStr, time::Duration};
 
 pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
 use crate::{convert::i24, player::duration_to_coefficient};
+pub use crate::protocol::metadata::audio_file::Format as AudioFileFormat;
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
     Bitrate96,
     Bitrate160,
     Bitrate320,
+}
+
+impl Bitrate {
+    pub fn file_formats(&self) -> Vec<AudioFileFormat> {
+        // (Most) podcasts seem to support only 96 kbps Ogg Vorbis, so fall back to it
+        Vec::from(match self {
+            Bitrate::Bitrate96 => [
+                AudioFileFormat::OGG_VORBIS_96,
+                AudioFileFormat::MP3_96,
+                AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::MP3_160,
+                AudioFileFormat::MP3_256,
+                AudioFileFormat::OGG_VORBIS_320,
+                AudioFileFormat::MP3_320,
+            ],
+            Bitrate::Bitrate160 => [
+                AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::MP3_160,
+                AudioFileFormat::OGG_VORBIS_96,
+                AudioFileFormat::MP3_96,
+                AudioFileFormat::MP3_256,
+                AudioFileFormat::OGG_VORBIS_320,
+                AudioFileFormat::MP3_320,
+            ],
+            Bitrate::Bitrate320 => [
+                AudioFileFormat::OGG_VORBIS_320,
+                AudioFileFormat::MP3_320,
+                AudioFileFormat::MP3_256,
+                AudioFileFormat::OGG_VORBIS_160,
+                AudioFileFormat::MP3_160,
+                AudioFileFormat::OGG_VORBIS_96,
+                AudioFileFormat::MP3_96,
+            ],
+        })
+    }
 }
 
 impl FromStr for Bitrate {
@@ -123,7 +159,7 @@ impl Default for NormalisationMethod {
 
 #[derive(Clone)]
 pub struct PlayerConfig {
-    pub bitrate: Bitrate,
+    pub file_formats: Vec<AudioFileFormat>,
     pub gapless: bool,
     pub passthrough: bool,
 
@@ -144,7 +180,7 @@ pub struct PlayerConfig {
 impl Default for PlayerConfig {
     fn default() -> Self {
         Self {
-            bitrate: Bitrate::default(),
+            file_formats: Bitrate::default().file_formats(),
             gapless: true,
             normalisation: false,
             normalisation_type: NormalisationType::default(),

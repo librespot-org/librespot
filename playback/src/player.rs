@@ -30,11 +30,11 @@ use crate::{
         READ_AHEAD_DURING_PLAYBACK,
     },
     audio_backend::Sink,
-    config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
+    config::{AudioFileFormat, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
     core::{util::SeqGenerator, Error, Session, SpotifyId},
     decoder::{AudioDecoder, AudioPacket, AudioPacketPosition, SymphoniaDecoder},
-    metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
+    metadata::audio::{AudioFiles, AudioItem},
     mixer::VolumeGetter,
 };
 
@@ -932,39 +932,8 @@ impl PlayerTrackLoader {
             audio_item.name, audio_item.uri
         );
 
-        // (Most) podcasts seem to support only 96 kbps Ogg Vorbis, so fall back to it
-        let formats = match self.config.bitrate {
-            Bitrate::Bitrate96 => [
-                AudioFileFormat::OGG_VORBIS_96,
-                AudioFileFormat::MP3_96,
-                AudioFileFormat::OGG_VORBIS_160,
-                AudioFileFormat::MP3_160,
-                AudioFileFormat::MP3_256,
-                AudioFileFormat::OGG_VORBIS_320,
-                AudioFileFormat::MP3_320,
-            ],
-            Bitrate::Bitrate160 => [
-                AudioFileFormat::OGG_VORBIS_160,
-                AudioFileFormat::MP3_160,
-                AudioFileFormat::OGG_VORBIS_96,
-                AudioFileFormat::MP3_96,
-                AudioFileFormat::MP3_256,
-                AudioFileFormat::OGG_VORBIS_320,
-                AudioFileFormat::MP3_320,
-            ],
-            Bitrate::Bitrate320 => [
-                AudioFileFormat::OGG_VORBIS_320,
-                AudioFileFormat::MP3_320,
-                AudioFileFormat::MP3_256,
-                AudioFileFormat::OGG_VORBIS_160,
-                AudioFileFormat::MP3_160,
-                AudioFileFormat::OGG_VORBIS_96,
-                AudioFileFormat::MP3_96,
-            ],
-        };
-
         let (format, file_id) =
-            match formats
+            match self.config.file_formats
                 .iter()
                 .find_map(|format| match audio_item.files.get(format) {
                     Some(&file_id) => Some((*format, file_id)),

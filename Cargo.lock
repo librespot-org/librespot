@@ -1530,6 +1530,7 @@ dependencies = [
  "librespot-audio",
  "librespot-core",
  "librespot-metadata",
+ "librespot-protocol",
  "log",
  "ogg",
  "parking_lot 0.12.1",
