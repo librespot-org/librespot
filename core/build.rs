@@ -22,5 +22,5 @@ fn main() {
             .collect(),
     };
 
-    println!("cargo:rustc-env=LIBRESPOT_BUILD_ID={}", build_id);
+    println!("cargo:rustc-env=LIBRESPOT_BUILD_ID={build_id}");
 }

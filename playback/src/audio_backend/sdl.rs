@@ -45,7 +45,7 @@ impl Open for SdlSink {
             AudioFormat::S32 => open_sink!(Self::S32, i32),
             AudioFormat::S16 => open_sink!(Self::S16, i16),
             _ => {
-                unimplemented!("SDL currently does not support {:?} output", format)
+                unimplemented!("SDL currently does not support {format:?} output")
             }
         }
     }

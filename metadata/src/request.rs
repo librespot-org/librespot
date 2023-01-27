@@ -15,10 +15,10 @@ pub trait MercuryRequest {
             Some(_) => "&",
             None => "?",
         };
-        let _ = write!(metrics_uri, "{}country={}", separator, session.country());
+        let _ = write!(metrics_uri, "{separator}country={}", session.country());
 
         if let Some(product) = session.get_user_attribute("type") {
-            let _ = write!(metrics_uri, "&product={}", product);
+            let _ = write!(metrics_uri, "&product={product}");
         }
 
         trace!("Requesting {}", metrics_uri);
@@ -28,7 +28,7 @@ pub trait MercuryRequest {
         match response.payload.first() {
             Some(data) => {
                 let data = data.to_vec().into();
-                trace!("Received metadata: {:?}", data);
+                trace!("Received metadata: {data:?}");
                 Ok(data)
             }
             None => Err(Error::unavailable(MetadataError::Empty)),

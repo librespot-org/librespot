@@ -328,7 +328,7 @@ impl Cache {
         if let Some(location) = &self.credentials_location {
             let result = File::create(location).and_then(|mut file| {
                 let data = serde_json::to_string(cred)?;
-                write!(file, "{}", data)
+                write!(file, "{data}")
             });
 
             if let Err(e) = result {
@@ -360,7 +360,7 @@ impl Cache {
 
     pub fn save_volume(&self, volume: u16) {
         if let Some(ref location) = self.volume_location {
-            let result = File::create(location).and_then(|mut file| write!(file, "{}", volume));
+            let result = File::create(location).and_then(|mut file| write!(file, "{volume}"));
             if let Err(e) = result {
                 warn!("Cannot save volume to cache: {}", e);
             }

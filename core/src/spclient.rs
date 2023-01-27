@@ -125,8 +125,7 @@ impl SpClient {
         let suffix = loop {
             if now.elapsed().as_secs() >= TIMEOUT {
                 return Err(Error::deadline_exceeded(format!(
-                    "{} seconds expired",
-                    TIMEOUT
+                    "{TIMEOUT} seconds expired"
                 )));
             }
 
@@ -282,8 +281,7 @@ impl SpClient {
                         let ctx = vec![];
                         let prefix = hex::decode(&hash_cash_challenge.prefix).map_err(|e| {
                             Error::failed_precondition(format!(
-                                "Unable to decode hash cash challenge: {}",
-                                e
+                                "Unable to decode hash cash challenge: {e}"
                             ))
                         })?;
                         let length = hash_cash_challenge.length;
@@ -339,8 +337,7 @@ impl SpClient {
                             response = self.client_token_request(&request).await?;
                         } else {
                             return Err(Error::failed_precondition(format!(
-                                "Unable to solve any of {} hash cash challenges",
-                                MAX_TRIES
+                                "Unable to solve any of {MAX_TRIES} hash cash challenges"
                             )));
                         }
                     } else {
@@ -350,8 +347,7 @@ impl SpClient {
 
                 Some(unknown) => {
                     return Err(Error::unimplemented(format!(
-                        "Unknown client token response type: {:?}",
-                        unknown
+                        "Unknown client token response type: {unknown:?}"
                     )))
                 }
                 None => return Err(Error::failed_precondition("No client token response type")),
@@ -595,20 +591,20 @@ impl SpClient {
         playlist_limit: Option<u32>,
         artist_limit: Option<u32>,
     ) -> SpClientResult {
-        let mut endpoint = format!("/user-profile-view/v3/profile/{}", username);
+        let mut endpoint = format!("/user-profile-view/v3/profile/{username}");
 
         if playlist_limit.is_some() || artist_limit.is_some() {
             let _ = write!(endpoint, "?");
 
             if let Some(limit) = playlist_limit {
-                let _ = write!(endpoint, "playlist_limit={}", limit);
+                let _ = write!(endpoint, "playlist_limit={limit}");
                 if artist_limit.is_some() {
                     let _ = write!(endpoint, "&");
                 }
             }
 
             if let Some(limit) = artist_limit {
-                let _ = write!(endpoint, "artist_limit={}", limit);
+                let _ = write!(endpoint, "artist_limit={limit}");
             }
         }
 
@@ -617,14 +613,14 @@ impl SpClient {
     }
 
     pub async fn get_user_followers(&self, username: &str) -> SpClientResult {
-        let endpoint = format!("/user-profile-view/v3/profile/{}/followers", username);
+        let endpoint = format!("/user-profile-view/v3/profile/{username}/followers");
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
             .await
     }
 
     pub async fn get_user_following(&self, username: &str) -> SpClientResult {
-        let endpoint = format!("/user-profile-view/v3/profile/{}/following", username);
+        let endpoint = format!("/user-profile-view/v3/profile/{username}/following");
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
             .await
@@ -657,14 +653,11 @@ impl SpClient {
         previous_tracks: Vec<SpotifyId>,
         autoplay: bool,
     ) -> SpClientResult {
-        let mut endpoint = format!(
-            "/radio-apollo/v3/{}/{}?autoplay={}",
-            scope, context_uri, autoplay,
-        );
+        let mut endpoint = format!("/radio-apollo/v3/{scope}/{context_uri}?autoplay={autoplay}");
 
         // Spotify has a default of 50
         if let Some(count) = count {
-            let _ = write!(endpoint, "&count={}", count);
+            let _ = write!(endpoint, "&count={count}");
         }
 
         let previous_track_str = previous_tracks
@@ -674,7 +667,7 @@ impl SpClient {
             .join(",");
         // better than checking `previous_tracks.len() > 0` because the `filter_map` could still return 0 items
         if !previous_track_str.is_empty() {
-            let _ = write!(endpoint, "&prev_tracks={}", previous_track_str);
+            let _ = write!(endpoint, "&prev_tracks={previous_track_str}");
         }
 
         self.request_as_json(&Method::GET, &endpoint, None, None)

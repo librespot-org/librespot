@@ -131,12 +131,12 @@ fn list_compatible_devices() -> SinkResult<()> {
                                 AudioFormat::F64,
                             ] {
                                 if hwp.test_format(Format::from(*f)).is_ok() {
-                                    supported_formats.push(format!("{:?}", f));
+                                    supported_formats.push(format!("{f:?}"));
                                 }
                             }
 
                             if !supported_formats.is_empty() {
-                                println!("\tDevice:\n\n\t\t{}\n", name);
+                                println!("\tDevice:\n\n\t\t{name}\n");
 
                                 println!(
                                     "\tDescription:\n\n\t\t{}\n",

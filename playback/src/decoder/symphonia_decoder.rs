@@ -51,8 +51,7 @@ impl SymphoniaDecoder {
             Box::new(Mp3Reader::try_new(mss, &format_opts)?)
         } else {
             return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported format: {:?}",
-                file_format
+                "Unsupported format: {file_format:?}"
             )));
         };
 
@@ -67,8 +66,7 @@ impl SymphoniaDecoder {
             Box::new(Mp3Decoder::try_new(&track.codec_params, &decoder_opts)?)
         } else {
             return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported decoder: {:?}",
-                file_format
+                "Unsupported decoder: {file_format:?}"
             )));
         };
 
@@ -77,8 +75,7 @@ impl SymphoniaDecoder {
         })?;
         if rate != SAMPLE_RATE {
             return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported sample rate: {}",
-                rate
+                "Unsupported sample rate: {rate}"
             )));
         }
 
@@ -87,8 +84,7 @@ impl SymphoniaDecoder {
         })?;
         if channels.count() != NUM_CHANNELS as usize {
             return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported number of channels: {}",
-                channels
+                "Unsupported number of channels: {channels}"
             )));
         }
 
@@ -215,7 +211,7 @@ impl AudioDecoder for SymphoniaDecoder {
                 Err(Error::DecodeError(_)) => {
                     // The packet failed to decode due to corrupted or invalid data, get a new
                     // packet and try again.
-                    warn!("Skipping malformed audio packet at {} ms", position_ms);
+                    warn!("Skipping malformed audio packet at {position_ms} ms");
                     skipped = true;
                     continue;
                 }

@@ -38,7 +38,7 @@ pub async fn proxy_connect<T: AsyncRead + AsyncWrite + Unpin>(
                 Some(200) => Ok(proxy_connection), // Proxy says all is well
                 Some(code) => {
                     let reason = response.reason.unwrap_or("no reason");
-                    let msg = format!("Proxy responded with {}: {}", code, reason);
+                    let msg = format!("Proxy responded with {code}: {reason}");
                     Err(io::Error::new(io::ErrorKind::Other, msg))
                 }
                 None => Err(io::Error::new(

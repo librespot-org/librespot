@@ -35,7 +35,7 @@ impl fmt::Display for RangeSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "(")?;
         for range in self.ranges.iter() {
-            write!(f, "{}", range)?;
+            write!(f, "{range}")?;
         }
         write!(f, ")")
     }

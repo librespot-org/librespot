@@ -69,11 +69,11 @@ fn list_formats(device: &rodio::Device) {
     match device.default_output_config() {
         Ok(cfg) => {
             debug!("  Default config:");
-            debug!("    {:?}", cfg);
+            debug!("    {cfg:?}");
         }
         Err(e) => {
             // Use loglevel debug, since even the output is only debug
-            debug!("Error getting default rodio::Sink config: {}", e);
+            debug!("Error getting default rodio::Sink config: {e}");
         }
     };
 
@@ -81,17 +81,17 @@ fn list_formats(device: &rodio::Device) {
         Ok(mut cfgs) => {
             if let Some(first) = cfgs.next() {
                 debug!("  Available configs:");
-                debug!("    {:?}", first);
+                debug!("    {first:?}");
             } else {
                 return;
             }
 
             for cfg in cfgs {
-                debug!("    {:?}", cfg);
+                debug!("    {cfg:?}");
             }
         }
         Err(e) => {
-            debug!("Error getting supported rodio::Sink configs: {}", e);
+            debug!("Error getting supported rodio::Sink configs: {e}");
         }
     }
 }
@@ -117,11 +117,11 @@ fn list_outputs(host: &cpal::Host) -> Result<(), cpal::DevicesError> {
         match device.name() {
             Ok(name) if Some(&name) == default_device_name.as_ref() => (),
             Ok(name) => {
-                println!("  {}", name);
+                println!("  {name}");
                 list_formats(&device);
             }
             Err(e) => {
-                warn!("Cannot get device name: {}", e);
+                warn!("Cannot get device name: {e}");
                 println!("   [unknown name]");
                 list_formats(&device);
             }
@@ -139,7 +139,7 @@ fn create_sink(
         Some("?") => match list_outputs(host) {
             Ok(()) => exit(0),
             Err(e) => {
-                error!("{}", e);
+                error!("{e}");
                 exit(1);
             }
         },
@@ -166,8 +166,7 @@ fn create_sink(
 
 pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> RodioSink {
     info!(
-        "Using Rodio sink with format {:?} and cpal host: {}",
-        format,
+        "Using Rodio sink with format {format:?} and cpal host: {}",
         host.id().name()
     );
 

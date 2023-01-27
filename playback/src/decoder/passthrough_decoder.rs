@@ -49,8 +49,7 @@ impl<R: Read + Seek> PassthroughDecoder<R> {
     pub fn new(rdr: R, format: AudioFileFormat) -> DecoderResult<Self> {
         if !AudioFiles::is_ogg_vorbis(format) {
             return Err(DecoderError::PassthroughDecoder(format!(
-                "Passthrough decoder is not implemented for format {:?}",
-                format
+                "Passthrough decoder is not implemented for format {format:?}"
             )));
         }
 
@@ -60,7 +59,7 @@ impl<R: Read + Seek> PassthroughDecoder<R> {
             .map_err(|e| DecoderError::PassthroughDecoder(e.to_string()))?;
         let stream_serial = since_epoch.as_millis() as u32;
 
-        info!("Starting passthrough track with serial {}", stream_serial);
+        info!("Starting passthrough track with serial {stream_serial}");
 
         // search for ident, comment, setup
         let ident = get_header(1, &mut rdr)?;
