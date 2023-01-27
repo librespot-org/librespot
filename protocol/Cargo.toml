@@ -11,7 +11,10 @@ edition = "2021"
 
 [dependencies]
 protobuf = "3"
+strum = "0.24"
+strum_macros = "0.24"
 
 [build-dependencies]
 glob = "0.3"
 protobuf-codegen = "3"
+protobuf = "3"

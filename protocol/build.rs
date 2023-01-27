@@ -4,6 +4,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use protobuf_codegen::{
+    Customize,
+    CustomizeCallback,
+};
+use protobuf::reflect::EnumDescriptor;
+
+struct GenStrum;
+
+impl CustomizeCallback for GenStrum {
+    fn enumeration(&self, _enum_type: &EnumDescriptor) -> Customize {
+        Customize::default().before("#[derive(::strum_macros::EnumString,::strum_macros::EnumVariantNames)]")
+    }
+}
+
 fn out_dir() -> PathBuf {
     Path::new(&env::var("OUT_DIR").expect("env")).to_path_buf()
 }
@@ -51,6 +65,7 @@ fn compile() {
         .out_dir(&out_dir)
         .inputs(&slices)
         .include(&proto_dir)
+        .customize_callback(GenStrum)
         .run()
         .expect("Codegen failed.");
 }

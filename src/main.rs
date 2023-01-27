@@ -14,6 +14,7 @@ use log::{error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use url::Url;
+use strum::VariantNames;
 
 use librespot::{
     connect::{config::ConnectConfig, spirc::Spirc},
@@ -24,7 +25,7 @@ use librespot::{
     playback::{
         audio_backend::{self, SinkBuilder, BACKENDS},
         config::{
-            AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
+            AudioFileFormat, AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
         },
         dither,
         mixer::{self, MixerConfig, MixerFn},
@@ -230,6 +231,7 @@ fn get_setup() -> Setup {
     const PASSWORD: &str = "password";
     const PROXY: &str = "proxy";
     const QUIET: &str = "quiet";
+    const STREAM_FORMAT: &str = "stream-format";
     const SYSTEM_CACHE: &str = "system-cache";
     const TEMP_DIR: &str = "tmp";
     const USERNAME: &str = "username";
@@ -258,6 +260,7 @@ fn get_setup() -> Setup {
     const DISABLE_CREDENTIAL_CACHE_SHORT: &str = "H";
     const HELP_SHORT: &str = "h";
     const ZEROCONF_INTERFACE_SHORT: &str = "i";
+    const STREAM_FORMAT_SHORT: &str = "l";
     const CACHE_SIZE_LIMIT_SHORT: &str = "M";
     const MIXER_TYPE_SHORT: &str = "m";
     const ENABLE_VOLUME_NORMALISATION_SHORT: &str = "N";
@@ -384,6 +387,12 @@ fn get_setup() -> Setup {
         NAME,
         "Device name. Defaults to Librespot.",
         "NAME",
+    )
+    .optmulti(
+        STREAM_FORMAT_SHORT,
+        STREAM_FORMAT,
+        &["Desired audio stream format {", &AudioFileFormat::VARIANTS.join("|"), "}. May be repeated to specify fallback priority."].join(""),
+        "STREAM_FORMAT",
     )
     .optopt(
         BITRATE_SHORT,
@@ -654,6 +663,12 @@ fn get_setup() -> Setup {
     if opt_present(VERSION) {
         println!("{}", get_version_string());
         exit(0);
+    }
+
+    if opt_present(STREAM_FORMAT) && opt_present(BITRATE) {
+        eprintln!("Options `--{}` / `-{}` and `--{}` / `-{}` are mutually exclusive.",
+                  STREAM_FORMAT, STREAM_FORMAT_SHORT, BITRATE, BITRATE_SHORT);
+        exit(1);
     }
 
     setup_logging(opt_present(QUIET), opt_present(VERBOSE));
@@ -1358,15 +1373,43 @@ fn get_setup() -> Setup {
     let player_config = {
         let player_default_config = PlayerConfig::default();
 
-        let file_formats = opt_str(BITRATE)
-            .as_deref()
-            .map(|bitrate| {
-                Bitrate::from_str(bitrate).unwrap_or_else(|_| {
-                    invalid_error_msg(BITRATE, BITRATE_SHORT, bitrate, "96, 160, 320", "160");
-                    exit(1);
-                }).file_formats()
-            })
-            .unwrap_or(player_default_config.file_formats);
+        let file_formats_strs = if matches.opt_present(STREAM_FORMAT) {
+            Some(matches.opt_strs(STREAM_FORMAT))
+        } else {
+            env_vars
+                .iter()
+                .find_map(|(k, v)|
+                          if stripped_env_key(k) == STREAM_FORMAT {
+                              Some(v.split(",").map(str::to_string).collect())
+                          } else {
+                              None
+                          })
+        };
+        let file_formats = if let Some(strs) = file_formats_strs {
+            strs.iter()
+                .map(|fmt| AudioFileFormat::from_str(fmt).unwrap_or_else(
+                    |_| {
+                        invalid_error_msg(
+                            STREAM_FORMAT,
+                            STREAM_FORMAT_SHORT,
+                            fmt,
+                            &AudioFileFormat::VARIANTS.join(", "),
+                            "",
+                        );
+                        exit(1);
+                    }))
+                .collect()
+        } else {
+            opt_str(BITRATE)
+                .as_deref()
+                .map(|bitrate| {
+                    Bitrate::from_str(bitrate).unwrap_or_else(|_| {
+                        invalid_error_msg(BITRATE, BITRATE_SHORT, bitrate, "96, 160, 320", "160");
+                        exit(1);
+                    }).file_formats()
+                })
+                .unwrap_or(player_default_config.file_formats)
+        };
 
         let gapless = !opt_present(DISABLE_GAPLESS);
 
