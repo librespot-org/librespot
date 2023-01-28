@@ -345,6 +345,7 @@ impl NamedSpotifyId {
         let mut dst = String::with_capacity(37 + self.username.len() + item_type.len());
         dst.push_str("spotify:user:");
         dst.push_str(&self.username);
+        dst.push(':');
         dst.push_str(item_type);
         dst.push(':');
         let base_62 = self.to_base62()?;
