@@ -112,6 +112,7 @@ https://github.com/librespot-org/librespot
   from the beginning
 - [playback] Handle disappearing and invalid devices better
 - [playback] Handle seek, pause, and play commands while loading
+- [metadata] Fix missing colon when converting named spotify IDs to URIs
 
 ## [0.4.2] - 2022-07-29
 
