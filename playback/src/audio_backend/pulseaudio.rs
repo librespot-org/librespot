@@ -64,7 +64,7 @@ impl Open for PulseAudioSink {
             actual_format = AudioFormat::F32;
         }
 
-        info!("Using PulseAudioSink with format: {:?}", actual_format);
+        info!("Using PulseAudioSink with format: {actual_format:?}");
 
         Self {
             sink: None,

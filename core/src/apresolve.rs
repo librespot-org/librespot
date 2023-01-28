@@ -137,17 +137,13 @@ impl ApResolver {
                 "spclient" => inner.data.spclient.pop_front(),
                 _ => {
                     return Err(Error::unimplemented(format!(
-                        "No implementation to resolve access point {}",
-                        endpoint
+                        "No implementation to resolve access point {endpoint}"
                     )))
                 }
             };
 
             let access_point = access_point.ok_or_else(|| {
-                Error::unavailable(format!(
-                    "No access point available for endpoint {}",
-                    endpoint
-                ))
+                Error::unavailable(format!("No access point available for endpoint {endpoint}"))
             })?;
 
             Ok(access_point)

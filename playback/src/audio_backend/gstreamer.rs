@@ -27,7 +27,7 @@ pub struct GstreamerSink {
 
 impl Open for GstreamerSink {
     fn open(device: Option<String>, format: AudioFormat) -> Self {
-        info!("Using GStreamer sink with format: {:?}", format);
+        info!("Using GStreamer sink with format: {format:?}");
         gst::init().expect("failed to init GStreamer!");
 
         let gst_format = match format {

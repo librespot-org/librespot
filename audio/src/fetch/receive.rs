@@ -62,7 +62,7 @@ async fn receive_data(
                 Some(Err(e)) => break Err(e.into()),
                 None => {
                     if actual_length != request.length {
-                        let msg = format!("did not expect body to contain {} bytes", actual_length);
+                        let msg = format!("did not expect body to contain {actual_length} bytes");
                         break Err(Error::data_loss(msg));
                     }
 
@@ -385,7 +385,7 @@ impl AudioFileFetch {
         let complete_tx = self.complete_tx.take();
 
         if let Some(mut output) = output {
-            output.seek(SeekFrom::Start(0))?;
+            output.rewind()?;
             if let Some(complete_tx) = complete_tx {
                 complete_tx
                     .send(output)

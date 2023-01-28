@@ -27,7 +27,7 @@ fn output_devices() -> Box<dyn Iterator<Item = (DeviceIndex, DeviceInfo)>> {
     let count = portaudio_rs::device::get_count().unwrap();
     let devices = (0..count)
         .filter_map(|idx| portaudio_rs::device::get_info(idx).map(|info| (idx, info)))
-        .filter(|&(_, ref info)| info.max_output_channels > 0);
+        .filter(|(_, info)| info.max_output_channels > 0);
 
     Box::new(devices)
 }
@@ -46,13 +46,13 @@ fn list_outputs() {
 
 fn find_output(device: &str) -> Option<DeviceIndex> {
     output_devices()
-        .find(|&(_, ref info)| info.name == device)
+        .find(|(_, info)| info.name == device)
         .map(|(idx, _)| idx)
 }
 
 impl<'a> Open for PortAudioSink<'a> {
     fn open(device: Option<String>, format: AudioFormat) -> PortAudioSink<'a> {
-        info!("Using PortAudio sink with format: {:?}", format);
+        info!("Using PortAudio sink with format: {format:?}");
 
         portaudio_rs::initialize().unwrap();
 
@@ -88,7 +88,7 @@ impl<'a> Open for PortAudioSink<'a> {
             AudioFormat::S32 => open_sink!(Self::S32, i32),
             AudioFormat::S16 => open_sink!(Self::S16, i16),
             _ => {
-                unimplemented!("PortAudio currently does not support {:?} output", format)
+                unimplemented!("PortAudio currently does not support {format:?} output")
             }
         }
     }
@@ -168,7 +168,7 @@ impl<'a> Sink for PortAudioSink<'a> {
         match result {
             Ok(_) => (),
             Err(portaudio_rs::PaError::OutputUnderflowed) => error!("PortAudio write underflow"),
-            Err(e) => panic!("PortAudio error {}", e),
+            Err(e) => panic!("PortAudio error {e}"),
         };
 
         Ok(())
