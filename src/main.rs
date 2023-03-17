@@ -1662,7 +1662,7 @@ async fn main() {
     let mut connecting = false;
     let mut _event_handler: Option<EventHandler> = None;
 
-    let session = Session::new(setup.session_config.clone(), setup.cache.clone());
+    let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
     if setup.enable_discovery {
         let device_id = setup.session_config.device_id.clone();
@@ -1721,6 +1721,10 @@ async fn main() {
                 }
             },
             _ = async {}, if connecting && last_credentials.is_some() => {
+                if session.is_invalid() {
+                    session = Session::new(setup.session_config.clone(), setup.cache.clone());
+                }
+
                 let mixer_config = setup.mixer_config.clone();
                 let mixer = (setup.mixer)(mixer_config);
                 let player_config = setup.player_config.clone();
@@ -1770,15 +1774,12 @@ async fn main() {
                     auto_connect_times.len() > RECONNECT_RATE_LIMIT
                 };
 
-                match last_credentials.clone() {
-                    Some(_) if !reconnect_exceeds_rate_limit() => {
-                        auto_connect_times.push(Instant::now());
-                        connecting = true;
-                    },
-                    _ => {
-                        error!("Spirc shut down too often. Not reconnecting automatically.");
-                        exit(1);
-                    },
+                if last_credentials.is_some() && !reconnect_exceeds_rate_limit() {
+                    auto_connect_times.push(Instant::now());
+                    connecting = true;
+                } else {
+                    error!("Spirc shut down too often. Not reconnecting automatically.");
+                    exit(1);
                 }
             },
             _ = tokio::signal::ctrl_c() => {
