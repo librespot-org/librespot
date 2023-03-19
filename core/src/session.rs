@@ -15,10 +15,10 @@ use futures_core::TryStream;
 use futures_util::{future, ready, StreamExt, TryStreamExt};
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use quick_xml::events::Event;
 use thiserror::Error;
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{sync::mpsc, time::Instant};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
@@ -80,6 +80,7 @@ struct SessionData {
     time_delta: i64,
     invalid: bool,
     user_data: UserData,
+    last_ping: Option<Instant>,
 }
 
 struct SessionInternal {
@@ -95,7 +96,6 @@ struct SessionInternal {
     mercury: OnceCell<MercuryManager>,
     spclient: OnceCell<SpClient>,
     token_provider: OnceCell<TokenProvider>,
-    session_timeout: OnceCell<SessionTimeout>,
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
@@ -127,7 +127,6 @@ impl Session {
             mercury: OnceCell::new(),
             spclient: OnceCell::new(),
             token_provider: OnceCell::new(),
-            session_timeout: OnceCell::new(),
             handle: tokio::runtime::Handle::current(),
         }))
     }
@@ -233,10 +232,20 @@ impl Session {
             .get_or_init(|| TokenProvider::new(self.weak()))
     }
 
-    fn session_timeout(&self) -> &SessionTimeout {
-        self.0
-            .session_timeout
-            .get_or_init(|| SessionTimeout::new(self))
+    /// Returns, when we haven't received a ping for too long, which means
+    /// that we silently lost connection to Spotify servers.
+    pub async fn session_timeout(&self) {
+        // pings are sent every 2 minutes and a 5 second margin should be fine
+        const SESSION_TIMEOUT: Duration = Duration::from_secs(125);
+
+        loop {
+            let last_ping = self.0.data.read().last_ping.unwrap_or_else(Instant::now);
+            if last_ping.elapsed() >= SESSION_TIMEOUT {
+                break;
+            }
+            // a potential timeout cannot occur at least until SESSION_TIMEOUT after the last_ping
+            tokio::time::sleep_until(last_ping + SESSION_TIMEOUT).await;
+        }
     }
 
     pub fn time_delta(&self) -> i64 {
@@ -292,8 +301,11 @@ impl Session {
                 }
                 .as_secs() as i64;
 
-                self.0.data.write().time_delta = server_timestamp - timestamp;
-                self.session_timeout().reset(self);
+                {
+                    let mut data = self.0.data.write();
+                    data.time_delta = server_timestamp - timestamp;
+                    data.last_ping = Some(Instant::now());
+                }
 
                 self.debug_info();
                 self.send_packet(Pong, vec![0, 0, 0, 0])
@@ -517,43 +529,6 @@ impl SessionWeak {
 impl Drop for SessionInternal {
     fn drop(&mut self) {
         debug!("drop Session");
-    }
-}
-
-struct SessionTimeout(Mutex<JoinHandle<()>>);
-
-// pings are sent every 2 minutes and a 5 second margin should be fine
-const SESSION_TIMEOUT: Duration = Duration::from_secs(125);
-
-impl SessionTimeout {
-    fn spawn_timeout(session: &Session) -> JoinHandle<()> {
-        session.0.handle.spawn({
-            let session = session.weak();
-            async move {
-                tokio::time::sleep(SESSION_TIMEOUT).await;
-                if let Some(session) = session.try_upgrade() {
-                    error!("connection to server timed out");
-                    session.shutdown();
-                }
-            }
-        })
-    }
-
-    pub fn new(session: &Session) -> Self {
-        Self(Mutex::new(Self::spawn_timeout(session)))
-    }
-
-    pub fn reset(&self, session: &Session) {
-        debug!("resetting session timeout");
-        let mut task = self.0.lock();
-        task.abort();
-        *task = Self::spawn_timeout(session);
-    }
-}
-
-impl Drop for SessionTimeout {
-    fn drop(&mut self) {
-        self.0.lock().abort()
     }
 }
 

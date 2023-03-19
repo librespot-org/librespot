@@ -452,6 +452,10 @@ impl SpircTask {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
             tokio::select! {
+                () = self.session.session_timeout() => {
+                    error!("lost connection to server (session timeout)");
+                    break;
+                }
                 remote_update = self.remote_update.next() => match remote_update {
                     Some(result) => match result {
                         Ok((username, frame)) => {
