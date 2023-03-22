@@ -295,15 +295,14 @@ impl Session {
         match packet_type {
             Some(Ping) => {
                 let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
-                let timestamp = match SystemTime::now().duration_since(UNIX_EPOCH) {
-                    Ok(dur) => dur,
-                    Err(err) => err.duration(),
-                }
-                .as_secs() as i64;
+                let timestamp = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or(Duration::ZERO)
+                    .as_secs() as i64;
 
                 {
                     let mut data = self.0.data.write();
-                    data.time_delta = server_timestamp - timestamp;
+                    data.time_delta = server_timestamp.saturating_sub(timestamp);
                     data.last_ping = Some(Instant::now());
                 }
 
