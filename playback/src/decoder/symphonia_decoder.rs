@@ -11,8 +11,8 @@ use symphonia::{
         units::Time,
     },
     default::{
-        codecs::{Mp3Decoder, VorbisDecoder},
-        formats::{Mp3Reader, OggReader},
+        codecs::{MpaDecoder, VorbisDecoder},
+        formats::{MpaReader, OggReader},
     },
 };
 
@@ -48,7 +48,7 @@ impl SymphoniaDecoder {
         let format: Box<dyn FormatReader> = if AudioFiles::is_ogg_vorbis(file_format) {
             Box::new(OggReader::try_new(mss, &format_opts)?)
         } else if AudioFiles::is_mp3(file_format) {
-            Box::new(Mp3Reader::try_new(mss, &format_opts)?)
+            Box::new(MpaReader::try_new(mss, &format_opts)?)
         } else {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported format: {file_format:?}"
@@ -63,7 +63,7 @@ impl SymphoniaDecoder {
         let decoder: Box<dyn Decoder> = if AudioFiles::is_ogg_vorbis(file_format) {
             Box::new(VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?)
         } else if AudioFiles::is_mp3(file_format) {
-            Box::new(Mp3Decoder::try_new(&track.codec_params, &decoder_opts)?)
+            Box::new(MpaDecoder::try_new(&track.codec_params, &decoder_opts)?)
         } else {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported decoder: {file_format:?}"
