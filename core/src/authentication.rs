@@ -96,7 +96,9 @@ impl Credentials {
                 return Err(AuthenticationError::Key.into());
             }
 
-            pbkdf2::<Hmac<Sha1>>(&secret, username.as_bytes(), 0x100, &mut key[0..20]);
+            let res = pbkdf2::<Hmac<Sha1>>(&secret, username.as_bytes(), 0x100, &mut key[0..20]);
+            assert!(res.is_ok(),"Failed to create hash");
+
 
             let hash = &Sha1::digest(&key[..20]);
             key[..20].copy_from_slice(hash);
