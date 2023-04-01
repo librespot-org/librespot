@@ -48,7 +48,8 @@ impl Open for GstreamerSink {
         let gst_bytes = NUM_CHANNELS as usize * 2048 * sample_size;
 
         let pipeline = gst::Pipeline::new(None);
-        let appsrc = gst::ElementFactory::make("appsrc", None)
+        let appsrc = gst::ElementFactory::make("appsrc")
+            .build()
             .expect("Failed to create GStreamer appsrc element")
             .downcast::<gst_app::AppSrc>()
             .expect("couldn't cast AppSrc element at runtime!");
