@@ -87,7 +87,7 @@ impl<R: Read + Seek> PassthroughDecoder<R> {
     }
 }
 
-impl< R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
+impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
     fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError> {
         let absgp = (position_ms as f64 * PAGES_PER_MS) as u64;
 
