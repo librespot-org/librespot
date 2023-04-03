@@ -29,7 +29,7 @@ where
         return Err(DecoderError::PassthroughDecoder("Invalid Data".into()));
     }
 
-    Ok(pck.data.to_vec())
+    Ok(pck.data)
 }
 
 pub struct PassthroughDecoder<R: Read + Seek> {
