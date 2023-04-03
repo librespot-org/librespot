@@ -76,7 +76,7 @@ jobs:
 
       - name: Get Rustc version
         id: get-rustc-version
-        run: echo "::set-output name=version::$(rustc -V)"
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache Rust dependencies
@@ -128,7 +128,7 @@ jobs:
 
       - name: Get Rustc version
         id: get-rustc-version
-        run: echo "::set-output name=version::$(rustc -V)"
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache Rust dependencies
@@ -176,7 +176,7 @@ jobs:
 
       - name: Get Rustc version
         id: get-rustc-version
-        run: echo "::set-output name=version::$(rustc -V)"
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache Rust dependencies
@@ -217,7 +217,7 @@ jobs:
 
       - name: Get Rustc version
         id: get-rustc-version
-        run: echo "::set-output name=version::$(rustc -V)"
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache Rust dependencies
