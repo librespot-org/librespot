@@ -68,11 +68,7 @@ jobs:
         uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.7
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.toolchain }}
-          override: true
+        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
 
       - name: Get Rustc version
         id: get-rustc-version
@@ -120,11 +116,7 @@ jobs:
         uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.7
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          profile: minimal
-          override: true
+        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
 
       - name: Get Rustc version
         id: get-rustc-version
@@ -167,12 +159,7 @@ jobs:
         uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.7
-        with:
-          profile: minimal
-          target: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
-          override: true
+        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
 
       - name: Get Rustc version
         id: get-rustc-version
@@ -208,12 +195,7 @@ jobs:
         uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.7
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-          components: clippy
+        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain ${{ matrix.toolchain }}  -y
 
       - name: Get Rustc version
         id: get-rustc-version
@@ -243,16 +225,11 @@ jobs:
 
   fmt:
     needs: clippy
-    name: cargo +${{ matrix.toolchain }} fmt
+    name: cargo fmt
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.5.0
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.7
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt
+        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain stable  -y
       - run: cargo fmt --all -- --check
