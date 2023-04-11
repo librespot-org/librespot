@@ -43,10 +43,10 @@ priority-queue = "1.2"
 protobuf = "3"
 quick-xml = { version = "0.23", features = ["serialize"] }
 rand = "0.8"
-rsa = "0.6"
+rsa = "0.8.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha1 = "0.10"
+sha1 = { version = "0.10", features = ["oid"] }
 shannon = "0.2"
 sysinfo = { version = "0.28", default-features = false }
 thiserror = "1.0"

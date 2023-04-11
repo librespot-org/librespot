@@ -4,7 +4,7 @@ use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use hmac::{Hmac, Mac};
 use protobuf::{self, Message};
 use rand::{thread_rng, RngCore};
-use rsa::{BigUint, PublicKey};
+use rsa::{BigUint, Pkcs1v15Sign, PublicKey};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -83,11 +83,9 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     })?;
 
     let hash = Sha1::digest(&remote_key);
-    let padding = PaddingScheme(rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(
-        rsa::hash::Hash::SHA1,
-    )));
+    let padding = Pkcs1v15Sign::new::<Sha1>();
     public_key
-        .verify(padding.0, &hash, &remote_signature)
+        .verify(padding, &hash, &remote_signature)
         .map_err(|_| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -104,13 +102,6 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
 
     Ok(codec.framed(connection))
 }
-
-// Workaround for https://github.com/RustCrypto/RSA/issues/214
-struct PaddingScheme(rsa::padding::PaddingScheme);
-
-/// # Safety
-/// The `rsa::padding::PaddingScheme` variant we use is actually `Send`.
-unsafe impl Send for PaddingScheme {}
 
 async fn client_hello<T>(connection: &mut T, gc: Vec<u8>) -> io::Result<Vec<u8>>
 where
