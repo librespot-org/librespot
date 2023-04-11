@@ -1,6 +1,8 @@
 use std::io::{self, Read};
 
 use aes::Aes192;
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::engine::Engine as _;
 use byteorder::{BigEndian, ByteOrder};
 use pbkdf2::pbkdf2_hmac;
 use protobuf::Enum;
@@ -108,7 +110,7 @@ impl Credentials {
             use aes::cipher::generic_array::GenericArray;
             use aes::cipher::{BlockDecrypt, BlockSizeUser, KeyInit};
 
-            let mut data = base64::decode(encrypted_blob)?;
+            let mut data = BASE64.decode(encrypted_blob)?;
             let cipher = Aes192::new(GenericArray::from_slice(&key));
             let block_size = Aes192::block_size();
 
@@ -164,7 +166,7 @@ where
     T: AsRef<[u8]>,
     S: serde::Serializer,
 {
-    serde::Serialize::serialize(&base64::encode(v.as_ref()), ser)
+    serde::Serialize::serialize(&BASE64.encode(v.as_ref()), ser)
 }
 
 fn deserialize_base64<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
@@ -172,5 +174,7 @@ where
     D: serde::Deserializer<'de>,
 {
     let v: String = serde::Deserialize::deserialize(de)?;
-    base64::decode(v).map_err(|e| serde::de::Error::custom(e.to_string()))
+    BASE64
+        .decode(v)
+        .map_err(|e| serde::de::Error::custom(e.to_string()))
 }
