@@ -68,7 +68,7 @@ jobs:
         uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.6
+        uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
@@ -120,7 +120,7 @@ jobs:
         uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.6
+        uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: ${{ matrix.toolchain }}
           profile: minimal
@@ -167,7 +167,7 @@ jobs:
         uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.6
+        uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
           target: ${{ matrix.target }}
@@ -208,7 +208,7 @@ jobs:
         uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.6
+        uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
@@ -249,7 +249,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3.5.0
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.6
+        uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
           toolchain: stable
