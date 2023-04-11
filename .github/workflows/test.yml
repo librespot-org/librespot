@@ -65,10 +65,10 @@ jobs:
             experimental: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1.0.6
         with:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
@@ -76,7 +76,7 @@ jobs:
 
       - name: Get Rustc version
         id: get-rustc-version
-        run: echo "::set-output name=version::$(rustc -V)"
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache Rust dependencies
@@ -117,10 +117,10 @@ jobs:
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1.0.6
         with:
           toolchain: ${{ matrix.toolchain }}
           profile: minimal
@@ -128,11 +128,11 @@ jobs:
 
       - name: Get Rustc version
         id: get-rustc-version
-        run: echo "::set-output name=version::$(rustc -V)"
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3.3.1
         with:
           path: |
             ~/.cargo/registry/index
@@ -164,10 +164,10 @@ jobs:
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1.0.6
         with:
           profile: minimal
           target: ${{ matrix.target }}
@@ -176,11 +176,11 @@ jobs:
 
       - name: Get Rustc version
         id: get-rustc-version
-        run: echo "::set-output name=version::$(rustc -V)"
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3.3.1
         with:
           path: |
             ~/.cargo/registry/index
@@ -205,10 +205,10 @@ jobs:
         toolchain: [stable]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.5.0
 
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1.0.6
         with:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
@@ -217,11 +217,11 @@ jobs:
 
       - name: Get Rustc version
         id: get-rustc-version
-        run: echo "::set-output name=version::$(rustc -V)"
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v3.3.1
         with:
           path: |
             ~/.cargo/registry/index
@@ -247,9 +247,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.5.0
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1.0.6
         with:
           profile: minimal
           toolchain: stable
