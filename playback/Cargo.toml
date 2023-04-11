@@ -31,16 +31,16 @@ tokio = { version = "1", features = ["parking_lot", "rt", "rt-multi-thread", "sy
 zerocopy = "0.6"
 
 # Backends
-alsa            = { version = "0.6", optional = true }
+alsa            = { version = "0.7", optional = true }
 portaudio-rs    = { version = "0.3", optional = true }
 libpulse-binding        = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 jack            = { version = "0.11", optional = true }
 sdl2            = { version = "0.35", optional = true }
-gstreamer       = { version = "0.18", optional = true }
-gstreamer-app   = { version = "0.18", optional = true }
-gstreamer-audio = { version = "0.18", optional = true }
-glib            = { version = "0.15", optional = true }
+gstreamer       = { version = "0.20", optional = true }
+gstreamer-app   = { version = "0.20", optional = true }
+gstreamer-audio = { version = "0.20", optional = true }
+glib            = { version = "0.17", optional = true }
 
 # Rodio dependencies
 rodio           = { version = "0.17.1", optional = true, default-features = false }
@@ -50,7 +50,7 @@ cpal            = { version = "0.15.1", optional = true }
 symphonia = { version = "0.5", default-features = false, features = ["mp3", "ogg", "vorbis"] }
 
 # Legacy Ogg container decoder for the passthrough decoder
-ogg = { version = "0.8", optional = true }
+ogg = { version = "0.9", optional = true }
 
 # Dithering
 rand = { version = "0.8", features = ["small_rng"] }

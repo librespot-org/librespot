@@ -50,7 +50,7 @@ path = "protocol"
 version = "0.5.0-dev"
 
 [dependencies]
-env_logger =  { version = "0.9", default-features = false, features = ["termcolor", "humantime", "atty"] }
+env_logger =  { version = "0.10", default-features = false, features = ["color", "humantime", "auto-color"] }
 futures-util = { version = "0.3", default_features = false }
 getopts = "0.2"
 hex = "0.4"

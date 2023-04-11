@@ -13,5 +13,4 @@ edition = "2021"
 protobuf = "3"
 
 [build-dependencies]
-glob = "0.3"
 protobuf-codegen = "3"

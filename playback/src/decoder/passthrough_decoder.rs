@@ -14,7 +14,7 @@ use crate::{
     MS_PER_PAGE, PAGES_PER_MS,
 };
 
-fn get_header<T>(code: u8, rdr: &mut PacketReader<T>) -> DecoderResult<Box<[u8]>>
+fn get_header<T>(code: u8, rdr: &mut PacketReader<T>) -> DecoderResult<Vec<u8>>
 where
     T: Read + Seek,
 {
@@ -29,19 +29,19 @@ where
         return Err(DecoderError::PassthroughDecoder("Invalid Data".into()));
     }
 
-    Ok(pck.data.into_boxed_slice())
+    Ok(pck.data)
 }
 
 pub struct PassthroughDecoder<R: Read + Seek> {
     rdr: PacketReader<R>,
-    wtr: PacketWriter<Vec<u8>>,
+    wtr: PacketWriter<'static, Vec<u8>>,
     eos: bool,
     bos: bool,
     ofsgp_page: u64,
     stream_serial: u32,
-    ident: Box<[u8]>,
-    comment: Box<[u8]>,
-    setup: Box<[u8]>,
+    ident: Vec<u8>,
+    comment: Vec<u8>,
+    setup: Vec<u8>,
 }
 
 impl<R: Read + Seek> PassthroughDecoder<R> {
@@ -98,7 +98,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
                     let absgp_page = pck.absgp_page() - self.ofsgp_page;
                     self.wtr
                         .write_packet(
-                            pck.data.into_boxed_slice(),
+                            pck.data,
                             self.stream_serial,
                             PacketWriteEndInfo::EndStream,
                             absgp_page,
@@ -196,7 +196,7 @@ impl<R: Read + Seek> AudioDecoder for PassthroughDecoder<R> {
 
             self.wtr
                 .write_packet(
-                    pck.data.into_boxed_slice(),
+                    pck.data,
                     self.stream_serial,
                     inf,
                     pckgp_page - self.ofsgp_page,
