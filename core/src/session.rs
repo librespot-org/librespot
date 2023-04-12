@@ -309,19 +309,17 @@ impl Session {
                 let mut user_attributes: UserAttributes = HashMap::new();
 
                 loop {
-                    match reader.read_event(&mut buf) {
+                    match reader.read_event_into(&mut buf) {
                         Ok(Event::Start(ref element)) => {
-                            current_element = std::str::from_utf8(element.name())?.to_owned()
+                            current_element = std::str::from_utf8(element)?.to_owned()
                         }
                         Ok(Event::End(_)) => {
                             current_element = String::new();
                         }
                         Ok(Event::Text(ref value)) => {
                             if !current_element.is_empty() {
-                                let _ = user_attributes.insert(
-                                    current_element.clone(),
-                                    value.unescape_and_decode(&reader)?,
-                                );
+                                let _ = user_attributes
+                                    .insert(current_element.clone(), value.unescape()?.to_string());
                             }
                         }
                         Ok(Event::Eof) => break,
