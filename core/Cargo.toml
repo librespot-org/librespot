@@ -60,7 +60,7 @@ uuid = { version = "1", default-features = false, features = ["fast-rng", "v4"] 
 
 [build-dependencies]
 rand = "0.8"
-vergen = { version = "7", default-features = false, features = ["build", "git"] }
+vergen = { version = "8", default-features = false, features = ["build", "git", "gitcl"] }
 
 [dev-dependencies]
 env_logger = "0.10"
