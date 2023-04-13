@@ -29,7 +29,7 @@ httparse = "1.7"
 http = "0.2"
 hyper = { version = "0.14", features = ["client", "http1", "http2", "tcp"] }
 hyper-proxy = { version = "0.9", default-features = false, features = ["rustls"] }
-hyper-rustls = { version = "0.23", features = ["http2"] }
+hyper-rustls = { version = "0.24", features = ["http2"] }
 log = "0.4"
 nonzero_ext = "0.3"
 num-bigint = { version = "0.4", features = ["rand"] }
