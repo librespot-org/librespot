@@ -15,7 +15,7 @@ version = "0.5.0-dev"
 
 [dependencies]
 aes = "0.8"
-base64 = "0.13"
+base64 = "0.21"
 byteorder = "1.4"
 bytes = "1"
 dns-sd = { version = "0.1", optional = true }

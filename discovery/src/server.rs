@@ -9,6 +9,8 @@ use std::{
 };
 
 use aes::cipher::{KeyIvInit, StreamCipher};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::engine::Engine as _;
 use futures_core::Stream;
 use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
@@ -16,6 +18,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, StatusCode,
 };
+
 use log::{debug, error, warn};
 use serde_json::json;
 use sha1::{Digest, Sha1};
@@ -61,7 +64,7 @@ impl RequestHandler {
     }
 
     fn handle_get_info(&self) -> Response<hyper::Body> {
-        let public_key = base64::encode(self.keys.public_key());
+        let public_key = BASE64.encode(self.keys.public_key());
         let device_type: &str = self.config.device_type.into();
         let mut active_user = String::new();
         if let Some(username) = &self.username {
@@ -125,9 +128,9 @@ impl RequestHandler {
             .get(clientkey_key)
             .ok_or(DiscoveryError::ParamsError(clientkey_key))?;
 
-        let encrypted_blob = base64::decode(encrypted_blob.as_bytes())?;
+        let encrypted_blob = BASE64.decode(encrypted_blob.as_bytes())?;
 
-        let client_key = base64::decode(client_key.as_bytes())?;
+        let client_key = BASE64.decode(client_key.as_bytes())?;
         let shared_key = self.keys.shared_secret(&client_key);
 
         let encrypted_blob_len = encrypted_blob.len();
