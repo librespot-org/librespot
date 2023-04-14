@@ -1,18 +1,13 @@
 use rand::{distributions::Alphanumeric, Rng};
-use vergen::{vergen, Config, ShaKind, TimestampKind};
+use vergen::EmitBuilder;
 
 fn main() {
-    let mut config = Config::default();
-    *config.build_mut().kind_mut() = TimestampKind::DateOnly;
-    *config.git_mut().enabled_mut() = true;
-    *config.git_mut().commit_timestamp_mut() = true;
-    *config.git_mut().commit_timestamp_kind_mut() = TimestampKind::DateOnly;
-    *config.git_mut().sha_mut() = true;
-    *config.git_mut().sha_kind_mut() = ShaKind::Short;
-    *config.git_mut().rerun_on_head_change_mut() = true;
-
-    vergen(config).expect("Unable to generate the cargo keys!");
-
+    EmitBuilder::builder()
+        .build_date() // outputs 'VERGEN_BUILD_DATE'
+        .git_sha(true) // outputs 'VERGEN_GIT_SHA', and sets the 'short' flag true
+        .git_commit_date() // outputs 'VERGEN_GIT_COMMIT_DATE'
+        .emit()
+        .expect("Unable to generate the cargo keys!");
     let build_id = match std::env::var("SOURCE_DATE_EPOCH") {
         Ok(val) => val,
         Err(_) => rand::thread_rng()

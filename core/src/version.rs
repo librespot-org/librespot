@@ -1,11 +1,11 @@
 /// Version string of the form "librespot-<sha>"
-pub const VERSION_STRING: &str = concat!("librespot-", env!("VERGEN_GIT_SHA_SHORT"));
+pub const VERSION_STRING: &str = concat!("librespot-", env!("VERGEN_GIT_SHA"));
 
 /// Generate a timestamp string representing the build date (UTC).
 pub const BUILD_DATE: &str = env!("VERGEN_BUILD_DATE");
 
 /// Short sha of the latest git commit.
-pub const SHA_SHORT: &str = env!("VERGEN_GIT_SHA_SHORT");
+pub const SHA_SHORT: &str = env!("VERGEN_GIT_SHA");
 
 /// Date of the latest git commit.
 pub const COMMIT_DATE: &str = env!("VERGEN_GIT_COMMIT_DATE");
