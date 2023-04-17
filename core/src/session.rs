@@ -101,6 +101,20 @@ struct SessionInternal {
     handle: tokio::runtime::Handle,
 }
 
+/// A shared reference to a Spotify session.
+///
+/// After instantiating, you need to login via [Session::connect].
+/// You can either implement the whole playback logic yourself by using
+/// this structs interface directly or hand it to a
+/// `Player`.
+///
+/// If you're not using `Spirc` to control the player, it's recommended
+/// to await the [Session::session_timeout] method to gracefully handle
+/// stale server connections. Without playback activity for a while,
+/// [Session] might otherwise not notice a broken connection.
+///
+/// *Note*: [Session] instances cannot yet be reused once invalidated. After
+/// an unexpectedly closed connection, you'll need to create a new [Session].
 #[derive(Clone)]
 pub struct Session(Arc<SessionInternal>);
 
@@ -232,7 +246,7 @@ impl Session {
             .get_or_init(|| TokenProvider::new(self.weak()))
     }
 
-    /// Returns, when we haven't received a ping for too long, which means
+    /// Returns, when we haven't received a ping for too long (2 minutes), which means
     /// that we silently lost connection to Spotify servers.
     pub async fn session_timeout(&self) {
         // pings are sent every 2 minutes and a 5 second margin should be fine
