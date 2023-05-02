@@ -1545,7 +1545,10 @@ impl PlayerInternal {
                         // dynamic method, there may still be peaks that we want to shave off.
 
                         // No matter the case we apply volume attenuation last if there is any.
-                        if !self.config.normalisation && volume < 1.0 {
+                        if !self.config.normalisation && volume >= 1.0 {
+                            // do not alter sample
+                        }
+                        else if !self.config.normalisation && volume < 1.0 {
                             for sample in data.iter_mut() {
                                 *sample *= volume;
                             }
