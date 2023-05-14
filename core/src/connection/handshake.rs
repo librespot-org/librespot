@@ -4,7 +4,7 @@ use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use hmac::{Hmac, Mac};
 use protobuf::{self, Message};
 use rand::{thread_rng, RngCore};
-use rsa::{BigUint, Pkcs1v15Sign, PublicKey};
+use rsa::{BigUint, Pkcs1v15Sign, RsaPublicKey};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -75,7 +75,7 @@ pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     // Prevent man-in-the-middle attacks: check server signature
     let n = BigUint::from_bytes_be(&SERVER_KEY);
     let e = BigUint::new(vec![65537]);
-    let public_key = rsa::RsaPublicKey::new(n, e).map_err(|_| {
+    let public_key = RsaPublicKey::new(n, e).map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidData,
             HandshakeError::VerificationFailed,
