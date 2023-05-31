@@ -108,11 +108,6 @@ struct SessionInternal {
 /// this structs interface directly or hand it to a
 /// `Player`.
 ///
-/// If you're not using `Spirc` to control the player, it's recommended
-/// to await the [Session::session_timeout] method to gracefully handle
-/// stale server connections. Without playback activity for a while,
-/// [Session] might otherwise not notice a broken connection.
-///
 /// *Note*: [Session] instances cannot yet be reused once invalidated. After
 /// an unexpectedly closed connection, you'll need to create a new [Session].
 #[derive(Clone)]
@@ -196,9 +191,10 @@ impl Session {
             .map(Ok)
             .forward(sink);
         let receiver_task = DispatchTask(stream, self.weak());
+        let timeout_task = Session::session_timeout(self.weak());
 
         tokio::spawn(async move {
-            let result = future::try_join(sender_task, receiver_task).await;
+            let result = future::try_join3(sender_task, receiver_task, timeout_task).await;
 
             if let Err(e) = result {
                 error!("{}", e);
@@ -246,20 +242,31 @@ impl Session {
             .get_or_init(|| TokenProvider::new(self.weak()))
     }
 
-    /// Returns, when we haven't received a ping for too long (2 minutes), which means
-    /// that we silently lost connection to Spotify servers.
-    pub async fn session_timeout(&self) {
+    /// Returns an error, when we haven't received a ping for too long (2 minutes),
+    /// which means that we silently lost connection to Spotify servers.
+    async fn session_timeout(session: SessionWeak) -> io::Result<()> {
         // pings are sent every 2 minutes and a 5 second margin should be fine
         const SESSION_TIMEOUT: Duration = Duration::from_secs(125);
 
-        loop {
-            let last_ping = self.0.data.read().last_ping.unwrap_or_else(Instant::now);
-            if last_ping.elapsed() >= SESSION_TIMEOUT {
+        while let Some(session) = session.try_upgrade() {
+            if session.is_invalid() {
                 break;
             }
+            let last_ping = session.0.data.read().last_ping.unwrap_or_else(Instant::now);
+            if last_ping.elapsed() >= SESSION_TIMEOUT {
+                session.shutdown();
+                // TODO: Optionally reconnect (with cached/last credentials?)
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "session lost connection to server",
+                ));
+            }
+            // drop the strong reference before sleeping
+            drop(session);
             // a potential timeout cannot occur at least until SESSION_TIMEOUT after the last_ping
             tokio::time::sleep_until(last_ping + SESSION_TIMEOUT).await;
         }
+        Ok(())
     }
 
     pub fn time_delta(&self) -> i64 {
