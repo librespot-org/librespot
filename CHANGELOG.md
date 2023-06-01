@@ -87,6 +87,7 @@ https://github.com/librespot-org/librespot
 - [core] Support downloading of lyrics
 - [core] Support parsing `SpotifyId` for local files
 - [core] Support parsing `SpotifyId` for named playlists
+- [core] Add checks and handling for stale server connections.
 - [main] Add all player events to `player_event_handler.rs`
 - [main] Add an event worker thread that runs async to the main thread(s) but
   sync to itself to prevent potential data races for event consumers
