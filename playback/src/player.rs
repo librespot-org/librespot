@@ -15,7 +15,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use byteorder::{LittleEndian, ReadBytesExt};
 use futures_util::{
     future, future::FusedFuture, stream::futures_unordered::FuturesUnordered, StreamExt,
     TryFutureExt,
@@ -306,29 +305,35 @@ impl Default for NormalisationData {
 impl NormalisationData {
     fn parse_from_ogg<T: Read + Seek>(mut file: T) -> io::Result<NormalisationData> {
         const SPOTIFY_NORMALIZATION_HEADER_START_OFFSET: u64 = 144;
+        const NORMALISATION_DATA_SIZE: usize = 16;
+
         let newpos = file.seek(SeekFrom::Start(SPOTIFY_NORMALIZATION_HEADER_START_OFFSET))?;
         if newpos != SPOTIFY_NORMALIZATION_HEADER_START_OFFSET {
             error!(
                 "NormalisationData::parse_from_file seeking to {} but position is now {}",
                 SPOTIFY_NORMALIZATION_HEADER_START_OFFSET, newpos
             );
+
             error!("Falling back to default (non-track and non-album) normalisation data.");
+
             return Ok(NormalisationData::default());
         }
 
-        let track_gain_db = file.read_f32::<LittleEndian>()? as f64;
-        let track_peak = file.read_f32::<LittleEndian>()? as f64;
-        let album_gain_db = file.read_f32::<LittleEndian>()? as f64;
-        let album_peak = file.read_f32::<LittleEndian>()? as f64;
+        let mut buf = [0u8; NORMALISATION_DATA_SIZE];
 
-        let r = NormalisationData {
+        file.read_exact(&mut buf)?;
+
+        let track_gain_db = f32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as f64;
+        let track_peak = f32::from_le_bytes([buf[4], buf[5], buf[6], buf[7]]) as f64;
+        let album_gain_db = f32::from_le_bytes([buf[8], buf[9], buf[10], buf[11]]) as f64;
+        let album_peak = f32::from_le_bytes([buf[12], buf[13], buf[14], buf[15]]) as f64;
+
+        Ok(Self {
             track_gain_db,
             track_peak,
             album_gain_db,
             album_peak,
-        };
-
-        Ok(r)
+        })
     }
 
     fn get_factor(config: &PlayerConfig, data: NormalisationData) -> f64 {
