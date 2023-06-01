@@ -1,4 +1,4 @@
-/// Version string of the form "librespot-<sha>"
+/// Version string of the form "librespot-\<sha\>"
 pub const VERSION_STRING: &str = concat!("librespot-", env!("VERGEN_GIT_SHA"));
 
 /// Generate a timestamp string representing the build date (UTC).

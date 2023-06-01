@@ -6,7 +6,7 @@ use std::{
     process::exit,
     sync::{Arc, Weak},
     task::{Context, Poll},
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use byteorder::{BigEndian, ByteOrder};
@@ -18,7 +18,7 @@ use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use quick_xml::events::Event;
 use thiserror::Error;
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time::Instant};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
@@ -80,6 +80,7 @@ struct SessionData {
     time_delta: i64,
     invalid: bool,
     user_data: UserData,
+    last_ping: Option<Instant>,
 }
 
 struct SessionInternal {
@@ -100,6 +101,15 @@ struct SessionInternal {
     handle: tokio::runtime::Handle,
 }
 
+/// A shared reference to a Spotify session.
+///
+/// After instantiating, you need to login via [Session::connect].
+/// You can either implement the whole playback logic yourself by using
+/// this structs interface directly or hand it to a
+/// `Player`.
+///
+/// *Note*: [Session] instances cannot yet be reused once invalidated. After
+/// an unexpectedly closed connection, you'll need to create a new [Session].
 #[derive(Clone)]
 pub struct Session(Arc<SessionInternal>);
 
@@ -181,9 +191,10 @@ impl Session {
             .map(Ok)
             .forward(sink);
         let receiver_task = DispatchTask(stream, self.weak());
+        let timeout_task = Session::session_timeout(self.weak());
 
         tokio::spawn(async move {
-            let result = future::try_join(sender_task, receiver_task).await;
+            let result = future::try_join3(sender_task, receiver_task, timeout_task).await;
 
             if let Err(e) = result {
                 error!("{}", e);
@@ -229,6 +240,33 @@ impl Session {
         self.0
             .token_provider
             .get_or_init(|| TokenProvider::new(self.weak()))
+    }
+
+    /// Returns an error, when we haven't received a ping for too long (2 minutes),
+    /// which means that we silently lost connection to Spotify servers.
+    async fn session_timeout(session: SessionWeak) -> io::Result<()> {
+        // pings are sent every 2 minutes and a 5 second margin should be fine
+        const SESSION_TIMEOUT: Duration = Duration::from_secs(125);
+
+        while let Some(session) = session.try_upgrade() {
+            if session.is_invalid() {
+                break;
+            }
+            let last_ping = session.0.data.read().last_ping.unwrap_or_else(Instant::now);
+            if last_ping.elapsed() >= SESSION_TIMEOUT {
+                session.shutdown();
+                // TODO: Optionally reconnect (with cached/last credentials?)
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "session lost connection to server",
+                ));
+            }
+            // drop the strong reference before sleeping
+            drop(session);
+            // a potential timeout cannot occur at least until SESSION_TIMEOUT after the last_ping
+            tokio::time::sleep_until(last_ping + SESSION_TIMEOUT).await;
+        }
+        Ok(())
     }
 
     pub fn time_delta(&self) -> i64 {
@@ -278,13 +316,16 @@ impl Session {
         match packet_type {
             Some(Ping) => {
                 let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
-                let timestamp = match SystemTime::now().duration_since(UNIX_EPOCH) {
-                    Ok(dur) => dur,
-                    Err(err) => err.duration(),
-                }
-                .as_secs() as i64;
+                let timestamp = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or(Duration::ZERO)
+                    .as_secs() as i64;
 
-                self.0.data.write().time_delta = server_timestamp - timestamp;
+                {
+                    let mut data = self.0.data.write();
+                    data.time_delta = server_timestamp.saturating_sub(timestamp);
+                    data.last_ping = Some(Instant::now());
+                }
 
                 self.debug_info();
                 self.send_packet(Pong, vec![0, 0, 0, 0])
