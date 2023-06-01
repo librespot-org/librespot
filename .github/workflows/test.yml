@@ -39,17 +39,71 @@ env:
   RUST_BACKTRACE: 1
   RUSTFLAGS: -D warnings
 
-# The layering here is as follows, checking in priority from highest to lowest:
-#  1. absence of errors and warnings on Linux/x86
-#  2. cross compilation on Windows and Linux/ARM
-#  3. absence of lints
-#  4. code formatting
+# The layering here is as follows:
+#  1. code formatting
+#  2. absence of lints
+#  3. absence of errors and warnings on Linux/x86
+#  4. cross compilation on Windows and Linux/ARM
 
 jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.5.2
+      - name: Install toolchain
+        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain stable  -y
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    needs: fmt
+    name: cargo +${{ matrix.toolchain }} clippy (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        toolchain: [stable]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.5.2
+
+      - name: Install toolchain
+        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain ${{ matrix.toolchain }}  -y
+
+      - name: Get Rustc version
+        id: get-rustc-version
+        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3.3.1
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Install developer package dependencies
+        run: sudo apt-get update && sudo apt install -y libunwind-dev && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev libavahi-compat-libdnssd-dev
+
+      - run: cargo install cargo-hack
+      - run: cargo hack --workspace --remove-dev-deps
+      - run: cargo clippy -p librespot-core --no-default-features
+      - run: cargo clippy -p librespot-core
+      - run: cargo hack clippy --each-feature -p librespot-discovery
+      - run: cargo hack clippy --each-feature -p librespot-playback
+      - run: cargo hack clippy --each-feature
+
   test-linux:
     name: cargo +${{ matrix.toolchain }} check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.experimental }}
+    needs: clippy
     strategy:
       fail-fast: false
       matrix:
@@ -179,57 +233,3 @@ jobs:
         run: cargo install cross || true
       - name: Build
         run: cross build --target ${{ matrix.target }} --no-default-features
-
-  clippy:
-    needs: [test-cross-arm, test-windows]
-    name: cargo +${{ matrix.toolchain }} clippy (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    continue-on-error: false
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        toolchain: [stable]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3.5.2
-
-      - name: Install toolchain
-        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain ${{ matrix.toolchain }}  -y
-
-      - name: Get Rustc version
-        id: get-rustc-version
-        run: echo "version=$(rustc -V)" >> $GITHUB_OUTPUT
-        shell: bash
-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v3.3.1
-        with:
-          path: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
-
-      - name: Install developer package dependencies
-        run: sudo apt-get update && sudo apt install -y libunwind-dev && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev libavahi-compat-libdnssd-dev
-
-      - run: cargo install cargo-hack
-      - run: cargo hack --workspace --remove-dev-deps
-      - run: cargo clippy -p librespot-core --no-default-features
-      - run: cargo clippy -p librespot-core
-      - run: cargo hack clippy --each-feature -p librespot-discovery
-      - run: cargo hack clippy --each-feature -p librespot-playback
-      - run: cargo hack clippy --each-feature
-
-  fmt:
-    needs: clippy
-    name: cargo fmt
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3.5.2
-      - name: Install toolchain
-        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain stable  -y
-      - run: cargo fmt --all -- --check
