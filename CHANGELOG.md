@@ -64,6 +64,7 @@ https://github.com/librespot-org/librespot
 - [playback] The passthrough decoder is now feature-gated (breaking)
 - [playback] `rodio`: call play and pause
 - [protocol] protobufs have been updated
+- [playback] Modularize Normalisation in `player.rs`
 
 ### Added
 
