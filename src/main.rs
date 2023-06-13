@@ -1811,6 +1811,9 @@ async fn main() {
 
                 if last_credentials.is_some() && !reconnect_exceeds_rate_limit() {
                     auto_connect_times.push(Instant::now());
+                    if !session.is_invalid() {
+                        session.shutdown();
+                    }
                     connecting = true;
                 } else {
                     error!("Spirc shut down too often. Not reconnecting automatically.");
