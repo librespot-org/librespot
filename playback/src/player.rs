@@ -495,6 +495,13 @@ impl Player {
         }
     }
 
+    pub fn is_invalid(&self) -> bool {
+        if let Some(handle) = self.thread_handle.as_ref() {
+            return handle.is_finished();
+        }
+        true
+    }
+
     fn command(&self, cmd: PlayerCommand) {
         if let Some(commands) = self.commands.as_ref() {
             if let Err(e) = commands.send(cmd) {
