@@ -105,6 +105,7 @@ enum PlayerCommand {
     Pause,
     Stop,
     Seek(u32),
+    SetSession(Session),
     AddEventSender(mpsc::UnboundedSender<PlayerEvent>),
     SetSinkEventCallback(Option<SinkEventCallback>),
     EmitVolumeChangedEvent(u16),
@@ -536,6 +537,10 @@ impl Player {
 
     pub fn seek(&self, position_ms: u32) {
         self.command(PlayerCommand::Seek(position_ms));
+    }
+
+    pub fn set_session(&self, session: Session) {
+        self.command(PlayerCommand::SetSession(session));
     }
 
     pub fn get_player_event_channel(&self) -> PlayerEventChannel {
@@ -2092,6 +2097,8 @@ impl PlayerInternal {
 
             PlayerCommand::Stop => self.handle_player_stop(),
 
+            PlayerCommand::SetSession(session) => self.session = session,
+
             PlayerCommand::AddEventSender(sender) => self.event_senders.push(sender),
 
             PlayerCommand::SetSinkEventCallback(callback) => self.sink_event_callback = callback,
@@ -2282,6 +2289,7 @@ impl fmt::Debug for PlayerCommand {
             PlayerCommand::Pause => f.debug_tuple("Pause").finish(),
             PlayerCommand::Stop => f.debug_tuple("Stop").finish(),
             PlayerCommand::Seek(position) => f.debug_tuple("Seek").field(&position).finish(),
+            PlayerCommand::SetSession(_) => f.debug_tuple("SetSession").finish(),
             PlayerCommand::AddEventSender(_) => f.debug_tuple("AddEventSender").finish(),
             PlayerCommand::SetSinkEventCallback(_) => {
                 f.debug_tuple("SetSinkEventCallback").finish()
