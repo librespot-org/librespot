@@ -55,7 +55,6 @@ pub type PlayerResult = Result<(), Error>;
 pub struct Player {
     commands: Option<mpsc::UnboundedSender<PlayerCommand>>,
     thread_handle: Option<thread::JoinHandle<()>>,
-    play_request_id_generator: SeqGenerator<u64>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -88,6 +87,7 @@ struct PlayerInternal {
     auto_normalise_as_album: bool,
 
     player_id: usize,
+    play_request_id_generator: SeqGenerator<u64>,
 }
 
 static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -95,7 +95,6 @@ static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 enum PlayerCommand {
     Load {
         track_id: SpotifyId,
-        play_request_id: u64,
         play: bool,
         position_ms: u32,
     },
@@ -132,6 +131,10 @@ enum PlayerCommand {
 
 #[derive(Debug, Clone)]
 pub enum PlayerEvent {
+    // Play request id changed
+    PlayRequestIdChanged {
+        play_request_id: u64,
+    },
     // Fired when the player is stopped (e.g. by issuing a "stop" command to the player).
     Stopped {
         play_request_id: u64,
@@ -475,6 +478,7 @@ impl Player {
                 auto_normalise_as_album: false,
 
                 player_id,
+                play_request_id_generator: SeqGenerator::new(0),
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -488,7 +492,6 @@ impl Player {
         Self {
             commands: Some(cmd_tx),
             thread_handle: Some(handle),
-            play_request_id_generator: SeqGenerator::new(0),
         }
     }
 
@@ -500,16 +503,12 @@ impl Player {
         }
     }
 
-    pub fn load(&mut self, track_id: SpotifyId, start_playing: bool, position_ms: u32) -> u64 {
-        let play_request_id = self.play_request_id_generator.get();
+    pub fn load(&self, track_id: SpotifyId, start_playing: bool, position_ms: u32) {
         self.command(PlayerCommand::Load {
             track_id,
-            play_request_id,
             play: start_playing,
             position_ms,
         });
-
-        play_request_id
     }
 
     pub fn preload(&self, track_id: SpotifyId) {
@@ -1754,10 +1753,15 @@ impl PlayerInternal {
     fn handle_command_load(
         &mut self,
         track_id: SpotifyId,
-        play_request_id: u64,
+        play_request_id_option: Option<u64>,
         play: bool,
         position_ms: u32,
     ) -> PlayerResult {
+        let play_request_id =
+            play_request_id_option.unwrap_or(self.play_request_id_generator.get());
+
+        self.send_event(PlayerEvent::PlayRequestIdChanged { play_request_id });
+
         if !self.config.gapless {
             self.ensure_sink_stopped(play);
         }
@@ -2010,7 +2014,7 @@ impl PlayerInternal {
         {
             return self.handle_command_load(
                 track_id,
-                play_request_id,
+                Some(play_request_id),
                 start_playback,
                 position_ms,
             );
@@ -2067,10 +2071,9 @@ impl PlayerInternal {
         match cmd {
             PlayerCommand::Load {
                 track_id,
-                play_request_id,
                 play,
                 position_ms,
-            } => self.handle_command_load(track_id, play_request_id, play, position_ms)?,
+            } => self.handle_command_load(track_id, None, play, position_ms)?,
 
             PlayerCommand::Preload { track_id } => self.handle_command_preload(track_id),
 
