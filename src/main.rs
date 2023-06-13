@@ -1817,6 +1817,10 @@ async fn main() {
                     exit(1);
                 }
             },
+            _ = async {}, if player.is_invalid() => {
+                error!("Player shut down unexpectedly");
+                exit(1);
+            },
             _ = tokio::signal::ctrl_c() => {
                 break;
             },
