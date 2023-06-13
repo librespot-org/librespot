@@ -420,7 +420,7 @@ impl Player {
         session: Session,
         volume_getter: Box<dyn VolumeGetter + Send>,
         sink_builder: F,
-    ) -> Self
+    ) -> Arc<Self>
     where
         F: FnOnce() -> Box<dyn Sink> + Send + 'static,
     {
@@ -490,10 +490,10 @@ impl Player {
             debug!("PlayerInternal thread finished.");
         });
 
-        Self {
+        Arc::new(Self {
             commands: Some(cmd_tx),
             thread_handle: Some(handle),
-        }
+        })
     }
 
     pub fn is_invalid(&self) -> bool {
@@ -1388,10 +1388,6 @@ impl Future for PlayerInternal {
                         play_request_id,
                     });
                 }
-            }
-
-            if self.session.is_invalid() {
-                return Poll::Ready(());
             }
 
             if (!self.state.is_playing()) && all_futures_completed_or_not_ready {

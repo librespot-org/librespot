@@ -3,6 +3,7 @@ use std::{
     future::Future,
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -77,8 +78,8 @@ enum SpircPlayStatus {
 type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
 
 struct SpircTask {
-    player: Player,
-    mixer: Box<dyn Mixer>,
+    player: Arc<Player>,
+    mixer: Arc<dyn Mixer>,
 
     sequence: SeqGenerator<u32>,
 
@@ -272,8 +273,8 @@ impl Spirc {
         config: ConnectConfig,
         session: Session,
         credentials: Credentials,
-        player: Player,
-        mixer: Box<dyn Mixer>,
+        player: Arc<Player>,
+        mixer: Arc<dyn Mixer>,
     ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Spirc[{}]", spirc_id);

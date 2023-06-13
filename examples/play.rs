@@ -40,7 +40,7 @@ async fn main() {
         exit(1);
     }
 
-    let mut player = Player::new(player_config, session, Box::new(NoOpVolume), move || {
+    let player = Player::new(player_config, session, Box::new(NoOpVolume), move || {
         backend(None, audio_format)
     });
 

@@ -17,6 +17,7 @@ use librespot_metadata::{Album, Metadata};
 use librespot_playback::mixer::{softmixer::SoftMixer, Mixer, MixerConfig};
 use librespot_protocol::spirc::TrackRef;
 use std::env;
+use std::sync::Arc;
 use tokio::join;
 
 #[tokio::main]
@@ -54,7 +55,7 @@ async fn main() {
         session.clone(),
         credentials,
         player,
-        Box::new(SoftMixer::open(MixerConfig::default())),
+        Arc::new(SoftMixer::open(MixerConfig::default())),
     )
     .await
     .unwrap();
