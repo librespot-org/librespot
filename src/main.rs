@@ -1762,6 +1762,9 @@ async fn main() {
                             // Continue shutdown in its own task
                             tokio::spawn(spirc_task);
                         }
+                        if !session.is_invalid() {
+                            session.shutdown();
+                        }
 
                         connecting = true;
                     },
