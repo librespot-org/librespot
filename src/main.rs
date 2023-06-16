@@ -10,7 +10,7 @@ use std::{
 };
 
 use futures_util::StreamExt;
-use log::{error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 use url::Url;
@@ -1665,17 +1665,51 @@ async fn main() {
     let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
     if setup.enable_discovery {
-        let device_id = setup.session_config.device_id.clone();
-        let client_id = setup.session_config.client_id.clone();
-        match librespot::discovery::Discovery::builder(device_id, client_id)
-            .name(setup.connect_config.name.clone())
-            .device_type(setup.connect_config.device_type)
-            .port(setup.zeroconf_port)
-            .zeroconf_ip(setup.zeroconf_ip)
-            .launch()
-        {
-            Ok(d) => discovery = Some(d),
-            Err(err) => warn!("Could not initialise discovery: {}.", err),
+        // When started at boot as a service discovery may fail due to it
+        // trying to bind to interfaces before the network is actually up.
+        // This could be prevented in systemd by starting the service after
+        // network-online.target but it requires that a wait-online.service is
+        // also enabled which is not always the case since a wait-online.service
+        // can potentially hang the boot process until it times out in certain situations.
+        // This allows for discovery to retry every 10 secs in the 1st 60 secs of uptime
+        // before giving up thus papering over the issue and not holding up the boot process.
+        let one_min = Duration::from_secs(60);
+        let retry_timeout = Duration::from_secs(10);
+
+        discovery = loop {
+            let device_id = setup.session_config.device_id.clone();
+            let client_id = setup.session_config.client_id.clone();
+
+            match librespot::discovery::Discovery::builder(device_id, client_id)
+                .name(setup.connect_config.name.clone())
+                .device_type(setup.connect_config.device_type)
+                .port(setup.zeroconf_port)
+                .zeroconf_ip(setup.zeroconf_ip.clone())
+                .launch()
+            {
+                Ok(d) => break Some(d),
+                Err(e) => {
+                    let is_first_min_of_uptime = match uptime_lib::get() {
+                        Ok(uptime) => {
+                            debug!("System uptime: {} secs", uptime.as_secs_f64());
+                            uptime <= one_min
+                        }
+                        Err(err) => {
+                            debug!("Unable to determine system uptime: {err}");
+                            false
+                        }
+                    };
+
+                    if is_first_min_of_uptime {
+                        debug!("Retrying to initialise discovery: {e}");
+                        tokio::time::sleep(retry_timeout).await;
+                    } else {
+                        debug!("System uptime >= 60 secs, not retrying to initialise discovery");
+                        warn!("Could not initialise discovery: {e}");
+                        break None;
+                    }
+                }
+            }
         };
     }
 
