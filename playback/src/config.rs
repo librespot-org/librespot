@@ -3,9 +3,10 @@ use std::{mem, str::FromStr, time::Duration};
 pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
 use crate::{convert::i24, player::duration_to_coefficient};
 
-#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Bitrate {
     Bitrate96,
+    #[default]
     Bitrate160,
     Bitrate320,
 }
@@ -22,19 +23,14 @@ impl FromStr for Bitrate {
     }
 }
 
-impl Default for Bitrate {
-    fn default() -> Self {
-        Self::Bitrate160
-    }
-}
-
-#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum AudioFormat {
     F64,
     F32,
     S32,
     S24,
     S24_3,
+    #[default]
     S16,
 }
 
@@ -53,12 +49,6 @@ impl FromStr for AudioFormat {
     }
 }
 
-impl Default for AudioFormat {
-    fn default() -> Self {
-        Self::S16
-    }
-}
-
 impl AudioFormat {
     // not used by all backends
     #[allow(dead_code)]
@@ -73,10 +63,11 @@ impl AudioFormat {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum NormalisationType {
     Album,
     Track,
+    #[default]
     Auto,
 }
 
@@ -92,15 +83,10 @@ impl FromStr for NormalisationType {
     }
 }
 
-impl Default for NormalisationType {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum NormalisationMethod {
     Basic,
+    #[default]
     Dynamic,
 }
 
@@ -112,12 +98,6 @@ impl FromStr for NormalisationMethod {
             "dynamic" => Ok(Self::Dynamic),
             _ => Err(()),
         }
-    }
-}
-
-impl Default for NormalisationMethod {
-    fn default() -> Self {
-        Self::Dynamic
     }
 }
 
