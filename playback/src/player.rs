@@ -1153,6 +1153,7 @@ impl Future for PlayerInternal {
                                 let new_stream_position_ms = packet_position
                                     .position_ms
                                     .saturating_sub(sample_pipeline_latency_ms);
+
                                 let expected_position_ms = std::mem::replace(
                                     &mut *stream_position_ms,
                                     new_stream_position_ms,
@@ -1200,7 +1201,7 @@ impl Future for PlayerInternal {
                                                             }
                                                         }
 
-                                                        notify
+                                                        notify || sample_pipeline_latency_ms > 1000
                                                     }
                                                 };
 
