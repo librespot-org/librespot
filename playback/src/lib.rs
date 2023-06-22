@@ -14,6 +14,7 @@ pub mod mixer;
 pub mod normaliser;
 pub mod player;
 pub mod resampler;
+pub mod sample_pipeline;
 
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
 pub const PCM_AT_0DBFS: f64 = 1.0;
