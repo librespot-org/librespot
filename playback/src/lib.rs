@@ -13,6 +13,7 @@ pub mod dither;
 pub mod mixer;
 pub mod player;
 
+pub const RESAMPLER_INPUT_SIZE: usize = 147;
 pub const SAMPLE_RATE: u32 = 44100;
 pub const NUM_CHANNELS: u8 = 2;
 pub const SAMPLES_PER_SECOND: u32 = SAMPLE_RATE * NUM_CHANNELS as u32;
