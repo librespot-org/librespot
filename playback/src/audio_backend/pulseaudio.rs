@@ -131,6 +131,17 @@ impl Sink for PulseAudioSink {
         Ok(())
     }
 
+    fn get_latency_pcm(&mut self) -> u64 {
+        self.sink
+            .as_mut()
+            .and_then(|sink| {
+                sink.get_latency()
+                    .ok()
+                    .map(|micro_sec| (micro_sec.as_secs_f64() * SAMPLE_RATE as f64).round() as u64)
+            })
+            .unwrap_or(0)
+    }
+
     sink_as_bytes!();
 }
 

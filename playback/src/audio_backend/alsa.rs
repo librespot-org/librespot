@@ -456,6 +456,23 @@ impl Sink for AlsaSink {
         Ok(())
     }
 
+    fn get_latency_pcm(&mut self) -> u64 {
+        let buffer_len = self.period_buffer.len();
+
+        self.pcm
+            .as_mut()
+            .and_then(|pcm| {
+                pcm.status().ok().map(|status| {
+                    let delay_frames = status.get_delay();
+
+                    let frames_in_buffer = pcm.bytes_to_frames(buffer_len as isize);
+
+                    (delay_frames + frames_in_buffer) as u64
+                })
+            })
+            .unwrap_or(0)
+    }
+
     sink_as_bytes!();
 }
 

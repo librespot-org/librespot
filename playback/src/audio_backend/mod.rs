@@ -30,6 +30,9 @@ pub trait Sink {
     fn stop(&mut self) -> SinkResult<()> {
         Ok(())
     }
+    fn get_latency_pcm(&mut self) -> u64 {
+        0
+    }
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()>;
 }
 
