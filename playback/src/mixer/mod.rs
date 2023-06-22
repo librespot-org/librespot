@@ -13,12 +13,12 @@ pub trait Mixer: Send {
     fn set_volume(&self, volume: u16);
     fn volume(&self) -> u16;
 
-    fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
+    fn get_soft_volume(&self) -> Box<dyn VolumeGetter> {
         Box::new(NoOpVolume)
     }
 }
 
-pub trait VolumeGetter {
+pub trait VolumeGetter: Send {
     fn attenuation_factor(&self) -> f64;
 }
 

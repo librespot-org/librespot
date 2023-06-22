@@ -119,9 +119,15 @@ impl<'a> Sink for PortAudioSink<'a> {
         }
 
         match self {
-            Self::F32(stream, parameters, sample_rate) => start_sink!(ref mut stream, ref parameters, ref sample_rate),
-            Self::S32(stream, parameters, sample_rate) => start_sink!(ref mut stream, ref parameters, ref sample_rate),
-            Self::S16(stream, parameters, sample_rate) => start_sink!(ref mut stream, ref parameters, ref sample_rate),
+            Self::F32(stream, parameters, sample_rate) => {
+                start_sink!(ref mut stream, ref parameters, ref sample_rate)
+            }
+            Self::S32(stream, parameters, sample_rate) => {
+                start_sink!(ref mut stream, ref parameters, ref sample_rate)
+            }
+            Self::S16(stream, parameters, sample_rate) => {
+                start_sink!(ref mut stream, ref parameters, ref sample_rate)
+            }
         };
 
         Ok(())

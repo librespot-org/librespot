@@ -35,7 +35,7 @@ impl Mixer for SoftMixer {
             .store(mapped_volume.to_bits(), Ordering::Relaxed)
     }
 
-    fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
+    fn get_soft_volume(&self) -> Box<dyn VolumeGetter> {
         Box::new(SoftVolume(self.volume.clone()))
     }
 }

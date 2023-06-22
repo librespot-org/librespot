@@ -1,7 +1,7 @@
 use std::{mem, str::FromStr, time::Duration};
 
 pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
-use crate::{convert::i24, player::duration_to_coefficient, RESAMPLER_INPUT_SIZE, SAMPLE_RATE};
+use crate::{convert::i24, RESAMPLER_INPUT_SIZE, SAMPLE_RATE};
 
 // Reciprocals allow us to multiply instead of divide during interpolation.
 const HZ48000_RESAMPLE_FACTOR_RECIPROCAL: f64 = SAMPLE_RATE as f64 / 48_000.0;
@@ -152,10 +152,12 @@ impl FromStr for SampleRate {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use SampleRate::*;
 
+        let lowercase_input = s.to_lowercase();
+
         // Match against both the actual
         // stringified value and how most
         // humans would write a sample rate.
-        match s.to_uppercase().as_ref() {
+        match lowercase_input.as_str() {
             "hz44100" | "44100hz" | "44100" | "44.1khz" => Ok(Hz44100),
             "hz48000" | "48000hz" | "48000" | "48khz" => Ok(Hz48000),
             "hz88200" | "88200hz" | "88200" | "88.2khz" => Ok(Hz88200),
@@ -348,6 +350,9 @@ pub struct PlayerConfig {
     pub gapless: bool,
     pub passthrough: bool,
 
+    pub interpolation_quality: InterpolationQuality,
+    pub sample_rate: SampleRate,
+
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
     pub normalisation_method: NormalisationMethod,
@@ -368,12 +373,17 @@ impl Default for PlayerConfig {
             bitrate: Bitrate::default(),
             gapless: true,
             normalisation: false,
+            interpolation_quality: InterpolationQuality::default(),
+            sample_rate: SampleRate::default(),
             normalisation_type: NormalisationType::default(),
             normalisation_method: NormalisationMethod::default(),
             normalisation_pregain_db: 0.0,
             normalisation_threshold_dbfs: -2.0,
-            normalisation_attack_cf: duration_to_coefficient(Duration::from_millis(5)),
-            normalisation_release_cf: duration_to_coefficient(Duration::from_millis(100)),
+            // Dummy value. We can't use the default because
+            // no matter what it's dependent on the sample rate.
+            normalisation_attack_cf: 0.0,
+            // Same with release.
+            normalisation_release_cf: 0.0,
             normalisation_knee_db: 5.0,
             passthrough: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),

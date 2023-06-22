@@ -13,9 +13,7 @@ use std::sync::Arc;
 
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 
-use crate::{
-    config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS,
-};
+use crate::{config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS};
 
 pub struct GstreamerSink {
     appsrc: gst_app::AppSrc,

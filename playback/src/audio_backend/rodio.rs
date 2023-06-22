@@ -23,7 +23,11 @@ pub fn mk_rodio(device: Option<String>, format: AudioFormat, sample_rate: u32) -
 }
 
 #[cfg(feature = "rodiojack-backend")]
-pub fn mk_rodiojack(device: Option<String>, format: AudioFormat, sample_rate: u32) -> Box<dyn Sink> {
+pub fn mk_rodiojack(
+    device: Option<String>,
+    format: AudioFormat,
+    sample_rate: u32,
+) -> Box<dyn Sink> {
     Box::new(open(
         cpal::host_from_id(cpal::HostId::Jack).unwrap(),
         device,
@@ -166,7 +170,12 @@ fn create_sink(
     Ok((sink, stream))
 }
 
-pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat, sample_rate: u32) -> RodioSink {
+pub fn open(
+    host: cpal::Host,
+    device: Option<String>,
+    format: AudioFormat,
+    sample_rate: u32,
+) -> RodioSink {
     info!(
         "Using Rodio sink with format {format:?} and cpal host: {}",
         host.id().name()

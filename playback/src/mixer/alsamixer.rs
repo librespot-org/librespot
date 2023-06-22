@@ -1,4 +1,4 @@
-use crate::player::{db_to_ratio, ratio_to_db};
+use crate::{db_to_ratio, ratio_to_db};
 
 use super::mappings::{LogMapping, MappedCtrl, VolumeMapping};
 use super::{Mixer, MixerConfig, VolumeCtrl};

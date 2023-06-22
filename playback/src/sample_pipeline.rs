@@ -1,5 +1,4 @@
 use crate::{
-    MS_PER_PAGE,
     audio_backend::{Sink, SinkResult},
     config::PlayerConfig,
     convert::Converter,
@@ -8,6 +7,7 @@ use crate::{
     normaliser::Normaliser,
     player::NormalisationData,
     resampler::StereoInterleavedResampler,
+    MS_PER_PAGE,
 };
 
 pub struct SamplePipeline {
