@@ -25,6 +25,7 @@ async fn main() {
     let player_config = PlayerConfig::default();
     let audio_format = AudioFormat::default();
     let connect_config = ConnectConfig::default();
+    let sample_rate = player_config.sample_rate.as_u32();
 
     let mut args: Vec<_> = env::args().collect();
     let context_uri = if args.len() == 4 {
@@ -46,7 +47,7 @@ async fn main() {
         player_config,
         session.clone(),
         Box::new(NoOpVolume),
-        move || backend(None, audio_format),
+        move || backend(None, audio_format, sample_rate),
     );
 
     let (spirc, spirc_task) = Spirc::new(

@@ -20,6 +20,7 @@ async fn main() {
     let session_config = SessionConfig::default();
     let player_config = PlayerConfig::default();
     let audio_format = AudioFormat::default();
+    let sample_rate = player_config.sample_rate.as_u32();
 
     let args: Vec<_> = env::args().collect();
     if args.len() != 4 {
@@ -41,7 +42,7 @@ async fn main() {
     }
 
     let mut player = Player::new(player_config, session, Box::new(NoOpVolume), move || {
-        backend(None, audio_format)
+        backend(None, audio_format, sample_rate)
     });
 
     player.load(track, true, 0);
