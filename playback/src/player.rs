@@ -1150,68 +1150,58 @@ impl Future for PlayerInternal {
                     match decoder.next_packet() {
                         Ok(result) => {
                             if let Some((ref packet_position, ref packet)) = result {
-                                let new_stream_position_ms = packet_position
-                                    .position_ms
-                                    .saturating_sub(sample_pipeline_latency_ms);
+                                let decoder_position_ms = packet_position.position_ms;
 
-                                let expected_position_ms = std::mem::replace(
-                                    &mut *stream_position_ms,
-                                    new_stream_position_ms,
-                                );
+                                *stream_position_ms =
+                                    decoder_position_ms.saturating_sub(sample_pipeline_latency_ms);
 
                                 if !passthrough {
                                     match packet.samples() {
                                         Ok(_) => {
-                                            let new_stream_position = Duration::from_millis(
-                                                new_stream_position_ms as u64,
-                                            );
-
                                             let now = Instant::now();
 
-                                            // Only notify if we're skipped some packets *or* we are behind.
-                                            // If we're ahead it's probably due to a buffer of the backend
-                                            // and we're actually in time.
-                                            let notify_about_position =
-                                                match *reported_nominal_start_time {
-                                                    None => true,
-                                                    Some(reported_nominal_start_time) => {
-                                                        let mut notify = false;
+                                            let notify_about_position = {
+                                                // It would be so much easier to use elapsed but elapsed could
+                                                // potentially panic is rare cases.
+                                                // See:
+                                                // https://doc.rust-lang.org/std/time/struct.Instant.html#monotonicity
+                                                //
+                                                // Otherwise this is pretty straight forward. If anything fails getting
+                                                // expected_position_ms it will return 0 which will trigger a notify if
+                                                // either stream_position_ms or decoder_position_ms is > 1000. If all goes
+                                                // well it's simply a matter of calculating the max delta of expected_position_ms
+                                                // and stream_position_ms and expected_position_ms and decoder_position_ms.
+                                                // So if the decoder or the sample pipeline are off by more than 1 sec we notify.
+                                                let expected_position_ms = now
+                                                    .checked_duration_since(
+                                                        reported_nominal_start_time.unwrap_or(now),
+                                                    )
+                                                    .unwrap_or(Duration::ZERO)
+                                                    .as_millis();
 
-                                                        if packet_position.skipped {
-                                                            if let Some(ahead) = new_stream_position
-                                                                .checked_sub(Duration::from_millis(
-                                                                    expected_position_ms as u64,
-                                                                ))
-                                                            {
-                                                                notify |=
-                                                                    ahead >= Duration::from_secs(1)
-                                                            }
-                                                        }
+                                                let max_expected_position_delta_ms =
+                                                    expected_position_ms
+                                                        .abs_diff(*stream_position_ms as u128)
+                                                        .max(
+                                                            expected_position_ms.abs_diff(
+                                                                decoder_position_ms as u128,
+                                                            ),
+                                                        );
 
-                                                        if let Some(lag) = now
-                                                            .checked_duration_since(
-                                                                reported_nominal_start_time,
-                                                            )
-                                                        {
-                                                            if let Some(lag) =
-                                                                lag.checked_sub(new_stream_position)
-                                                            {
-                                                                notify |=
-                                                                    lag >= Duration::from_secs(1)
-                                                            }
-                                                        }
-
-                                                        notify || sample_pipeline_latency_ms > 1000
-                                                    }
-                                                };
+                                                max_expected_position_delta_ms > 1000
+                                            };
 
                                             if notify_about_position {
-                                                *reported_nominal_start_time =
-                                                    now.checked_sub(new_stream_position);
+                                                let position_ms = *stream_position_ms;
+
+                                                *reported_nominal_start_time = now.checked_sub(
+                                                    Duration::from_millis(position_ms as u64),
+                                                );
+
                                                 self.send_event(PlayerEvent::PositionCorrection {
                                                     play_request_id,
                                                     track_id,
-                                                    position_ms: new_stream_position_ms,
+                                                    position_ms,
                                                 });
                                             }
                                         }
