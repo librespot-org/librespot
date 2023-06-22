@@ -2,7 +2,7 @@ use super::{Open, Sink, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::NUM_CHANNELS;
 use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
 use portaudio_rs::stream::*;
 use std::process::exit;
@@ -76,14 +76,14 @@ impl<'a> Open for PortAudioSink<'a> {
         };
 
         macro_rules! open_sink {
-            ($sink: expr, $type: ty) => {{
+            ($sink: expr, $type: ty, $sample_rate: ident) => {{
                 let params = StreamParameters {
                     device: device_idx,
                     channel_count: NUM_CHANNELS as u32,
                     suggested_latency: latency,
                     data: 0.0 as $type,
                 };
-                $sink(None, params, sample_rate)
+                $sink(None, params, $sample_rate)
             }};
         }
         match format {
@@ -141,9 +141,9 @@ impl<'a> Sink for PortAudioSink<'a> {
             }};
         }
         match self {
-            Self::F32(stream, _) => stop_sink!(ref mut stream),
-            Self::S32(stream, _) => stop_sink!(ref mut stream),
-            Self::S16(stream, _) => stop_sink!(ref mut stream),
+            Self::F32(stream, _, _) => stop_sink!(ref mut stream),
+            Self::S32(stream, _, _) => stop_sink!(ref mut stream),
+            Self::S16(stream, _, _) => stop_sink!(ref mut stream),
         };
 
         Ok(())
@@ -161,15 +161,15 @@ impl<'a> Sink for PortAudioSink<'a> {
             .map_err(|e| SinkError::OnWrite(e.to_string()))?;
 
         let result = match self {
-            Self::F32(stream, _parameters) => {
+            Self::F32(stream, _parameters, _sample_rate) => {
                 let samples_f32: &[f32] = &converter.f64_to_f32(samples);
                 write_sink!(ref mut stream, samples_f32)
             }
-            Self::S32(stream, _parameters) => {
+            Self::S32(stream, _parameters, _sample_rate) => {
                 let samples_s32: &[i32] = &converter.f64_to_s32(samples);
                 write_sink!(ref mut stream, samples_s32)
             }
-            Self::S16(stream, _parameters) => {
+            Self::S16(stream, _parameters, _sample_rate) => {
                 let samples_s16: &[i16] = &converter.f64_to_s16(samples);
                 write_sink!(ref mut stream, samples_s16)
             }
