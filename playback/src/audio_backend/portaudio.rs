@@ -12,14 +12,17 @@ pub enum PortAudioSink<'a> {
     F32(
         Option<portaudio_rs::stream::Stream<'a, f32, f32>>,
         StreamParameters<f32>,
+        f64,
     ),
     S32(
         Option<portaudio_rs::stream::Stream<'a, i32, i32>>,
         StreamParameters<i32>,
+        f64,
     ),
     S16(
         Option<portaudio_rs::stream::Stream<'a, i16, i16>>,
         StreamParameters<i16>,
+        f64,
     ),
 }
 
@@ -51,8 +54,8 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 }
 
 impl<'a> Open for PortAudioSink<'a> {
-    fn open(device: Option<String>, format: AudioFormat) -> PortAudioSink<'a> {
-        info!("Using PortAudio sink with format: {format:?}");
+    fn open(device: Option<String>, format: AudioFormat, sample_rate: u32) -> PortAudioSink<'a> {
+        info!("Using PortAudio sink with format: {format:?}, sample rate: {sample_rate}");
 
         portaudio_rs::initialize().unwrap();
 
@@ -80,13 +83,13 @@ impl<'a> Open for PortAudioSink<'a> {
                     suggested_latency: latency,
                     data: 0.0 as $type,
                 };
-                $sink(None, params)
+                $sink(None, params, sample_rate)
             }};
         }
         match format {
-            AudioFormat::F32 => open_sink!(Self::F32, f32),
-            AudioFormat::S32 => open_sink!(Self::S32, i32),
-            AudioFormat::S16 => open_sink!(Self::S16, i16),
+            AudioFormat::F32 => open_sink!(Self::F32, f32, sample_rate as f64),
+            AudioFormat::S32 => open_sink!(Self::S32, i32, sample_rate as f64),
+            AudioFormat::S16 => open_sink!(Self::S16, i16, sample_rate as f64),
             _ => {
                 unimplemented!("PortAudio currently does not support {format:?} output")
             }
@@ -97,13 +100,13 @@ impl<'a> Open for PortAudioSink<'a> {
 impl<'a> Sink for PortAudioSink<'a> {
     fn start(&mut self) -> SinkResult<()> {
         macro_rules! start_sink {
-            (ref mut $stream: ident, ref $parameters: ident) => {{
+            (ref mut $stream: ident, ref $parameters: ident, ref $sample_rate: ident ) => {{
                 if $stream.is_none() {
                     *$stream = Some(
                         Stream::open(
                             None,
                             Some(*$parameters),
-                            SAMPLE_RATE as f64,
+                            *$sample_rate,
                             FRAMES_PER_BUFFER_UNSPECIFIED,
                             StreamFlags::DITHER_OFF, // no need to dither twice; use librespot dithering instead
                             None,
@@ -116,9 +119,9 @@ impl<'a> Sink for PortAudioSink<'a> {
         }
 
         match self {
-            Self::F32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
-            Self::S32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
-            Self::S16(stream, parameters) => start_sink!(ref mut stream, ref parameters),
+            Self::F32(stream, parameters, sample_rate) => start_sink!(ref mut stream, ref parameters, ref sample_rate),
+            Self::S32(stream, parameters, sample_rate) => start_sink!(ref mut stream, ref parameters, ref sample_rate),
+            Self::S16(stream, parameters, sample_rate) => start_sink!(ref mut stream, ref parameters, ref sample_rate),
         };
 
         Ok(())

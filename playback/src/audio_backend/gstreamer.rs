@@ -14,7 +14,7 @@ use std::sync::Arc;
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 
 use crate::{
-    config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS, SAMPLE_RATE,
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS,
 };
 
 pub struct GstreamerSink {
@@ -26,8 +26,8 @@ pub struct GstreamerSink {
 }
 
 impl Open for GstreamerSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
-        info!("Using GStreamer sink with format: {format:?}");
+    fn open(device: Option<String>, format: AudioFormat, sample_rate: u32) -> Self {
+        info!("Using GStreamer sink with format: {format:?}, sample rate: {sample_rate}");
         gst::init().expect("failed to init GStreamer!");
 
         let gst_format = match format {
@@ -39,7 +39,7 @@ impl Open for GstreamerSink {
             AudioFormat::S16 => gst_audio::AUDIO_FORMAT_S16,
         };
 
-        let gst_info = gst_audio::AudioInfo::builder(gst_format, SAMPLE_RATE, NUM_CHANNELS as u32)
+        let gst_info = gst_audio::AudioInfo::builder(gst_format, sample_rate, NUM_CHANNELS as u32)
             .build()
             .expect("Failed to create GStreamer audio format");
         let gst_caps = gst_info.to_caps().expect("Failed to create GStreamer caps");

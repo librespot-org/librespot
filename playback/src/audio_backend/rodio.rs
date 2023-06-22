@@ -9,7 +9,7 @@ use super::{Sink, SinkError, SinkResult};
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::NUM_CHANNELS;
 
 #[cfg(all(
     feature = "rodiojack-backend",
@@ -18,16 +18,17 @@ use crate::{NUM_CHANNELS, SAMPLE_RATE};
 compile_error!("Rodio JACK backend is currently only supported on linux.");
 
 #[cfg(feature = "rodio-backend")]
-pub fn mk_rodio(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
-    Box::new(open(cpal::default_host(), device, format))
+pub fn mk_rodio(device: Option<String>, format: AudioFormat, sample_rate: u32) -> Box<dyn Sink> {
+    Box::new(open(cpal::default_host(), device, format, sample_rate))
 }
 
 #[cfg(feature = "rodiojack-backend")]
-pub fn mk_rodiojack(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
+pub fn mk_rodiojack(device: Option<String>, format: AudioFormat, sample_rate: u32) -> Box<dyn Sink> {
     Box::new(open(
         cpal::host_from_id(cpal::HostId::Jack).unwrap(),
         device,
         format,
+        sample_rate,
     ))
 }
 
@@ -62,6 +63,7 @@ impl From<RodioError> for SinkError {
 pub struct RodioSink {
     rodio_sink: rodio::Sink,
     format: AudioFormat,
+    sample_rate: u32,
     _stream: rodio::OutputStream,
 }
 
@@ -164,7 +166,7 @@ fn create_sink(
     Ok((sink, stream))
 }
 
-pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> RodioSink {
+pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat, sample_rate: u32) -> RodioSink {
     info!(
         "Using Rodio sink with format {format:?} and cpal host: {}",
         host.id().name()
@@ -180,6 +182,7 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
     RodioSink {
         rodio_sink: sink,
         format,
+        sample_rate,
         _stream: stream,
     }
 }
@@ -205,7 +208,7 @@ impl Sink for RodioSink {
                 let samples_f32: &[f32] = &converter.f64_to_f32(samples);
                 let source = rodio::buffer::SamplesBuffer::new(
                     NUM_CHANNELS as u16,
-                    SAMPLE_RATE,
+                    self.sample_rate,
                     samples_f32,
                 );
                 self.rodio_sink.append(source);
@@ -214,7 +217,7 @@ impl Sink for RodioSink {
                 let samples_s16: &[i16] = &converter.f64_to_s16(samples);
                 let source = rodio::buffer::SamplesBuffer::new(
                     NUM_CHANNELS as u16,
-                    SAMPLE_RATE,
+                    self.sample_rate,
                     samples_s16,
                 );
                 self.rodio_sink.append(source);

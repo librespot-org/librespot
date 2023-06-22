@@ -14,8 +14,8 @@ pub enum SdlSink {
 }
 
 impl Open for SdlSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
-        info!("Using SDL sink with format: {:?}", format);
+    fn open(device: Option<String>, format: AudioFormat, sample_rate: u32) -> Self {
+        info!("Using SDL sink with format: {format:?}, sample rate: {sample_rate}");
 
         if device.is_some() {
             warn!("SDL sink does not support specifying a device name");
@@ -27,7 +27,7 @@ impl Open for SdlSink {
             .expect("could not initialize SDL audio subsystem");
 
         let desired_spec = AudioSpecDesired {
-            freq: Some(SAMPLE_RATE as i32),
+            freq: Some(sample_rate as i32),
             channels: Some(NUM_CHANNELS),
             samples: None,
         };
