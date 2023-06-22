@@ -137,7 +137,7 @@ impl Sink for PulseAudioSink {
             .and_then(|sink| {
                 sink.get_latency()
                     .ok()
-                    .map(|micro_sec| (micro_sec.as_secs_f64() * SAMPLE_RATE as f64).round() as u64)
+                    .map(|micro_sec| (micro_sec.as_secs_f64() * SAMPLE_RATE as f64) as u64)
             })
             .unwrap_or(0)
     }

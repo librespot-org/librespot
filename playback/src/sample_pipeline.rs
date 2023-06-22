@@ -1,4 +1,5 @@
 use crate::{
+    MS_PER_PAGE,
     audio_backend::{Sink, SinkResult},
     config::PlayerConfig,
     convert::Converter,
@@ -36,8 +37,10 @@ impl SamplePipeline {
         }
     }
 
-    pub fn get_latency_pcm(&mut self) -> u64 {
-        self.sink.get_latency_pcm() + self.resampler.get_latency_pcm()
+    pub fn get_latency_ms(&mut self) -> u32 {
+        let total_latency_pcm = self.sink.get_latency_pcm() + self.resampler.get_latency_pcm();
+
+        (total_latency_pcm as f64 * MS_PER_PAGE) as u32
     }
 
     pub fn start(&mut self) -> SinkResult<()> {

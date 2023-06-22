@@ -119,8 +119,7 @@ impl MonoResampler for MonoSincResampler {
 
         let delay_line_latency = (interpolation_quality.get_interpolation_coefficients_length()
             as f64
-            * spec.resample_factor_reciprocal)
-            .round() as u64;
+            * spec.resample_factor_reciprocal) as u64;
 
         Self {
             interpolator: WindowedSincInterpolator::new(
