@@ -86,10 +86,13 @@ impl<'a> Open for PortAudioSink<'a> {
                 $sink(None, params, $sample_rate)
             }};
         }
+
+        let sample_rate = sample_rate as f64;
+
         match format {
-            AudioFormat::F32 => open_sink!(Self::F32, f32, sample_rate as f64),
-            AudioFormat::S32 => open_sink!(Self::S32, i32, sample_rate as f64),
-            AudioFormat::S16 => open_sink!(Self::S16, i16, sample_rate as f64),
+            AudioFormat::F32 => open_sink!(Self::F32, f32, sample_rate),
+            AudioFormat::S32 => open_sink!(Self::S32, i32, sample_rate),
+            AudioFormat::S16 => open_sink!(Self::S16, i16, sample_rate),
             _ => {
                 unimplemented!("PortAudio currently does not support {format:?} output")
             }

@@ -1562,12 +1562,7 @@ fn get_setup() -> Setup {
                             NORMALISATION_ATTACK_SHORT,
                             &attack,
                             valid_values,
-                            &sample_rate
-                                .normalisation_coefficient_to_duration(
-                                    player_default_config.normalisation_attack_cf,
-                                )
-                                .as_millis()
-                                .to_string(),
+                            "5",
                         );
 
                         exit(1);
@@ -1595,12 +1590,7 @@ fn get_setup() -> Setup {
                             NORMALISATION_RELEASE_SHORT,
                             &release,
                             valid_values,
-                            &sample_rate
-                                .normalisation_coefficient_to_duration(
-                                    player_default_config.normalisation_release_cf,
-                                )
-                                .as_millis()
-                                .to_string(),
+                            "100",
                         );
 
                         exit(1);
