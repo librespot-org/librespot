@@ -448,10 +448,13 @@ impl Player {
             }
         }
 
-        let handle = thread::spawn(move || {
-            let player_id = PLAYER_COUNTER.fetch_add(1, Ordering::AcqRel);
-            debug!("new Player [{}]", player_id);
+        let player_id = PLAYER_COUNTER.fetch_add(1, Ordering::AcqRel);
 
+        let thread_name = format!("player:{}", player_id);
+
+        let builder = thread::Builder::new().name(thread_name.clone());
+
+        let handle = match builder.spawn(move || {
             let converter = Converter::new(config.ditherer);
 
             let internal = PlayerInternal {
@@ -479,11 +482,34 @@ impl Player {
 
             // While PlayerInternal is written as a future, it still contains blocking code.
             // It must be run by using block_on() in a dedicated thread.
-            let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+            let runtime = match tokio::runtime::Runtime::new() {
+                Ok(runtime) => runtime,
+                Err(e) => {
+                    match thread::current().name() {
+                        Some(name) => debug!("Error creating <PlayerInternal> [{name}] thread, Failed to create Tokio runtime: {e}"),
+                        None => debug!("Error creating <PlayerInternal> thread, Failed to create Tokio runtime: {e}"),
+                    }
+
+                    exit(1);
+                }
+            };
+
             runtime.block_on(internal);
 
-            debug!("PlayerInternal thread finished.");
-        });
+            match thread::current().name() {
+                Some(name) => debug!("<PlayerInternal> [{name}] thread finished"),
+                None => debug!("<PlayerInternal> thread finished"),
+            }
+        }) {
+            Ok(handle) => {
+                debug!("Created <PlayerInternal> [{thread_name}] thread");
+                handle
+            }
+            Err(e) => {
+                error!("Error creating <PlayerInternal> [{thread_name}] thread: {e}");
+                exit(1);
+            }
+        };
 
         Self {
             commands: Some(cmd_tx),
@@ -2191,7 +2217,12 @@ impl PlayerInternal {
 
         let load_handles_clone = self.load_handles.clone();
         let handle = tokio::runtime::Handle::current();
-        let load_handle = thread::spawn(move || {
+
+        let thread_name = format!("loader:{}", spotify_id.to_uri().unwrap_or_default());
+
+        let builder = thread::Builder::new().name(thread_name.clone());
+
+        let load_handle = match builder.spawn(move || {
             let data = handle.block_on(loader.load_track(spotify_id, position_ms));
             if let Some(data) = data {
                 let _ = result_tx.send(data);
@@ -2199,7 +2230,21 @@ impl PlayerInternal {
 
             let mut load_handles = load_handles_clone.lock();
             load_handles.remove(&thread::current().id());
-        });
+
+            match thread::current().name() {
+                Some(name) => debug!("<PlayerInternal> [{name}] thread finished"),
+                None => debug!("<PlayerInternal> [loader] thread finished"),
+            }
+        }) {
+            Ok(handle) => {
+                debug!("Created <PlayerInternal> [{thread_name}] thread");
+                handle
+            }
+            Err(e) => {
+                error!("Error creating <PlayerInternal> [{thread_name}] thread: {e}");
+                exit(1);
+            }
+        };
 
         let mut load_handles = self.load_handles.lock();
         load_handles.insert(load_handle.thread().id(), load_handle);
