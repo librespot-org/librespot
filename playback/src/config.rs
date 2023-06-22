@@ -1,7 +1,7 @@
 use std::{mem, str::FromStr, time::Duration};
 
 pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
-use crate::{SAMPLE_RATE, RESAMPLER_INPUT_SIZE, convert::i24, player::duration_to_coefficient};
+use crate::{convert::i24, player::duration_to_coefficient, RESAMPLER_INPUT_SIZE, SAMPLE_RATE};
 
 // Reciprocals allow us to multiply instead of divide during interpolation.
 const HZ48000_RESAMPLE_FACTOR_RECIPROCAL: f64 = SAMPLE_RATE as f64 / 48_000.0;
@@ -16,7 +16,7 @@ const HZ96000_SAMPLES_PER_SECOND: f64 = 96_000.0 * 2.0;
 
 // Given a RESAMPLER_INPUT_SIZE of 147 all of our output sizes work out
 // to be integers, which is a very good thing. That means no fractional samples
-// which translates to much better interpolation.  
+// which translates to much better interpolation.
 const HZ48000_INTERPOLATION_OUTPUT_SIZE: usize =
     (RESAMPLER_INPUT_SIZE as f64 * (1.0 / HZ48000_RESAMPLE_FACTOR_RECIPROCAL)) as usize;
 const HZ88200_INTERPOLATION_OUTPUT_SIZE: usize =
@@ -182,8 +182,8 @@ impl std::fmt::Display for SampleRate {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ResampleSpec {
-    resample_factor_reciprocal: f64,
-    interpolation_output_size: usize,
+    pub resample_factor_reciprocal: f64,
+    pub interpolation_output_size: usize,
 }
 
 impl SampleRate {
