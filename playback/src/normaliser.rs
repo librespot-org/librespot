@@ -246,7 +246,11 @@ impl Normaliser {
         self.normalisation.stop();
     }
 
-    pub fn set_factor(&mut self, auto_normalise_as_album: bool, data: NormalisationData) {
+    pub fn update_normalisation_data(
+        &mut self,
+        auto_normalise_as_album: bool,
+        data: NormalisationData,
+    ) {
         if self.normalisation != Normalisation::None {
             self.factor = self.get_factor(auto_normalise_as_album, data);
         }

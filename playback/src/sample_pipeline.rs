@@ -57,12 +57,13 @@ impl SamplePipeline {
         Ok(())
     }
 
-    pub fn set_normalisation_factor(
+    pub fn update_normalisation_data(
         &mut self,
         auto_normalise_as_album: bool,
         data: NormalisationData,
     ) {
-        self.normaliser.set_factor(auto_normalise_as_album, data);
+        self.normaliser
+            .update_normalisation_data(auto_normalise_as_album, data);
     }
 
     pub fn write(&mut self, packet: AudioPacket) -> SinkResult<()> {

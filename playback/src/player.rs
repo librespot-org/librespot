@@ -1459,7 +1459,7 @@ impl PlayerInternal {
 
         let position_ms = loaded_track.stream_position_ms;
 
-        self.sample_pipeline.set_normalisation_factor(
+        self.sample_pipeline.update_normalisation_data(
             self.auto_normalise_as_album,
             loaded_track.normalisation_data,
         );
