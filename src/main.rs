@@ -782,24 +782,6 @@ fn get_setup() -> Setup {
         exit(1);
     });
 
-    let interpolation_quality = opt_str(INTERPOLATION_QUALITY)
-        .as_deref()
-        .map(|interpolation_quality| {
-            InterpolationQuality::from_str(interpolation_quality).unwrap_or_else(|_| {
-                let default_value = &format!("{}", InterpolationQuality::default());
-                invalid_error_msg(
-                    INTERPOLATION_QUALITY,
-                    "",
-                    interpolation_quality,
-                    "Low, Medium, High",
-                    default_value,
-                );
-
-                exit(1);
-            })
-        })
-        .unwrap_or_default();
-
     let sample_rate = opt_str(SAMPLE_RATE)
         .as_deref()
         .map(|sample_rate| {
@@ -815,6 +797,32 @@ fn get_setup() -> Setup {
 
                 exit(1);
             })
+        })
+        .unwrap_or_default();
+
+    let interpolation_quality = opt_str(INTERPOLATION_QUALITY)
+        .as_deref()
+        .map(|interpolation_quality| match sample_rate {
+            SampleRate::Hz44100 => {
+                warn!(
+                    "--{} has no effect with a sample rate of {sample_rate}.",
+                    INTERPOLATION_QUALITY
+                );
+
+                InterpolationQuality::default()
+            }
+            _ => InterpolationQuality::from_str(interpolation_quality).unwrap_or_else(|_| {
+                let default_value = &format!("{}", InterpolationQuality::default());
+                invalid_error_msg(
+                    INTERPOLATION_QUALITY,
+                    "",
+                    interpolation_quality,
+                    "Low, Medium, High",
+                    default_value,
+                );
+
+                exit(1);
+            }),
         })
         .unwrap_or_default();
 
