@@ -77,6 +77,12 @@ passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
 default = ["rodio-backend"]
 
+[profile.release-dist-optimized]
+inherits = "release"
+panic = "abort"
+codegen-units = 1
+lto = true
+
 [package.metadata.deb]
 maintainer = "librespot-org"
 copyright = "2018 Paul Liétar"
