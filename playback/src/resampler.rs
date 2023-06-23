@@ -2,12 +2,14 @@ use std::{
     collections::{vec_deque, VecDeque},
     marker::Send,
     process::exit,
+    sync::atomic::Ordering,
     sync::mpsc,
     thread,
 };
 
 use crate::{
     config::{InterpolationQuality, SampleRate},
+    player::PLAYER_COUNTER,
     RESAMPLER_INPUT_SIZE, SAMPLE_RATE as SOURCE_SAMPLE_RATE,
 };
 
@@ -287,8 +289,8 @@ impl ResampleWorker {
                     }
                     ResampleTask::Terminate => {
                         match thread::current().name() {
-                            Some(name) => debug!("drop <ResampleWorker> [{name}] thread"),
-                            None => debug!("drop <ResampleWorker> thread"),
+                            Some(name) => debug!("<ResampleWorker> [{name}] thread finished"),
+                            None => debug!("<ResampleWorker> thread finished"),
                         }
 
                         break;
@@ -353,6 +355,7 @@ impl ResampleWorker {
 
 impl Drop for ResampleWorker {
     fn drop(&mut self) {
+        debug!("Shutting down <ResampleWorker> thread ...");
         self.task_sender
             .take()
             .and_then(|sender| sender.send(ResampleTask::Terminate).ok());
@@ -399,8 +402,11 @@ impl StereoInterleavedResampler {
             _ => {
                 debug!("Interpolation Quality: {interpolation_quality}");
 
-                let left_thread_name = "resampler:left".to_string();
-                let right_thread_name = "resampler:right".to_string();
+                // The player increments the player id when it gets it...
+                let player_id = PLAYER_COUNTER.load(Ordering::Relaxed).saturating_sub(1);
+
+                let left_thread_name = format!("resampler:{player_id}:left");
+                let right_thread_name = format!("resampler:{player_id}:right");
 
                 match interpolation_quality {
                     InterpolationQuality::Low => {

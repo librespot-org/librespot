@@ -1,10 +1,10 @@
 use log::{debug, error, warn};
 
-use std::{collections::HashMap, process::Command, thread};
+use std::{collections::HashMap, process::exit, process::Command, sync::atomic::Ordering, thread};
 
 use librespot::{
     metadata::audio::UniqueFields,
-    playback::player::{PlayerEvent, PlayerEventChannel, SinkStatus},
+    playback::player::{PlayerEvent, PlayerEventChannel, SinkStatus, PLAYER_COUNTER},
 };
 
 pub struct EventHandler {
@@ -14,9 +14,25 @@ pub struct EventHandler {
 impl EventHandler {
     pub fn new(mut player_events: PlayerEventChannel, onevent: &str) -> Self {
         let on_event = onevent.to_string();
-        let thread_handle = Some(thread::spawn(move || loop {
+
+        // The player increments the player id when it gets it...
+        let thread_name = format!(
+            "event-handler:{}",
+            PLAYER_COUNTER.load(Ordering::Relaxed).saturating_sub(1)
+        );
+
+        let builder = thread::Builder::new().name(thread_name.clone());
+
+        let thread_handle = match builder.spawn(move || loop {
             match player_events.blocking_recv() {
-                None => break,
+                None => {
+                    match thread::current().name() {
+                        Some(name) => debug!("<EventHandler> [{name}] thread finished"),
+                        None => debug!("<EventHandler> thread finished"),
+                    }
+
+                    break;
+                }
                 Some(event) => {
                     let mut env_vars = HashMap::new();
 
@@ -245,18 +261,29 @@ impl EventHandler {
                     }
                 }
             }
-        }));
+        }) {
+            Ok(handle) => {
+                debug!("Created <EventHandler> [{thread_name}] thread");
+                handle
+            }
+            Err(e) => {
+                error!("Error creating <EventHandler> [{thread_name}] thread: {e}");
+                exit(1);
+            }
+        };
 
-        Self { thread_handle }
+        Self {
+            thread_handle: Some(thread_handle),
+        }
     }
 }
 
 impl Drop for EventHandler {
     fn drop(&mut self) {
-        debug!("Shutting down EventHandler thread ...");
+        debug!("Shutting down <EventHandler> thread ...");
         if let Some(handle) = self.thread_handle.take() {
             if let Err(e) = handle.join() {
-                error!("EventHandler thread Error: {:?}", e);
+                error!("<EventHandler> thread Error: {:?}", e);
             }
         }
     }

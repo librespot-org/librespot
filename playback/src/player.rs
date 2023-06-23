@@ -81,7 +81,7 @@ struct PlayerInternal {
     player_id: usize,
 }
 
-static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
+pub static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 enum PlayerCommand {
     Load {
@@ -507,11 +507,11 @@ impl Player {
 
 impl Drop for Player {
     fn drop(&mut self) {
-        debug!("Shutting down player thread ...");
+        debug!("Shutting down <Player> thread ...");
         self.commands = None;
         if let Some(handle) = self.thread_handle.take() {
             if let Err(e) = handle.join() {
-                error!("Player thread Error: {:?}", e);
+                error!("<Player> thread Error: {:?}", e);
             }
         }
     }
@@ -1953,7 +1953,12 @@ impl PlayerInternal {
         let load_handles_clone = self.load_handles.clone();
         let handle = tokio::runtime::Handle::current();
 
-        let thread_name = format!("loader:{}", spotify_id.to_uri().unwrap_or_default());
+        // The player increments the player id when it gets it...
+        let thread_name = format!(
+            "loader:{}:{}",
+            PLAYER_COUNTER.load(Ordering::Relaxed).saturating_sub(1),
+            spotify_id.to_uri().unwrap_or_default()
+        );
 
         let builder = thread::Builder::new().name(thread_name.clone());
 
