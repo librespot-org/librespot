@@ -288,6 +288,14 @@ impl ResampleWorker {
                             .ok();
                     }
                     ResampleTask::Terminate => {
+                        loop {
+                            let drained = task_receiver.recv().ok();
+
+                            if drained.is_none() {
+                                break;
+                            }
+                        }
+
                         match thread::current().name() {
                             Some(name) => debug!("<ResampleWorker> [{name}] thread finished"),
                             None => debug!("<ResampleWorker> thread finished"),
