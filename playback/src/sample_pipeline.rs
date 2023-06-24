@@ -69,7 +69,7 @@ impl SamplePipeline {
     pub fn write(&mut self, packet: AudioPacket) -> SinkResult<()> {
         if let AudioPacket::Samples(samples) = packet {
             self.resampler
-                .process(&samples)
+                .resample(&samples)
                 .map(|processed_samples| self.normaliser.normalise(&processed_samples))
                 .map(|new_packet| self.sink.write(new_packet, &mut self.converter))
                 .transpose()?;

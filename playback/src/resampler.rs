@@ -241,18 +241,12 @@ impl MonoResampler for MonoLinearResampler {
 enum ResampleTask {
     Stop,
     Terminate,
-    GetLatency,
-    ProcessSamples(Vec<f64>),
-}
-
-enum ResampleResult {
-    Latency(u64),
-    ProcessedSamples(Option<Vec<f64>>),
+    Resample(Vec<f64>),
 }
 
 struct ResampleWorker {
     task_sender: Option<mpsc::Sender<ResampleTask>>,
-    result_receiver: Option<mpsc::Receiver<ResampleResult>>,
+    result_receiver: Option<mpsc::Receiver<(Option<Vec<f64>>, u64)>>,
     handle: Option<thread::JoinHandle<()>>,
 }
 
@@ -275,17 +269,11 @@ impl ResampleWorker {
                 }
                 Ok(task) => match task {
                     ResampleTask::Stop => resampler.stop(),
-                    ResampleTask::GetLatency => {
+                    ResampleTask::Resample(samples) => {
+                        let resampled = resampler.resample(&samples);
                         let latency = resampler.get_latency_pcm();
 
-                        result_sender.send(ResampleResult::Latency(latency)).ok();
-                    }
-                    ResampleTask::ProcessSamples(samples) => {
-                        let samples = resampler.resample(&samples);
-
-                        result_sender
-                            .send(ResampleResult::ProcessedSamples(samples))
-                            .ok();
+                        result_sender.send((resampled, latency)).ok();
                     }
                     ResampleTask::Terminate => {
                         loop {
@@ -323,41 +311,23 @@ impl ResampleWorker {
         }
     }
 
-    fn get_latency_pcm(&mut self) -> u64 {
-        self.task_sender
-            .as_mut()
-            .and_then(|sender| sender.send(ResampleTask::GetLatency).ok());
-
-        self.result_receiver
-            .as_mut()
-            .and_then(|result_receiver| result_receiver.recv().ok())
-            .and_then(|result| match result {
-                ResampleResult::Latency(latency) => Some(latency),
-                _ => None,
-            })
-            .unwrap_or_default()
-    }
-
     fn stop(&mut self) {
         self.task_sender
             .as_mut()
             .and_then(|sender| sender.send(ResampleTask::Stop).ok());
     }
 
-    fn process(&mut self, samples: Vec<f64>) {
+    fn resample(&mut self, samples: Vec<f64>) {
         self.task_sender
             .as_mut()
-            .and_then(|sender| sender.send(ResampleTask::ProcessSamples(samples)).ok());
+            .and_then(|sender| sender.send(ResampleTask::Resample(samples)).ok());
     }
 
-    fn receive_result(&mut self) -> Option<Vec<f64>> {
+    fn get_resampled(&mut self) -> (Option<Vec<f64>>, u64) {
         self.result_receiver
             .as_mut()
             .and_then(|result_receiver| result_receiver.recv().ok())
-            .and_then(|result| match result {
-                ResampleResult::ProcessedSamples(samples) => samples,
-                _ => None,
-            })
+            .unwrap_or((None, 0))
     }
 }
 
@@ -392,8 +362,7 @@ enum Resampler {
 
 pub struct StereoInterleavedResampler {
     resampler: Resampler,
-    latency_flag: bool,
-    process_flag: bool,
+    latency_pcm: u64,
 }
 
 impl StereoInterleavedResampler {
@@ -445,50 +414,15 @@ impl StereoInterleavedResampler {
 
         Self {
             resampler,
-            latency_flag: true,
-            process_flag: false,
+            latency_pcm: 0,
         }
     }
 
     pub fn get_latency_pcm(&mut self) -> u64 {
-        let alternate_latency_flag = self.alternate_latency_flag();
-
-        match &mut self.resampler {
-            Resampler::Bypass => 0,
-            Resampler::Worker {
-                left_resampler,
-                right_resampler,
-            } => {
-                if alternate_latency_flag {
-                    left_resampler.get_latency_pcm()
-                } else {
-                    right_resampler.get_latency_pcm()
-                }
-            }
-        }
+        self.latency_pcm
     }
 
-    fn alternate_latency_flag(&mut self) -> bool {
-        // We only actually need the latency
-        // from one channel for PCM frame latency
-        // to balance the load we alternate.
-        let current_flag = self.latency_flag;
-        self.latency_flag = !self.latency_flag;
-        current_flag
-    }
-
-    fn alternate_process_flag(&mut self) -> bool {
-        // This along with the latency_flag makes
-        // sure that all worker calls alternate
-        // for load balancing.
-        let current_flag = self.process_flag;
-        self.process_flag = !self.process_flag;
-        current_flag
-    }
-
-    pub fn process(&mut self, input_samples: &[f64]) -> Option<Vec<f64>> {
-        let alternate_process_flag = self.alternate_process_flag();
-
+    pub fn resample(&mut self, input_samples: &[f64]) -> Option<Vec<f64>> {
         match &mut self.resampler {
             // Bypass is basically a no-op.
             Resampler::Bypass => Some(input_samples.to_vec()),
@@ -498,26 +432,17 @@ impl StereoInterleavedResampler {
             } => {
                 let (left_samples, right_samples) = Self::deinterleave_samples(input_samples);
 
-                let (processed_left_samples, processed_right_samples) = if alternate_process_flag {
-                    left_resampler.process(left_samples);
-                    right_resampler.process(right_samples);
+                left_resampler.resample(left_samples);
+                right_resampler.resample(right_samples);
 
-                    let processed_left_samples = left_resampler.receive_result();
-                    let processed_right_samples = right_resampler.receive_result();
+                let (left_resampled, left_latency_pcm) = left_resampler.get_resampled();
+                let (right_resampled, right_latency_pcm) = right_resampler.get_resampled();
 
-                    (processed_left_samples, processed_right_samples)
-                } else {
-                    right_resampler.process(right_samples);
-                    left_resampler.process(left_samples);
+                // They should always be equal
+                self.latency_pcm = left_latency_pcm.max(right_latency_pcm);
 
-                    let processed_right_samples = right_resampler.receive_result();
-                    let processed_left_samples = left_resampler.receive_result();
-
-                    (processed_left_samples, processed_right_samples)
-                };
-
-                processed_left_samples.and_then(|left_samples| {
-                    processed_right_samples.map(|right_samples| {
+                left_resampled.and_then(|left_samples| {
+                    right_resampled.map(|right_samples| {
                         Self::interleave_samples(&left_samples, &right_samples)
                     })
                 })
