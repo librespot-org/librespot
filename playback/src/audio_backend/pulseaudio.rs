@@ -140,9 +140,9 @@ impl Sink for PulseAudioSink {
         self.sink
             .as_mut()
             .and_then(|sink| {
-                sink.get_latency().ok().map(|micro_sec| {
-                    (micro_sec.as_secs_f64() * DECODER_SAMPLE_RATE as f64).round() as u64
-                })
+                sink.get_latency()
+                    .ok()
+                    .map(|micro_sec| (micro_sec.as_secs_f64() * DECODER_SAMPLE_RATE as f64) as u64)
             })
             .unwrap_or(0)
     }
