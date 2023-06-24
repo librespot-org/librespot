@@ -16,7 +16,7 @@ use symphonia::{
     },
 };
 
-use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
+use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 
 use crate::{
     metadata::audio::{AudioFileFormat, AudioFiles},
@@ -165,9 +165,7 @@ impl AudioDecoder for SymphoniaDecoder {
         Ok(self.ts_to_ms(seeked_to_ts.actual_ts))
     }
 
-    fn next_packet(&mut self) -> DecoderResult<Option<(AudioPacketPosition, AudioPacket)>> {
-        let mut skipped = false;
-
+    fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>> {
         loop {
             let packet = match self.format.next_packet() {
                 Ok(packet) => packet,
@@ -184,10 +182,6 @@ impl AudioDecoder for SymphoniaDecoder {
             };
 
             let position_ms = self.ts_to_ms(packet.ts());
-            let packet_position = AudioPacketPosition {
-                position_ms,
-                skipped,
-            };
 
             match self.decoder.decode(&packet) {
                 Ok(decoded) => {
@@ -203,13 +197,12 @@ impl AudioDecoder for SymphoniaDecoder {
                     sample_buffer.copy_interleaved_ref(decoded);
                     let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
 
-                    return Ok(Some((packet_position, samples)));
+                    return Ok(Some((position_ms, samples)));
                 }
                 Err(Error::DecodeError(_)) => {
                     // The packet failed to decode due to corrupted or invalid data, get a new
                     // packet and try again.
                     warn!("Skipping malformed audio packet at {position_ms} ms");
-                    skipped = true;
                     continue;
                 }
                 Err(err) => return Err(err.into()),

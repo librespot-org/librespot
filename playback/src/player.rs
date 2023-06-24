@@ -31,7 +31,7 @@ use crate::{
     audio_backend::Sink,
     config::{Bitrate, PlayerConfig},
     core::{util::SeqGenerator, Error, Session, SpotifyId},
-    decoder::{AudioDecoder, AudioPacket, AudioPacketPosition, SymphoniaDecoder},
+    decoder::{AudioDecoder, AudioPacket, SymphoniaDecoder},
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::VolumeGetter,
     sample_pipeline::SamplePipeline,
@@ -1149,9 +1149,7 @@ impl Future for PlayerInternal {
                 {
                     match decoder.next_packet() {
                         Ok(result) => {
-                            if let Some((ref packet_position, ref packet)) = result {
-                                let decoder_position_ms = packet_position.position_ms;
-
+                            if let Some((decoder_position_ms, ref packet)) = result {
                                 *stream_position_ms =
                                     decoder_position_ms.saturating_sub(sample_pipeline_latency_ms);
 
@@ -1416,7 +1414,7 @@ impl PlayerInternal {
         }
     }
 
-    fn handle_packet(&mut self, packet: Option<(AudioPacketPosition, AudioPacket)>) {
+    fn handle_packet(&mut self, packet: Option<(u32, AudioPacket)>) {
         match packet {
             Some((_, packet)) => {
                 if !packet.is_empty() {
