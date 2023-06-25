@@ -451,6 +451,8 @@ impl StereoInterleavedResampler {
     }
 
     pub fn stop(&mut self) {
+        self.latency_pcm = 0;
+
         match &mut self.resampler {
             // Stop does nothing
             // if we're bypassed.
