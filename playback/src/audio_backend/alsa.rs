@@ -246,9 +246,6 @@ impl Sink for AlsaSink {
     }
 
     fn stop(&mut self) -> SinkResult<()> {
-        // Zero fill the remainder of the period buffer and
-        // write any leftover data before draining the actual PCM buffer.
-        self.period_buffer.resize(self.period_buffer.capacity(), 0);
         self.write_buf()?;
 
         if let Some(pcm) = self.pcm.take() {
