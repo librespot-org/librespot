@@ -46,23 +46,29 @@ struct DynamicNormalisation {
 impl DynamicNormalisation {
     fn new(config: &PlayerConfig) -> Self {
         // as_millis() has rounding errors (truncates)
-        debug!(
-            "Normalisation Attack: {:.0} ms",
-            config
-                .sample_rate
-                .normalisation_coefficient_to_duration(config.normalisation_attack_cf)
-                .as_secs_f64()
-                * 1000.
-        );
+        let attack = config
+            .sample_rate
+            .normalisation_coefficient_to_duration(config.normalisation_attack_cf)
+            .as_secs_f64()
+            * 1000.0;
 
-        debug!(
-            "Normalisation Release: {:.0} ms",
-            config
-                .sample_rate
-                .normalisation_coefficient_to_duration(config.normalisation_release_cf)
-                .as_secs_f64()
-                * 1000.
-        );
+        if attack < 1.0 {
+            warn!("Normalisation Attack: {:.0} ms, an Attack of < 1.0 ms will cause severe distortion", attack);
+        } else {
+            debug!("Normalisation Attack: {:.0} ms", attack);
+        }
+
+        let release = config
+            .sample_rate
+            .normalisation_coefficient_to_duration(config.normalisation_release_cf)
+            .as_secs_f64()
+            * 1000.0;
+
+        if release < 1.0 {
+            warn!("Normalisation Release: {:.0} ms, a Release of < 1.0 ms will cause severe distortion", release);
+        } else {
+            debug!("Normalisation Release: {:.0} ms", release);
+        }
 
         Self {
             threshold_db: config.normalisation_threshold_dbfs,
