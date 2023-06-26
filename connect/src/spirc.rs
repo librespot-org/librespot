@@ -872,6 +872,11 @@ impl SpircTask {
             );
         }
 
+        // Don't handle messages that are not intended for us.
+        if !update.recipient.contains(device_id) {
+            return Ok(());
+        }
+
         match update.typ() {
             MessageType::kMessageTypeHello => self.notify(Some(ident)),
 
