@@ -469,22 +469,27 @@ impl StereoInterleavedResampler {
 
     fn interleave_samples(left_samples: &[f64], right_samples: &[f64]) -> Vec<f64> {
         // Re-interleave the resampled channels.
-        left_samples
-            .iter()
-            .zip(right_samples.iter())
-            .flat_map(|(&x, &y)| vec![x, y])
-            .collect()
+        let mut output = Vec::with_capacity(left_samples.len() + right_samples.len());
+
+        output.extend(
+            left_samples
+                .iter()
+                .zip(right_samples.iter())
+                .flat_map(|(&left, &right)| std::iter::once(left).chain(std::iter::once(right))),
+        );
+
+        output
     }
 
     fn deinterleave_samples(samples: &[f64]) -> (Vec<f64>, Vec<f64>) {
         // Split the stereo interleaved samples into left and right channels.
-        let (left_samples, right_samples): (Vec<f64>, Vec<f64>) = samples
-            .chunks(2)
-            .map(|chunk| {
-                let [left_sample, right_sample] = [chunk[0], chunk[1]];
-                (left_sample, right_sample)
-            })
-            .unzip();
+        let samples_len = samples.len() / 2;
+
+        let mut left_samples = Vec::with_capacity(samples_len);
+        let mut right_samples = Vec::with_capacity(samples_len);
+
+        left_samples.extend(samples.iter().step_by(2));
+        right_samples.extend(samples.iter().skip(1).step_by(2));
 
         (left_samples, right_samples)
     }

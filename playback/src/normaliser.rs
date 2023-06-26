@@ -10,32 +10,26 @@ use crate::{
 struct NoNormalisation;
 
 impl NoNormalisation {
-    fn normalise(samples: &[f64], volume: f64) -> Vec<f64> {
+    fn normalise(mut samples: Vec<f64>, volume: f64) -> Vec<f64> {
         if volume < 1.0 {
-            let mut output = Vec::with_capacity(samples.len());
-
-            output.extend(samples.iter().map(|sample| sample * volume));
-
-            output
-        } else {
-            samples.to_vec()
+            samples.iter_mut().for_each(|sample| *sample *= volume);
         }
+
+        samples
     }
 }
 
 struct BasicNormalisation;
 
 impl BasicNormalisation {
-    fn normalise(samples: &[f64], volume: f64, factor: f64) -> Vec<f64> {
+    fn normalise(mut samples: Vec<f64>, volume: f64, factor: f64) -> Vec<f64> {
         if volume < 1.0 || factor < 1.0 {
-            let mut output = Vec::with_capacity(samples.len());
-
-            output.extend(samples.iter().map(|sample| sample * factor * volume));
-
-            output
-        } else {
-            samples.to_vec()
+            samples
+                .iter_mut()
+                .for_each(|sample| *sample *= factor * volume);
         }
+
+        samples
     }
 }
 
@@ -85,11 +79,9 @@ impl DynamicNormalisation {
         self.peak = 0.0;
     }
 
-    fn normalise(&mut self, samples: &[f64], volume: f64, factor: f64) -> Vec<f64> {
-        let mut output = Vec::with_capacity(samples.len());
-
-        output.extend(samples.iter().map(|sample| {
-            let mut sample = sample * factor;
+    fn normalise(&mut self, mut samples: Vec<f64>, volume: f64, factor: f64) -> Vec<f64> {
+        samples.iter_mut().for_each(|sample| {
+            *sample *= factor;
 
             // Feedforward limiter in the log domain
             // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012). Digital Dynamic
@@ -154,13 +146,13 @@ impl DynamicNormalisation {
                 // the default threshold, so that would clip.
 
                 // steps 7-8: conversion into level and multiplication into gain stage
-                sample *= db_to_ratio(-self.peak);
+                *sample *= db_to_ratio(-self.peak);
             }
 
-            sample * volume
-        }));
+            *sample *= volume
+        });
 
-        output
+        samples
     }
 }
 
@@ -204,7 +196,7 @@ impl Normalisation {
         }
     }
 
-    fn normalise(&mut self, samples: &[f64], volume: f64, factor: f64) -> Vec<f64> {
+    fn normalise(&mut self, samples: Vec<f64>, volume: f64, factor: f64) -> Vec<f64> {
         use Normalisation::*;
 
         match self {
@@ -236,7 +228,7 @@ impl Normaliser {
         }
     }
 
-    pub fn normalise(&mut self, samples: &[f64]) -> AudioPacket {
+    pub fn normalise(&mut self, samples: Vec<f64>) -> AudioPacket {
         let volume = self.volume_getter.attenuation_factor();
 
         AudioPacket::Samples(self.normalisation.normalise(samples, volume, self.factor))

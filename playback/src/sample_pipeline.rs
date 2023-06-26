@@ -70,7 +70,7 @@ impl SamplePipeline {
         if let AudioPacket::Samples(samples) = packet {
             self.resampler
                 .resample(&samples)
-                .map(|processed_samples| self.normaliser.normalise(&processed_samples))
+                .map(|processed_samples| self.normaliser.normalise(processed_samples))
                 .map(|new_packet| self.sink.write(new_packet, &mut self.converter))
                 .transpose()?;
         } else {
