@@ -252,8 +252,20 @@ impl Session {
             if session.is_invalid() {
                 break;
             }
-            let last_ping = session.0.data.read().last_ping.unwrap_or_else(Instant::now);
-            if last_ping.elapsed() >= SESSION_TIMEOUT {
+
+            // It would be so much easier to use elapsed but elapsed could
+            // potentially panic is rare cases.
+            // See:
+            // https://doc.rust-lang.org/std/time/struct.Instant.html#monotonicity
+            let now = Instant::now();
+
+            let last_ping = session.0.data.read().last_ping.unwrap_or(now);
+
+            let since_last_ping = now
+                .checked_duration_since(last_ping)
+                .unwrap_or(SESSION_TIMEOUT);
+
+            if since_last_ping >= SESSION_TIMEOUT {
                 session.shutdown();
                 // TODO: Optionally reconnect (with cached/last credentials?)
                 return Err(io::Error::new(

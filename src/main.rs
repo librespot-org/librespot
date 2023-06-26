@@ -1836,7 +1836,16 @@ async fn main() {
                 warn!("Spirc shut down unexpectedly");
 
                 let mut reconnect_exceeds_rate_limit = || {
-                    auto_connect_times.retain(|&t| t.elapsed() < RECONNECT_RATE_LIMIT_WINDOW);
+                    // It would be so much easier to use elapsed but elapsed could
+                    // potentially panic is rare cases.
+                    // See:
+                    // https://doc.rust-lang.org/std/time/struct.Instant.html#monotonicity
+                    let now = Instant::now();
+
+                    auto_connect_times.retain(|&t| {
+                        now.checked_duration_since(t).unwrap_or(RECONNECT_RATE_LIMIT_WINDOW) < RECONNECT_RATE_LIMIT_WINDOW
+                    });
+
                     auto_connect_times.len() > RECONNECT_RATE_LIMIT
                 };
 
