@@ -226,10 +226,14 @@ impl SampleRate {
             // Dummy values to satisfy
             // the match statement.
             // 44.1kHz will be bypassed.
-            Hz44100 => ResampleSpec {
-                resample_factor_reciprocal: 1.0,
-                interpolation_output_size: RESAMPLER_INPUT_SIZE,
-            },
+            Hz44100 => {
+                warn!("Resampling 44.1kHz to 44.1kHz is just a really CPU intensive no-op, you should not be doing it");
+
+                ResampleSpec {
+                    resample_factor_reciprocal: 1.0,
+                    interpolation_output_size: RESAMPLER_INPUT_SIZE,
+                }
+            }
             Hz48000 => ResampleSpec {
                 resample_factor_reciprocal: HZ48000_RESAMPLE_FACTOR_RECIPROCAL,
                 interpolation_output_size: HZ48000_INTERPOLATION_OUTPUT_SIZE,
