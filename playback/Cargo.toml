@@ -44,7 +44,7 @@ glib            = { version = "0.17", optional = true }
 
 # Rodio dependencies
 rodio           = { version = "0.17.1", optional = true, default-features = false }
-cpal            = { version = "0.15.1", optional = true }
+cpal            = { version = "0.15.2", optional = true }
 
 # Container and audio decoder
 symphonia = { version = "0.5", default-features = false, features = ["mp3", "ogg", "vorbis"] }
