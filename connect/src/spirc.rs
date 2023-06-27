@@ -842,6 +842,7 @@ impl SpircTask {
         // First see if this update was intended for us.
         let device_id = &self.ident;
         let ident = update.ident();
+
         if ident == device_id
             || (!update.recipient.is_empty() && !update.recipient.contains(device_id))
         {
@@ -872,14 +873,7 @@ impl SpircTask {
             );
         }
 
-        // Don't handle messages that are not intended for us.
-        if !update.recipient.contains(device_id) {
-            return Ok(());
-        }
-
         match update.typ() {
-            MessageType::kMessageTypeHello => self.notify(Some(ident)),
-
             MessageType::kMessageTypeLoad => {
                 self.handle_load(update.state.get_or_default())?;
                 self.notify(None)
@@ -996,8 +990,10 @@ impl SpircTask {
                     && self.device.became_active_at() <= update.device_state.became_active_at()
                 {
                     self.handle_disconnect();
+                    self.notify(None)?;
                 }
-                self.notify(None)
+
+                Ok(())
             }
 
             _ => Ok(()),
