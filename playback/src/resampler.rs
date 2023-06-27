@@ -50,7 +50,6 @@ impl<'a> IntoIterator for &'a DelayLine {
 
 struct WindowedSincInterpolator {
     interpolation_coefficients: Vec<f64>,
-    interpolation_coefficients_sum: f64,
     delay_line: DelayLine,
 }
 
@@ -59,13 +58,10 @@ impl WindowedSincInterpolator {
         let interpolation_coefficients =
             interpolation_quality.get_interpolation_coefficients(resample_factor_reciprocal);
 
-        let interpolation_coefficients_sum = interpolation_coefficients.iter().sum();
-
         let delay_line = DelayLine::new(interpolation_coefficients.len());
 
         Self {
             interpolation_coefficients,
-            interpolation_coefficients_sum,
             delay_line,
         }
     }
@@ -76,20 +72,12 @@ impl WindowedSincInterpolator {
         self.delay_line.push(sample);
 
         // Temporal convolution
-        let mut output_sample = self
-            .interpolation_coefficients
+        self.interpolation_coefficients
             .iter()
             .zip(&self.delay_line)
             .fold(0.0, |acc, (coefficient, delay_line_sample)| {
                 acc + coefficient * delay_line_sample
-            });
-
-        if output_sample.is_normal() {
-            // Make sure that interpolation does not add any gain.
-            output_sample /= self.interpolation_coefficients_sum;
-        }
-
-        output_sample
+            })
     }
 
     fn clear(&mut self) {
