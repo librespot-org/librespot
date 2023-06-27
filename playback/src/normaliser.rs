@@ -52,11 +52,7 @@ impl DynamicNormalisation {
             .as_secs_f64()
             * 1000.0;
 
-        if attack < 1.0 {
-            warn!("Normalisation Attack: {:.0} ms, an Attack of < 1.0 ms will cause severe distortion", attack);
-        } else {
-            debug!("Normalisation Attack: {:.0} ms", attack);
-        }
+        debug!("Normalisation Attack: {:.0} ms", attack);
 
         let release = config
             .sample_rate
@@ -64,11 +60,7 @@ impl DynamicNormalisation {
             .as_secs_f64()
             * 1000.0;
 
-        if release < 1.0 {
-            warn!("Normalisation Release: {:.0} ms, a Release of < 1.0 ms will cause severe distortion", release);
-        } else {
-            debug!("Normalisation Release: {:.0} ms", release);
-        }
+        debug!("Normalisation Release: {:.0} ms", release);
 
         Self {
             threshold_db: config.normalisation_threshold_dbfs,

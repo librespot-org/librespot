@@ -74,6 +74,11 @@ impl InterpolationQuality {
 
         let mut coefficients = Vec::with_capacity(interpolation_coefficients_length);
 
+        if interpolation_coefficients_length == 0 {
+            warn!("InterpolationQuality::Low::get_interpolation_coefficients always returns an empty Vec<f64> because Linear Interpolation does not use coefficients");
+            return coefficients;
+        }
+
         let last_index = interpolation_coefficients_length as f64 - 1.0;
 
         let sinc_center = last_index * 0.5;
@@ -201,11 +206,27 @@ impl SampleRate {
     }
 
     pub fn duration_to_normalisation_coefficient(&self, duration: Duration) -> f64 {
-        (-1.0 / (duration.as_secs_f64() * self.samples_per_second())).exp()
+        let secs = duration.as_secs_f64();
+        let ms = secs * 1000.0;
+
+        if ms < 1.0 {
+            warn!("Coefficient Duration: {:.0} ms, a Normalisation Attack/Release of < 1 ms will cause severe distortion", ms);
+        }
+
+        (-1.0 / (secs * self.samples_per_second())).exp()
     }
 
     pub fn normalisation_coefficient_to_duration(&self, coefficient: f64) -> Duration {
-        Duration::from_secs_f64(-1.0 / coefficient.ln() / self.samples_per_second())
+        let duration = Duration::from_secs_f64(-1.0 / coefficient.ln() / self.samples_per_second());
+
+        let secs = duration.as_secs_f64();
+        let ms = secs * 1000.0;
+
+        if ms < 1.0 {
+            warn!("Coefficient Duration: {:.0} ms, a Normalisation Attack/Release of < 1 ms will cause severe distortion", ms);
+        }
+
+        duration
     }
 
     fn samples_per_second(&self) -> f64 {
