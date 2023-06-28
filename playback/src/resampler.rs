@@ -410,15 +410,15 @@ impl StereoInterleavedResampler {
         self.latency_pcm
     }
 
-    pub fn resample(&mut self, input_samples: &[f64]) -> Option<Vec<f64>> {
+    pub fn resample(&mut self, input_samples: Vec<f64>) -> Option<Vec<f64>> {
         match &mut self.resampler {
             // Bypass is basically a no-op.
-            Resampler::Bypass => Some(input_samples.to_vec()),
+            Resampler::Bypass => Some(input_samples),
             Resampler::Worker {
                 left_resampler,
                 right_resampler,
             } => {
-                let (left_samples, right_samples) = Self::deinterleave_samples(input_samples);
+                let (left_samples, right_samples) = Self::deinterleave_samples(&input_samples);
 
                 left_resampler.resample(left_samples);
                 right_resampler.resample(right_samples);
