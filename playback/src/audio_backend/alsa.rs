@@ -2,7 +2,7 @@ use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 use crate::config::{AudioFormat, SampleRate};
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::{COMMON_SAMPLE_RATES, NUM_CHANNELS, SAMPLE_RATE as DECODER_SAMPLE_RATE};
+use crate::{CommonSampleRates, NUM_CHANNELS, SAMPLE_RATE as DECODER_SAMPLE_RATE};
 use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, ValueOr};
@@ -35,7 +35,7 @@ enum AlsaError {
     UnsupportedSampleRate {
         device: String,
         samplerate: u32,
-        supported_rates: Vec<u32>,
+        supported_rates: Vec<String>,
         e: alsa::Error,
     },
 
@@ -382,9 +382,21 @@ impl AlsaSink {
 
             hwp.set_rate(self.sample_rate, ValueOr::Nearest)
                 .map_err(|e| {
+                    let common_sample_rates = CommonSampleRates::default();
+
                     let supported_rates = (hwp.get_rate_min().unwrap_or_default()
                         ..=hwp.get_rate_max().unwrap_or_default())
-                        .filter(|r| COMMON_SAMPLE_RATES.contains(r) && hwp.test_rate(*r).is_ok())
+                        .filter_map(|r| {
+                            if common_sample_rates.contains(r) && hwp.test_rate(r).is_ok() {
+                                Some(
+                                    CommonSampleRates::try_from(r)
+                                        .unwrap_or_default()
+                                        .to_string(),
+                                )
+                            } else {
+                                None
+                            }
+                        })
                         .collect();
 
                     AlsaError::UnsupportedSampleRate {
