@@ -1,6 +1,11 @@
 use log::{debug, error, warn};
 
-use std::{collections::HashMap, process::exit, process::Command, sync::atomic::Ordering, thread};
+use std::{
+    collections::HashMap,
+    process::{exit, Command},
+    sync::atomic::Ordering,
+    thread,
+};
 
 use librespot::{
     metadata::audio::UniqueFields,
@@ -18,7 +23,7 @@ impl EventHandler {
         // The player increments the player id when it gets it...
         let thread_name = format!(
             "event-handler:{}",
-            PLAYER_COUNTER.load(Ordering::Relaxed).saturating_sub(1)
+            PLAYER_COUNTER.load(Ordering::SeqCst).saturating_sub(1)
         );
 
         let builder = thread::Builder::new().name(thread_name.clone());

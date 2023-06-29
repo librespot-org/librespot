@@ -25,6 +25,13 @@ pub const SAMPLES_PER_SECOND: u32 = SAMPLE_RATE * NUM_CHANNELS as u32;
 pub const PAGES_PER_MS: f64 = SAMPLE_RATE as f64 / 1000.0;
 pub const MS_PER_PAGE: f64 = 1000.0 / SAMPLE_RATE as f64;
 
+// not used by all backends
+#[allow(dead_code)]
+const COMMON_SAMPLE_RATES: [u32; 14] = [
+    8000, 11025, 16000, 22050, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600,
+    768000,
+];
+
 pub fn db_to_ratio(db: f64) -> f64 {
     f64::powf(10.0, db / DB_VOLTAGE_RATIO)
 }

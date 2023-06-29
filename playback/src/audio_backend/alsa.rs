@@ -1,8 +1,8 @@
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
+use crate::config::{AudioFormat, SampleRate};
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE as DECODER_SAMPLE_RATE};
+use crate::{COMMON_SAMPLE_RATES, NUM_CHANNELS, SAMPLE_RATE as DECODER_SAMPLE_RATE};
 use alsa::device_name::HintIter;
 use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
 use alsa::{Direction, ValueOr};
@@ -11,22 +11,6 @@ use thiserror::Error;
 
 const OPTIMAL_NUM_PERIODS: Frames = 5;
 const MIN_NUM_PERIODS: Frames = 2;
-
-const COMMON_SAMPLE_RATES: [u32; 14] = [
-    8000, 11025, 16000, 22050, 44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600,
-    768000,
-];
-
-const SUPPORTED_SAMPLE_RATES: [u32; 4] = [44100, 48000, 88200, 96000];
-
-const FORMATS: [AudioFormat; 6] = [
-    AudioFormat::S16,
-    AudioFormat::S24,
-    AudioFormat::S24_3,
-    AudioFormat::S32,
-    AudioFormat::F32,
-    AudioFormat::F64,
-];
 
 #[derive(Debug, Error)]
 enum AlsaError {
@@ -134,25 +118,22 @@ fn list_compatible_devices() -> SinkResult<()> {
                             {
                                 let mut supported_formats_and_samplerates = String::new();
 
-                                for format in FORMATS.iter() {
+                                for format in AudioFormat::default().into_iter() {
                                     let hwp = hwp.clone();
 
-                                    if hwp.set_format((*format).into()).is_ok() {
-                                        let sample_rates: Vec<String> = SUPPORTED_SAMPLE_RATES
-                                            .iter()
+                                    if hwp.set_format(format.into()).is_ok() {
+                                        let sample_rates: Vec<String> = SampleRate::default()
+                                            .into_iter()
                                             .filter_map(|sample_rate| {
                                                 let hwp = hwp.clone();
                                                 if hwp
-                                                    .set_rate(*sample_rate, ValueOr::Nearest)
+                                                    .set_rate(
+                                                        sample_rate.as_u32(),
+                                                        ValueOr::Nearest,
+                                                    )
                                                     .is_ok()
                                                 {
-                                                    match *sample_rate {
-                                                        44100 => Some("44.1kHz".to_string()),
-                                                        48000 => Some("48kHz".to_string()),
-                                                        88200 => Some("88.2kHz".to_string()),
-                                                        96000 => Some("96kHz".to_string()),
-                                                        _ => None,
-                                                    }
+                                                    Some(sample_rate.to_string())
                                                 } else {
                                                     None
                                                 }
@@ -161,7 +142,7 @@ fn list_compatible_devices() -> SinkResult<()> {
 
                                         if !sample_rates.is_empty() {
                                             let format_and_sample_rates =
-                                                if *format == AudioFormat::S24_3 {
+                                                if format == AudioFormat::S24_3 {
                                                     format!(
                                                     "\n\t\tFormat: {format:?} Sample Rate(s): {}",
                                                     sample_rates.join(", ")
@@ -379,10 +360,10 @@ impl AlsaSink {
             let alsa_format = self.format.into();
 
             hwp.set_format(alsa_format).map_err(|e| {
-                let supported_formats = FORMATS
-                    .iter()
+                let supported_formats = AudioFormat::default()
+                    .into_iter()
                     .filter_map(|f| {
-                        if hwp.test_format((*f).into()).is_ok() {
+                        if hwp.test_format(f.into()).is_ok() {
                             Some(format!("{f:?}"))
                         } else {
                             None

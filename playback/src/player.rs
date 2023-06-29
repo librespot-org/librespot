@@ -324,7 +324,7 @@ impl Player {
     {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
-        let player_id = PLAYER_COUNTER.fetch_add(1, Ordering::AcqRel);
+        let player_id = PLAYER_COUNTER.fetch_add(1, Ordering::SeqCst);
 
         let thread_name = format!("player:{}", player_id);
 
@@ -1954,7 +1954,7 @@ impl PlayerInternal {
         // The player increments the player id when it gets it...
         let thread_name = format!(
             "loader:{}:{}",
-            PLAYER_COUNTER.load(Ordering::Relaxed).saturating_sub(1),
+            PLAYER_COUNTER.load(Ordering::SeqCst).saturating_sub(1),
             spotify_id.to_uri().unwrap_or_default()
         );
 

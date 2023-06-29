@@ -368,7 +368,7 @@ impl StereoInterleavedResampler {
                 debug!("Interpolation Quality: {interpolation_quality}");
 
                 // The player increments the player id when it gets it...
-                let player_id = PLAYER_COUNTER.load(Ordering::Relaxed).saturating_sub(1);
+                let player_id = PLAYER_COUNTER.load(Ordering::SeqCst).saturating_sub(1);
 
                 let left_thread_name = format!("resampler:{player_id}:left");
                 let right_thread_name = format!("resampler:{player_id}:right");

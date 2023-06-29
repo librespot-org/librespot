@@ -151,6 +151,17 @@ pub enum SampleRate {
     Hz96000,
 }
 
+impl IntoIterator for SampleRate {
+    type Item = SampleRate;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        use SampleRate::*;
+
+        vec![Hz44100, Hz48000, Hz88200, Hz96000].into_iter()
+    }
+}
+
 impl FromStr for SampleRate {
     type Err = ();
 
@@ -300,6 +311,17 @@ pub enum AudioFormat {
     S24_3,
     #[default]
     S16,
+}
+
+impl IntoIterator for AudioFormat {
+    type Item = AudioFormat;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        use AudioFormat::*;
+
+        vec![F64, F32, S32, S24, S24_3, S16].into_iter()
+    }
 }
 
 impl FromStr for AudioFormat {

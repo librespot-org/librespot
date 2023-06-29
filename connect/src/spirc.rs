@@ -874,6 +874,7 @@ impl SpircTask {
         }
 
         match update.typ() {
+            MessageType::kMessageTypeHello => self.notify(Some(ident)),
             MessageType::kMessageTypeLoad => {
                 self.handle_load(update.state.get_or_default())?;
                 self.notify(None)
