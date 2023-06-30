@@ -1,12 +1,15 @@
 use super::{Open, Sink, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::NUM_CHANNELS;
-use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
-use portaudio_rs::stream::*;
-use std::process::exit;
-use std::time::Duration;
+
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates, NUM_CHANNELS,
+};
+
+use portaudio_rs::{
+    device::{get_default_output_index, DeviceIndex, DeviceInfo},
+    stream::*,
+};
+
+use std::{process::exit, time::Duration};
 
 pub enum PortAudioSink<'a> {
     F32(
@@ -55,7 +58,12 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 
 impl<'a> Open for PortAudioSink<'a> {
     fn open(device: Option<String>, format: AudioFormat, sample_rate: u32) -> PortAudioSink<'a> {
-        info!("Using PortAudio sink with format: {format:?}, sample rate: {sample_rate}");
+        info!(
+            "Using PortAudioSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
 
         portaudio_rs::initialize().unwrap();
 

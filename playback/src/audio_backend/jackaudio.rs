@@ -1,11 +1,13 @@
 use super::{Open, Sink, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::NUM_CHANNELS;
+
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates, NUM_CHANNELS,
+};
+
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
+
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 
 pub struct JackSink {
@@ -42,9 +44,12 @@ impl Open for JackSink {
         if format != AudioFormat::F32 {
             warn!("JACK currently does not support {format:?} output");
         }
+
         info!(
-            "Using JACK sink with format {:?}, sample rate: {sample_rate}",
-            AudioFormat::F32
+            "Using JackSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
         );
 
         let client_name = client_name.unwrap_or_else(|| "librespot".to_string());

@@ -1,8 +1,10 @@
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE as DECODER_SAMPLE_RATE};
+
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates, NUM_CHANNELS,
+    SAMPLE_RATE as DECODER_SAMPLE_RATE,
+};
+
 use libpulse_binding::{self as pulse, error::PAErr, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::env;
@@ -76,7 +78,12 @@ impl Open for PulseAudioSink {
             format
         };
 
-        info!("Using PulseAudioSink with format: {format:?}, sample rate: {sample_rate}");
+        info!(
+            "Using PulseAudioSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
 
         let sample_spec = pulse::sample::Spec {
             format: format.into(),

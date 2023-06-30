@@ -1,11 +1,13 @@
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use shell_words::split;
 
-use std::io::{ErrorKind, Write};
-use std::process::{exit, Child, Command, Stdio};
+use crate::{config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates};
+
+use std::{
+    io::{ErrorKind, Write},
+    process::{exit, Child, Command, Stdio},
+};
+
+use shell_words::split;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -72,7 +74,12 @@ impl Open for SubprocessSink {
             exit(0);
         }
 
-        info!("Using SubprocessSink with format: {format:?}, sample rate: {sample_rate}");
+        info!(
+            "Using SubprocessSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
 
         Self {
             shell_command,

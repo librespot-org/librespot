@@ -1,11 +1,12 @@
 use super::{Open, Sink, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates, NUM_CHANNELS,
+    SAMPLE_RATE,
+};
+
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
-use std::thread;
-use std::time::Duration;
+use std::{thread, time::Duration};
 
 pub enum SdlSink {
     F32(AudioQueue<f32>),
@@ -15,7 +16,12 @@ pub enum SdlSink {
 
 impl Open for SdlSink {
     fn open(device: Option<String>, format: AudioFormat, sample_rate: u32) -> Self {
-        info!("Using SDL sink with format: {format:?}, sample rate: {sample_rate}");
+        info!(
+            "Using SdlSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
 
         if device.is_some() {
             warn!("SDL sink does not support specifying a device name");

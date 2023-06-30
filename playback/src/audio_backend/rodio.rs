@@ -1,15 +1,13 @@
-use std::process::exit;
-use std::thread;
-use std::time::Duration;
+use std::{process::exit, thread, time::Duration};
 
 use cpal::traits::{DeviceTrait, HostTrait};
 use thiserror::Error;
 
 use super::{Sink, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::NUM_CHANNELS;
+
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates, NUM_CHANNELS,
+};
 
 #[cfg(all(
     feature = "rodiojack-backend",
@@ -176,14 +174,17 @@ pub fn open(
     format: AudioFormat,
     sample_rate: u32,
 ) -> RodioSink {
-    info!(
-        "Using Rodio sink with format {format:?} and cpal host: {}",
-        host.id().name()
-    );
-
     if format != AudioFormat::S16 && format != AudioFormat::F32 {
         unimplemented!("Rodio currently only supports F32 and S16 formats");
     }
+
+    info!(
+        "Using RodioSink with format: {format:?}, sample rate: {}, and cpal host: {}",
+        CommonSampleRates::try_from(sample_rate)
+            .unwrap_or_default()
+            .to_string(),
+        host.id().name(),
+    );
 
     let (sink, stream) = create_sink(&host, device).unwrap();
 

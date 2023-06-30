@@ -13,7 +13,9 @@ use std::sync::Arc;
 
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 
-use crate::{config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS};
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates, NUM_CHANNELS,
+};
 
 pub struct GstreamerSink {
     appsrc: gst_app::AppSrc,
@@ -25,7 +27,13 @@ pub struct GstreamerSink {
 
 impl Open for GstreamerSink {
     fn open(device: Option<String>, format: AudioFormat, sample_rate: u32) -> Self {
-        info!("Using GStreamer sink with format: {format:?}, sample rate: {sample_rate}");
+        info!(
+            "Using GstreamerSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
+
         gst::init().expect("failed to init GStreamer!");
 
         let gst_format = match format {

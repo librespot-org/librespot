@@ -1,11 +1,12 @@
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
+use crate::{config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates};
 
-use std::fs::OpenOptions;
-use std::io::{self, Write};
-use std::process::exit;
+use std::{
+    fs::OpenOptions,
+    io::{self, Write},
+    process::exit,
+};
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -48,7 +49,12 @@ impl Open for StdoutSink {
             exit(0);
         }
 
-        info!("Using StdoutSink (pipe) with format: {format:?}, sample rate: {sample_rate}");
+        info!(
+            "Using StdoutSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
 
         Self {
             output: None,

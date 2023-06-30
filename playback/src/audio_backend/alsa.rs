@@ -1,11 +1,18 @@
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::{AudioFormat, SampleRate};
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{CommonSampleRates, NUM_CHANNELS, SAMPLE_RATE as DECODER_SAMPLE_RATE};
-use alsa::device_name::HintIter;
-use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
-use alsa::{Direction, ValueOr};
+
+use crate::{
+    config::{AudioFormat, SampleRate},
+    convert::Converter,
+    decoder::AudioPacket,
+    CommonSampleRates, NUM_CHANNELS, SAMPLE_RATE as DECODER_SAMPLE_RATE,
+};
+
+use alsa::{
+    device_name::HintIter,
+    pcm::{Access, Format, Frames, HwParams, PCM},
+    Direction, ValueOr,
+};
+
 use std::process::exit;
 use thiserror::Error;
 
@@ -204,7 +211,12 @@ impl Open for AlsaSink {
 
         let latency_scale_factor = DECODER_SAMPLE_RATE as f64 / sample_rate as f64;
 
-        info!("Using AlsaSink with format: {format:?}, sample rate: {sample_rate}");
+        info!(
+            "Using AlsaSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
 
         Self {
             pcm: None,
