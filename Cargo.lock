@@ -1355,6 +1355,7 @@ dependencies = [
  "log",
  "rpassword",
  "sha1",
+ "sysinfo",
  "thiserror",
  "tokio",
  "url",

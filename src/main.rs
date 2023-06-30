@@ -1,3 +1,6 @@
+use futures_util::StreamExt;
+use log::{debug, error, info, trace, warn};
+use sha1::{Digest, Sha1};
 use std::{
     env,
     fs::create_dir_all,
@@ -8,10 +11,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
-
-use futures_util::StreamExt;
-use log::{error, info, trace, warn};
-use sha1::{Digest, Sha1};
+use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use url::Url;
 
@@ -1646,6 +1646,7 @@ fn get_setup() -> Setup {
 async fn main() {
     const RUST_BACKTRACE: &str = "RUST_BACKTRACE";
     const RECONNECT_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(600);
+    const DISCOVERY_RETRY_TIMEOUT: Duration = Duration::from_secs(10);
     const RECONNECT_RATE_LIMIT: usize = 5;
 
     if env::var(RUST_BACKTRACE).is_err() {
@@ -1664,18 +1665,43 @@ async fn main() {
 
     let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
+    let mut sys = System::new();
+
     if setup.enable_discovery {
-        let device_id = setup.session_config.device_id.clone();
-        let client_id = setup.session_config.client_id.clone();
-        match librespot::discovery::Discovery::builder(device_id, client_id)
-            .name(setup.connect_config.name.clone())
-            .device_type(setup.connect_config.device_type)
-            .port(setup.zeroconf_port)
-            .zeroconf_ip(setup.zeroconf_ip)
-            .launch()
-        {
-            Ok(d) => discovery = Some(d),
-            Err(err) => warn!("Could not initialise discovery: {}.", err),
+        // When started at boot as a service discovery may fail due to it
+        // trying to bind to interfaces before the network is actually up.
+        // This could be prevented in systemd by starting the service after
+        // network-online.target but it requires that a wait-online.service is
+        // also enabled which is not always the case since a wait-online.service
+        // can potentially hang the boot process until it times out in certain situations.
+        // This allows for discovery to retry every 10 secs in the 1st min of uptime
+        // before giving up thus papering over the issue and not holding up the boot process.
+
+        discovery = loop {
+            let device_id = setup.session_config.device_id.clone();
+            let client_id = setup.session_config.client_id.clone();
+
+            match librespot::discovery::Discovery::builder(device_id, client_id)
+                .name(setup.connect_config.name.clone())
+                .device_type(setup.connect_config.device_type)
+                .port(setup.zeroconf_port)
+                .zeroconf_ip(setup.zeroconf_ip.clone())
+                .launch()
+            {
+                Ok(d) => break Some(d),
+                Err(e) => {
+                    sys.refresh_processes();
+
+                    if sys.uptime() <= 1 {
+                        debug!("Retrying to initialise discovery: {e}");
+                        tokio::time::sleep(DISCOVERY_RETRY_TIMEOUT).await;
+                    } else {
+                        debug!("System uptime > 1 min, not retrying to initialise discovery");
+                        warn!("Could not initialise discovery: {e}");
+                        break None;
+                    }
+                }
+            }
         };
     }
 
