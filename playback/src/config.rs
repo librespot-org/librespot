@@ -35,9 +35,9 @@ const FOUR_TIMES_PI: f64 = 4.0 * std::f64::consts::PI;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum InterpolationQuality {
-    #[default]
     Low,
     Medium,
+    #[default]
     High,
 }
 

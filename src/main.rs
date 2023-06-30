@@ -582,7 +582,7 @@ fn get_setup() -> Setup {
     ).optopt(
         "",
         INTERPOLATION_QUALITY,
-        "Interpolation Quality to use if Resampling {Low|Medium|High}. Defaults to Low.",
+        "Interpolation Quality to use if Resampling {Low|Medium|High}. Defaults to High.",
         "QUALITY"
     ).optopt(
         "",
