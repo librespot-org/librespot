@@ -991,10 +991,8 @@ impl SpircTask {
                     && self.device.became_active_at() <= update.device_state.became_active_at()
                 {
                     self.handle_disconnect();
-                    self.notify(None)?;
                 }
-
-                Ok(())
+                self.notify(None)
             }
 
             _ => Ok(()),
