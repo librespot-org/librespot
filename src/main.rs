@@ -1,3 +1,6 @@
+use futures_util::StreamExt;
+use log::{debug, error, info, trace, warn};
+use sha1::{Digest, Sha1};
 use std::{
     env,
     fs::create_dir_all,
@@ -8,10 +11,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
-
-use futures_util::StreamExt;
-use log::{debug, error, info, trace, warn};
-use sha1::{Digest, Sha1};
+use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use url::Url;
 
@@ -1646,6 +1646,7 @@ fn get_setup() -> Setup {
 async fn main() {
     const RUST_BACKTRACE: &str = "RUST_BACKTRACE";
     const RECONNECT_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(600);
+    const DISCOVERY_RETRY_TIMEOUT: Duration = Duration::from_secs(10);
     const RECONNECT_RATE_LIMIT: usize = 5;
 
     if env::var(RUST_BACKTRACE).is_err() {
@@ -1664,6 +1665,8 @@ async fn main() {
 
     let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
+    let mut sys = System::new();
+
     if setup.enable_discovery {
         // When started at boot as a service discovery may fail due to it
         // trying to bind to interfaces before the network is actually up.
@@ -1671,10 +1674,8 @@ async fn main() {
         // network-online.target but it requires that a wait-online.service is
         // also enabled which is not always the case since a wait-online.service
         // can potentially hang the boot process until it times out in certain situations.
-        // This allows for discovery to retry every 10 secs in the 1st 60 secs of uptime
+        // This allows for discovery to retry every 10 secs in the 1st min of uptime
         // before giving up thus papering over the issue and not holding up the boot process.
-        let one_min = Duration::from_secs(60);
-        let retry_timeout = Duration::from_secs(10);
 
         discovery = loop {
             let device_id = setup.session_config.device_id.clone();
@@ -1689,22 +1690,13 @@ async fn main() {
             {
                 Ok(d) => break Some(d),
                 Err(e) => {
-                    let is_first_min_of_uptime = match uptime_lib::get() {
-                        Ok(uptime) => {
-                            debug!("System uptime: {} secs", uptime.as_secs_f64());
-                            uptime <= one_min
-                        }
-                        Err(err) => {
-                            debug!("Unable to determine system uptime: {err}");
-                            false
-                        }
-                    };
+                    sys.refresh_processes();
 
-                    if is_first_min_of_uptime {
+                    if sys.uptime() <= 1 {
                         debug!("Retrying to initialise discovery: {e}");
-                        tokio::time::sleep(retry_timeout).await;
+                        tokio::time::sleep(DISCOVERY_RETRY_TIMEOUT).await;
                     } else {
-                        debug!("System uptime >= 60 secs, not retrying to initialise discovery");
+                        debug!("System uptime > 1 min, not retrying to initialise discovery");
                         warn!("Could not initialise discovery: {e}");
                         break None;
                     }

@@ -98,6 +98,7 @@ https://github.com/librespot-org/librespot
 - [playback] Add metadata support via a `TrackChanged` event
 - [connect] Add `activate` and `load` functions to `Spirc`, allowing control over local connect sessions
 - [metadata] Add `Lyrics`
+- [discovery] Add discovery initialisation retries if within the 1st min of uptime
 
 ### Fixed
 
