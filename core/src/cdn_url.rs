@@ -16,6 +16,8 @@ use protocol::storage_resolve::StorageResolveResponse as CdnUrlMessage;
 #[derive(Debug, Clone)]
 pub struct MaybeExpiringUrl(pub String, pub Option<Date>);
 
+const CDN_URL_EXPIRY_MARGIN_SECONDS: i64 = 5 * 60;
+
 #[derive(Debug, Clone)]
 pub struct MaybeExpiringUrls(pub Vec<MaybeExpiringUrl>);
 
@@ -164,14 +166,17 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
                         String::new()
                     };
 
-                    let mut expiry: i64 = expiry_str.parse()?;
-
-                    expiry -= 5 * 60; // seconds
-
-                    Ok(MaybeExpiringUrl(
-                        cdn_url.to_owned(),
-                        Some(Date::from_timestamp_ms(expiry * 1000)?),
-                    ))
+                    let expiry = match expiry_str.parse::<i64>() {
+                        Ok(exp) => {
+                            let exp = exp - CDN_URL_EXPIRY_MARGIN_SECONDS;
+                            Some(Date::from_timestamp_ms(exp * 1000)?)
+                        }
+                        Err(_) => {
+                            warn!("Unknown CDN URL format: {:#?}", cdn_url);
+                            None
+                        }
+                    };
+                    Ok(MaybeExpiringUrl(cdn_url.to_owned(), expiry))
                 } else {
                     Ok(MaybeExpiringUrl(cdn_url.to_owned(), None))
                 }
@@ -179,5 +184,36 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
             .collect::<Result<Vec<MaybeExpiringUrl>, Error>>()?;
 
         Ok(Self(result))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_maybe_expiring_urls() {
+        let timestamp = 1688165560;
+        let mut msg = CdnUrlMessage::new();
+        msg.result = StorageResolveResponse_Result::CDN.into();
+        msg.cdnurl = vec![
+            format!("https://audio-ak-spotify-com.akamaized.net/audio/foo?__token__=exp={timestamp}~hmac=4e661527574fab5793adb99cf04e1c2ce12294c71fe1d39ffbfabdcfe8ce3b41"),
+            format!("https://audio-gm-off.spotifycdn.com/audio/foo?Expires={timestamp}~FullPath~hmac=IIZA28qptl8cuGLq15-SjHKHtLoxzpy_6r_JpAU4MfM="),
+            format!("https://audio4-fa.scdn.co/audio/foo?{timestamp}_0GKSyXjLaTW1BksFOyI4J7Tf9tZDbBUNNPu9Mt4mhH4="),
+            "https://audio4-fa.scdn.co/foo?baz".to_string(),
+        ];
+        msg.fileid = vec![0];
+
+        let urls = MaybeExpiringUrls::try_from(msg).expect("valid urls");
+        assert_eq!(urls.len(), 4);
+        assert!(urls[0].1.is_some());
+        assert!(urls[1].1.is_some());
+        assert!(urls[2].1.is_some());
+        assert!(urls[3].1.is_none());
+        let timestamp_margin = timestamp - CDN_URL_EXPIRY_MARGIN_SECONDS;
+        assert_eq!(
+            urls[0].1.unwrap().as_timestamp_ms(),
+            timestamp_margin * 1000
+        );
     }
 }
