@@ -52,9 +52,6 @@ enum AlsaError {
     #[error("<AlsaSink> Device {device} May be Invalid, Busy, or Already in Use, {e}")]
     PcmSetUp { device: String, e: alsa::Error },
 
-    #[error("<AlsaSink> Failed to Drain PCM Buffer, {0}")]
-    DrainFailure(alsa::Error),
-
     #[error("<AlsaSink> {0}")]
     OnWrite(alsa::Error),
 
@@ -76,7 +73,7 @@ impl From<AlsaError> for SinkError {
         use AlsaError::*;
         let es = e.to_string();
         match e {
-            DrainFailure(_) | OnWrite(_) => SinkError::OnWrite(es),
+            OnWrite(_) => SinkError::OnWrite(es),
             PcmSetUp { .. } => SinkError::ConnectionRefused(es),
             _ => SinkError::InvalidParams(es),
         }
@@ -239,11 +236,8 @@ impl Sink for AlsaSink {
     }
 
     fn stop(&mut self) -> SinkResult<()> {
-        self.write_buf()?;
-
-        if let Some(pcm) = self.pcm.take() {
-            pcm.drain().map_err(AlsaError::DrainFailure)?;
-        }
+        self.period_buffer.clear();
+        self.pcm = None;
 
         Ok(())
     }

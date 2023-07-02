@@ -137,7 +137,7 @@ impl Sink for PulseAudioSink {
 
     fn stop(&mut self) -> SinkResult<()> {
         if let Some(sink) = self.sink.take() {
-            sink.drain().map_err(PulseError::DrainFailure)?;
+            sink.flush().map_err(PulseError::DrainFailure)?;
         }
 
         Ok(())

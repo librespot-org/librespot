@@ -676,7 +676,7 @@ impl PlayerState {
             Paused {
                 track_id,
                 play_request_id,
-                decoder,
+                mut decoder,
                 audio_item,
                 normalisation_data,
                 stream_loader_controller,
@@ -686,6 +686,8 @@ impl PlayerState {
                 suggested_to_preload_next_track,
                 is_explicit,
             } => {
+                let stream_position_ms = decoder.seek(stream_position_ms).unwrap_or_default();
+
                 *self = Playing {
                     track_id,
                     play_request_id,
