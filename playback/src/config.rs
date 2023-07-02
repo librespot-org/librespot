@@ -19,10 +19,19 @@ const HZ96000_SAMPLES_PER_SECOND: f64 = 96_000.0 * 2.0;
 // which translates to much better interpolation.
 const HZ48000_INTERPOLATION_OUTPUT_SIZE: usize =
     (RESAMPLER_INPUT_SIZE as f64 * (1.0 / HZ48000_RESAMPLE_FACTOR_RECIPROCAL)) as usize;
+
 const HZ88200_INTERPOLATION_OUTPUT_SIZE: usize =
     (RESAMPLER_INPUT_SIZE as f64 * (1.0 / HZ88200_RESAMPLE_FACTOR_RECIPROCAL)) as usize;
+
 const HZ96000_INTERPOLATION_OUTPUT_SIZE: usize =
     (RESAMPLER_INPUT_SIZE as f64 * (1.0 / HZ96000_RESAMPLE_FACTOR_RECIPROCAL)) as usize;
+
+// This is the bandwidth of the output.
+// Even at 48kHz it still translates to 100% source bandwidth.
+// This just provides a little bit of anti-alias filtering.
+// There is more then likely nothing there to filter,
+// but it doesn't hurt or cost us anything to make sure.
+const WINDOWED_SINC_INTERPOLATION_BANDWIDTH: f64 = 0.92;
 
 // Blackman Window coefficients
 const BLACKMAN_A0: f64 = 0.42;
@@ -89,7 +98,8 @@ impl InterpolationQuality {
             |interpolation_coefficient_index| {
                 let index_float = interpolation_coefficient_index as f64;
                 let sample_index_fractional = (index_float * resample_factor_reciprocal).fract();
-                let sinc_center_offset = index_float - sinc_center;
+                let sinc_center_offset =
+                    (index_float - sinc_center) * WINDOWED_SINC_INTERPOLATION_BANDWIDTH;
 
                 let sample_index_fractional_sinc_weight = Self::sinc(sample_index_fractional);
 
