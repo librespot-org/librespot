@@ -1757,7 +1757,7 @@ async fn main() {
                 Err(e) => {
                     sys.refresh_processes();
 
-                    if sys.uptime() <= 1 {
+                    if sys.uptime() <= 60 {
                         debug!("Retrying to initialise discovery: {e}");
                         tokio::time::sleep(DISCOVERY_RETRY_TIMEOUT).await;
                     } else {
