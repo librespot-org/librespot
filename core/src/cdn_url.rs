@@ -5,6 +5,7 @@ use std::{
 
 use protobuf::Message;
 use thiserror::Error;
+use time::Duration;
 use url::Url;
 
 use super::{date::Date, Error, FileId, Session};
@@ -16,7 +17,7 @@ use protocol::storage_resolve::StorageResolveResponse as CdnUrlMessage;
 #[derive(Debug, Clone)]
 pub struct MaybeExpiringUrl(pub String, pub Option<Date>);
 
-const CDN_URL_EXPIRY_MARGIN_SECONDS: i64 = 5 * 60;
+const CDN_URL_EXPIRY_MARGIN: Duration = Duration::seconds(5 * 60);
 
 #[derive(Debug, Clone)]
 pub struct MaybeExpiringUrls(pub Vec<MaybeExpiringUrl>);
@@ -116,9 +117,11 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
             .iter()
             .map(|cdn_url| {
                 let url = Url::parse(cdn_url)?;
+                let mut expiry: Option<Date> = None;
 
                 if is_expiring {
-                    let expiry_str = if let Some(token) = url
+                    let mut expiry_str: Option<String> = None;
+                    if let Some(token) = url
                         .query_pairs()
                         .into_iter()
                         .find(|(key, _value)| key == "__token__")
@@ -130,15 +133,11 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
                                 let slice = &token.1[start..];
                                 if let Some(end) = slice.find('~') {
                                     // this is the only valid invariant for akamaized.net
-                                    String::from(&slice[..end])
+                                    expiry_str = Some(String::from(&slice[..end]));
                                 } else {
-                                    String::from(slice)
+                                    expiry_str = Some(String::from(slice));
                                 }
-                            } else {
-                                String::new()
                             }
-                        } else {
-                            String::new()
                         }
                     } else if let Some(token) = url
                         .query_pairs()
@@ -149,37 +148,31 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
                         if let Some(end) = token.1.find('~') {
                             // this is the only valid invariant for spotifycdn.com
                             let slice = &token.1[..end];
-                            String::from(&slice[..end])
-                        } else {
-                            String::new()
+                            expiry_str = Some(String::from(&slice[..end]));
                         }
                     } else if let Some(query) = url.query() {
                         //"https://audio4-fa.scdn.co/audio/4712bc9e47f7feb4ee3450ef2bb545e1d83c3d54?1688165560_0GKSyXjLaTW1BksFOyI4J7Tf9tZDbBUNNPu9Mt4mhH4=",
                         let mut items = query.split('_');
                         if let Some(first) = items.next() {
                             // this is the only valid invariant for scdn.co
-                            String::from(first)
+                            expiry_str = Some(String::from(first));
+                        }
+                    }
+
+                    if let Some(exp_str) = expiry_str {
+                        if let Ok(expiry_parsed) = exp_str.parse::<i64>() {
+                            if let Ok(expiry_at) = Date::from_timestamp_ms(expiry_parsed * 1_000) {
+                                let with_margin = expiry_at.saturating_sub(CDN_URL_EXPIRY_MARGIN);
+                                expiry = Some(Date::from(with_margin));
+                            }
                         } else {
-                            String::new()
+                            warn!("Cannot parse CDN URL expiry timestamp '{exp_str}' from '{cdn_url}'");
                         }
                     } else {
-                        String::new()
-                    };
-
-                    let expiry = match expiry_str.parse::<i64>() {
-                        Ok(exp) => {
-                            let exp = exp - CDN_URL_EXPIRY_MARGIN_SECONDS;
-                            Some(Date::from_timestamp_ms(exp * 1000)?)
-                        }
-                        Err(_) => {
-                            warn!("Unknown CDN URL format: {:#?}", cdn_url);
-                            None
-                        }
-                    };
-                    Ok(MaybeExpiringUrl(cdn_url.to_owned(), expiry))
-                } else {
-                    Ok(MaybeExpiringUrl(cdn_url.to_owned(), None))
+                        warn!("Unknown CDN URL format: {cdn_url}");
+                    }
                 }
+                Ok(MaybeExpiringUrl(cdn_url.to_owned(), expiry))
             })
             .collect::<Result<Vec<MaybeExpiringUrl>, Error>>()?;
 
@@ -210,10 +203,10 @@ mod test {
         assert!(urls[1].1.is_some());
         assert!(urls[2].1.is_some());
         assert!(urls[3].1.is_none());
-        let timestamp_margin = timestamp - CDN_URL_EXPIRY_MARGIN_SECONDS;
+        let timestamp_margin = Duration::seconds(timestamp) - CDN_URL_EXPIRY_MARGIN;
         assert_eq!(
-            urls[0].1.unwrap().as_timestamp_ms(),
-            timestamp_margin * 1000
+            urls[0].1.unwrap().as_timestamp_ms() as i128,
+            timestamp_margin.whole_milliseconds()
         );
     }
 }
