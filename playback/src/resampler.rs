@@ -8,28 +8,28 @@ use std::{
 };
 
 use crate::{
-    config::{InterpolationQuality, SampleRate},
+    config::{InterpolationQuality, SampleRate, NUM_FIR_FILTER_TAPS},
     player::PLAYER_COUNTER,
     RESAMPLER_INPUT_SIZE, SAMPLE_RATE as SOURCE_SAMPLE_RATE,
 };
 
 struct DelayLine {
     buffer: VecDeque<f64>,
-    interpolation_coefficients_length: usize,
+    coefficients_length: usize,
 }
 
 impl DelayLine {
-    fn new(interpolation_coefficients_length: usize) -> DelayLine {
+    fn new(coefficients_length: usize) -> DelayLine {
         Self {
-            buffer: VecDeque::with_capacity(interpolation_coefficients_length),
-            interpolation_coefficients_length,
+            buffer: VecDeque::with_capacity(coefficients_length),
+            coefficients_length,
         }
     }
 
     fn push(&mut self, sample: f64) {
         self.buffer.push_back(sample);
 
-        while self.buffer.len() > self.interpolation_coefficients_length {
+        while self.buffer.len() > self.coefficients_length {
             self.buffer.pop_front();
         }
     }
@@ -48,12 +48,21 @@ impl<'a> IntoIterator for &'a DelayLine {
     }
 }
 
+trait Convoluter {
+    fn new(interpolation_quality: InterpolationQuality, resample_factor_reciprocal: f64) -> Self
+    where
+        Self: Sized;
+
+    fn convolute(&mut self, sample: f64) -> f64;
+    fn clear(&mut self);
+}
+
 struct WindowedSincInterpolator {
     interpolation_coefficients: Vec<f64>,
     delay_line: DelayLine,
 }
 
-impl WindowedSincInterpolator {
+impl Convoluter for WindowedSincInterpolator {
     fn new(interpolation_quality: InterpolationQuality, resample_factor_reciprocal: f64) -> Self {
         let interpolation_coefficients =
             interpolation_quality.get_interpolation_coefficients(resample_factor_reciprocal);
@@ -66,13 +75,48 @@ impl WindowedSincInterpolator {
         }
     }
 
-    fn interpolate(&mut self, sample: f64) -> f64 {
+    fn convolute(&mut self, sample: f64) -> f64 {
         // Since our interpolation coefficients are pre-calculated
         // we can basically pretend like the Interpolator is a FIR filter.
         self.delay_line.push(sample);
 
         // Temporal convolution
         self.interpolation_coefficients
+            .iter()
+            .zip(&self.delay_line)
+            .fold(0.0, |acc, (coefficient, delay_line_sample)| {
+                acc + coefficient * delay_line_sample
+            })
+    }
+
+    fn clear(&mut self) {
+        self.delay_line.clear();
+    }
+}
+
+struct LinearFirFilter {
+    fir_filter_coefficients: Vec<f64>,
+    delay_line: DelayLine,
+}
+
+impl Convoluter for LinearFirFilter {
+    fn new(interpolation_quality: InterpolationQuality, resample_factor_reciprocal: f64) -> Self {
+        let fir_filter_coefficients =
+            interpolation_quality.get_fir_filter_coefficients(resample_factor_reciprocal);
+
+        let delay_line = DelayLine::new(fir_filter_coefficients.len());
+
+        Self {
+            fir_filter_coefficients,
+            delay_line,
+        }
+    }
+
+    fn convolute(&mut self, sample: f64) -> f64 {
+        self.delay_line.push(sample);
+
+        // Temporal convolution
+        self.fir_filter_coefficients
             .iter()
             .zip(&self.delay_line)
             .fold(0.0, |acc, (coefficient, delay_line_sample)| {
@@ -156,7 +200,7 @@ impl MonoResampler for MonoSincResampler {
             // out the other side is Sinc Windowed Interpolated samples.
             let sample_index = (ouput_index as f64 * self.resample_factor_reciprocal) as usize;
             let sample = self.input_buffer[sample_index];
-            self.interpolator.interpolate(sample)
+            self.interpolator.convolute(sample)
         }));
 
         self.input_buffer.drain(..input_size);
@@ -166,27 +210,39 @@ impl MonoResampler for MonoSincResampler {
 }
 
 struct MonoLinearResampler {
+    fir_filter: LinearFirFilter,
     input_buffer: Vec<f64>,
     resample_factor_reciprocal: f64,
+    delay_line_latency: u64,
     interpolation_output_size: usize,
 }
 
 impl MonoResampler for MonoLinearResampler {
-    fn new(sample_rate: SampleRate, _: InterpolationQuality) -> Self {
+    fn new(sample_rate: SampleRate, interpolation_quality: InterpolationQuality) -> Self {
         let spec = sample_rate.get_resample_spec();
 
+        let delay_line_latency =
+            (NUM_FIR_FILTER_TAPS as f64 * spec.resample_factor_reciprocal) as u64;
+
         Self {
+            fir_filter: LinearFirFilter::new(
+                interpolation_quality,
+                spec.resample_factor_reciprocal,
+            ),
+
             input_buffer: Vec::with_capacity(SOURCE_SAMPLE_RATE as usize),
             resample_factor_reciprocal: spec.resample_factor_reciprocal,
+            delay_line_latency,
             interpolation_output_size: spec.interpolation_output_size,
         }
     }
 
     fn get_latency_pcm(&mut self) -> u64 {
-        self.input_buffer.len() as u64
+        self.input_buffer.len() as u64 + self.delay_line_latency
     }
 
     fn stop(&mut self) {
+        self.fir_filter.clear();
         self.input_buffer.clear();
     }
 
@@ -219,6 +275,10 @@ impl MonoResampler for MonoLinearResampler {
 
         // Remove the last garbage sample.
         output.pop();
+
+        output
+            .iter_mut()
+            .for_each(|sample| *sample = self.fir_filter.convolute(*sample));
 
         self.input_buffer.drain(..input_size);
 

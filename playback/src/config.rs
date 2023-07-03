@@ -26,6 +26,8 @@ const HZ88200_INTERPOLATION_OUTPUT_SIZE: usize =
 const HZ96000_INTERPOLATION_OUTPUT_SIZE: usize =
     (RESAMPLER_INPUT_SIZE as f64 * (1.0 / HZ96000_RESAMPLE_FACTOR_RECIPROCAL)) as usize;
 
+pub const NUM_FIR_FILTER_TAPS: usize = 5;
+
 // Blackman Window coefficients
 const BLACKMAN_A0: f64 = 0.42;
 const BLACKMAN_A1: f64 = 0.5;
@@ -77,7 +79,9 @@ impl InterpolationQuality {
         let mut coefficients = Vec::with_capacity(interpolation_coefficients_length);
 
         if interpolation_coefficients_length == 0 {
-            warn!("InterpolationQuality::Low::get_interpolation_coefficients always returns an empty Vec<f64> because Linear Interpolation does not use coefficients");
+            warn!("InterpolationQuality::Low::get_interpolation_coefficients always returns an empty Vec<f64>");
+            warn!("Linear Interpolation does not use coefficients");
+
             return coefficients;
         }
 
@@ -91,36 +95,61 @@ impl InterpolationQuality {
             |interpolation_coefficient_index| {
                 let index_float = interpolation_coefficient_index as f64;
                 let sample_index_fractional = (index_float * resample_factor_reciprocal).fract();
-                let sinc_center_offset =
-                    // The resample_factor_reciprocal also happens to be our
-                    // anti-alias cutoff. In this case it represents the minimum
-                    // output bandwidth needed to fully represent the input.
-                    (index_float - sinc_center) * resample_factor_reciprocal;
 
                 let sample_index_fractional_sinc_weight = Self::sinc(sample_index_fractional);
 
-                let sinc_value = Self::sinc(sinc_center_offset);
-                // Calculate the Blackman window function for the given center offset
-                // w(n) = A0 - A1*cos(2πn / (N-1)) + A2*cos(4πn / (N-1)),
-                // where n is the center offset, N is the window size,
-                // and A0, A1, A2 are precalculated coefficients
+                let fir_filter = Self::fir_filter(
+                    index_float,
+                    last_index,
+                    sinc_center,
+                    resample_factor_reciprocal,
+                );
 
-                let two_pi_n = TWO_TIMES_PI * index_float;
-                let four_pi_n = FOUR_TIMES_PI * index_float;
-
-                let blackman_window_value = BLACKMAN_A0
-                    - BLACKMAN_A1 * (two_pi_n / last_index).cos()
-                    + BLACKMAN_A2 * (four_pi_n / last_index).cos();
-
-                let sinc_window = sinc_value * blackman_window_value;
-
-                let coefficient = sinc_window * sample_index_fractional_sinc_weight;
+                let coefficient = sample_index_fractional_sinc_weight * fir_filter;
 
                 coefficient_sum += coefficient;
 
                 coefficient
             },
         ));
+
+        coefficients
+            .iter_mut()
+            .for_each(|coefficient| *coefficient /= coefficient_sum);
+
+        coefficients
+    }
+
+    pub fn get_fir_filter_coefficients(&self, resample_factor_reciprocal: f64) -> Vec<f64> {
+        let mut coefficients = Vec::with_capacity(NUM_FIR_FILTER_TAPS);
+
+        if self.get_interpolation_coefficients_length() != 0 {
+            warn!("InterpolationQuality::Medium/High::get_fir_filter_coefficients always returns an empty Vec<f64>");
+            warn!("The FIR Filter coefficients are a part of the Windowed Sinc Interpolation coefficients");
+
+            return coefficients;
+        }
+
+        let last_index = NUM_FIR_FILTER_TAPS as f64 - 1.0;
+
+        let sinc_center = last_index * 0.5;
+
+        let mut coefficient_sum = 0.0;
+
+        coefficients.extend(
+            (0..NUM_FIR_FILTER_TAPS).map(|fir_filter_coefficient_index| {
+                let coefficient = Self::fir_filter(
+                    fir_filter_coefficient_index as f64,
+                    last_index,
+                    sinc_center,
+                    resample_factor_reciprocal,
+                );
+
+                coefficient_sum += coefficient;
+
+                coefficient
+            }),
+        );
 
         coefficients
             .iter_mut()
@@ -145,6 +174,35 @@ impl InterpolationQuality {
             let pi_x = std::f64::consts::PI * x;
             pi_x.sin() / pi_x
         }
+    }
+
+    fn blackman(index: f64, last_index: f64) -> f64 {
+        // Calculate the Blackman window function for the given center offset
+        // w(n) = A0 - A1*cos(2πn / (N-1)) + A2*cos(4πn / (N-1)),
+        // where n is the center offset, N is the window size,
+        // and A0, A1, A2 are precalculated coefficients
+        let two_pi_n = TWO_TIMES_PI * index;
+        let four_pi_n = FOUR_TIMES_PI * index;
+
+        BLACKMAN_A0 - BLACKMAN_A1 * (two_pi_n / last_index).cos()
+            + BLACKMAN_A2 * (four_pi_n / last_index).cos()
+    }
+
+    fn fir_filter(
+        index: f64,
+        last_index: f64,
+        sinc_center: f64,
+        resample_factor_reciprocal: f64,
+    ) -> f64 {
+        // The resample_factor_reciprocal also happens to be our
+        // anti-alias cutoff. In this case it represents the minimum
+        // output bandwidth needed to fully represent the input.
+        let adjusted_sinc_center_offset = (index - sinc_center) * resample_factor_reciprocal;
+
+        let sinc_value = Self::sinc(adjusted_sinc_center_offset);
+        let blackman_window_value = Self::blackman(index, last_index);
+
+        sinc_value * blackman_window_value
     }
 }
 
