@@ -48,66 +48,17 @@ impl<'a> IntoIterator for &'a DelayLine {
     }
 }
 
-trait Convoluter {
-    fn new(interpolation_quality: InterpolationQuality, resample_factor_reciprocal: f64) -> Self
-    where
-        Self: Sized;
-
-    fn convolute(&mut self, sample: f64) -> f64;
-    fn clear(&mut self);
-}
-
-struct WindowedSincInterpolator {
-    interpolation_coefficients: Vec<f64>,
+struct ConvolutionFilter {
+    coefficients: Vec<f64>,
     delay_line: DelayLine,
 }
 
-impl Convoluter for WindowedSincInterpolator {
-    fn new(interpolation_quality: InterpolationQuality, resample_factor_reciprocal: f64) -> Self {
-        let interpolation_coefficients =
-            interpolation_quality.get_interpolation_coefficients(resample_factor_reciprocal);
-
-        let delay_line = DelayLine::new(interpolation_coefficients.len());
+impl ConvolutionFilter {
+    fn new(coefficients: Vec<f64>) -> Self {
+        let delay_line = DelayLine::new(coefficients.len());
 
         Self {
-            interpolation_coefficients,
-            delay_line,
-        }
-    }
-
-    fn convolute(&mut self, sample: f64) -> f64 {
-        // Since our interpolation coefficients are pre-calculated
-        // we can basically pretend like the Interpolator is a FIR filter.
-        self.delay_line.push(sample);
-
-        // Temporal convolution
-        self.interpolation_coefficients
-            .iter()
-            .zip(&self.delay_line)
-            .fold(0.0, |acc, (coefficient, delay_line_sample)| {
-                acc + coefficient * delay_line_sample
-            })
-    }
-
-    fn clear(&mut self) {
-        self.delay_line.clear();
-    }
-}
-
-struct LinearFirFilter {
-    fir_filter_coefficients: Vec<f64>,
-    delay_line: DelayLine,
-}
-
-impl Convoluter for LinearFirFilter {
-    fn new(interpolation_quality: InterpolationQuality, resample_factor_reciprocal: f64) -> Self {
-        let fir_filter_coefficients =
-            interpolation_quality.get_fir_filter_coefficients(resample_factor_reciprocal);
-
-        let delay_line = DelayLine::new(fir_filter_coefficients.len());
-
-        Self {
-            fir_filter_coefficients,
+            coefficients,
             delay_line,
         }
     }
@@ -116,7 +67,7 @@ impl Convoluter for LinearFirFilter {
         self.delay_line.push(sample);
 
         // Temporal convolution
-        self.fir_filter_coefficients
+        self.coefficients
             .iter()
             .zip(&self.delay_line)
             .fold(0.0, |acc, (coefficient, delay_line_sample)| {
@@ -140,7 +91,7 @@ trait MonoResampler {
 }
 
 struct MonoSincResampler {
-    interpolator: WindowedSincInterpolator,
+    interpolator: ConvolutionFilter,
     input_buffer: Vec<f64>,
     resample_factor_reciprocal: f64,
     delay_line_latency: u64,
@@ -156,9 +107,9 @@ impl MonoResampler for MonoSincResampler {
             * spec.resample_factor_reciprocal) as u64;
 
         Self {
-            interpolator: WindowedSincInterpolator::new(
-                interpolation_quality,
-                spec.resample_factor_reciprocal,
+            interpolator: ConvolutionFilter::new(
+                interpolation_quality
+                    .get_interpolation_coefficients(spec.resample_factor_reciprocal),
             ),
 
             input_buffer: Vec::with_capacity(SOURCE_SAMPLE_RATE as usize),
@@ -210,7 +161,7 @@ impl MonoResampler for MonoSincResampler {
 }
 
 struct MonoLinearResampler {
-    fir_filter: LinearFirFilter,
+    fir_filter: ConvolutionFilter,
     input_buffer: Vec<f64>,
     resample_factor_reciprocal: f64,
     delay_line_latency: u64,
@@ -225,9 +176,8 @@ impl MonoResampler for MonoLinearResampler {
             (NUM_FIR_FILTER_TAPS as f64 * spec.resample_factor_reciprocal) as u64;
 
         Self {
-            fir_filter: LinearFirFilter::new(
-                interpolation_quality,
-                spec.resample_factor_reciprocal,
+            fir_filter: ConvolutionFilter::new(
+                interpolation_quality.get_fir_filter_coefficients(spec.resample_factor_reciprocal),
             ),
 
             input_buffer: Vec::with_capacity(SOURCE_SAMPLE_RATE as usize),
