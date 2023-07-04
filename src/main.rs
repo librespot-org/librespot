@@ -24,8 +24,8 @@ use librespot::{
     playback::{
         audio_backend::{self, SinkBuilder, BACKENDS},
         config::{
-            AudioFormat, Bitrate, InterpolationQuality, NormalisationMethod, NormalisationType,
-            PlayerConfig, SampleRate, VolumeCtrl,
+            AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, SampleRate,
+            VolumeCtrl,
         },
         dither,
         mixer::{self, MixerConfig, MixerFn},
@@ -240,7 +240,6 @@ fn get_setup() -> Setup {
     const VOLUME_RANGE: &str = "volume-range";
     const ZEROCONF_PORT: &str = "zeroconf-port";
     const ZEROCONF_INTERFACE: &str = "zeroconf-interface";
-    const INTERPOLATION_QUALITY: &str = "interpolation-quality";
     const SAMPLE_RATE: &str = "sample-rate";
 
     // Mostly arbitrary.
@@ -581,11 +580,6 @@ fn get_setup() -> Setup {
         "IP"
     ).optopt(
         "",
-        INTERPOLATION_QUALITY,
-        "Interpolation Quality to use if Resampling {Low|High}. Defaults to High.",
-        "QUALITY"
-    ).optopt(
-        "",
         SAMPLE_RATE,
         "Sample Rate to Resample to {44.1kHz|48kHz|88.2kHz|96kHz}. Defaults to 44.1kHz meaning no resampling.",
         "SAMPLERATE"
@@ -797,32 +791,6 @@ fn get_setup() -> Setup {
 
                 exit(1);
             })
-        })
-        .unwrap_or_default();
-
-    let interpolation_quality = opt_str(INTERPOLATION_QUALITY)
-        .as_deref()
-        .map(|interpolation_quality| match sample_rate {
-            SampleRate::Hz44100 => {
-                warn!(
-                    "--{} has no effect with a sample rate of {sample_rate}.",
-                    INTERPOLATION_QUALITY
-                );
-
-                InterpolationQuality::default()
-            }
-            _ => InterpolationQuality::from_str(interpolation_quality).unwrap_or_else(|_| {
-                let default_value = &format!("{}", InterpolationQuality::default());
-                invalid_error_msg(
-                    INTERPOLATION_QUALITY,
-                    "",
-                    interpolation_quality,
-                    "Low, High",
-                    default_value,
-                );
-
-                exit(1);
-            }),
         })
         .unwrap_or_default();
 
@@ -1671,7 +1639,6 @@ fn get_setup() -> Setup {
             bitrate,
             gapless,
             passthrough,
-            interpolation_quality,
             sample_rate,
             normalisation,
             normalisation_type,

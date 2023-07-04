@@ -4,9 +4,7 @@ pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
 
 use crate::{
     convert::i24,
-    filter_coefficients::{
-        HZ48000_HIGH, HZ48000_LOW, HZ88200_HIGH, HZ88200_LOW, HZ96000_HIGH, HZ96000_LOW,
-    },
+    filter_coefficients::{HZ48000_COEFFICIENTS, HZ88200_COEFFICIENTS, HZ96000_COEFFICIENTS},
     RESAMPLER_INPUT_SIZE, SAMPLE_RATE,
 };
 
@@ -32,69 +30,6 @@ const HZ88200_INTERPOLATION_OUTPUT_SIZE: usize =
 
 const HZ96000_INTERPOLATION_OUTPUT_SIZE: usize =
     (RESAMPLER_INPUT_SIZE as f64 * (1.0 / HZ96000_RESAMPLE_FACTOR_RECIPROCAL)) as usize;
-
-#[derive(Clone, Copy, Debug, Default)]
-pub enum InterpolationQuality {
-    Low,
-    #[default]
-    High,
-}
-
-impl FromStr for InterpolationQuality {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use InterpolationQuality::*;
-
-        match s.to_lowercase().as_ref() {
-            "low" => Ok(Low),
-            "high" => Ok(High),
-            _ => Err(()),
-        }
-    }
-}
-
-impl std::fmt::Display for InterpolationQuality {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use InterpolationQuality::*;
-
-        match self {
-            Low => write!(f, "Low"),
-            High => write!(f, "High"),
-        }
-    }
-}
-
-impl InterpolationQuality {
-    pub fn get_interpolation_coefficients(
-        &self,
-        mut coefficients: Vec<f64>,
-        resample_factor_reciprocal: f64,
-    ) -> Vec<f64> {
-        let mut coefficient_sum = 0.0;
-
-        for (index, coefficient) in coefficients.iter_mut().enumerate() {
-            *coefficient *= Self::sinc((index as f64 * resample_factor_reciprocal).fract());
-
-            coefficient_sum += *coefficient;
-        }
-
-        coefficients
-            .iter_mut()
-            .for_each(|coefficient| *coefficient /= coefficient_sum);
-
-        coefficients
-    }
-
-    fn sinc(x: f64) -> f64 {
-        if x.abs() < f64::EPSILON {
-            1.0
-        } else {
-            let pi_x = std::f64::consts::PI * x;
-            pi_x.sin() / pi_x
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum SampleRate {
@@ -152,14 +87,6 @@ impl std::fmt::Display for SampleRate {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct ResampleSpec {
-    pub resample_factor_reciprocal: f64,
-    pub interpolation_output_size: usize,
-    pub high_coefficients: Vec<f64>,
-    pub low_coefficients: Vec<f64>,
-}
-
 impl SampleRate {
     pub fn as_u32(&self) -> u32 {
         use SampleRate::*;
@@ -207,41 +134,73 @@ impl SampleRate {
         }
     }
 
-    pub fn get_resample_spec(&self) -> ResampleSpec {
+    pub fn get_resample_factor_reciprocal(&self) -> Option<f64> {
         use SampleRate::*;
 
         match self {
-            // Dummy values to satisfy
-            // the match statement.
-            // 44.1kHz will be bypassed.
-            Hz44100 => {
-                warn!("Resampling 44.1kHz to 44.1kHz is just a really CPU intensive no-op, you should not be doing it");
+            Hz44100 => None,
+            Hz48000 => Some(HZ48000_RESAMPLE_FACTOR_RECIPROCAL),
+            Hz88200 => Some(HZ88200_RESAMPLE_FACTOR_RECIPROCAL),
+            Hz96000 => Some(HZ96000_RESAMPLE_FACTOR_RECIPROCAL),
+        }
+    }
 
-                ResampleSpec {
-                    resample_factor_reciprocal: 1.0,
-                    interpolation_output_size: RESAMPLER_INPUT_SIZE,
-                    high_coefficients: vec![],
-                    low_coefficients: vec![],
-                }
-            }
-            Hz48000 => ResampleSpec {
-                resample_factor_reciprocal: HZ48000_RESAMPLE_FACTOR_RECIPROCAL,
-                interpolation_output_size: HZ48000_INTERPOLATION_OUTPUT_SIZE,
-                high_coefficients: HZ48000_HIGH.to_vec(),
-                low_coefficients: HZ48000_LOW.to_vec(),
-            },
-            Hz88200 => ResampleSpec {
-                resample_factor_reciprocal: HZ88200_RESAMPLE_FACTOR_RECIPROCAL,
-                interpolation_output_size: HZ88200_INTERPOLATION_OUTPUT_SIZE,
-                high_coefficients: HZ88200_HIGH.to_vec(),
-                low_coefficients: HZ88200_LOW.to_vec(),
-            },
-            Hz96000 => ResampleSpec {
-                resample_factor_reciprocal: HZ96000_RESAMPLE_FACTOR_RECIPROCAL,
-                interpolation_output_size: HZ96000_INTERPOLATION_OUTPUT_SIZE,
-                high_coefficients: HZ96000_HIGH.to_vec(),
-                low_coefficients: HZ96000_LOW.to_vec(),
-            },
+    pub fn get_interpolation_output_size(&self) -> Option<usize> {
+        use SampleRate::*;
+
+        match self {
+            Hz44100 => None,
+            Hz48000 => Some(HZ48000_INTERPOLATION_OUTPUT_SIZE),
+            Hz88200 => Some(HZ88200_INTERPOLATION_OUTPUT_SIZE),
+            Hz96000 => Some(HZ96000_INTERPOLATION_OUTPUT_SIZE),
+        }
+    }
+
+    pub fn get_interpolation_coefficients(&self) -> Option<Vec<f64>> {
+        use SampleRate::*;
+
+        match self {
+            Hz44100 => None,
+            Hz48000 => Some(Self::calculate_interpolation_coefficients(
+                HZ48000_COEFFICIENTS.to_vec(),
+                HZ48000_RESAMPLE_FACTOR_RECIPROCAL,
+            )),
+            Hz88200 => Some(Self::calculate_interpolation_coefficients(
+                HZ88200_COEFFICIENTS.to_vec(),
+                HZ88200_RESAMPLE_FACTOR_RECIPROCAL,
+            )),
+            Hz96000 => Some(Self::calculate_interpolation_coefficients(
+                HZ96000_COEFFICIENTS.to_vec(),
+                HZ96000_RESAMPLE_FACTOR_RECIPROCAL,
+            )),
+        }
+    }
+
+    fn calculate_interpolation_coefficients(
+        mut coefficients: Vec<f64>,
+        resample_factor_reciprocal: f64,
+    ) -> Vec<f64> {
+        let mut coefficient_sum = 0.0;
+
+        for (index, coefficient) in coefficients.iter_mut().enumerate() {
+            *coefficient *= Self::sinc((index as f64 * resample_factor_reciprocal).fract());
+
+            coefficient_sum += *coefficient;
+        }
+
+        coefficients
+            .iter_mut()
+            .for_each(|coefficient| *coefficient /= coefficient_sum);
+
+        coefficients
+    }
+
+    fn sinc(x: f64) -> f64 {
+        if x.abs() < f64::EPSILON {
+            1.0
+        } else {
+            let pi_x = std::f64::consts::PI * x;
+            pi_x.sin() / pi_x
         }
     }
 }
@@ -361,7 +320,6 @@ pub struct PlayerConfig {
     pub gapless: bool,
     pub passthrough: bool,
 
-    pub interpolation_quality: InterpolationQuality,
     pub sample_rate: SampleRate,
 
     pub normalisation: bool,
@@ -384,7 +342,6 @@ impl Default for PlayerConfig {
             bitrate: Bitrate::default(),
             gapless: true,
             normalisation: false,
-            interpolation_quality: InterpolationQuality::default(),
             sample_rate: SampleRate::default(),
             normalisation_type: NormalisationType::default(),
             normalisation_method: NormalisationMethod::default(),

@@ -23,8 +23,7 @@ impl SamplePipeline {
         sink: Box<dyn Sink>,
         volume_getter: Box<dyn VolumeGetter>,
     ) -> Self {
-        let resampler =
-            StereoInterleavedResampler::new(config.sample_rate, config.interpolation_quality);
+        let resampler = StereoInterleavedResampler::new(config.sample_rate);
 
         let normaliser = Normaliser::new(config, volume_getter);
         let converter = Converter::new(config.ditherer);

@@ -7,9 +7,8 @@ use std::{
 };
 
 use crate::{
-    config::{InterpolationQuality, SampleRate},
-    player::PLAYER_COUNTER,
-    RESAMPLER_INPUT_SIZE, SAMPLE_RATE as SOURCE_SAMPLE_RATE,
+    config::SampleRate, player::PLAYER_COUNTER, RESAMPLER_INPUT_SIZE,
+    SAMPLE_RATE as SOURCE_SAMPLE_RATE,
 };
 
 struct DelayLine {
@@ -88,27 +87,27 @@ struct MonoSincResampler {
 }
 
 impl MonoSincResampler {
-    fn new(sample_rate: SampleRate, interpolation_quality: InterpolationQuality) -> Self {
-        let spec = sample_rate.get_resample_spec();
+    fn new(sample_rate: SampleRate) -> Self {
+        let coefficients = sample_rate
+            .get_interpolation_coefficients()
+            .unwrap_or_default();
 
-        let coefficients = match interpolation_quality {
-            InterpolationQuality::Low => spec.low_coefficients,
-            InterpolationQuality::High => spec.high_coefficients,
-        };
+        let resample_factor_reciprocal = sample_rate
+            .get_resample_factor_reciprocal()
+            .unwrap_or_default();
 
-        let delay_line_latency =
-            (coefficients.len() as f64 * spec.resample_factor_reciprocal) as u64;
+        let interpolation_output_size = sample_rate
+            .get_interpolation_output_size()
+            .unwrap_or_default();
+
+        let delay_line_latency = (coefficients.len() as f64 * resample_factor_reciprocal) as u64;
 
         Self {
-            interpolator: ConvolutionFilter::new(
-                interpolation_quality
-                    .get_interpolation_coefficients(coefficients, spec.resample_factor_reciprocal),
-            ),
-
+            interpolator: ConvolutionFilter::new(coefficients),
             input_buffer: Vec::with_capacity(SOURCE_SAMPLE_RATE as usize),
-            resample_factor_reciprocal: spec.resample_factor_reciprocal,
+            resample_factor_reciprocal,
             delay_line_latency,
-            interpolation_output_size: spec.interpolation_output_size,
+            interpolation_output_size,
         }
     }
 
@@ -281,7 +280,7 @@ pub struct StereoInterleavedResampler {
 }
 
 impl StereoInterleavedResampler {
-    pub fn new(sample_rate: SampleRate, interpolation_quality: InterpolationQuality) -> Self {
+    pub fn new(sample_rate: SampleRate) -> Self {
         debug!("Sample Rate: {sample_rate}");
 
         let resampler = match sample_rate {
@@ -292,7 +291,7 @@ impl StereoInterleavedResampler {
                 Resampler::Bypass
             }
             _ => {
-                debug!("Interpolation Quality: {interpolation_quality}");
+                debug!("Interpolation Type: Windowed Sinc");
 
                 // The player increments the player id when it gets it...
                 let player_id = PLAYER_COUNTER.load(Ordering::SeqCst).saturating_sub(1);
@@ -300,12 +299,15 @@ impl StereoInterleavedResampler {
                 let left_thread_name = format!("resampler:{player_id}:left");
                 let right_thread_name = format!("resampler:{player_id}:right");
 
-                let left = MonoSincResampler::new(sample_rate, interpolation_quality);
-                let right = MonoSincResampler::new(sample_rate, interpolation_quality);
-
                 Resampler::Worker {
-                    left_resampler: ResampleWorker::new(left, left_thread_name),
-                    right_resampler: ResampleWorker::new(right, right_thread_name),
+                    left_resampler: ResampleWorker::new(
+                        MonoSincResampler::new(sample_rate),
+                        left_thread_name,
+                    ),
+                    right_resampler: ResampleWorker::new(
+                        MonoSincResampler::new(sample_rate),
+                        right_thread_name,
+                    ),
                 }
             }
         };
