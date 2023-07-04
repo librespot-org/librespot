@@ -1,6 +1,5 @@
 use std::{
     collections::{vec_deque, VecDeque},
-    marker::Send,
     process::exit,
     sync::atomic::Ordering,
     sync::mpsc,
@@ -8,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    config::{InterpolationQuality, SampleRate, NUM_FIR_FILTER_TAPS},
+    config::{InterpolationQuality, SampleRate},
     player::PLAYER_COUNTER,
     RESAMPLER_INPUT_SIZE, SAMPLE_RATE as SOURCE_SAMPLE_RATE,
 };
@@ -80,16 +79,6 @@ impl ConvolutionFilter {
     }
 }
 
-trait MonoResampler {
-    fn new(sample_rate: SampleRate, interpolation_quality: InterpolationQuality) -> Self
-    where
-        Self: Sized;
-
-    fn stop(&mut self);
-    fn get_latency_pcm(&mut self) -> u64;
-    fn resample(&mut self, samples: &[f64]) -> Option<Vec<f64>>;
-}
-
 struct MonoSincResampler {
     interpolator: ConvolutionFilter,
     input_buffer: Vec<f64>,
@@ -98,18 +87,22 @@ struct MonoSincResampler {
     interpolation_output_size: usize,
 }
 
-impl MonoResampler for MonoSincResampler {
+impl MonoSincResampler {
     fn new(sample_rate: SampleRate, interpolation_quality: InterpolationQuality) -> Self {
         let spec = sample_rate.get_resample_spec();
 
-        let delay_line_latency = (interpolation_quality.get_interpolation_coefficients_length()
-            as f64
-            * spec.resample_factor_reciprocal) as u64;
+        let coefficients = match interpolation_quality {
+            InterpolationQuality::Low => spec.low_coefficients,
+            InterpolationQuality::High => spec.high_coefficients,
+        };
+
+        let delay_line_latency =
+            (coefficients.len() as f64 * spec.resample_factor_reciprocal) as u64;
 
         Self {
             interpolator: ConvolutionFilter::new(
                 interpolation_quality
-                    .get_interpolation_coefficients(spec.resample_factor_reciprocal),
+                    .get_interpolation_coefficients(coefficients, spec.resample_factor_reciprocal),
             ),
 
             input_buffer: Vec::with_capacity(SOURCE_SAMPLE_RATE as usize),
@@ -160,82 +153,6 @@ impl MonoResampler for MonoSincResampler {
     }
 }
 
-struct MonoLinearResampler {
-    fir_filter: ConvolutionFilter,
-    input_buffer: Vec<f64>,
-    resample_factor_reciprocal: f64,
-    delay_line_latency: u64,
-    interpolation_output_size: usize,
-}
-
-impl MonoResampler for MonoLinearResampler {
-    fn new(sample_rate: SampleRate, interpolation_quality: InterpolationQuality) -> Self {
-        let spec = sample_rate.get_resample_spec();
-
-        let delay_line_latency =
-            (NUM_FIR_FILTER_TAPS as f64 * spec.resample_factor_reciprocal) as u64;
-
-        Self {
-            fir_filter: ConvolutionFilter::new(
-                interpolation_quality.get_fir_filter_coefficients(spec.resample_factor_reciprocal),
-            ),
-
-            input_buffer: Vec::with_capacity(SOURCE_SAMPLE_RATE as usize),
-            resample_factor_reciprocal: spec.resample_factor_reciprocal,
-            delay_line_latency,
-            interpolation_output_size: spec.interpolation_output_size,
-        }
-    }
-
-    fn get_latency_pcm(&mut self) -> u64 {
-        self.input_buffer.len() as u64 + self.delay_line_latency
-    }
-
-    fn stop(&mut self) {
-        self.fir_filter.clear();
-        self.input_buffer.clear();
-    }
-
-    fn resample(&mut self, samples: &[f64]) -> Option<Vec<f64>> {
-        self.input_buffer.extend_from_slice(samples);
-
-        let num_buffer_chunks = self.input_buffer.len().saturating_div(RESAMPLER_INPUT_SIZE);
-
-        if num_buffer_chunks == 0 {
-            return None;
-        }
-
-        let input_size = num_buffer_chunks * RESAMPLER_INPUT_SIZE;
-        // The size of the output after interpolation.
-        // We have to account for the fact that to do effective linear
-        // interpolation we need an extra sample to be able to throw away later.
-        let output_size = num_buffer_chunks * self.interpolation_output_size + 1;
-
-        let mut output = Vec::with_capacity(output_size);
-
-        output.extend((0..output_size).map(|output_index| {
-            let sample_index = output_index as f64 * self.resample_factor_reciprocal;
-            let sample_index_fractional = sample_index.fract();
-            let sample_index = sample_index as usize;
-            let sample = *self.input_buffer.get(sample_index).unwrap_or(&0.0);
-            let next_sample = *self.input_buffer.get(sample_index + 1).unwrap_or(&0.0);
-            let sample_index_fractional_complementary = 1.0 - sample_index_fractional;
-            sample * sample_index_fractional_complementary + next_sample * sample_index_fractional
-        }));
-
-        // Remove the last garbage sample.
-        output.pop();
-
-        output
-            .iter_mut()
-            .for_each(|sample| *sample = self.fir_filter.convolute(*sample));
-
-        self.input_buffer.drain(..input_size);
-
-        Some(output)
-    }
-}
-
 enum ResampleTask {
     Stop,
     Terminate,
@@ -249,7 +166,7 @@ struct ResampleWorker {
 }
 
 impl ResampleWorker {
-    fn new(mut resampler: impl MonoResampler + Send + 'static, name: String) -> Self {
+    fn new(mut resampler: MonoSincResampler, name: String) -> Self {
         let (task_sender, task_receiver) = mpsc::channel();
         let (result_sender, result_receiver) = mpsc::channel();
 
@@ -383,29 +300,12 @@ impl StereoInterleavedResampler {
                 let left_thread_name = format!("resampler:{player_id}:left");
                 let right_thread_name = format!("resampler:{player_id}:right");
 
-                match interpolation_quality {
-                    InterpolationQuality::Low => {
-                        debug!("Interpolation Type: Linear");
+                let left = MonoSincResampler::new(sample_rate, interpolation_quality);
+                let right = MonoSincResampler::new(sample_rate, interpolation_quality);
 
-                        let left = MonoLinearResampler::new(sample_rate, interpolation_quality);
-                        let right = MonoLinearResampler::new(sample_rate, interpolation_quality);
-
-                        Resampler::Worker {
-                            left_resampler: ResampleWorker::new(left, left_thread_name),
-                            right_resampler: ResampleWorker::new(right, right_thread_name),
-                        }
-                    }
-                    _ => {
-                        debug!("Interpolation Type: Windowed Sinc");
-
-                        let left = MonoSincResampler::new(sample_rate, interpolation_quality);
-                        let right = MonoSincResampler::new(sample_rate, interpolation_quality);
-
-                        Resampler::Worker {
-                            left_resampler: ResampleWorker::new(left, left_thread_name),
-                            right_resampler: ResampleWorker::new(right, right_thread_name),
-                        }
-                    }
+                Resampler::Worker {
+                    left_resampler: ResampleWorker::new(left, left_thread_name),
+                    right_resampler: ResampleWorker::new(right, right_thread_name),
                 }
             }
         };

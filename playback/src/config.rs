@@ -1,7 +1,14 @@
 use std::{mem, str::FromStr, time::Duration};
 
 pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
-use crate::{convert::i24, RESAMPLER_INPUT_SIZE, SAMPLE_RATE};
+
+use crate::{
+    convert::i24,
+    filter_coefficients::{
+        HZ48000_HIGH, HZ48000_LOW, HZ88200_HIGH, HZ88200_LOW, HZ96000_HIGH, HZ96000_LOW,
+    },
+    RESAMPLER_INPUT_SIZE, SAMPLE_RATE,
+};
 
 // Reciprocals allow us to multiply instead of divide during interpolation.
 const HZ48000_RESAMPLE_FACTOR_RECIPROCAL: f64 = SAMPLE_RATE as f64 / 48_000.0;
@@ -26,21 +33,9 @@ const HZ88200_INTERPOLATION_OUTPUT_SIZE: usize =
 const HZ96000_INTERPOLATION_OUTPUT_SIZE: usize =
     (RESAMPLER_INPUT_SIZE as f64 * (1.0 / HZ96000_RESAMPLE_FACTOR_RECIPROCAL)) as usize;
 
-pub const NUM_FIR_FILTER_TAPS: usize = 5;
-
-// Blackman Window coefficients
-const BLACKMAN_A0: f64 = 0.42;
-const BLACKMAN_A1: f64 = 0.5;
-const BLACKMAN_A2: f64 = 0.08;
-
-// Constants for calculations
-const TWO_TIMES_PI: f64 = 2.0 * std::f64::consts::PI;
-const FOUR_TIMES_PI: f64 = 4.0 * std::f64::consts::PI;
-
 #[derive(Clone, Copy, Debug, Default)]
 pub enum InterpolationQuality {
     Low,
-    Medium,
     #[default]
     High,
 }
@@ -53,7 +48,6 @@ impl FromStr for InterpolationQuality {
 
         match s.to_lowercase().as_ref() {
             "low" => Ok(Low),
-            "medium" => Ok(Medium),
             "high" => Ok(High),
             _ => Err(()),
         }
@@ -66,105 +60,30 @@ impl std::fmt::Display for InterpolationQuality {
 
         match self {
             Low => write!(f, "Low"),
-            Medium => write!(f, "Medium"),
             High => write!(f, "High"),
         }
     }
 }
 
 impl InterpolationQuality {
-    pub fn get_interpolation_coefficients(&self, resample_factor_reciprocal: f64) -> Vec<f64> {
-        let interpolation_coefficients_length = self.get_interpolation_coefficients_length();
-
-        let mut coefficients = Vec::with_capacity(interpolation_coefficients_length);
-
-        if interpolation_coefficients_length == 0 {
-            warn!("InterpolationQuality::Low::get_interpolation_coefficients always returns an empty Vec<f64>");
-            warn!("Linear Interpolation does not use coefficients");
-
-            return coefficients;
-        }
-
-        let last_index = interpolation_coefficients_length as f64 - 1.0;
-
-        let sinc_center = last_index * 0.5;
-
+    pub fn get_interpolation_coefficients(
+        &self,
+        mut coefficients: Vec<f64>,
+        resample_factor_reciprocal: f64,
+    ) -> Vec<f64> {
         let mut coefficient_sum = 0.0;
 
-        coefficients.extend((0..interpolation_coefficients_length).map(
-            |interpolation_coefficient_index| {
-                let index_float = interpolation_coefficient_index as f64;
-                let sample_index_fractional = (index_float * resample_factor_reciprocal).fract();
+        for (index, coefficient) in coefficients.iter_mut().enumerate() {
+            *coefficient *= Self::sinc((index as f64 * resample_factor_reciprocal).fract());
 
-                let sample_index_fractional_sinc_weight = Self::sinc(sample_index_fractional);
-
-                let fir_filter = Self::fir_filter(
-                    index_float,
-                    last_index,
-                    sinc_center,
-                    resample_factor_reciprocal,
-                );
-
-                let coefficient = sample_index_fractional_sinc_weight * fir_filter;
-
-                coefficient_sum += coefficient;
-
-                coefficient
-            },
-        ));
+            coefficient_sum += *coefficient;
+        }
 
         coefficients
             .iter_mut()
             .for_each(|coefficient| *coefficient /= coefficient_sum);
 
         coefficients
-    }
-
-    pub fn get_fir_filter_coefficients(&self, resample_factor_reciprocal: f64) -> Vec<f64> {
-        let mut coefficients = Vec::with_capacity(NUM_FIR_FILTER_TAPS);
-
-        if self.get_interpolation_coefficients_length() != 0 {
-            warn!("InterpolationQuality::Medium/High::get_fir_filter_coefficients always returns an empty Vec<f64>");
-            warn!("The FIR Filter coefficients are a part of the Windowed Sinc Interpolation coefficients");
-
-            return coefficients;
-        }
-
-        let last_index = NUM_FIR_FILTER_TAPS as f64 - 1.0;
-
-        let sinc_center = last_index * 0.5;
-
-        let mut coefficient_sum = 0.0;
-
-        coefficients.extend(
-            (0..NUM_FIR_FILTER_TAPS).map(|fir_filter_coefficient_index| {
-                let coefficient = Self::fir_filter(
-                    fir_filter_coefficient_index as f64,
-                    last_index,
-                    sinc_center,
-                    resample_factor_reciprocal,
-                );
-
-                coefficient_sum += coefficient;
-
-                coefficient
-            }),
-        );
-
-        coefficients
-            .iter_mut()
-            .for_each(|coefficient| *coefficient /= coefficient_sum);
-
-        coefficients
-    }
-
-    pub fn get_interpolation_coefficients_length(&self) -> usize {
-        use InterpolationQuality::*;
-        match self {
-            Low => 0,
-            Medium => 129,
-            High => 257,
-        }
     }
 
     fn sinc(x: f64) -> f64 {
@@ -174,35 +93,6 @@ impl InterpolationQuality {
             let pi_x = std::f64::consts::PI * x;
             pi_x.sin() / pi_x
         }
-    }
-
-    fn blackman(index: f64, last_index: f64) -> f64 {
-        // Calculate the Blackman window function for the given center offset
-        // w(n) = A0 - A1*cos(2πn / (N-1)) + A2*cos(4πn / (N-1)),
-        // where n is the center offset, N is the window size,
-        // and A0, A1, A2 are precalculated coefficients
-        let two_pi_n = TWO_TIMES_PI * index;
-        let four_pi_n = FOUR_TIMES_PI * index;
-
-        BLACKMAN_A0 - BLACKMAN_A1 * (two_pi_n / last_index).cos()
-            + BLACKMAN_A2 * (four_pi_n / last_index).cos()
-    }
-
-    fn fir_filter(
-        index: f64,
-        last_index: f64,
-        sinc_center: f64,
-        resample_factor_reciprocal: f64,
-    ) -> f64 {
-        // The resample_factor_reciprocal also happens to be our
-        // anti-alias cutoff. In this case it represents the minimum
-        // output bandwidth needed to fully represent the input.
-        let adjusted_sinc_center_offset = (index - sinc_center) * resample_factor_reciprocal;
-
-        let sinc_value = Self::sinc(adjusted_sinc_center_offset);
-        let blackman_window_value = Self::blackman(index, last_index);
-
-        sinc_value * blackman_window_value
     }
 }
 
@@ -262,10 +152,12 @@ impl std::fmt::Display for SampleRate {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct ResampleSpec {
     pub resample_factor_reciprocal: f64,
     pub interpolation_output_size: usize,
+    pub high_coefficients: Vec<f64>,
+    pub low_coefficients: Vec<f64>,
 }
 
 impl SampleRate {
@@ -328,19 +220,27 @@ impl SampleRate {
                 ResampleSpec {
                     resample_factor_reciprocal: 1.0,
                     interpolation_output_size: RESAMPLER_INPUT_SIZE,
+                    high_coefficients: vec![],
+                    low_coefficients: vec![],
                 }
             }
             Hz48000 => ResampleSpec {
                 resample_factor_reciprocal: HZ48000_RESAMPLE_FACTOR_RECIPROCAL,
                 interpolation_output_size: HZ48000_INTERPOLATION_OUTPUT_SIZE,
+                high_coefficients: HZ48000_HIGH.to_vec(),
+                low_coefficients: HZ48000_LOW.to_vec(),
             },
             Hz88200 => ResampleSpec {
                 resample_factor_reciprocal: HZ88200_RESAMPLE_FACTOR_RECIPROCAL,
                 interpolation_output_size: HZ88200_INTERPOLATION_OUTPUT_SIZE,
+                high_coefficients: HZ88200_HIGH.to_vec(),
+                low_coefficients: HZ88200_LOW.to_vec(),
             },
             Hz96000 => ResampleSpec {
                 resample_factor_reciprocal: HZ96000_RESAMPLE_FACTOR_RECIPROCAL,
                 interpolation_output_size: HZ96000_INTERPOLATION_OUTPUT_SIZE,
+                high_coefficients: HZ96000_HIGH.to_vec(),
+                low_coefficients: HZ96000_LOW.to_vec(),
             },
         }
     }

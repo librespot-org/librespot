@@ -13,6 +13,7 @@ pub mod config;
 pub mod convert;
 pub mod decoder;
 pub mod dither;
+pub mod filter_coefficients;
 pub mod mixer;
 pub mod normaliser;
 pub mod player;
