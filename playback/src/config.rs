@@ -180,17 +180,20 @@ impl SampleRate {
         mut coefficients: Vec<f64>,
         resample_factor_reciprocal: f64,
     ) -> Vec<f64> {
-        let mut coefficient_sum = 0.0;
-
-        for (index, coefficient) in coefficients.iter_mut().enumerate() {
-            *coefficient *= Self::sinc((index as f64 * resample_factor_reciprocal).fract());
-
-            coefficient_sum += *coefficient;
-        }
+        let mut coefficients_sum = 0.0;
 
         coefficients
             .iter_mut()
-            .for_each(|coefficient| *coefficient /= coefficient_sum);
+            .enumerate()
+            .for_each(|(index, coefficient)| {
+                *coefficient *= Self::sinc((index as f64 * resample_factor_reciprocal).fract());
+
+                coefficients_sum += *coefficient;
+            });
+
+        coefficients
+            .iter_mut()
+            .for_each(|coefficient| *coefficient /= coefficients_sum);
 
         coefficients
     }

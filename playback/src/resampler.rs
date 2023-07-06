@@ -296,17 +296,14 @@ impl StereoInterleavedResampler {
                 // The player increments the player id when it gets it...
                 let player_id = PLAYER_COUNTER.load(Ordering::SeqCst).saturating_sub(1);
 
-                let left_thread_name = format!("resampler:{player_id}:left");
-                let right_thread_name = format!("resampler:{player_id}:right");
-
                 Resampler::Worker {
                     left_resampler: ResampleWorker::new(
                         MonoSincResampler::new(sample_rate),
-                        left_thread_name,
+                        format!("resampler:{player_id}:left"),
                     ),
                     right_resampler: ResampleWorker::new(
                         MonoSincResampler::new(sample_rate),
-                        right_thread_name,
+                        format!("resampler:{player_id}:right"),
                     ),
                 }
             }
