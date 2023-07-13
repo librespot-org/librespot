@@ -47,8 +47,8 @@ impl Open for JackSink {
         let client_name = client_name.unwrap_or_else(|| "librespot".to_string());
         let (client, _status) =
             Client::new(&client_name[..], ClientOptions::NO_START_SERVER).unwrap();
-        let ch_r = client.register_port("out_0", AudioOut::default()).unwrap();
-        let ch_l = client.register_port("out_1", AudioOut::default()).unwrap();
+        let ch_r = client.register_port("out_0", AudioOut).unwrap();
+        let ch_l = client.register_port("out_1", AudioOut).unwrap();
         // buffer for samples from librespot (~10ms)
         let (tx, rx) = sync_channel::<f32>(NUM_CHANNELS as usize * 1024 * AudioFormat::F32.size());
         let jack_data = JackData {
