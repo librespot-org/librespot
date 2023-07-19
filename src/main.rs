@@ -1715,6 +1715,31 @@ async fn main() {
         exit(1);
     }
 
+    let mixer_config = setup.mixer_config.clone();
+    let mixer = (setup.mixer)(mixer_config);
+    let player_config = setup.player_config.clone();
+
+    let soft_volume = mixer.get_soft_volume();
+    let format = setup.format;
+    let backend = setup.backend;
+    let device = setup.device.clone();
+    let player = Player::new(player_config, session.clone(), soft_volume, move || {
+        (backend)(device, format)
+    });
+
+    if let Some(player_event_program) = setup.player_event_program.clone() {
+        _event_handler = Some(EventHandler::new(
+            player.get_player_event_channel(),
+            &player_event_program,
+        ));
+
+        if setup.emit_sink_events {
+            player.set_sink_event_callback(Some(Box::new(move |sink_status| {
+                run_program_on_sink_events(sink_status, &player_event_program)
+            })));
+        }
+    }
+
     loop {
         tokio::select! {
             credentials = async {
@@ -1737,6 +1762,9 @@ async fn main() {
                             // Continue shutdown in its own task
                             tokio::spawn(spirc_task);
                         }
+                        if !session.is_invalid() {
+                            session.shutdown();
+                        }
 
                         connecting = true;
                     },
@@ -1749,32 +1777,16 @@ async fn main() {
             _ = async {}, if connecting && last_credentials.is_some() => {
                 if session.is_invalid() {
                     session = Session::new(setup.session_config.clone(), setup.cache.clone());
+                    player.set_session(session.clone());
                 }
 
-                let mixer_config = setup.mixer_config.clone();
-                let mixer = (setup.mixer)(mixer_config);
-                let player_config = setup.player_config.clone();
                 let connect_config = setup.connect_config.clone();
 
-                let soft_volume = mixer.get_soft_volume();
-                let format = setup.format;
-                let backend = setup.backend;
-                let device = setup.device.clone();
-                let player = Player::new(player_config, session.clone(), soft_volume, move || {
-                    (backend)(device, format)
-                });
-
-                if let Some(player_event_program) = setup.player_event_program.clone() {
-                    _event_handler = Some(EventHandler::new(player.get_player_event_channel(), &player_event_program));
-
-                    if setup.emit_sink_events {
-                        player.set_sink_event_callback(Some(Box::new(move |sink_status| {
-                            run_program_on_sink_events(sink_status, &player_event_program)
-                        })));
-                    }
-                };
-
-                let (spirc_, spirc_task_) = match Spirc::new(connect_config, session.clone(), last_credentials.clone().unwrap_or_default(), player, mixer).await {
+                let (spirc_, spirc_task_) = match Spirc::new(connect_config,
+                                                                session.clone(),
+                                                                last_credentials.clone().unwrap_or_default(),
+                                                                player.clone(),
+                                                                mixer.clone()).await {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
                     Err(e) => {
                         error!("could not initialize spirc: {}", e);
@@ -1802,11 +1814,18 @@ async fn main() {
 
                 if last_credentials.is_some() && !reconnect_exceeds_rate_limit() {
                     auto_connect_times.push(Instant::now());
+                    if !session.is_invalid() {
+                        session.shutdown();
+                    }
                     connecting = true;
                 } else {
                     error!("Spirc shut down too often. Not reconnecting automatically.");
                     exit(1);
                 }
+            },
+            _ = async {}, if player.is_invalid() => {
+                error!("Player shut down unexpectedly");
+                exit(1);
             },
             _ = tokio::signal::ctrl_c() => {
                 break;

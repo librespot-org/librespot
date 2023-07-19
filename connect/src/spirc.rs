@@ -3,6 +3,7 @@ use std::{
     future::Future,
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -77,8 +78,8 @@ enum SpircPlayStatus {
 type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
 
 struct SpircTask {
-    player: Player,
-    mixer: Box<dyn Mixer>,
+    player: Arc<Player>,
+    mixer: Arc<dyn Mixer>,
 
     sequence: SeqGenerator<u32>,
 
@@ -272,8 +273,8 @@ impl Spirc {
         config: ConnectConfig,
         session: Session,
         credentials: Credentials,
-        player: Player,
-        mixer: Box<dyn Mixer>,
+        player: Arc<Player>,
+        mixer: Arc<dyn Mixer>,
     ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Spirc[{}]", spirc_id);
@@ -663,6 +664,11 @@ impl SpircTask {
     }
 
     fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
+        // update play_request_id
+        if let PlayerEvent::PlayRequestIdChanged { play_request_id } = event {
+            self.play_request_id = Some(play_request_id);
+            return Ok(());
+        }
         // we only process events if the play_request_id matches. If it doesn't, it is
         // an event that belongs to a previous track and only arrives now due to a race
         // condition. In this case we have updated the state already and don't want to
@@ -1462,7 +1468,7 @@ impl SpircTask {
             Some((track, index)) => {
                 self.state.set_playing_track_index(index);
 
-                self.play_request_id = Some(self.player.load(track, start_playing, position_ms));
+                self.player.load(track, start_playing, position_ms);
 
                 self.update_state_position(position_ms);
                 if start_playing {

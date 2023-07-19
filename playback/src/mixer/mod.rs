@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::config::VolumeCtrl;
 
 pub mod mappings;
@@ -5,7 +7,7 @@ use self::mappings::MappedCtrl;
 
 pub struct NoOpVolume;
 
-pub trait Mixer: Send {
+pub trait Mixer: Send + Sync {
     fn open(config: MixerConfig) -> Self
     where
         Self: Sized;
@@ -55,10 +57,10 @@ impl Default for MixerConfig {
     }
 }
 
-pub type MixerFn = fn(MixerConfig) -> Box<dyn Mixer>;
+pub type MixerFn = fn(MixerConfig) -> Arc<dyn Mixer>;
 
-fn mk_sink<M: Mixer + 'static>(config: MixerConfig) -> Box<dyn Mixer> {
-    Box::new(M::open(config))
+fn mk_sink<M: Mixer + 'static>(config: MixerConfig) -> Arc<dyn Mixer> {
+    Arc::new(M::open(config))
 }
 
 pub const MIXERS: &[(&str, MixerFn)] = &[

@@ -21,6 +21,10 @@ impl EventHandler {
                     let mut env_vars = HashMap::new();
 
                     match event {
+                        PlayerEvent::PlayRequestIdChanged { play_request_id } => {
+                            env_vars.insert("PLAYER_EVENT", "play_request_id_changed".to_string());
+                            env_vars.insert("PLAY_REQUEST_ID", play_request_id.to_string());
+                        }
                         PlayerEvent::TrackChanged { audio_item } => {
                             match audio_item.track_id.to_base62() {
                                 Err(e) => {
