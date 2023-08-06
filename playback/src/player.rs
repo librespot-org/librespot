@@ -1544,7 +1544,7 @@ impl PlayerInternal {
         normalisation_factor: f64,
     ) {
         match packet {
-            Some((_, mut packet)) => {
+            Some((timing, mut packet)) => {
                 if !packet.is_empty() {
                     if let AudioPacket::Samples(ref mut data) = packet {
                         // Get the volume for the packet.
@@ -1660,6 +1660,34 @@ impl PlayerInternal {
                     if let Err(e) = self.sink.write(packet, &mut self.converter) {
                         error!("{}", e);
                         self.handle_pause();
+                    }
+
+                    let prevent_buffering_ahead = true;
+
+                    if prevent_buffering_ahead {
+                        if let PlayerState::Playing {
+                            reported_nominal_start_time,
+                            ..
+                        } = self.state
+                        {
+                            let packet_end_duration =
+                                Duration::from_millis(timing.position_ms as u64);
+                            let now = std::time::Instant::now();
+
+                            if let Some(reported_start_time) = reported_nominal_start_time {
+                                if let Some(since_start) =
+                                    now.checked_duration_since(reported_start_time)
+                                {
+                                    if let Some(ahead) =
+                                        packet_end_duration.checked_sub(since_start)
+                                    {
+                                        if ahead > Duration::from_millis(100) {
+                                            std::thread::sleep(ahead);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

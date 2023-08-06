@@ -227,6 +227,7 @@ fn get_setup() -> Setup {
     const ONEVENT: &str = "onevent";
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
+    const LIMIT_SINK_WRITE_RATE: &str = "limit-sink-write";
     const PASSWORD: &str = "password";
     const PROXY: &str = "proxy";
     const QUIET: &str = "quiet";
@@ -266,6 +267,7 @@ fn get_setup() -> Setup {
     const ONEVENT_SHORT: &str = "o";
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH_SHORT: &str = "P";
+    const LIMIT_SINK_WRITE_RATE_SHORT: &str = "";
     const PASSWORD_SHORT: &str = "p";
     const EMIT_SINK_EVENTS_SHORT: &str = "Q";
     const QUIET_SHORT: &str = "q";
@@ -583,6 +585,12 @@ fn get_setup() -> Setup {
         PASSTHROUGH_SHORT,
         PASSTHROUGH,
         "Pass a raw stream to the output. Only works with the pipe and subprocess backends.",
+    );
+
+    opts.optflag(
+        LIMIT_SINK_WRITE_RATE_SHORT,
+        LIMIT_SINK_WRITE_RATE,
+        "Limits the rate at which librespot writes to the output device. Useful for pipe backend.",
     );
 
     let args: Vec<_> = std::env::args_os()
@@ -1604,10 +1612,13 @@ fn get_setup() -> Setup {
         #[cfg(not(feature = "passthrough-decoder"))]
         let passthrough = false;
 
+        let limit_sink_write_rate = opt_present(LIMIT_SINK_WRITE_RATE);
+
         PlayerConfig {
             bitrate,
             gapless,
             passthrough,
+            limit_sink_write_rate,
             normalisation,
             normalisation_type,
             normalisation_method,

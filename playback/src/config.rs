@@ -126,6 +126,7 @@ pub struct PlayerConfig {
     pub bitrate: Bitrate,
     pub gapless: bool,
     pub passthrough: bool,
+    pub limit_sink_write_rate: bool,
 
     pub normalisation: bool,
     pub normalisation_type: NormalisationType,
@@ -155,6 +156,7 @@ impl Default for PlayerConfig {
             normalisation_release_cf: duration_to_coefficient(Duration::from_millis(100)),
             normalisation_knee_db: 5.0,
             passthrough: false,
+            limit_sink_write_rate: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),
         }
     }
