@@ -1662,9 +1662,7 @@ impl PlayerInternal {
                         self.handle_pause();
                     }
 
-                    let prevent_buffering_ahead = true;
-
-                    if prevent_buffering_ahead {
+                    if self.config.limit_sink_write_rate {
                         if let PlayerState::Playing {
                             reported_nominal_start_time,
                             ..
