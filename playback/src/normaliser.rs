@@ -7,32 +7,6 @@ use crate::{
     ratio_to_db, PCM_AT_0DBFS,
 };
 
-struct NoNormalisation;
-
-impl NoNormalisation {
-    fn normalise(mut samples: Vec<f64>, volume: f64) -> Vec<f64> {
-        if volume < 1.0 {
-            samples.iter_mut().for_each(|sample| *sample *= volume);
-        }
-
-        samples
-    }
-}
-
-struct BasicNormalisation;
-
-impl BasicNormalisation {
-    fn normalise(mut samples: Vec<f64>, volume: f64, factor: f64) -> Vec<f64> {
-        if volume < 1.0 || factor < 1.0 {
-            samples
-                .iter_mut()
-                .for_each(|sample| *sample *= factor * volume);
-        }
-
-        samples
-    }
-}
-
 #[derive(PartialEq)]
 struct DynamicNormalisation {
     threshold_db: f64,
@@ -194,12 +168,35 @@ impl Normalisation {
         }
     }
 
-    fn normalise(&mut self, samples: Vec<f64>, volume: f64, factor: f64) -> Vec<f64> {
+    fn normalise(&mut self, mut samples: Vec<f64>, volume: f64, factor: f64) -> Vec<f64> {
         use Normalisation::*;
 
         match self {
-            None => NoNormalisation::normalise(samples, volume),
-            Basic => BasicNormalisation::normalise(samples, volume, factor),
+            None => {
+                // We only care about volume.
+                // We don't care about factor.
+                // volume: 0.0 - 1.0
+                if volume < 1.0 {
+                    // for each sample: sample = sample * volume
+                    samples.iter_mut().for_each(|sample| *sample *= volume);
+                }
+
+                samples
+            }
+            Basic => {
+                // We care about both volume and factor.
+                // volume: 0.0 - 1.0
+                // factor: 0.0 - 1.0
+                if volume < 1.0 || factor < 1.0 {
+                    // for each sample: sample = sample * volume * factor
+                    samples
+                        .iter_mut()
+                        .for_each(|sample| *sample *= volume * factor);
+                }
+
+                samples
+            }
+            // We don't care about anything, DynamicNormalisation does that for us.
             Dynamic(ref mut d) => d.normalise(samples, volume, factor),
         }
     }
@@ -222,7 +219,7 @@ impl Normaliser {
             normalisation_type: config.normalisation_type,
             pregain_db: config.normalisation_pregain_db,
             threshold_dbfs: config.normalisation_threshold_dbfs,
-            factor: 1.0,
+            factor: 0.0,
         }
     }
 
@@ -233,6 +230,7 @@ impl Normaliser {
     }
 
     pub fn stop(&mut self) {
+        self.factor = 0.0;
         self.normalisation.stop();
     }
 
@@ -241,6 +239,8 @@ impl Normaliser {
         auto_normalise_as_album: bool,
         data: NormalisationData,
     ) {
+        // Normalisation::None doesn't use the factor,
+        // so there is no need to waste the time calculating it.
         if self.normalisation != Normalisation::None {
             self.factor = self.get_factor(auto_normalise_as_album, data);
         }
@@ -326,6 +326,7 @@ impl Normaliser {
         };
 
         debug!("Normalisation Data: {:?}", data);
+        debug!("Normalisation Type: {:?}", self.normalisation_type);
         debug!(
             "Calculated Normalisation Factor for {:?}: {:.2}%",
             norm_type,
