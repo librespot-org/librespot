@@ -27,7 +27,7 @@ impl From<AuthenticationError> for Error {
 }
 
 /// The credentials are used to log into the Spotify API.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Credentials {
     pub username: String,
 

@@ -36,6 +36,9 @@ https://github.com/librespot-org/librespot
 - [all] `chrono` replaced with `time` (breaking)
 - [all] `time` updated (CVE-2020-26235)
 - [all] Improve lock contention and performance (breaking)
+- [all] Use a single `player` instance. Eliminates occasional `player` and
+  `audio backend` restarts, which can cause issues with some playback
+  configurations.
 - [audio] Files are now downloaded over the HTTPS CDN (breaking)
 - [audio] Improve file opening and seeking performance (breaking)
 - [core] MSRV is now 1.65 (breaking)

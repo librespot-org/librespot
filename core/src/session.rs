@@ -176,7 +176,13 @@ impl Session {
         self.set_username(&reusable_credentials.username);
         if let Some(cache) = self.cache() {
             if store_credentials {
-                cache.save_credentials(&reusable_credentials);
+                let cred_changed = cache
+                    .credentials()
+                    .map(|c| c != reusable_credentials)
+                    .unwrap_or(true);
+                if cred_changed {
+                    cache.save_credentials(&reusable_credentials);
+                }
             }
         }
 
