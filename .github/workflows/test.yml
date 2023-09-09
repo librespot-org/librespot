@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain stable  -y
       - run: cargo fmt --all -- --check
@@ -68,7 +68,7 @@ jobs:
         toolchain: [stable]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain ${{ matrix.toolchain }}  -y
@@ -119,7 +119,7 @@ jobs:
             experimental: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -167,7 +167,7 @@ jobs:
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -210,7 +210,7 @@ jobs:
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.0.0
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
