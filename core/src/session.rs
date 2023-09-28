@@ -73,14 +73,40 @@ impl Session {
         info!("Connecting to AP \"{}\"", ap);
         let mut conn = connection::connect(ap, config.proxy.as_ref()).await?;
 
-        let reusable_credentials =
-            connection::authenticate(&mut conn, credentials, &config.device_id).await?;
-        info!("Authenticated as \"{}\" !", reusable_credentials.username);
+        let mut reusable_credentials: Option<Credentials> = None;
+
+        if let Some(cache) = &cache {
+            let cached_credentials = cache.credentials();
+
+            if let Some(cached_credentials) = &cached_credentials {
+                reusable_credentials = Some(
+                    connection::authenticate(
+                        &mut conn,
+                        cached_credentials.clone(),
+                        &config.device_id,
+                    )
+                    .await?,
+                );
+            }
+        }
+
+        if reusable_credentials.is_none() {
+            reusable_credentials = Some(
+                connection::authenticate(&mut conn, credentials.clone(), &config.device_id).await?,
+            );
+        }
+
+        let reusable_credentials = reusable_credentials.unwrap();
+
+        info!("Connected as \"{}\" !", reusable_credentials.username);
+
         if let Some(cache) = &cache {
             if store_credentials {
                 cache.save_credentials(&reusable_credentials);
             }
         }
+
+        info!("Authenticated as \"{}\" !", reusable_credentials.username);
 
         let session = Session::create(
             conn,
