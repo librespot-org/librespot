@@ -392,7 +392,7 @@ impl SpClient {
     ) -> SpClientResult {
         let body = protobuf::text_format::print_to_string(message);
 
-        let mut headers = headers.unwrap_or_else(HeaderMap::new);
+        let mut headers = headers.unwrap_or_default();
         headers.insert(
             CONTENT_TYPE,
             HeaderValue::from_static("application/x-protobuf"),
@@ -409,7 +409,7 @@ impl SpClient {
         headers: Option<HeaderMap>,
         body: Option<&str>,
     ) -> SpClientResult {
-        let mut headers = headers.unwrap_or_else(HeaderMap::new);
+        let mut headers = headers.unwrap_or_default();
         headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
 
         self.request(method, endpoint, Some(headers), body).await

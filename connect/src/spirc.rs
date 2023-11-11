@@ -1382,7 +1382,6 @@ impl SpircTask {
         // has_shuffle/repeat seem to always be true in these replace msgs,
         // but to replicate the behaviour of the Android client we have to
         // ignore false values.
-        let state = state;
         if state.repeat() {
             self.state.set_repeat(true);
         }
