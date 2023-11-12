@@ -26,6 +26,9 @@ elif player_event == 'shuffle_changed':
 elif player_event == 'repeat_changed':
     json_dict['repeat'] = os.environ['REPEAT']
 
+elif player_event == 'repeat_one_changed':
+    json_dict['repeat_one'] = os.environ['REPEAT_ONE']
+
 elif player_event == 'auto_play_changed':
     json_dict['auto_play'] = os.environ['AUTO_PLAY']
 

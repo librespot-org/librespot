@@ -33,6 +33,7 @@ enum MessageType {
     kMessageTypeVolume = 0x1b;
     kMessageTypeShuffle = 0x1c;
     kMessageTypeRepeat = 0x1d;
+    kMessageTypeRepeatOne = 0x1e;
     kMessageTypeVolumeDown = 0x1f;
     kMessageTypeVolumeUp = 0x20;
     kMessageTypeReplace = 0x21;
@@ -92,6 +93,7 @@ message State {
     optional string context_description = 0x8;
     optional bool shuffle = 0xd;
     optional bool repeat = 0xe;
+    optional bool repeat_one = 0xf;
     optional string last_command_ident = 0x14;
     optional uint32 last_command_msgid = 0x15;
     optional bool playing_from_fallback = 0x18;
