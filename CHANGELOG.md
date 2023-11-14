@@ -41,7 +41,7 @@ https://github.com/librespot-org/librespot
   configurations.
 - [audio] Files are now downloaded over the HTTPS CDN (breaking)
 - [audio] Improve file opening and seeking performance (breaking)
-- [core] MSRV is now 1.65 (breaking)
+- [core] MSRV is now 1.70 (breaking)
 - [connect] `DeviceType` moved out of `connect` into `core` (breaking)
 - [connect] Update and expose all `spirc` context fields (breaking)
 - [connect] Add `Clone, Defaut` traits to `spirc` contexts
