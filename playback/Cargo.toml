@@ -37,9 +37,9 @@ libpulse-binding        = { version = "2", optional = true, default-features = f
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 jack            = { version = "0.11", optional = true }
 sdl2            = { version = "0.35", optional = true }
-gstreamer       = { version = "0.20", optional = true }
-gstreamer-app   = { version = "0.20", optional = true }
-gstreamer-audio = { version = "0.20", optional = true }
+gstreamer       = { version = "0.21.2", optional = true }
+gstreamer-app   = { version = "0.21.2", optional = true }
+gstreamer-audio = { version = "0.21.2", optional = true }
 glib            = { version = "0.18.1", optional = true }
 
 # Rodio dependencies
