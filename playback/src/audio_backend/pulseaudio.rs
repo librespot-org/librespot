@@ -1,8 +1,10 @@
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates, NUM_CHANNELS,
+    SAMPLE_RATE as DECODER_SAMPLE_RATE,
+};
+
 use libpulse_binding::{self as pulse, error::PAErr, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::env;
@@ -24,9 +26,6 @@ enum PulseError {
     #[error("<PulseAudioSink> Failed to Drain Pulseaudio Buffer, {0}")]
     DrainFailure(PAErr),
 
-    #[error("<PulseAudioSink>")]
-    NotConnected,
-
     #[error("<PulseAudioSink> {0}")]
     OnWrite(PAErr),
 }
@@ -38,8 +37,20 @@ impl From<PulseError> for SinkError {
         match e {
             DrainFailure(_) | OnWrite(_) => SinkError::OnWrite(es),
             ConnectionRefused(_) => SinkError::ConnectionRefused(es),
-            NotConnected => SinkError::NotConnected(es),
             InvalidSampleSpec { .. } => SinkError::InvalidParams(es),
+        }
+    }
+}
+
+impl From<AudioFormat> for pulse::sample::Format {
+    fn from(f: AudioFormat) -> pulse::sample::Format {
+        use AudioFormat::*;
+        match f {
+            F64 | F32 => pulse::sample::Format::FLOAT32NE,
+            S32 => pulse::sample::Format::S32NE,
+            S24 => pulse::sample::Format::S24_32NE,
+            S24_3 => pulse::sample::Format::S24NE,
+            S16 => pulse::sample::Format::S16NE,
         }
     }
 }
@@ -50,28 +61,44 @@ pub struct PulseAudioSink {
     app_name: String,
     stream_desc: String,
     format: AudioFormat,
+    sample_rate: u32,
+
+    sample_spec: pulse::sample::Spec,
 }
 
 impl Open for PulseAudioSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
+    fn open(device: Option<String>, format: AudioFormat, sample_rate: u32) -> Self {
         let app_name = env::var("PULSE_PROP_application.name").unwrap_or_default();
         let stream_desc = env::var("PULSE_PROP_stream.description").unwrap_or_default();
 
-        let mut actual_format = format;
-
-        if actual_format == AudioFormat::F64 {
+        let format = if format == AudioFormat::F64 {
             warn!("PulseAudio currently does not support F64 output");
-            actual_format = AudioFormat::F32;
-        }
+            AudioFormat::F32
+        } else {
+            format
+        };
 
-        info!("Using PulseAudioSink with format: {actual_format:?}");
+        info!(
+            "Using PulseAudioSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
+
+        let sample_spec = pulse::sample::Spec {
+            format: format.into(),
+            channels: NUM_CHANNELS,
+            rate: sample_rate,
+        };
 
         Self {
             sink: None,
             device,
             app_name,
             stream_desc,
-            format: actual_format,
+            format,
+            sample_rate,
+            sample_spec,
         }
     }
 }
@@ -79,31 +106,15 @@ impl Open for PulseAudioSink {
 impl Sink for PulseAudioSink {
     fn start(&mut self) -> SinkResult<()> {
         if self.sink.is_none() {
-            // PulseAudio calls S24 and S24_3 different from the rest of the world
-            let pulse_format = match self.format {
-                AudioFormat::F32 => pulse::sample::Format::FLOAT32NE,
-                AudioFormat::S32 => pulse::sample::Format::S32NE,
-                AudioFormat::S24 => pulse::sample::Format::S24_32NE,
-                AudioFormat::S24_3 => pulse::sample::Format::S24NE,
-                AudioFormat::S16 => pulse::sample::Format::S16NE,
-                _ => unreachable!(),
-            };
-
-            let sample_spec = pulse::sample::Spec {
-                format: pulse_format,
-                channels: NUM_CHANNELS,
-                rate: SAMPLE_RATE,
-            };
-
-            if !sample_spec.is_valid() {
+            if !self.sample_spec.is_valid() {
                 let pulse_error = PulseError::InvalidSampleSpec {
-                    pulse_format,
+                    pulse_format: self.sample_spec.format,
                     format: self.format,
                     channels: NUM_CHANNELS,
-                    rate: SAMPLE_RATE,
+                    rate: self.sample_rate,
                 };
 
-                return Err(SinkError::from(pulse_error));
+                return Err(pulse_error.into());
             }
 
             let sink = Simple::new(
@@ -112,7 +123,7 @@ impl Sink for PulseAudioSink {
                 Direction::Playback,    // Direction.
                 self.device.as_deref(), // Our device (sink) name.
                 &self.stream_desc,      // Description of our stream.
-                &sample_spec,           // Our sample format.
+                &self.sample_spec,      // Our sample format.
                 None,                   // Use default channel map.
                 None,                   // Use default buffering attributes.
             )
@@ -125,10 +136,22 @@ impl Sink for PulseAudioSink {
     }
 
     fn stop(&mut self) -> SinkResult<()> {
-        let sink = self.sink.take().ok_or(PulseError::NotConnected)?;
+        if let Some(sink) = self.sink.take() {
+            sink.flush().map_err(PulseError::DrainFailure)?;
+        }
 
-        sink.drain().map_err(PulseError::DrainFailure)?;
         Ok(())
+    }
+
+    fn get_latency_pcm(&mut self) -> u64 {
+        self.sink
+            .as_mut()
+            .and_then(|sink| {
+                sink.get_latency()
+                    .ok()
+                    .map(|micro_sec| (micro_sec.as_secs_f64() * DECODER_SAMPLE_RATE as f64) as u64)
+            })
+            .unwrap_or(0)
     }
 
     sink_as_bytes!();
@@ -136,9 +159,9 @@ impl Sink for PulseAudioSink {
 
 impl SinkAsBytes for PulseAudioSink {
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
-        let sink = self.sink.as_mut().ok_or(PulseError::NotConnected)?;
-
-        sink.write(data).map_err(PulseError::OnWrite)?;
+        if let Some(sink) = self.sink.as_mut() {
+            sink.write(data).map_err(PulseError::OnWrite)?;
+        }
 
         Ok(())
     }

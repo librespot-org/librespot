@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use thiserror::Error;
 
 #[cfg(feature = "passthrough-decoder")]
@@ -58,22 +56,9 @@ impl AudioPacket {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct AudioPacketPosition {
-    pub position_ms: u32,
-    pub skipped: bool,
-}
-
-impl Deref for AudioPacketPosition {
-    type Target = u32;
-    fn deref(&self) -> &Self::Target {
-        &self.position_ms
-    }
-}
-
 pub trait AudioDecoder {
     fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError>;
-    fn next_packet(&mut self) -> DecoderResult<Option<(AudioPacketPosition, AudioPacket)>>;
+    fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>>;
 }
 
 impl From<DecoderError> for librespot_core::error::Error {

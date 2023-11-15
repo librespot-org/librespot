@@ -8,7 +8,7 @@ use symphonia::{
         formats::{FormatOptions, FormatReader, SeekMode, SeekTo},
         io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
         meta::{StandardTagKey, Value},
-        units::Time,
+        units::TimeBase,
     },
     default::{
         codecs::{MpaDecoder, VorbisDecoder},
@@ -16,7 +16,7 @@ use symphonia::{
     },
 };
 
-use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
+use super::{AudioDecoder, AudioPacket, DecoderError, DecoderResult};
 
 use crate::{
     metadata::audio::{AudioFileFormat, AudioFiles},
@@ -27,6 +27,7 @@ use crate::{
 pub struct SymphoniaDecoder {
     format: Box<dyn FormatReader>,
     decoder: Box<dyn Decoder>,
+    time_base: Option<TimeBase>,
     sample_buffer: Option<SampleBuffer<f64>>,
 }
 
@@ -88,9 +89,12 @@ impl SymphoniaDecoder {
             )));
         }
 
+        let time_base = decoder.codec_params().time_base;
+
         Ok(Self {
             format,
             decoder,
+            time_base,
 
             // We set the sample buffer when decoding the first full packet,
             // whose duration is also the ideal sample buffer size.
@@ -133,30 +137,23 @@ impl SymphoniaDecoder {
     }
 
     fn ts_to_ms(&self, ts: u64) -> u32 {
-        let time_base = self.decoder.codec_params().time_base;
-        let seeked_to_ms = match time_base {
-            Some(time_base) => {
+        // Falls back in the unexpected case that the format has no base time set.
+        self.time_base
+            .map(|time_base| {
                 let time = time_base.calc_time(ts);
-                (time.seconds as f64 + time.frac) * 1000.
-            }
-            // Fallback in the unexpected case that the format has no base time set.
-            None => ts as f64 * PAGES_PER_MS,
-        };
-        seeked_to_ms as u32
+                ((time.seconds as f64 + time.frac) * 1000.) as u32
+            })
+            .unwrap_or((ts as f64 * PAGES_PER_MS) as u32)
     }
 }
 
 impl AudioDecoder for SymphoniaDecoder {
     fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError> {
-        let seconds = position_ms as u64 / 1000;
-        let frac = (position_ms as f64 % 1000.) / 1000.;
-        let time = Time::new(seconds, frac);
-
         // `track_id: None` implies the default track ID (of the container, not of Spotify).
         let seeked_to_ts = self.format.seek(
             SeekMode::Accurate,
             SeekTo::Time {
-                time,
+                time: (position_ms as f64 / 1000.).into(),
                 track_id: None,
             },
         )?;
@@ -168,9 +165,7 @@ impl AudioDecoder for SymphoniaDecoder {
         Ok(self.ts_to_ms(seeked_to_ts.actual_ts))
     }
 
-    fn next_packet(&mut self) -> DecoderResult<Option<(AudioPacketPosition, AudioPacket)>> {
-        let mut skipped = false;
-
+    fn next_packet(&mut self) -> DecoderResult<Option<(u32, AudioPacket)>> {
         loop {
             let packet = match self.format.next_packet() {
                 Ok(packet) => packet,
@@ -187,10 +182,6 @@ impl AudioDecoder for SymphoniaDecoder {
             };
 
             let position_ms = self.ts_to_ms(packet.ts());
-            let packet_position = AudioPacketPosition {
-                position_ms,
-                skipped,
-            };
 
             match self.decoder.decode(&packet) {
                 Ok(decoded) => {
@@ -206,13 +197,12 @@ impl AudioDecoder for SymphoniaDecoder {
                     sample_buffer.copy_interleaved_ref(decoded);
                     let samples = AudioPacket::Samples(sample_buffer.samples().to_vec());
 
-                    return Ok(Some((packet_position, samples)));
+                    return Ok(Some((position_ms, samples)));
                 }
                 Err(Error::DecodeError(_)) => {
                     // The packet failed to decode due to corrupted or invalid data, get a new
                     // packet and try again.
                     warn!("Skipping malformed audio packet at {position_ms} ms");
-                    skipped = true;
                     continue;
                 }
                 Err(err) => return Err(err.into()),

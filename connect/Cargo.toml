@@ -9,7 +9,7 @@ repository = "https://github.com/librespot-org/librespot"
 edition = "2021"
 
 [dependencies]
-form_urlencoded = "1.0"
+form_urlencoded = "1.2"
 futures-util = "0.3"
 log = "0.4"
 protobuf = "3"

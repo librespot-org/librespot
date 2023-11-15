@@ -20,7 +20,7 @@ pub enum SinkError {
 pub type SinkResult<T> = Result<T, SinkError>;
 
 pub trait Open {
-    fn open(_: Option<String>, format: AudioFormat) -> Self;
+    fn open(_: Option<String>, format: AudioFormat, sample_rate: u32) -> Self;
 }
 
 pub trait Sink {
@@ -30,17 +30,24 @@ pub trait Sink {
     fn stop(&mut self) -> SinkResult<()> {
         Ok(())
     }
+    fn get_latency_pcm(&mut self) -> u64 {
+        0
+    }
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()>;
 }
 
-pub type SinkBuilder = fn(Option<String>, AudioFormat) -> Box<dyn Sink>;
+pub type SinkBuilder = fn(Option<String>, AudioFormat, u32) -> Box<dyn Sink>;
 
 pub trait SinkAsBytes {
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()>;
 }
 
-fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
-    Box::new(S::open(device, format))
+fn mk_sink<S: Sink + Open + 'static>(
+    device: Option<String>,
+    format: AudioFormat,
+    sample_rate: u32,
+) -> Box<dyn Sink> {
+    Box::new(S::open(device, format, sample_rate))
 }
 
 // reuse code for various backends

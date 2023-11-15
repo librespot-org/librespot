@@ -114,8 +114,9 @@ impl SpClient {
         dst: &mut [u8],
     ) -> Result<(), Error> {
         // after a certain number of seconds, the challenge expires
-        const TIMEOUT: u64 = 5; // seconds
-        let now = Instant::now();
+        const TIMEOUT: Duration = Duration::from_secs(5);
+
+        let then = Instant::now();
 
         let md = Sha1::digest(ctx);
 
@@ -123,9 +124,18 @@ impl SpClient {
         let target: i64 = BigEndian::read_i64(&md[12..20]);
 
         let suffix = loop {
-            if now.elapsed().as_secs() >= TIMEOUT {
+            // It would be so much easier to use elapsed but elapsed could
+            // potentially panic is rare cases.
+            // See:
+            // https://doc.rust-lang.org/std/time/struct.Instant.html#monotonicity
+            if Instant::now()
+                .checked_duration_since(then)
+                .unwrap_or(TIMEOUT)
+                >= TIMEOUT
+            {
                 return Err(Error::deadline_exceeded(format!(
-                    "{TIMEOUT} seconds expired"
+                    "{} seconds expired",
+                    TIMEOUT.as_secs(),
                 )));
             }
 

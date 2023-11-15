@@ -1,5 +1,5 @@
 use super::VolumeCtrl;
-use crate::player::db_to_ratio;
+use crate::db_to_ratio;
 
 pub trait MappedCtrl {
     fn to_mapped(&self, volume: u16) -> f64;

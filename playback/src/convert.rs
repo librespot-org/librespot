@@ -80,36 +80,60 @@ impl Converter {
     }
 
     pub fn f64_to_f32(&mut self, samples: &[f64]) -> Vec<f32> {
-        samples.iter().map(|sample| *sample as f32).collect()
+        let mut output = Vec::with_capacity(samples.len());
+
+        output.extend(samples.iter().map(|sample| *sample as f32));
+
+        output
     }
 
     pub fn f64_to_s32(&mut self, samples: &[f64]) -> Vec<i32> {
-        samples
-            .iter()
-            .map(|sample| self.scale(*sample, Self::SCALE_S32) as i32)
-            .collect()
+        let mut output = Vec::with_capacity(samples.len());
+
+        output.extend(
+            samples
+                .iter()
+                .map(|sample| self.scale(*sample, Self::SCALE_S32) as i32),
+        );
+
+        output
     }
 
     // S24 is 24-bit PCM packed in an upper 32-bit word
     pub fn f64_to_s24(&mut self, samples: &[f64]) -> Vec<i32> {
-        samples
-            .iter()
-            .map(|sample| self.clamping_scale(*sample, Self::SCALE_S24) as i32)
-            .collect()
+        let mut output = Vec::with_capacity(samples.len());
+
+        output.extend(
+            samples
+                .iter()
+                .map(|sample| self.clamping_scale(*sample, Self::SCALE_S24) as i32),
+        );
+
+        output
     }
 
     // S24_3 is 24-bit PCM in a 3-byte array
     pub fn f64_to_s24_3(&mut self, samples: &[f64]) -> Vec<i24> {
-        samples
-            .iter()
-            .map(|sample| i24::from_s24(self.clamping_scale(*sample, Self::SCALE_S24) as i32))
-            .collect()
+        let mut output = Vec::with_capacity(samples.len());
+
+        output.extend(
+            samples
+                .iter()
+                .map(|sample| i24::from_s24(self.clamping_scale(*sample, Self::SCALE_S24) as i32)),
+        );
+
+        output
     }
 
     pub fn f64_to_s16(&mut self, samples: &[f64]) -> Vec<i16> {
-        samples
-            .iter()
-            .map(|sample| self.scale(*sample, Self::SCALE_S16) as i16)
-            .collect()
+        let mut output = Vec::with_capacity(samples.len());
+
+        output.extend(
+            samples
+                .iter()
+                .map(|sample| self.scale(*sample, Self::SCALE_S16) as i16),
+        );
+
+        output
     }
 }

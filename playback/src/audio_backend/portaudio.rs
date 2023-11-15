@@ -1,25 +1,31 @@
 use super::{Open, Sink, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
-use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
-use portaudio_rs::stream::*;
-use std::process::exit;
-use std::time::Duration;
+
+use crate::{
+    config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates, NUM_CHANNELS,
+};
+
+use portaudio_rs::{
+    device::{get_default_output_index, DeviceIndex, DeviceInfo},
+    stream::*,
+};
+
+use std::{process::exit, time::Duration};
 
 pub enum PortAudioSink<'a> {
     F32(
         Option<portaudio_rs::stream::Stream<'a, f32, f32>>,
         StreamParameters<f32>,
+        f64,
     ),
     S32(
         Option<portaudio_rs::stream::Stream<'a, i32, i32>>,
         StreamParameters<i32>,
+        f64,
     ),
     S16(
         Option<portaudio_rs::stream::Stream<'a, i16, i16>>,
         StreamParameters<i16>,
+        f64,
     ),
 }
 
@@ -51,8 +57,13 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 }
 
 impl<'a> Open for PortAudioSink<'a> {
-    fn open(device: Option<String>, format: AudioFormat) -> PortAudioSink<'a> {
-        info!("Using PortAudio sink with format: {format:?}");
+    fn open(device: Option<String>, format: AudioFormat, sample_rate: u32) -> PortAudioSink<'a> {
+        info!(
+            "Using PortAudioSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
 
         portaudio_rs::initialize().unwrap();
 
@@ -73,20 +84,23 @@ impl<'a> Open for PortAudioSink<'a> {
         };
 
         macro_rules! open_sink {
-            ($sink: expr, $type: ty) => {{
+            ($sink: expr, $type: ty, $sample_rate: ident) => {{
                 let params = StreamParameters {
                     device: device_idx,
                     channel_count: NUM_CHANNELS as u32,
                     suggested_latency: latency,
                     data: 0.0 as $type,
                 };
-                $sink(None, params)
+                $sink(None, params, $sample_rate)
             }};
         }
+
+        let sample_rate = sample_rate as f64;
+
         match format {
-            AudioFormat::F32 => open_sink!(Self::F32, f32),
-            AudioFormat::S32 => open_sink!(Self::S32, i32),
-            AudioFormat::S16 => open_sink!(Self::S16, i16),
+            AudioFormat::F32 => open_sink!(Self::F32, f32, sample_rate),
+            AudioFormat::S32 => open_sink!(Self::S32, i32, sample_rate),
+            AudioFormat::S16 => open_sink!(Self::S16, i16, sample_rate),
             _ => {
                 unimplemented!("PortAudio currently does not support {format:?} output")
             }
@@ -97,13 +111,13 @@ impl<'a> Open for PortAudioSink<'a> {
 impl<'a> Sink for PortAudioSink<'a> {
     fn start(&mut self) -> SinkResult<()> {
         macro_rules! start_sink {
-            (ref mut $stream: ident, ref $parameters: ident) => {{
+            (ref mut $stream: ident, ref $parameters: ident, ref $sample_rate: ident ) => {{
                 if $stream.is_none() {
                     *$stream = Some(
                         Stream::open(
                             None,
                             Some(*$parameters),
-                            SAMPLE_RATE as f64,
+                            *$sample_rate,
                             FRAMES_PER_BUFFER_UNSPECIFIED,
                             StreamFlags::DITHER_OFF, // no need to dither twice; use librespot dithering instead
                             None,
@@ -116,9 +130,15 @@ impl<'a> Sink for PortAudioSink<'a> {
         }
 
         match self {
-            Self::F32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
-            Self::S32(stream, parameters) => start_sink!(ref mut stream, ref parameters),
-            Self::S16(stream, parameters) => start_sink!(ref mut stream, ref parameters),
+            Self::F32(stream, parameters, sample_rate) => {
+                start_sink!(ref mut stream, ref parameters, ref sample_rate)
+            }
+            Self::S32(stream, parameters, sample_rate) => {
+                start_sink!(ref mut stream, ref parameters, ref sample_rate)
+            }
+            Self::S16(stream, parameters, sample_rate) => {
+                start_sink!(ref mut stream, ref parameters, ref sample_rate)
+            }
         };
 
         Ok(())
@@ -132,9 +152,9 @@ impl<'a> Sink for PortAudioSink<'a> {
             }};
         }
         match self {
-            Self::F32(stream, _) => stop_sink!(ref mut stream),
-            Self::S32(stream, _) => stop_sink!(ref mut stream),
-            Self::S16(stream, _) => stop_sink!(ref mut stream),
+            Self::F32(stream, _, _) => stop_sink!(ref mut stream),
+            Self::S32(stream, _, _) => stop_sink!(ref mut stream),
+            Self::S16(stream, _, _) => stop_sink!(ref mut stream),
         };
 
         Ok(())
@@ -152,15 +172,15 @@ impl<'a> Sink for PortAudioSink<'a> {
             .map_err(|e| SinkError::OnWrite(e.to_string()))?;
 
         let result = match self {
-            Self::F32(stream, _parameters) => {
+            Self::F32(stream, _parameters, _sample_rate) => {
                 let samples_f32: &[f32] = &converter.f64_to_f32(samples);
                 write_sink!(ref mut stream, samples_f32)
             }
-            Self::S32(stream, _parameters) => {
+            Self::S32(stream, _parameters, _sample_rate) => {
                 let samples_s32: &[i32] = &converter.f64_to_s32(samples);
                 write_sink!(ref mut stream, samples_s32)
             }
-            Self::S16(stream, _parameters) => {
+            Self::S16(stream, _parameters, _sample_rate) => {
                 let samples_s16: &[i16] = &converter.f64_to_s16(samples);
                 write_sink!(ref mut stream, samples_s16)
             }

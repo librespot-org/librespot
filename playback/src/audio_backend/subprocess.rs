@@ -1,11 +1,13 @@
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use shell_words::split;
 
-use std::io::{ErrorKind, Write};
-use std::process::{exit, Child, Command, Stdio};
+use crate::{config::AudioFormat, convert::Converter, decoder::AudioPacket, CommonSampleRates};
+
+use std::{
+    io::{ErrorKind, Write},
+    process::{exit, Child, Command, Stdio},
+};
+
+use shell_words::split;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -66,13 +68,18 @@ pub struct SubprocessSink {
 }
 
 impl Open for SubprocessSink {
-    fn open(shell_command: Option<String>, format: AudioFormat) -> Self {
+    fn open(shell_command: Option<String>, format: AudioFormat, sample_rate: u32) -> Self {
         if let Some("?") = shell_command.as_deref() {
             println!("\nUsage:\n\nOutput to a Subprocess:\n\n\t--backend subprocess --device {{shell_command}}\n");
             exit(0);
         }
 
-        info!("Using SubprocessSink with format: {:?}", format);
+        info!(
+            "Using SubprocessSink with format: {format:?}, sample rate: {}",
+            CommonSampleRates::try_from(sample_rate)
+                .unwrap_or_default()
+                .to_string()
+        );
 
         Self {
             shell_command,

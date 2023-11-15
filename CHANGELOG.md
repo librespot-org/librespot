@@ -67,6 +67,7 @@ https://github.com/librespot-org/librespot
 - [playback] The passthrough decoder is now feature-gated (breaking)
 - [playback] `rodio`: call play and pause
 - [protocol] protobufs have been updated
+- [playback] Moved audio processing with the exception of decoding out of `player` (breaking)
 
 ### Added
 
@@ -102,6 +103,8 @@ https://github.com/librespot-org/librespot
 - [connect] Add `activate` and `load` functions to `Spirc`, allowing control over local connect sessions
 - [metadata] Add `Lyrics`
 - [discovery] Add discovery initialisation retries if within the 1st min of uptime
+- [playback] Add `normaliser`, `resampler` and `sample_pipeline`.
+- [playback] Add resampling support to 48kHz, 88.2kHz, and 96kHz.
 
 ### Fixed
 
@@ -119,6 +122,7 @@ https://github.com/librespot-org/librespot
 - [playback] Handle seek, pause, and play commands while loading
 - [playback] Handle disabled normalisation correctly when using fixed volume
 - [metadata] Fix missing colon when converting named spotify IDs to URIs
+- [playback] Better thread handling in `player`.
 
 ## [0.4.2] - 2022-07-29
 

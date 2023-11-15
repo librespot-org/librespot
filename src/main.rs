@@ -24,11 +24,12 @@ use librespot::{
     playback::{
         audio_backend::{self, SinkBuilder, BACKENDS},
         config::{
-            AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
+            AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, SampleRate,
+            VolumeCtrl,
         },
         dither,
         mixer::{self, MixerConfig, MixerFn},
-        player::{coefficient_to_duration, duration_to_coefficient, Player},
+        player::Player,
     },
 };
 
@@ -239,6 +240,7 @@ fn get_setup() -> Setup {
     const VOLUME_RANGE: &str = "volume-range";
     const ZEROCONF_PORT: &str = "zeroconf-port";
     const ZEROCONF_INTERFACE: &str = "zeroconf-interface";
+    const SAMPLE_RATE: &str = "sample-rate";
 
     // Mostly arbitrary.
     const AP_PORT_SHORT: &str = "a";
@@ -576,6 +578,11 @@ fn get_setup() -> Setup {
         ZEROCONF_INTERFACE,
         "Comma-separated interface IP addresses on which zeroconf will bind. Defaults to all interfaces. Ignored by DNS-SD.",
         "IP"
+    ).optopt(
+        "",
+        SAMPLE_RATE,
+        "Sample Rate to Resample to {44.1kHz|48kHz|88.2kHz|96kHz}. Defaults to 44.1kHz meaning no resampling.",
+        "SAMPLERATE"
     );
 
     #[cfg(feature = "passthrough-decoder")]
@@ -732,10 +739,18 @@ fn get_setup() -> Setup {
 
     let invalid_error_msg =
         |long: &str, short: &str, invalid: &str, valid_values: &str, default_value: &str| {
-            error!("Invalid `--{long}` / `-{short}`: \"{invalid}\"");
+            if short.is_empty() {
+                error!("Invalid `--{long}`: \"{invalid}\"");
+            } else {
+                error!("Invalid `--{long}` / `-{short}`: \"{invalid}\"");
+            }
 
             if !valid_values.is_empty() {
-                println!("Valid `--{long}` / `-{short}` values: {valid_values}");
+                if short.is_empty() {
+                    println!("Valid `--{long}` values: {valid_values}");
+                } else {
+                    println!("Valid `--{long}` / `-{short}` values: {valid_values}");
+                }
             }
 
             if !default_value.is_empty() {
@@ -761,6 +776,24 @@ fn get_setup() -> Setup {
         exit(1);
     });
 
+    let sample_rate = opt_str(SAMPLE_RATE)
+        .as_deref()
+        .map(|sample_rate| {
+            SampleRate::from_str(sample_rate).unwrap_or_else(|_| {
+                let default_value = &format!("{}", SampleRate::default());
+                invalid_error_msg(
+                    SAMPLE_RATE,
+                    "",
+                    sample_rate,
+                    "44.1kHz, 48kHz, 88.2kHz, 96kHz",
+                    default_value,
+                );
+
+                exit(1);
+            })
+        })
+        .unwrap_or_default();
+
     let format = opt_str(FORMAT)
         .as_deref()
         .map(|format| {
@@ -782,7 +815,7 @@ fn get_setup() -> Setup {
     let device = opt_str(DEVICE);
     if let Some(ref value) = device {
         if value == "?" {
-            backend(device, format);
+            backend(device, format, sample_rate.as_u32());
             exit(0);
         } else if value.is_empty() {
             empty_string_error_msg(DEVICE, DEVICE_SHORT);
@@ -1491,9 +1524,8 @@ fn get_setup() -> Setup {
 
             normalisation_attack_cf = opt_str(NORMALISATION_ATTACK)
                 .map(|attack| match attack.parse::<u64>() {
-                    Ok(value) if (VALID_NORMALISATION_ATTACK_RANGE).contains(&value) => {
-                        duration_to_coefficient(Duration::from_millis(value))
-                    }
+                    Ok(value) if (VALID_NORMALISATION_ATTACK_RANGE).contains(&value) => sample_rate
+                        .duration_to_normalisation_coefficient(Duration::from_millis(value)),
                     _ => {
                         let valid_values = &format!(
                             "{} - {}",
@@ -1506,20 +1538,21 @@ fn get_setup() -> Setup {
                             NORMALISATION_ATTACK_SHORT,
                             &attack,
                             valid_values,
-                            &coefficient_to_duration(player_default_config.normalisation_attack_cf)
-                                .as_millis()
-                                .to_string(),
+                            "5",
                         );
 
                         exit(1);
                     }
                 })
-                .unwrap_or(player_default_config.normalisation_attack_cf);
+                .unwrap_or(
+                    sample_rate.duration_to_normalisation_coefficient(Duration::from_millis(5)),
+                );
 
             normalisation_release_cf = opt_str(NORMALISATION_RELEASE)
                 .map(|release| match release.parse::<u64>() {
                     Ok(value) if (VALID_NORMALISATION_RELEASE_RANGE).contains(&value) => {
-                        duration_to_coefficient(Duration::from_millis(value))
+                        sample_rate
+                            .duration_to_normalisation_coefficient(Duration::from_millis(value))
                     }
                     _ => {
                         let valid_values = &format!(
@@ -1533,17 +1566,15 @@ fn get_setup() -> Setup {
                             NORMALISATION_RELEASE_SHORT,
                             &release,
                             valid_values,
-                            &coefficient_to_duration(
-                                player_default_config.normalisation_release_cf,
-                            )
-                            .as_millis()
-                            .to_string(),
+                            "100",
                         );
 
                         exit(1);
                     }
                 })
-                .unwrap_or(player_default_config.normalisation_release_cf);
+                .unwrap_or(
+                    sample_rate.duration_to_normalisation_coefficient(Duration::from_millis(100)),
+                );
 
             normalisation_knee_db = opt_str(NORMALISATION_KNEE)
                 .map(|knee| match knee.parse::<f64>() {
@@ -1608,6 +1639,7 @@ fn get_setup() -> Setup {
             bitrate,
             gapless,
             passthrough,
+            sample_rate,
             normalisation,
             normalisation_type,
             normalisation_method,
@@ -1692,7 +1724,7 @@ async fn main() {
                 Err(e) => {
                     sys.refresh_processes();
 
-                    if sys.uptime() <= 1 {
+                    if sys.uptime() <= 60 {
                         debug!("Retrying to initialise discovery: {e}");
                         tokio::time::sleep(DISCOVERY_RETRY_TIMEOUT).await;
                     } else {
@@ -1723,8 +1755,9 @@ async fn main() {
     let format = setup.format;
     let backend = setup.backend;
     let device = setup.device.clone();
+    let sample_rate = player_config.sample_rate.as_u32();
     let player = Player::new(player_config, session.clone(), soft_volume, move || {
-        (backend)(device, format)
+        (backend)(device, format, sample_rate)
     });
 
     if let Some(player_event_program) = setup.player_event_program.clone() {
@@ -1782,6 +1815,7 @@ async fn main() {
 
                 let connect_config = setup.connect_config.clone();
 
+
                 let (spirc_, spirc_task_) = match Spirc::new(connect_config,
                                                                 session.clone(),
                                                                 last_credentials.clone().unwrap_or_default(),
@@ -1808,7 +1842,16 @@ async fn main() {
                 warn!("Spirc shut down unexpectedly");
 
                 let mut reconnect_exceeds_rate_limit = || {
-                    auto_connect_times.retain(|&t| t.elapsed() < RECONNECT_RATE_LIMIT_WINDOW);
+                    // It would be so much easier to use elapsed but elapsed could
+                    // potentially panic is rare cases.
+                    // See:
+                    // https://doc.rust-lang.org/std/time/struct.Instant.html#monotonicity
+                    let now = Instant::now();
+
+                    auto_connect_times.retain(|&t| {
+                        now.checked_duration_since(t).unwrap_or(RECONNECT_RATE_LIMIT_WINDOW) < RECONNECT_RATE_LIMIT_WINDOW
+                    });
+
                     auto_connect_times.len() > RECONNECT_RATE_LIMIT
                 };
 
