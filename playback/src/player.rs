@@ -1910,10 +1910,6 @@ impl PlayerInternal {
             }
         }
 
-        // We need to load the track - either from scratch or by completing a preload.
-        // In any case we go into a Loading state to load the track.
-        self.ensure_sink_stopped(play);
-
         self.send_event(PlayerEvent::Loading {
             track_id,
             play_request_id,
