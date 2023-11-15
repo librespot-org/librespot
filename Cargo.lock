@@ -1032,7 +1032,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.22.0",
  "tower-service",
- "webpki",
+ "webpki 0.21.4",
 ]
 
 [[package]]
@@ -1049,7 +1049,7 @@ dependencies = [
  "rustls-native-certs 0.5.0",
  "tokio",
  "tokio-rustls 0.22.0",
- "webpki",
+ "webpki 0.21.4",
 ]
 
 [[package]]
@@ -1349,6 +1349,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "url",
+ "webpki 0.22.4",
 ]
 
 [[package]]
@@ -2374,9 +2375,9 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
 name = "rustix"
-version = "0.38.23"
+version = "0.38.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffb93593068e9babdad10e4fce47dc9b3ac25315a72a59766ffd9e9a71996a04"
+checksum = "9ad981d6c340a49cdc40a1028d9c6084ec7e9fa33fcb839cab656a267071e234"
 dependencies = [
  "bitflags 2.4.1",
  "errno",
@@ -2395,7 +2396,7 @@ dependencies = [
  "log",
  "ring 0.16.20",
  "sct 0.6.1",
- "webpki",
+ "webpki 0.21.4",
 ]
 
 [[package]]
@@ -2985,7 +2986,7 @@ checksum = "bc6844de72e57df1980054b38be3a9f4702aba4858be64dd700181a8a6d0e1b6"
 dependencies = [
  "rustls 0.19.1",
  "tokio",
- "webpki",
+ "webpki 0.21.4",
 ]
 
 [[package]]
@@ -3349,6 +3350,16 @@ checksum = "b8e38c0608262c46d4a56202ebabdeb094cef7e560ca7a226c6bf055188aa4ea"
 dependencies = [
  "ring 0.16.20",
  "untrusted 0.7.1",
+]
+
+[[package]]
+name = "webpki"
+version = "0.22.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed63aea5ce73d0ff405984102c42de94fc55a6b75765d621c65262469b3c9b53"
+dependencies = [
+ "ring 0.17.5",
+ "untrusted 0.9.0",
 ]
 
 [[package]]
