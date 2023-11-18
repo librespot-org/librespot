@@ -386,7 +386,7 @@ impl NormalisationData {
                 let limiting_db = factor_db + config.normalisation_threshold_dbfs.abs();
 
                 warn!(
-                    "This track may exceed dBFS by {:.2} dB and be subject to {:.2} dB of dynamic limiting at it's peak.",
+                    "This track may exceed dBFS by {:.2} dB and be subject to {:.2} dB of dynamic limiting at its peak.",
                     factor_db, limiting_db
                 );
             } else if factor > threshold_ratio {
@@ -395,7 +395,7 @@ impl NormalisationData {
                     + config.normalisation_threshold_dbfs.abs();
 
                 info!(
-                    "This track may be subject to {:.2} dB of dynamic limiting at it's peak.",
+                    "This track may be subject to {:.2} dB of dynamic limiting at its peak.",
                     limiting_db
                 );
             }

@@ -4,7 +4,7 @@
 
 Read through this paragraph in its entirety before running anything.
 
-The Bash script in the root of the project, named `publish.sh` can be used to publish a new version of librespot and it's corresponding crates. the command should be used as follows from the project root: `./publish 0.1.0` from the project root, substituting the new version number that you wish to publish. *Note the lack of a v prefix on the version number. This is important, do not add one.* The v prefix is added where appropriate by the script.
+The Bash script in the root of the project, named `publish.sh` can be used to publish a new version of librespot and its corresponding crates. the command should be used as follows from the project root: `./publish 0.1.0` from the project root, substituting the new version number that you wish to publish. *Note the lack of a v prefix on the version number. This is important, do not add one.* The v prefix is added where appropriate by the script.
 
 Make sure that you are are starting from a clean working directory for both `dev` and `master`, completely up to date with remote and all local changes either committed and pushed or stashed.
 
