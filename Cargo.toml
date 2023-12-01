@@ -50,10 +50,10 @@ path = "protocol"
 version = "0.5.0-dev"
 
 [dependencies]
+data-encoding = "2.5"
 env_logger =  { version = "0.10", default-features = false, features = ["color", "humantime", "auto-color"] }
 futures-util = { version = "0.3", default_features = false }
 getopts = "0.2"
-hex = "0.4"
 log = "0.4"
 rpassword = "7.0"
 sha1 = "0.10"

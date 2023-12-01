@@ -23,7 +23,6 @@ form_urlencoded = "1.0"
 futures-core = "0.3"
 futures-util = { version = "0.3", features = ["alloc", "bilock", "sink", "unstable"] }
 governor = { version = "0.6", default-features = false, features = ["std", "jitter"] }
-hex = "0.4"
 hmac = "0.12"
 httparse = "1.7"
 http = "0.2"
@@ -57,6 +56,7 @@ tokio-tungstenite = { version = "*", default-features = false, features = ["rust
 tokio-util = { version = "0.7", features = ["codec"] }
 url = "2"
 uuid = { version = "1", default-features = false, features = ["fast-rng", "v4"] }
+data-encoding = "2.5"
 
 [build-dependencies]
 rand = "0.8"
