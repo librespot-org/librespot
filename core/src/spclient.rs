@@ -357,7 +357,10 @@ impl SpClient {
             match ClientTokenResponseType::from_i32(message.response_type.value()) {
                 // depending on the platform, you're either given a token immediately
                 // or are presented a hash cash challenge to solve first
-                Some(ClientTokenResponseType::RESPONSE_GRANTED_TOKEN_RESPONSE) => break message,
+                Some(ClientTokenResponseType::RESPONSE_GRANTED_TOKEN_RESPONSE) => {
+                    debug!("Received a granted token");
+                    break message;
+                }
                 Some(ClientTokenResponseType::RESPONSE_CHALLENGES_RESPONSE) => {
                     debug!("Received a hash cash challenge, solving...");
 
@@ -566,8 +569,15 @@ impl SpClient {
                 ))?,
             );
 
-            let client_token = self.client_token().await?;
-            headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
+            match self.client_token().await {
+                Ok(client_token) => {
+                    let _ = headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
+                }
+                Err(e) => {
+                    // currently these endpoints seem to work fine without it
+                    warn!("Unable to get client token: {e} Trying to continue without...")
+                }
+            }
 
             last_response = self.session().http_client().request_body(request).await;
 
