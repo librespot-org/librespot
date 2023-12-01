@@ -77,7 +77,7 @@ struct SessionData {
     client_brand_name: String,
     client_model_name: String,
     connection_id: String,
-    auth_blob: Vec<u8>,    
+    auth_blob: Vec<u8>,
     time_delta: i64,
     invalid: bool,
     user_data: UserData,
@@ -477,7 +477,7 @@ impl Session {
         self.0.data.read().auth_blob.clone()
     }
 
-    pub fn set_auth_blob(&self, auth_blob: &Vec<u8>,) {
+    pub fn set_auth_blob(&self, auth_blob: &Vec<u8>) {
         self.0.data.write().auth_blob = auth_blob.clone();
     }
 

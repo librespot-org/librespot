@@ -32,7 +32,7 @@ use crate::{
         },
         connect::PutStateRequest,
         extended_metadata::BatchedEntityRequest,
-        login5::{LoginRequest, LoginResponse,},
+        login5::{LoginRequest, LoginResponse},
     },
     token::Token,
     version::spotify_version,
@@ -149,7 +149,7 @@ impl SpClient {
 
         Ok(())
     }
-    
+
     async fn auth_token_request<M: Message>(&self, message: &M) -> Result<Bytes, Error> {
         let client_token = self.client_token().await?;
         let body = message.write_to_bytes()?;
@@ -185,7 +185,8 @@ impl SpClient {
 
         let mut login_request = LoginRequest::new();
         login_request.client_info.mut_or_insert_default().client_id = client_id;
-        login_request.client_info.mut_or_insert_default().device_id = self.session().device_id().to_string();
+        login_request.client_info.mut_or_insert_default().device_id =
+            self.session().device_id().to_string();
 
         let stored_credential = login_request.mut_stored_credential();
         stored_credential.username = self.session().username().to_string();
@@ -556,7 +557,10 @@ impl SpClient {
             }
             headers_mut.insert(
                 AUTHORIZATION,
-                HeaderValue::from_str(&format!("{} {}", auth_token.token_type, auth_token.access_token,))?,
+                HeaderValue::from_str(&format!(
+                    "{} {}",
+                    auth_token.token_type, auth_token.access_token,
+                ))?,
             );
 
             let client_token = self.client_token().await?;
