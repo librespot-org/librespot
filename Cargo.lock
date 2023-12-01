@@ -480,6 +480,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "faster-hex"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2a2b11eda1d40935b26cf18f6833c526845ae8c41e58d09af6adeb6f0269183"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1332,9 +1341,9 @@ name = "librespot"
 version = "0.5.0-dev"
 dependencies = [
  "env_logger",
+ "faster-hex",
  "futures-util",
  "getopts",
- "hex",
  "librespot-audio",
  "librespot-connect",
  "librespot-core",
@@ -1400,11 +1409,11 @@ dependencies = [
  "bytes",
  "dns-sd",
  "env_logger",
+ "faster-hex",
  "form_urlencoded",
  "futures-core",
  "futures-util",
  "governor",
- "hex",
  "hmac",
  "http",
  "httparse",
