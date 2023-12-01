@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.1
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain stable  -y
       - run: cargo fmt --all -- --check
@@ -68,7 +68,7 @@ jobs:
         toolchain: [stable]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.1
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain ${{ matrix.toolchain }}  -y
@@ -79,7 +79,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3.3.1
+        uses: actions/cache@v3.3.2
         with:
           path: |
             ~/.cargo/registry/index
@@ -109,7 +109,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         toolchain:
-          - "1.65" # MSRV (Minimum supported rust version)
+          - "1.70" # MSRV (Minimum supported rust version)
           - stable
         experimental: [false]
         # Ignore failures in beta
@@ -119,7 +119,7 @@ jobs:
             experimental: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.1
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -130,7 +130,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3.3.1
+        uses: actions/cache@v3.3.2
         with:
           path: |
             ~/.cargo/registry/index
@@ -163,11 +163,11 @@ jobs:
       matrix:
         os: [windows-latest]
         toolchain:
-          - "1.65" # MSRV (Minimum supported rust version)
+          - "1.70" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.1
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -178,7 +178,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3.3.1
+        uses: actions/cache@v3.3.2
         with:
           path: |
             ~/.cargo/registry/index
@@ -206,11 +206,11 @@ jobs:
         os: [ubuntu-latest]
         target: [armv7-unknown-linux-gnueabihf]
         toolchain:
-          - "1.65" # MSRV (Minimum supported rust version)
+          - "1.70" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.1
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -221,7 +221,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3.3.1
+        uses: actions/cache@v3.3.2
         with:
           path: |
             ~/.cargo/registry/index

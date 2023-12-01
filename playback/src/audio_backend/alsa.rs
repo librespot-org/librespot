@@ -262,7 +262,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                     }
                 }
             } else {
-                trace!("The device's min reported Buffer size was greater than or equal to it's max reported Buffer size.");
+                trace!("The device's min reported Buffer size was greater than or equal to its max reported Buffer size.");
                 ZERO_FRAMES
             };
 
@@ -328,7 +328,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                         }
                     }
                 } else {
-                    trace!("The device's min reported Period size was greater than or equal to it's max reported Period size,");
+                    trace!("The device's min reported Period size was greater than or equal to its max reported Period size,");
                     trace!("or the desired min Period size was greater than or equal to the desired max Period size.");
                     ZERO_FRAMES
                 };

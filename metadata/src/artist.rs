@@ -91,7 +91,7 @@ impl_deref_wrapped!(AlbumGroup, Albums);
 ///     [Album1], [Album2-relelease, Album2-older-release], [Album3]
 /// ]
 /// ```
-/// In most cases only the current variant of each album is needed. A list of every album in it's
+/// In most cases only the current variant of each album is needed. A list of every album in its
 /// current release variant can be obtained by using [`AlbumGroups::current_releases`]
 #[derive(Debug, Clone, Default)]
 pub struct AlbumGroups(pub Vec<AlbumGroup>);

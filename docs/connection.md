@@ -31,7 +31,7 @@ The client solves a challenge based on these two packets, and sends it back usin
 It also computes the shared keys used to encrypt the rest of the communication.
 
 ## Login challenge and cipher key computation.
-The client starts by computing the DH shared secret using it's private key and the server's public key.
+The client starts by computing the DH shared secret using its private key and the server's public key.
 HMAC-SHA1 is then used to compute the send and receive keys, as well as the login challenge.
 
 ```

@@ -61,6 +61,7 @@ sysinfo = { version = "0.29", default-features = false }
 thiserror = "1.0"
 tokio = { version = "1", features = ["rt", "macros", "signal", "sync", "parking_lot", "process"] }
 url = "2.2"
+webpki = "0.22.4"
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
