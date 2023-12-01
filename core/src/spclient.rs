@@ -6,6 +6,7 @@ use std::{
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
+use data_encoding::HEXUPPER_PERMISSIVE;
 use futures_util::future::IntoStream;
 use http::header::HeaderValue;
 use hyper::{
@@ -279,20 +280,22 @@ impl SpClient {
                         let hash_cash_challenge = challenge.evaluate_hashcash_parameters();
 
                         let ctx = vec![];
-                        let prefix = hex::decode(&hash_cash_challenge.prefix).map_err(|e| {
-                            Error::failed_precondition(format!(
-                                "Unable to decode hash cash challenge: {e}"
-                            ))
-                        })?;
+                        let prefix = HEXUPPER_PERMISSIVE
+                            .decode(hash_cash_challenge.prefix.as_bytes())
+                            .map_err(|e| {
+                                Error::failed_precondition(format!(
+                                    "Unable to decode hash cash challenge: {e}"
+                                ))
+                            })?;
                         let length = hash_cash_challenge.length;
 
-                        let mut suffix = vec![0; 0x10];
+                        let mut suffix = [0u8; 0x10];
                         let answer = Self::solve_hash_cash(&ctx, &prefix, length, &mut suffix);
 
                         match answer {
                             Ok(_) => {
                                 // the suffix must be in uppercase
-                                let suffix = hex::encode(suffix).to_uppercase();
+                                let suffix = HEXUPPER_PERMISSIVE.encode(&suffix);
 
                                 let mut answer_message = ClientTokenRequest::new();
                                 answer_message.request_type =
@@ -302,7 +305,7 @@ impl SpClient {
                                 let challenge_answers = answer_message.mut_challenge_answers();
 
                                 let mut challenge_answer = ChallengeAnswer::new();
-                                challenge_answer.mut_hash_cash().suffix = suffix.to_string();
+                                challenge_answer.mut_hash_cash().suffix = suffix;
                                 challenge_answer.ChallengeType =
                                     ChallengeType::CHALLENGE_HASH_CASH.into();
 

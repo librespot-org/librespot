@@ -389,9 +389,9 @@ checksum = "0c87e182de0887fd5361989c677c4e8f5000cd9491d6d563161a8f3a5519fc7f"
 
 [[package]]
 name = "data-encoding"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
+checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
 
 [[package]]
 name = "der"
@@ -1331,10 +1331,10 @@ dependencies = [
 name = "librespot"
 version = "0.5.0-dev"
 dependencies = [
+ "data-encoding",
  "env_logger",
  "futures-util",
  "getopts",
- "hex",
  "librespot-audio",
  "librespot-connect",
  "librespot-core",
@@ -1398,13 +1398,13 @@ dependencies = [
  "base64 0.21.5",
  "byteorder",
  "bytes",
+ "data-encoding",
  "dns-sd",
  "env_logger",
  "form_urlencoded",
  "futures-core",
  "futures-util",
  "governor",
- "hex",
  "hmac",
  "http",
  "httparse",
