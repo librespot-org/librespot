@@ -100,7 +100,7 @@ impl SpotifyId {
     ///
     /// `src` is expected to be 32 bytes long and encoded using valid characters.
     ///
-    /// [Spotify ID]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
+    /// [Spotify ID]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn from_base16(src: &str) -> SpotifyIdResult {
         let mut dst: u128 = 0;
 
@@ -125,7 +125,7 @@ impl SpotifyId {
     ///
     /// `src` is expected to be 22 bytes long and encoded using valid characters.
     ///
-    /// [Spotify ID]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
+    /// [Spotify ID]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn from_base62(src: &str) -> SpotifyIdResult {
         let mut dst: u128 = 0;
 
@@ -168,7 +168,7 @@ impl SpotifyId {
     /// Note that this should not be used for playlists, which have the form of
     /// `spotify:playlist:{id}`.
     ///
-    /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
+    /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn from_uri(src: &str) -> SpotifyIdResult {
         // Basic: `spotify:{type}:{id}`
         // Named: `spotify:user:{user}:{type}:{id}`
@@ -223,7 +223,7 @@ impl SpotifyId {
     /// Returns the `SpotifyId` as a [canonically] base62 encoded, `SpotifyId::SIZE_BASE62` (22)
     /// character long `String`.
     ///
-    /// [canonically]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
+    /// [canonically]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     #[allow(clippy::wrong_self_convention)]
     pub fn to_base62(&self) -> Result<String, Error> {
         let mut dst = [0u8; 22];
@@ -280,7 +280,7 @@ impl SpotifyId {
     /// If the `SpotifyId` has an associated type unrecognized by the library, `{type}` will
     /// be encoded as `unknown`.
     ///
-    /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
+    /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     #[allow(clippy::wrong_self_convention)]
     pub fn to_uri(&self) -> Result<String, Error> {
         // 8 chars for the "spotify:" prefix + 1 colon + 22 chars base62 encoded ID  = 31
