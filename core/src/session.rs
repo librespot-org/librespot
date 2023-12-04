@@ -477,8 +477,8 @@ impl Session {
         self.0.data.read().auth_blob.clone()
     }
 
-    pub fn set_auth_blob(&self, auth_blob: &Vec<u8>) {
-        self.0.data.write().auth_blob = auth_blob.clone();
+    pub fn set_auth_blob(&self, auth_blob: &[u8]) {
+        self.0.data.write().auth_blob = auth_blob.to_owned();
     }
 
     pub fn country(&self) -> String {
