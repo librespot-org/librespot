@@ -269,10 +269,10 @@ impl DiscoveryServer {
         tokio::spawn(async {
             let result = server
                 .with_graceful_shutdown(async {
-                    debug!("Shutting down discovery server");
-                    if close_rx.await.is_ok() {
-                        debug!("unable to close discovery Rx channel completely");
+                    if let Err(e) = close_rx.await {
+                        debug!("unable to close discovery Rx channel completely: {e}");
                     }
+                    debug!("Shutting down discovery server");
                 })
                 .await;
 
