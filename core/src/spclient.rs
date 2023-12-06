@@ -190,9 +190,10 @@ impl SpClient {
         // on macOS and Windows. On Android and iOS we can send a platform-specific client ID and are
         // then presented with a hash cash challenge. On Linux, we have to pass the old keymaster ID.
         // We delegate most of this logic to `SessionConfig`.
-        let client_id = match OS {
+        let os = OS;
+        let client_id = match os {
             "macos" | "windows" => self.session().client_id(),
-            _ => SessionConfig::default().client_id,
+            os => SessionConfig::default_for_os(os).client_id,
         };
         client_data.client_id = client_id;
 
@@ -207,7 +208,7 @@ impl SpClient {
         let os_version = sys.os_version().unwrap_or_else(|| String::from("0"));
         let kernel_version = sys.kernel_version().unwrap_or_else(|| String::from("0"));
 
-        match OS {
+        match os {
             "windows" => {
                 let os_version = os_version.parse::<f32>().unwrap_or(10.) as i32;
                 let kernel_version = kernel_version.parse::<i32>().unwrap_or(21370);
