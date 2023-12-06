@@ -16,17 +16,17 @@ pub struct SessionConfig {
     pub autoplay: Option<bool>,
 }
 
-impl Default for SessionConfig {
-    fn default() -> SessionConfig {
+impl SessionConfig {
+    pub(crate) fn default_for_os(os: &str) -> Self {
         let device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
-        let client_id = match std::env::consts::OS {
+        let client_id = match os {
             "android" => ANDROID_CLIENT_ID,
             "ios" => IOS_CLIENT_ID,
             _ => KEYMASTER_CLIENT_ID,
         }
         .to_owned();
 
-        SessionConfig {
+        Self {
             client_id,
             device_id,
             proxy: None,
@@ -34,6 +34,12 @@ impl Default for SessionConfig {
             tmp_dir: std::env::temp_dir(),
             autoplay: None,
         }
+    }
+}
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self::default_for_os(std::env::consts::OS)
     }
 }
 
