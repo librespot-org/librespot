@@ -1,3 +1,4 @@
+use data_encoding::HEXLOWER;
 use futures_util::StreamExt;
 use log::{debug, error, info, trace, warn};
 use sha1::{Digest, Sha1};
@@ -39,7 +40,7 @@ mod player_event_handler;
 use player_event_handler::{run_program_on_sink_events, EventHandler};
 
 fn device_id(name: &str) -> String {
-    hex::encode(Sha1::digest(name.as_bytes()))
+    HEXLOWER.encode(&Sha1::digest(name.as_bytes()))
 }
 
 fn usage(program: &str, opts: &getopts::Options) -> String {

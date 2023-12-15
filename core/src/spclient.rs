@@ -6,6 +6,7 @@ use std::{
 
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
+use data_encoding::HEXUPPER_PERMISSIVE;
 use futures_util::future::IntoStream;
 use http::header::HeaderValue;
 use hyper::{
@@ -189,9 +190,10 @@ impl SpClient {
         // on macOS and Windows. On Android and iOS we can send a platform-specific client ID and are
         // then presented with a hash cash challenge. On Linux, we have to pass the old keymaster ID.
         // We delegate most of this logic to `SessionConfig`.
-        let client_id = match OS {
+        let os = OS;
+        let client_id = match os {
             "macos" | "windows" => self.session().client_id(),
-            _ => SessionConfig::default().client_id,
+            os => SessionConfig::default_for_os(os).client_id,
         };
         client_data.client_id = client_id;
 
@@ -206,7 +208,7 @@ impl SpClient {
         let os_version = sys.os_version().unwrap_or_else(|| String::from("0"));
         let kernel_version = sys.kernel_version().unwrap_or_else(|| String::from("0"));
 
-        match OS {
+        match os {
             "windows" => {
                 let os_version = os_version.parse::<f32>().unwrap_or(10.) as i32;
                 let kernel_version = kernel_version.parse::<i32>().unwrap_or(21370);
@@ -269,7 +271,10 @@ impl SpClient {
             match ClientTokenResponseType::from_i32(message.response_type.value()) {
                 // depending on the platform, you're either given a token immediately
                 // or are presented a hash cash challenge to solve first
-                Some(ClientTokenResponseType::RESPONSE_GRANTED_TOKEN_RESPONSE) => break message,
+                Some(ClientTokenResponseType::RESPONSE_GRANTED_TOKEN_RESPONSE) => {
+                    debug!("Received a granted token");
+                    break message;
+                }
                 Some(ClientTokenResponseType::RESPONSE_CHALLENGES_RESPONSE) => {
                     debug!("Received a hash cash challenge, solving...");
 
@@ -279,20 +284,22 @@ impl SpClient {
                         let hash_cash_challenge = challenge.evaluate_hashcash_parameters();
 
                         let ctx = vec![];
-                        let prefix = hex::decode(&hash_cash_challenge.prefix).map_err(|e| {
-                            Error::failed_precondition(format!(
-                                "Unable to decode hash cash challenge: {e}"
-                            ))
-                        })?;
+                        let prefix = HEXUPPER_PERMISSIVE
+                            .decode(hash_cash_challenge.prefix.as_bytes())
+                            .map_err(|e| {
+                                Error::failed_precondition(format!(
+                                    "Unable to decode hash cash challenge: {e}"
+                                ))
+                            })?;
                         let length = hash_cash_challenge.length;
 
-                        let mut suffix = vec![0; 0x10];
+                        let mut suffix = [0u8; 0x10];
                         let answer = Self::solve_hash_cash(&ctx, &prefix, length, &mut suffix);
 
                         match answer {
                             Ok(_) => {
                                 // the suffix must be in uppercase
-                                let suffix = hex::encode(suffix).to_uppercase();
+                                let suffix = HEXUPPER_PERMISSIVE.encode(&suffix);
 
                                 let mut answer_message = ClientTokenRequest::new();
                                 answer_message.request_type =
@@ -302,7 +309,7 @@ impl SpClient {
                                 let challenge_answers = answer_message.mut_challenge_answers();
 
                                 let mut challenge_answer = ChallengeAnswer::new();
-                                challenge_answer.mut_hash_cash().suffix = suffix.to_string();
+                                challenge_answer.mut_hash_cash().suffix = suffix;
                                 challenge_answer.ChallengeType =
                                     ChallengeType::CHALLENGE_HASH_CASH.into();
 
@@ -477,11 +484,14 @@ impl SpClient {
                 HeaderValue::from_str(&format!("{} {}", token.token_type, token.access_token,))?,
             );
 
-            if let Ok(client_token) = self.client_token().await {
-                headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
-            } else {
-                // currently these endpoints seem to work fine without it
-                warn!("Unable to get client token. Trying to continue without...");
+            match self.client_token().await {
+                Ok(client_token) => {
+                    let _ = headers_mut.insert(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?);
+                }
+                Err(e) => {
+                    // currently these endpoints seem to work fine without it
+                    warn!("Unable to get client token: {e} Trying to continue without...")
+                }
             }
 
             last_response = self.session().http_client().request_body(request).await;
