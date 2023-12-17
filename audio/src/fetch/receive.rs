@@ -16,9 +16,8 @@ use librespot_core::{http_client::HttpClient, session::Session, Error};
 use crate::range_set::{Range, RangeSet};
 
 use super::{
-    AudioFileError, AudioFileResult, AudioFileShared, StreamLoaderCommand, StreamingRequest,
-    MAXIMUM_ASSUMED_PING_TIME, MINIMUM_DOWNLOAD_SIZE, MINIMUM_THROUGHPUT,
-    PREFETCH_THRESHOLD_FACTOR,
+    AudioFetchParams, AudioFileError, AudioFileResult, AudioFileShared, StreamLoaderCommand,
+    StreamingRequest,
 };
 
 struct PartialFileData {
@@ -151,6 +150,8 @@ struct AudioFileFetch {
     file_data_tx: mpsc::UnboundedSender<ReceivedData>,
     complete_tx: Option<oneshot::Sender<NamedTempFile>>,
     network_response_times: Vec<Duration>,
+
+    params: AudioFetchParams,
 }
 
 // Might be replaced by enum from std once stable
@@ -166,8 +167,8 @@ impl AudioFileFetch {
     }
 
     fn download_range(&mut self, offset: usize, mut length: usize) -> AudioFileResult {
-        if length < MINIMUM_DOWNLOAD_SIZE {
-            length = MINIMUM_DOWNLOAD_SIZE;
+        if length < self.params.minimum_download_size {
+            length = self.params.minimum_download_size;
         }
 
         // If we are in streaming mode (so not seeking) then start downloading as large
@@ -258,13 +259,13 @@ impl AudioFileFetch {
     fn handle_file_data(&mut self, data: ReceivedData) -> Result<ControlFlow, Error> {
         match data {
             ReceivedData::Throughput(mut throughput) => {
-                if throughput < MINIMUM_THROUGHPUT {
+                if throughput < self.params.minimum_throughput {
                     warn!(
                         "Throughput {} kbps lower than minimum {}, setting to minimum",
                         throughput / 1000,
-                        MINIMUM_THROUGHPUT / 1000,
+                        self.params.minimum_throughput / 1000,
                     );
-                    throughput = MINIMUM_THROUGHPUT;
+                    throughput = self.params.minimum_throughput;
                 }
 
                 let old_throughput = self.shared.throughput();
@@ -287,13 +288,13 @@ impl AudioFileFetch {
                 self.shared.set_throughput(avg_throughput);
             }
             ReceivedData::ResponseTime(mut response_time) => {
-                if response_time > MAXIMUM_ASSUMED_PING_TIME {
+                if response_time > self.params.maximum_assumed_ping_time {
                     warn!(
                         "Time to first byte {} ms exceeds maximum {}, setting to maximum",
                         response_time.as_millis(),
-                        MAXIMUM_ASSUMED_PING_TIME.as_millis()
+                        self.params.maximum_assumed_ping_time.as_millis()
                     );
-                    response_time = MAXIMUM_ASSUMED_PING_TIME;
+                    response_time = self.params.maximum_assumed_ping_time;
                 }
 
                 let old_ping_time_ms = self.shared.ping_time().as_millis();
@@ -423,6 +424,8 @@ pub(super) async fn audio_file_fetch(
         initial_request,
     ));
 
+    let params = AudioFetchParams::get();
+
     let mut fetch = AudioFileFetch {
         session: session.clone(),
         shared,
@@ -431,6 +434,8 @@ pub(super) async fn audio_file_fetch(
         file_data_tx,
         complete_tx: Some(complete_tx),
         network_response_times: Vec::with_capacity(3),
+
+        params: params.clone(),
     };
 
     loop {
@@ -472,7 +477,7 @@ pub(super) async fn audio_file_fetch(
             let throughput = fetch.shared.throughput();
 
             let desired_pending_bytes = max(
-                (PREFETCH_THRESHOLD_FACTOR
+                (params.prefetch_threshold_factor
                     * ping_time_seconds
                     * fetch.shared.bytes_per_second as f32) as usize,
                 (ping_time_seconds * throughput as f32) as usize,
