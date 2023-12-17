@@ -24,10 +24,7 @@ use symphonia::core::io::MediaSource;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    audio::{
-        AudioDecrypt, AudioFile, StreamLoaderController, READ_AHEAD_BEFORE_PLAYBACK,
-        READ_AHEAD_DURING_PLAYBACK,
-    },
+    audio::{AudioDecrypt, AudioFetchParams, AudioFile, StreamLoaderController},
     audio_backend::Sink,
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
@@ -2223,13 +2220,14 @@ impl PlayerInternal {
             ..
         } = self.state
         {
+            let read_ahead_during_playback = AudioFetchParams::get().read_ahead_during_playback;
             // Request our read ahead range
             let request_data_length =
-                (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize;
+                (read_ahead_during_playback.as_secs_f32() * bytes_per_second as f32) as usize;
 
             // Request the part we want to wait for blocking. This effectively means we wait for the previous request to partially complete.
             let wait_for_data_length =
-                (READ_AHEAD_BEFORE_PLAYBACK.as_secs_f32() * bytes_per_second as f32) as usize;
+                (read_ahead_during_playback.as_secs_f32() * bytes_per_second as f32) as usize;
 
             stream_loader_controller
                 .fetch_next_and_wait(request_data_length, wait_for_data_length)

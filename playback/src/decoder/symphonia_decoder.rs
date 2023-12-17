@@ -36,7 +36,7 @@ impl SymphoniaDecoder {
         R: MediaSource + 'static,
     {
         let mss_opts = MediaSourceStreamOptions {
-            buffer_len: librespot_audio::MINIMUM_DOWNLOAD_SIZE,
+            buffer_len: librespot_audio::AudioFetchParams::get().minimum_download_size,
         };
         let mss = MediaSourceStream::new(Box::new(input), mss_opts);
 
