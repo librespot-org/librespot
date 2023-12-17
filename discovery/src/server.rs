@@ -12,7 +12,7 @@ use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::engine::Engine as _;
 use futures_core::Stream;
-use futures_util::{FutureExt, TryFutureExt};
+use futures_util::{lock::Mutex, FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
 use hyper::{
     service::{make_service_fn, service_fn},
@@ -44,7 +44,7 @@ pub struct Config {
 
 struct RequestHandler {
     config: Config,
-    username: Option<String>,
+    username: Mutex<Option<String>>,
     keys: DhLocalKeys,
     tx: mpsc::UnboundedSender<Credentials>,
 }
@@ -55,7 +55,7 @@ impl RequestHandler {
 
         let discovery = Self {
             config,
-            username: None,
+            username: Mutex::new(None),
             keys: DhLocalKeys::random(&mut rand::thread_rng()),
             tx,
         };
@@ -63,13 +63,11 @@ impl RequestHandler {
         (discovery, rx)
     }
 
-    fn handle_get_info(&self) -> Response<hyper::Body> {
+    async fn handle_get_info(&self) -> Response<hyper::Body> {
         let public_key = BASE64.encode(self.keys.public_key());
         let device_type: &str = self.config.device_type.into();
-        let mut active_user = String::new();
-        if let Some(username) = &self.username {
-            active_user = username.to_string();
-        }
+        let maybe_username = self.username.lock().await;
+        let active_user = maybe_username.as_deref().unwrap_or("");
 
         // See: https://developer.spotify.com/documentation/commercial-hardware/implementation/guides/zeroconf/
         let body = json!({
@@ -111,7 +109,7 @@ impl RequestHandler {
         Response::new(Body::from(body))
     }
 
-    fn handle_add_user(&self, params: &Params<'_>) -> Result<Response<hyper::Body>, Error> {
+    async fn handle_add_user(&self, params: &Params<'_>) -> Result<Response<hyper::Body>, Error> {
         let username_key = "userName";
         let username = params
             .get(username_key)
@@ -184,7 +182,11 @@ impl RequestHandler {
 
         let credentials = Credentials::with_blob(username, decrypted, &self.config.device_id)?;
 
-        self.tx.send(credentials)?;
+        {
+            let mut username_field = self.username.lock().await;
+            self.tx.send(credentials)?;
+            *username_field = Some(String::from(username));
+        }
 
         let result = json!({
             "status": 101,
@@ -226,8 +228,8 @@ impl RequestHandler {
         let action = params.get("action").map(Cow::as_ref);
 
         Ok(Ok(match (parts.method, action) {
-            (Method::GET, Some("getInfo")) => self.handle_get_info(),
-            (Method::POST, Some("addUser")) => self.handle_add_user(&params)?,
+            (Method::GET, Some("getInfo")) => self.handle_get_info().await,
+            (Method::POST, Some("addUser")) => self.handle_add_user(&params).await?,
             _ => self.not_found(),
         }))
     }
