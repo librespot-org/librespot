@@ -6,7 +6,7 @@ use std::{
     io::{self, Read, Seek, SeekFrom},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
+        Arc, OnceLock,
     },
     time::Duration,
 };
@@ -55,42 +55,75 @@ impl From<AudioFileError> for Error {
     }
 }
 
-/// The minimum size of a block that is requested from the Spotify servers in one request.
-/// This is the block size that is typically requested while doing a `seek()` on a file.
-/// The Symphonia decoder requires this to be a power of 2 and > 32 kB.
-/// Note: smaller requests can happen if part of the block is downloaded already.
-pub const MINIMUM_DOWNLOAD_SIZE: usize = 64 * 1024;
+#[derive(Clone)]
+pub struct AudioFetchParams {
+    /// The minimum size of a block that is requested from the Spotify servers in one request.
+    /// This is the block size that is typically requested while doing a `seek()` on a file.
+    /// The Symphonia decoder requires this to be a power of 2 and > 32 kB.
+    /// Note: smaller requests can happen if part of the block is downloaded already.
+    pub minimum_download_size: usize,
 
-/// The minimum network throughput that we expect. Together with the minimum download size,
-/// this will determine the time we will wait for a response.
-pub const MINIMUM_THROUGHPUT: usize = 8 * 1024;
+    /// The minimum network throughput that we expect. Together with the minimum download size,
+    /// this will determine the time we will wait for a response.
+    pub minimum_throughput: usize,
 
-/// The ping time that is used for calculations before a ping time was actually measured.
-pub const INITIAL_PING_TIME_ESTIMATE: Duration = Duration::from_millis(500);
+    /// The ping time that is used for calculations before a ping time was actually measured.
+    pub initial_ping_time_estimate: Duration,
 
-/// If the measured ping time to the Spotify server is larger than this value, it is capped
-/// to avoid run-away block sizes and pre-fetching.
-pub const MAXIMUM_ASSUMED_PING_TIME: Duration = Duration::from_millis(1500);
+    /// If the measured ping time to the Spotify server is larger than this value, it is capped
+    /// to avoid run-away block sizes and pre-fetching.
+    pub maximum_assumed_ping_time: Duration,
 
-/// Before playback starts, this many seconds of data must be present.
-/// Note: the calculations are done using the nominal bitrate of the file. The actual amount
-/// of audio data may be larger or smaller.
-pub const READ_AHEAD_BEFORE_PLAYBACK: Duration = Duration::from_secs(1);
+    /// Before playback starts, this many seconds of data must be present.
+    /// Note: the calculations are done using the nominal bitrate of the file. The actual amount
+    /// of audio data may be larger or smaller.
+    pub read_ahead_before_playback: Duration,
 
-/// While playing back, this many seconds of data ahead of the current read position are
-/// requested.
-/// Note: the calculations are done using the nominal bitrate of the file. The actual amount
-/// of audio data may be larger or smaller.
-pub const READ_AHEAD_DURING_PLAYBACK: Duration = Duration::from_secs(5);
+    /// While playing back, this many seconds of data ahead of the current read position are
+    /// requested.
+    /// Note: the calculations are done using the nominal bitrate of the file. The actual amount
+    /// of audio data may be larger or smaller.
+    pub read_ahead_during_playback: Duration,
 
-/// If the amount of data that is pending (requested but not received) is less than a certain amount,
-/// data is pre-fetched in addition to the read ahead settings above. The threshold for requesting more
-/// data is calculated as `<pending bytes> < PREFETCH_THRESHOLD_FACTOR * <ping time> * <nominal data rate>`
-pub const PREFETCH_THRESHOLD_FACTOR: f32 = 4.0;
+    /// If the amount of data that is pending (requested but not received) is less than a certain amount,
+    /// data is pre-fetched in addition to the read ahead settings above. The threshold for requesting more
+    /// data is calculated as `<pending bytes> < PREFETCH_THRESHOLD_FACTOR * <ping time> * <nominal data rate>`
+    pub prefetch_threshold_factor: f32,
 
-/// The time we will wait to obtain status updates on downloading.
-pub const DOWNLOAD_TIMEOUT: Duration =
-    Duration::from_secs((MINIMUM_DOWNLOAD_SIZE / MINIMUM_THROUGHPUT) as u64);
+    /// The time we will wait to obtain status updates on downloading.
+    pub download_timeout: Duration,
+}
+
+impl Default for AudioFetchParams {
+    fn default() -> Self {
+        let minimum_download_size = 64 * 1024;
+        let minimum_throughput = 8 * 1024;
+        Self {
+            minimum_download_size,
+            minimum_throughput,
+            initial_ping_time_estimate: Duration::from_millis(500),
+            maximum_assumed_ping_time: Duration::from_millis(1500),
+            read_ahead_before_playback: Duration::from_secs(1),
+            read_ahead_during_playback: Duration::from_secs(5),
+            prefetch_threshold_factor: 4.0,
+            download_timeout: Duration::from_secs(
+                (minimum_download_size / minimum_throughput) as u64,
+            ),
+        }
+    }
+}
+
+static AUDIO_FETCH_PARAMS: OnceLock<AudioFetchParams> = OnceLock::new();
+
+impl AudioFetchParams {
+    pub fn set(params: AudioFetchParams) -> Result<(), AudioFetchParams> {
+        AUDIO_FETCH_PARAMS.set(params)
+    }
+
+    pub fn get() -> &'static AudioFetchParams {
+        AUDIO_FETCH_PARAMS.get_or_init(AudioFetchParams::default)
+    }
+}
 
 pub enum AudioFile {
     Cached(fs::File),
@@ -183,6 +216,7 @@ impl StreamLoaderController {
 
         if let Some(ref shared) = self.stream_shared {
             let mut download_status = shared.download_status.lock();
+            let download_timeout = AudioFetchParams::get().download_timeout;
 
             while range.length
                 > download_status
@@ -191,7 +225,7 @@ impl StreamLoaderController {
             {
                 if shared
                     .cond
-                    .wait_for(&mut download_status, DOWNLOAD_TIMEOUT)
+                    .wait_for(&mut download_status, download_timeout)
                     .timed_out()
                 {
                     return Err(AudioFileError::WaitTimeout.into());
@@ -297,7 +331,7 @@ impl AudioFileShared {
         if ping_time_ms > 0 {
             Duration::from_millis(ping_time_ms as u64)
         } else {
-            INITIAL_PING_TIME_ESTIMATE
+            AudioFetchParams::get().initial_ping_time_estimate
         }
     }
 
@@ -395,6 +429,8 @@ impl AudioFileStreaming {
             trace!("Streaming from {}", url);
         }
 
+        let minimum_download_size = AudioFetchParams::get().minimum_download_size;
+
         // When the audio file is really small, this `download_size` may turn out to be
         // larger than the audio file we're going to stream later on. This is OK; requesting
         // `Content-Range` > `Content-Length` will return the complete file with status code
@@ -402,7 +438,7 @@ impl AudioFileStreaming {
         let mut streamer =
             session
                 .spclient()
-                .stream_from_cdn(&cdn_url, 0, MINIMUM_DOWNLOAD_SIZE)?;
+                .stream_from_cdn(&cdn_url, 0, minimum_download_size)?;
 
         // Get the first chunk with the headers to get the file size.
         // The remainder of that chunk with possibly also a response body is then
@@ -490,9 +526,10 @@ impl Read for AudioFileStreaming {
             return Ok(0);
         }
 
+        let read_ahead_during_playback = AudioFetchParams::get().read_ahead_during_playback;
         let length_to_request = if self.shared.is_download_streaming() {
             let length_to_request = length
-                + (READ_AHEAD_DURING_PLAYBACK.as_secs_f32() * self.shared.bytes_per_second as f32)
+                + (read_ahead_during_playback.as_secs_f32() * self.shared.bytes_per_second as f32)
                     as usize;
 
             // Due to the read-ahead stuff, we potentially request more than the actual request demanded.
@@ -515,11 +552,12 @@ impl Read for AudioFileStreaming {
                 .map_err(|err| io::Error::new(io::ErrorKind::BrokenPipe, err))?;
         }
 
+        let download_timeout = AudioFetchParams::get().download_timeout;
         while !download_status.downloaded.contains(offset) {
             if self
                 .shared
                 .cond
-                .wait_for(&mut download_status, DOWNLOAD_TIMEOUT)
+                .wait_for(&mut download_status, download_timeout)
                 .timed_out()
             {
                 return Err(io::Error::new(
