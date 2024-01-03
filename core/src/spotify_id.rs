@@ -98,6 +98,9 @@ impl SpotifyId {
     ///
     /// [Spotify ID]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn from_base16(src: &str) -> SpotifyIdResult {
+        if src.len() != 32 {
+            return Err(SpotifyIdError::InvalidId.into());
+        }
         let mut dst: u128 = 0;
 
         for c in src.as_bytes() {
@@ -123,6 +126,9 @@ impl SpotifyId {
     ///
     /// [Spotify ID]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn from_base62(src: &str) -> SpotifyIdResult {
+        if src.len() != 22 {
+            return Err(SpotifyIdError::InvalidId.into());
+        }
         let mut dst: u128 = 0;
 
         for c in src.as_bytes() {
@@ -133,8 +139,8 @@ impl SpotifyId {
                 _ => return Err(SpotifyIdError::InvalidId.into()),
             } as u128;
 
-            dst *= 62;
-            dst += p;
+            dst = dst.checked_mul(62).ok_or(SpotifyIdError::InvalidId)?;
+            dst = dst.checked_add(p).ok_or(SpotifyIdError::InvalidId)?;
         }
 
         Ok(Self {
@@ -606,7 +612,7 @@ mod tests {
         },
     ];
 
-    static CONV_INVALID: [ConversionCase; 3] = [
+    static CONV_INVALID: [ConversionCase; 5] = [
         ConversionCase {
             id: 0,
             kind: SpotifyItemType::Unknown,
@@ -636,8 +642,35 @@ mod tests {
             kind: SpotifyItemType::Unknown,
             // Uri too short
             uri: "spotify:azb:aRS48xBl0tH",
+            // too long, should return error but not panic overflow
+            base16: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            // too long, should return error but not panic overflow
+            base62: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            raw: &[
+                // Invalid length.
+                154, 27, 28, 251,
+            ],
+        },
+        ConversionCase {
+            id: 0,
+            kind: SpotifyItemType::Unknown,
+            // Uri too short
+            uri: "spotify:azb:aRS48xBl0tH",
             base16: "--------------------",
-            base62: "....................",
+            // too short to encode a 128 bits int
+            base62: "aa",
+            raw: &[
+                // Invalid length.
+                154, 27, 28, 251,
+            ],
+        },
+        ConversionCase {
+            id: 0,
+            kind: SpotifyItemType::Unknown,
+            uri: "cleary invalid uri",
+            base16: "--------------------",
+            // too high of a value, this would need a 132 bits int
+            base62: "ZZZZZZZZZZZZZZZZZZZZZZ",
             raw: &[
                 // Invalid length.
                 154, 27, 28, 251,
