@@ -74,6 +74,8 @@ enum Platform {
     PLATFORM_GENERIC_PARTNER = 0x26;
     PLATFORM_WIN32_X86_64 = 0x27;
     PLATFORM_WATCHOS = 0x28;
+    PLATFORM_OPENBSD_X86_64 = 0x29;
+    PLATFORM_OPENBSD_ARM64 = 0x2a;
 }
 
 enum Fingerprint {

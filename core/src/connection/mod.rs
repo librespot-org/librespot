@@ -90,7 +90,8 @@ pub async fn authenticate(
 
     let os = match std::env::consts::OS {
         "android" => Os::OS_ANDROID,
-        "freebsd" | "netbsd" | "openbsd" => Os::OS_FREEBSD,
+        "freebsd" | "netbsd" => Os::OS_FREEBSD,
+        "opensbd" => Os::OS_OPENBSD,
         "ios" => Os::OS_IPHONE,
         "linux" => Os::OS_LINUX,
         "macos" => Os::OS_OSX,

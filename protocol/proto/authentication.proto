@@ -115,6 +115,7 @@ enum Os {
     OS_MEEGO = 0x14;
     OS_QNXNTO = 0x15;
     OS_BCO = 0x16;
+    OS_OPENBSD = 0x17;
 }
 
 message LibspotifyAppKey {

@@ -112,9 +112,13 @@ where
 
     let platform = match std::env::consts::OS {
         "android" => Platform::PLATFORM_ANDROID_ARM,
-        "freebsd" | "netbsd" | "openbsd" => match ARCH {
+        "freebsd" | "netbsd" => match ARCH {
             "x86_64" => Platform::PLATFORM_FREEBSD_X86_64,
             _ => Platform::PLATFORM_FREEBSD_X86,
+        },
+        "openbsd" => match ARCH {
+            "aarch64" => Platform::PLATFORM_OPENBSD_ARM64,
+            _ => Platform::PLATFORM_OPENBSD_X86_64,
         },
         "ios" => match ARCH {
             "aarch64" => Platform::PLATFORM_IPHONE_ARM64,

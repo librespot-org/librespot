@@ -71,7 +71,7 @@ cargo build --release
 
 # Packages
 
-librespot is also available via official package system on various operating systems such as Linux, FreeBSD, NetBSD. [Repology](https://repology.org/project/librespot/versions) offers a good overview.
+librespot is also available via official package system on various operating systems such as Linux, FreeBSD, NetBSD, OpenBSD. [Repology](https://repology.org/project/librespot/versions) offers a good overview.
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/librespot.svg)](https://repology.org/project/librespot/versions)
 
