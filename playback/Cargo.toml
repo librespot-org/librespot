@@ -40,7 +40,7 @@ sdl2            = { version = "0.35", optional = true }
 gstreamer       = { version = "0.21.2", optional = true }
 gstreamer-app   = { version = "0.21.2", optional = true }
 gstreamer-audio = { version = "0.21.2", optional = true }
-glib            = { version = "0.18.1", optional = true }
+glib            = { version = "0.19.2", optional = true }
 
 # Rodio dependencies
 rodio           = { version = "0.17.1", optional = true, default-features = false }
