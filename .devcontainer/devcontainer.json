@@ -1,0 +1,24 @@
+{
+  "name": "Librespot Devcontainer",
+  "dockerFile": "Dockerfile",
+	// Use 'postCreateCommand' to run commands after the container is created.
+	//"postCreateCommand": "",
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			"settings": {
+				"dev.containers.copyGitConfig": true
+			},
+			"extensions": [
+				"eamodio.gitlens",
+        		"github.vscode-github-actions",
+				"rust-lang.rust-analyzer"
+			]
+		}
+	},
+  "containerEnv": {
+    "GIT_EDITOR": "nano"
+  }
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+ }
