@@ -2,7 +2,7 @@
 # Build the docker image from the root of the project with the following command :
 # $ docker build -t librespot-cross -f contrib/Dockerfile .
 #
-# The resulting image can be used to build librespot for linux x86_64, armhf(with support for armv6hf), armel, mipsel, aarch64
+# The resulting image can be used to build librespot for linux x86_64, armhf, armel, mipsel, aarch64
 # $ docker run -v /tmp/librespot-build:/build librespot-cross
 #
 # The compiled binaries will be located in /tmp/librespot-build
@@ -12,8 +12,6 @@
 # $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features alsa-backend
 # $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabi --no-default-features --features alsa-backend
 # $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target aarch64-unknown-linux-gnu --no-default-features --features alsa-backend
-
-# $ docker run -v /tmp/librespot-build:/build librespot-cross contrib/docker-build-pi-armv6hf.sh
 
 FROM debian:stretch
 
@@ -39,10 +37,6 @@ RUN mkdir /.cargo && \
     echo '[target.arm-unknown-linux-gnueabihf]\nlinker = "arm-linux-gnueabihf-gcc"' >> /.cargo/config && \
     echo '[target.arm-unknown-linux-gnueabi]\nlinker = "arm-linux-gnueabi-gcc"' >> /.cargo/config && \
     echo '[target.mipsel-unknown-linux-gnu]\nlinker = "mipsel-linux-gnu-gcc"' >> /.cargo/config
-
-RUN mkdir /build && \
-    mkdir /pi-tools && \
-    curl -L https://github.com/raspberrypi/tools/archive/648a6eeb1e3c2b40af4eb34d88941ee0edeb3e9a.tar.gz | tar xz --strip-components 1 -C /pi-tools
 
 ENV CARGO_TARGET_DIR /build
 ENV CARGO_HOME /build/cache
