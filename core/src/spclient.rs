@@ -17,7 +17,7 @@ use hyper::{
 use protobuf::{Enum, Message, MessageFull};
 use rand::RngCore;
 use sha1::{Digest, Sha1};
-use sysinfo::{System, SystemExt};
+use sysinfo::System;
 use thiserror::Error;
 
 use crate::{
@@ -204,9 +204,8 @@ impl SpClient {
             .platform_specific_data
             .mut_or_insert_default();
 
-        let sys = System::new();
-        let os_version = sys.os_version().unwrap_or_else(|| String::from("0"));
-        let kernel_version = sys.kernel_version().unwrap_or_else(|| String::from("0"));
+        let os_version = System::os_version().unwrap_or_else(|| String::from("0"));
+        let kernel_version = System::kernel_version().unwrap_or_else(|| String::from("0"));
 
         match os {
             "windows" => {

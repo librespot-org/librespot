@@ -12,7 +12,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
-use sysinfo::{System, SystemExt};
+use sysinfo::System;
 use thiserror::Error;
 use url::Url;
 
@@ -1693,7 +1693,7 @@ async fn main() {
                 Err(e) => {
                     sys.refresh_processes();
 
-                    if sys.uptime() <= 1 {
+                    if System::uptime() <= 1 {
                         debug!("Retrying to initialise discovery: {e}");
                         tokio::time::sleep(DISCOVERY_RETRY_TIMEOUT).await;
                     } else {

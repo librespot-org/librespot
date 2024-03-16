@@ -20,7 +20,7 @@ use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use nonzero_ext::nonzero;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use sysinfo::{System, SystemExt};
+use sysinfo::System;
 use thiserror::Error;
 use url::Url;
 
@@ -105,9 +105,7 @@ pub struct HttpClient {
 impl HttpClient {
     pub fn new(proxy_url: Option<&Url>) -> Self {
         let zero_str = String::from("0");
-        let os_version = System::new()
-            .os_version()
-            .unwrap_or_else(|| zero_str.clone());
+        let os_version = System::os_version().unwrap_or_else(|| zero_str.clone());
 
         let (spotify_platform, os_version) = match OS {
             "android" => ("Android", os_version),
