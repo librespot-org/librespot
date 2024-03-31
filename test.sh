@@ -14,9 +14,8 @@ cargo hack clippy --each-feature
 
 cargo build --workspace --examples
 cargo test --workspace
-cargo hack --workspace --remove-dev-deps
 cargo check -p librespot-core --no-default-features
 cargo check -p librespot-core
-cargo hack check --each-feature -p librespot-discovery
-cargo hack check --each-feature -p librespot-playback
-cargo hack check --each-feature
+cargo hack check --no-dev-deps --each-feature -p librespot-discovery
+cargo hack check --no-dev-deps --each-feature -p librespot-playback
+cargo hack check --no-dev-deps --each-feature
