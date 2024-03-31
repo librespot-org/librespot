@@ -28,19 +28,19 @@ parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 shell-words = "1.1"
 thiserror = "1"
 tokio = { version = "1", features = ["parking_lot", "rt", "rt-multi-thread", "sync"] }
-zerocopy = { version = "0.7.31", features = ["derive"] }
+zerocopy = { version = "0.7.32", features = ["derive"] }
 
 # Backends
-alsa            = { version = "0.8.1", optional = true }
+alsa            = { version = "0.9.0", optional = true }
 portaudio-rs    = { version = "0.3", optional = true }
 libpulse-binding        = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
 jack            = { version = "0.11", optional = true }
-sdl2            = { version = "0.35", optional = true }
-gstreamer       = { version = "0.21.2", optional = true }
-gstreamer-app   = { version = "0.21.2", optional = true }
-gstreamer-audio = { version = "0.21.2", optional = true }
-glib            = { version = "0.18.1", optional = true }
+sdl2            = { version = "0.36", optional = true }
+gstreamer       = { version = "0.22.1", optional = true }
+gstreamer-app   = { version = "0.22.0", optional = true }
+gstreamer-audio = { version = "0.22.0", optional = true }
+glib            = { version = "0.19.2", optional = true }
 
 # Rodio dependencies
 rodio           = { version = "0.17.1", optional = true, default-features = false }
