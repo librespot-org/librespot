@@ -7,7 +7,7 @@ use std::io;
 
 use futures_util::{SinkExt, StreamExt};
 use num_traits::FromPrimitive;
-use protobuf::{self, Message};
+use protobuf::Message;
 use thiserror::Error;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;

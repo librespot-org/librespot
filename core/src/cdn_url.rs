@@ -1,7 +1,4 @@
-use std::{
-    convert::TryFrom,
-    ops::{Deref, DerefMut},
-};
+use std::ops::{Deref, DerefMut};
 
 use protobuf::Message;
 use thiserror::Error;
