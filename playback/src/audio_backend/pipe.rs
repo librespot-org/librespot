@@ -66,6 +66,7 @@ impl Sink for StdoutSink {
                     OpenOptions::new()
                         .write(true)
                         .create(true)
+                        .truncate(true)
                         .open(file)
                         .map_err(|e| StdoutError::OpenFailure {
                             file: file.to_string(),
