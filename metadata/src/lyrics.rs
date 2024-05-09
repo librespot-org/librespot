@@ -48,7 +48,6 @@ pub struct Colors {
 #[serde(rename_all = "camelCase")]
 pub struct LyricsInner {
     // TODO: 'alternatives' field as an array but I don't know what it's meant for
-    pub fullscreen_action: String,
     pub is_dense_typeface: bool,
     pub is_rtl_language: bool,
     pub language: String,
