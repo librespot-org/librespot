@@ -239,9 +239,9 @@ impl SpClient {
                 let android_data = platform_data.mut_android();
                 android_data.android_version = os_version;
                 android_data.api_version = 31;
-                android_data.device_name = "Pixel".to_owned();
-                android_data.model_str = "GF5KQ".to_owned();
-                android_data.vendor = "Google".to_owned();
+                "Pixel".clone_into(&mut android_data.device_name);
+                "GF5KQ".clone_into(&mut android_data.model_str);
+                "Google".clone_into(&mut android_data.vendor);
             }
             "macos" => {
                 let macos_data = platform_data.mut_desktop_macos();
