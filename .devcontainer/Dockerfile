@@ -5,6 +5,9 @@ FROM rust:${rust_version}-${debian_version}
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
+ENV RUST_BACKTRACE=1
+ENV RUSTFLAGS=-Dwarnings
+
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
