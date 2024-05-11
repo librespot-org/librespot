@@ -2,7 +2,7 @@ use std::{env::consts::ARCH, io};
 
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use hmac::{Hmac, Mac};
-use protobuf::{self, Message};
+use protobuf::Message;
 use rand::{thread_rng, RngCore};
 use rsa::{BigUint, Pkcs1v15Sign, RsaPublicKey};
 use sha1::{Digest, Sha1};

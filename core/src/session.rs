@@ -513,13 +513,7 @@ impl Session {
     }
 
     pub fn get_user_attribute(&self, key: &str) -> Option<String> {
-        self.0
-            .data
-            .read()
-            .user_data
-            .attributes
-            .get(key)
-            .map(Clone::clone)
+        self.0.data.read().user_data.attributes.get(key).cloned()
     }
 
     fn weak(&self) -> SessionWeak {
