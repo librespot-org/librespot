@@ -49,15 +49,15 @@ impl From<MercuryError> for Error {
     }
 }
 
-impl ToString for MercuryMethod {
-    fn to_string(&self) -> String {
-        match *self {
+impl std::fmt::Display for MercuryMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match *self {
             MercuryMethod::Get => "GET",
             MercuryMethod::Sub => "SUB",
             MercuryMethod::Unsub => "UNSUB",
             MercuryMethod::Send => "SEND",
-        }
-        .to_owned()
+        };
+        write!(f, "{}", s)
     }
 }
 

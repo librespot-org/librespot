@@ -358,7 +358,7 @@ impl Session {
                 loop {
                     match reader.read_event_into(&mut buf) {
                         Ok(Event::Start(ref element)) => {
-                            current_element = std::str::from_utf8(element)?.to_owned()
+                            std::str::from_utf8(element)?.clone_into(&mut current_element)
                         }
                         Ok(Event::End(_)) => {
                             current_element = String::new();
@@ -428,7 +428,7 @@ impl Session {
     }
 
     pub fn set_client_id(&self, client_id: &str) {
-        self.0.data.write().client_id = client_id.to_owned();
+        client_id.clone_into(&mut self.0.data.write().client_id);
     }
 
     pub fn client_name(&self) -> String {
@@ -436,7 +436,7 @@ impl Session {
     }
 
     pub fn set_client_name(&self, client_name: &str) {
-        self.0.data.write().client_name = client_name.to_owned();
+        client_name.clone_into(&mut self.0.data.write().client_name);
     }
 
     pub fn client_brand_name(&self) -> String {
@@ -444,7 +444,7 @@ impl Session {
     }
 
     pub fn set_client_brand_name(&self, client_brand_name: &str) {
-        self.0.data.write().client_brand_name = client_brand_name.to_owned();
+        client_brand_name.clone_into(&mut self.0.data.write().client_brand_name);
     }
 
     pub fn client_model_name(&self) -> String {
@@ -452,7 +452,7 @@ impl Session {
     }
 
     pub fn set_client_model_name(&self, client_model_name: &str) {
-        self.0.data.write().client_model_name = client_model_name.to_owned();
+        client_model_name.clone_into(&mut self.0.data.write().client_model_name);
     }
 
     pub fn connection_id(&self) -> String {
@@ -460,7 +460,7 @@ impl Session {
     }
 
     pub fn set_connection_id(&self, connection_id: &str) {
-        self.0.data.write().connection_id = connection_id.to_owned();
+        connection_id.clone_into(&mut self.0.data.write().connection_id);
     }
 
     pub fn username(&self) -> String {
@@ -468,7 +468,7 @@ impl Session {
     }
 
     pub fn set_username(&self, username: &str) {
-        self.0.data.write().user_data.canonical_username = username.to_owned();
+        username.clone_into(&mut self.0.data.write().user_data.canonical_username);
     }
 
     pub fn country(&self) -> String {
