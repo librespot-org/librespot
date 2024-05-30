@@ -15,6 +15,10 @@
 
 FROM debian:stretch
 
+RUN echo "deb http://archive.debian.org/debian stretch main"                   > /etc/apt/sources.list
+RUN echo "deb http://archive.debian.org/debian stretch-proposed-updates main" >> /etc/apt/sources.list
+RUN echo "deb http://archive.debian.org/debian-security stretch/updates main" >> /etc/apt/sources.list
+
 RUN dpkg --add-architecture arm64
 RUN dpkg --add-architecture armhf
 RUN dpkg --add-architecture armel
@@ -25,7 +29,7 @@ RUN apt-get install -y curl git build-essential crossbuild-essential-arm64 cross
 RUN apt-get install -y libasound2-dev libasound2-dev:arm64 libasound2-dev:armel libasound2-dev:armhf libasound2-dev:mipsel
 RUN apt-get install -y libpulse0 libpulse0:arm64 libpulse0:armel libpulse0:armhf
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.71 -y
 ENV PATH="/root/.cargo/bin/:${PATH}"
 RUN rustup target add aarch64-unknown-linux-gnu
 RUN rustup target add arm-unknown-linux-gnueabi
