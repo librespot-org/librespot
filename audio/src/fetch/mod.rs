@@ -12,7 +12,8 @@ use std::{
 };
 
 use futures_util::{future::IntoStream, StreamExt, TryFutureExt};
-use hyper::{client::ResponseFuture, header::CONTENT_RANGE, Body, Response, StatusCode};
+use hyper::{body::Incoming, header::CONTENT_RANGE, Response, StatusCode};
+use hyper_util::client::legacy::ResponseFuture;
 use parking_lot::{Condvar, Mutex};
 use tempfile::NamedTempFile;
 use thiserror::Error;
@@ -133,7 +134,7 @@ pub enum AudioFile {
 #[derive(Debug)]
 pub struct StreamingRequest {
     streamer: IntoStream<ResponseFuture>,
-    initial_response: Option<Response<Body>>,
+    initial_response: Option<Response<Incoming>>,
     offset: usize,
     length: usize,
 }
