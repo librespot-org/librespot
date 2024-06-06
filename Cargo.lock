@@ -942,7 +942,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "322106e6bd0cba2d5ead589ddb8150a13d7c4217cf80d7c4f682ca994ccc6aa9"
 dependencies = [
- "base64 0.21.7",
+ "base64",
  "bytes",
  "headers-core",
  "http",
@@ -1459,7 +1459,7 @@ name = "librespot-core"
 version = "0.5.0-dev"
 dependencies = [
  "aes",
- "base64 0.21.7",
+ "base64",
  "byteorder",
  "bytes",
  "data-encoding",
@@ -1513,7 +1513,8 @@ name = "librespot-discovery"
 version = "0.5.0-dev"
 dependencies = [
  "aes",
- "base64 0.21.7",
+ "base64",
+ "bytes",
  "cfg-if",
  "ctr",
  "dns-sd",
@@ -1523,6 +1524,7 @@ dependencies = [
  "futures-util",
  "hex",
  "hmac",
+ "http-body-util",
  "hyper",
  "hyper-util",
  "libmdns",
@@ -2455,7 +2457,7 @@ version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c333bb734fcdedcea57de1602543590f545f127dc8b533324318fd492c5c70b"
 dependencies = [
- "base64 0.21.7",
+ "base64",
  "rustls-pki-types",
 ]
 
