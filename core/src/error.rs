@@ -329,10 +329,6 @@ impl From<hyper::Error> for Error {
             return Self::new(ErrorKind::Cancelled, err);
         }
 
-        if err.is_connect() {
-            return Self::new(ErrorKind::Unavailable, err);
-        }
-
         if err.is_incomplete_message() {
             return Self::new(ErrorKind::DataLoss, err);
         }
@@ -343,6 +339,16 @@ impl From<hyper::Error> for Error {
 
         if err.is_timeout() {
             return Self::new(ErrorKind::DeadlineExceeded, err);
+        }
+
+        Self::new(ErrorKind::Unknown, err)
+    }
+}
+
+impl From<hyper_util::client::legacy::Error> for Error {
+    fn from(err: hyper_util::client::legacy::Error) -> Self {
+        if err.is_connect() {
+            return Self::new(ErrorKind::Unavailable, err);
         }
 
         Self::new(ErrorKind::Unknown, err)
