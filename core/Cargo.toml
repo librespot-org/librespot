@@ -26,7 +26,7 @@ governor = { version = "0.6", default-features = false, features = ["std", "jitt
 hmac = "0.12"
 httparse = "1.7"
 http = "0.2"
-hyper = { version = "0.14", features = ["client", "http1", "http2", "tcp"] }
+hyper = { version = "0.14", features = ["client", "http1", "http2", "tcp", "backports", "deprecated"] }
 hyper-proxy = { version = "0.9", default-features = false, features = ["rustls"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
 log = "0.4"

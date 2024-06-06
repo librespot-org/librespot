@@ -18,7 +18,7 @@ form_urlencoded = "1.0"
 futures-core = "0.3"
 futures-util = "0.3"
 hmac = "0.12"
-hyper = { version = "0.14", features = ["http1", "server", "tcp"] }
+hyper = { version = "0.14", features = ["http1", "server", "tcp", "backports", "deprecated"] }
 libmdns = "0.8"
 log = "0.4"
 rand = "0.8"

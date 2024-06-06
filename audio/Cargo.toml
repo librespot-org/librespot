@@ -19,7 +19,7 @@ bytes = "1"
 ctr = "0.9"
 futures-core = "0.3"
 futures-util = "0.3"
-hyper = { version = "0.14", features = ["client"] }
+hyper = { version = "0.14", features = ["client", "backports", "deprecated"] }
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 tempfile = "3"

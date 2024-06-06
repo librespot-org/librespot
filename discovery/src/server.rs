@@ -15,8 +15,7 @@ use futures_core::Stream;
 use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
 use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, StatusCode,
+    body::HttpBody, service::{make_service_fn, service_fn}, Body, Method, Request, Response, StatusCode
 };
 
 use log::{debug, error, warn};
@@ -219,7 +218,7 @@ impl RequestHandler {
             debug!("{:?} {:?} {:?}", parts.method, parts.uri.path(), params);
         }
 
-        let body = hyper::body::to_bytes(body).await?;
+        let body = body.collect().await?.to_bytes();
 
         params.extend(form_urlencoded::parse(&body));
 

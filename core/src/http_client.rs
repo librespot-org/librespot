@@ -11,9 +11,7 @@ use governor::{
 };
 use http::{header::HeaderValue, Uri};
 use hyper::{
-    client::{HttpConnector, ResponseFuture},
-    header::USER_AGENT,
-    Body, Client, HeaderMap, Request, Response, StatusCode,
+    body::HttpBody, client::{HttpConnector, ResponseFuture}, header::USER_AGENT, Body, Client, HeaderMap, Request, Response, StatusCode
 };
 use hyper_proxy::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
@@ -178,9 +176,7 @@ impl HttpClient {
         // As correct as that may be technically, we now need all this boilerplate to clone it
         // ourselves, as any `Request` is moved in the loop.
         let (parts, body) = req.into_parts();
-        let body_as_bytes = hyper::body::to_bytes(body)
-            .await
-            .unwrap_or_else(|_| Bytes::new());
+        let body_as_bytes = body.collect().await.map(|b| b.to_bytes()).unwrap_or_default();
 
         loop {
             let mut req = Request::builder()
@@ -218,7 +214,7 @@ impl HttpClient {
 
     pub async fn request_body(&self, req: Request<Body>) -> Result<Bytes, Error> {
         let response = self.request(req).await?;
-        Ok(hyper::body::to_bytes(response.into_body()).await?)
+        Ok(response.into_body().collect().await?.to_bytes())
     }
 
     pub fn request_stream(&self, req: Request<Body>) -> Result<IntoStream<ResponseFuture>, Error> {
