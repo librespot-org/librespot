@@ -321,7 +321,7 @@ impl From<http::Error> for Error {
 
 impl From<hyper::Error> for Error {
     fn from(err: hyper::Error) -> Self {
-        if err.is_parse() || err.is_parse_too_large() || err.is_parse_status() || err.is_user() {
+        if err.is_parse() || err.is_parse_status() || err.is_user() {
             return Self::new(ErrorKind::Internal, err);
         }
 
