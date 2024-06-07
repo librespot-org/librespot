@@ -7,10 +7,10 @@ use std::{
 
 use bytes::Bytes;
 use futures_util::StreamExt;
+use http_body_util::BodyExt;
 use hyper::StatusCode;
 use tempfile::NamedTempFile;
 use tokio::sync::{mpsc, oneshot};
-use http_body_util::BodyExt;
 
 use librespot_core::{http_client::HttpClient, session::Session, Error};
 

@@ -11,12 +11,13 @@ use governor::{
 };
 use http::{header::HeaderValue, Uri};
 use http_body_util::{BodyExt, Full};
-use hyper::{
-    body::Incoming, header::USER_AGENT, HeaderMap, Request, Response, StatusCode
-};
+use hyper::{body::Incoming, header::USER_AGENT, HeaderMap, Request, Response, StatusCode};
 use hyper_proxy2::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
-use hyper_util::{client::legacy::{connect::HttpConnector, Client, ResponseFuture}, rt::TokioExecutor};
+use hyper_util::{
+    client::legacy::{connect::HttpConnector, Client, ResponseFuture},
+    rt::TokioExecutor,
+};
 use nonzero_ext::nonzero;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -249,7 +250,6 @@ impl HttpClient {
             ))
         })?;
 
-        
         Ok(self.hyper_client()?.request(req.map(Full::new)))
     }
 

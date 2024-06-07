@@ -16,9 +16,7 @@ use futures_core::Stream;
 use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
 use http_body_util::{BodyExt, Full};
-use hyper::{
-    body::Incoming, Method, Request, Response, StatusCode
-};
+use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 use log::{debug, error, warn};
@@ -246,7 +244,7 @@ impl DiscoveryServer {
     pub fn new(config: Config, port: &mut u16) -> Result<Self, Error> {
         let (discovery, cred_rx) = RequestHandler::new(config);
         let address = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *port);
-        
+
         let (close_tx, close_rx) = oneshot::channel();
 
         let listener = match TcpListener::bind(address) {
@@ -271,10 +269,9 @@ impl DiscoveryServer {
             }
         }
 
-
         tokio::spawn(async move {
             let discovery = Arc::new(discovery);
-        
+
             let server = hyper::server::conn::http1::Builder::new();
             let graceful = GracefulShutdown::new();
             let mut close_rx = std::pin::pin!(close_rx);
