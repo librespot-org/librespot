@@ -409,7 +409,7 @@ async fn connect(
 
     let stream = socket::connect(host, port, proxy).await?;
 
-    let (mut ws_tx, ws_rx) = tokio_tungstenite::client_async_tls(address, stream)
+    let (mut ws_tx, ws_rx) = tokio_tungstenite::client_async_tls(address.as_str(), stream)
         .await?
         .0
         .split();
