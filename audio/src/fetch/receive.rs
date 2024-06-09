@@ -7,6 +7,7 @@ use std::{
 
 use bytes::Bytes;
 use futures_util::StreamExt;
+use http_body_util::BodyExt;
 use hyper::StatusCode;
 use tempfile::NamedTempFile;
 use tokio::sync::{mpsc, oneshot};
@@ -97,7 +98,7 @@ async fn receive_data(
         }
 
         let body = response.into_body();
-        let data = match hyper::body::to_bytes(body).await {
+        let data = match body.collect().await.map(|b| b.to_bytes()) {
             Ok(bytes) => bytes,
             Err(e) => break Err(e.into()),
         };

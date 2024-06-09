@@ -321,16 +321,12 @@ impl From<http::Error> for Error {
 
 impl From<hyper::Error> for Error {
     fn from(err: hyper::Error) -> Self {
-        if err.is_parse() || err.is_parse_too_large() || err.is_parse_status() || err.is_user() {
+        if err.is_parse() || err.is_parse_status() || err.is_user() {
             return Self::new(ErrorKind::Internal, err);
         }
 
         if err.is_canceled() {
             return Self::new(ErrorKind::Cancelled, err);
-        }
-
-        if err.is_connect() {
-            return Self::new(ErrorKind::Unavailable, err);
         }
 
         if err.is_incomplete_message() {
@@ -343,6 +339,16 @@ impl From<hyper::Error> for Error {
 
         if err.is_timeout() {
             return Self::new(ErrorKind::DeadlineExceeded, err);
+        }
+
+        Self::new(ErrorKind::Unknown, err)
+    }
+}
+
+impl From<hyper_util::client::legacy::Error> for Error {
+    fn from(err: hyper_util::client::legacy::Error) -> Self {
+        if err.is_connect() {
+            return Self::new(ErrorKind::Unavailable, err);
         }
 
         Self::new(ErrorKind::Unknown, err)

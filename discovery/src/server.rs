@@ -2,7 +2,7 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     convert::Infallible,
-    net::{Ipv4Addr, SocketAddr},
+    net::{Ipv4Addr, SocketAddr, TcpListener},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -11,14 +11,14 @@ use std::{
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::engine::Engine as _;
+use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
-use hyper::{
-    service::{make_service_fn, service_fn},
-    Body, Method, Request, Response, StatusCode,
-};
+use http_body_util::{BodyExt, Full};
+use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
+use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 use log::{debug, error, warn};
 use serde_json::json;
 use sha1::{Digest, Sha1};
@@ -63,7 +63,7 @@ impl RequestHandler {
         (discovery, rx)
     }
 
-    fn handle_get_info(&self) -> Response<hyper::Body> {
+    fn handle_get_info(&self) -> Response<Full<Bytes>> {
         let public_key = BASE64.encode(self.keys.public_key());
         let device_type: &str = self.config.device_type.into();
         let mut active_user = String::new();
@@ -107,11 +107,11 @@ impl RequestHandler {
             // - "deviceAPI_isGroup": False
         })
         .to_string();
-
-        Response::new(Body::from(body))
+        let body = Bytes::from(body);
+        Response::new(Full::new(body))
     }
 
-    fn handle_add_user(&self, params: &Params<'_>) -> Result<Response<hyper::Body>, Error> {
+    fn handle_add_user(&self, params: &Params<'_>) -> Result<Response<Full<Bytes>>, Error> {
         let username_key = "userName";
         let username = params
             .get(username_key)
@@ -171,7 +171,8 @@ impl RequestHandler {
             });
 
             let body = result.to_string();
-            return Ok(Response::new(Body::from(body)));
+            let body = Bytes::from(body);
+            return Ok(Response::new(Full::new(body)));
         }
 
         let decrypted = {
@@ -193,10 +194,11 @@ impl RequestHandler {
         });
 
         let body = result.to_string();
-        Ok(Response::new(Body::from(body)))
+        let body = Bytes::from(body);
+        Ok(Response::new(Full::new(body)))
     }
 
-    fn not_found(&self) -> Response<hyper::Body> {
+    fn not_found(&self) -> Response<Full<Bytes>> {
         let mut res = Response::default();
         *res.status_mut() = StatusCode::NOT_FOUND;
         res
@@ -204,8 +206,8 @@ impl RequestHandler {
 
     async fn handle(
         self: Arc<Self>,
-        request: Request<Body>,
-    ) -> Result<hyper::Result<Response<Body>>, Error> {
+        request: Request<Incoming>,
+    ) -> Result<hyper::Result<Response<Full<Bytes>>>, Error> {
         let mut params = Params::new();
 
         let (parts, body) = request.into_parts();
@@ -219,7 +221,7 @@ impl RequestHandler {
             debug!("{:?} {:?} {:?}", parts.method, parts.uri.path(), params);
         }
 
-        let body = hyper::body::to_bytes(body).await?;
+        let body = body.collect().await?.to_bytes();
 
         params.extend(form_urlencoded::parse(&body));
 
@@ -239,52 +241,77 @@ pub struct DiscoveryServer {
 }
 
 impl DiscoveryServer {
-    pub fn new(config: Config, port: &mut u16) -> Result<hyper::Result<Self>, Error> {
+    pub fn new(config: Config, port: &mut u16) -> Result<Self, Error> {
         let (discovery, cred_rx) = RequestHandler::new(config);
-        let discovery = Arc::new(discovery);
+        let address = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *port);
 
         let (close_tx, close_rx) = oneshot::channel();
 
-        let address = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *port);
-
-        let make_service = make_service_fn(move |_| {
-            let discovery = discovery.clone();
-            async move {
-                Ok::<_, hyper::Error>(service_fn(move |request| {
-                    discovery
-                        .clone()
-                        .handle(request)
-                        .inspect_err(|e| error!("could not handle discovery request: {}", e))
-                        .and_then(|x| async move { Ok(x) })
-                        .map(Result::unwrap) // guaranteed by `and_then` above
-                }))
+        let listener = match TcpListener::bind(address) {
+            Ok(listener) => listener,
+            Err(e) => {
+                warn!("Discovery server failed to start: {e}");
+                return Err(e.into());
             }
-        });
+        };
 
-        let server = hyper::Server::try_bind(&address)?.serve(make_service);
+        listener.set_nonblocking(true)?;
+        let listener = tokio::net::TcpListener::from_std(listener)?;
 
-        *port = server.local_addr().port();
-        debug!("Zeroconf server listening on 0.0.0.0:{}", *port);
+        match listener.local_addr() {
+            Ok(addr) => {
+                *port = addr.port();
+                debug!("Zeroconf server listening on 0.0.0.0:{}", *port);
+            }
+            Err(e) => {
+                warn!("Discovery server failed to start: {e}");
+                return Err(e.into());
+            }
+        }
 
-        tokio::spawn(async {
-            let result = server
-                .with_graceful_shutdown(async {
-                    if let Err(e) = close_rx.await {
-                        debug!("unable to close discovery Rx channel completely: {e}");
+        tokio::spawn(async move {
+            let discovery = Arc::new(discovery);
+
+            let server = hyper::server::conn::http1::Builder::new();
+            let graceful = GracefulShutdown::new();
+            let mut close_rx = std::pin::pin!(close_rx);
+            loop {
+                tokio::select! {
+                    Ok((stream, _)) = listener.accept() => {
+                        let io = TokioIo::new(stream);
+                        let discovery = discovery.clone();
+
+                        let svc = hyper::service::service_fn(move |request| {
+                            discovery
+                                .clone()
+                                .handle(request)
+                                .inspect_err(|e| error!("could not handle discovery request: {}", e))
+                                .and_then(|x| async move { Ok(x) })
+                                .map(Result::unwrap) // guaranteed by `and_then` above
+                        });
+
+                        let conn = server.serve_connection(io, svc);
+                        let fut = graceful.watch(conn);
+                        tokio::spawn(async move {
+                            // Errors are logged in the service_fn
+                            let _ = fut.await;
+                        });
                     }
-                    debug!("Shutting down discovery server");
-                })
-                .await;
-
-            if let Err(e) = result {
-                warn!("Discovery server failed: {}", e);
+                    _ = &mut close_rx => {
+                        debug!("Shutting down discovery server");
+                        break;
+                    }
+                }
             }
+
+            graceful.shutdown().await;
+            debug!("Discovery server stopped");
         });
 
-        Ok(Ok(Self {
+        Ok(Self {
             cred_rx,
             _close_tx: close_tx,
-        }))
+        })
     }
 }
 

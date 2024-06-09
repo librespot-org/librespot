@@ -124,7 +124,7 @@ impl Builder {
     pub fn launch(self) -> Result<Discovery, Error> {
         let mut port = self.port;
         let name = self.server_config.name.clone().into_owned();
-        let server = DiscoveryServer::new(self.server_config, &mut port)??;
+        let server = DiscoveryServer::new(self.server_config, &mut port)?;
         let _zeroconf_ip = self.zeroconf_ip;
         let svc;
 

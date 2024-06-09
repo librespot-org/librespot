@@ -10,13 +10,14 @@ use governor::{
     clock::MonotonicClock, middleware::NoOpMiddleware, state::InMemoryState, Quota, RateLimiter,
 };
 use http::{header::HeaderValue, Uri};
-use hyper::{
-    client::{HttpConnector, ResponseFuture},
-    header::USER_AGENT,
-    Body, Client, HeaderMap, Request, Response, StatusCode,
-};
-use hyper_proxy::{Intercept, Proxy, ProxyConnector};
+use http_body_util::{BodyExt, Full};
+use hyper::{body::Incoming, header::USER_AGENT, HeaderMap, Request, Response, StatusCode};
+use hyper_proxy2::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use hyper_util::{
+    client::legacy::{connect::HttpConnector, Client, ResponseFuture},
+    rt::TokioExecutor,
+};
 use nonzero_ext::nonzero;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -89,7 +90,7 @@ impl From<HttpClientError> for Error {
     }
 }
 
-type HyperClient = Client<ProxyConnector<HttpsConnector<HttpConnector>>, Body>;
+type HyperClient = Client<ProxyConnector<HttpsConnector<HttpConnector>>, Full<bytes::Bytes>>;
 
 pub struct HttpClient {
     user_agent: HeaderValue,
@@ -146,7 +147,7 @@ impl HttpClient {
     fn try_create_hyper_client(proxy_url: Option<&Url>) -> Result<HyperClient, Error> {
         // configuring TLS is expensive and should be done once per process
         let https_connector = HttpsConnectorBuilder::new()
-            .with_native_roots()
+            .with_native_roots()?
             .https_or_http()
             .enable_http1()
             .enable_http2()
@@ -160,7 +161,7 @@ impl HttpClient {
         };
         let proxy_connector = ProxyConnector::from_proxy(https_connector, proxy)?;
 
-        let client = Client::builder()
+        let client = Client::builder(TokioExecutor::new())
             .http2_adaptive_window(true)
             .build(proxy_connector);
         Ok(client)
@@ -171,23 +172,20 @@ impl HttpClient {
             .get_or_try_init(|| Self::try_create_hyper_client(self.proxy_url.as_ref()))
     }
 
-    pub async fn request(&self, req: Request<Body>) -> Result<Response<Body>, Error> {
+    pub async fn request(&self, req: Request<Bytes>) -> Result<Response<Incoming>, Error> {
         debug!("Requesting {}", req.uri().to_string());
 
         // `Request` does not implement `Clone` because its `Body` may be a single-shot stream.
         // As correct as that may be technically, we now need all this boilerplate to clone it
         // ourselves, as any `Request` is moved in the loop.
-        let (parts, body) = req.into_parts();
-        let body_as_bytes = hyper::body::to_bytes(body)
-            .await
-            .unwrap_or_else(|_| Bytes::new());
+        let (parts, body_as_bytes) = req.into_parts();
 
         loop {
             let mut req = Request::builder()
                 .method(parts.method.clone())
                 .uri(parts.uri.clone())
                 .version(parts.version)
-                .body(Body::from(body_as_bytes.clone()))?;
+                .body(body_as_bytes.clone())?;
             *req.headers_mut() = parts.headers.clone();
 
             let request = self.request_fut(req)?;
@@ -212,20 +210,21 @@ impl HttpClient {
                 }
             }
 
-            return Ok(response?);
+            let response = response?;
+            return Ok(response);
         }
     }
 
-    pub async fn request_body(&self, req: Request<Body>) -> Result<Bytes, Error> {
+    pub async fn request_body(&self, req: Request<Bytes>) -> Result<Bytes, Error> {
         let response = self.request(req).await?;
-        Ok(hyper::body::to_bytes(response.into_body()).await?)
+        Ok(response.into_body().collect().await?.to_bytes())
     }
 
-    pub fn request_stream(&self, req: Request<Body>) -> Result<IntoStream<ResponseFuture>, Error> {
+    pub fn request_stream(&self, req: Request<Bytes>) -> Result<IntoStream<ResponseFuture>, Error> {
         Ok(self.request_fut(req)?.into_stream())
     }
 
-    pub fn request_fut(&self, mut req: Request<Body>) -> Result<ResponseFuture, Error> {
+    pub fn request_fut(&self, mut req: Request<Bytes>) -> Result<ResponseFuture, Error> {
         let headers_mut = req.headers_mut();
         headers_mut.insert(USER_AGENT, self.user_agent.clone());
 
@@ -251,7 +250,7 @@ impl HttpClient {
             ))
         })?;
 
-        Ok(self.hyper_client()?.request(req))
+        Ok(self.hyper_client()?.request(req.map(Full::new)))
     }
 
     pub fn get_retry_after(headers: &HeaderMap<HeaderValue>) -> Option<Duration> {

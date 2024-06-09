@@ -10,10 +10,10 @@ use data_encoding::HEXUPPER_PERMISSIVE;
 use futures_util::future::IntoStream;
 use http::header::HeaderValue;
 use hyper::{
-    client::ResponseFuture,
     header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
-    Body, HeaderMap, Method, Request,
+    HeaderMap, Method, Request,
 };
+use hyper_util::client::legacy::ResponseFuture;
 use protobuf::{Enum, Message, MessageFull};
 use rand::RngCore;
 use sha1::{Digest, Sha1};
@@ -156,7 +156,7 @@ impl SpClient {
             .method(&Method::POST)
             .uri("https://clienttoken.spotify.com/v1/clienttoken")
             .header(ACCEPT, HeaderValue::from_static("application/x-protobuf"))
-            .body(Body::from(body))?;
+            .body(body.into())?;
 
         self.session().http_client().request_body(request).await
     }
@@ -465,7 +465,7 @@ impl SpClient {
             let mut request = Request::builder()
                 .method(method)
                 .uri(url)
-                .body(Body::from(body.to_owned()))?;
+                .body(body.to_owned().into())?;
 
             // Reconnection logic: keep getting (cached) tokens because they might have expired.
             let token = self
@@ -727,7 +727,7 @@ impl SpClient {
                 RANGE,
                 HeaderValue::from_str(&format!("bytes={}-{}", offset, offset + length - 1))?,
             )
-            .body(Body::empty())?;
+            .body(Bytes::new())?;
 
         let stream = self.session().http_client().request_stream(req)?;
 
@@ -738,7 +738,7 @@ impl SpClient {
         let request = Request::builder()
             .method(&Method::GET)
             .uri(url)
-            .body(Body::empty())?;
+            .body(Bytes::new())?;
 
         self.session().http_client().request_body(request).await
     }
