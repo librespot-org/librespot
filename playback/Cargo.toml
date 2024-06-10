@@ -43,7 +43,7 @@ gstreamer-audio = { version = "0.22.0", optional = true }
 glib            = { version = "0.19.2", optional = true }
 
 # Rodio dependencies
-rodio           = { version = "0.17.1", optional = true, default-features = false }
+rodio           = { version = "0.18.1", optional = true, default-features = false }
 cpal            = { version = "0.15.1", optional = true }
 
 # Container and audio decoder
