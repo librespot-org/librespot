@@ -40,7 +40,7 @@ num-traits = "0.2"
 once_cell = "1"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
-priority-queue = "1.2"
+priority-queue = "2.0"
 protobuf = "3"
 quick-xml = { version = "0.31", features = ["serialize"] }
 rand = "0.8"
