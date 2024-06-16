@@ -39,6 +39,7 @@ pub struct Config {
     pub name: Cow<'static, str>,
     pub device_type: DeviceType,
     pub device_id: String,
+    pub is_group: bool,
     pub client_id: String,
 }
 
@@ -70,6 +71,12 @@ impl RequestHandler {
         if let Some(username) = &self.username {
             active_user = username.to_string();
         }
+        // options based on zeroconf guide, search for `groupStatus` on page
+        let group_status = if self.config.is_group {
+            "GROUP"
+        } else {
+            "NONE"
+        };
 
         // See: https://developer.spotify.com/documentation/commercial-hardware/implementation/guides/zeroconf/
         let body = json!({
@@ -87,7 +94,8 @@ impl RequestHandler {
             "modelDisplayName": "librespot",
             "libraryVersion": crate::core::version::SEMVER,
             "resolverVersion": "1",
-            "groupStatus": "NONE",
+            // valid values are "GROUP" and "NONE"
+            "groupStatus": group_status,
             // valid value documented & seen in the wild: "accesstoken"
             // Using it will cause clients to fail to connect.
             "tokenType": "default",
