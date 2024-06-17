@@ -203,6 +203,7 @@ fn get_setup() -> Setup {
     const CACHE_SIZE_LIMIT: &str = "cache-size-limit";
     const DEVICE: &str = "device";
     const DEVICE_TYPE: &str = "device-type";
+    const DEVICE_IS_GROUP: &str = "group";
     const DISABLE_AUDIO_CACHE: &str = "disable-audio-cache";
     const DISABLE_CREDENTIAL_CACHE: &str = "disable-credential-cache";
     const DISABLE_DISCOVERY: &str = "disable-discovery";
@@ -409,6 +410,10 @@ fn get_setup() -> Setup {
         DEVICE_TYPE,
         "Displayed device type. Defaults to speaker.",
         "TYPE",
+    ).optflag(
+        "",
+        DEVICE_IS_GROUP,
+        "Whether the device represents a group. Defaults to false.",
     )
     .optopt(
         TEMP_DIR_SHORT,
@@ -1312,11 +1317,14 @@ fn get_setup() -> Setup {
             })
             .unwrap_or_default();
 
+        let is_group = opt_present(DEVICE_IS_GROUP);
+
         let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
 
         ConnectConfig {
             name,
             device_type,
+            is_group,
             initial_volume,
             has_volume_ctrl,
         }
@@ -1685,6 +1693,7 @@ async fn main() {
             match librespot::discovery::Discovery::builder(device_id, client_id)
                 .name(setup.connect_config.name.clone())
                 .device_type(setup.connect_config.device_type)
+                .is_group(setup.connect_config.is_group)
                 .port(setup.zeroconf_port)
                 .zeroconf_ip(setup.zeroconf_ip.clone())
                 .launch()
