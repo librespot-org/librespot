@@ -31,6 +31,13 @@ pub const FALLBACK_USER_AGENT: &str = "Spotify/117300517 Linux/0 (librespot)";
 pub fn spotify_version() -> String {
     match std::env::consts::OS {
         "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
+        _ => SPOTIFY_VERSION.to_string(),
+    }
+}
+
+pub fn spotify_semantic_version() -> String {
+    match std::env::consts::OS {
+        "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
         _ => SPOTIFY_SEMANTIC_VERSION.to_string(),
     }
 }
