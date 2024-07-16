@@ -4,9 +4,9 @@ use std::{
     convert::Infallible,
     net::{IpAddr, SocketAddr, TcpListener},
     pin::Pin,
+    str::FromStr,
     sync::{Arc, Mutex},
     task::{Context, Poll},
-    str::FromStr
 };
 
 use aes::cipher::{KeyIvInit, StreamCipher};
