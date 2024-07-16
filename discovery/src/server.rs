@@ -2,10 +2,11 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     convert::Infallible,
-    net::{Ipv4Addr, SocketAddr, TcpListener},
+    net::{IpAddr, SocketAddr, TcpListener},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    str::FromStr
 };
 
 use aes::cipher::{KeyIvInit, StreamCipher};
@@ -251,7 +252,7 @@ pub struct DiscoveryServer {
 impl DiscoveryServer {
     pub fn new(config: Config, port: &mut u16) -> Result<Self, Error> {
         let (discovery, cred_rx) = RequestHandler::new(config);
-        let address = SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *port);
+        let address = SocketAddr::new(IpAddr::from_str("::0").unwrap(), *port);
 
         let (close_tx, close_rx) = oneshot::channel();
 
