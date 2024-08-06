@@ -1,0 +1,18 @@
+[package]
+name = "librespot-oauth"
+version = "0.5.0-dev"
+rust-version = "1.73"
+authors = ["Paul Lietar <paul@lietar.net>"]
+description = "Spotify OAuth"
+license = "MIT"
+repository = "https://github.com/librespot-org/librespot"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+oauth2 = "4.4"
+url = "2.2"
+
+[dependencies.librespot-core]
+path = "../core"
+version = "0.5.0-dev"
