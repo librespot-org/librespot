@@ -13,13 +13,23 @@ use std::{
 };
 use url::Url;
 
+fn get_code(redirect_url: &str) -> AuthorizationCode {
+    let url = Url::parse(redirect_url).unwrap();
+    let code = url
+        .query_pairs()
+        .find(|(key, _)| key == "code")
+        .map(|(_, code)| AuthorizationCode::new(code.into_owned()))
+        .unwrap();
+    code
+}
+
 fn get_authcode_stdin() -> AuthorizationCode {
-    println!("Provide code");
+    println!("Provide redirect URL");
     let mut buffer = String::new();
     let stdin = io::stdin(); // We get `Stdin` here.
     stdin.read_line(&mut buffer).unwrap();
 
-    AuthorizationCode::new(buffer.trim().into())
+    get_code(buffer.trim())
 }
 
 fn get_authcode_listener(socket_address: SocketAddr) -> AuthorizationCode {
@@ -39,13 +49,7 @@ fn get_authcode_listener(socket_address: SocketAddr) -> AuthorizationCode {
     reader.read_line(&mut request_line).unwrap();
 
     let redirect_url = request_line.split_whitespace().nth(1).unwrap();
-    let url = Url::parse(&("http://localhost".to_string() + redirect_url)).unwrap();
-
-    let code = url
-        .query_pairs()
-        .find(|(key, _)| key == "code")
-        .map(|(_, code)| AuthorizationCode::new(code.into_owned()))
-        .unwrap();
+    let code = get_code(&("http://localhost".to_string() + redirect_url));
 
     let message = "Go back to your terminal :)";
     let response = format!(
@@ -60,6 +64,7 @@ fn get_authcode_listener(socket_address: SocketAddr) -> AuthorizationCode {
 
 // TODO: Return a Result?
 // TODO: Pass in redirect_address instead since the redirect host depends on client ID?
+// TODO: Pass in scopes.
 pub fn get_access_token(client_id: &str, redirect_port: u16) -> String {
     // Must use host 127.0.0.1 with Spotify Desktop client ID.
     let redirect_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
