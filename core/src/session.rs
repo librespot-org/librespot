@@ -77,6 +77,7 @@ struct SessionData {
     client_brand_name: String,
     client_model_name: String,
     connection_id: String,
+    auth_data: Vec<u8>,
     time_delta: i64,
     invalid: bool,
     user_data: UserData,
@@ -178,6 +179,7 @@ impl Session {
             .map_or("UNKNOWN", |s| s.as_str());
         info!("Authenticated as '{username}' !");
         self.set_username(username);
+        self.set_auth_data(&reusable_credentials.auth_data);
         if let Some(cache) = self.cache() {
             if store_credentials {
                 let cred_changed = cache
@@ -473,6 +475,14 @@ impl Session {
 
     pub fn set_username(&self, username: &str) {
         username.clone_into(&mut self.0.data.write().user_data.canonical_username);
+    }
+
+    pub fn auth_data(&self) -> Vec<u8> {
+        self.0.data.read().auth_data.clone()
+    }
+
+    pub fn set_auth_data(&self, auth_data: &[u8]) {
+        self.0.data.write().auth_data = auth_data.to_owned();
     }
 
     pub fn country(&self) -> String {
