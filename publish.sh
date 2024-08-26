@@ -6,7 +6,7 @@ DRY_RUN='false'
 WORKINGDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $WORKINGDIR
 
-crates=( "protocol" "core" "discovery" "audio" "metadata" "playback" "connect" "librespot" )
+crates=( "protocol" "core" "discovery" "oauth" "audio" "metadata" "playback" "connect" "librespot" )
 
 OS=`uname`
 function replace_in_file() {

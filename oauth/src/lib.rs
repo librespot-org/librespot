@@ -1,3 +1,15 @@
+//! Provides a Spotify access token using the OAuth authorization code flow
+//! with PKCE.
+//!
+//! Assuming sufficient scopes, the returned access token may be used with Spotify's
+//! Web API, and/or to establish a new Session with [`librespot_core`].
+//!
+//! The authorization code flow is an interactive process which requires a web browser
+//! to complete. The resulting code must then be provided back from the browser to this
+//! library for exchange into an access token. Providing the code can be automatic via
+//! a spawned http server (mimicking Spotify's client), or manually via stdin. The latter
+//! is appropriate for headless systems.
+
 use log::{debug, error, info, trace};
 use oauth2::reqwest::http_client;
 use oauth2::{

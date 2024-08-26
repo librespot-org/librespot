@@ -2,8 +2,8 @@
 name = "librespot-oauth"
 version = "0.5.0-dev"
 rust-version = "1.73"
-authors = ["Paul Lietar <paul@lietar.net>"]
-description = "Spotify OAuth"
+authors = ["Nick Steel <nick@nsteel.co.uk>"]
+description = "OAuth authorization code flow with PKCE for obtaining a Spotify access token"
 license = "MIT"
 repository = "https://github.com/librespot-org/librespot"
 edition = "2021"
