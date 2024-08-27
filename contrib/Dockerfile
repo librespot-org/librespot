@@ -28,7 +28,7 @@ RUN apt-get install -y curl git build-essential crossbuild-essential-arm64 cross
 RUN apt-get install -y libasound2-dev libasound2-dev:arm64 libasound2-dev:armel libasound2-dev:armhf
 RUN apt-get install -y libpulse0 libpulse0:arm64 libpulse0:armel libpulse0:armhf
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.73 -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.74 -y
 ENV PATH="/root/.cargo/bin/:${PATH}"
 RUN rustup target add aarch64-unknown-linux-gnu
 RUN rustup target add arm-unknown-linux-gnueabi

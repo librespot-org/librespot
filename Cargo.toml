@@ -1,7 +1,7 @@
 [package]
 name = "librespot"
 version = "0.5.0-dev"
-rust-version = "1.73"
+rust-version = "1.74"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
@@ -57,7 +57,7 @@ getopts = "0.2"
 log = "0.4"
 rpassword = "7.0"
 sha1 = "0.10"
-sysinfo = { version = "0.30.5", default-features = false }
+sysinfo = { version = "0.31.3", default-features = false, features = ["system"] }
 thiserror = "1.0"
 tokio = { version = "1", features = ["rt", "macros", "signal", "sync", "parking_lot", "process"] }
 url = "2.2"

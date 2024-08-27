@@ -1,7 +1,7 @@
 [package]
 name = "librespot-connect"
 version = "0.5.0-dev"
-rust-version = "1.73"
+rust-version = "1.74"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The discovery and Spotify Connect logic for librespot"
 license = "MIT"
