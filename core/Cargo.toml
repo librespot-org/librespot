@@ -62,7 +62,7 @@ data-encoding = "2.5"
 
 [build-dependencies]
 rand = "0.8"
-vergen = { version = "8", default-features = false, features = ["build", "git", "gitcl"] }
+vergen-gitcl = { version = "1.0.0", default-features = false, features = ["build"] }
 
 [dev-dependencies]
 env_logger = "0.11.2"
