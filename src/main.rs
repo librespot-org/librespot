@@ -1345,7 +1345,7 @@ fn get_setup() -> Setup {
                     OAUTH_SCOPES.to_vec(),
                     token_port,
                 ) {
-                    Ok(token) => token,
+                    Ok(token) => token.access_token,
                     Err(e) => {
                         error!("Failed to get Spotify access token: {e}");
                         exit(1);

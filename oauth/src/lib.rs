@@ -17,6 +17,7 @@ use oauth2::{
     RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 use std::io;
+use std::time::{Duration, Instant};
 use std::{
     io::{BufRead, BufReader, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
@@ -62,6 +63,15 @@ pub enum OAuthError {
 
     #[error("Failed to exchange code for access token ({e})")]
     ExchangeCode { e: String },
+}
+
+#[derive(Debug)]
+pub struct AccessToken {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_at: Instant,
+    pub token_type: String,
+    pub scopes: Vec<String>,
 }
 
 /// Return code query-string parameter from the redirect URI.
@@ -139,7 +149,7 @@ pub fn get_access_token(
     client_id: &str,
     scopes: Vec<&str>,
     redirect_port: Option<u16>,
-) -> Result<String, OAuthError> {
+) -> Result<AccessToken, OAuthError> {
     // Must use host 127.0.0.1 with Spotify Desktop client ID.
     let redirect_address = SocketAddr::new(
         IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -168,10 +178,10 @@ pub fn get_access_token(
 
     // Generate the full authorization URL.
     // Some of these scopes are unavailable for custom client IDs. Which?
-    let scopes: Vec<oauth2::Scope> = scopes.into_iter().map(|s| Scope::new(s.into())).collect();
+    let request_scopes: Vec<oauth2::Scope> = scopes.clone().into_iter().map(|s| Scope::new(s.into())).collect();
     let (auth_url, _) = client
         .authorize_url(CsrfToken::new_random)
-        .add_scopes(scopes)
+        .add_scopes(request_scopes)
         .set_pkce_challenge(pkce_challenge)
         .url();
 
@@ -200,5 +210,16 @@ pub fn get_access_token(
     let token = token_response.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
     trace!("Obtained new access token: {token:?}");
 
-    Ok(token.access_token().secret().to_string())
+    let token_scopes: Vec<String> = match token.scopes() {
+        Some(s) => s.into_iter().map(|s| s.to_string()).collect(),
+        _ => scopes.into_iter().map(|s| s.to_string()).collect(),
+    };
+    Ok(
+        AccessToken {
+        access_token: token.access_token().secret().to_string(),
+        refresh_token: token.refresh_token().unwrap().secret().to_string(),
+        expires_at: Instant::now() + token.expires_in().unwrap_or(Duration::from_secs(3600)),
+        token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
+        scopes: token_scopes,
+    })
 }
