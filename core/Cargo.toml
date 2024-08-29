@@ -30,7 +30,7 @@ hyper = { version = "1.3", features = ["http1", "http2"] }
 hyper-util = { version = "0.1", features = ["client"] }
 http-body-util = "0.1.1"
 hyper-proxy2 = { version = "0.1", default-features = false, features = ["rustls"] }
-hyper-rustls = { version = "0.26", features = ["http2"] }
+hyper-rustls = { version = "0.27.2", features = ["http2"] }
 log = "0.4"
 nonzero_ext = "0.3"
 num-bigint = { version = "0.4", features = ["rand"] }
