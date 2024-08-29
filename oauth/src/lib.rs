@@ -178,7 +178,11 @@ pub fn get_access_token(
 
     // Generate the full authorization URL.
     // Some of these scopes are unavailable for custom client IDs. Which?
-    let request_scopes: Vec<oauth2::Scope> = scopes.clone().into_iter().map(|s| Scope::new(s.into())).collect();
+    let request_scopes: Vec<oauth2::Scope> = scopes
+        .clone()
+        .into_iter()
+        .map(|s| Scope::new(s.into()))
+        .collect();
     let (auth_url, _) = client
         .authorize_url(CsrfToken::new_random)
         .add_scopes(request_scopes)
@@ -211,11 +215,10 @@ pub fn get_access_token(
     trace!("Obtained new access token: {token:?}");
 
     let token_scopes: Vec<String> = match token.scopes() {
-        Some(s) => s.into_iter().map(|s| s.to_string()).collect(),
+        Some(s) => s.iter().map(|s| s.to_string()).collect(),
         _ => scopes.into_iter().map(|s| s.to_string()).collect(),
     };
-    Ok(
-        AccessToken {
+    Ok(AccessToken {
         access_token: token.access_token().secret().to_string(),
         refresh_token: token.refresh_token().unwrap().secret().to_string(),
         expires_at: Instant::now() + token.expires_in().unwrap_or(Duration::from_secs(3600)),
