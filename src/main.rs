@@ -168,6 +168,37 @@ fn get_version_string() -> String {
     )
 }
 
+/// Spotify's Desktop app uses these. Some of these are only available when requested with Spotify's client IDs.
+static OAUTH_SCOPES: &[&str] = &[
+    //const OAUTH_SCOPES: Vec<&str> = vec![
+    "app-remote-control",
+    "playlist-modify",
+    "playlist-modify-private",
+    "playlist-modify-public",
+    "playlist-read",
+    "playlist-read-collaborative",
+    "playlist-read-private",
+    "streaming",
+    "ugc-image-upload",
+    "user-follow-modify",
+    "user-follow-read",
+    "user-library-modify",
+    "user-library-read",
+    "user-modify",
+    "user-modify-playback-state",
+    "user-modify-private",
+    "user-personalized",
+    "user-read-birthdate",
+    "user-read-currently-playing",
+    "user-read-email",
+    "user-read-play-history",
+    "user-read-playback-position",
+    "user-read-playback-state",
+    "user-read-private",
+    "user-read-recently-played",
+    "user-top-read",
+];
+
 struct Setup {
     format: AudioFormat,
     backend: SinkBuilder,
@@ -1289,7 +1320,13 @@ fn get_setup() -> Setup {
         let token_port = if opt_present(TOKEN_PORT) {
             opt_str(TOKEN_PORT)
                 .map(|port| match port.parse::<u16>() {
-                    Ok(value) => value,
+                    Ok(value) => {
+                        if value > 0 {
+                            Some(value)
+                        } else {
+                            None
+                        }
+                    }
                     _ => {
                         let valid_values = &format!("1 - {}", u16::MAX);
                         invalid_error_msg(TOKEN_PORT, TOKEN_PORT_SHORT, &port, valid_values, "");
@@ -1297,14 +1334,23 @@ fn get_setup() -> Setup {
                         exit(1);
                     }
                 })
-                .unwrap_or(0)
+                .unwrap_or(None)
         } else {
-            5588
+            Some(5588)
         };
         if let Some(mut access_token) = opt_str(TOKEN) {
             if access_token.is_empty() {
-                access_token =
-                    librespot::oauth::get_access_token(&session_config.client_id, token_port);
+                access_token = match librespot::oauth::get_access_token(
+                    &session_config.client_id,
+                    OAUTH_SCOPES.to_vec(),
+                    token_port,
+                ) {
+                    Ok(token) => token,
+                    Err(e) => {
+                        error!("Failed to get Spotify access token: {e}");
+                        exit(1);
+                    }
+                };
             }
             Some(Credentials::with_access_token(access_token))
         } else if let Some(username) = opt_str(USERNAME) {
