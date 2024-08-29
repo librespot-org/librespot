@@ -233,7 +233,15 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-${{ matrix.target }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
-      - name: Install cross
-        run: cargo install cross || true
+
+      - name: Install the cross compiler targets
+        run: rustup target add ${{ matrix.target }}
+      
+      - name: Install cross compiler toolchain
+        run: sudo apt-get install -y gcc-arm-linux-gnueabihf
+      
       - name: Build
-        run: cross build --target ${{ matrix.target }} --no-default-features
+        run: cargo build --verbose --target ${{ matrix.target }} --no-default-features
+      
+      - name: Check binary
+        run: file target/${{ matrix.target }}/debug/librespot
