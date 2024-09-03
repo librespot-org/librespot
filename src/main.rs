@@ -210,6 +210,8 @@ struct Setup {
     connect_config: ConnectConfig,
     mixer_config: MixerConfig,
     credentials: Option<Credentials>,
+    enable_oauth: bool,
+    oauth_port: Option<u16>,
     enable_discovery: bool,
     zeroconf_port: u16,
     player_event_program: Option<String>,
@@ -226,6 +228,7 @@ fn get_setup() -> Setup {
     const VALID_NORMALISATION_ATTACK_RANGE: RangeInclusive<u64> = 1..=500;
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
 
+    const ACCESS_TOKEN: &str = "access-token";
     const AP_PORT: &str = "ap-port";
     const AUTOPLAY: &str = "autoplay";
     const BACKEND: &str = "backend";
@@ -241,6 +244,7 @@ fn get_setup() -> Setup {
     const DISABLE_GAPLESS: &str = "disable-gapless";
     const DITHER: &str = "dither";
     const EMIT_SINK_EVENTS: &str = "emit-sink-events";
+    const ENABLE_OAUTH: &str = "enable-oauth";
     const ENABLE_VOLUME_NORMALISATION: &str = "enable-volume-normalisation";
     const FORMAT: &str = "format";
     const HELP: &str = "help";
@@ -257,6 +261,7 @@ fn get_setup() -> Setup {
     const NORMALISATION_PREGAIN: &str = "normalisation-pregain";
     const NORMALISATION_RELEASE: &str = "normalisation-release";
     const NORMALISATION_THRESHOLD: &str = "normalisation-threshold";
+    const OAUTH_PORT: &str = "oauth-port";
     const ONEVENT: &str = "onevent";
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
@@ -265,8 +270,6 @@ fn get_setup() -> Setup {
     const QUIET: &str = "quiet";
     const SYSTEM_CACHE: &str = "system-cache";
     const TEMP_DIR: &str = "tmp";
-    const TOKEN: &str = "token";
-    const TOKEN_PORT: &str = "token-port";
     const USERNAME: &str = "username";
     const VERBOSE: &str = "verbose";
     const VERSION: &str = "version";
@@ -293,6 +296,9 @@ fn get_setup() -> Setup {
     const DISABLE_CREDENTIAL_CACHE_SHORT: &str = "H";
     const HELP_SHORT: &str = "h";
     const ZEROCONF_INTERFACE_SHORT: &str = "i";
+    const ENABLE_OAUTH_SHORT: &str = "j";
+    const OAUTH_PORT_SHORT: &str = "K";
+    const ACCESS_TOKEN_SHORT: &str = "k";
     const CACHE_SIZE_LIMIT_SHORT: &str = "M";
     const MIXER_TYPE_SHORT: &str = "m";
     const ENABLE_VOLUME_NORMALISATION_SHORT: &str = "N";
@@ -309,8 +315,6 @@ fn get_setup() -> Setup {
     const ALSA_MIXER_INDEX_SHORT: &str = "s";
     const ALSA_MIXER_CONTROL_SHORT: &str = "T";
     const TEMP_DIR_SHORT: &str = "t";
-    const TOKEN_SHORT: &str = "k";
-    const TOKEN_PORT_SHORT: &str = "K";
     const NORMALISATION_ATTACK_SHORT: &str = "U";
     const USERNAME_SHORT: &str = "u";
     const VERSION_SHORT: &str = "V";
@@ -416,6 +420,11 @@ fn get_setup() -> Setup {
         ENABLE_VOLUME_NORMALISATION,
         "Play all tracks at approximately the same apparent volume.",
     )
+    .optflag(
+        ENABLE_OAUTH_SHORT,
+        ENABLE_OAUTH,
+        "Perform interactive OAuth sign in.",
+    )
     .optopt(
         NAME_SHORT,
         NAME,
@@ -449,18 +458,6 @@ fn get_setup() -> Setup {
         "",
         DEVICE_IS_GROUP,
         "Whether the device represents a group. Defaults to false.",
-    )
-    .optopt(
-        TOKEN_SHORT,
-        TOKEN,
-        "Spotify access token to sign in with. Use empty string to obtain token.",
-        "TOKEN",
-    )
-    .optopt(
-        TOKEN_PORT_SHORT,
-        TOKEN_PORT,
-        "The port the oauth redirect server uses 1 - 65535. Ports <= 1024 may require root privileges.",
-        "PORT",
     )
     .optopt(
         TEMP_DIR_SHORT,
@@ -503,6 +500,18 @@ fn get_setup() -> Setup {
         PASSWORD,
         "Password used to sign in with.",
         "PASSWORD",
+    )
+    .optopt(
+        ACCESS_TOKEN_SHORT,
+        ACCESS_TOKEN,
+        "Spotify access token to sign in with.",
+        "TOKEN",
+    )
+    .optopt(
+        OAUTH_PORT_SHORT,
+        OAUTH_PORT,
+        "The port the oauth redirect server uses 1 - 65535. Ports <= 1024 may require root privileges.",
+        "PORT",
     )
     .optopt(
         ONEVENT_SHORT,
@@ -719,7 +728,7 @@ fn get_setup() -> Setup {
         for (k, v) in &env_vars {
             if matches!(
                 k.as_str(),
-                "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME" | "LIBRESPOT_TOKEN"
+                "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME" | "LIBRESPOT_ACCESS_TOKEN"
             ) {
                 trace!("\t\t{k}=\"XXXXXXXX\"");
             } else if v.is_empty() {
@@ -754,7 +763,12 @@ fn get_setup() -> Setup {
             {
                 if matches!(
                     opt,
-                    PASSWORD | PASSWORD_SHORT | USERNAME | USERNAME_SHORT | TOKEN | TOKEN_SHORT
+                    PASSWORD
+                        | PASSWORD_SHORT
+                        | USERNAME
+                        | USERNAME_SHORT
+                        | ACCESS_TOKEN
+                        | ACCESS_TOKEN_SHORT
                 ) {
                     // Don't log creds.
                     trace!("\t\t{opt} \"XXXXXXXX\"");
@@ -1134,6 +1148,145 @@ fn get_setup() -> Setup {
         }
     };
 
+    let enable_oauth = opt_present(ENABLE_OAUTH);
+
+    let credentials = {
+        let cached_creds = cache.as_ref().and_then(Cache::credentials);
+
+        if let Some(access_token) = opt_str(ACCESS_TOKEN) {
+            if access_token.is_empty() {
+                empty_string_error_msg(ACCESS_TOKEN, ACCESS_TOKEN_SHORT);
+            }
+            Some(Credentials::with_access_token(access_token))
+        } else if let Some(username) = opt_str(USERNAME) {
+            if username.is_empty() {
+                empty_string_error_msg(USERNAME, USERNAME_SHORT);
+            }
+            if opt_present(PASSWORD) {
+                error!("Invalid `--{PASSWORD}` / `-{PASSWORD_SHORT}`: Password authentication no longer supported, use OAuth");
+                exit(1);
+            }
+            match cached_creds {
+                Some(creds) if Some(username) == creds.username => {
+                    trace!("Using cached credentials for specified username.");
+                    Some(creds)
+                }
+                _ => {
+                    trace!("No cached credentials for specified username.");
+                    None
+                }
+            }
+        } else {
+            if cached_creds.is_some() {
+                trace!("Using cached credentials.");
+            }
+            cached_creds
+        }
+    };
+
+    let enable_discovery = !opt_present(DISABLE_DISCOVERY);
+
+    if credentials.is_none() && !enable_discovery && !enable_oauth {
+        error!("Credentials are required if discovery and oauth login are disabled.");
+        exit(1);
+    }
+
+    let oauth_port = if opt_present(OAUTH_PORT) {
+        if !enable_oauth {
+            warn!(
+                "Without the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
+                ENABLE_OAUTH, ENABLE_OAUTH_SHORT, OAUTH_PORT, OAUTH_PORT_SHORT
+            );
+        }
+        opt_str(OAUTH_PORT)
+            .map(|port| match port.parse::<u16>() {
+                Ok(value) => {
+                    if value > 0 {
+                        Some(value)
+                    } else {
+                        None
+                    }
+                }
+                _ => {
+                    let valid_values = &format!("1 - {}", u16::MAX);
+                    invalid_error_msg(OAUTH_PORT, OAUTH_PORT_SHORT, &port, valid_values, "");
+
+                    exit(1);
+                }
+            })
+            .unwrap_or(None)
+    } else {
+        Some(5588)
+    };
+
+    if !enable_discovery && opt_present(ZEROCONF_PORT) {
+        warn!(
+            "With the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
+            DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
+        );
+    }
+
+    let zeroconf_port = if enable_discovery {
+        opt_str(ZEROCONF_PORT)
+            .map(|port| match port.parse::<u16>() {
+                Ok(value) if value != 0 => value,
+                _ => {
+                    let valid_values = &format!("1 - {}", u16::MAX);
+                    invalid_error_msg(ZEROCONF_PORT, ZEROCONF_PORT_SHORT, &port, valid_values, "");
+
+                    exit(1);
+                }
+            })
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    // #1046: not all connections are supplied an `autoplay` user attribute to run statelessly.
+    // This knob allows for a manual override.
+    let autoplay = match opt_str(AUTOPLAY) {
+        Some(value) => match value.as_ref() {
+            "on" => Some(true),
+            "off" => Some(false),
+            _ => {
+                invalid_error_msg(
+                    AUTOPLAY,
+                    AUTOPLAY_SHORT,
+                    &opt_str(AUTOPLAY).unwrap_or_default(),
+                    "on, off",
+                    "",
+                );
+                exit(1);
+            }
+        },
+        None => SessionConfig::default().autoplay,
+    };
+
+    let zeroconf_ip: Vec<std::net::IpAddr> = if opt_present(ZEROCONF_INTERFACE) {
+        if let Some(zeroconf_ip) = opt_str(ZEROCONF_INTERFACE) {
+            zeroconf_ip
+                .split(',')
+                .map(|s| {
+                    s.trim().parse::<std::net::IpAddr>().unwrap_or_else(|_| {
+                        invalid_error_msg(
+                            ZEROCONF_INTERFACE,
+                            ZEROCONF_INTERFACE_SHORT,
+                            s,
+                            "IPv4 and IPv6 addresses",
+                            "",
+                        );
+                        exit(1);
+                    })
+                })
+                .collect()
+        } else {
+            warn!("Unable to use zeroconf-interface option, default to all interfaces.");
+            vec![]
+        }
+    } else {
+        vec![]
+    };
+
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
@@ -1260,26 +1413,6 @@ fn get_setup() -> Setup {
         }
     };
 
-    // #1046: not all connections are supplied an `autoplay` user attribute to run statelessly.
-    // This knob allows for a manual override.
-    let autoplay = match opt_str(AUTOPLAY) {
-        Some(value) => match value.as_ref() {
-            "on" => Some(true),
-            "off" => Some(false),
-            _ => {
-                invalid_error_msg(
-                    AUTOPLAY,
-                    AUTOPLAY_SHORT,
-                    &opt_str(AUTOPLAY).unwrap_or_default(),
-                    "on, off",
-                    "",
-                );
-                exit(1);
-            }
-        },
-        None => SessionConfig::default().autoplay,
-    };
-
     let session_config = SessionConfig {
         device_id: device_id(&connect_config.name),
         proxy: opt_str(PROXY).or_else(|| std::env::var("http_proxy").ok()).map(
@@ -1312,145 +1445,6 @@ fn get_setup() -> Setup {
 		tmp_dir,
 		autoplay,
 		..SessionConfig::default()
-    };
-
-    let credentials = {
-        let cached_creds = cache.as_ref().and_then(Cache::credentials);
-
-        let token_port = if opt_present(TOKEN_PORT) {
-            opt_str(TOKEN_PORT)
-                .map(|port| match port.parse::<u16>() {
-                    Ok(value) => {
-                        if value > 0 {
-                            Some(value)
-                        } else {
-                            None
-                        }
-                    }
-                    _ => {
-                        let valid_values = &format!("1 - {}", u16::MAX);
-                        invalid_error_msg(TOKEN_PORT, TOKEN_PORT_SHORT, &port, valid_values, "");
-
-                        exit(1);
-                    }
-                })
-                .unwrap_or(None)
-        } else {
-            Some(5588)
-        };
-        if let Some(mut access_token) = opt_str(TOKEN) {
-            if access_token.is_empty() {
-                access_token = match librespot::oauth::get_access_token(
-                    &session_config.client_id,
-                    OAUTH_SCOPES.to_vec(),
-                    token_port,
-                ) {
-                    Ok(token) => token.access_token,
-                    Err(e) => {
-                        error!("Failed to get Spotify access token: {e}");
-                        exit(1);
-                    }
-                };
-            }
-            Some(Credentials::with_access_token(access_token))
-        } else if let Some(username) = opt_str(USERNAME) {
-            if username.is_empty() {
-                empty_string_error_msg(USERNAME, USERNAME_SHORT);
-            }
-            if let Some(password) = opt_str(PASSWORD) {
-                if password.is_empty() {
-                    empty_string_error_msg(PASSWORD, PASSWORD_SHORT);
-                }
-                Some(Credentials::with_password(username, password))
-            } else {
-                match cached_creds {
-                    Some(creds) if Some(&username) == creds.username.as_ref() => Some(creds),
-                    _ => {
-                        let prompt = &format!("Password for {username}: ");
-                        match rpassword::prompt_password(prompt) {
-                            Ok(password) => {
-                                if !password.is_empty() {
-                                    Some(Credentials::with_password(username, password))
-                                } else {
-                                    trace!("Password was empty.");
-                                    if cached_creds.is_some() {
-                                        trace!("Using cached credentials.");
-                                    }
-                                    cached_creds
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Cannot parse password: {}", e);
-                                if cached_creds.is_some() {
-                                    trace!("Using cached credentials.");
-                                }
-                                cached_creds
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            if cached_creds.is_some() {
-                trace!("Using cached credentials.");
-            }
-            cached_creds
-        }
-    };
-
-    let enable_discovery = !opt_present(DISABLE_DISCOVERY);
-
-    if credentials.is_none() && !enable_discovery {
-        error!("Credentials are required if discovery is disabled.");
-        exit(1);
-    }
-
-    if !enable_discovery && opt_present(ZEROCONF_PORT) {
-        warn!(
-            "With the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
-            DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
-        );
-    }
-
-    let zeroconf_port = if enable_discovery {
-        opt_str(ZEROCONF_PORT)
-            .map(|port| match port.parse::<u16>() {
-                Ok(value) if value != 0 => value,
-                _ => {
-                    let valid_values = &format!("1 - {}", u16::MAX);
-                    invalid_error_msg(ZEROCONF_PORT, ZEROCONF_PORT_SHORT, &port, valid_values, "");
-
-                    exit(1);
-                }
-            })
-            .unwrap_or(0)
-    } else {
-        0
-    };
-
-    let zeroconf_ip: Vec<std::net::IpAddr> = if opt_present(ZEROCONF_INTERFACE) {
-        if let Some(zeroconf_ip) = opt_str(ZEROCONF_INTERFACE) {
-            zeroconf_ip
-                .split(',')
-                .map(|s| {
-                    s.trim().parse::<std::net::IpAddr>().unwrap_or_else(|_| {
-                        invalid_error_msg(
-                            ZEROCONF_INTERFACE,
-                            ZEROCONF_INTERFACE_SHORT,
-                            s,
-                            "IPv4 and IPv6 addresses",
-                            "",
-                        );
-                        exit(1);
-                    })
-                })
-                .collect()
-        } else {
-            warn!("Unable to use zeroconf-interface option, default to all interfaces.");
-            vec![]
-        }
-    } else {
-        vec![]
     };
 
     let player_config = {
@@ -1732,6 +1726,8 @@ fn get_setup() -> Setup {
         connect_config,
         mixer_config,
         credentials,
+        enable_oauth,
+        oauth_port,
         enable_discovery,
         zeroconf_port,
         player_event_program,
@@ -1806,6 +1802,20 @@ async fn main() {
 
     if let Some(credentials) = setup.credentials {
         last_credentials = Some(credentials);
+        connecting = true;
+    } else if setup.enable_oauth {
+        let access_token = match librespot::oauth::get_access_token(
+            &setup.session_config.client_id,
+            OAUTH_SCOPES.to_vec(),
+            setup.oauth_port,
+        ) {
+            Ok(token) => token.access_token,
+            Err(e) => {
+                error!("Failed to get Spotify access token: {e}");
+                exit(1);
+            }
+        };
+        last_credentials = Some(Credentials::with_access_token(access_token));
         connecting = true;
     } else if discovery.is_none() {
         error!(
