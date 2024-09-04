@@ -10,7 +10,7 @@
 //! a spawned http server (mimicking Spotify's client), or manually via stdin. The latter
 //! is appropriate for headless systems.
 
-use log::{debug, error, info, trace};
+use log::{error, info, trace};
 use oauth2::reqwest::http_client;
 use oauth2::{
     basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, CsrfToken, PkceCodeChallenge,
@@ -66,7 +66,7 @@ pub enum OAuthError {
 }
 
 #[derive(Debug)]
-pub struct AccessToken {
+pub struct OAuthToken {
     pub access_token: String,
     pub refresh_token: String,
     pub expires_at: Instant,
@@ -149,7 +149,7 @@ pub fn get_access_token(
     client_id: &str,
     scopes: Vec<&str>,
     redirect_port: Option<u16>,
-) -> Result<AccessToken, OAuthError> {
+) -> Result<OAuthToken, OAuthError> {
     // Must use host 127.0.0.1 with Spotify Desktop client ID.
     let redirect_address = SocketAddr::new(
         IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
@@ -196,13 +196,12 @@ pub fn get_access_token(
     } else {
         get_authcode_stdin()
     }?;
-    debug!("Exchange {code:?} for access token");
+    trace!("Exchange {code:?} for access token");
 
     // Do this sync in another thread because I am too stupid to make the async version work.
     let (tx, rx) = mpsc::channel();
-    let client_clone = client.clone();
     std::thread::spawn(move || {
-        let resp = client_clone
+        let resp = client
             .exchange_code(code)
             .set_pkce_verifier(pkce_verifier)
             .request(http_client);
@@ -218,7 +217,7 @@ pub fn get_access_token(
         Some(s) => s.iter().map(|s| s.to_string()).collect(),
         _ => scopes.into_iter().map(|s| s.to_string()).collect(),
     };
-    Ok(AccessToken {
+    Ok(OAuthToken {
         access_token: token.access_token().secret().to_string(),
         refresh_token: token.refresh_token().unwrap().secret().to_string(),
         expires_at: Instant::now() + token.expires_in().unwrap_or(Duration::from_secs(3600)),
