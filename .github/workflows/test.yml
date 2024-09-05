@@ -168,6 +168,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.7
+    
+      # hyper-rustls >=0.27 uses aws-lc as default backend which requires NASM to build
+      - name: Install NASM
+        uses: ilammy/setup-nasm@v1.5.1
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -229,7 +233,15 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-${{ matrix.target }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
-      - name: Install cross
-        run: cargo install cross || true
+
+      - name: Install the cross compiler targets
+        run: rustup target add ${{ matrix.target }}
+      
+      - name: Install cross compiler toolchain
+        run: sudo apt-get install -y gcc-arm-linux-gnueabihf
+      
       - name: Build
-        run: cross build --target ${{ matrix.target }} --no-default-features
+        run: cargo build --verbose --target ${{ matrix.target }} --no-default-features
+      
+      - name: Check binary
+        run: file target/${{ matrix.target }}/debug/librespot
