@@ -12,7 +12,7 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
-use sysinfo::System;
+use sysinfo::{ProcessesToUpdate, System};
 use thiserror::Error;
 use url::Url;
 
@@ -1700,7 +1700,7 @@ async fn main() {
             {
                 Ok(d) => break Some(d),
                 Err(e) => {
-                    sys.refresh_processes();
+                    sys.refresh_processes(ProcessesToUpdate::All);
 
                     if System::uptime() <= 1 {
                         debug!("Retrying to initialise discovery: {e}");

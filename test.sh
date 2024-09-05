@@ -3,7 +3,7 @@
 set -e
 
 # this script runs the tests and checks that also run as part of the`test.yml` github action workflow
-
+cargo clean
 cargo fmt --all -- --check
 cargo clippy -p librespot-core --no-default-features
 cargo clippy -p librespot-core

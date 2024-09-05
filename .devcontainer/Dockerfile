@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG debian_version=slim-bookworm
-ARG rust_version=1.73.0
+ARG rust_version=1.74.0
 FROM rust:${rust_version}-${debian_version}
 
 ARG DEBIAN_FRONTEND=noninteractive
