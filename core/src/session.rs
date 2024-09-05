@@ -13,6 +13,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
 use futures_util::{future, ready, StreamExt, TryStreamExt};
+use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
@@ -22,13 +23,13 @@ use tokio::{sync::mpsc, time::Instant};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
-    apresolve::ApResolver,
+    apresolve::{ApResolver, SocketAddress},
     audio_key::AudioKeyManager,
     authentication::Credentials,
     cache::Cache,
     channel::ChannelManager,
     config::SessionConfig,
-    connection::{self, AuthenticationError},
+    connection::{self, AuthenticationError, Transport},
     http_client::HttpClient,
     mercury::MercuryManager,
     packet::PacketType,
@@ -141,6 +142,46 @@ impl Session {
         }))
     }
 
+    async fn connect_inner(
+        &self,
+        access_point: SocketAddress,
+        credentials: Credentials,
+    ) -> Result<(Credentials, Transport), Error> {
+        let mut transport = connection::connect(
+            &access_point.0,
+            access_point.1,
+            self.config().proxy.as_ref(),
+        )
+        .await?;
+        let mut reusable_credentials = connection::authenticate(
+            &mut transport,
+            credentials.clone(),
+            &self.config().device_id,
+        )
+        .await?;
+
+        // Might be able to remove this once keymaster is replaced with login5.
+        if credentials.auth_type == AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN {
+            trace!(
+                "Reconnect using stored credentials as token authed sessions cannot use keymaster."
+            );
+            transport = connection::connect(
+                &access_point.0,
+                access_point.1,
+                self.config().proxy.as_ref(),
+            )
+            .await?;
+            reusable_credentials = connection::authenticate(
+                &mut transport,
+                reusable_credentials.clone(),
+                &self.config().device_id,
+            )
+            .await?;
+        }
+
+        Ok((reusable_credentials, transport))
+    }
+
     pub async fn connect(
         &self,
         credentials: Credentials,
@@ -149,17 +190,8 @@ impl Session {
         let (reusable_credentials, transport) = loop {
             let ap = self.apresolver().resolve("accesspoint").await?;
             info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
-            let mut transport =
-                connection::connect(&ap.0, ap.1, self.config().proxy.as_ref()).await?;
-
-            match connection::authenticate(
-                &mut transport,
-                credentials.clone(),
-                &self.config().device_id,
-            )
-            .await
-            {
-                Ok(creds) => break (creds, transport),
+            match self.connect_inner(ap, credentials.clone()).await {
+                Ok(ct) => break ct,
                 Err(e) => {
                     if let Some(AuthenticationError::LoginFailed(ErrorCode::TryAnotherAP)) =
                         e.error.downcast_ref::<AuthenticationError>()
