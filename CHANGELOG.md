@@ -55,6 +55,8 @@ https://github.com/librespot-org/librespot
 - [core] Cache resolved access points during runtime (breaking)
 - [core] `FileId` is moved out of `SpotifyId`. For now it will be re-exported.
 - [core] Report actual platform data on login
+- [core] Support `Session` authentication with a Spotify access token
+- [core] `Credentials.username` is now an `Option` (breaking) 
 - [main] `autoplay {on|off}` now acts as an override. If unspecified, `librespot`
   now follows the setting in the Connect client that controls it. (breaking)
 - [metadata] Most metadata is now retrieved with the `spclient` (breaking)
@@ -95,6 +97,7 @@ https://github.com/librespot-org/librespot
 - [main] Add an event worker thread that runs async to the main thread(s) but
   sync to itself to prevent potential data races for event consumers
 - [metadata] All metadata fields in the protobufs are now exposed (breaking)
+- [oauth] Standalone module to obtain Spotify access token using OAuth authorization code flow.
 - [playback] Explicit tracks are skipped if the controlling Connect client has
   disabled such content. Applications that use librespot as a library without
   Connect should use the 'filter-explicit-content' user attribute in the session.
