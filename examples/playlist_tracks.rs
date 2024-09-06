@@ -13,13 +13,13 @@ async fn main() {
     let session_config = SessionConfig::default();
 
     let args: Vec<_> = env::args().collect();
-    if args.len() != 4 {
-        eprintln!("Usage: {} USERNAME PASSWORD PLAYLIST", args[0]);
+    if args.len() != 3 {
+        eprintln!("Usage: {} ACCESS_TOKEN PLAYLIST", args[0]);
         return;
     }
-    let credentials = Credentials::with_password(&args[1], &args[2]);
+    let credentials = Credentials::with_access_token(&args[1]);
 
-    let plist_uri = SpotifyId::from_uri(&args[3]).unwrap_or_else(|_| {
+    let plist_uri = SpotifyId::from_uri(&args[2]).unwrap_or_else(|_| {
         eprintln!(
             "PLAYLIST should be a playlist URI such as: \
                 \"spotify:playlist:37i9dQZF1DXec50AjHrNTq\""
