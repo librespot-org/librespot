@@ -37,7 +37,7 @@ on:
 
 env:
   RUST_BACKTRACE: 1
-  RUSTFLAGS: -D warnings
+  RUSTFLAGS: -D warnings -A renamed-and-removed-lints
 
 # The layering here is as follows:
 #  1. code formatting
