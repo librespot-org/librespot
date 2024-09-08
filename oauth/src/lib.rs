@@ -58,7 +58,7 @@ pub enum OAuthError {
     #[error("Invalid Redirect URI {uri} ({e})")]
     InvalidRedirectUri { uri: String, e: url::ParseError },
 
-    #[error("Failed to recieve code")]
+    #[error("Failed to receive code")]
     Recv,
 
     #[error("Failed to exchange code for access token ({e})")]
@@ -217,10 +217,17 @@ pub fn get_access_token(
         Some(s) => s.iter().map(|s| s.to_string()).collect(),
         _ => scopes.into_iter().map(|s| s.to_string()).collect(),
     };
+    let refresh_token = match token.refresh_token() {
+        Some(t) => t.secret().to_string(),
+        _ => "".to_string(), // Spotify always provides a refresh token.
+    };
     Ok(OAuthToken {
         access_token: token.access_token().secret().to_string(),
-        refresh_token: token.refresh_token().unwrap().secret().to_string(),
-        expires_at: Instant::now() + token.expires_in().unwrap_or(Duration::from_secs(3600)),
+        refresh_token,
+        expires_at: Instant::now()
+            + token
+                .expires_in()
+                .unwrap_or_else(|| Duration::from_secs(3600)),
         token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
         scopes: token_scopes,
     })
