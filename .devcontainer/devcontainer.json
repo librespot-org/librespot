@@ -1,6 +1,6 @@
 {
   "name": "Librespot Devcontainer",
-  "dockerFile": "Dockerfile",
+  "dockerFile": "Dockerfile.alpine",
 	// Use 'postCreateCommand' to run commands after the container is created.
 	//"postCreateCommand": "",
 	"customizations": {

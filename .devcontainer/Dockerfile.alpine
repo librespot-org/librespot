@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1
+ARG alpine_version=alpine3.18
+ARG rust_version=1.74.0
+FROM rust:${rust_version}-${alpine_version}
+
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
+ENV RUST_BACKTRACE=1
+ENV RUSTFLAGS="-D warnings -A renamed-and-removed-lints -C target-feature=-crt-static"
+
+
+RUN apk add --no-cache \
+        git \
+        nano\
+        openssh-server  \
+        # for rust-analyzer vscode plugin
+        pkgconf \
+        musl-dev \
+        # developer dependencies
+        libunwind-dev \
+        pulseaudio-dev \
+        portaudio-dev \
+        alsa-lib-dev \
+        sdl2-dev \
+        gstreamer-dev \
+        gst-plugins-base-dev \
+        jack-dev \
+        avahi-dev && \
+        rm -rf /lib/apk/db/*
+
+RUN rustup component add rustfmt && \
+    rustup component add clippy && \
+    cargo install cargo-hack
