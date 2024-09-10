@@ -240,6 +240,9 @@ jobs:
       - name: Install cross compiler toolchain
         run: sudo apt-get install -y gcc-arm-linux-gnueabihf
       
+      - name: Set target link compiler
+        run: echo "CARGO_TARGET_ARMV7_UNKNOWN-LINUX-GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+      
       - name: Build
         run: cargo build --verbose --target ${{ matrix.target }} --no-default-features
       
