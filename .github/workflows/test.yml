@@ -154,7 +154,7 @@ jobs:
       - run: cargo hack check --each-feature
 
   test-windows:
-    needs: test-linux
+    needs: clippy
     name: cargo +${{ matrix.toolchain }} check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     continue-on-error: false
@@ -201,7 +201,7 @@ jobs:
 
   test-cross-arm:
     name: cross +${{ matrix.toolchain }} build ${{ matrix.target }}
-    needs: test-linux
+    needs: clippy
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     strategy:
