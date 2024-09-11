@@ -20,7 +20,7 @@ use std::io;
 use std::time::{Duration, Instant};
 use std::{
     io::{BufRead, BufReader, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
+    net::{SocketAddr, TcpListener},
     sync::mpsc,
 };
 use thiserror::Error;
@@ -103,7 +103,7 @@ fn get_authcode_stdin() -> Result<AuthorizationCode, OAuthError> {
     get_code(buffer.trim())
 }
 
-/// Spawn HTTP server on provided socket to accept OAuth callback and return auth code.
+/// Spawn HTTP server at provided socket address to accept OAuth callback and return auth code.
 fn get_authcode_listener(socket_address: SocketAddr) -> Result<AuthorizationCode, OAuthError> {
     let listener =
         TcpListener::bind(socket_address).map_err(|e| OAuthError::AuthCodeListenerBind {
@@ -143,36 +143,48 @@ fn get_authcode_listener(socket_address: SocketAddr) -> Result<AuthorizationCode
     code
 }
 
-// TODO: Pass in redirect_address instead since the redirect host depends on client ID?
+// If the specified `redirect_uri` is HTTP, loopback, and contains a port,
+// then the corresponding socket address is returned.
+fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
+    let url = match Url::parse(redirect_uri) {
+        Ok(u) if u.scheme() == "http" && u.port().is_some() => u,
+        _ => return None,
+    };
+    let socket_addr = match url.socket_addrs(|| None) {
+        Ok(mut addrs) => addrs.pop(),
+        _ => None,
+    };
+    if let Some(s) = socket_addr {
+        if s.ip().is_loopback() {
+            return socket_addr;
+        }
+    }
+    None
+}
+
 /// Obtain a Spotify access token using the authorization code with PKCE OAuth flow.
+/// The redirect_uri must match what is registered to the client ID.
 pub fn get_access_token(
     client_id: &str,
+    redirect_uri: &str,
     scopes: Vec<&str>,
-    redirect_port: Option<u16>,
 ) -> Result<OAuthToken, OAuthError> {
-    // Must use host 127.0.0.1 with Spotify Desktop client ID.
-    let redirect_address = SocketAddr::new(
-        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-        redirect_port.unwrap_or_default(),
-    );
-    let redirect_uri = format!("http://{redirect_address}/login");
-
     let auth_url = AuthUrl::new("https://accounts.spotify.com/authorize".to_string())
         .map_err(|_| OAuthError::InvalidSpotifyUri)?;
     let token_url = TokenUrl::new("https://accounts.spotify.com/api/token".to_string())
         .map_err(|_| OAuthError::InvalidSpotifyUri)?;
+    let redirect_url =
+        RedirectUrl::new(redirect_uri.to_string()).map_err(|e| OAuthError::InvalidRedirectUri {
+            uri: redirect_uri.to_string(),
+            e,
+        })?;
     let client = BasicClient::new(
         ClientId::new(client_id.to_string()),
         None,
         auth_url,
         Some(token_url),
     )
-    .set_redirect_uri(RedirectUrl::new(redirect_uri.clone()).map_err(|e| {
-        OAuthError::InvalidRedirectUri {
-            uri: redirect_uri,
-            e,
-        }
-    })?);
+    .set_redirect_uri(redirect_url);
 
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
@@ -191,10 +203,9 @@ pub fn get_access_token(
 
     println!("Browse to: {}", auth_url);
 
-    let code = if redirect_port.is_some() {
-        get_authcode_listener(redirect_address)
-    } else {
-        get_authcode_stdin()
+    let code = match get_socket_address(redirect_uri) {
+        Some(addr) => get_authcode_listener(addr),
+        _ => get_authcode_stdin(),
     }?;
     trace!("Exchange {code:?} for access token");
 
@@ -231,4 +242,46 @@ pub fn get_access_token(
         token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
         scopes: token_scopes,
     })
+}
+
+#[cfg(test)]
+mod test {
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+
+    use super::*;
+
+    #[test]
+    fn get_socket_address_none() {
+        // No port
+        assert_eq!(get_socket_address("http://127.0.0.1/foo"), None);
+        assert_eq!(get_socket_address("http://127.0.0.1:/foo"), None);
+        assert_eq!(get_socket_address("http://[::1]/foo"), None);
+        // Not localhost
+        assert_eq!(get_socket_address("http://56.0.0.1:1234/foo"), None);
+        assert_eq!(
+            get_socket_address("http://[3ffe:2a00:100:7031::1]:1234/foo"),
+            None
+        );
+        // Not http
+        assert_eq!(get_socket_address("https://127.0.0.1/foo"), None);
+    }
+
+    #[test]
+    fn get_socket_address_localhost() {
+        let localhost_v4 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
+        let localhost_v6 = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8888);
+
+        assert_eq!(
+            get_socket_address("http://127.0.0.1:1234/foo"),
+            Some(localhost_v4)
+        );
+        assert_eq!(
+            get_socket_address("http://[0:0:0:0:0:0:0:1]:8888/foo"),
+            Some(localhost_v6)
+        );
+        assert_eq!(
+            get_socket_address("http://[::1]:8888/foo"),
+            Some(localhost_v6)
+        );
+    }
 }

@@ -1804,10 +1804,14 @@ async fn main() {
         last_credentials = Some(credentials);
         connecting = true;
     } else if setup.enable_oauth {
+        let port_str = match setup.oauth_port {
+            Some(port) => format!(":{port}"),
+            _ => String::new(),
+        };
         let access_token = match librespot::oauth::get_access_token(
             &setup.session_config.client_id,
+            &format!("http://127.0.0.1{port_str}/login"),
             OAUTH_SCOPES.to_vec(),
-            setup.oauth_port,
         ) {
             Ok(token) => token.access_token,
             Err(e) => {
