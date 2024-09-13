@@ -28,16 +28,16 @@ async fn main() {
     let connect_config = ConnectConfig::default();
 
     let mut args: Vec<_> = env::args().collect();
-    let context_uri = if args.len() == 4 {
+    let context_uri = if args.len() == 3 {
         args.pop().unwrap()
-    } else if args.len() == 3 {
+    } else if args.len() == 2 {
         String::from("spotify:album:79dL7FLiJFOO0EoehUHQBv")
     } else {
-        eprintln!("Usage: {} USERNAME PASSWORD (ALBUM URI)", args[0]);
+        eprintln!("Usage: {} ACCESS_TOKEN (ALBUM URI)", args[0]);
         return;
     };
 
-    let credentials = Credentials::with_password(&args[1], &args[2]);
+    let credentials = Credentials::with_access_token(&args[1]);
     let backend = audio_backend::find(None).unwrap();
 
     println!("Connecting...");

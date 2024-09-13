@@ -1,0 +1,18 @@
+[package]
+name = "librespot-oauth"
+version = "0.5.0-dev"
+rust-version = "1.73"
+authors = ["Nick Steel <nick@nsteel.co.uk>"]
+description = "OAuth authorization code flow with PKCE for obtaining a Spotify access token"
+license = "MIT"
+repository = "https://github.com/librespot-org/librespot"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+oauth2 = "4.4"
+thiserror = "1.0"
+url = "2.2"
+
+[dev-dependencies]
+env_logger =  { version = "0.11.2", default-features = false, features = ["color", "humantime", "auto-color"] }

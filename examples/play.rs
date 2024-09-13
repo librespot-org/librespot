@@ -22,13 +22,13 @@ async fn main() {
     let audio_format = AudioFormat::default();
 
     let args: Vec<_> = env::args().collect();
-    if args.len() != 4 {
-        eprintln!("Usage: {} USERNAME PASSWORD TRACK", args[0]);
+    if args.len() != 3 {
+        eprintln!("Usage: {} ACCESS_TOKEN TRACK", args[0]);
         return;
     }
-    let credentials = Credentials::with_password(&args[1], &args[2]);
+    let credentials = Credentials::with_access_token(&args[1]);
 
-    let mut track = SpotifyId::from_base62(&args[3]).unwrap();
+    let mut track = SpotifyId::from_base62(&args[2]).unwrap();
     track.item_type = SpotifyItemType::Track;
 
     let backend = audio_backend::find(None).unwrap();

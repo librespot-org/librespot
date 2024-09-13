@@ -9,6 +9,10 @@ license = "MIT"
 repository = "https://github.com/librespot-org/librespot"
 edition = "2021"
 
+[dependencies.librespot-oauth]
+path = "../oauth"
+version = "0.5.0-dev"
+
 [dependencies.librespot-protocol]
 path = "../protocol"
 version = "0.5.0-dev"

@@ -168,6 +168,37 @@ fn get_version_string() -> String {
     )
 }
 
+/// Spotify's Desktop app uses these. Some of these are only available when requested with Spotify's client IDs.
+static OAUTH_SCOPES: &[&str] = &[
+    //const OAUTH_SCOPES: Vec<&str> = vec![
+    "app-remote-control",
+    "playlist-modify",
+    "playlist-modify-private",
+    "playlist-modify-public",
+    "playlist-read",
+    "playlist-read-collaborative",
+    "playlist-read-private",
+    "streaming",
+    "ugc-image-upload",
+    "user-follow-modify",
+    "user-follow-read",
+    "user-library-modify",
+    "user-library-read",
+    "user-modify",
+    "user-modify-playback-state",
+    "user-modify-private",
+    "user-personalized",
+    "user-read-birthdate",
+    "user-read-currently-playing",
+    "user-read-email",
+    "user-read-play-history",
+    "user-read-playback-position",
+    "user-read-playback-state",
+    "user-read-private",
+    "user-read-recently-played",
+    "user-top-read",
+];
+
 struct Setup {
     format: AudioFormat,
     backend: SinkBuilder,
@@ -179,6 +210,8 @@ struct Setup {
     connect_config: ConnectConfig,
     mixer_config: MixerConfig,
     credentials: Option<Credentials>,
+    enable_oauth: bool,
+    oauth_port: Option<u16>,
     enable_discovery: bool,
     zeroconf_port: u16,
     player_event_program: Option<String>,
@@ -195,6 +228,7 @@ fn get_setup() -> Setup {
     const VALID_NORMALISATION_ATTACK_RANGE: RangeInclusive<u64> = 1..=500;
     const VALID_NORMALISATION_RELEASE_RANGE: RangeInclusive<u64> = 1..=1000;
 
+    const ACCESS_TOKEN: &str = "access-token";
     const AP_PORT: &str = "ap-port";
     const AUTOPLAY: &str = "autoplay";
     const BACKEND: &str = "backend";
@@ -210,6 +244,7 @@ fn get_setup() -> Setup {
     const DISABLE_GAPLESS: &str = "disable-gapless";
     const DITHER: &str = "dither";
     const EMIT_SINK_EVENTS: &str = "emit-sink-events";
+    const ENABLE_OAUTH: &str = "enable-oauth";
     const ENABLE_VOLUME_NORMALISATION: &str = "enable-volume-normalisation";
     const FORMAT: &str = "format";
     const HELP: &str = "help";
@@ -226,6 +261,7 @@ fn get_setup() -> Setup {
     const NORMALISATION_PREGAIN: &str = "normalisation-pregain";
     const NORMALISATION_RELEASE: &str = "normalisation-release";
     const NORMALISATION_THRESHOLD: &str = "normalisation-threshold";
+    const OAUTH_PORT: &str = "oauth-port";
     const ONEVENT: &str = "onevent";
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
@@ -260,6 +296,9 @@ fn get_setup() -> Setup {
     const DISABLE_CREDENTIAL_CACHE_SHORT: &str = "H";
     const HELP_SHORT: &str = "h";
     const ZEROCONF_INTERFACE_SHORT: &str = "i";
+    const ENABLE_OAUTH_SHORT: &str = "j";
+    const OAUTH_PORT_SHORT: &str = "K";
+    const ACCESS_TOKEN_SHORT: &str = "k";
     const CACHE_SIZE_LIMIT_SHORT: &str = "M";
     const MIXER_TYPE_SHORT: &str = "m";
     const ENABLE_VOLUME_NORMALISATION_SHORT: &str = "N";
@@ -381,6 +420,11 @@ fn get_setup() -> Setup {
         ENABLE_VOLUME_NORMALISATION,
         "Play all tracks at approximately the same apparent volume.",
     )
+    .optflag(
+        ENABLE_OAUTH_SHORT,
+        ENABLE_OAUTH,
+        "Perform interactive OAuth sign in.",
+    )
     .optopt(
         NAME_SHORT,
         NAME,
@@ -456,6 +500,18 @@ fn get_setup() -> Setup {
         PASSWORD,
         "Password used to sign in with.",
         "PASSWORD",
+    )
+    .optopt(
+        ACCESS_TOKEN_SHORT,
+        ACCESS_TOKEN,
+        "Spotify access token to sign in with.",
+        "TOKEN",
+    )
+    .optopt(
+        OAUTH_PORT_SHORT,
+        OAUTH_PORT,
+        "The port the oauth redirect server uses 1 - 65535. Ports <= 1024 may require root privileges.",
+        "PORT",
     )
     .optopt(
         ONEVENT_SHORT,
@@ -670,7 +726,10 @@ fn get_setup() -> Setup {
         trace!("Environment variable(s):");
 
         for (k, v) in &env_vars {
-            if matches!(k.as_str(), "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME") {
+            if matches!(
+                k.as_str(),
+                "LIBRESPOT_PASSWORD" | "LIBRESPOT_USERNAME" | "LIBRESPOT_ACCESS_TOKEN"
+            ) {
                 trace!("\t\t{k}=\"XXXXXXXX\"");
             } else if v.is_empty() {
                 trace!("\t\t{k}=");
@@ -702,7 +761,15 @@ fn get_setup() -> Setup {
                 && matches.opt_defined(opt)
                 && matches.opt_present(opt)
             {
-                if matches!(opt, PASSWORD | PASSWORD_SHORT | USERNAME | USERNAME_SHORT) {
+                if matches!(
+                    opt,
+                    PASSWORD
+                        | PASSWORD_SHORT
+                        | USERNAME
+                        | USERNAME_SHORT
+                        | ACCESS_TOKEN
+                        | ACCESS_TOKEN_SHORT
+                ) {
                     // Don't log creds.
                     trace!("\t\t{opt} \"XXXXXXXX\"");
                 } else {
@@ -1081,44 +1148,32 @@ fn get_setup() -> Setup {
         }
     };
 
+    let enable_oauth = opt_present(ENABLE_OAUTH);
+
     let credentials = {
         let cached_creds = cache.as_ref().and_then(Cache::credentials);
 
-        if let Some(username) = opt_str(USERNAME) {
+        if let Some(access_token) = opt_str(ACCESS_TOKEN) {
+            if access_token.is_empty() {
+                empty_string_error_msg(ACCESS_TOKEN, ACCESS_TOKEN_SHORT);
+            }
+            Some(Credentials::with_access_token(access_token))
+        } else if let Some(username) = opt_str(USERNAME) {
             if username.is_empty() {
                 empty_string_error_msg(USERNAME, USERNAME_SHORT);
             }
-            if let Some(password) = opt_str(PASSWORD) {
-                if password.is_empty() {
-                    empty_string_error_msg(PASSWORD, PASSWORD_SHORT);
+            if opt_present(PASSWORD) {
+                error!("Invalid `--{PASSWORD}` / `-{PASSWORD_SHORT}`: Password authentication no longer supported, use OAuth");
+                exit(1);
+            }
+            match cached_creds {
+                Some(creds) if Some(username) == creds.username => {
+                    trace!("Using cached credentials for specified username.");
+                    Some(creds)
                 }
-                Some(Credentials::with_password(username, password))
-            } else {
-                match cached_creds {
-                    Some(creds) if username == creds.username => Some(creds),
-                    _ => {
-                        let prompt = &format!("Password for {username}: ");
-                        match rpassword::prompt_password(prompt) {
-                            Ok(password) => {
-                                if !password.is_empty() {
-                                    Some(Credentials::with_password(username, password))
-                                } else {
-                                    trace!("Password was empty.");
-                                    if cached_creds.is_some() {
-                                        trace!("Using cached credentials.");
-                                    }
-                                    cached_creds
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Cannot parse password: {}", e);
-                                if cached_creds.is_some() {
-                                    trace!("Using cached credentials.");
-                                }
-                                cached_creds
-                            }
-                        }
-                    }
+                _ => {
+                    trace!("No cached credentials for specified username.");
+                    None
                 }
             }
         } else {
@@ -1131,10 +1186,38 @@ fn get_setup() -> Setup {
 
     let enable_discovery = !opt_present(DISABLE_DISCOVERY);
 
-    if credentials.is_none() && !enable_discovery {
-        error!("Credentials are required if discovery is disabled.");
+    if credentials.is_none() && !enable_discovery && !enable_oauth {
+        error!("Credentials are required if discovery and oauth login are disabled.");
         exit(1);
     }
+
+    let oauth_port = if opt_present(OAUTH_PORT) {
+        if !enable_oauth {
+            warn!(
+                "Without the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
+                ENABLE_OAUTH, ENABLE_OAUTH_SHORT, OAUTH_PORT, OAUTH_PORT_SHORT
+            );
+        }
+        opt_str(OAUTH_PORT)
+            .map(|port| match port.parse::<u16>() {
+                Ok(value) => {
+                    if value > 0 {
+                        Some(value)
+                    } else {
+                        None
+                    }
+                }
+                _ => {
+                    let valid_values = &format!("1 - {}", u16::MAX);
+                    invalid_error_msg(OAUTH_PORT, OAUTH_PORT_SHORT, &port, valid_values, "");
+
+                    exit(1);
+                }
+            })
+            .unwrap_or(None)
+    } else {
+        Some(5588)
+    };
 
     if !enable_discovery && opt_present(ZEROCONF_PORT) {
         warn!(
@@ -1643,6 +1726,8 @@ fn get_setup() -> Setup {
         connect_config,
         mixer_config,
         credentials,
+        enable_oauth,
+        oauth_port,
         enable_discovery,
         zeroconf_port,
         player_event_program,
@@ -1717,6 +1802,24 @@ async fn main() {
 
     if let Some(credentials) = setup.credentials {
         last_credentials = Some(credentials);
+        connecting = true;
+    } else if setup.enable_oauth {
+        let port_str = match setup.oauth_port {
+            Some(port) => format!(":{port}"),
+            _ => String::new(),
+        };
+        let access_token = match librespot::oauth::get_access_token(
+            &setup.session_config.client_id,
+            &format!("http://127.0.0.1{port_str}/login"),
+            OAUTH_SCOPES.to_vec(),
+        ) {
+            Ok(token) => token.access_token,
+            Err(e) => {
+                error!("Failed to get Spotify access token: {e}");
+                exit(1);
+            }
+        };
+        last_credentials = Some(Credentials::with_access_token(access_token));
         connecting = true;
     } else if discovery.is_none() {
         error!(
