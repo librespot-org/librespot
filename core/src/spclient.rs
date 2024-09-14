@@ -1,25 +1,3 @@
-use std::{
-    env::consts::OS,
-    fmt::Write,
-    time::{Duration, Instant},
-};
-
-use byteorder::{BigEndian, ByteOrder};
-use bytes::Bytes;
-use data_encoding::HEXUPPER_PERMISSIVE;
-use futures_util::future::IntoStream;
-use http::header::HeaderValue;
-use hyper::{
-    header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
-    HeaderMap, Method, Request,
-};
-use hyper_util::client::legacy::ResponseFuture;
-use protobuf::{Enum, Message, MessageFull};
-use rand::RngCore;
-use sha1::{Digest, Sha1};
-use sysinfo::System;
-use thiserror::Error;
-
 use crate::{
     apresolve::SocketAddress,
     cdn_url::CdnUrl,
@@ -38,6 +16,26 @@ use crate::{
     version::spotify_semantic_version,
     Error, FileId, SpotifyId,
 };
+use byteorder::{BigEndian, ByteOrder};
+use bytes::Bytes;
+use data_encoding::HEXUPPER_PERMISSIVE;
+use futures_util::future::IntoStream;
+use http::header::HeaderValue;
+use hyper::{
+    header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
+    HeaderMap, Method, Request,
+};
+use hyper_util::client::legacy::ResponseFuture;
+use protobuf::{Enum, Message, MessageFull};
+use rand::RngCore;
+use sha1::{Digest, Sha1};
+use std::{
+    env::consts::OS,
+    fmt::Write,
+    time::{Duration, Instant},
+};
+use sysinfo::System;
+use thiserror::Error;
 
 component! {
     SpClient : SpClientInner {
@@ -49,8 +47,8 @@ component! {
 
 pub type SpClientResult = Result<Bytes, Error>;
 
-#[allow(clippy::declare_interior_mutable_const)]
 const CLIENT_TOKEN: HeaderName = HeaderName::from_static("client-token");
+const CONNECTION_ID: HeaderName = HeaderName::from_static("x-spotify-connection-id");
 
 #[derive(Debug, Error)]
 pub enum SpClientError {
@@ -396,7 +394,7 @@ impl SpClient {
         headers: Option<HeaderMap>,
         message: &M,
     ) -> SpClientResult {
-        let body = protobuf::text_format::print_to_string(message);
+        let body = message.write_to_bytes()?;
 
         let mut headers = headers.unwrap_or_default();
         headers.insert(
@@ -418,7 +416,8 @@ impl SpClient {
         let mut headers = headers.unwrap_or_default();
         headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
 
-        self.request(method, endpoint, Some(headers), body).await
+        self.request(method, endpoint, Some(headers), body.map(|s| s.as_bytes()))
+            .await
     }
 
     pub async fn request(
@@ -426,7 +425,7 @@ impl SpClient {
         method: &Method,
         endpoint: &str,
         headers: Option<HeaderMap>,
-        body: Option<&str>,
+        body: Option<&[u8]>,
     ) -> SpClientResult {
         let mut tries: usize = 0;
         let mut last_response;
@@ -465,7 +464,7 @@ impl SpClient {
             let mut request = Request::builder()
                 .method(method)
                 .uri(url)
-                .body(body.to_owned().into())?;
+                .body(Bytes::copy_from_slice(body))?;
 
             // Reconnection logic: keep getting (cached) tokens because they might have expired.
             let token = self
@@ -527,17 +526,13 @@ impl SpClient {
         last_response
     }
 
-    pub async fn put_connect_state(
-        &self,
-        connection_id: &str,
-        state: &PutStateRequest,
-    ) -> SpClientResult {
+    pub async fn put_connect_state_request(&self, state: PutStateRequest) -> SpClientResult {
         let endpoint = format!("/connect-state/v1/devices/{}", self.session().device_id());
 
         let mut headers = HeaderMap::new();
-        headers.insert("X-Spotify-Connection-Id", connection_id.parse()?);
+        headers.insert(CONNECTION_ID, self.session().connection_id().parse()?);
 
-        self.request_with_protobuf(&Method::PUT, &endpoint, Some(headers), state)
+        self.request_with_protobuf(&Method::PUT, &endpoint, Some(headers), &state)
             .await
     }
 
