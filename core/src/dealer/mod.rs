@@ -1,3 +1,4 @@
+pub mod manager;
 mod maps;
 pub mod protocol;
 

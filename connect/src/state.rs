@@ -1,9 +1,12 @@
 use librespot_core::config::DeviceType;
+use librespot_core::spclient::SpClientResult;
 use librespot_core::{version, Session};
-use librespot_protocol::connect::{Capabilities, DeviceInfo};
+use librespot_protocol::connect::{
+    Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest,
+};
 use librespot_protocol::player::{ContextPlayerOptions, PlayOrigin, PlayerState, Suppressions};
 use protobuf::{EnumOrUnknown, MessageField};
-use std::time::{Instant, SystemTime};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 pub struct ConnectStateConfig {
@@ -108,5 +111,62 @@ impl ConnectState {
             options: MessageField::some(ContextPlayerOptions::new()),
             ..Default::default()
         }
+    }
+
+    pub async fn update_remote(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
+        if matches!(reason, PutStateReason::BECAME_INACTIVE) {
+            todo!("handle became inactive")
+        }
+
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        let client_side_timestamp = u64::try_from(since_the_epoch.as_millis())?;
+
+        let member_type = EnumOrUnknown::new(MemberType::CONNECT_STATE);
+        let put_state_reason = EnumOrUnknown::new(reason);
+
+        let state = self.clone();
+
+        let is_active = state.active;
+        let device = MessageField::some(Device {
+            device_info: MessageField::some(state.device),
+            player_state: MessageField::some(state.player),
+            ..Default::default()
+        });
+
+        let mut put_state = PutStateRequest {
+            client_side_timestamp,
+            member_type,
+            put_state_reason,
+            is_active,
+            device,
+            ..Default::default()
+        };
+
+        if let Some(has_been_playing_for) = state.has_been_playing_for {
+            match has_been_playing_for.elapsed().as_millis().try_into() {
+                Ok(ms) => put_state.has_been_playing_for_ms = ms,
+                Err(why) => warn!("couldn't update has been playing for because {why}"),
+            }
+        }
+
+        if let Some(active_since) = state.active_since {
+            if let Ok(active_since_duration) = active_since.duration_since(UNIX_EPOCH) {
+                match active_since_duration.as_millis().try_into() {
+                    Ok(active_since_ms) => put_state.started_playing_at = active_since_ms,
+                    Err(why) => warn!("couldn't update active since because {why}"),
+                }
+            }
+        }
+
+        if let Some((message_id, device_id)) = state.last_command {
+            put_state.last_command_message_id = message_id;
+            put_state.last_command_sent_by_device_id = device_id;
+        }
+
+        session
+            .spclient()
+            .put_connect_state_request(put_state)
+            .await
     }
 }

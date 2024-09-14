@@ -16,8 +16,7 @@ use crate::{
         user_attributes::UserAttributesMutation,
     },
 };
-use futures_util::stream::FusedStream;
-use futures_util::{FutureExt, StreamExt};
+use futures_util::{FutureExt, Stream, StreamExt};
 use protobuf::Message;
 use rand::prelude::SliceRandom;
 use std::{
@@ -27,9 +26,12 @@ use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
 
 #[derive(Debug, Error)]
 pub enum SpircError {
@@ -72,7 +74,7 @@ enum SpircPlayStatus {
     },
 }
 
-type BoxedStream<T> = Pin<Box<dyn FusedStream<Item = T> + Send>>;
+type BoxedStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
 
 struct SpircTask {
     player: Arc<Player>,
@@ -90,6 +92,7 @@ struct SpircTask {
 
     remote_update: BoxedStream<Result<(String, Frame), Error>>,
     connection_id_update: BoxedStream<Result<String, Error>>,
+    connect_state_update: BoxedStream<Result<ClusterUpdate, Error>>,
     user_attributes_update: BoxedStream<Result<UserAttributesUpdate, Error>>,
     user_attributes_mutation: BoxedStream<Result<UserAttributesMutation, Error>>,
     sender: MercurySender,
@@ -164,7 +167,7 @@ pub struct Spirc {
 }
 
 fn initial_state() -> State {
-    let mut frame = protocol::spirc::State::new();
+    let mut frame = State::new();
     frame.set_repeat(false);
     frame.set_shuffle(false);
     frame.set_status(PlayStatus::kPlayStatusStop);
@@ -297,16 +300,32 @@ impl Spirc {
 
         let connection_id_update = Box::pin(
             session
-                .mercury()
-                .listen_for("hm://pusher/v1/connections/")
-                .map(UnboundedReceiverStream::new)
-                .flatten_stream()
+                .dealer()
+                .listen_for("hm://pusher/v1/connections/")?
                 .map(|response| -> Result<String, Error> {
                     let connection_id = response
-                        .uri
-                        .strip_prefix("hm://pusher/v1/connections/")
+                        .headers
+                        .get("Spotify-Connection-Id")
                         .ok_or_else(|| SpircError::InvalidUri(response.uri.clone()))?;
                     Ok(connection_id.to_owned())
+                }),
+        );
+
+        let connect_state_update = Box::pin(
+            session
+                .dealer()
+                .listen_for("hm://connect-state/v1/cluster")?
+                .map(|response| -> Result<ClusterUpdate, Error> {
+                    let json_string = response
+                        .payloads
+                        .first()
+                        .ok_or(SpircError::NoData)?
+                        .to_string();
+                    // a json string has a leading and trailing quotation mark, we need to remove them
+                    let base64_data = &json_string[1..json_string.len() - 1];
+                    let data = BASE64_STANDARD.decode(base64_data)?;
+
+                    ClusterUpdate::parse_from_bytes(&data).map_err(Error::failed_precondition)
                 }),
         );
 
@@ -367,6 +386,7 @@ impl Spirc {
 
             remote_update,
             connection_id_update,
+            connect_state_update,
             user_attributes_update,
             user_attributes_mutation,
             sender,
@@ -443,6 +463,20 @@ impl SpircTask {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
             tokio::select! {
+                cluster_update = self.connect_state_update.next() => match cluster_update {
+                    Some(result) => match result {
+                        Ok(cluster_update) => {
+                            if let Err(e) = self.handle_cluster_update(cluster_update) {
+                                error!("could not dispatch connect state update: {}", e);
+                            }
+                        },
+                        Err(e) => error!("could not parse connect state update: {}", e),
+                    }
+                    None => {
+                        error!("connect state update selected, but none received");
+                        break;
+                    }
+                },
                 remote_update = self.remote_update.next() => match remote_update {
                     Some(result) => match result {
                         Ok((username, frame)) => {
@@ -481,7 +515,7 @@ impl SpircTask {
                 },
                 connection_id_update = self.connection_id_update.next() => match connection_id_update {
                     Some(result) => match result {
-                        Ok(connection_id) => self.handle_connection_id_update(connection_id),
+                        Ok(connection_id) => self.handle_connection_id_update(connection_id).await,
                         Err(e) => error!("could not parse connection ID update: {}", e),
                     }
                     None => {
@@ -551,16 +585,17 @@ impl SpircTask {
             }
         }
 
+        self.session.dealer().close().await;
+
         if self.sender.flush().await.is_err() {
             warn!("Cannot flush spirc event sender when done.");
         }
     }
 
     fn now_ms(&mut self) -> i64 {
-        let dur = match SystemTime::now().duration_since(UNIX_EPOCH) {
-            Ok(dur) => dur,
-            Err(err) => err.duration(),
-        };
+        let dur = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_else(|err| err.duration());
 
         dur.as_millis() as i64 + 1000 * self.session.time_delta()
     }
@@ -775,9 +810,25 @@ impl SpircTask {
         }
     }
 
-    fn handle_connection_id_update(&mut self, connection_id: String) {
+    async fn handle_connection_id_update(&mut self, connection_id: String) {
         trace!("Received connection ID update: {:?}", connection_id);
         self.session.set_connection_id(&connection_id);
+
+        let response = match self.connect_state.update_remote(&self.session, PutStateReason::NEW_DEVICE).await {
+            Ok(res) => Cluster::parse_from_bytes(&res).ok(),
+            Err(why) => {
+                error!("{why:?}");
+                None
+            }
+        };
+
+        if let Some(cluster) = response {
+            debug!(
+                "successfully put connect state for {} with connection-id {connection_id}",
+                self.session.device_id()
+            );
+            info!("active device is {:?}", cluster.active_device_id);
+        }
     }
 
     fn handle_user_attributes_update(&mut self, update: UserAttributesUpdate) {
@@ -993,6 +1044,21 @@ impl SpircTask {
 
             _ => Ok(()),
         }
+    }
+
+    fn handle_cluster_update(&mut self, cluster_update: ClusterUpdate) -> Result<(), Error> {
+        let reason = cluster_update.update_reason.enum_value_or_default();
+
+        let device_ids = cluster_update.devices_that_changed.join(", ");
+        // the websocket version sends devices not device
+        let devices = cluster_update.cluster.device.len();
+
+        let prev_tracks = cluster_update.cluster.player_state.prev_tracks.len();
+        let next_tracks = cluster_update.cluster.player_state.next_tracks.len();
+
+        info!("cluster update! {reason:?} for {device_ids} from {devices}");
+        info!("has {prev_tracks:?} previous tracks and {next_tracks} next tracks");
+        Ok(())
     }
 
     fn handle_disconnect(&mut self) {
@@ -1521,12 +1587,12 @@ impl Drop for SpircTask {
 
 struct CommandSender<'a> {
     spirc: &'a mut SpircTask,
-    frame: protocol::spirc::Frame,
+    frame: Frame,
 }
 
 impl<'a> CommandSender<'a> {
     fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender<'_> {
-        let mut frame = protocol::spirc::Frame::new();
+        let mut frame = Frame::new();
         // frame version
         frame.set_version(1);
         // Latest known Spirc version is 3.2.6, but we need another interface to announce support for Spirc V3.
@@ -1546,7 +1612,7 @@ impl<'a> CommandSender<'a> {
     }
 
     #[allow(dead_code)]
-    fn state(mut self, state: protocol::spirc::State) -> CommandSender<'a> {
+    fn state(mut self, state: State) -> CommandSender<'a> {
         *self.frame.state.mut_or_insert_default() = state;
         self
     }
