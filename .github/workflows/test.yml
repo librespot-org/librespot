@@ -199,7 +199,7 @@ jobs:
       - run: cargo check --no-default-features
       - run: cargo check
 
-  test-cross-arm:
+  test-cross-linux:
     name: cross +${{ matrix.toolchain }} build ${{ matrix.target }}
     needs: clippy
     runs-on: ${{ matrix.os }}
@@ -208,7 +208,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        target: [armv7-unknown-linux-gnueabihf]
+        target: 
+          - armv7-unknown-linux-gnueabihf
+          - aarch64-unknown-linux-gnu
+          - riscv64gc-unknown-linux-gnu
         toolchain:
           - "1.74" # MSRV (Minimum supported rust version)
           - stable
@@ -242,6 +245,12 @@ jobs:
             if [ ${{ matrix.target }} = "armv7-unknown-linux-gnueabihf" ]; then
               sudo apt-get install -y gcc-arm-linux-gnueabihf
             fi
+            if [ ${{ matrix.target }} = "aarch64-unknown-linux-gnu" ]; then
+              sudo apt-get install -y gcc-aarch64-linux-gnu
+            fi
+            if [ ${{ matrix.target }} = "riscv64gc-unknown-linux-gnu" ]; then
+              sudo apt-get install -y gcc-riscv64-linux-gnu
+            fi
       
       - name: Set target link compiler
         run: |
@@ -252,7 +261,13 @@ jobs:
             if [ ${{ matrix.target }} = "armv7-unknown-linux-gnueabihf" ]; then
               echo "CARGO_TARGET_${target}_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
             fi
-      
+            if [ ${{ matrix.target }} = "aarch64-unknown-linux-gnu" ]; then
+              echo "CARGO_TARGET_${target}_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+            fi
+            if [ ${{ matrix.target }} = "riscv64gc-unknown-linux-gnu" ]; then
+              echo "CARGO_TARGET_${target}_LINKER=riscv64-linux-gnu-gcc" >> $GITHUB_ENV
+            fi
+            
       - name: Build
         run: cargo build --verbose --target ${{ matrix.target }} --no-default-features
       
