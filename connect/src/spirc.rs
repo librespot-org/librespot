@@ -1,21 +1,5 @@
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
-use futures_util::{stream::FusedStream, FutureExt, StreamExt};
-
-use protobuf::Message;
-use rand::prelude::SliceRandom;
-use thiserror::Error;
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
+use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
-    config::ConnectConfig,
     context::PageContext,
     core::{
         authentication::Credentials, mercury::MercurySender, session::UserAttributes,
@@ -32,6 +16,20 @@ use crate::{
         user_attributes::UserAttributesMutation,
     },
 };
+use futures_util::stream::FusedStream;
+use futures_util::{FutureExt, StreamExt};
+use protobuf::Message;
+use rand::prelude::SliceRandom;
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[derive(Debug, Error)]
 pub enum SpircError {
@@ -81,6 +79,8 @@ struct SpircTask {
     mixer: Arc<dyn Mixer>,
 
     sequence: SeqGenerator<u32>,
+
+    connect_state: ConnectState,
 
     ident: String,
     device: DeviceState,
@@ -157,7 +157,6 @@ impl From<SpircLoadCommand> for State {
 const CONTEXT_TRACKS_HISTORY: usize = 10;
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
 
-const VOLUME_STEPS: i64 = 64;
 const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
 
 pub struct Spirc {
@@ -181,7 +180,7 @@ fn int_capability(typ: protocol::spirc::CapabilityType, val: i64) -> protocol::s
     cap
 }
 
-fn initial_device_state(config: ConnectConfig) -> DeviceState {
+fn initial_device_state(config: ConnectStateConfig) -> DeviceState {
     let mut msg = DeviceState::new();
     msg.set_sw_version(version::SEMVER.to_string());
     msg.set_is_active(false);
@@ -211,11 +210,7 @@ fn initial_device_state(config: ConnectConfig) -> DeviceState {
     ));
     msg.capabilities.push(int_capability(
         protocol::spirc::CapabilityType::kVolumeSteps,
-        if config.has_volume_ctrl {
-            VOLUME_STEPS
-        } else {
-            0
-        },
+        config.volume_steps.into(),
     ));
     msg.capabilities.push(int_capability(
         protocol::spirc::CapabilityType::kSupportsPlaylistV2,
@@ -269,7 +264,7 @@ fn url_encode(bytes: impl AsRef<[u8]>) -> String {
 
 impl Spirc {
     pub async fn new(
-        config: ConnectConfig,
+        config: ConnectStateConfig,
         session: Session,
         credentials: Credentials,
         player: Arc<Player>,
@@ -279,6 +274,8 @@ impl Spirc {
         debug!("new Spirc[{}]", spirc_id);
 
         let ident = session.device_id().to_owned();
+
+        let connect_state = ConnectState::new(config, &session);
 
         let remote_update = Box::pin(
             session
@@ -339,6 +336,7 @@ impl Spirc {
 
         // Connect *after* all message listeners are registered
         session.connect(credentials, true).await?;
+        session.dealer().start().await?;
 
         let canonical_username = &session.username();
         debug!("canonical_username: {}", canonical_username);
@@ -348,9 +346,7 @@ impl Spirc {
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
-        let initial_volume = config.initial_volume;
-
-        let device = initial_device_state(config);
+        let device = initial_device_state(ConnectStateConfig::default());
 
         let player_events = player.get_player_event_channel();
 
@@ -359,6 +355,8 @@ impl Spirc {
             mixer,
 
             sequence: SeqGenerator::new(1),
+
+            connect_state,
 
             ident,
 
@@ -384,13 +382,6 @@ impl Spirc {
 
             spirc_id,
         };
-
-        if let Some(volume) = initial_volume {
-            task.set_volume(volume);
-        } else {
-            let current_volume = task.mixer.volume();
-            task.set_volume(current_volume);
-        }
 
         let spirc = Spirc { commands: cmd_tx };
 

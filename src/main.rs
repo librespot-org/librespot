@@ -17,7 +17,7 @@ use thiserror::Error;
 use url::Url;
 
 use librespot::{
-    connect::{config::ConnectConfig, spirc::Spirc},
+    connect::{spirc::Spirc, state::ConnectStateConfig},
     core::{
         authentication::Credentials, cache::Cache, config::DeviceType, version, Session,
         SessionConfig,
@@ -207,7 +207,7 @@ struct Setup {
     cache: Option<Cache>,
     player_config: PlayerConfig,
     session_config: SessionConfig,
-    connect_config: ConnectConfig,
+    connect_config: ConnectStateConfig,
     mixer_config: MixerConfig,
     credentials: Option<Credentials>,
     enable_oauth: bool,
@@ -1288,7 +1288,7 @@ fn get_setup() -> Setup {
     };
 
     let connect_config = {
-        let connect_default_config = ConnectConfig::default();
+        let connect_default_config = ConnectStateConfig::default();
 
         let name = opt_str(NAME).unwrap_or_else(|| connect_default_config.name.clone());
 
@@ -1348,14 +1348,12 @@ fn get_setup() -> Setup {
                         #[cfg(feature = "alsa-backend")]
                         let default_value = &format!(
                             "{}, or the current value when the alsa mixer is used.",
-                            connect_default_config.initial_volume.unwrap_or_default()
+                            connect_default_config.initial_volume
                         );
 
                         #[cfg(not(feature = "alsa-backend"))]
-                        let default_value = &connect_default_config
-                            .initial_volume
-                            .unwrap_or_default()
-                            .to_string();
+                        let default_value =
+                            &connect_default_config.initial_volume.to_string();
 
                         invalid_error_msg(
                             INITIAL_VOLUME,
@@ -1402,14 +1400,23 @@ fn get_setup() -> Setup {
 
         let is_group = opt_present(DEVICE_IS_GROUP);
 
-        let has_volume_ctrl = !matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
-
-        ConnectConfig {
-            name,
-            device_type,
-            is_group,
-            initial_volume,
-            has_volume_ctrl,
+        if let Some(initial_volume) = initial_volume {
+            ConnectStateConfig {
+                name,
+                device_type,
+                is_group,
+                initial_volume: initial_volume.into(),
+                zeroconf_enabled: enable_discovery,
+                ..Default::default()
+            }
+        } else {
+            ConnectStateConfig {
+                name,
+                device_type,
+                is_group,
+                zeroconf_enabled: enable_discovery,
+                ..Default::default()
+            }
         }
     };
 

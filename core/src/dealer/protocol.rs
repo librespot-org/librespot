@@ -7,7 +7,7 @@ pub type JsonObject = serde_json::Map<String, JsonValue>;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Payload {
-    pub message_id: i32,
+    pub message_id: u32,
     pub sent_by_device_id: String,
     pub command: JsonObject,
 }
