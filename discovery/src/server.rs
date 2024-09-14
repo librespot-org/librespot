@@ -4,7 +4,7 @@ use std::{
     convert::Infallible,
     net::{Ipv4Addr, SocketAddr, TcpListener},
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, Mutex},
     task::{Context, Poll},
 };
 
@@ -45,7 +45,7 @@ pub struct Config {
 
 struct RequestHandler {
     config: Config,
-    username: Option<String>,
+    username: Mutex<Option<String>>,
     keys: DhLocalKeys,
     tx: mpsc::UnboundedSender<Credentials>,
 }
@@ -56,7 +56,7 @@ impl RequestHandler {
 
         let discovery = Self {
             config,
-            username: None,
+            username: Mutex::new(None),
             keys: DhLocalKeys::random(&mut rand::thread_rng()),
             tx,
         };
@@ -64,13 +64,20 @@ impl RequestHandler {
         (discovery, rx)
     }
 
+    fn active_user(&self) -> String {
+        if let Ok(maybe_username) = self.username.lock() {
+            maybe_username.clone().unwrap_or(String::new())
+        } else {
+            warn!("username lock corrupted; read failed");
+            String::from("!")
+        }
+    }
+
     fn handle_get_info(&self) -> Response<Full<Bytes>> {
         let public_key = BASE64.encode(self.keys.public_key());
         let device_type: &str = self.config.device_type.into();
-        let mut active_user = String::new();
-        if let Some(username) = &self.username {
-            active_user = username.to_string();
-        }
+        let active_user = self.active_user();
+
         // options based on zeroconf guide, search for `groupStatus` on page
         let group_status = if self.config.is_group {
             "GROUP"
@@ -193,7 +200,15 @@ impl RequestHandler {
 
         let credentials = Credentials::with_blob(username, decrypted, &self.config.device_id)?;
 
-        self.tx.send(credentials)?;
+        {
+            let maybe_username = self.username.lock();
+            self.tx.send(credentials)?;
+            if let Ok(mut username_field) = maybe_username {
+                *username_field = Some(String::from(username));
+            } else {
+                warn!("username lock corrupted; write failed");
+            }
+        }
 
         let result = json!({
             "status": 101,
