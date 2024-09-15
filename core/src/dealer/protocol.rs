@@ -1,10 +1,12 @@
-use crate::Error;
+use std::collections::HashMap;
+use std::io::Read;
+
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use flate2::read::GzDecoder;
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::io::Read;
+
+use crate::Error;
 
 pub type JsonValue = serde_json::Value;
 pub type JsonObject = serde_json::Map<String, JsonValue>;
@@ -35,7 +37,6 @@ pub struct WebsocketMessage {
     pub uri: String,
 }
 
-pub const PAYLOAD_DEFAULT: PayloadValue = PayloadValue::Bytes(Vec::new());
 #[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum PayloadValue {

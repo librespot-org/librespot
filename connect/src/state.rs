@@ -1,3 +1,5 @@
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
 use librespot_core::config::DeviceType;
 use librespot_core::spclient::SpClientResult;
 use librespot_core::{version, Session};
@@ -6,7 +8,6 @@ use librespot_protocol::connect::{
 };
 use librespot_protocol::player::{ContextPlayerOptions, PlayOrigin, PlayerState, Suppressions};
 use protobuf::{EnumOrUnknown, MessageField};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 pub struct ConnectStateConfig {

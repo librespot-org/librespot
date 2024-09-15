@@ -1,3 +1,19 @@
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use futures_util::{FutureExt, Stream, StreamExt};
+use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
+use protobuf::Message;
+use rand::prelude::SliceRandom;
+use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
+
 use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
     context::PageContext,
@@ -16,20 +32,6 @@ use crate::{
         user_attributes::UserAttributesMutation,
     },
 };
-use futures_util::{FutureExt, Stream, StreamExt};
-use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
-use protobuf::Message;
-use rand::prelude::SliceRandom;
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
-use thiserror::Error;
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[derive(Debug, Error)]
 pub enum SpircError {
@@ -802,7 +804,11 @@ impl SpircTask {
         trace!("Received connection ID update: {:?}", connection_id);
         self.session.set_connection_id(&connection_id);
 
-        let response = match self.connect_state.update_remote(&self.session, PutStateReason::NEW_DEVICE).await {
+        let response = match self
+            .connect_state
+            .update_remote(&self.session, PutStateReason::NEW_DEVICE)
+            .await
+        {
             Ok(res) => Cluster::parse_from_bytes(&res).ok(),
             Err(why) => {
                 error!("{why:?}");

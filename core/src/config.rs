@@ -1,6 +1,6 @@
 use std::{fmt, path::PathBuf, str::FromStr};
-use librespot_protocol::devices::DeviceType as ProtoDeviceType;
 
+use librespot_protocol::devices::DeviceType as ProtoDeviceType;
 use url::Url;
 
 pub(crate) const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";

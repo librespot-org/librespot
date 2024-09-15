@@ -119,7 +119,7 @@ impl<T> SubscriberMap<T> {
         let mut handled_by_any = false;
         self.subscribed.retain(|x| {
             handled_by_any = true;
-            fun(x) 
+            fun(x)
         });
 
         if let Some(next) = path.next() {

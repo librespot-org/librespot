@@ -1,9 +1,11 @@
-use crate::dealer::{Builder, Dealer, Subscription, WsError};
-use crate::Error;
 use std::cell::OnceCell;
 use std::str::FromStr;
+
 use thiserror::Error;
 use url::Url;
+
+use crate::dealer::{Builder, Dealer, Subscription, WsError};
+use crate::Error;
 
 component! {
     DealerManager: DealerManagerInner {

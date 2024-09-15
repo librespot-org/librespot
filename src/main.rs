@@ -1,7 +1,3 @@
-use data_encoding::HEXLOWER;
-use futures_util::StreamExt;
-use log::{debug, error, info, trace, warn};
-use sha1::{Digest, Sha1};
 use std::{
     env,
     fs::create_dir_all,
@@ -12,10 +8,11 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
-use sysinfo::{ProcessesToUpdate, System};
-use thiserror::Error;
-use url::Url;
 
+use data_encoding::HEXLOWER;
+use futures_util::StreamExt;
+#[cfg(feature = "alsa-backend")]
+use librespot::playback::mixer::alsamixer::AlsaMixer;
 use librespot::{
     connect::{spirc::Spirc, state::ConnectStateConfig},
     core::{
@@ -32,9 +29,11 @@ use librespot::{
         player::{coefficient_to_duration, duration_to_coefficient, Player},
     },
 };
-
-#[cfg(feature = "alsa-backend")]
-use librespot::playback::mixer::alsamixer::AlsaMixer;
+use log::{debug, error, info, trace, warn};
+use sha1::{Digest, Sha1};
+use sysinfo::{ProcessesToUpdate, System};
+use thiserror::Error;
+use url::Url;
 
 mod player_event_handler;
 use player_event_handler::{run_program_on_sink_events, EventHandler};
@@ -1352,8 +1351,7 @@ fn get_setup() -> Setup {
                         );
 
                         #[cfg(not(feature = "alsa-backend"))]
-                        let default_value =
-                            &connect_default_config.initial_volume.to_string();
+                        let default_value = &connect_default_config.initial_volume.to_string();
 
                         invalid_error_msg(
                             INITIAL_VOLUME,

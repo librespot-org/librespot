@@ -2,9 +2,6 @@ pub mod manager;
 mod maps;
 pub mod protocol;
 
-use futures_core::{Future, Stream};
-use futures_util::{future::join_all, SinkExt, StreamExt};
-use parking_lot::Mutex;
 use std::{
     iter,
     pin::Pin,
@@ -15,6 +12,10 @@ use std::{
     task::Poll,
     time::Duration,
 };
+
+use futures_core::{Future, Stream};
+use futures_util::{future::join_all, SinkExt, StreamExt};
+use parking_lot::Mutex;
 use thiserror::Error;
 use tokio::{
     select,
@@ -30,7 +31,6 @@ use url::Url;
 
 use self::maps::*;
 use self::protocol::*;
-
 use crate::{
     socket,
     util::{keep_flushing, CancelOnDrop, TimeoutOnDrop},
