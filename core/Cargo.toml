@@ -63,6 +63,7 @@ tokio-util = { version = "0.7", features = ["codec"] }
 url = "2"
 uuid = { version = "1", default-features = false, features = ["fast-rng", "v4"] }
 data-encoding = "2.5"
+flate2 = "1.0.33"
 
 [build-dependencies]
 rand = "0.8"

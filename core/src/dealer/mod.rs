@@ -2,6 +2,9 @@ pub mod manager;
 mod maps;
 pub mod protocol;
 
+use futures_core::{Future, Stream};
+use futures_util::{future::join_all, SinkExt, StreamExt};
+use parking_lot::Mutex;
 use std::{
     iter,
     pin::Pin,
@@ -12,10 +15,6 @@ use std::{
     task::Poll,
     time::Duration,
 };
-
-use futures_core::{Future, Stream};
-use futures_util::{future::join_all, SinkExt, StreamExt};
-use parking_lot::Mutex;
 use thiserror::Error;
 use tokio::{
     select,
@@ -304,12 +303,30 @@ struct DealerShared {
 }
 
 impl DealerShared {
-    fn dispatch_message(&self, msg: Message) {
+    fn dispatch_message(&self, msg: WebsocketMessage) {
+        let msg = match msg.handle_payload() {
+            Ok(data) => Message {
+                headers: msg.headers,
+                payload: data,
+                uri: msg.uri,
+            },
+            Err(why) => {
+                warn!("failure during data parsing for {}: {why}", msg.uri);
+                return;
+            }
+        };
+
         if let Some(split) = split_uri(&msg.uri) {
-            self.message_handlers
+            if self
+                .message_handlers
                 .lock()
-                .retain(split, &mut |tx| tx.send(msg.clone()).is_ok());
+                .retain(split, &mut |tx| tx.send(msg.clone()).is_ok())
+            {
+                return;
+            }
         }
+
+        warn!("No subscriber for msg.uri: {}", msg.uri);
     }
 
     fn dispatch_request(&self, request: Request, send_tx: &mpsc::UnboundedSender<WsMessage>) {
@@ -491,7 +508,7 @@ async fn connect(
                             info!("Received invalid binary message");
                         }
                         WsMessage::Pong(_) => {
-                            debug!("Received pong");
+                            trace!("Received pong");
                             pong_received.store(true, atomic::Ordering::Relaxed);
                         }
                         _ => (), // tungstenite handles Close and Ping automatically
@@ -523,7 +540,7 @@ async fn connect(
                     break;
                 }
 
-                debug!("Sent ping");
+                trace!("Sent ping");
 
                 sleep(PING_TIMEOUT).await;
 

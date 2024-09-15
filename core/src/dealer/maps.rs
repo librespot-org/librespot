@@ -115,16 +115,22 @@ impl<T> SubscriberMap<T> {
         &mut self,
         mut path: impl Iterator<Item = &'a str>,
         fun: &mut impl FnMut(&T) -> bool,
-    ) {
-        self.subscribed.retain(|x| fun(x));
+    ) -> bool {
+        let mut handled_by_any = false;
+        self.subscribed.retain(|x| {
+            handled_by_any = true;
+            fun(x) 
+        });
 
         if let Some(next) = path.next() {
             if let Some(y) = self.children.get_mut(next) {
-                y.retain(path, fun);
+                handled_by_any = handled_by_any || y.retain(path, fun);
                 if y.is_empty() {
                     self.children.remove(next);
                 }
             }
         }
+
+        handled_by_any
     }
 }

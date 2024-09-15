@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use futures_util::{FutureExt, Stream, StreamExt};
+use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
 use protobuf::Message;
 use rand::prelude::SliceRandom;
 use std::{
@@ -26,12 +27,9 @@ use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
 
 #[derive(Debug, Error)]
 pub enum SpircError {
@@ -316,16 +314,8 @@ impl Spirc {
                 .dealer()
                 .listen_for("hm://connect-state/v1/cluster")?
                 .map(|response| -> Result<ClusterUpdate, Error> {
-                    let json_string = response
-                        .payloads
-                        .first()
-                        .ok_or(SpircError::NoData)?
-                        .to_string();
-                    // a json string has a leading and trailing quotation mark, we need to remove them
-                    let base64_data = &json_string[1..json_string.len() - 1];
-                    let data = BASE64_STANDARD.decode(base64_data)?;
-
-                    ClusterUpdate::parse_from_bytes(&data).map_err(Error::failed_precondition)
+                    ClusterUpdate::parse_from_bytes(&response.payload)
+                        .map_err(Error::failed_precondition)
                 }),
         );
 
