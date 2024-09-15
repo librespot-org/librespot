@@ -359,7 +359,7 @@ impl Spirc {
 
         let player_events = player.get_player_event_channel();
 
-        let mut task = SpircTask {
+        let task = SpircTask {
             player,
             mixer,
 
@@ -394,8 +394,6 @@ impl Spirc {
         };
 
         let spirc = Spirc { commands: cmd_tx };
-
-        task.hello()?;
 
         Ok((spirc, task.run()))
     }
@@ -1528,10 +1526,6 @@ impl SpircTask {
                 self.handle_stop();
             }
         }
-    }
-
-    fn hello(&mut self) -> Result<(), Error> {
-        CommandSender::new(self, MessageType::kMessageTypeHello).send()
     }
 
     fn notify(&mut self, recipient: Option<&str>) -> Result<(), Error> {
