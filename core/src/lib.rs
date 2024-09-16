@@ -22,6 +22,7 @@ pub mod diffie_hellman;
 pub mod error;
 pub mod file_id;
 pub mod http_client;
+pub mod login5;
 pub mod mercury;
 pub mod packet;
 mod proxytunnel;

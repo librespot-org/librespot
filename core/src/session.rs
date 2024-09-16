@@ -31,6 +31,7 @@ use crate::{
     config::SessionConfig,
     connection::{self, AuthenticationError, Transport},
     http_client::HttpClient,
+    login5::Login5Manager,
     mercury::MercuryManager,
     packet::PacketType,
     protocol::keyexchange::ErrorCode,
@@ -98,6 +99,7 @@ struct SessionInternal {
     mercury: OnceCell<MercuryManager>,
     spclient: OnceCell<SpClient>,
     token_provider: OnceCell<TokenProvider>,
+    login5: OnceCell<Login5Manager>,
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
@@ -138,6 +140,7 @@ impl Session {
             mercury: OnceCell::new(),
             spclient: OnceCell::new(),
             token_provider: OnceCell::new(),
+            login5: OnceCell::new(),
             handle: tokio::runtime::Handle::current(),
         }))
     }
@@ -284,6 +287,12 @@ impl Session {
         self.0
             .token_provider
             .get_or_init(|| TokenProvider::new(self.weak()))
+    }
+
+    pub fn login5(&self) -> &Login5Manager {
+        self.0
+            .login5
+            .get_or_init(|| Login5Manager::new(self.weak()))
     }
 
     /// Returns an error, when we haven't received a ping for too long (2 minutes),
