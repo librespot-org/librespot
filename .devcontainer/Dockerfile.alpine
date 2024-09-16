@@ -5,7 +5,7 @@ FROM rust:${rust_version}-${alpine_version}
 
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
 ENV RUST_BACKTRACE=1
-ENV RUSTFLAGS="-D warnings -A renamed-and-removed-lints -C target-feature=-crt-static"
+ENV RUSTFLAGS="-D warnings -C target-feature=-crt-static"
 
 
 RUN apk add --no-cache \

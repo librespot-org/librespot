@@ -10,7 +10,7 @@ repository = "https://github.com/librespot-org/librespot"
 edition = "2021"
 
 [dependencies]
-protobuf = "3"
+protobuf = "3.5"
 
 [build-dependencies]
 protobuf-codegen = "3"
