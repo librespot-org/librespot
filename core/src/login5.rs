@@ -1,12 +1,22 @@
+use crate::spclient::CLIENT_TOKEN;
+use crate::token::Token;
+use crate::{util, Error, SessionConfig};
+use bytes::Bytes;
+use http::header::ACCEPT;
+use http::{HeaderValue, Method, Request};
+use librespot_protocol::hashcash::HashcashSolution;
+use librespot_protocol::login5::{
+    ChallengeSolution, Challenges, LoginError, LoginRequest, LoginResponse,
+};
+use protobuf::well_known_types::duration::Duration as ProtoDuration;
+use protobuf::{Message, MessageField};
 use std::env::consts::OS;
 use std::time::{Duration, Instant};
-use bytes::Bytes;
-use http::{HeaderValue, Method, Request};
-use http::header::ACCEPT;
-use protobuf::Message;
-use librespot_protocol::login5::{LoginRequest, LoginResponse};
-use crate::{Error, SessionConfig};
-use crate::token::Token;
+use thiserror::Error;
+use tokio::time::sleep;
+
+const MAX_LOGIN_TRIES: u8 = 3;
+const LOGIN_TIMEOUT: Duration = Duration::from_secs(3);
 
 component! {
     Login5Manager : Login5ManagerInner {
@@ -14,8 +24,22 @@ component! {
     }
 }
 
+#[derive(Debug, Error)]
+enum Login5Error {
+    #[error("Requesting login failed: {0:?}")]
+    FaultyRequest(LoginError),
+    #[error("doesn't support code challenge")]
+    CodeChallenge,
+}
+
+impl From<Login5Error> for Error {
+    fn from(err: Login5Error) -> Self {
+        Error::failed_precondition(err)
+    }
+}
+
 impl Login5Manager {
-    async fn auth_token_request<M: Message>(&self, message: &M) -> Result<Bytes, Error> {
+    async fn auth_token_request(&self, message: &LoginRequest) -> Result<Bytes, Error> {
         let client_token = self.session().spclient().client_token().await?;
         let body = message.write_to_bytes()?;
 
@@ -23,12 +47,12 @@ impl Login5Manager {
             .method(&Method::POST)
             .uri("https://login5.spotify.com/v3/login")
             .header(ACCEPT, HeaderValue::from_static("application/x-protobuf"))
-            .header(crate::spclient::CLIENT_TOKEN, HeaderValue::from_str(&client_token)?)
+            .header(CLIENT_TOKEN, HeaderValue::from_str(&client_token)?)
             .body(body.into())?;
 
         self.session().http_client().request_body(request).await
     }
-    
+
     pub async fn auth_token(&self) -> Result<Token, Error> {
         let auth_token = self.lock(|inner| {
             if let Some(token) = &inner.auth_token {
@@ -59,22 +83,33 @@ impl Login5Manager {
 
         let mut response = self.auth_token_request(&login_request).await?;
         let mut count = 0;
-        const MAX_TRIES: u8 = 3;
 
         let token_response = loop {
             count += 1;
 
             let message = LoginResponse::parse_from_bytes(&response)?;
-            // TODO: Handle hash cash stuff
             if message.has_ok() {
                 break message.ok().to_owned();
             }
 
-            if count < MAX_TRIES {
+            if message.has_error() {
+                match message.error() {
+                    LoginError::TIMEOUT | LoginError::TOO_MANY_ATTEMPTS => {
+                        sleep(LOGIN_TIMEOUT).await
+                    }
+                    others => return Err(Login5Error::FaultyRequest(others).into()),
+                }
+            }
+
+            if message.has_challenges() {
+                Self::handle_challenges(&mut login_request, message.challenges())?
+            }
+
+            if count < MAX_LOGIN_TRIES {
                 response = self.auth_token_request(&login_request).await?;
             } else {
                 return Err(Error::failed_precondition(format!(
-                    "Unable to solve any of {MAX_TRIES} hash cash challenges"
+                    "Unable to solve any of {MAX_LOGIN_TRIES} hash cash challenges"
                 )));
             }
         };
@@ -91,6 +126,7 @@ impl Login5Manager {
             scopes: vec![],
             timestamp: Instant::now(),
         };
+
         self.lock(|inner| {
             inner.auth_token = Some(auth_token.clone());
         });
@@ -98,5 +134,57 @@ impl Login5Manager {
         trace!("Got auth token: {:?}", auth_token);
 
         Ok(auth_token)
+    }
+
+    fn handle_challenges(
+        login_request: &mut LoginRequest,
+        challenges: &Challenges,
+    ) -> Result<(), Error> {
+        info!(
+            "login5 response has {} challenges...",
+            challenges.challenges.len()
+        );
+
+        for challenge in &challenges.challenges {
+            if challenge.has_code() {
+                debug!("empty challenge, skipping");
+                return Err(Login5Error::CodeChallenge.into());
+            } else if !challenge.has_hashcash() {
+                debug!("empty challenge, skipping");
+                continue;
+            }
+
+            let hash_cash_challenge = challenge.hashcash();
+
+            let mut suffix = [0u8; 0x10];
+            let duration = util::solve_hash_cash(
+                &login_request.login_context,
+                &hash_cash_challenge.prefix,
+                hash_cash_challenge.length,
+                &mut suffix,
+            )?;
+
+            let (seconds, nanos) = (duration.as_secs() as i64, duration.subsec_nanos() as i32);
+            info!("solving login5 hashcash took {seconds}.{nanos}s");
+
+            let mut solution = ChallengeSolution::new();
+            solution.set_hashcash(HashcashSolution {
+                suffix: Vec::from(suffix),
+                duration: MessageField::some(ProtoDuration {
+                    seconds,
+                    nanos,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+
+            login_request
+                .challenge_solutions
+                .mut_or_insert_default()
+                .solutions
+                .push(solution);
+        }
+
+        Ok(())
     }
 }
