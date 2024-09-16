@@ -4,7 +4,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use data_encoding::HEXUPPER_PERMISSIVE;
 use futures_util::future::IntoStream;
@@ -16,7 +15,6 @@ use hyper::{
 use hyper_util::client::legacy::ResponseFuture;
 use protobuf::{Enum, Message, MessageFull};
 use rand::RngCore;
-use sha1::{Digest, Sha1};
 use sysinfo::System;
 use thiserror::Error;
 
@@ -35,6 +33,7 @@ use crate::{
         extended_metadata::BatchedEntityRequest,
     },
     token::Token,
+    util,
     version::spotify_semantic_version,
     Error, FileId, SpotifyId,
 };
@@ -106,47 +105,6 @@ impl SpClient {
     pub async fn base_url(&self) -> Result<String, Error> {
         let ap = self.get_accesspoint().await?;
         Ok(format!("https://{}:{}", ap.0, ap.1))
-    }
-
-    fn solve_hash_cash(
-        ctx: &[u8],
-        prefix: &[u8],
-        length: i32,
-        dst: &mut [u8],
-    ) -> Result<(), Error> {
-        // after a certain number of seconds, the challenge expires
-        const TIMEOUT: u64 = 5; // seconds
-        let now = Instant::now();
-
-        let md = Sha1::digest(ctx);
-
-        let mut counter: i64 = 0;
-        let target: i64 = BigEndian::read_i64(&md[12..20]);
-
-        let suffix = loop {
-            if now.elapsed().as_secs() >= TIMEOUT {
-                return Err(Error::deadline_exceeded(format!(
-                    "{TIMEOUT} seconds expired"
-                )));
-            }
-
-            let suffix = [(target + counter).to_be_bytes(), counter.to_be_bytes()].concat();
-
-            let mut hasher = Sha1::new();
-            hasher.update(prefix);
-            hasher.update(&suffix);
-            let md = hasher.finalize();
-
-            if BigEndian::read_i64(&md[12..20]).trailing_zeros() >= (length as u32) {
-                break suffix;
-            }
-
-            counter += 1;
-        };
-
-        dst.copy_from_slice(&suffix);
-
-        Ok(())
     }
 
     async fn client_token_request<M: Message>(&self, message: &M) -> Result<Bytes, Error> {
@@ -293,7 +251,7 @@ impl SpClient {
                         let length = hash_cash_challenge.length;
 
                         let mut suffix = [0u8; 0x10];
-                        let answer = Self::solve_hash_cash(&ctx, &prefix, length, &mut suffix);
+                        let answer = util::solve_hash_cash(&ctx, &prefix, length, &mut suffix);
 
                         match answer {
                             Ok(_) => {
