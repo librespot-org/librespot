@@ -121,6 +121,7 @@ pub enum SpircCommand {
     Repeat(bool),
     Disconnect,
     SetPosition(u32),
+    SeekOffset(i32),
     SetVolume(u16),
     Activate,
     Load(SpircLoadCommand),
@@ -439,6 +440,9 @@ impl Spirc {
     pub fn set_position_ms(&self, position_ms: u32) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetPosition(position_ms))?)
     }
+    pub fn seek_offset(&self, offset_ms: i32) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::SeekOffset(offset_ms))?)
+    }
     pub fn disconnect(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Disconnect)?)
     }
@@ -654,6 +658,10 @@ impl SpircTask {
                 }
                 SpircCommand::SetPosition(position) => {
                     self.handle_seek(position);
+                    self.notify(None)
+                }
+                SpircCommand::SeekOffset(offset) => {
+                    self.handle_seek_offset(offset);
                     self.notify(None)
                 }
                 SpircCommand::SetVolume(volume) => {
@@ -1170,6 +1178,25 @@ impl SpircTask {
                 ..
             } => *nominal_start_time = now - position_ms as i64,
         };
+    }
+
+    fn handle_seek_offset(&mut self, offset_ms: i32) {
+        let position_ms = match self.play_status {
+            SpircPlayStatus::Stopped => return,
+            SpircPlayStatus::LoadingPause { position_ms }
+            | SpircPlayStatus::LoadingPlay { position_ms }
+            | SpircPlayStatus::Paused { position_ms, .. } => position_ms,
+            SpircPlayStatus::Playing {
+                nominal_start_time, ..
+            } => {
+                let now = self.now_ms();
+                (now - nominal_start_time) as u32
+            }
+        };
+
+        let position_ms = ((position_ms as i32) + offset_ms).max(0) as u32;
+
+        self.handle_seek(position_ms);
     }
 
     fn consume_queued_track(&mut self) -> usize {
