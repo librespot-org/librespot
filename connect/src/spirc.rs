@@ -139,6 +139,7 @@ const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 
 /// The spotify connect handle
+#[derive(Clone)]
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
 }
