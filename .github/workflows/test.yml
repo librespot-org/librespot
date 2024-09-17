@@ -142,7 +142,8 @@ jobs:
       - name: Install developer package dependencies
         run: sudo apt-get update && sudo apt install -y libunwind-dev && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev libavahi-compat-libdnssd-dev
 
-      - run: cargo build --workspace --examples
+      - run: cargo fetch --locked
+      - run: cargo build --frozen --workspace --examples
       - run: cargo test --workspace
 
       - run: cargo install cargo-hack
@@ -191,7 +192,8 @@ jobs:
             target
           key: ${{ runner.os }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
 
-      - run: cargo build --workspace --examples
+      - run: cargo fetch --locked
+      - run: cargo build --frozen --workspace --examples
       - run: cargo test --workspace
 
       - run: cargo install cargo-hack
@@ -268,8 +270,10 @@ jobs:
               echo "CARGO_TARGET_${target}_LINKER=riscv64-linux-gnu-gcc" >> $GITHUB_ENV
             fi
             
+      - name: Fetch
+        run: cargo fetch --locked
       - name: Build
-        run: cargo build --verbose --target ${{ matrix.target }} --no-default-features
+        run: cargo build --frozen --verbose --target ${{ matrix.target }} --no-default-features
       
       - name: Check binary
         run: file target/${{ matrix.target }}/debug/librespot
