@@ -920,7 +920,7 @@ impl PlayerTrackLoader {
             AudioFileFormat::FLAC_FLAC => 112, // assume 900 kbit/s on average
             AudioFileFormat::UNKNOWN_FORMAT => {
                 error!("Unknown stream data rate");
-                return None
+                return None;
             }
         };
         Some(kbps * 1024)
