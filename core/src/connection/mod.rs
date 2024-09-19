@@ -68,6 +68,29 @@ pub async fn connect(host: &str, port: u16, proxy: Option<&Url>) -> io::Result<T
     handshake(socket).await
 }
 
+pub async fn connect_with_retry(
+    host: &str,
+    port: u16,
+    proxy: Option<&Url>,
+    max_retries: u8,
+) -> io::Result<Transport> {
+    let mut num_retries = 0;
+    loop {
+        match connect(host, port, proxy).await {
+            Ok(f) => return Ok(f),
+            Err(e) => {
+                debug!("Connection failed: {e}");
+                if num_retries < max_retries {
+                    num_retries += 1;
+                    debug!("Retry access point...");
+                    continue;
+                }
+                return Err(e);
+            }
+        }
+    }
+}
+
 pub async fn authenticate(
     transport: &mut Transport,
     credentials: Credentials,
