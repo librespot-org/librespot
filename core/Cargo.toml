@@ -64,6 +64,7 @@ url = "2"
 uuid = { version = "1", default-features = false, features = ["fast-rng", "v4"] }
 data-encoding = "2.5"
 flate2 = "1.0.33"
+protobuf-json-mapping = "3.5.1"
 
 [build-dependencies]
 rand = "0.8"

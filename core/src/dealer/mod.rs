@@ -329,7 +329,22 @@ impl DealerShared {
         warn!("No subscriber for msg.uri: {}", msg.uri);
     }
 
-    fn dispatch_request(&self, request: Request, send_tx: &mpsc::UnboundedSender<WsMessage>) {
+    fn dispatch_request(
+        &self,
+        request: WebsocketRequest,
+        send_tx: &mpsc::UnboundedSender<WsMessage>,
+    ) {
+        debug!("dealer request {}", &request.message_ident);
+
+        let payload_request = match request.handle_payload() {
+            Ok(payload) => payload,
+            Err(why) => {
+                warn!("request payload handling failed because of {why}");
+                return;
+            }
+        };
+        debug!("request command: {payload_request:?}");
+
         // ResponseSender will automatically send "success: false" if it is dropped without an answer.
         let responder = Responder::new(request.key.clone(), send_tx.clone());
 
@@ -343,13 +358,11 @@ impl DealerShared {
             return;
         };
 
-        {
-            let handler_map = self.request_handlers.lock();
+        let handler_map = self.request_handlers.lock();
 
-            if let Some(handler) = handler_map.get(split) {
-                handler.handle_request(request, responder);
-                return;
-            }
+        if let Some(handler) = handler_map.get(split) {
+            handler.handle_request(payload_request, responder);
+            return;
         }
 
         warn!("No handler for message_ident: {}", &request.message_ident);
@@ -502,7 +515,7 @@ async fn connect(
                     Some(Ok(msg)) => match msg {
                         WsMessage::Text(t) => match serde_json::from_str(&t) {
                             Ok(m) => shared.dispatch(m, &send_tx),
-                            Err(e) => info!("Received invalid message: {}", e),
+                            Err(e) => warn!("Message couldn't be parsed: {e}. Message was {t}"),
                         },
                         WsMessage::Binary(_) => {
                             info!("Received invalid binary message");

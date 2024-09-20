@@ -1825,6 +1825,7 @@ dependencies = [
  "pbkdf2",
  "priority-queue",
  "protobuf",
+ "protobuf-json-mapping",
  "quick-xml",
  "rand",
  "rsa",
@@ -2562,6 +2563,17 @@ dependencies = [
  "protobuf-parse",
  "regex",
  "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "protobuf-json-mapping"
+version = "3.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b07993d14c66dfb74c639dc1b90381773b85cff66ef47bff35bad0778150a3aa"
+dependencies = [
+ "protobuf",
+ "protobuf-support",
  "thiserror",
 ]
 
