@@ -1,4 +1,4 @@
-pub mod manager;
+pub(super) mod manager;
 mod maps;
 pub mod protocol;
 
@@ -30,7 +30,9 @@ use tungstenite::error::UrlError;
 use url::Url;
 
 use self::maps::*;
-use self::protocol::*;
+use crate::dealer::protocol::{
+    Message, MessageOrRequest, Request, WebsocketMessage, WebsocketRequest,
+};
 use crate::{
     socket,
     util::{keep_flushing, CancelOnDrop, TimeoutOnDrop},
@@ -48,11 +50,11 @@ const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
 
-pub struct Response {
+struct Response {
     pub success: bool,
 }
 
-pub struct Responder {
+struct Responder {
     key: String,
     tx: mpsc::UnboundedSender<WsMessage>,
     sent: bool,
@@ -101,7 +103,7 @@ impl Drop for Responder {
     }
 }
 
-pub trait IntoResponse {
+trait IntoResponse {
     fn respond(self, responder: Responder);
 }
 
@@ -132,7 +134,7 @@ where
     }
 }
 
-pub trait RequestHandler: Send + 'static {
+trait RequestHandler: Send + 'static {
     fn handle_request(&self, request: Request, responder: Responder);
 }
 
@@ -169,7 +171,7 @@ fn split_uri(s: &str) -> Option<impl Iterator<Item = &'_ str>> {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum AddHandlerError {
+enum AddHandlerError {
     #[error("There is already a handler for the given uri")]
     AlreadyHandled,
     #[error("The specified uri {0} is invalid")]
@@ -186,7 +188,7 @@ impl From<AddHandlerError> for Error {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum SubscriptionError {
+enum SubscriptionError {
     #[error("The specified uri is invalid")]
     InvalidUri(String),
 }
@@ -225,7 +227,7 @@ fn subscribe(
 }
 
 #[derive(Default)]
-pub struct Builder {
+struct Builder {
     message_handlers: SubscriberMap<MessageHandler>,
     request_handlers: HandlerMap<Box<dyn RequestHandler>>,
 }
@@ -386,7 +388,7 @@ impl DealerShared {
     }
 }
 
-pub struct Dealer {
+struct Dealer {
     shared: Arc<DealerShared>,
     handle: TimeoutOnDrop<()>,
 }
