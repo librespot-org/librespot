@@ -1,4 +1,4 @@
-pub(super) mod manager;
+pub mod manager;
 mod maps;
 pub mod protocol;
 

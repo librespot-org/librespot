@@ -6,14 +6,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use futures_util::{FutureExt, Stream, StreamExt};
-use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
-use protobuf::Message;
-use rand::prelude::SliceRandom;
-use thiserror::Error;
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
 use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
     context::PageContext,
@@ -32,6 +24,14 @@ use crate::{
         user_attributes::UserAttributesMutation,
     },
 };
+use futures_util::{FutureExt, Stream, StreamExt};
+use librespot_core::dealer::manager::{Reply, RequestReply};
+use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
+use protobuf::Message;
+use rand::prelude::SliceRandom;
+use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[derive(Debug, Error)]
 pub enum SpircError {
@@ -93,6 +93,7 @@ struct SpircTask {
     remote_update: BoxedStream<Result<(String, Frame), Error>>,
     connection_id_update: BoxedStream<Result<String, Error>>,
     connect_state_update: BoxedStream<Result<ClusterUpdate, Error>>,
+    connect_state_command: BoxedStream<RequestReply>,
     user_attributes_update: BoxedStream<Result<UserAttributesUpdate, Error>>,
     user_attributes_mutation: BoxedStream<Result<UserAttributesMutation, Error>>,
     sender: MercurySender,
@@ -321,6 +322,13 @@ impl Spirc {
                 }),
         );
 
+        let connect_state_command = Box::pin(
+            session
+                .dealer()
+                .handle_for("hm://connect-state/v1/player/command")
+                .map(UnboundedReceiverStream::new)?,
+        );
+
         let user_attributes_update = Box::pin(
             session
                 .mercury()
@@ -379,6 +387,7 @@ impl Spirc {
             remote_update,
             connection_id_update,
             connect_state_update,
+            connect_state_command,
             user_attributes_update,
             user_attributes_mutation,
             sender,
@@ -464,6 +473,15 @@ impl SpircTask {
                     }
                     None => {
                         error!("connect state update selected, but none received");
+                        break;
+                    }
+                },
+                connect_state_command = self.connect_state_command.next() => match connect_state_command {
+                    Some(request) => if let Err(e) = self.handle_connect_state_command(request){
+                        error!("could handle connect state command: {}", e);
+                    },
+                    None => {
+                        error!("connect state command selected, but none received");
                         break;
                     }
                 },
@@ -1053,6 +1071,14 @@ impl SpircTask {
         info!("cluster update! {reason:?} for {device_ids} from {devices}");
         info!("has {prev_tracks:?} previous tracks and {next_tracks} next tracks");
         Ok(())
+    }
+
+    fn handle_connect_state_command(
+        &mut self,
+        (request, sender): RequestReply,
+    ) -> Result<(), Error> {
+        debug!("connect state command: {:?}", request.command.endpoint);
+        sender.send(Reply::Unanswered).map_err(Into::into)
     }
 
     fn handle_disconnect(&mut self) {
