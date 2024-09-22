@@ -84,7 +84,6 @@ struct SpircTask {
 
     connect_state: ConnectState,
 
-    ident: String,
     device: DeviceState,
     state: State,
     play_request_id: Option<u64>,
@@ -277,8 +276,6 @@ impl Spirc {
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Spirc[{}]", spirc_id);
 
-        let ident = session.device_id().to_owned();
-
         let connect_state = ConnectState::new(config, &session);
 
         let remote_update = Box::pin(
@@ -376,8 +373,6 @@ impl Spirc {
             sequence: SeqGenerator::new(1),
 
             connect_state,
-
-            ident,
 
             device,
             state: initial_state(),
@@ -899,7 +894,7 @@ impl SpircTask {
         trace!("Received update frame: {:#?}", update);
 
         // First see if this update was intended for us.
-        let device_id = &self.ident;
+        let device_id = &self.connect_state.device.device_id;
         let ident = update.ident();
         if ident == device_id
             || (!update.recipient.is_empty() && !update.recipient.contains(device_id))
@@ -1614,7 +1609,7 @@ impl<'a> CommandSender<'a> {
         // Latest known Spirc version is 3.2.6, but we need another interface to announce support for Spirc V3.
         // Setting anything higher than 2.0.0 here just seems to limit it to 2.0.0.
         frame.set_protocol_version("2.0.0".to_string());
-        frame.set_ident(spirc.ident.clone());
+        frame.set_ident(spirc.connect_state.device.device_id.clone());
         frame.set_seq_nr(spirc.sequence.get());
         frame.set_typ(cmd);
         *frame.device_state.mut_or_insert_default() = spirc.device.clone();
