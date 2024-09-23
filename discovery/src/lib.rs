@@ -137,11 +137,10 @@ impl Builder {
         let name = self.server_config.name.clone().into_owned();
         let server = DiscoveryServer::new(self.server_config, &mut port)?;
         let _zeroconf_ip = self.zeroconf_ip;
-        let svc;
 
         #[cfg(feature = "with-dns-sd")]
-        {
-            svc = dns_sd::DNSService::register(
+        let svc = {
+            dns_sd::DNSService::register(
                 Some(name.as_ref()),
                 "_spotify-connect._tcp",
                 None,
@@ -149,26 +148,27 @@ impl Builder {
                 port,
                 &["VERSION=1.0", "CPath=/"],
             )
-            .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?;
-        }
+            .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?
+        };
 
         #[cfg(not(feature = "with-dns-sd"))]
-        {
-            let _svc = if !_zeroconf_ip.is_empty() {
+        let svc = {
+            if !_zeroconf_ip.is_empty() {
                 libmdns::Responder::spawn_with_ip_list(
                     &tokio::runtime::Handle::current(),
                     _zeroconf_ip,
-                )?
+                )
             } else {
-                libmdns::Responder::spawn(&tokio::runtime::Handle::current())?
-            };
-            svc = _svc.register(
+                libmdns::Responder::spawn(&tokio::runtime::Handle::current())
+            }
+            .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?
+            .register(
                 "_spotify-connect._tcp".to_owned(),
                 name,
                 port,
                 &["VERSION=1.0", "CPath=/"],
-            );
-        }
+            )
+        };
 
         Ok(Discovery { server, _svc: svc })
     }
