@@ -217,6 +217,7 @@ struct Setup {
     player_event_program: Option<String>,
     emit_sink_events: bool,
     zeroconf_ip: Vec<std::net::IpAddr>,
+    zeroconf_backend: librespot::discovery::ServiceBuilder,
 }
 
 fn get_setup() -> Setup {
@@ -277,6 +278,7 @@ fn get_setup() -> Setup {
     const VOLUME_RANGE: &str = "volume-range";
     const ZEROCONF_PORT: &str = "zeroconf-port";
     const ZEROCONF_INTERFACE: &str = "zeroconf-interface";
+    const ZEROCONF_BACKEND: &str = "zeroconf-backend";
 
     // Mostly arbitrary.
     const AP_PORT_SHORT: &str = "a";
@@ -327,6 +329,7 @@ fn get_setup() -> Setup {
     const NORMALISATION_RELEASE_SHORT: &str = "y";
     const NORMALISATION_THRESHOLD_SHORT: &str = "Z";
     const ZEROCONF_PORT_SHORT: &str = "z";
+    const ZEROCONF_BACKEND_SHORT: &str = ""; // no short flag
 
     // Options that have different descriptions
     // depending on what backends were enabled at build time.
@@ -638,6 +641,12 @@ fn get_setup() -> Setup {
         ZEROCONF_INTERFACE,
         "Comma-separated interface IP addresses on which zeroconf will bind. Defaults to all interfaces. Ignored by DNS-SD.",
         "IP"
+    )
+    .optopt(
+        ZEROCONF_BACKEND_SHORT,
+        ZEROCONF_BACKEND,
+        "Zeroconf (MDNS/DNS-SD) backend to use. Valid values are 'dns-sd' and 'libmdns', if librespot is compiled with the corresponding feature flags.",
+        "BACKEND"
     );
 
     #[cfg(feature = "passthrough-decoder")]
@@ -1293,6 +1302,29 @@ fn get_setup() -> Setup {
         vec![]
     };
 
+    let zeroconf_backend_name = opt_str(ZEROCONF_BACKEND);
+    let zeroconf_backend = librespot::discovery::find(zeroconf_backend_name.as_deref())
+        .unwrap_or_else(|_| {
+            let available_backends: Vec<_> = librespot::discovery::BACKENDS
+                .iter()
+                .filter_map(|(id, launch_svc)| launch_svc.map(|_| *id))
+                .collect();
+            let default_backend = librespot::discovery::BACKENDS
+                .iter()
+                .find_map(|(id, launch_svc)| launch_svc.map(|_| *id))
+                .unwrap_or("<none>");
+
+            invalid_error_msg(
+                ZEROCONF_BACKEND,
+                ZEROCONF_BACKEND_SHORT,
+                &zeroconf_backend_name.unwrap_or_default(),
+                &available_backends.join(", "),
+                default_backend,
+            );
+
+            exit(1);
+        });
+
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
@@ -1739,6 +1771,7 @@ fn get_setup() -> Setup {
         player_event_program,
         emit_sink_events,
         zeroconf_ip,
+        zeroconf_backend,
     }
 }
 
@@ -1787,6 +1820,7 @@ async fn main() {
                 .is_group(setup.connect_config.is_group)
                 .port(setup.zeroconf_port)
                 .zeroconf_ip(setup.zeroconf_ip.clone())
+                .zeroconf_backend(setup.zeroconf_backend)
                 .launch()
             {
                 Ok(d) => break Some(d),
