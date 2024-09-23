@@ -10,6 +10,7 @@
 mod server;
 
 use std::{
+    any::Any,
     borrow::Cow,
     error::Error as StdError,
     pin::Pin,
@@ -37,10 +38,9 @@ pub use crate::core::config::DeviceType;
 pub struct Discovery {
     server: DiscoveryServer,
 
-    #[cfg(not(feature = "with-dns-sd"))]
-    _svc: libmdns::Service,
-    #[cfg(feature = "with-dns-sd")]
-    _svc: dns_sd::DNSService,
+    /// An opaque handle to the DNS-SD service. Dropping this will unregister the service.
+    #[allow(unused)]
+    svc: Box<dyn Any>,
 }
 
 /// A builder for [`Discovery`].
@@ -168,7 +168,10 @@ impl Builder {
             .register(DNS_SD_SERVICE_NAME.to_owned(), name, port, &TXT_RECORD)
         };
 
-        Ok(Discovery { server, _svc: svc })
+        Ok(Discovery {
+            server,
+            svc: Box::new(svc),
+        })
     }
 }
 
