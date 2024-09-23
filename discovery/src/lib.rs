@@ -81,6 +81,9 @@ impl From<DiscoveryError> for Error {
     }
 }
 
+const DNS_SD_SERVICE_NAME: &str = "_spotify-connect._tcp";
+const TXT_RECORD: [&str; 2] = ["VERSION=1.0", "CPath=/"];
+
 impl Builder {
     /// Starts a new builder using the provided device and client IDs.
     pub fn new<T: Into<String>>(device_id: T, client_id: T) -> Self {
@@ -142,11 +145,11 @@ impl Builder {
         let svc = {
             dns_sd::DNSService::register(
                 Some(name.as_ref()),
-                "_spotify-connect._tcp",
+                &DNS_SD_SERVICE_NAME,
                 None,
                 None,
                 port,
-                &["VERSION=1.0", "CPath=/"],
+                &TXT_RECORD,
             )
             .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?
         };
@@ -162,12 +165,7 @@ impl Builder {
                 libmdns::Responder::spawn(&tokio::runtime::Handle::current())
             }
             .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?
-            .register(
-                "_spotify-connect._tcp".to_owned(),
-                name,
-                port,
-                &["VERSION=1.0", "CPath=/"],
-            )
+            .register(DNS_SD_SERVICE_NAME.to_owned(), name, port, &TXT_RECORD)
         };
 
         Ok(Discovery { server, _svc: svc })
