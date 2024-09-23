@@ -24,10 +24,12 @@ http-body-util = "0.1.1"
 libmdns = { version = "0.9", optional = true }
 log = "0.4"
 rand = "0.8"
+serde = { version = "1", default-features = false, features = ["derive"], optional = true }
 serde_json = "1.0"
 sha1 = "0.10"
 thiserror = "1.0"
 tokio = { version = "1", features = ["parking_lot", "sync", "rt"] }
+zbus = { version = "4", default-features = false, features = ["tokio"], optional = true }
 
 [dependencies.librespot-core]
 path = "../core"
@@ -39,6 +41,7 @@ hex = "0.4"
 tokio = { version = "1", features = ["macros", "parking_lot", "rt"] }
 
 [features]
+with-avahi = ["zbus", "serde"]
 with-dns-sd = ["dns-sd"]
 with-libmdns = ["libmdns"]
 
