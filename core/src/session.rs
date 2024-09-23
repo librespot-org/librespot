@@ -144,13 +144,15 @@ impl Session {
 
     async fn connect_inner(
         &self,
-        access_point: SocketAddress,
+        access_point: &SocketAddress,
         credentials: Credentials,
     ) -> Result<(Credentials, Transport), Error> {
-        let mut transport = connection::connect(
+        const MAX_RETRIES: u8 = 1;
+        let mut transport = connection::connect_with_retry(
             &access_point.0,
             access_point.1,
             self.config().proxy.as_ref(),
+            MAX_RETRIES,
         )
         .await?;
         let mut reusable_credentials = connection::authenticate(
@@ -165,10 +167,11 @@ impl Session {
             trace!(
                 "Reconnect using stored credentials as token authed sessions cannot use keymaster."
             );
-            transport = connection::connect(
+            transport = connection::connect_with_retry(
                 &access_point.0,
                 access_point.1,
                 self.config().proxy.as_ref(),
+                MAX_RETRIES,
             )
             .await?;
             reusable_credentials = connection::authenticate(
@@ -187,19 +190,32 @@ impl Session {
         credentials: Credentials,
         store_credentials: bool,
     ) -> Result<(), Error> {
+        // There currently happen to be 6 APs but anything will do to avoid an infinite loop.
+        const MAX_AP_TRIES: u8 = 6;
+        let mut num_ap_tries = 0;
         let (reusable_credentials, transport) = loop {
             let ap = self.apresolver().resolve("accesspoint").await?;
             info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
-            match self.connect_inner(ap, credentials.clone()).await {
+            match self.connect_inner(&ap, credentials.clone()).await {
                 Ok(ct) => break ct,
                 Err(e) => {
+                    num_ap_tries += 1;
+                    if MAX_AP_TRIES == num_ap_tries {
+                        error!("Tried too many access points");
+                        return Err(e);
+                    }
                     if let Some(AuthenticationError::LoginFailed(ErrorCode::TryAnotherAP)) =
                         e.error.downcast_ref::<AuthenticationError>()
                     {
                         warn!("Instructed to try another access point...");
                         continue;
-                    } else {
+                    } else if let Some(AuthenticationError::LoginFailed(..)) =
+                        e.error.downcast_ref::<AuthenticationError>()
+                    {
                         return Err(e);
+                    } else {
+                        warn!("Try another access point...");
+                        continue;
                     }
                 }
             }
@@ -567,7 +583,7 @@ impl Session {
     }
 
     pub fn shutdown(&self) {
-        debug!("Invalidating session");
+        debug!("Shutdown: Invalidating session");
         self.0.data.write().invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
@@ -624,6 +640,7 @@ where
                     return Poll::Ready(Ok(()));
                 }
                 Some(Err(e)) => {
+                    error!("Connection to server closed.");
                     session.shutdown();
                     return Poll::Ready(Err(e));
                 }
