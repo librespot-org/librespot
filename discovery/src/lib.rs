@@ -7,6 +7,7 @@
 //! This library uses mDNS and DNS-SD so that other devices can find it,
 //! and spawns an http server to answer requests of Spotify clients.
 
+mod avahi;
 mod server;
 
 use std::{
@@ -41,6 +42,10 @@ pub const BACKENDS: &[(
     // If None, the backend is known but wasn't compiled.
     Option<ServiceBuilder>,
 )] = &[
+    #[cfg(feature = "with-avahi")]
+    ("avahi", Some(launch_avahi)),
+    #[cfg(not(feature = "with-avahi"))]
+    ("avahi", None),
     #[cfg(feature = "with-dns-sd")]
     ("dns-sd", Some(launch_dns_sd)),
     #[cfg(not(feature = "with-dns-sd"))]
@@ -129,6 +134,66 @@ impl From<DiscoveryError> for Error {
 const DNS_SD_SERVICE_NAME: &str = "_spotify-connect._tcp";
 #[allow(unused)]
 const TXT_RECORD: [&str; 2] = ["VERSION=1.0", "CPath=/"];
+
+#[cfg(feature = "with-avahi")]
+async fn avahi_task(name: Cow<'static, str>, port: u16) -> zbus::Result<()> {
+    use self::avahi::ServerProxy;
+
+    let conn = zbus::Connection::system().await?;
+
+    // Connect to Avahi and publish the service
+    let avahi_server = ServerProxy::new(&conn).await?;
+    log::trace!("Connected to Avahi");
+
+    let entry_group = avahi_server.entry_group_new().await?;
+
+    entry_group
+        .add_service(
+            -1, // AVAHI_IF_UNSPEC
+            -1, // IPv4 and IPv6
+            0,  // flags
+            &name,
+            DNS_SD_SERVICE_NAME, // type
+            "",                  // domain: let the server choose
+            "",                  // host: let the server choose
+            port,
+            &TXT_RECORD.map(|s| s.as_bytes()),
+        )
+        .await?;
+
+    entry_group.commit().await?;
+    log::debug!("Commited zeroconf service with name {}", &name);
+
+    let _: () = std::future::pending().await;
+
+    Ok(())
+}
+
+#[cfg(feature = "with-avahi")]
+fn launch_avahi(
+    name: Cow<'static, str>,
+    _zeroconf_ip: Vec<std::net::IpAddr>,
+    port: u16,
+) -> Result<Box<dyn Any>, Error> {
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+    tokio::spawn(async move {
+        tokio::select! {
+            res = avahi_task(name, port) => {
+                if let Err(e) = res {
+                    log::error!("Avahi error {}, shutting down discovery", e);
+                }
+            },
+            _ = shutdown_rx => {
+                log::debug!("Un-publishing zeroconf service")
+                // FIXME: Call EntryGroup.Free() and ensure that the future
+                // continues to be polled until that has completed.
+            },
+        }
+    });
+
+    // Dropping the shutdown_tx will wake the shutdown_rx.await
+    Ok(Box::new(shutdown_tx))
+}
 
 #[cfg(feature = "with-dns-sd")]
 fn launch_dns_sd(

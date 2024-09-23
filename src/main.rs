@@ -645,7 +645,7 @@ fn get_setup() -> Setup {
     .optopt(
         ZEROCONF_BACKEND_SHORT,
         ZEROCONF_BACKEND,
-        "Zeroconf (MDNS/DNS-SD) backend to use. Valid values are 'dns-sd' and 'libmdns', if librespot is compiled with the corresponding feature flags.",
+        "Zeroconf (MDNS/DNS-SD) backend to use. Valid values are 'avahi', 'dns-sd' and 'libmdns', if librespot is compiled with the corresponding feature flags.",
         "BACKEND"
     );
 
