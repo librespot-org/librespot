@@ -31,6 +31,49 @@ pub use crate::core::authentication::Credentials;
 /// Determining the icon in the list of available devices.
 pub use crate::core::config::DeviceType;
 
+pub type ServiceBuilder =
+    fn(Cow<'static, str>, Vec<std::net::IpAddr>, u16) -> Result<Box<dyn Any>, Error>;
+
+// Default goes first: This matches the behaviour when feature flags were exlusive, i.e. when there
+// was only `feature = "with-dns-sd"` or `not(feature = "with-dns-sd")`
+pub const BACKENDS: &[(
+    &str,
+    // If None, the backend is known but wasn't compiled.
+    Option<ServiceBuilder>,
+)] = &[
+    #[cfg(feature = "with-dns-sd")]
+    ("dns-sd", Some(launch_dns_sd)),
+    #[cfg(not(feature = "with-dns-sd"))]
+    ("dns-sd", None),
+    #[cfg(feature = "with-libmdns")]
+    ("libmdns", Some(launch_libmdns)),
+    #[cfg(not(feature = "with-libmdns"))]
+    ("libmdns", None),
+];
+
+pub fn find(name: Option<&str>) -> Result<ServiceBuilder, Error> {
+    if let Some(ref name) = name {
+        match BACKENDS.iter().find(|(id, _)| name == id) {
+            Some((_id, Some(launch_svc))) => Ok(*launch_svc),
+            Some((_id, None)) => Err(Error::unavailable(format!(
+                "librespot built without '{}' support",
+                name
+            ))),
+            None => Err(Error::not_found(format!(
+                "unknown zeroconf backend '{}'",
+                name
+            ))),
+        }
+    } else {
+        BACKENDS
+            .iter()
+            .find_map(|(_, launch_svc)| *launch_svc)
+            .ok_or(Error::unavailable(
+                "librespot built without zeroconf backends",
+            ))
+    }
+}
+
 /// Makes this device visible to Spotify clients in the local network.
 ///
 /// `Discovery` implements the [`Stream`] trait. Every time this device
@@ -48,6 +91,7 @@ pub struct Builder {
     server_config: server::Config,
     port: u16,
     zeroconf_ip: Vec<std::net::IpAddr>,
+    zeroconf_backend: Option<ServiceBuilder>,
 }
 
 /// Errors that can occur while setting up a [`Discovery`] instance.
@@ -81,7 +125,9 @@ impl From<DiscoveryError> for Error {
     }
 }
 
+#[allow(unused)]
 const DNS_SD_SERVICE_NAME: &str = "_spotify-connect._tcp";
+#[allow(unused)]
 const TXT_RECORD: [&str; 2] = ["VERSION=1.0", "CPath=/"];
 
 #[cfg(feature = "with-dns-sd")]
@@ -103,7 +149,7 @@ fn launch_dns_sd(
     Ok(Box::new(svc))
 }
 
-#[cfg(not(feature = "with-dns-sd"))]
+#[cfg(feature = "with-libmdns")]
 fn launch_libmdns(
     name: Cow<'static, str>,
     zeroconf_ip: Vec<std::net::IpAddr>,
@@ -138,6 +184,7 @@ impl Builder {
             },
             port: 0,
             zeroconf_ip: vec![],
+            zeroconf_backend: None,
         }
     }
 
@@ -165,6 +212,12 @@ impl Builder {
         self
     }
 
+    /// Set the zeroconf (MDNS and DNS-SD) implementation to use.
+    pub fn zeroconf_backend(mut self, zeroconf_backend: ServiceBuilder) -> Self {
+        self.zeroconf_backend = Some(zeroconf_backend);
+        self
+    }
+
     /// Sets the port on which it should listen to incoming connections.
     /// The default value `0` means any port.
     pub fn port(mut self, port: u16) -> Self {
@@ -183,12 +236,8 @@ impl Builder {
         let mut port = self.port;
         let server = DiscoveryServer::new(self.server_config, &mut port)?;
 
-        #[cfg(feature = "with-dns-sd")]
-        let svc = launch_dns_sd(name, zeroconf_ip, port)?;
-
-        #[cfg(not(feature = "with-dns-sd"))]
-        let svc = launch_libmdns(name, zeroconf_ip, port)?;
-
+        let launch_svc = self.zeroconf_backend.unwrap_or(find(None)?);
+        let svc = launch_svc(name, zeroconf_ip, port)?;
         Ok(Discovery { server, svc })
     }
 }

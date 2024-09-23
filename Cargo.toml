@@ -36,6 +36,7 @@ version = "0.5.0"
 [dependencies.librespot-discovery]
 path = "discovery"
 version = "0.5.0"
+default-features = false
 
 [dependencies.librespot-metadata]
 path = "metadata"
@@ -76,10 +77,11 @@ sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
 with-dns-sd = ["librespot-discovery/with-dns-sd"]
+with-libmdns = ["librespot-discovery/with-libmdns"]
 
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
-default = ["rodio-backend"]
+default = ["rodio-backend", "with-libmdns"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
