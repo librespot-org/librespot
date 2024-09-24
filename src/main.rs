@@ -1989,18 +1989,27 @@ async fn main() {
 
     info!("Gracefully shutting down");
 
+    let mut shutdown_tasks = tokio::task::JoinSet::new();
+
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
         if let Err(e) = spirc.shutdown() {
             error!("error sending spirc shutdown message: {}", e);
         }
 
-        if let Some(mut spirc_task) = spirc_task {
-            tokio::select! {
-                _ = tokio::signal::ctrl_c() => (),
-                _ = spirc_task.as_mut() => (),
-                else => (),
-            }
+        if let Some(spirc_task) = spirc_task {
+            shutdown_tasks.spawn(spirc_task);
         }
+    }
+
+    if let Some(discovery) = discovery {
+        shutdown_tasks.spawn(discovery.shutdown());
+    }
+
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => (),
+        _ = async {
+            while shutdown_tasks.join_next().await.is_some() {}
+        } => (),
     }
 }
