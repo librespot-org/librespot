@@ -3,16 +3,13 @@ use std::{
     collections::BTreeMap,
     convert::Infallible,
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener},
-    pin::Pin,
     sync::{Arc, Mutex},
-    task::{Context, Poll},
 };
 
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::engine::Engine as _;
 use bytes::Bytes;
-use futures_core::Stream;
 use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
 use http_body_util::{BodyExt, Full};
@@ -24,7 +21,7 @@ use serde_json::json;
 use sha1::{Digest, Sha1};
 use tokio::sync::{mpsc, oneshot};
 
-use super::DiscoveryError;
+use super::{DiscoveryError, DiscoveryEvent};
 
 use crate::{
     core::config::DeviceType,
@@ -47,21 +44,17 @@ struct RequestHandler {
     config: Config,
     username: Mutex<Option<String>>,
     keys: DhLocalKeys,
-    tx: mpsc::UnboundedSender<Credentials>,
+    event_tx: mpsc::UnboundedSender<DiscoveryEvent>,
 }
 
 impl RequestHandler {
-    fn new(config: Config) -> (Self, mpsc::UnboundedReceiver<Credentials>) {
-        let (tx, rx) = mpsc::unbounded_channel();
-
-        let discovery = Self {
+    fn new(config: Config, event_tx: mpsc::UnboundedSender<DiscoveryEvent>) -> Self {
+        Self {
             config,
             username: Mutex::new(None),
             keys: DhLocalKeys::random(&mut rand::thread_rng()),
-            tx,
-        };
-
-        (discovery, rx)
+            event_tx,
+        }
     }
 
     fn active_user(&self) -> String {
@@ -202,7 +195,8 @@ impl RequestHandler {
 
         {
             let maybe_username = self.username.lock();
-            self.tx.send(credentials)?;
+            self.event_tx
+                .send(DiscoveryEvent::Credentials(credentials))?;
             if let Ok(mut username_field) = maybe_username {
                 *username_field = Some(String::from(username));
             } else {
@@ -259,14 +253,17 @@ impl RequestHandler {
 }
 
 pub struct DiscoveryServer {
-    cred_rx: mpsc::UnboundedReceiver<Credentials>,
     close_tx: oneshot::Sender<Infallible>,
     task_handle: tokio::task::JoinHandle<()>,
 }
 
 impl DiscoveryServer {
-    pub fn new(config: Config, port: &mut u16) -> Result<Self, Error> {
-        let (discovery, cred_rx) = RequestHandler::new(config);
+    pub fn new(
+        config: Config,
+        port: &mut u16,
+        event_tx: mpsc::UnboundedSender<DiscoveryEvent>,
+    ) -> Result<Self, Error> {
+        let discovery = RequestHandler::new(config, event_tx);
         let address = if cfg!(windows) {
             SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *port)
         } else {
@@ -338,7 +335,6 @@ impl DiscoveryServer {
         });
 
         Ok(Self {
-            cred_rx,
             close_tx,
             task_handle,
         })
@@ -352,13 +348,5 @@ impl DiscoveryServer {
         } = self;
         std::mem::drop(close_tx);
         let _ = task_handle.await;
-    }
-}
-
-impl Stream for DiscoveryServer {
-    type Item = Credentials;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Credentials>> {
-        self.cred_rx.poll_recv(cx)
     }
 }
