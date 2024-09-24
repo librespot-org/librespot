@@ -11,8 +11,8 @@ mod avahi;
 mod server;
 
 use std::{
-    any::Any,
     borrow::Cow,
+    convert::Infallible,
     error::Error as StdError,
     pin::Pin,
     task::{Context, Poll},
@@ -20,6 +20,7 @@ use std::{
 
 use futures_core::Stream;
 use thiserror::Error;
+use tokio::sync::oneshot;
 
 use self::server::DiscoveryServer;
 
@@ -32,8 +33,32 @@ pub use crate::core::authentication::Credentials;
 /// Determining the icon in the list of available devices.
 pub use crate::core::config::DeviceType;
 
+pub enum DiscoveryEvent {
+    Credentials(Credentials),
+    ServerError(DiscoveryError),
+    ZeroconfError(DiscoveryError),
+}
+
+pub struct DnsSdHandle {
+    task_handle: tokio::task::JoinHandle<()>,
+    shutdown_tx: oneshot::Sender<Infallible>,
+}
+
+impl DnsSdHandle {
+    async fn shutdown(self) {
+        log::debug!("Shutting down zeroconf responder");
+        let Self {
+            task_handle,
+            shutdown_tx,
+        } = self;
+        std::mem::drop(shutdown_tx);
+        let _ = task_handle.await;
+        log::debug!("Zeroconf responder stopped");
+    }
+}
+
 pub type ServiceBuilder =
-    fn(Cow<'static, str>, Vec<std::net::IpAddr>, u16) -> Result<Box<dyn Any>, Error>;
+    fn(Cow<'static, str>, Vec<std::net::IpAddr>, u16) -> Result<DnsSdHandle, Error>;
 
 // Default goes first: This matches the behaviour when feature flags were exlusive, i.e. when there
 // was only `feature = "with-dns-sd"` or `not(feature = "with-dns-sd")`
@@ -88,7 +113,7 @@ pub struct Discovery {
 
     /// An opaque handle to the DNS-SD service. Dropping this will unregister the service.
     #[allow(unused)]
-    svc: Box<dyn Any>,
+    svc: DnsSdHandle,
 }
 
 /// A builder for [`Discovery`].
@@ -136,7 +161,11 @@ const DNS_SD_SERVICE_NAME: &str = "_spotify-connect._tcp";
 const TXT_RECORD: [&str; 2] = ["VERSION=1.0", "CPath=/"];
 
 #[cfg(feature = "with-avahi")]
-async fn avahi_task(name: Cow<'static, str>, port: u16) -> zbus::Result<()> {
+async fn avahi_task(
+    name: Cow<'static, str>,
+    port: u16,
+    entry_group: &mut Option<avahi::EntryGroupProxy<'_>>,
+) -> zbus::Result<()> {
     use self::avahi::ServerProxy;
 
     let conn = zbus::Connection::system().await?;
@@ -145,9 +174,11 @@ async fn avahi_task(name: Cow<'static, str>, port: u16) -> zbus::Result<()> {
     let avahi_server = ServerProxy::new(&conn).await?;
     log::trace!("Connected to Avahi");
 
-    let entry_group = avahi_server.entry_group_new().await?;
+    *entry_group = Some(avahi_server.entry_group_new().await?);
 
     entry_group
+        .as_mut()
+        .unwrap()
         .add_service(
             -1, // AVAHI_IF_UNSPEC
             -1, // IPv4 and IPv6
@@ -161,7 +192,7 @@ async fn avahi_task(name: Cow<'static, str>, port: u16) -> zbus::Result<()> {
         )
         .await?;
 
-    entry_group.commit().await?;
+    entry_group.as_mut().unwrap().commit().await?;
     log::debug!("Commited zeroconf service with name {}", &name);
 
     let _: () = std::future::pending().await;
@@ -174,25 +205,32 @@ fn launch_avahi(
     name: Cow<'static, str>,
     _zeroconf_ip: Vec<std::net::IpAddr>,
     port: u16,
-) -> Result<Box<dyn Any>, Error> {
-    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-    tokio::spawn(async move {
+) -> Result<DnsSdHandle, Error> {
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let task_handle = tokio::spawn(async move {
+        let mut entry_group = None;
         tokio::select! {
-            res = avahi_task(name, port) => {
+            res = avahi_task(name, port, &mut entry_group) => {
                 if let Err(e) = res {
                     log::error!("Avahi error {}, shutting down discovery", e);
                 }
             },
             _ = shutdown_rx => {
-                log::debug!("Un-publishing zeroconf service")
-                // FIXME: Call EntryGroup.Free() and ensure that the future
-                // continues to be polled until that has completed.
+                if let Some(entry_group) = entry_group.as_mut() {
+                    if let Err(e) = entry_group.free().await {
+                        log::warn!("Failed to un-publish zeroconf service: {}", e);
+                    } else {
+                        log::debug!("Un-published zeroconf service");
+                    }
+                }
             },
         }
     });
 
-    // Dropping the shutdown_tx will wake the shutdown_rx.await
-    Ok(Box::new(shutdown_tx))
+    Ok(DnsSdHandle {
+        task_handle,
+        shutdown_tx,
+    })
 }
 
 #[cfg(feature = "with-dns-sd")]
@@ -200,18 +238,29 @@ fn launch_dns_sd(
     name: Cow<'static, str>,
     _zeroconf_ip: Vec<std::net::IpAddr>,
     port: u16,
-) -> Result<Box<dyn Any>, Error> {
-    let svc = dns_sd::DNSService::register(
-        Some(name.as_ref()),
-        DNS_SD_SERVICE_NAME,
-        None,
-        None,
-        port,
-        &TXT_RECORD,
-    )
-    .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?;
+) -> Result<DnsSdHandle, Error> {
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let task_handle = tokio::task::spawn_blocking(move || {
+        let svc = dns_sd::DNSService::register(
+            Some(name.as_ref()),
+            DNS_SD_SERVICE_NAME,
+            None,
+            None,
+            port,
+            &TXT_RECORD,
+        )
+        .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))
+        .unwrap();
 
-    Ok(Box::new(svc))
+        let _ = shutdown_rx.blocking_recv();
+
+        std::mem::drop(svc);
+    });
+
+    Ok(DnsSdHandle {
+        shutdown_tx,
+        task_handle,
+    })
 }
 
 #[cfg(feature = "with-libmdns")]
@@ -219,21 +268,32 @@ fn launch_libmdns(
     name: Cow<'static, str>,
     zeroconf_ip: Vec<std::net::IpAddr>,
     port: u16,
-) -> Result<Box<dyn Any>, Error> {
-    let svc = if !zeroconf_ip.is_empty() {
-        libmdns::Responder::spawn_with_ip_list(&tokio::runtime::Handle::current(), zeroconf_ip)
-    } else {
-        libmdns::Responder::spawn(&tokio::runtime::Handle::current())
-    }
-    .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?
-    .register(
-        DNS_SD_SERVICE_NAME.to_owned(),
-        name.into_owned(),
-        port,
-        &TXT_RECORD,
-    );
+) -> Result<DnsSdHandle, Error> {
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let task_handle = tokio::task::spawn_blocking(move || {
+        let svc = if !zeroconf_ip.is_empty() {
+            libmdns::Responder::spawn_with_ip_list(&tokio::runtime::Handle::current(), zeroconf_ip)
+        } else {
+            libmdns::Responder::spawn(&tokio::runtime::Handle::current())
+        }
+        .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))
+        .unwrap()
+        .register(
+            DNS_SD_SERVICE_NAME.to_owned(),
+            name.into_owned(),
+            port,
+            &TXT_RECORD,
+        );
 
-    Ok(Box::new(svc))
+        let _ = shutdown_rx.blocking_recv();
+
+        std::mem::drop(svc);
+    });
+
+    Ok(DnsSdHandle {
+        shutdown_tx,
+        task_handle,
+    })
 }
 
 impl Builder {
@@ -316,6 +376,10 @@ impl Discovery {
     /// Create a new instance with the specified device id and default paramaters.
     pub fn new<T: Into<String>>(device_id: T, client_id: T) -> Result<Self, Error> {
         Self::builder(device_id, client_id).launch()
+    }
+
+    pub async fn shutdown(self) {
+        tokio::join!(self.server.shutdown(), self.svc.shutdown(),);
     }
 }
 

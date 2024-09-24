@@ -260,7 +260,8 @@ impl RequestHandler {
 
 pub struct DiscoveryServer {
     cred_rx: mpsc::UnboundedReceiver<Credentials>,
-    _close_tx: oneshot::Sender<Infallible>,
+    close_tx: oneshot::Sender<Infallible>,
+    task_handle: tokio::task::JoinHandle<()>,
 }
 
 impl DiscoveryServer {
@@ -297,7 +298,7 @@ impl DiscoveryServer {
             }
         }
 
-        tokio::spawn(async move {
+        let task_handle = tokio::spawn(async move {
             let discovery = Arc::new(discovery);
 
             let server = hyper::server::conn::http1::Builder::new();
@@ -338,8 +339,19 @@ impl DiscoveryServer {
 
         Ok(Self {
             cred_rx,
-            _close_tx: close_tx,
+            close_tx,
+            task_handle,
         })
+    }
+
+    pub async fn shutdown(self) {
+        let Self {
+            close_tx,
+            task_handle,
+            ..
+        } = self;
+        std::mem::drop(close_tx);
+        let _ = task_handle.await;
     }
 }
 
