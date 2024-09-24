@@ -84,6 +84,47 @@ impl From<DiscoveryError> for Error {
 const DNS_SD_SERVICE_NAME: &str = "_spotify-connect._tcp";
 const TXT_RECORD: [&str; 2] = ["VERSION=1.0", "CPath=/"];
 
+#[cfg(feature = "with-dns-sd")]
+fn launch_dns_sd(
+    name: Cow<'static, str>,
+    _zeroconf_ip: Vec<std::net::IpAddr>,
+    port: u16,
+) -> Result<Box<dyn Any>, Error> {
+    let svc = dns_sd::DNSService::register(
+        Some(name.as_ref()),
+        DNS_SD_SERVICE_NAME,
+        None,
+        None,
+        port,
+        &TXT_RECORD,
+    )
+    .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?;
+
+    Ok(Box::new(svc))
+}
+
+#[cfg(not(feature = "with-dns-sd"))]
+fn launch_libmdns(
+    name: Cow<'static, str>,
+    zeroconf_ip: Vec<std::net::IpAddr>,
+    port: u16,
+) -> Result<Box<dyn Any>, Error> {
+    let svc = if !zeroconf_ip.is_empty() {
+        libmdns::Responder::spawn_with_ip_list(&tokio::runtime::Handle::current(), zeroconf_ip)
+    } else {
+        libmdns::Responder::spawn(&tokio::runtime::Handle::current())
+    }
+    .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?
+    .register(
+        DNS_SD_SERVICE_NAME.to_owned(),
+        name.into_owned(),
+        port,
+        &TXT_RECORD,
+    );
+
+    Ok(Box::new(svc))
+}
+
 impl Builder {
     /// Starts a new builder using the provided device and client IDs.
     pub fn new<T: Into<String>>(device_id: T, client_id: T) -> Self {
@@ -136,42 +177,19 @@ impl Builder {
     /// # Errors
     /// If setting up the mdns service or creating the server fails, this function returns an error.
     pub fn launch(self) -> Result<Discovery, Error> {
+        let name = self.server_config.name.clone();
+        let zeroconf_ip = self.zeroconf_ip;
+
         let mut port = self.port;
-        let name = self.server_config.name.clone().into_owned();
         let server = DiscoveryServer::new(self.server_config, &mut port)?;
-        let _zeroconf_ip = self.zeroconf_ip;
 
         #[cfg(feature = "with-dns-sd")]
-        let svc = {
-            dns_sd::DNSService::register(
-                Some(name.as_ref()),
-                &DNS_SD_SERVICE_NAME,
-                None,
-                None,
-                port,
-                &TXT_RECORD,
-            )
-            .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?
-        };
+        let svc = launch_dns_sd(name, zeroconf_ip, port)?;
 
         #[cfg(not(feature = "with-dns-sd"))]
-        let svc = {
-            if !_zeroconf_ip.is_empty() {
-                libmdns::Responder::spawn_with_ip_list(
-                    &tokio::runtime::Handle::current(),
-                    _zeroconf_ip,
-                )
-            } else {
-                libmdns::Responder::spawn(&tokio::runtime::Handle::current())
-            }
-            .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?
-            .register(DNS_SD_SERVICE_NAME.to_owned(), name, port, &TXT_RECORD)
-        };
+        let svc = launch_libmdns(name, zeroconf_ip, port)?;
 
-        Ok(Discovery {
-            server,
-            svc: Box::new(svc),
-        })
+        Ok(Discovery { server, svc })
     }
 }
 
