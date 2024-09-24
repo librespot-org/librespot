@@ -7,6 +7,7 @@ use serde::{
     de::{Error, Unexpected},
     Deserialize,
 };
+use librespot_protocol::player::{ContextPage, ContextTrack};
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct StationContext {
@@ -77,6 +78,25 @@ pub struct MetadataContext {
 pub struct SubtitleContext {
     name: String,
     uri: String,
+}
+
+fn track_ref_to_context_track(track_ref: TrackRef) -> ContextTrack {
+    ContextTrack {
+        uri: track_ref.uri.unwrap_or_default(),
+        gid: track_ref.gid.unwrap_or_default(),
+        ..Default::default()
+    }
+}
+
+impl From<PageContext> for ContextPage {
+    fn from(value: PageContext) -> Self {
+        Self {
+            next_page_url: value.next_page_url,
+            tracks: value.tracks.into_iter().map(track_ref_to_context_track).collect(),
+            loading: false,
+            ..Default::default()
+        }
+    }
 }
 
 fn bool_from_string<'de, D>(de: D) -> Result<bool, D::Error>

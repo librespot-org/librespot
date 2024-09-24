@@ -1,5 +1,6 @@
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use crate::spirc::SpircPlayStatus;
 use librespot_core::config::DeviceType;
 use librespot_core::spclient::SpClientResult;
 use librespot_core::{version, Session};
@@ -8,6 +9,7 @@ use librespot_protocol::connect::{
 };
 use librespot_protocol::player::{ContextPlayerOptions, PlayOrigin, PlayerState, Suppressions};
 use protobuf::{EnumOrUnknown, MessageField};
+use librespot_core::dealer::protocol::Request;
 
 #[derive(Debug, Clone)]
 pub struct ConnectStateConfig {
@@ -44,9 +46,7 @@ pub struct ConnectState {
     pub device: DeviceInfo,
     pub player: PlayerState,
 
-    pub tracks: Vec<()>,
-
-    pub last_command: Option<(u32, String)>,
+    pub last_command: Option<Request>,
 }
 
 impl ConnectState {
@@ -114,7 +114,44 @@ impl ConnectState {
         }
     }
 
-    pub async fn update_remote(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
+    pub fn set_active(&mut self, value: bool) {
+        if value {
+            if self.active {
+                return;
+            }
+
+            self.active = true;
+            self.active_since = Some(SystemTime::now())
+        } else {
+            self.active = false;
+            self.active_since = None
+        }
+    }
+
+    pub fn set_playing_track_index(&mut self, new_index: u32) {
+        if let Some(index) = self.player.index.as_mut() {
+            index.track = new_index;
+        }
+    }
+
+    pub(crate) fn set_status(&mut self, status: &SpircPlayStatus) {
+        self.player.is_paused = matches!(
+            status,
+            SpircPlayStatus::LoadingPause { .. }
+                | SpircPlayStatus::Paused { .. }
+                | SpircPlayStatus::Stopped
+        );
+        self.player.is_buffering = matches!(
+            status,
+            SpircPlayStatus::LoadingPause { .. } | SpircPlayStatus::LoadingPlay { .. }
+        );
+        self.player.is_playing = matches!(
+            status,
+            SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::Playing { .. }
+        );
+    }
+
+    pub async fn update_state(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
         if matches!(reason, PutStateReason::BECAME_INACTIVE) {
             todo!("handle became inactive")
         }
@@ -127,6 +164,11 @@ impl ConnectState {
         let put_state_reason = EnumOrUnknown::new(reason);
 
         let state = self.clone();
+
+        if state.active && state.player.is_playing {
+            state.player.position_as_of_timestamp;
+            state.player.timestamp;
+        }
 
         let is_active = state.active;
         let device = MessageField::some(Device {
@@ -160,9 +202,9 @@ impl ConnectState {
             }
         }
 
-        if let Some((message_id, device_id)) = state.last_command {
-            put_state.last_command_message_id = message_id;
-            put_state.last_command_sent_by_device_id = device_id;
+        if let Some(request) = state.last_command {
+            put_state.last_command_message_id = request.message_id;
+            put_state.last_command_sent_by_device_id = request.sent_by_device_id;
         }
 
         session

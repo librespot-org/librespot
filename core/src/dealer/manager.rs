@@ -33,6 +33,7 @@ impl From<DealerError> for Error {
     }
 }
 
+#[derive(Debug)]
 pub enum Reply {
     Success,
     Failure,
@@ -64,6 +65,7 @@ impl RequestHandler for DealerRequestHandler {
 
         tokio::spawn(async move {
             let reply = rx.recv().await.unwrap_or(Reply::Failure);
+            debug!("replying to ws request: {reply:?}");
             match reply {
                 Reply::Unanswered => responder.force_unanswered(),
                 Reply::Success | Reply::Failure => responder.send(Response {

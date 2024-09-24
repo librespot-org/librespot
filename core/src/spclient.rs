@@ -19,7 +19,7 @@ use rand::RngCore;
 use sha1::{Digest, Sha1};
 use sysinfo::System;
 use thiserror::Error;
-
+use librespot_protocol::player::Context;
 use crate::{
     apresolve::SocketAddress,
     cdn_url::CdnUrl,
@@ -780,5 +780,16 @@ impl SpClient {
         let url = template.replace("{file_id}", &image_id.to_base16()?);
 
         self.request_url(&url).await
+    }
+
+    pub async fn get_context(&self, uri: &str) -> Result<Context, Error> {
+        // requesting this endpoint with metrics results in a somewhat consistent 502 errors
+        let uri = format!("/context-resolve/v1/{uri}");
+
+        let res = self.request(&Method::GET, &uri, None, None).await?;
+        let ctx_json = String::from_utf8(res.to_vec())?;
+        let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json)?;
+
+        Ok(ctx)
     }
 }

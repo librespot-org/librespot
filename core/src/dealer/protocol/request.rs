@@ -27,6 +27,7 @@ pub struct RequestCommand {
 #[serde(rename_all = "snake_case")]
 pub enum RequestEndpoint {
     Transfer,
+    #[serde(untagged)]
     Unknown(String),
 }
 

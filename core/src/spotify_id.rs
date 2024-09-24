@@ -436,6 +436,14 @@ impl TryFrom<&protocol::spirc::TrackRef> for SpotifyId {
     }
 }
 
+impl TryFrom<&protocol::player::ProvidedTrack> for SpotifyId {
+    type Error = crate::Error;
+
+    fn try_from(track: &protocol::player::ProvidedTrack) -> Result<Self, Self::Error> {
+        SpotifyId::from_uri(&track.uri)
+    }
+}
+
 impl TryFrom<&protocol::metadata::Album> for SpotifyId {
     type Error = crate::Error;
     fn try_from(album: &protocol::metadata::Album) -> Result<Self, Self::Error> {
