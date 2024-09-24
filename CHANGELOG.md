@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - [core] The `access_token` for http requests is now acquired by `login5`
+- [core] MSRV is now 1.75 (breaking)
 
 ### Added
 
