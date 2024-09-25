@@ -7,22 +7,28 @@ assignees: ''
 
 ---
 
-**Describe the bug**
+### Describe the bug
 A clear and concise description of what the bug is.
 
-**To reproduce**
-Steps to reproduce the behavior:
+### To reproduce
+Steps to reproduce the behavior in *librespot*:
 1. Launch `librespot` with '...'
 2. Connect with '...'
 3. In the client click on '...'
 4. See error
 
-**Log**
-A full log so we may trace your problem (launch `librespot` with `--verbose`). Format the log as code.
+### Version
+What version(s) of *librespot* does this problem exist in?
 
-**Host (what you are running `librespot` on):**
+### Log
+* A *full* **debug** log so we may trace your problem (launch `librespot` with `--verbose`).
+* Ideally contains your above steps to reproduce.
+* Format the log as code ([help](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-and-highlighting-code-blocks)) or use a *non-expiring* [pastebin](https://pastebin.com/).
+* Redact data you consider personal but do not remove/trim anthing else.
+
+### Host (what you are running `librespot` on):
 - OS: [e.g. Linux]
 - Platform: [e.g. RPi 3B+]
 
-**Additional context**
+### Additional context
 Add any other context about the problem here. If your issue is related to sound playback, at a minimum specify the type and make of your output device.
