@@ -10,17 +10,16 @@ use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
     context::PageContext,
     core::{
-        authentication::Credentials, mercury::MercurySender, session::UserAttributes,
-        util::SeqGenerator, version, Error, Session, SpotifyId,
+        authentication::Credentials, mercury::MercurySender, session::UserAttributes, Error,
+        Session, SpotifyId,
     },
     playback::{
         mixer::Mixer,
         player::{Player, PlayerEvent, PlayerEventChannel},
     },
     protocol::{
-        self,
         explicit_content_pubsub::UserAttributesUpdate,
-        spirc::{DeviceState, Frame, MessageType, PlayStatus, State, TrackRef},
+        spirc::{PlayStatus, State, TrackRef},
         user_attributes::UserAttributesMutation,
     },
 };
@@ -30,7 +29,6 @@ use librespot_core::dealer::protocol::RequestEndpoint;
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
 use librespot_protocol::player::{Context, ContextPage, ProvidedTrack, TransferState};
 use protobuf::Message;
-use rand::prelude::SliceRandom;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -82,11 +80,8 @@ struct SpircTask {
     player: Arc<Player>,
     mixer: Arc<dyn Mixer>,
 
-    sequence: SeqGenerator<u32>,
-
     connect_state: ConnectState,
 
-    device: DeviceState,
     state: State,
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
@@ -177,91 +172,6 @@ fn initial_state() -> State {
     frame
 }
 
-fn int_capability(typ: protocol::spirc::CapabilityType, val: i64) -> protocol::spirc::Capability {
-    let mut cap = protocol::spirc::Capability::new();
-    cap.set_typ(typ);
-    cap.intValue.push(val);
-    cap
-}
-
-fn initial_device_state(config: ConnectStateConfig) -> DeviceState {
-    let mut msg = DeviceState::new();
-    msg.set_sw_version(version::SEMVER.to_string());
-    msg.set_is_active(false);
-    msg.set_can_play(true);
-    msg.set_volume(0);
-    msg.set_name(config.name);
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kCanBePlayer,
-        1,
-    ));
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kDeviceType,
-        config.device_type as i64,
-    ));
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kGaiaEqConnectId,
-        1,
-    ));
-    // TODO: implement logout
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kSupportsLogout,
-        0,
-    ));
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kIsObservable,
-        1,
-    ));
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kVolumeSteps,
-        config.volume_steps.into(),
-    ));
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kSupportsPlaylistV2,
-        1,
-    ));
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kSupportsExternalEpisodes,
-        1,
-    ));
-    // TODO: how would such a rename command be triggered? Handle it.
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kSupportsRename,
-        1,
-    ));
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kCommandAcks,
-        0,
-    ));
-    // TODO: does this mean local files or the local network?
-    // LAN may be an interesting privacy toggle.
-    msg.capabilities.push(int_capability(
-        protocol::spirc::CapabilityType::kRestrictToLocal,
-        0,
-    ));
-    // TODO: what does this hide, or who do we hide from?
-    // May be an interesting privacy toggle.
-    msg.capabilities
-        .push(int_capability(protocol::spirc::CapabilityType::kHidden, 0));
-    let mut supported_types = protocol::spirc::Capability::new();
-    supported_types.set_typ(protocol::spirc::CapabilityType::kSupportedTypes);
-    supported_types
-        .stringValue
-        .push("audio/episode".to_string());
-    supported_types
-        .stringValue
-        .push("audio/episode+track".to_string());
-    supported_types.stringValue.push("audio/track".to_string());
-    // other known types:
-    // - "audio/ad"
-    // - "audio/interruption"
-    // - "audio/local"
-    // - "video/ad"
-    // - "video/episode"
-    msg.capabilities.push(supported_types);
-    msg
-}
-
 fn url_encode(bytes: impl AsRef<[u8]>) -> String {
     form_urlencoded::byte_serialize(bytes.as_ref()).collect()
 }
@@ -345,24 +255,18 @@ impl Spirc {
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
-        let device = initial_device_state(ConnectStateConfig::default());
-
         let player_events = player.get_player_event_channel();
 
         let task = SpircTask {
             player,
             mixer,
 
-            sequence: SeqGenerator::new(1),
-
             connect_state,
 
-            device,
             state: initial_state(),
             play_request_id: None,
             play_status: SpircPlayStatus::Stopped,
 
-            remote_update,
             connection_id_update,
             connect_state_update,
             connect_state_command,
@@ -585,7 +489,7 @@ impl SpircTask {
                 rx.close()
             }
             Ok(())
-        } else if self.device.is_active() {
+        } else if self.connect_state.active {
             trace!("Received SpircCommand::{:?}", cmd);
             match cmd {
                 SpircCommand::Play => {
@@ -594,7 +498,7 @@ impl SpircTask {
                 }
                 SpircCommand::PlayPause => {
                     self.handle_play_pause();
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::Pause => {
                     self.handle_pause();
@@ -917,8 +821,6 @@ impl SpircTask {
     }
 
     async fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
-        // todo: load ctx tracks
-
         if let Some(session) = transfer.current_session.as_mut() {
             if let Some(ctx) = session.context.as_mut() {
                 self.resolve_context(ctx).await?;
@@ -955,11 +857,13 @@ impl SpircTask {
                 .insert(key.clone(), value.clone());
         }
 
-        for (key, value) in &transfer.current_session.context.metadata {
-            state
-                .player
-                .context_metadata
-                .insert(key.clone(), value.clone());
+        if let Some(context) = &self.context {
+            for (key, value) in &context.metadata {
+                state
+                    .player
+                    .context_metadata
+                    .insert(key.clone(), value.clone());
+            }
         }
 
         if state.player.track.is_none() {
@@ -1011,7 +915,7 @@ impl SpircTask {
     }
 
     fn handle_disconnect(&mut self) {
-        self.device.set_is_active(false);
+        self.connect_state.set_active(false);
         self.handle_stop();
 
         self.player
@@ -1023,9 +927,7 @@ impl SpircTask {
     }
 
     fn handle_activate(&mut self) {
-        let now = self.now_ms();
-        self.device.set_is_active(true);
-        self.device.set_became_active_at(now);
+        self.connect_state.set_active(true);
         self.player
             .emit_session_connected_event(self.session.connection_id(), self.session.username());
         self.player.emit_session_client_changed_event(
@@ -1036,7 +938,7 @@ impl SpircTask {
         );
 
         self.player
-            .emit_volume_changed_event(self.device.volume() as u16);
+            .emit_volume_changed_event(self.connect_state.device.volume as u16);
 
         self.player
             .emit_auto_play_changed_event(self.session.autoplay());
@@ -1050,7 +952,7 @@ impl SpircTask {
     }
 
     async fn handle_load(&mut self, state: &State) -> Result<(), Error> {
-        if !self.device.is_active() {
+        if !self.connect_state.active {
             self.handle_activate();
         }
 
@@ -1172,8 +1074,8 @@ impl SpircTask {
     }
 
     fn preview_next_track(&mut self) -> Option<SpotifyId> {
-        self.get_track_id_to_play_from_playlist(self.state.playing_track_index() + 1)
-            .map(|(track_id, _)| track_id)
+        let next = self.connect_state.player.next_tracks.iter().next()?;
+        SpotifyId::try_from(next).ok()
     }
 
     fn handle_preload_next_track(&mut self) {
@@ -1314,12 +1216,12 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let volume = (self.device.volume() as u16).saturating_add(VOLUME_STEP_SIZE);
+        let volume = (self.connect_state.device.volume as u16).saturating_add(VOLUME_STEP_SIZE);
         self.set_volume(volume);
     }
 
     fn handle_volume_down(&mut self) {
-        let volume = (self.device.volume() as u16).saturating_sub(VOLUME_STEP_SIZE);
+        let volume = (self.connect_state.device.volume as u16).saturating_sub(VOLUME_STEP_SIZE);
         self.set_volume(volume);
     }
 
@@ -1430,61 +1332,6 @@ impl SpircTask {
         index
     }
 
-    // Broken out here so we can refactor this later when we move to SpotifyObjectID or similar
-    fn track_ref_is_unavailable(&self, track_ref: &TrackRef) -> bool {
-        track_ref.context() == "NonPlayable"
-    }
-
-    fn get_track_id_to_play_from_playlist(&self, index: u32) -> Option<(SpotifyId, u32)> {
-        let tracks_len = self.state.track.len();
-
-        // Guard against tracks_len being zero to prevent
-        // 'index out of bounds: the len is 0 but the index is 0'
-        // https://github.com/librespot-org/librespot/issues/226#issuecomment-971642037
-        if tracks_len == 0 {
-            warn!("No playable track found in state: {:?}", self.state);
-            return None;
-        }
-
-        let mut new_playlist_index = index as usize;
-
-        if new_playlist_index >= tracks_len {
-            new_playlist_index = 0;
-        }
-
-        let start_index = new_playlist_index;
-
-        // Cycle through all tracks, break if we don't find any playable tracks
-        // tracks in each frame either have a gid or uri (that may or may not be a valid track)
-        // E.g - context based frames sometimes contain tracks with <spotify:meta:page:>
-
-        let mut track_ref = self.state.track[new_playlist_index].clone();
-        let mut track_id = SpotifyId::try_from(&track_ref);
-        while self.track_ref_is_unavailable(&track_ref) || track_id.is_err() {
-            warn!(
-                "Skipping track <{:?}> at position [{}] of {}",
-                track_ref, new_playlist_index, tracks_len
-            );
-
-            new_playlist_index += 1;
-            if new_playlist_index >= tracks_len {
-                new_playlist_index = 0;
-            }
-
-            if new_playlist_index == start_index {
-                warn!("No playable track found in state: {:?}", self.state);
-                return None;
-            }
-            track_ref = self.state.track[new_playlist_index].clone();
-            track_id = SpotifyId::try_from(&track_ref);
-        }
-
-        match track_id {
-            Ok(track_id) => Some((track_id, new_playlist_index as u32)),
-            Err(_) => None,
-        }
-    }
-
     fn load_track(&mut self, start_playing: bool, position_ms: u32) -> Result<(), Error> {
         let track_to_load = match self.connect_state.player.track.as_ref() {
             None => {
@@ -1526,15 +1373,15 @@ impl SpircTask {
     }
 
     fn set_volume(&mut self, volume: u16) {
-        let old_volume = self.device.volume();
+        let old_volume = self.connect_state.device.volume;
         let new_volume = volume as u32;
         if old_volume != new_volume {
-            self.device.set_volume(new_volume);
+            self.connect_state.device.volume = new_volume;
             self.mixer.set_volume(volume);
             if let Some(cache) = self.session.cache() {
                 cache.save_volume(volume)
             }
-            if self.device.is_active() {
+            if self.connect_state.active {
                 self.player.emit_volume_changed_event(volume);
             }
         }
