@@ -3,7 +3,7 @@ mod handshake;
 
 pub use self::{codec::ApCodec, handshake::handshake};
 
-use std::io;
+use std::{io, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
 use num_traits::FromPrimitive;
@@ -63,7 +63,8 @@ impl From<APLoginFailed> for AuthenticationError {
 }
 
 pub async fn connect(host: &str, port: u16, proxy: Option<&Url>) -> io::Result<Transport> {
-    let socket = crate::socket::connect(host, port, proxy).await?;
+    const TIMEOUT: Duration = Duration::from_secs(3);
+    let socket = tokio::time::timeout(TIMEOUT, crate::socket::connect(host, port, proxy)).await??;
 
     handshake(socket).await
 }

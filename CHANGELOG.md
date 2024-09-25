@@ -58,6 +58,7 @@ https://github.com/librespot-org/librespot
 - [core] Support `Session` authentication with a Spotify access token
 - [core] `Credentials.username` is now an `Option` (breaking)
 - [core] `Session::connect` tries multiple access points, retrying each one.
+- [core] Each access point connection now timesout after 3 seconds.
 - [main] `autoplay {on|off}` now acts as an override. If unspecified, `librespot`
   now follows the setting in the Connect client that controls it. (breaking)
 - [metadata] Most metadata is now retrieved with the `spclient` (breaking)
