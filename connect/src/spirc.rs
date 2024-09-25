@@ -91,7 +91,6 @@ struct SpircTask {
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
 
-    remote_update: BoxedStream<Result<(String, Frame), Error>>,
     connection_id_update: BoxedStream<Result<String, Error>>,
     connect_state_update: BoxedStream<Result<ClusterUpdate, Error>>,
     connect_state_command: BoxedStream<RequestReply>,
@@ -280,24 +279,6 @@ impl Spirc {
 
         let connect_state = ConnectState::new(config, &session);
 
-        let remote_update = Box::pin(
-            session
-                .mercury()
-                .listen_for("hm://remote/user/")
-                .map(UnboundedReceiverStream::new)
-                .flatten_stream()
-                .map(|response| -> Result<(String, Frame), Error> {
-                    let uri_split: Vec<&str> = response.uri.split('/').collect();
-                    let username = match uri_split.get(4) {
-                        Some(s) => s.to_string(),
-                        None => String::new(),
-                    };
-
-                    let data = response.payload.first().ok_or(SpircError::NoData)?;
-                    Ok((username, Frame::parse_from_bytes(data)?))
-                }),
-        );
-
         let connection_id_update = Box::pin(
             session
                 .dealer()
@@ -479,22 +460,6 @@ impl SpircTask {
                     },
                     None => {
                         error!("connect state command selected, but none received");
-                        break;
-                    }
-                },
-                remote_update = self.remote_update.next() => match remote_update {
-                    Some(result) => match result {
-                        Ok((username, frame)) => {
-                            if username != self.session.username() {
-                                warn!("could not dispatch remote update: frame was intended for {}", username);
-                            } else if let Err(e) = self.handle_remote_update(frame) {
-                                error!("could not dispatch remote update: {}", e);
-                            }
-                        },
-                        Err(e) => error!("could not parse remote update: {}", e),
-                    }
-                    None => {
-                        error!("remote update selected, but none received");
                         break;
                     }
                 },
@@ -897,169 +862,6 @@ impl SpircTask {
                     key
                 );
             }
-        }
-    }
-
-    fn handle_remote_update(&mut self, update: Frame) -> Result<(), Error> {
-        trace!("Received update frame: {:#?}", update);
-
-        // First see if this update was intended for us.
-        let device_id = &self.connect_state.device.device_id;
-        let ident = update.ident();
-        if ident == device_id
-            || (!update.recipient.is_empty() && !update.recipient.contains(device_id))
-        {
-            return Err(SpircError::Ident(ident.to_string()).into());
-        }
-
-        let old_client_id = self.session.client_id();
-
-        for entry in update.device_state.metadata.iter() {
-            match entry.type_() {
-                "client_id" => self.session.set_client_id(entry.metadata()),
-                "brand_display_name" => self.session.set_client_brand_name(entry.metadata()),
-                "model_display_name" => self.session.set_client_model_name(entry.metadata()),
-                _ => (),
-            }
-        }
-
-        self.session.set_client_name(update.device_state.name());
-
-        let new_client_id = self.session.client_id();
-
-        if self.device.is_active() && new_client_id != old_client_id {
-            self.player.emit_session_client_changed_event(
-                new_client_id,
-                self.session.client_name(),
-                self.session.client_brand_name(),
-                self.session.client_model_name(),
-            );
-        }
-
-        match update.typ() {
-            MessageType::kMessageTypeHello => self.notify(Some(ident)),
-
-            MessageType::kMessageTypeLoad => {
-                self.handle_load(update.state.get_or_default())?;
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypePlay => {
-                self.handle_play();
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypePlayPause => {
-                self.handle_play_pause();
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypePause => {
-                self.handle_pause();
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeNext => {
-                self.handle_next()?;
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypePrev => {
-                self.handle_prev()?;
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeVolumeUp => {
-                self.handle_volume_up();
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeVolumeDown => {
-                self.handle_volume_down();
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeRepeat => {
-                let repeat = update.state.repeat();
-                self.state.set_repeat(repeat);
-
-                self.player.emit_repeat_changed_event(repeat);
-
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeShuffle => {
-                let shuffle = update.state.shuffle();
-                self.state.set_shuffle(shuffle);
-                if shuffle {
-                    let current_index = self.state.playing_track_index();
-                    let tracks = &mut self.state.track;
-                    if !tracks.is_empty() {
-                        tracks.swap(0, current_index as usize);
-                        if let Some((_, rest)) = tracks.split_first_mut() {
-                            let mut rng = rand::thread_rng();
-                            rest.shuffle(&mut rng);
-                        }
-                        self.state.set_playing_track_index(0);
-                    }
-                }
-                self.player.emit_shuffle_changed_event(shuffle);
-
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeSeek => {
-                self.handle_seek(update.position());
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeReplace => {
-                let context_uri = update.state.context_uri().to_owned();
-
-                // completely ignore local playback.
-                if context_uri.starts_with("spotify:local-files") {
-                    self.notify(None)?;
-                    return Err(SpircError::UnsupportedLocalPlayBack.into());
-                }
-
-                self.update_tracks(update.state.get_or_default());
-
-                if let SpircPlayStatus::Playing {
-                    preloading_of_next_track_triggered,
-                    ..
-                }
-                | SpircPlayStatus::Paused {
-                    preloading_of_next_track_triggered,
-                    ..
-                } = self.play_status
-                {
-                    if preloading_of_next_track_triggered {
-                        // Get the next track_id in the playlist
-                        if let Some(track_id) = self.preview_next_track() {
-                            self.player.preload(track_id);
-                        }
-                    }
-                }
-
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeVolume => {
-                self.set_volume(update.volume() as u16);
-                self.notify(None)
-            }
-
-            MessageType::kMessageTypeNotify => {
-                if self.device.is_active()
-                    && update.device_state.is_active()
-                    && self.device.became_active_at() <= update.device_state.became_active_at()
-                {
-                    self.handle_disconnect();
-                }
-                self.notify(None)
-            }
-
-            _ => Ok(()),
         }
     }
 
