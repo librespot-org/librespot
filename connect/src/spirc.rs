@@ -10,7 +10,7 @@ use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
     context::PageContext,
     core::{
-        authentication::Credentials, mercury::MercurySender, session::UserAttributes, Error,
+        authentication::Credentials, session::UserAttributes, Error,
         Session, SpotifyId,
     },
     playback::{
@@ -91,7 +91,7 @@ struct SpircTask {
     connect_state_command: BoxedStream<RequestReply>,
     user_attributes_update: BoxedStream<Result<UserAttributesUpdate, Error>>,
     user_attributes_mutation: BoxedStream<Result<UserAttributesMutation, Error>>,
-    sender: MercurySender,
+
     commands: Option<mpsc::UnboundedReceiver<SpircCommand>>,
     player_events: Option<PlayerEventChannel>,
 
@@ -247,12 +247,6 @@ impl Spirc {
         session.connect(credentials, true).await?;
         session.dealer().start().await?;
 
-        let canonical_username = &session.username();
-        debug!("canonical_username: {}", canonical_username);
-        let sender_uri = format!("hm://remote/user/{}/", url_encode(canonical_username));
-
-        let sender = session.mercury().sender(sender_uri);
-
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         let player_events = player.get_player_event_channel();
@@ -272,7 +266,6 @@ impl Spirc {
             connect_state_command,
             user_attributes_update,
             user_attributes_mutation,
-            sender,
             commands: Some(cmd_rx),
             player_events: Some(player_events),
 
@@ -407,10 +400,6 @@ impl SpircTask {
                         error!("could not dispatch player event: {}", e);
                     }
                 },
-                result = self.sender.flush(), if !self.sender.is_flushed() => if result.is_err() {
-                    error!("Cannot flush spirc event sender.");
-                    break;
-                },
                 context_uri = async { self.resolve_context.take() }, if self.resolve_context.is_some() => {
                     let context_uri = context_uri.unwrap(); // guaranteed above
                     if context_uri.contains("spotify:show:") || context_uri.contains("spotify:episode:") {
@@ -460,10 +449,6 @@ impl SpircTask {
         }
 
         self.session.dealer().close().await;
-
-        if self.sender.flush().await.is_err() {
-            warn!("Cannot flush spirc event sender when done.");
-        }
     }
 
     fn now_ms(&self) -> i64 {
