@@ -494,12 +494,12 @@ impl SpircTask {
                     }
                 },
                 cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
-                    if let Err(e) = self.handle_command(cmd) {
+                    if let Err(e) = self.handle_command(cmd).await {
                         debug!("could not dispatch command: {}", e);
                     }
                 },
                 event = async { player_events?.recv().await }, if player_events.is_some() => if let Some(event) = event {
-                    if let Err(e) = self.handle_player_event(event) {
+                    if let Err(e) = self.handle_player_event(event).await {
                         error!("could not dispatch player event: {}", e);
                     }
                 },
@@ -575,13 +575,10 @@ impl SpircTask {
         self.connect_state.player.timestamp = self.now_ms();
     }
 
-    // 1727262048196
-    // 1727262048000
-
-    fn handle_command(&mut self, cmd: SpircCommand) -> Result<(), Error> {
+    async fn handle_command(&mut self, cmd: SpircCommand) -> Result<(), Error> {
         if matches!(cmd, SpircCommand::Shutdown) {
             trace!("Received SpircCommand::Shutdown");
-            CommandSender::new(self, MessageType::kMessageTypeGoodbye).send()?;
+            todo!("signal shutdown to spotify");
             self.handle_disconnect();
             self.shutdown = true;
             if let Some(rx) = self.commands.as_mut() {
@@ -593,7 +590,7 @@ impl SpircTask {
             match cmd {
                 SpircCommand::Play => {
                     self.handle_play();
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::PlayPause => {
                     self.handle_play_pause();
@@ -601,47 +598,47 @@ impl SpircTask {
                 }
                 SpircCommand::Pause => {
                     self.handle_pause();
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::Prev => {
                     self.handle_prev()?;
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::Next => {
                     self.handle_next()?;
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::VolumeUp => {
                     self.handle_volume_up();
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::VolumeDown => {
                     self.handle_volume_down();
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::Disconnect => {
                     self.handle_disconnect();
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::Shuffle(shuffle) => {
                     self.state.set_shuffle(shuffle);
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::Repeat(repeat) => {
                     self.state.set_repeat(repeat);
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::SetPosition(position) => {
                     self.handle_seek(position);
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::SetVolume(volume) => {
                     self.set_volume(volume);
-                    self.notify(None)
+                    self.notify().await
                 }
                 SpircCommand::Load(command) => {
-                    self.handle_load(&command.into())?;
-                    self.notify(None)
+                    self.handle_load(&command.into()).await?;
+                    self.notify().await
                 }
                 _ => Ok(()),
             }
@@ -650,7 +647,7 @@ impl SpircTask {
                 SpircCommand::Activate => {
                     trace!("Received SpircCommand::{:?}", cmd);
                     self.handle_activate();
-                    self.notify(None)
+                    self.notify().await
                 }
                 _ => {
                     warn!("SpircCommand::{:?} will be ignored while Not Active", cmd);
@@ -660,7 +657,7 @@ impl SpircTask {
         }
     }
 
-    fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
+    async fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
         // update play_request_id
         if let PlayerEvent::PlayRequestIdChanged { play_request_id } = event {
             self.play_request_id = Some(play_request_id);
@@ -673,7 +670,7 @@ impl SpircTask {
         if let Some(play_request_id) = event.get_play_request_id() {
             if Some(play_request_id) == self.play_request_id {
                 match event {
-                    PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track(),
+                    PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track().await,
                     PlayerEvent::Loading { .. } => {
                         match self.play_status {
                             SpircPlayStatus::LoadingPlay { position_ms } => {
@@ -692,7 +689,7 @@ impl SpircTask {
                                 trace!("==> kPlayStatusLoading");
                             }
                         }
-                        self.notify(None)
+                        self.notify().await
                     }
                     PlayerEvent::Playing { position_ms, .. }
                     | PlayerEvent::PositionCorrection { position_ms, .. }
@@ -707,7 +704,7 @@ impl SpircTask {
                                 if (*nominal_start_time - new_nominal_start_time).abs() > 100 {
                                     *nominal_start_time = new_nominal_start_time;
                                     self.update_state_position(position_ms);
-                                    self.notify(None)
+                                    self.notify().await
                                 } else {
                                     Ok(())
                                 }
@@ -720,7 +717,7 @@ impl SpircTask {
                                     nominal_start_time: new_nominal_start_time,
                                     preloading_of_next_track_triggered: false,
                                 };
-                                self.notify(None)
+                                self.notify().await
                             }
                             _ => Ok(()),
                         }
@@ -738,7 +735,7 @@ impl SpircTask {
                                     position_ms: new_position_ms,
                                     preloading_of_next_track_triggered: false,
                                 };
-                                self.notify(None)
+                                self.notify().await
                             }
                             SpircPlayStatus::LoadingPlay { .. }
                             | SpircPlayStatus::LoadingPause { .. } => {
@@ -748,7 +745,7 @@ impl SpircTask {
                                     position_ms: new_position_ms,
                                     preloading_of_next_track_triggered: false,
                                 };
-                                self.notify(None)
+                                self.notify().await
                             }
                             _ => Ok(()),
                         }
@@ -760,7 +757,7 @@ impl SpircTask {
                             _ => {
                                 self.state.set_status(PlayStatus::kPlayStatusStop);
                                 self.play_status = SpircPlayStatus::Stopped;
-                                self.notify(None)
+                                self.notify().await
                             }
                         }
                     }
@@ -893,13 +890,16 @@ impl SpircTask {
     ) -> Result<(), Error> {
         self.connect_state.last_command = Some(request.clone());
 
+        debug!(
+            "handling {:?} player command from {}",
+            request.command.endpoint, request.sent_by_device_id
+        );
+
         let response = match request.command.endpoint {
             RequestEndpoint::Transfer if request.command.data.is_some() => {
                 self.handle_transfer(request.command.data.expect("by condition checked"))
                     .await?;
-                self.connect_state
-                    .update_state(&self.session, PutStateReason::PLAYER_STATE_CHANGED)
-                    .await?;
+                self.notify().await?;
 
                 Reply::Success
             }
@@ -1049,7 +1049,7 @@ impl SpircTask {
         self.player.emit_repeat_changed_event(self.state.repeat());
     }
 
-    fn handle_load(&mut self, state: &State) -> Result<(), Error> {
+    async fn handle_load(&mut self, state: &State) -> Result<(), Error> {
         if !self.device.is_active() {
             self.handle_activate();
         }
@@ -1058,7 +1058,7 @@ impl SpircTask {
 
         // completely ignore local playback.
         if context_uri.starts_with("spotify:local-files") {
-            self.notify(None)?;
+            self.notify().await?;
             return Err(SpircError::UnsupportedLocalPlayBack.into());
         }
 
@@ -1323,9 +1323,9 @@ impl SpircTask {
         self.set_volume(volume);
     }
 
-    fn handle_end_of_track(&mut self) -> Result<(), Error> {
+    async fn handle_end_of_track(&mut self) -> Result<(), Error> {
         self.handle_next()?;
-        self.notify(None)
+        self.notify().await
     }
 
     fn position(&mut self) -> u32 {
@@ -1508,7 +1508,7 @@ impl SpircTask {
         Ok(())
     }
 
-    fn notify(&mut self, recipient: Option<&str>) -> Result<(), Error> {
+    async fn notify(&mut self) -> Result<(), Error> {
         let status = self.state.status();
 
         // When in loading state, the Spotify UI is disabled for interaction.
@@ -1519,12 +1519,10 @@ impl SpircTask {
             return Ok(());
         }
 
-        trace!("Sending status to server: [{:?}]", status);
-        let mut cs = CommandSender::new(self, MessageType::kMessageTypeNotify);
-        if let Some(s) = recipient {
-            cs = cs.recipient(s);
-        }
-        cs.send()
+        self.connect_state
+            .update_state(&self.session, PutStateReason::PLAYER_STATE_CHANGED)
+            .await
+            .map(|_| ())
     }
 
     fn set_volume(&mut self, volume: u16) {
@@ -1546,46 +1544,5 @@ impl SpircTask {
 impl Drop for SpircTask {
     fn drop(&mut self) {
         debug!("drop Spirc[{}]", self.spirc_id);
-    }
-}
-
-struct CommandSender<'a> {
-    spirc: &'a mut SpircTask,
-    frame: Frame,
-}
-
-impl<'a> CommandSender<'a> {
-    fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender<'_> {
-        let mut frame = Frame::new();
-        // frame version
-        frame.set_version(1);
-        // Latest known Spirc version is 3.2.6, but we need another interface to announce support for Spirc V3.
-        // Setting anything higher than 2.0.0 here just seems to limit it to 2.0.0.
-        frame.set_protocol_version("2.0.0".to_string());
-        frame.set_ident(spirc.connect_state.device.device_id.clone());
-        frame.set_seq_nr(spirc.sequence.get());
-        frame.set_typ(cmd);
-        *frame.device_state.mut_or_insert_default() = spirc.device.clone();
-        frame.set_state_update_id(spirc.now_ms());
-        CommandSender { spirc, frame }
-    }
-
-    fn recipient(mut self, recipient: &'a str) -> CommandSender<'_> {
-        self.frame.recipient.push(recipient.to_owned());
-        self
-    }
-
-    #[allow(dead_code)]
-    fn state(mut self, state: State) -> CommandSender<'a> {
-        *self.frame.state.mut_or_insert_default() = state;
-        self
-    }
-
-    fn send(mut self) -> Result<(), Error> {
-        if self.frame.state.is_none() && self.spirc.device.is_active() {
-            *self.frame.state.mut_or_insert_default() = self.spirc.state.clone();
-        }
-
-        self.spirc.sender.send(self.frame.write_to_bytes()?)
     }
 }
