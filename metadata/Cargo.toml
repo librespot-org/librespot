@@ -10,7 +10,6 @@ edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
-byteorder = "1"
 bytes = "1"
 log = "0.4"
 protobuf = "3.5"
