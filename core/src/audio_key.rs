@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Write};
+use std::{collections::HashMap, io::Write, time::Duration};
 
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use bytes::Bytes;
@@ -20,6 +20,8 @@ pub enum AudioKeyError {
     Packet(u8),
     #[error("sequence {0} not pending")]
     Sequence(u32),
+    #[error("audio key response timeout")]
+    Timeout,
 }
 
 impl From<AudioKeyError> for Error {
@@ -29,6 +31,7 @@ impl From<AudioKeyError> for Error {
             AudioKeyError::Channel => Error::aborted(err),
             AudioKeyError::Sequence(_) => Error::aborted(err),
             AudioKeyError::Packet(_) => Error::unimplemented(err),
+            AudioKeyError::Timeout => Error::aborted(err),
         }
     }
 }
@@ -89,7 +92,14 @@ impl AudioKeyManager {
         });
 
         self.send_key_request(seq, track, file)?;
-        rx.await?
+        const KEY_RESPONSE_TIMEOUT: Duration = Duration::from_millis(1500);
+        match tokio::time::timeout(KEY_RESPONSE_TIMEOUT, rx).await {
+            Err(_) => {
+                error!("Audio key response timeout");
+                Err(AudioKeyError::Timeout.into())
+            }
+            Ok(k) => k?,
+        }
     }
 
     fn send_key_request(&self, seq: u32, track: SpotifyId, file: FileId) -> Result<(), Error> {
