@@ -4,22 +4,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use byteorder::{BigEndian, ByteOrder};
-use bytes::Bytes;
-use data_encoding::HEXUPPER_PERMISSIVE;
-use futures_util::future::IntoStream;
-use http::header::HeaderValue;
-use hyper::{
-    header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
-    HeaderMap, Method, Request,
-};
-use hyper_util::client::legacy::ResponseFuture;
-use protobuf::{Enum, Message, MessageFull};
-use rand::RngCore;
-use sha1::{Digest, Sha1};
-use sysinfo::System;
-use thiserror::Error;
-use librespot_protocol::player::Context;
 use crate::{
     apresolve::SocketAddress,
     cdn_url::CdnUrl,
@@ -38,6 +22,22 @@ use crate::{
     version::spotify_semantic_version,
     Error, FileId, SpotifyId,
 };
+use byteorder::{BigEndian, ByteOrder};
+use bytes::Bytes;
+use data_encoding::HEXUPPER_PERMISSIVE;
+use futures_util::future::IntoStream;
+use http::header::HeaderValue;
+use hyper::{
+    header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
+    HeaderMap, Method, Request,
+};
+use hyper_util::client::legacy::ResponseFuture;
+use librespot_protocol::player::Context;
+use protobuf::{Enum, Message, MessageFull};
+use rand::RngCore;
+use sha1::{Digest, Sha1};
+use sysinfo::System;
+use thiserror::Error;
 
 component! {
     SpClient : SpClientInner {

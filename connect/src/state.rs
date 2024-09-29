@@ -248,10 +248,7 @@ impl ConnectState {
     }
 
     pub fn move_to_next_track(&mut self) -> Result<u32, ConnectStateError> {
-        let old_track = self
-            .player
-            .track
-            .take();
+        let old_track = self.player.track.take();
 
         if let Some(old_track) = old_track {
             // only add songs not from the queue to our previous tracks
@@ -261,7 +258,7 @@ impl ConnectState {
                     self.player.prev_tracks.remove(0);
                 }
                 self.player.prev_tracks.push(old_track);
-            }   
+            }
         }
 
         if self.player.next_tracks.is_empty() {
@@ -302,10 +299,7 @@ impl ConnectState {
     pub fn move_to_prev_track(
         &mut self,
     ) -> Result<&MessageField<ProvidedTrack>, ConnectStateError> {
-        let old_track = self
-            .player
-            .track
-            .take();
+        let old_track = self.player.track.take();
 
         if let Some(old_track) = old_track {
             if old_track.provider != QUEUE_PROVIDER {
@@ -340,7 +334,9 @@ impl ConnectState {
             .player
             .index
             .as_mut()
-            .ok_or(ConnectStateError::MessageFieldNone("player.index".to_string()))?;
+            .ok_or(ConnectStateError::MessageFieldNone(
+                "player.index".to_string(),
+            ))?;
 
         index.track -= 1;
 

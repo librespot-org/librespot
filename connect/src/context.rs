@@ -3,11 +3,11 @@
 use crate::core::spotify_id::SpotifyId;
 use crate::protocol::spirc::TrackRef;
 
+use librespot_protocol::player::{ContextPage, ContextTrack};
 use serde::{
     de::{Error, Unexpected},
     Deserialize,
 };
-use librespot_protocol::player::{ContextPage, ContextTrack};
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct StationContext {
@@ -92,7 +92,11 @@ impl From<PageContext> for ContextPage {
     fn from(value: PageContext) -> Self {
         Self {
             next_page_url: value.next_page_url,
-            tracks: value.tracks.into_iter().map(track_ref_to_context_track).collect(),
+            tracks: value
+                .tracks
+                .into_iter()
+                .map(track_ref_to_context_track)
+                .collect(),
             loading: false,
             ..Default::default()
         }

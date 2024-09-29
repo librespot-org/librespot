@@ -1,2 +1,1 @@
 edition = "2021"
-group_imports = "StdExternalCrate"
