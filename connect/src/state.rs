@@ -128,6 +128,24 @@ impl ConnectState {
         }
     }
 
+    pub fn set_repeat_context(&mut self, repeat: bool) {
+        if let Some(options) = self.player.options.as_mut() {
+            options.repeating_context = repeat;
+        }
+    }
+
+    pub fn set_repeat_track(&mut self, repeat: bool) {
+        if let Some(options) = self.player.options.as_mut() {
+            options.repeating_track = repeat;
+        }
+    }
+
+    pub fn set_shuffle(&mut self, shuffle: bool) {
+        if let Some(options) = self.player.options.as_mut() {
+            options.shuffling_context = shuffle;
+        }
+    }
+
     pub fn set_playing_track_index(&mut self, new_index: u32) {
         if let Some(index) = self.player.index.as_mut() {
             index.track = new_index;

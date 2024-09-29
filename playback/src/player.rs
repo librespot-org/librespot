@@ -123,7 +123,10 @@ enum PlayerCommand {
     },
     EmitFilterExplicitContentChangedEvent(bool),
     EmitShuffleChangedEvent(bool),
-    EmitRepeatChangedEvent(bool),
+    EmitRepeatChangedEvent {
+        context: bool,
+        track: bool,
+    },
     EmitAutoPlayChangedEvent(bool),
 }
 
@@ -218,7 +221,8 @@ pub enum PlayerEvent {
         shuffle: bool,
     },
     RepeatChanged {
-        repeat: bool,
+        context: bool,
+        track: bool,
     },
     AutoPlayChanged {
         auto_play: bool,
@@ -607,8 +611,8 @@ impl Player {
         self.command(PlayerCommand::EmitShuffleChangedEvent(shuffle));
     }
 
-    pub fn emit_repeat_changed_event(&self, repeat: bool) {
-        self.command(PlayerCommand::EmitRepeatChangedEvent(repeat));
+    pub fn emit_repeat_changed_event(&self, context: bool, track: bool) {
+        self.command(PlayerCommand::EmitRepeatChangedEvent { context, track });
     }
 
     pub fn emit_auto_play_changed_event(&self, auto_play: bool) {
@@ -2104,8 +2108,8 @@ impl PlayerInternal {
                 self.send_event(PlayerEvent::VolumeChanged { volume })
             }
 
-            PlayerCommand::EmitRepeatChangedEvent(repeat) => {
-                self.send_event(PlayerEvent::RepeatChanged { repeat })
+            PlayerCommand::EmitRepeatChangedEvent { context, track } => {
+                self.send_event(PlayerEvent::RepeatChanged { context, track })
             }
 
             PlayerCommand::EmitShuffleChangedEvent(shuffle) => {
@@ -2336,9 +2340,10 @@ impl fmt::Debug for PlayerCommand {
                 .debug_tuple("EmitShuffleChangedEvent")
                 .field(&shuffle)
                 .finish(),
-            PlayerCommand::EmitRepeatChangedEvent(repeat) => f
+            PlayerCommand::EmitRepeatChangedEvent { context, track } => f
                 .debug_tuple("EmitRepeatChangedEvent")
-                .field(&repeat)
+                .field(&context)
+                .field(&track)
                 .finish(),
             PlayerCommand::EmitAutoPlayChangedEvent(auto_play) => f
                 .debug_tuple("EmitAutoPlayChangedEvent")

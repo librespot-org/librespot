@@ -118,6 +118,7 @@ pub enum SpircCommand {
     Shutdown,
     Shuffle(bool),
     Repeat(bool),
+    RepeatTrack(bool),
     Disconnect,
     SetPosition(u32),
     SetVolume(u16),
@@ -132,6 +133,7 @@ pub struct SpircLoadCommand {
     pub start_playing: bool,
     pub shuffle: bool,
     pub repeat: bool,
+    pub repeat_track: bool,
     pub playing_track_index: u32,
     pub tracks: Vec<TrackRef>,
 }
@@ -313,6 +315,9 @@ impl Spirc {
     }
     pub fn repeat(&self, repeat: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Repeat(repeat))?)
+    }
+    pub fn repeat_track(&self, repeat: bool) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::RepeatTrack(repeat))?)
     }
     pub fn set_volume(&self, volume: u16) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetVolume(volume))?)
@@ -510,11 +515,15 @@ impl SpircTask {
                     self.notify().await
                 }
                 SpircCommand::Shuffle(shuffle) => {
-                    self.state.set_shuffle(shuffle);
+                    self.connect_state.set_shuffle(shuffle);
                     self.notify().await
                 }
                 SpircCommand::Repeat(repeat) => {
-                    self.state.set_repeat(repeat);
+                    self.connect_state.set_repeat_context(repeat);
+                    self.notify().await
+                }
+                SpircCommand::RepeatTrack(repeat) => {
+                    self.connect_state.set_repeat_track(repeat);
                     self.notify().await
                 }
                 SpircCommand::SetPosition(position) => {
@@ -931,9 +940,12 @@ impl SpircTask {
         self.player
             .emit_filter_explicit_content_changed_event(self.session.filter_explicit_content());
 
-        self.player.emit_shuffle_changed_event(self.state.shuffle());
+        let options = &self.connect_state.player.options;
+        self.player
+            .emit_shuffle_changed_event(options.shuffling_context);
 
-        self.player.emit_repeat_changed_event(self.state.repeat());
+        self.player
+            .emit_repeat_changed_event(options.repeating_context, options.repeating_track);
     }
 
     async fn handle_load(&mut self, state: &State) -> Result<(), Error> {
