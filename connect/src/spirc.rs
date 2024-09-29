@@ -16,7 +16,6 @@ use crate::{
     },
     protocol::{
         explicit_content_pubsub::UserAttributesUpdate,
-        spirc::{PlayStatus, State, TrackRef},
         user_attributes::UserAttributesMutation,
     },
 };
@@ -79,7 +78,6 @@ struct SpircTask {
 
     connect_state: ConnectState,
 
-    state: State,
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
 
@@ -131,24 +129,6 @@ pub struct SpircLoadCommand {
     pub repeat: bool,
     pub repeat_track: bool,
     pub playing_track_index: u32,
-    pub tracks: Vec<TrackRef>,
-}
-
-impl From<SpircLoadCommand> for State {
-    fn from(command: SpircLoadCommand) -> Self {
-        let mut state = State::new();
-        state.set_context_uri(command.context_uri);
-        state.set_status(if command.start_playing {
-            PlayStatus::kPlayStatusPlay
-        } else {
-            PlayStatus::kPlayStatusStop
-        });
-        state.set_shuffle(command.shuffle);
-        state.set_repeat(command.repeat);
-        state.set_playing_track_index(command.playing_track_index);
-        state.track = command.tracks;
-        state
-    }
 }
 
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
@@ -157,20 +137,6 @@ const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
 
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
-}
-
-fn initial_state() -> State {
-    let mut frame = State::new();
-    frame.set_repeat(false);
-    frame.set_shuffle(false);
-    frame.set_status(PlayStatus::kPlayStatusStop);
-    frame.set_position_ms(0);
-    frame.set_position_measured_at(0);
-    frame
-}
-
-fn url_encode(bytes: impl AsRef<[u8]>) -> String {
-    form_urlencoded::byte_serialize(bytes.as_ref()).collect()
 }
 
 impl Spirc {
@@ -254,7 +220,6 @@ impl Spirc {
 
             connect_state,
 
-            state: initial_state(),
             play_request_id: None,
             play_status: SpircPlayStatus::Stopped,
 
@@ -408,9 +373,13 @@ impl SpircTask {
                     let context = if context_uri.starts_with("hm://") {
                         self.session.spclient().get_next_page(&context_uri).await
                     } else {
-                        // only send previous tracks that were before the current playback position
-                        let current_position = self.state.playing_track_index() as usize;
-                        let previous_tracks = self.state.track[..current_position].iter().filter_map(|t| SpotifyId::try_from(t).ok()).collect();
+                        let previous_tracks = self
+                            .connect_state
+                            .player.prev_tracks
+                            .iter()
+                            .map(SpotifyId::try_from)
+                            .filter_map(Result::ok)
+                            .collect();
 
                         let scope = if self.autoplay_context {
                             "stations" // this returns a `StationContext` but we deserialize it into a `PageContext`
@@ -428,7 +397,7 @@ impl SpircTask {
                                     info!(
                                         "Resolved {:?} tracks from <{:?}>",
                                         context.tracks.len(),
-                                        self.state.context_uri(),
+                                        self.connect_state.player.context_uri,
                                     );
                                     Some(context.into())
                                 }
@@ -568,16 +537,13 @@ impl SpircTask {
                         match self.play_status {
                             SpircPlayStatus::LoadingPlay { position_ms } => {
                                 self.update_state_position(position_ms);
-                                self.state.set_status(PlayStatus::kPlayStatusPlay);
                                 trace!("==> kPlayStatusPlay");
                             }
                             SpircPlayStatus::LoadingPause { position_ms } => {
                                 self.update_state_position(position_ms);
-                                self.state.set_status(PlayStatus::kPlayStatusPause);
                                 trace!("==> kPlayStatusPause");
                             }
                             _ => {
-                                self.state.set_status(PlayStatus::kPlayStatusLoading);
                                 self.update_state_position(0);
                                 trace!("==> kPlayStatusLoading");
                             }
@@ -604,7 +570,6 @@ impl SpircTask {
                             }
                             SpircPlayStatus::LoadingPlay { .. }
                             | SpircPlayStatus::LoadingPause { .. } => {
-                                self.state.set_status(PlayStatus::kPlayStatusPlay);
                                 self.update_state_position(position_ms);
                                 self.play_status = SpircPlayStatus::Playing {
                                     nominal_start_time: new_nominal_start_time,
@@ -622,7 +587,6 @@ impl SpircTask {
                         trace!("==> kPlayStatusPause");
                         match self.play_status {
                             SpircPlayStatus::Paused { .. } | SpircPlayStatus::Playing { .. } => {
-                                self.state.set_status(PlayStatus::kPlayStatusPause);
                                 self.update_state_position(new_position_ms);
                                 self.play_status = SpircPlayStatus::Paused {
                                     position_ms: new_position_ms,
@@ -632,7 +596,6 @@ impl SpircTask {
                             }
                             SpircPlayStatus::LoadingPlay { .. }
                             | SpircPlayStatus::LoadingPause { .. } => {
-                                self.state.set_status(PlayStatus::kPlayStatusPause);
                                 self.update_state_position(new_position_ms);
                                 self.play_status = SpircPlayStatus::Paused {
                                     position_ms: new_position_ms,
@@ -648,7 +611,6 @@ impl SpircTask {
                         match self.play_status {
                             SpircPlayStatus::Stopped => Ok(()),
                             _ => {
-                                self.state.set_status(PlayStatus::kPlayStatusStop);
                                 self.play_status = SpircPlayStatus::Stopped;
                                 self.notify().await
                             }
@@ -977,7 +939,6 @@ impl SpircTask {
                 preloading_of_next_track_triggered,
             } => {
                 self.player.play();
-                self.state.set_status(PlayStatus::kPlayStatusPlay);
                 self.update_state_position(position_ms);
                 self.play_status = SpircPlayStatus::Playing {
                     nominal_start_time: self.now_ms() - position_ms as i64,
@@ -1016,7 +977,6 @@ impl SpircTask {
                 preloading_of_next_track_triggered,
             } => {
                 self.player.pause();
-                self.state.set_status(PlayStatus::kPlayStatusPause);
                 let position_ms = (self.now_ms() - nominal_start_time) as u32;
                 self.update_state_position(position_ms);
                 self.play_status = SpircPlayStatus::Paused {
@@ -1053,18 +1013,6 @@ impl SpircTask {
                 ..
             } => *nominal_start_time = now - position_ms as i64,
         };
-    }
-
-    fn consume_queued_track(&mut self) -> usize {
-        // Removes current track if it is queued
-        // Returns the index of the next track
-        let current_index = self.state.playing_track_index() as usize;
-        if (current_index < self.state.track.len()) && self.state.track[current_index].queued() {
-            self.state.track.remove(current_index);
-            current_index
-        } else {
-            current_index + 1
-        }
     }
 
     fn preview_next_track(&mut self) -> Option<SpotifyId> {
@@ -1175,36 +1123,17 @@ impl SpircTask {
         // Under 3s it goes to the previous song (starts playing)
         // Over 3s it seeks to zero (retains previous play status)
         if self.position() < 3000 {
-            // Queued tracks always follow the currently playing track.
-            // They should not be considered when calculating the previous
-            // track so extract them beforehand and reinsert them after it.
-            let mut queue_tracks = Vec::new();
-            {
-                let queue_index = self.consume_queued_track();
-                let tracks = &mut self.state.track;
-                while queue_index < tracks.len() && tracks[queue_index].queued() {
-                    queue_tracks.push(tracks.remove(queue_index));
-                }
-            }
-            let current_index = self.state.playing_track_index();
-            let new_index = if current_index > 0 {
-                current_index - 1
-            } else if self.state.repeat() {
-                self.state.track.len() as u32 - 1
-            } else {
-                0
+            let new_track_index = match self.connect_state.move_to_prev_track() {
+                Ok(index) => Some(index),
+                Err(ConnectStateError::NoPrevTrack) => None,
+                Err(why) => return Err(why.into()),
             };
-            // Reinsert queued tracks after the new playing track.
-            let mut pos = (new_index + 1) as usize;
-            for track in queue_tracks {
-                self.state.track.insert(pos, track);
-                pos += 1;
+
+            if new_track_index.is_none() && self.connect_state.player.options.repeating_context {
+                self.connect_state.reset_playback_context()?
             }
 
-            self.state.set_playing_track_index(new_index);
-
-            let start_playing = self.state.status() == PlayStatus::kPlayStatusPlay;
-            self.load_track(start_playing, 0)
+            self.load_track(self.connect_state.player.is_playing, 0)
         } else {
             self.handle_seek(0);
             Ok(())
@@ -1262,16 +1191,7 @@ impl SpircTask {
     }
 
     async fn notify(&mut self) -> Result<(), Error> {
-        let status = self.state.status();
-
-        // When in loading state, the Spotify UI is disabled for interaction.
-        // On desktop this isn't so bad but on mobile it means that the bottom
-        // control disappears entirely. This is very confusing, so don't notify
-        // in this case.
-        if status == PlayStatus::kPlayStatusLoading {
-            return Ok(());
-        }
-
+        self.connect_state.set_status(&self.play_status);
         self.connect_state
             .update_state(&self.session, PutStateReason::PLAYER_STATE_CHANGED)
             .await
