@@ -15,14 +15,13 @@ use crate::{
         player::{Player, PlayerEvent, PlayerEventChannel},
     },
     protocol::{
-        explicit_content_pubsub::UserAttributesUpdate,
-        user_attributes::UserAttributesMutation,
+        explicit_content_pubsub::UserAttributesUpdate, user_attributes::UserAttributesMutation,
     },
 };
 use futures_util::{FutureExt, Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
-use librespot_core::dealer::protocol::RequestEndpoint;
-use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
+use librespot_core::dealer::protocol::RequestCommand;
+use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
 use librespot_protocol::player::{Context, TransferState};
 use protobuf::Message;
 use thiserror::Error;
@@ -83,6 +82,7 @@ struct SpircTask {
 
     connection_id_update: BoxedStream<Result<String, Error>>,
     connect_state_update: BoxedStream<Result<ClusterUpdate, Error>>,
+    connect_state_volume_update: BoxedStream<Result<SetVolumeCommand, Error>>,
     connect_state_command: BoxedStream<RequestReply>,
     user_attributes_update: BoxedStream<Result<UserAttributesUpdate, Error>>,
     user_attributes_mutation: BoxedStream<Result<UserAttributesMutation, Error>>,
@@ -150,6 +150,7 @@ impl Spirc {
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Spirc[{}]", spirc_id);
 
+        let initial_volume = config.initial_volume;
         let connect_state = ConnectState::new(config, &session);
 
         let connection_id_update = Box::pin(
@@ -169,8 +170,18 @@ impl Spirc {
             session
                 .dealer()
                 .listen_for("hm://connect-state/v1/cluster")?
-                .map(|response| -> Result<ClusterUpdate, Error> {
-                    ClusterUpdate::parse_from_bytes(&response.payload)
+                .map(|msg| -> Result<ClusterUpdate, Error> {
+                    ClusterUpdate::parse_from_bytes(&msg.payload)
+                        .map_err(Error::failed_precondition)
+                }),
+        );
+
+        let connect_state_volume_update = Box::pin(
+            session
+                .dealer()
+                .listen_for("hm://connect-state/v1/connect/volume")?
+                .map(|msg| {
+                    SetVolumeCommand::parse_from_bytes(&msg.payload)
                         .map_err(Error::failed_precondition)
                 }),
         );
@@ -182,6 +193,7 @@ impl Spirc {
                 .map(UnboundedReceiverStream::new)?,
         );
 
+        // todo: remove later? probably have to find the equivalent for the dealer
         let user_attributes_update = Box::pin(
             session
                 .mercury()
@@ -194,6 +206,7 @@ impl Spirc {
                 }),
         );
 
+        // todo: remove later? probably have to find the equivalent for the dealer
         let user_attributes_mutation = Box::pin(
             session
                 .mercury()
@@ -214,7 +227,7 @@ impl Spirc {
 
         let player_events = player.get_player_event_channel();
 
-        let task = SpircTask {
+        let mut task = SpircTask {
             player,
             mixer,
 
@@ -225,6 +238,7 @@ impl Spirc {
 
             connection_id_update,
             connect_state_update,
+            connect_state_volume_update,
             connect_state_command,
             user_attributes_update,
             user_attributes_mutation,
@@ -241,6 +255,7 @@ impl Spirc {
         };
 
         let spirc = Spirc { commands: cmd_tx };
+        task.set_volume(initial_volume as u16 - 1);
 
         Ok((spirc, task.run()))
     }
@@ -312,6 +327,18 @@ impl SpircTask {
                     }
                     None => {
                         error!("connect state update selected, but none received");
+                        break;
+                    }
+                },
+                volume_update = self.connect_state_volume_update.next() => match volume_update {
+                    Some(result) => match result {
+                        Ok(volume_update) => {
+                            self.set_volume(volume_update.volume as u16)
+                        },
+                        Err(e) => error!("could not parse set volume update request: {}", e),
+                    }
+                    None => {
+                        error!("volume update selected, but none received");
                         break;
                     }
                 },
@@ -436,8 +463,7 @@ impl SpircTask {
     async fn handle_command(&mut self, cmd: SpircCommand) -> Result<(), Error> {
         if matches!(cmd, SpircCommand::Shutdown) {
             trace!("Received SpircCommand::Shutdown");
-            todo!("signal shutdown to spotify");
-            self.handle_disconnect();
+            self.handle_disconnect().await?;
             self.shutdown = true;
             if let Some(rx) = self.commands.as_mut() {
                 rx.close()
@@ -475,7 +501,7 @@ impl SpircTask {
                     self.notify().await
                 }
                 SpircCommand::Disconnect => {
-                    self.handle_disconnect();
+                    self.handle_disconnect().await?;
                     self.notify().await
                 }
                 SpircCommand::Shuffle(shuffle) => {
@@ -746,25 +772,58 @@ impl SpircTask {
         self.connect_state.last_command = Some(request.clone());
 
         debug!(
-            "handling {:?} player command from {}",
-            request.command.endpoint, request.sent_by_device_id
+            "handling: '{}' from {}",
+            request.command, request.sent_by_device_id
         );
 
-        let response = match request.command.endpoint {
-            RequestEndpoint::Transfer if request.command.data.is_some() => {
-                self.handle_transfer(request.command.data.expect("by condition checked"))
+        let response = match request.command {
+            RequestCommand::Transfer(transfer) if transfer.data.is_some() => {
+                self.handle_transfer(transfer.data.expect("by condition checked"))
                     .await?;
                 self.notify().await?;
 
                 Reply::Success
             }
-            RequestEndpoint::Transfer => {
+            RequestCommand::Transfer(_) => {
                 warn!("transfer endpoint didn't contain any data to transfer");
                 Reply::Failure
             }
-            RequestEndpoint::Unknown(endpoint) => {
-                warn!("unhandled command! endpoint '{endpoint}'");
-                Reply::Unanswered
+            RequestCommand::Play(play) => {
+                self.handle_load(SpircLoadCommand {
+                    context_uri: play.context.uri,
+                    start_playing: true,
+                    playing_track_index: play.options.skip_to.track_index,
+                    shuffle: false,
+                    repeat: false,
+                    repeat_track: false,
+                })
+                .await?;
+                self.notify().await.map(|_| Reply::Success)?
+            }
+            RequestCommand::Pause(_) => {
+                self.handle_pause();
+                self.notify().await.map(|_| Reply::Success)?
+            }
+            RequestCommand::SeekTo(seek_to) => {
+                self.handle_seek(seek_to.position);
+                self.notify().await.map(|_| Reply::Success)?
+            }
+            RequestCommand::SkipNext(_) => {
+                self.handle_next()?;
+                self.notify().await.map(|_| Reply::Success)?
+            }
+            RequestCommand::SkipPrev(_) => {
+                self.handle_prev()?;
+                self.notify().await.map(|_| Reply::Success)?
+            }
+            RequestCommand::Resume(_) => {
+                self.handle_play();
+                self.notify().await.map(|_| Reply::Success)?
+            }
+            RequestCommand::Unknown(unknown) => {
+                warn!("unknown request command: {unknown}");
+                // we just don't handle the command, by that we don't lose our connect state
+                Reply::Success
             }
         };
 
@@ -865,12 +924,15 @@ impl SpircTask {
         Ok(())
     }
 
-    fn handle_disconnect(&mut self) {
+    async fn handle_disconnect(&mut self) -> Result<(), Error> {
         self.connect_state.set_active(false);
+        self.notify().await?;
         self.handle_stop();
 
         self.player
             .emit_session_disconnected_event(self.session.connection_id(), self.session.username());
+
+        Ok(())
     }
 
     fn handle_stop(&mut self) {
@@ -1016,7 +1078,7 @@ impl SpircTask {
     }
 
     fn preview_next_track(&mut self) -> Option<SpotifyId> {
-        let next = self.connect_state.player.next_tracks.iter().next()?;
+        let next = self.connect_state.player.next_tracks.first()?;
         SpotifyId::try_from(next).ok()
     }
 

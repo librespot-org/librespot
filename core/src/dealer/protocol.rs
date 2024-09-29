@@ -21,7 +21,7 @@ enum ProtocolError {
     Base64(DecodeError),
     #[error("gzip decoding failed: {0}")]
     GZip(IoError),
-    #[error("Deserialization failed: {0}")]
+    #[error("deserialization failed: {0}")]
     Deserialization(SerdeError),
 }
 
@@ -108,10 +108,10 @@ impl WebsocketRequest {
 
         let payload = handle_transfer_encoding(&self.headers, payload_bytes)?;
         let payload = String::from_utf8(payload)?;
-        debug!("request payload: {payload}");
 
-        let request = serde_json::from_str(&payload).map_err(ProtocolError::Deserialization)?;
-        Ok(request)
+        serde_json::from_str(&payload)
+            .map_err(ProtocolError::Deserialization)
+            .map_err(Into::into)
     }
 }
 
