@@ -25,6 +25,9 @@ pub const SPOTIFY_SEMANTIC_VERSION: &str = "1.2.31.1205.g4d59ad7c";
 /// The protocol version of the Spotify mobile app.
 pub const SPOTIFY_MOBILE_VERSION: &str = "8.6.84";
 
+/// The general spirc version
+pub const SPOTIFY_SPIRC_VERSION: &str = "3.2.6";
+
 /// The user agent to fall back to, if one could not be determined dynamically.
 pub const FALLBACK_USER_AGENT: &str = "Spotify/117300517 Linux/0 (librespot)";
 

@@ -1,3 +1,4 @@
+pub mod manager;
 mod maps;
 pub mod protocol;
 
@@ -29,8 +30,9 @@ use tungstenite::error::UrlError;
 use url::Url;
 
 use self::maps::*;
-use self::protocol::*;
-
+use crate::dealer::protocol::{
+    Message, MessageOrRequest, Request, WebsocketMessage, WebsocketRequest,
+};
 use crate::{
     socket,
     util::{keep_flushing, CancelOnDrop, TimeoutOnDrop},
@@ -48,11 +50,11 @@ const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
 
-pub struct Response {
+struct Response {
     pub success: bool,
 }
 
-pub struct Responder {
+struct Responder {
     key: String,
     tx: mpsc::UnboundedSender<WsMessage>,
     sent: bool,
@@ -101,7 +103,7 @@ impl Drop for Responder {
     }
 }
 
-pub trait IntoResponse {
+trait IntoResponse {
     fn respond(self, responder: Responder);
 }
 
@@ -132,7 +134,7 @@ where
     }
 }
 
-pub trait RequestHandler: Send + 'static {
+trait RequestHandler: Send + 'static {
     fn handle_request(&self, request: Request, responder: Responder);
 }
 
@@ -169,7 +171,7 @@ fn split_uri(s: &str) -> Option<impl Iterator<Item = &'_ str>> {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum AddHandlerError {
+enum AddHandlerError {
     #[error("There is already a handler for the given uri")]
     AlreadyHandled,
     #[error("The specified uri {0} is invalid")]
@@ -186,7 +188,7 @@ impl From<AddHandlerError> for Error {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum SubscriptionError {
+enum SubscriptionError {
     #[error("The specified uri is invalid")]
     InvalidUri(String),
 }
@@ -225,7 +227,7 @@ fn subscribe(
 }
 
 #[derive(Default)]
-pub struct Builder {
+struct Builder {
     message_handlers: SubscriberMap<MessageHandler>,
     request_handlers: HandlerMap<Box<dyn RequestHandler>>,
 }
@@ -303,15 +305,48 @@ struct DealerShared {
 }
 
 impl DealerShared {
-    fn dispatch_message(&self, msg: Message) {
+    fn dispatch_message(&self, msg: WebsocketMessage) {
+        let msg = match msg.handle_payload() {
+            Ok(data) => Message {
+                headers: msg.headers,
+                payload: data,
+                uri: msg.uri,
+            },
+            Err(why) => {
+                warn!("failure during data parsing for {}: {why}", msg.uri);
+                return;
+            }
+        };
+
         if let Some(split) = split_uri(&msg.uri) {
-            self.message_handlers
+            if self
+                .message_handlers
                 .lock()
-                .retain(split, &mut |tx| tx.send(msg.clone()).is_ok());
+                .retain(split, &mut |tx| tx.send(msg.clone()).is_ok())
+            {
+                return;
+            }
         }
+
+        warn!("No subscriber for msg.uri: {}", msg.uri);
     }
 
-    fn dispatch_request(&self, request: Request, send_tx: &mpsc::UnboundedSender<WsMessage>) {
+    fn dispatch_request(
+        &self,
+        request: WebsocketRequest,
+        send_tx: &mpsc::UnboundedSender<WsMessage>,
+    ) {
+        debug!("dealer request {}", &request.message_ident);
+
+        let payload_request = match request.handle_payload() {
+            Ok(payload) => payload,
+            Err(why) => {
+                warn!("request payload handling failed because of {why}");
+                return;
+            }
+        };
+        debug!("request command: {payload_request:?}");
+
         // ResponseSender will automatically send "success: false" if it is dropped without an answer.
         let responder = Responder::new(request.key.clone(), send_tx.clone());
 
@@ -325,13 +360,11 @@ impl DealerShared {
             return;
         };
 
-        {
-            let handler_map = self.request_handlers.lock();
+        let handler_map = self.request_handlers.lock();
 
-            if let Some(handler) = handler_map.get(split) {
-                handler.handle_request(request, responder);
-                return;
-            }
+        if let Some(handler) = handler_map.get(split) {
+            handler.handle_request(payload_request, responder);
+            return;
         }
 
         warn!("No handler for message_ident: {}", &request.message_ident);
@@ -355,7 +388,7 @@ impl DealerShared {
     }
 }
 
-pub struct Dealer {
+struct Dealer {
     shared: Arc<DealerShared>,
     handle: TimeoutOnDrop<()>,
 }
@@ -484,13 +517,13 @@ async fn connect(
                     Some(Ok(msg)) => match msg {
                         WsMessage::Text(t) => match serde_json::from_str(&t) {
                             Ok(m) => shared.dispatch(m, &send_tx),
-                            Err(e) => info!("Received invalid message: {}", e),
+                            Err(e) => warn!("Message couldn't be parsed: {e}. Message was {t}"),
                         },
                         WsMessage::Binary(_) => {
                             info!("Received invalid binary message");
                         }
                         WsMessage::Pong(_) => {
-                            debug!("Received pong");
+                            trace!("Received pong");
                             pong_received.store(true, atomic::Ordering::Relaxed);
                         }
                         _ => (), // tungstenite handles Close and Ping automatically
@@ -522,7 +555,7 @@ async fn connect(
                     break;
                 }
 
-                debug!("Sent ping");
+                trace!("Sent ping");
 
                 sleep(PING_TIMEOUT).await;
 

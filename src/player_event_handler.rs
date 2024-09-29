@@ -226,9 +226,10 @@ impl EventHandler {
                             env_vars.insert("PLAYER_EVENT", "shuffle_changed".to_string());
                             env_vars.insert("SHUFFLE", shuffle.to_string());
                         }
-                        PlayerEvent::RepeatChanged { repeat } => {
+                        PlayerEvent::RepeatChanged { context, track } => {
                             env_vars.insert("PLAYER_EVENT", "repeat_changed".to_string());
-                            env_vars.insert("REPEAT", repeat.to_string());
+                            env_vars.insert("REPEAT", context.to_string());
+                            env_vars.insert("REPEAT_TRACK", track.to_string());
                         }
                         PlayerEvent::AutoPlayChanged { auto_play } => {
                             env_vars.insert("PLAYER_EVENT", "auto_play_changed".to_string());
