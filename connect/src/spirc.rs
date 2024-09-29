@@ -6,13 +6,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::state::{ConnectState, ConnectStateConfig};
+use crate::state::{ConnectState, ConnectStateConfig, ConnectStateError};
 use crate::{
     context::PageContext,
-    core::{
-        authentication::Credentials, session::UserAttributes, Error,
-        Session, SpotifyId,
-    },
+    core::{authentication::Credentials, session::UserAttributes, Error, Session, SpotifyId},
     playback::{
         mixer::Mixer,
         player::{Player, PlayerEvent, PlayerEventChannel},
@@ -27,7 +24,7 @@ use futures_util::{FutureExt, Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
 use librespot_core::dealer::protocol::RequestEndpoint;
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason};
-use librespot_protocol::player::{Context, ContextPage, ProvidedTrack, TransferState};
+use librespot_protocol::player::{Context, TransferState};
 use protobuf::Message;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -99,7 +96,6 @@ struct SpircTask {
     session: Session,
     resolve_context: Option<String>,
     autoplay_context: bool,
-    context: Option<ContextPage>,
 
     spirc_id: usize,
 }
@@ -155,7 +151,6 @@ impl From<SpircLoadCommand> for State {
     }
 }
 
-const CONTEXT_TRACKS_HISTORY: usize = 10;
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
 
 const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
@@ -276,7 +271,6 @@ impl Spirc {
 
             resolve_context: None,
             autoplay_context: false,
-            context: None,
 
             spirc_id,
         };
@@ -429,7 +423,7 @@ impl SpircTask {
 
                     match context {
                         Ok(value) => {
-                            self.context = match serde_json::from_slice::<PageContext>(&value) {
+                            let context = match serde_json::from_slice::<PageContext>(&value) {
                                 Ok(context) => {
                                     info!(
                                         "Resolved {:?} tracks from <{:?}>",
@@ -443,6 +437,7 @@ impl SpircTask {
                                     None
                                 }
                             };
+                            self.connect_state.update_context(context)
                         },
                         Err(err) => {
                             error!("ContextError: {:?}", err)
@@ -535,7 +530,7 @@ impl SpircTask {
                     self.notify().await
                 }
                 SpircCommand::Load(command) => {
-                    self.handle_load(&command.into()).await?;
+                    self.handle_load(command).await?;
                     self.notify().await
                 }
                 _ => Ok(()),
@@ -818,7 +813,7 @@ impl SpircTask {
         if let Some(session) = transfer.current_session.as_mut() {
             if let Some(ctx) = session.context.as_mut() {
                 self.resolve_context(ctx).await?;
-                self.context = ctx.pages.pop();
+                self.connect_state.update_context(ctx.pages.pop())
             }
         }
 
@@ -851,7 +846,7 @@ impl SpircTask {
                 .insert(key.clone(), value.clone());
         }
 
-        if let Some(context) = &self.context {
+        if let Some((context, _)) = &state.context {
             for (key, value) in &context.metadata {
                 state
                     .player
@@ -948,24 +943,26 @@ impl SpircTask {
             .emit_repeat_changed_event(options.repeating_context, options.repeating_track);
     }
 
-    async fn handle_load(&mut self, state: &State) -> Result<(), Error> {
+    async fn handle_load(&mut self, cmd: SpircLoadCommand) -> Result<(), Error> {
         if !self.connect_state.active {
             self.handle_activate();
         }
 
-        let context_uri = state.context_uri().to_owned();
+        let mut ctx = Context {
+            uri: cmd.context_uri,
+            ..Default::default()
+        };
 
-        // completely ignore local playback.
-        if context_uri.starts_with("spotify:local-files") {
-            self.notify().await?;
-            return Err(SpircError::UnsupportedLocalPlayBack.into());
-        }
+        self.resolve_context(&mut ctx).await?;
+        self.connect_state.update_context(ctx.pages.pop());
+        self.connect_state.reset_playback_context()?;
 
-        self.update_tracks(state);
+        self.connect_state.set_shuffle(cmd.shuffle);
+        self.connect_state.set_repeat_context(cmd.repeat);
+        self.connect_state.set_repeat_track(cmd.repeat_track);
 
-        if !self.state.track.is_empty() {
-            let start_playing = state.status() == PlayStatus::kPlayStatusPlay;
-            self.load_track(start_playing, state.position_ms())?;
+        if !self.connect_state.player.next_tracks.is_empty() {
+            self.load_track(self.connect_state.player.is_playing, 0)?;
         } else {
             info!("No more tracks left in queue");
             self.handle_stop();
@@ -1100,72 +1097,74 @@ impl SpircTask {
 
     // Mark unavailable tracks so we can skip them later
     fn handle_unavailable(&mut self, track_id: SpotifyId) {
-        let unavailables = self.get_track_index_for_spotify_id(&track_id, 0);
-        for &index in unavailables.iter() {
-            let mut unplayable_track_ref = TrackRef::new();
-            unplayable_track_ref.set_gid(self.state.track[index].gid().to_vec());
-            // Misuse context field to flag the track
-            unplayable_track_ref.set_context(String::from("NonPlayable"));
-            std::mem::swap(&mut self.state.track[index], &mut unplayable_track_ref);
-            debug!(
-                "Marked <{:?}> at {:?} as NonPlayable",
-                self.state.track[index], index,
-            );
-        }
+        self.connect_state.mark_all_as_unavailable(track_id);
         self.handle_preload_next_track();
     }
 
     fn handle_next(&mut self) -> Result<(), Error> {
-        let context_uri = self.state.context_uri().to_owned();
-        let mut tracks_len = self.state.track.len() as u32;
-        let mut new_index = self.consume_queued_track() as u32;
-        let mut continue_playing = self.state.status() == PlayStatus::kPlayStatusPlay;
+        let context_uri = self.connect_state.player.context_uri.to_owned();
+        let mut continue_playing = self.connect_state.player.is_playing;
+
+        let new_track_index = match self.connect_state.move_to_next_track() {
+            Ok(index) => Some(index),
+            Err(ConnectStateError::NoNextTrack) => None,
+            Err(why) => return Err(why.into()),
+        };
+
+        let (ctx, ctx_index) = self
+            .connect_state
+            .context
+            .as_ref()
+            .ok_or(ConnectStateError::NoContext)?;
+        let context_length = ctx.tracks.len() as u32;
+        let context_index = ctx_index.track;
 
         let update_tracks =
-            self.autoplay_context && tracks_len - new_index < CONTEXT_FETCH_THRESHOLD;
+            self.autoplay_context && context_length - context_index < CONTEXT_FETCH_THRESHOLD;
 
         debug!(
-            "At track {:?} of {:?} <{:?}> update [{}]",
-            new_index + 1,
-            tracks_len,
+            "At context track {:?} of {:?} <{:?}> update [{}]",
+            context_index + 1,
+            context_length,
             context_uri,
             update_tracks,
         );
 
         // When in autoplay, keep topping up the playlist when it nears the end
         if update_tracks {
-            if let Some(ref context) = self.context {
-                self.resolve_context = Some(context.next_page_url.to_owned());
-                self.update_tracks_from_context();
-                tracks_len = self.state.track.len() as u32;
+            if let Some((ctx, _)) = self.connect_state.context.as_ref() {
+                self.resolve_context = Some(ctx.next_page_url.to_owned());
             }
+            todo!("update tracks from context: preloading");
         }
 
         // When not in autoplay, either start autoplay or loop back to the start
-        if new_index >= tracks_len {
+        if matches!(new_track_index, Some(i) if i >= context_length) || new_track_index.is_none() {
             // for some contexts there is no autoplay, such as shows and episodes
             // in such cases there is no context in librespot.
-            if self.context.is_some() && self.session.autoplay() {
+            if self.connect_state.context.is_some() && self.session.autoplay() {
                 // Extend the playlist
                 debug!("Starting autoplay for <{}>", context_uri);
                 // force reloading the current context with an autoplay context
                 self.autoplay_context = true;
-                self.resolve_context = Some(self.state.context_uri().to_owned());
-                self.update_tracks_from_context();
+                self.resolve_context = Some(context_uri);
+                todo!("update tracks from context: autoplay");
                 self.player.set_auto_normalise_as_album(false);
             } else {
-                new_index = 0;
-                continue_playing &= self.state.repeat();
-                debug!("Looping back to start, repeat is {}", continue_playing);
+                self.connect_state.reset_playback_context()?;
+                continue_playing &= self.connect_state.player.options.repeating_context;
+                debug!(
+                    "Looping back to start, repeating_context is {}",
+                    continue_playing
+                );
             }
         }
 
-        if tracks_len > 0 {
-            self.state.set_playing_track_index(new_index);
+        if context_length > 0 {
             self.load_track(continue_playing, 0)
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
-            self.state.set_playing_track_index(0);
+            self.connect_state.reset_playback_context()?;
             self.handle_stop();
             Ok(())
         }
@@ -1237,96 +1236,6 @@ impl SpircTask {
                 nominal_start_time, ..
             } => (self.now_ms() - nominal_start_time) as u32,
         }
-    }
-
-    fn update_tracks_from_context(&mut self) {
-        if let Some(ref context) = self.context {
-            let new_tracks = &context.tracks;
-
-            debug!(
-                "Adding {:?} tracks from context to next_tracks",
-                new_tracks.len()
-            );
-
-            let mut track_vec = self.connect_state.player.next_tracks.clone();
-            if let Some(head) = track_vec.len().checked_sub(CONTEXT_TRACKS_HISTORY) {
-                track_vec.drain(0..head);
-            }
-
-            let new_tracks = new_tracks
-                .iter()
-                .map(|track| ProvidedTrack {
-                    uri: track.uri.clone(),
-                    uid: track.uid.clone(),
-                    metadata: track.metadata.clone(),
-                    // todo: correct provider
-                    provider: "autoplay".to_string(),
-                    ..Default::default()
-                })
-                .collect::<Vec<_>>();
-
-            track_vec.extend_from_slice(&new_tracks);
-            self.connect_state.player.next_tracks = track_vec;
-
-            // Update playing index
-            if let Some(new_index) = self
-                .connect_state
-                .player
-                .index
-                .track
-                .checked_sub(CONTEXT_TRACKS_HISTORY as u32)
-            {
-                self.connect_state.set_playing_track_index(new_index);
-            }
-        } else {
-            warn!("No context to update from!");
-        }
-    }
-
-    fn update_tracks(&mut self, state: &State) {
-        trace!("State: {:#?}", state);
-
-        let index = state.playing_track_index();
-        let context_uri = state.context_uri();
-        let tracks = &state.track;
-
-        trace!("Frame has {:?} tracks", tracks.len());
-
-        // First the tracks from the requested context, without autoplay.
-        // We will transition into autoplay after the latest track of this context.
-        self.autoplay_context = false;
-        self.resolve_context = Some(context_uri.to_owned());
-
-        self.player
-            .set_auto_normalise_as_album(context_uri.starts_with("spotify:album:"));
-
-        self.state.set_playing_track_index(index);
-        self.state.track = tracks.to_vec();
-        self.state.set_context_uri(context_uri.to_owned());
-        // has_shuffle/repeat seem to always be true in these replace msgs,
-        // but to replicate the behaviour of the Android client we have to
-        // ignore false values.
-        if state.repeat() {
-            self.state.set_repeat(true);
-        }
-        if state.shuffle() {
-            self.state.set_shuffle(true);
-        }
-    }
-
-    // Helper to find corresponding index(s) for track_id
-    fn get_track_index_for_spotify_id(
-        &self,
-        track_id: &SpotifyId,
-        start_index: usize,
-    ) -> Vec<usize> {
-        let index: Vec<usize> = self.state.track[start_index..]
-            .iter()
-            .enumerate()
-            .filter(|&(_, track_ref)| track_ref.gid() == track_id.to_raw())
-            .map(|(idx, _)| start_index + idx)
-            .collect();
-        index
     }
 
     fn load_track(&mut self, start_playing: bool, position_ms: u32) -> Result<(), Error> {
