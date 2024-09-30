@@ -21,7 +21,6 @@ path = "../metadata"
 version = "0.5.0-dev"
 
 [dependencies]
-byteorder = "1"
 futures-util = "0.3"
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
@@ -40,7 +39,6 @@ sdl2            = { version = "0.37", optional = true }
 gstreamer       = { version = "0.22.1", optional = true }
 gstreamer-app   = { version = "0.22.0", optional = true }
 gstreamer-audio = { version = "0.22.0", optional = true }
-glib            = { version = "0.19.2", optional = true }
 
 # Rodio dependencies
 rodio           = { version = "0.19.0", optional = true, default-features = false }
@@ -64,6 +62,6 @@ jackaudio-backend = ["jack"]
 rodio-backend = ["rodio", "cpal"]
 rodiojack-backend = ["rodio", "cpal/jack"]
 sdl-backend = ["sdl2"]
-gstreamer-backend = ["gstreamer", "gstreamer-app", "gstreamer-audio", "glib"]
+gstreamer-backend = ["gstreamer", "gstreamer-app", "gstreamer-audio"]
 
 passthrough-decoder = ["ogg"]
