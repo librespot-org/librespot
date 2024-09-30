@@ -375,6 +375,7 @@ impl Session {
 
         match packet_type {
             Some(Ping) => {
+                info!("Received Ping");
                 let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
                 let timestamp = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
@@ -388,7 +389,23 @@ impl Session {
                 }
 
                 self.debug_info();
-                self.send_packet(Pong, vec![0, 0, 0, 0])
+                let session = self.weak();
+                tokio::spawn(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                    if let Some(session) = session.try_upgrade() {
+                        info!("Sending Pong");
+                        let _ = session.send_packet(Pong, vec![0, 0, 0, 0]);
+                    }
+
+                    // TODO: Wait for PongAck. Then, wait for next ping and use
+                    // both events in the session timeout detection.
+                });
+
+                Ok(())
+            }
+            Some(PongAck) => {
+                info!("Received PongAck");
+                Ok(())
             }
             Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned())?;
@@ -439,8 +456,7 @@ impl Session {
                 self.0.data.write().user_data.attributes = user_attributes;
                 Ok(())
             }
-            Some(PongAck)
-            | Some(SecretBlock)
+            Some(SecretBlock)
             | Some(LegacyWelcome)
             | Some(UnknownDataAllZeros)
             | Some(LicenseVersion) => Ok(()),
