@@ -12,14 +12,17 @@ use std::{
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
-use futures_util::{future, ready, StreamExt, TryStreamExt};
+use futures_util::{StreamExt, TryStreamExt};
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use quick_xml::events::Event;
 use thiserror::Error;
-use tokio::{sync::mpsc, time::Instant};
+use tokio::{
+    sync::mpsc,
+    time::{sleep, Duration as TokioDuration, Instant as TokioInstant, Sleep},
+};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
@@ -82,7 +85,6 @@ struct SessionData {
     time_delta: i64,
     invalid: bool,
     user_data: UserData,
-    last_ping: Option<Instant>,
 }
 
 struct SessionInternal {
@@ -240,6 +242,9 @@ impl Session {
             }
         }
 
+        // This channel serves as a buffer for packets and serializes them,
+        // such that `self.send_packet` can return immediately and needs no
+        // additional synchronization.
         let (tx_connection, rx_connection) = mpsc::unbounded_channel();
         self.0
             .tx_connection
@@ -250,16 +255,19 @@ impl Session {
         let sender_task = UnboundedReceiverStream::new(rx_connection)
             .map(Ok)
             .forward(sink);
-        let receiver_task = DispatchTask::new(self.weak(), stream);
-        let timeout_task = Session::session_timeout(self.weak());
-
+        let session_weak = self.weak();
         tokio::spawn(async move {
-            let result = future::try_join3(sender_task, receiver_task, timeout_task).await;
-
-            if let Err(e) = result {
+            if let Err(e) = sender_task.await {
                 error!("{}", e);
+                if let Some(session) = session_weak.try_upgrade() {
+                    if !session.is_invalid() {
+                        session.shutdown();
+                    }
+                }
             }
         });
+
+        tokio::spawn(DispatchTask::new(self.weak(), stream));
 
         Ok(())
     }
@@ -300,33 +308,6 @@ impl Session {
         self.0
             .token_provider
             .get_or_init(|| TokenProvider::new(self.weak()))
-    }
-
-    /// Returns an error, when we haven't received a ping for too long (2 minutes),
-    /// which means that we silently lost connection to Spotify servers.
-    async fn session_timeout(session: SessionWeak) -> io::Result<()> {
-        // pings are sent every 2 minutes and a 5 second margin should be fine
-        const SESSION_TIMEOUT: Duration = Duration::from_secs(125);
-
-        while let Some(session) = session.try_upgrade() {
-            if session.is_invalid() {
-                break;
-            }
-            let last_ping = session.0.data.read().last_ping.unwrap_or_else(Instant::now);
-            if last_ping.elapsed() >= SESSION_TIMEOUT {
-                session.shutdown();
-                // TODO: Optionally reconnect (with cached/last credentials?)
-                return Err(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "session lost connection to server",
-                ));
-            }
-            // drop the strong reference before sleeping
-            drop(session);
-            // a potential timeout cannot occur at least until SESSION_TIMEOUT after the last_ping
-            tokio::time::sleep_until(last_ping + SESSION_TIMEOUT).await;
-        }
-        Ok(())
     }
 
     pub fn time_delta(&self) -> i64 {
@@ -524,23 +505,61 @@ impl Drop for SessionInternal {
     }
 }
 
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
+enum KeepAliveState {
+    #[default]
+    // Expecting a Ping from the server, either after startup or after a PongAck.
+    ExpectingPing,
+
+    // We need to send a Pong at the given time.
+    PendingPong,
+
+    // We just sent a Pong and wait for it be ACK'd.
+    ExpectingPongAck,
+}
+
+const INITIAL_PING_TIMEOUT: TokioDuration = TokioDuration::from_secs(5);
+const PING_TIMEOUT: TokioDuration = TokioDuration::from_secs(65);
+const PONG_DELAY: TokioDuration = TokioDuration::from_secs(60);
+const PONG_ACK_TIMEOUT: TokioDuration = TokioDuration::from_secs(5);
+
+impl KeepAliveState {
+    fn debug(&self, sleep: &Sleep) {
+        let delay = sleep
+            .deadline()
+            .checked_duration_since(TokioInstant::now())
+            .map(|t| t.as_secs_f64())
+            .unwrap_or(f64::INFINITY);
+
+        trace!("keep-alive state: {:?}, timeout in {:.1}", self, delay);
+    }
+}
+
 struct DispatchTask<S>
 where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin
+    S: TryStream<Ok = (u8, Bytes)> + Unpin,
 {
+    session: SessionWeak,
+    keep_alive_state: KeepAliveState,
     stream: S,
-    session: SessionWeak
+    timeout: Pin<Box<Sleep>>,
 }
 
 impl<S> DispatchTask<S>
 where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin
+    S: TryStream<Ok = (u8, Bytes)> + Unpin,
 {
     fn new(session: SessionWeak, stream: S) -> Self {
-        Self { stream, session }
+        Self {
+            session,
+            keep_alive_state: KeepAliveState::ExpectingPing,
+            stream,
+            timeout: Box::pin(sleep(INITIAL_PING_TIMEOUT)),
+        }
     }
 
-    fn dispatch(&self, session: &Session, cmd: u8, data: Bytes) -> Result<(), Error> {
+    fn dispatch(&mut self, session: &Session, cmd: u8, data: Bytes) -> Result<(), Error> {
+        use KeepAliveState::*;
         use PacketType::*;
 
         let packet_type = FromPrimitive::from_u8(cmd);
@@ -554,20 +573,42 @@ where
 
         match packet_type {
             Some(Ping) => {
+                trace!("Received Ping");
+                if self.keep_alive_state != ExpectingPing {
+                    warn!("Received unexpected Ping from server")
+                }
+                self.keep_alive_state = PendingPong;
+                self.timeout
+                    .as_mut()
+                    .reset(TokioInstant::now() + PONG_DELAY);
+                self.keep_alive_state.debug(&self.timeout);
+
                 let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
                 let timestamp = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap_or(Duration::ZERO)
                     .as_secs() as i64;
-
                 {
                     let mut data = session.0.data.write();
                     data.time_delta = server_timestamp.saturating_sub(timestamp);
-                    data.last_ping = Some(Instant::now());
                 }
 
                 session.debug_info();
-                session.send_packet(Pong, vec![0, 0, 0, 0])
+
+                Ok(())
+            }
+            Some(PongAck) => {
+                trace!("Received PongAck");
+                if self.keep_alive_state != ExpectingPongAck {
+                    warn!("Received unexpected PongAck from server")
+                }
+                self.keep_alive_state = ExpectingPing;
+                self.timeout
+                    .as_mut()
+                    .reset(TokioInstant::now() + PING_TIMEOUT);
+                self.keep_alive_state.debug(&self.timeout);
+
+                Ok(())
             }
             Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned())?;
@@ -618,8 +659,7 @@ where
                 session.0.data.write().user_data.attributes = user_attributes;
                 Ok(())
             }
-            Some(PongAck)
-            | Some(SecretBlock)
+            Some(SecretBlock)
             | Some(LegacyWelcome)
             | Some(UnknownDataAllZeros)
             | Some(LicenseVersion) => Ok(()),
@@ -633,36 +673,83 @@ where
 
 impl<S> Future for DispatchTask<S>
 where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin,
+    S: TryStream<Ok = (u8, Bytes), Error = std::io::Error> + Unpin,
     <S as TryStream>::Ok: std::fmt::Debug,
 {
     type Output = Result<(), S::Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        use KeepAliveState::*;
+
         let session = match self.session.try_upgrade() {
             Some(session) => session,
             None => return Poll::Ready(Ok(())),
         };
 
+        // Process all messages that are immediately ready
         loop {
-            let (cmd, data) = match ready!(self.stream.try_poll_next_unpin(cx)) {
-                Some(Ok(t)) => t,
-                None => {
+            match self.stream.try_poll_next_unpin(cx) {
+                Poll::Ready(Some(Ok((cmd, data)))) => {
+                    let result = self.dispatch(&session, cmd, data);
+                    if let Err(e) = result {
+                        debug!("could not dispatch command: {}", e);
+                    }
+                }
+                Poll::Ready(None) => {
                     warn!("Connection to server closed.");
                     session.shutdown();
                     return Poll::Ready(Ok(()));
                 }
-                Some(Err(e)) => {
+                Poll::Ready(Some(Err(e))) => {
                     error!("Connection to server closed.");
                     session.shutdown();
                     return Poll::Ready(Err(e));
                 }
-            };
-
-            if let Err(e) = self.dispatch(&session, cmd, data) {
-                debug!("could not dispatch command: {}", e);
+                Poll::Pending => break,
             }
         }
+
+        // Handle the keee-alive sequence, returning an error when we haven't received a
+        // Ping/PongAck for too long.
+        //
+        // The expected keepalive sequence is
+        // - Server: Ping
+        // - wait 60s
+        // - Client: Pong
+        // - Server: PongAck
+        // - wait 60s
+        // - repeat
+        //
+        // This means that we silently lost connection to Spotify servers if
+        // - we don't receive a Ping 60s after the last PongAck, or
+        // - we don't receive a PongAck immediately after our Pong.
+        //
+        // Currently, we add a safety margin of 5s to these expected deadlines.
+        if let Poll::Ready(()) = self.timeout.as_mut().poll(cx) {
+            match self.keep_alive_state {
+                ExpectingPing | ExpectingPongAck => {
+                    if !session.is_invalid() {
+                        session.shutdown();
+                    }
+                    // TODO: Optionally reconnect (with cached/last credentials?)
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "session lost connection to server",
+                    )));
+                }
+                PendingPong => {
+                    trace!("Sending Pong");
+                    let _ = session.send_packet(PacketType::Pong, vec![0, 0, 0, 0]);
+                    self.keep_alive_state = ExpectingPongAck;
+                    self.timeout
+                        .as_mut()
+                        .reset(TokioInstant::now() + PONG_ACK_TIMEOUT);
+                    self.keep_alive_state.debug(&self.timeout);
+                }
+            }
+        }
+
+        Poll::Pending
     }
 }
 
