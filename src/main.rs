@@ -40,6 +40,11 @@ use librespot::playback::mixer::alsamixer::AlsaMixer;
 mod player_event_handler;
 use player_event_handler::{run_program_on_sink_events, EventHandler};
 
+#[cfg(feature = "with-mpris")]
+mod mpris_event_handler;
+#[cfg(feature = "with-mpris")]
+use mpris_event_handler::MprisEventHandler;
+
 fn device_id(name: &str) -> String {
     HEXLOWER.encode(&Sha1::digest(name.as_bytes()))
 }
@@ -1937,6 +1942,14 @@ async fn main() {
         }
     }
 
+    #[cfg(feature = "with-mpris")]
+    let mpris = MprisEventHandler::spawn(player.clone())
+        .await
+        .unwrap_or_else(|e| {
+            error!("could not initialize MPRIS: {}", e);
+            exit(1);
+        });
+
     loop {
         tokio::select! {
             credentials = async {
@@ -1990,6 +2003,10 @@ async fn main() {
                         exit(1);
                     }
                 };
+
+                #[cfg(feature = "with-mpris")]
+                mpris.set_spirc(spirc_.clone());
+
                 spirc = Some(spirc_);
                 spirc_task = Some(Box::pin(spirc_task_));
 
@@ -2034,6 +2051,9 @@ async fn main() {
     info!("Gracefully shutting down");
 
     let mut shutdown_tasks = tokio::task::JoinSet::new();
+
+    #[cfg(feature = "with-mpris")]
+    shutdown_tasks.spawn(mpris.quit_and_join());
 
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {

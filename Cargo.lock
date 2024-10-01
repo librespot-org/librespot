@@ -1911,8 +1911,11 @@ dependencies = [
  "sha1",
  "sysinfo",
  "thiserror",
+ "time",
  "tokio",
  "url",
+ "zbus",
+ "zvariant",
 ]
 
 [[package]]
