@@ -1753,7 +1753,6 @@ dependencies = [
  "byteorder",
  "bytes",
  "data-encoding",
- "dns-sd",
  "form_urlencoded",
  "futures-core",
  "futures-util",
