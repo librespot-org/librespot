@@ -75,7 +75,7 @@ rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
-with-dns-sd = ["librespot-core/with-dns-sd", "librespot-discovery/with-dns-sd"]
+with-dns-sd = ["librespot-discovery/with-dns-sd"]
 
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 

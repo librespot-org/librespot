@@ -39,4 +39,4 @@ hex = "0.4"
 tokio = { version = "1", features = ["macros", "parking_lot", "rt"] }
 
 [features]
-with-dns-sd = ["dns-sd", "librespot-core/with-dns-sd"]
+with-dns-sd = ["dns-sd"]

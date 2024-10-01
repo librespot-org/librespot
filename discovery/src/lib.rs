@@ -11,7 +11,7 @@ mod server;
 
 use std::{
     borrow::Cow,
-    io,
+    error::Error as StdError,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -55,12 +55,16 @@ pub struct Builder {
 pub enum DiscoveryError {
     #[error("Creating SHA1 block cipher failed")]
     AesError(#[from] aes::cipher::InvalidLength),
+
     #[error("Setting up dns-sd failed: {0}")]
-    DnsSdError(#[from] io::Error),
+    DnsSdError(#[source] Box<dyn StdError + Send + Sync>),
+
     #[error("Creating SHA1 HMAC failed for base key {0:?}")]
     HmacError(Vec<u8>),
+
     #[error("Setting up the HTTP server failed: {0}")]
     HttpServerError(#[from] hyper::Error),
+
     #[error("Missing params for key {0}")]
     ParamsError(&'static str),
 }
@@ -144,7 +148,8 @@ impl Builder {
                 None,
                 port,
                 &["VERSION=1.0", "CPath=/"],
-            )?;
+            )
+            .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?;
         }
 
         #[cfg(not(feature = "with-dns-sd"))]
