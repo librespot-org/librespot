@@ -361,96 +361,6 @@ impl Session {
         }
     }
 
-    fn dispatch(&self, cmd: u8, data: Bytes) -> Result<(), Error> {
-        use PacketType::*;
-
-        let packet_type = FromPrimitive::from_u8(cmd);
-        let cmd = match packet_type {
-            Some(cmd) => cmd,
-            None => {
-                trace!("Ignoring unknown packet {:x}", cmd);
-                return Err(SessionError::Packet(cmd).into());
-            }
-        };
-
-        match packet_type {
-            Some(Ping) => {
-                let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
-                let timestamp = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or(Duration::ZERO)
-                    .as_secs() as i64;
-
-                {
-                    let mut data = self.0.data.write();
-                    data.time_delta = server_timestamp.saturating_sub(timestamp);
-                    data.last_ping = Some(Instant::now());
-                }
-
-                self.debug_info();
-                self.send_packet(Pong, vec![0, 0, 0, 0])
-            }
-            Some(CountryCode) => {
-                let country = String::from_utf8(data.as_ref().to_owned())?;
-                info!("Country: {:?}", country);
-                self.0.data.write().user_data.country = country;
-                Ok(())
-            }
-            Some(StreamChunkRes) | Some(ChannelError) => self.channel().dispatch(cmd, data),
-            Some(AesKey) | Some(AesKeyError) => self.audio_key().dispatch(cmd, data),
-            Some(MercuryReq) | Some(MercurySub) | Some(MercuryUnsub) | Some(MercuryEvent) => {
-                self.mercury().dispatch(cmd, data)
-            }
-            Some(ProductInfo) => {
-                let data = std::str::from_utf8(&data)?;
-                let mut reader = quick_xml::Reader::from_str(data);
-
-                let mut buf = Vec::new();
-                let mut current_element = String::new();
-                let mut user_attributes: UserAttributes = HashMap::new();
-
-                loop {
-                    match reader.read_event_into(&mut buf) {
-                        Ok(Event::Start(ref element)) => {
-                            std::str::from_utf8(element)?.clone_into(&mut current_element)
-                        }
-                        Ok(Event::End(_)) => {
-                            current_element = String::new();
-                        }
-                        Ok(Event::Text(ref value)) => {
-                            if !current_element.is_empty() {
-                                let _ = user_attributes
-                                    .insert(current_element.clone(), value.unescape()?.to_string());
-                            }
-                        }
-                        Ok(Event::Eof) => break,
-                        Ok(_) => (),
-                        Err(e) => warn!(
-                            "Error parsing XML at position {}: {:?}",
-                            reader.buffer_position(),
-                            e
-                        ),
-                    }
-                }
-
-                trace!("Received product info: {:#?}", user_attributes);
-                Self::check_catalogue(&user_attributes);
-
-                self.0.data.write().user_data.attributes = user_attributes;
-                Ok(())
-            }
-            Some(PongAck)
-            | Some(SecretBlock)
-            | Some(LegacyWelcome)
-            | Some(UnknownDataAllZeros)
-            | Some(LicenseVersion) => Ok(()),
-            _ => {
-                trace!("Ignoring {:?} packet with data {:#?}", cmd, data);
-                Err(SessionError::Packet(cmd as u8).into())
-            }
-        }
-    }
-
     pub fn send_packet(&self, cmd: PacketType, data: Vec<u8>) -> Result<(), Error> {
         match self.0.tx_connection.get() {
             Some(tx) => Ok(tx.send((cmd as u8, data))?),
@@ -618,6 +528,101 @@ struct DispatchTask<S>(S, SessionWeak)
 where
     S: TryStream<Ok = (u8, Bytes)> + Unpin;
 
+impl<S> DispatchTask<S>
+where
+    S: TryStream<Ok = (u8, Bytes)> + Unpin
+{
+    fn dispatch(&self, session: &Session, cmd: u8, data: Bytes) -> Result<(), Error> {
+        use PacketType::*;
+
+        let packet_type = FromPrimitive::from_u8(cmd);
+        let cmd = match packet_type {
+            Some(cmd) => cmd,
+            None => {
+                trace!("Ignoring unknown packet {:x}", cmd);
+                return Err(SessionError::Packet(cmd).into());
+            }
+        };
+
+        match packet_type {
+            Some(Ping) => {
+                let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
+                let timestamp = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or(Duration::ZERO)
+                    .as_secs() as i64;
+
+                {
+                    let mut data = session.0.data.write();
+                    data.time_delta = server_timestamp.saturating_sub(timestamp);
+                    data.last_ping = Some(Instant::now());
+                }
+
+                session.debug_info();
+                session.send_packet(Pong, vec![0, 0, 0, 0])
+            }
+            Some(CountryCode) => {
+                let country = String::from_utf8(data.as_ref().to_owned())?;
+                info!("Country: {:?}", country);
+                session.0.data.write().user_data.country = country;
+                Ok(())
+            }
+            Some(StreamChunkRes) | Some(ChannelError) => session.channel().dispatch(cmd, data),
+            Some(AesKey) | Some(AesKeyError) => session.audio_key().dispatch(cmd, data),
+            Some(MercuryReq) | Some(MercurySub) | Some(MercuryUnsub) | Some(MercuryEvent) => {
+                session.mercury().dispatch(cmd, data)
+            }
+            Some(ProductInfo) => {
+                let data = std::str::from_utf8(&data)?;
+                let mut reader = quick_xml::Reader::from_str(data);
+
+                let mut buf = Vec::new();
+                let mut current_element = String::new();
+                let mut user_attributes: UserAttributes = HashMap::new();
+
+                loop {
+                    match reader.read_event_into(&mut buf) {
+                        Ok(Event::Start(ref element)) => {
+                            std::str::from_utf8(element)?.clone_into(&mut current_element)
+                        }
+                        Ok(Event::End(_)) => {
+                            current_element = String::new();
+                        }
+                        Ok(Event::Text(ref value)) => {
+                            if !current_element.is_empty() {
+                                let _ = user_attributes
+                                    .insert(current_element.clone(), value.unescape()?.to_string());
+                            }
+                        }
+                        Ok(Event::Eof) => break,
+                        Ok(_) => (),
+                        Err(e) => warn!(
+                            "Error parsing XML at position {}: {:?}",
+                            reader.buffer_position(),
+                            e
+                        ),
+                    }
+                }
+
+                trace!("Received product info: {:#?}", user_attributes);
+                Session::check_catalogue(&user_attributes);
+
+                session.0.data.write().user_data.attributes = user_attributes;
+                Ok(())
+            }
+            Some(PongAck)
+            | Some(SecretBlock)
+            | Some(LegacyWelcome)
+            | Some(UnknownDataAllZeros)
+            | Some(LicenseVersion) => Ok(()),
+            _ => {
+                trace!("Ignoring {:?} packet with data {:#?}", cmd, data);
+                Err(SessionError::Packet(cmd as u8).into())
+            }
+        }
+    }
+}
+
 impl<S> Future for DispatchTask<S>
 where
     S: TryStream<Ok = (u8, Bytes)> + Unpin,
@@ -646,7 +651,7 @@ where
                 }
             };
 
-            if let Err(e) = session.dispatch(cmd, data) {
+            if let Err(e) = self.dispatch(&session, cmd, data) {
                 debug!("could not dispatch command: {}", e);
             }
         }
