@@ -250,7 +250,7 @@ impl Session {
         let sender_task = UnboundedReceiverStream::new(rx_connection)
             .map(Ok)
             .forward(sink);
-        let receiver_task = DispatchTask(stream, self.weak());
+        let receiver_task = DispatchTask::new(self.weak(), stream);
         let timeout_task = Session::session_timeout(self.weak());
 
         tokio::spawn(async move {
@@ -524,14 +524,22 @@ impl Drop for SessionInternal {
     }
 }
 
-struct DispatchTask<S>(S, SessionWeak)
+struct DispatchTask<S>
 where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin;
+    S: TryStream<Ok = (u8, Bytes)> + Unpin
+{
+    stream: S,
+    session: SessionWeak
+}
 
 impl<S> DispatchTask<S>
 where
     S: TryStream<Ok = (u8, Bytes)> + Unpin
 {
+    fn new(session: SessionWeak, stream: S) -> Self {
+        Self { stream, session }
+    }
+
     fn dispatch(&self, session: &Session, cmd: u8, data: Bytes) -> Result<(), Error> {
         use PacketType::*;
 
@@ -631,13 +639,13 @@ where
     type Output = Result<(), S::Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let session = match self.1.try_upgrade() {
+        let session = match self.session.try_upgrade() {
             Some(session) => session,
             None => return Poll::Ready(Ok(())),
         };
 
         loop {
-            let (cmd, data) = match ready!(self.0.try_poll_next_unpin(cx)) {
+            let (cmd, data) = match ready!(self.stream.try_poll_next_unpin(cx)) {
                 Some(Ok(t)) => t,
                 None => {
                     warn!("Connection to server closed.");
