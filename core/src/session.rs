@@ -305,7 +305,6 @@ impl Session {
             .map(Ok)
             .forward(sink);
         let receiver_task = DispatchTask(stream, self.weak());
-        let keep_alive_task = Session::keep_alive_task(self)?;
 
         // Expect an initial Ping from the server.
         self.0
@@ -313,6 +312,8 @@ impl Session {
             .send_replace(KeepAliveState::ExpectingPing(
                 TokioInstant::now() + TokioDuration::from_secs(5),
             ));
+        let keep_alive_task =
+            Session::keep_alive_task(self.weak(), self.0.keep_alive_state.clone());
 
         tokio::spawn(async move {
             let result = future::try_join3(sender_task, receiver_task, keep_alive_task).await;
@@ -378,34 +379,30 @@ impl Session {
     /// - we don't receive a PongAck immediately after our Pong.
     ///
     /// Currently, we add a safety margin of 5s to these expected deadlines.
-    fn keep_alive_task(
-        session: &Session,
-    ) -> Result<impl Future<Output = Result<(), io::Error>>, Error> {
+    async fn keep_alive_task(
+        session: SessionWeak,
+        state_tx: watch::Sender<KeepAliveState>,
+    ) -> Result<(), io::Error> {
         use KeepAliveState::*;
 
-        let state_tx = session.0.keep_alive_state.clone();
         let state_rx = state_tx.subscribe();
         let mut state_stream = tokio_stream::wrappers::WatchStream::new(state_rx);
-
         let mut timeout_at = None;
 
-        let session = session.weak();
-        Ok(async move {
-            loop {
-                tokio::select! {
-                    // Handle keepalive events received via Mercury.
-                    state = state_stream.next() => {
-                        if let Some(state) = state {
-                            debug!("Keepalive state: {:?}", state);
-                        }
+        loop {
+            tokio::select! {
+                // Handle keepalive events received via Mercury.
+                state = state_stream.next() => {
+                    if let Some(state) = state {
+                        debug!("Keepalive state: {:?}", state);
                         match state {
-                            Some(Idle) => {
+                            Idle => {
                                 timeout_at = None;
                             }
-                            Some(ExpectingPing(t) | ExpectingPongAck(t)) => {
+                            ExpectingPing(t) | ExpectingPongAck(t) => {
                                 timeout_at = Some(t);
                             }
-                            Some(PendingPong(pong_at)) => {
+                            PendingPong(pong_at) => {
                                 timeout_at = None;
                                 sleep_until(pong_at).await;
                                 {
@@ -416,37 +413,36 @@ impl Session {
                                             ExpectingPongAck(TokioInstant::now() + TokioDuration::from_secs(5))
                                         );
                                     } else {
-                                        break;
+                                        return Ok(());
                                     }
                                 }
                             }
-                            None => break,
+                        }
+                    } else {
+                        return Ok(());
+                    }
+                }
+
+                // Watch for timeouts.
+                _ = async {
+                    if let Some(timeout_at) = timeout_at {
+                        sleep_until(timeout_at).await
+                    }
+                }, if timeout_at.is_some() => {
+                    if let Some(session) = session.try_upgrade() {
+                        if !session.is_invalid() {
+                            session.shutdown();
                         }
                     }
 
-                    // Watch for timeouts.
-                    _ = async {
-                        if let Some(timeout_at) = timeout_at {
-                            sleep_until(timeout_at).await
-                        }
-                    }, if timeout_at.is_some() => {
-                        if let Some(session) = session.try_upgrade() {
-                            if !session.is_invalid() {
-                                session.shutdown();
-                            }
-                        }
-
-                        // TODO: Optionally reconnect (with cached/last credentials?)
-                        return Err(io::Error::new(
+                    // TODO: Optionally reconnect (with cached/last credentials?)
+                    return Err(io::Error::new(
                             io::ErrorKind::TimedOut,
                             "session lost connection to server",
-                        ));
-                    }
-                };
-            }
-
-            Ok(())
-        })
+                    ));
+                }
+            };
+        }
     }
 
     pub fn time_delta(&self) -> i64 {
