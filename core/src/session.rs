@@ -12,11 +12,12 @@ use std::{
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::StreamExt;
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
+use pin_project_lite::pin_project;
 use quick_xml::events::Event;
 use thiserror::Error;
 use tokio::{
@@ -242,9 +243,8 @@ impl Session {
             }
         }
 
-        // This channel serves as a buffer for packets and serializes them,
-        // such that `self.send_packet` can return immediately and needs no
-        // additional synchronization.
+        // This channel serves as a buffer for packets and serializes access to the TcpStream, such
+        // that `self.send_packet` can return immediately and needs no additional synchronization.
         let (tx_connection, rx_connection) = mpsc::unbounded_channel();
         self.0
             .tx_connection
@@ -535,30 +535,48 @@ impl KeepAliveState {
     }
 }
 
-struct DispatchTask<S>
-where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin,
-{
-    session: SessionWeak,
-    keep_alive_state: KeepAliveState,
-    stream: S,
-    timeout: Pin<Box<Sleep>>,
+pin_project! {
+    struct DispatchTask<S>
+    where
+        S: TryStream<Ok = (u8, Bytes)>
+    {
+        session: SessionWeak,
+        keep_alive_state: KeepAliveState,
+        #[pin]
+        stream: S,
+        #[pin]
+        timeout: Sleep,
+    }
+
+    impl<S> PinnedDrop for DispatchTask<S>
+    where
+        S: TryStream<Ok = (u8, Bytes)>
+    {
+        fn drop(_this: Pin<&mut Self>) {
+            debug!("drop Dispatch");
+        }
+    }
 }
 
 impl<S> DispatchTask<S>
 where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin,
+    S: TryStream<Ok = (u8, Bytes)>,
 {
     fn new(session: SessionWeak, stream: S) -> Self {
         Self {
             session,
             keep_alive_state: KeepAliveState::ExpectingPing,
             stream,
-            timeout: Box::pin(sleep(INITIAL_PING_TIMEOUT)),
+            timeout: sleep(INITIAL_PING_TIMEOUT),
         }
     }
 
-    fn dispatch(&mut self, session: &Session, cmd: u8, data: Bytes) -> Result<(), Error> {
+    fn dispatch(
+        mut self: Pin<&mut Self>,
+        session: &Session,
+        cmd: u8,
+        data: Bytes,
+    ) -> Result<(), Error> {
         use KeepAliveState::*;
         use PacketType::*;
 
@@ -577,11 +595,12 @@ where
                 if self.keep_alive_state != ExpectingPing {
                     warn!("Received unexpected Ping from server")
                 }
-                self.keep_alive_state = PendingPong;
-                self.timeout
+                let mut this = self.as_mut().project();
+                *this.keep_alive_state = PendingPong;
+                this.timeout
                     .as_mut()
                     .reset(TokioInstant::now() + PONG_DELAY);
-                self.keep_alive_state.debug(&self.timeout);
+                this.keep_alive_state.debug(&this.timeout);
 
                 let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
                 let timestamp = SystemTime::now()
@@ -602,11 +621,12 @@ where
                 if self.keep_alive_state != ExpectingPongAck {
                     warn!("Received unexpected PongAck from server")
                 }
-                self.keep_alive_state = ExpectingPing;
-                self.timeout
+                let mut this = self.as_mut().project();
+                *this.keep_alive_state = ExpectingPing;
+                this.timeout
                     .as_mut()
                     .reset(TokioInstant::now() + PING_TIMEOUT);
-                self.keep_alive_state.debug(&self.timeout);
+                this.keep_alive_state.debug(&this.timeout);
 
                 Ok(())
             }
@@ -673,7 +693,7 @@ where
 
 impl<S> Future for DispatchTask<S>
 where
-    S: TryStream<Ok = (u8, Bytes), Error = std::io::Error> + Unpin,
+    S: TryStream<Ok = (u8, Bytes), Error = std::io::Error>,
     <S as TryStream>::Ok: std::fmt::Debug,
 {
     type Output = Result<(), S::Error>;
@@ -688,9 +708,9 @@ where
 
         // Process all messages that are immediately ready
         loop {
-            match self.stream.try_poll_next_unpin(cx) {
+            match self.as_mut().project().stream.try_poll_next(cx) {
                 Poll::Ready(Some(Ok((cmd, data)))) => {
-                    let result = self.dispatch(&session, cmd, data);
+                    let result = self.as_mut().dispatch(&session, cmd, data);
                     if let Err(e) = result {
                         debug!("could not dispatch command: {}", e);
                     }
@@ -725,8 +745,9 @@ where
         // - we don't receive a PongAck immediately after our Pong.
         //
         // Currently, we add a safety margin of 5s to these expected deadlines.
-        if let Poll::Ready(()) = self.timeout.as_mut().poll(cx) {
-            match self.keep_alive_state {
+        let mut this = self.as_mut().project();
+        if let Poll::Ready(()) = this.timeout.as_mut().poll(cx) {
+            match this.keep_alive_state {
                 ExpectingPing | ExpectingPongAck => {
                     if !session.is_invalid() {
                         session.shutdown();
@@ -740,24 +761,15 @@ where
                 PendingPong => {
                     trace!("Sending Pong");
                     let _ = session.send_packet(PacketType::Pong, vec![0, 0, 0, 0]);
-                    self.keep_alive_state = ExpectingPongAck;
-                    self.timeout
+                    *this.keep_alive_state = ExpectingPongAck;
+                    this.timeout
                         .as_mut()
                         .reset(TokioInstant::now() + PONG_ACK_TIMEOUT);
-                    self.keep_alive_state.debug(&self.timeout);
+                    this.keep_alive_state.debug(&this.timeout);
                 }
             }
         }
 
         Poll::Pending
-    }
-}
-
-impl<S> Drop for DispatchTask<S>
-where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin,
-{
-    fn drop(&mut self) {
-        debug!("drop Dispatch");
     }
 }
