@@ -1,11 +1,10 @@
-use crate::dealer::protocol::JsonValue;
 use librespot_protocol::player::{
     Context, ContextPlayerOptionOverrides, PlayOrigin, TransferState,
 };
 use serde::Deserialize;
 use std::fmt::{Display, Formatter};
 
-use super::{deserialize_base64_proto, deserialize_json_proto};
+use super::*;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Request {
@@ -20,6 +19,7 @@ pub struct Request {
 #[serde(tag = "endpoint", rename_all = "snake_case")]
 pub enum RequestCommand {
     Transfer(TransferCommand),
+    #[serde(deserialize_with = "boxed")]
     Play(Box<PlayCommand>),
     Pause(PauseCommand),
     SeekTo(SeekToCommand),
@@ -112,8 +112,8 @@ pub struct TransferOptions {
 #[derive(Clone, Debug, Deserialize)]
 pub struct PlayOptions {
     pub skip_to: SkipTo,
-    #[serde(deserialize_with = "deserialize_json_proto")]
-    pub player_option_overrides: ContextPlayerOptionOverrides,
+    #[serde(default, deserialize_with = "deserialize_option_json_proto")]
+    pub player_option_overrides: Option<ContextPlayerOptionOverrides>,
     pub license: String,
 }
 
@@ -130,4 +130,5 @@ pub struct LoggingParams {
     pub device_identifier: Option<String>,
     pub command_initiated_time: Option<i64>,
     pub page_instance_ids: Option<Vec<String>>,
+    pub command_id: Option<String>,
 }

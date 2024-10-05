@@ -160,7 +160,7 @@ where
 {
     use serde::de::Error;
 
-    let v: String = serde::Deserialize::deserialize(de)?;
+    let v: String = Deserialize::deserialize(de)?;
     let bytes = BASE64_STANDARD
         .decode(v)
         .map_err(|e| Error::custom(e.to_string()))?;
@@ -175,10 +175,36 @@ where
 {
     use serde::de::Error;
 
-    let v: serde_json::Value = serde::Deserialize::deserialize(de)?;
+    let v: serde_json::Value = Deserialize::deserialize(de)?;
     protobuf_json_mapping::parse_from_str(&v.to_string()).map_err(|why| {
         warn!("deserialize_json_proto: {v}");
         error!("deserialize_json_proto: {why}");
         Error::custom(why)
     })
+}
+
+fn deserialize_option_json_proto<'de, T, D>(de: D) -> Result<Option<T>, D::Error>
+where
+    T: MessageFull,
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let v: serde_json::Value = Deserialize::deserialize(de)?;
+    protobuf_json_mapping::parse_from_str(&v.to_string())
+        .map(Some)
+        .map_err(|why| {
+            warn!("deserialize_json_proto: {v}");
+            error!("deserialize_json_proto: {why}");
+            Error::custom(why)
+        })
+}
+
+fn boxed<'de, T, D>(de: D) -> Result<Box<T>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    let v: T = Deserialize::deserialize(de)?;
+    Ok(Box::new(v))
 }
