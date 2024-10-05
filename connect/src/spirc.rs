@@ -338,9 +338,7 @@ impl SpircTask {
                 },
                 volume_update = self.connect_state_volume_update.next() => match volume_update {
                     Some(result) => match result {
-                        Ok(volume_update) => {
-                            self.set_volume(volume_update.volume as u16);
-                        },
+                        Ok(volume_update) => self.handle_set_volume(volume_update).await,
                         Err(e) => error!("could not parse set volume update request: {}", e),
                     }
                     None => {
@@ -784,6 +782,19 @@ impl SpircTask {
         }
 
         Ok(())
+    }
+
+    async fn handle_set_volume(&mut self, set_volume_command: SetVolumeCommand) {
+
+        let volume_difference = set_volume_command.volume - self.connect_state.device.volume as i32;
+        if volume_difference < self.connect_state.device.capabilities.volume_steps {
+            return;
+        }
+
+        self.set_volume(set_volume_command.volume as u16);
+        if let Err(why) = self.notify().await {
+            error!("couldn't notify after updating the volume: {why}")
+        }
     }
 
     async fn handle_connect_state_command(
