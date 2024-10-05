@@ -1,12 +1,11 @@
 use crate::dealer::protocol::JsonValue;
-use base64::prelude::BASE64_STANDARD;
-use base64::Engine;
 use librespot_protocol::player::{
     Context, ContextPlayerOptionOverrides, PlayOrigin, TransferState,
 };
-use protobuf::MessageFull;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use std::fmt::{Display, Formatter};
+
+use super::{deserialize_base64_proto, deserialize_json_proto};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Request {
@@ -21,7 +20,7 @@ pub struct Request {
 #[serde(tag = "endpoint", rename_all = "snake_case")]
 pub enum RequestCommand {
     Transfer(TransferCommand),
-    Play(PlayCommand),
+    Play(Box<PlayCommand>),
     Pause(PauseCommand),
     SeekTo(SeekToCommand),
     SetShufflingContext(SetShufflingCommand),
@@ -75,6 +74,7 @@ pub struct PlayCommand {
     #[serde(deserialize_with = "deserialize_json_proto")]
     pub play_origin: PlayOrigin,
     pub options: PlayOptions,
+    pub logging_params: LoggingParams,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -130,30 +130,4 @@ pub struct LoggingParams {
     pub device_identifier: Option<String>,
     pub command_initiated_time: Option<i64>,
     pub page_instance_ids: Option<Vec<String>>,
-}
-
-fn deserialize_base64_proto<'de, T, D>(de: D) -> Result<Option<T>, D::Error>
-where
-    T: MessageFull,
-    D: Deserializer<'de>,
-{
-    use serde::de::Error;
-
-    let v: String = serde::Deserialize::deserialize(de)?;
-    let bytes = BASE64_STANDARD
-        .decode(v)
-        .map_err(|e| Error::custom(e.to_string()))?;
-
-    T::parse_from_bytes(&bytes).map(Some).map_err(Error::custom)
-}
-
-fn deserialize_json_proto<'de, T, D>(de: D) -> Result<T, D::Error>
-where
-    T: MessageFull,
-    D: Deserializer<'de>,
-{
-    use serde::de::Error;
-
-    let v: serde_json::Value = serde::Deserialize::deserialize(de)?;
-    protobuf_json_mapping::parse_from_str(&v.to_string()).map_err(Error::custom)
 }

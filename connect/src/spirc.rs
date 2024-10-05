@@ -20,7 +20,7 @@ use crate::{
 };
 use futures_util::{FutureExt, Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
-use librespot_core::dealer::protocol::RequestCommand;
+use librespot_core::dealer::protocol::{PayloadValue, RequestCommand};
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
 use librespot_protocol::player::{Context, TransferState};
 use protobuf::Message;
@@ -32,6 +32,8 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 pub enum SpircError {
     #[error("response payload empty")]
     NoData,
+    #[error("received unexpected data {0:#?}")]
+    UnexpectedData(PayloadValue),
     #[error("playback of local files is not supported")]
     UnsupportedLocalPlayBack,
     #[error("message addressed at another ident: {0}")]
@@ -44,7 +46,7 @@ impl From<SpircError> for Error {
     fn from(err: SpircError) -> Self {
         use SpircError::*;
         match err {
-            NoData | UnsupportedLocalPlayBack => Error::unavailable(err),
+            NoData | UnsupportedLocalPlayBack | UnexpectedData(_) => Error::unavailable(err),
             Ident(_) | InvalidUri(_) => Error::aborted(err),
         }
     }
@@ -171,8 +173,11 @@ impl Spirc {
                 .dealer()
                 .listen_for("hm://connect-state/v1/cluster")?
                 .map(|msg| -> Result<ClusterUpdate, Error> {
-                    ClusterUpdate::parse_from_bytes(&msg.payload)
-                        .map_err(Error::failed_precondition)
+                    match msg.payload {
+                        PayloadValue::Raw(bytes) => ClusterUpdate::parse_from_bytes(&bytes)
+                            .map_err(Error::failed_precondition),
+                        other => Err(SpircError::UnexpectedData(other).into()),
+                    }
                 }),
         );
 
@@ -180,9 +185,10 @@ impl Spirc {
             session
                 .dealer()
                 .listen_for("hm://connect-state/v1/connect/volume")?
-                .map(|msg| {
-                    SetVolumeCommand::parse_from_bytes(&msg.payload)
-                        .map_err(Error::failed_precondition)
+                .map(|msg| match msg.payload {
+                    PayloadValue::Raw(bytes) => SetVolumeCommand::parse_from_bytes(&bytes)
+                        .map_err(Error::failed_precondition),
+                    other => Err(SpircError::UnexpectedData(other).into()),
                 }),
         );
 

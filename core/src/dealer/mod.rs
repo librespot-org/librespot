@@ -305,11 +305,11 @@ struct DealerShared {
 }
 
 impl DealerShared {
-    fn dispatch_message(&self, msg: WebsocketMessage) {
+    fn dispatch_message(&self, mut msg: WebsocketMessage) {
         let msg = match msg.handle_payload() {
-            Ok(data) => Message {
+            Ok(value) => Message {
                 headers: msg.headers,
-                payload: data,
+                payload: value,
                 uri: msg.uri,
             },
             Err(why) => {
