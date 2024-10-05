@@ -319,7 +319,7 @@ impl SpircTask {
                 cluster_update = self.connect_state_update.next() => match cluster_update {
                     Some(result) => match result {
                         Ok(cluster_update) => {
-                            if let Err(e) = self.handle_cluster_update(cluster_update) {
+                            if let Err(e) = self.handle_cluster_update(cluster_update).await {
                                 error!("could not dispatch connect state update: {}", e);
                             }
                         },
@@ -743,7 +743,10 @@ impl SpircTask {
         }
     }
 
-    fn handle_cluster_update(&mut self, mut cluster_update: ClusterUpdate) -> Result<(), Error> {
+    async fn handle_cluster_update(
+        &mut self,
+        mut cluster_update: ClusterUpdate,
+    ) -> Result<(), Error> {
         let reason = cluster_update.update_reason.enum_value_or_default();
 
         let device_ids = cluster_update.devices_that_changed.join(", ");
@@ -756,9 +759,21 @@ impl SpircTask {
 
         let state = &mut self.connect_state;
 
-        if let Some(cluster) = cluster_update.cluster.as_mut() {
+        if let Some(mut cluster) = cluster_update.cluster.take() {
             if let Some(player_state) = cluster.player_state.take() {
                 state.player = player_state;
+            }
+
+            let became_inactive =
+                self.connect_state.active && cluster.active_device_id != self.session.device_id();
+            if became_inactive {
+                info!("device became inactive");
+                self.handle_stop();
+                self.connect_state.reset();
+                let _ = self
+                    .connect_state
+                    .update_state(&self.session, PutStateReason::BECAME_INACTIVE)
+                    .await?;
             }
         }
 

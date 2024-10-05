@@ -538,6 +538,16 @@ impl SpClient {
             .await
     }
 
+    pub async fn put_connect_state_inactive(&self, notify: bool) -> SpClientResult {
+        let endpoint = format!("/connect-state/v1/devices/{}/inactive?notify={notify}", self.session().device_id());
+
+        let mut headers = HeaderMap::new();
+        headers.insert(CONNECTION_ID, self.session().connection_id().parse()?);
+
+        self.request(&Method::PUT, &endpoint, Some(headers), None)
+            .await
+    }
+
     pub async fn get_metadata(&self, scope: &str, id: &SpotifyId) -> SpClientResult {
         let endpoint = format!("/metadata/4/{}/{}", scope, id.to_base16()?);
         self.request(&Method::GET, &endpoint, None, None).await

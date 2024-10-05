@@ -154,19 +154,6 @@ impl ConnectState {
         state
     }
 
-    fn reset(&mut self) {
-        self.active = false;
-        self.active_since = None;
-        self.player = PlayerState {
-            is_system_initiated: true,
-            playback_speed: 1.,
-            play_origin: MessageField::some(PlayOrigin::new()),
-            suppressions: MessageField::some(Suppressions::new()),
-            options: MessageField::some(ContextPlayerOptions::new()),
-            ..Default::default()
-        }
-    }
-
     // todo: is there maybe a better way to calculate the hash?
     fn new_queue_revision(&self) -> String {
         let mut hasher = DefaultHasher::new();
@@ -177,6 +164,19 @@ impl ConnectState {
         }
 
         hasher.finish().to_string()
+    }
+
+    pub fn reset(&mut self) {
+        self.active = false;
+        self.active_since = None;
+        self.player = PlayerState {
+            is_system_initiated: true,
+            playback_speed: 1.,
+            play_origin: MessageField::some(PlayOrigin::new()),
+            suppressions: MessageField::some(Suppressions::new()),
+            options: MessageField::some(ContextPlayerOptions::new()),
+            ..Default::default()
+        }
     }
 
     pub fn set_active(&mut self, value: bool) {
@@ -437,7 +437,7 @@ impl ConnectState {
 
     pub async fn update_state(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
         if matches!(reason, PutStateReason::BECAME_INACTIVE) {
-            todo!("handle became inactive")
+            return session.spclient().put_connect_state_inactive(false).await;
         }
 
         let now = SystemTime::now();
