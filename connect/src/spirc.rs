@@ -1534,7 +1534,7 @@ struct CommandSender<'a> {
 }
 
 impl<'a> CommandSender<'a> {
-    fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender<'_> {
+    fn new(spirc: &'a mut SpircTask, cmd: MessageType) -> CommandSender<'a> {
         let mut frame = protocol::spirc::Frame::new();
         // frame version
         frame.set_version(1);
@@ -1549,7 +1549,7 @@ impl<'a> CommandSender<'a> {
         CommandSender { spirc, frame }
     }
 
-    fn recipient(mut self, recipient: &'a str) -> CommandSender<'_> {
+    fn recipient(mut self, recipient: &'a str) -> CommandSender<'a> {
         self.frame.recipient.push(recipient.to_owned());
         self
     }
