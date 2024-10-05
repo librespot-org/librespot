@@ -333,7 +333,7 @@ impl SpircTask {
                 volume_update = self.connect_state_volume_update.next() => match volume_update {
                     Some(result) => match result {
                         Ok(volume_update) => {
-                            self.set_volume(volume_update.volume as u16)
+                            self.set_volume(volume_update.volume as u16);
                         },
                         Err(e) => error!("could not parse set volume update request: {}", e),
                     }
@@ -505,7 +505,7 @@ impl SpircTask {
                     self.notify().await
                 }
                 SpircCommand::Shuffle(shuffle) => {
-                    self.connect_state.set_shuffle(shuffle);
+                    self.connect_state.set_shuffle(shuffle)?;
                     self.notify().await
                 }
                 SpircCommand::Repeat(repeat) => {
@@ -808,6 +808,10 @@ impl SpircTask {
                 self.handle_seek(seek_to.position);
                 self.notify().await.map(|_| Reply::Success)?
             }
+            RequestCommand::SetShufflingContext(shuffle) => {
+                self.connect_state.set_shuffle(shuffle.value)?;
+                self.notify().await.map(|_| Reply::Success)?
+            }
             RequestCommand::SkipNext(_) => {
                 self.handle_next()?;
                 self.notify().await.map(|_| Reply::Success)?
@@ -888,6 +892,10 @@ impl SpircTask {
             let time_since_position_update = timestamp - state.player.timestamp;
             state.player.position_as_of_timestamp + time_since_position_update
         };
+
+        if self.connect_state.player.options.shuffling_context {
+            self.connect_state.set_shuffle(true)?;
+        }
 
         self.load_track(self.connect_state.player.is_playing, position.try_into()?)
     }
@@ -979,9 +987,10 @@ impl SpircTask {
 
         self.resolve_context(&mut ctx).await?;
         self.connect_state.update_context(ctx.pages.pop());
-        self.connect_state.reset_playback_context()?;
+        self.connect_state
+            .reset_playback_context(Some(cmd.playing_track_index as usize))?;
 
-        self.connect_state.set_shuffle(cmd.shuffle);
+        self.connect_state.set_shuffle(cmd.shuffle)?;
         self.connect_state.set_repeat_context(cmd.repeat);
         self.connect_state.set_repeat_track(cmd.repeat_track);
 
@@ -1161,7 +1170,12 @@ impl SpircTask {
                 todo!("update tracks from context: autoplay");
                 self.player.set_auto_normalise_as_album(false);
             } else {
-                self.connect_state.reset_playback_context()?;
+                if self.connect_state.player.options.shuffling_context {
+                    self.connect_state.shuffle()?
+                } else {
+                    self.connect_state.reset_playback_context(None)?;
+                }
+
                 continue_playing &= self.connect_state.player.options.repeating_context;
                 debug!(
                     "Looping back to start, repeating_context is {}",
@@ -1174,7 +1188,7 @@ impl SpircTask {
             self.load_track(continue_playing, 0)
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
-            self.connect_state.reset_playback_context()?;
+            self.connect_state.reset_playback_context(None)?;
             self.handle_stop();
             Ok(())
         }
@@ -1192,7 +1206,7 @@ impl SpircTask {
             };
 
             if new_track_index.is_none() && self.connect_state.player.options.repeating_context {
-                self.connect_state.reset_playback_context()?
+                self.connect_state.reset_playback_context(None)?
             }
 
             self.load_track(self.connect_state.player.is_playing, 0)

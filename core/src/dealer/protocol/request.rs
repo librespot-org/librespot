@@ -24,6 +24,7 @@ pub enum RequestCommand {
     Play(PlayCommand),
     Pause(PauseCommand),
     SeekTo(SeekToCommand),
+    SetShufflingContext(SetShufflingCommand),
     // commands that don't send any context
     SkipNext(GenericCommand),
     SkipPrev(GenericCommand),
@@ -43,6 +44,7 @@ impl Display for RequestCommand {
                 RequestCommand::Play(_) => "play",
                 RequestCommand::Pause(_) => "pause",
                 RequestCommand::SeekTo(_) => "seek_to",
+                RequestCommand::SetShufflingContext(_) => "set_shuffling_context",
                 RequestCommand::SkipNext(_) => "skip_next",
                 RequestCommand::SkipPrev(_) => "skip_prev",
                 RequestCommand::Resume(_) => "resume",
@@ -85,6 +87,12 @@ pub struct PauseCommand {
 pub struct SeekToCommand {
     pub value: u32,
     pub position: u32,
+    pub logging_params: LoggingParams,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SetShufflingCommand {
+    pub value: bool,
     pub logging_params: LoggingParams,
 }
 

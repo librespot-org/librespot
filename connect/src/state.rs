@@ -14,6 +14,7 @@ use librespot_protocol::player::{
     ProvidedTrack, Suppressions,
 };
 use protobuf::{EnumOrUnknown, Message, MessageField};
+use rand::prelude::SliceRandom;
 use thiserror::Error;
 
 // these limitations are essential, otherwise to many tracks will overload the web-player
@@ -39,6 +40,8 @@ pub enum ConnectStateError {
     NoContext,
     #[error("not the first context page")]
     NotFirstContextPage,
+    #[error("could not find the new track")]
+    CanNotFindTrackInContext,
 }
 
 impl From<ConnectStateError> for Error {
@@ -91,6 +94,8 @@ pub struct ConnectState {
     // the context from which we play, is used to top up prev and next tracks
     // the index is used to keep track which tracks are already loaded into next tracks
     pub context: Option<(ContextPage, ContextIndex)>,
+    // a context to keep track of our shuffled context, should be only available when option.shuffling_context is true
+    pub shuffle_context: Option<(ContextPage, ContextIndex)>,
 
     pub last_command: Option<Request>,
 }
@@ -126,7 +131,7 @@ impl ConnectState {
                     supports_command_request: true,
                     supports_gzip_pushes: true,
 
-                    // todo: not handled yet
+                    // todo: not handled yet, repeat missing
                     supports_set_options_command: true,
 
                     is_voice_enabled: false,
@@ -200,17 +205,50 @@ impl ConnectState {
         }
     }
 
-    pub fn set_shuffle(&mut self, shuffle: bool) {
+    pub fn set_shuffle(&mut self, shuffle: bool) -> Result<(), Error> {
         if let Some(options) = self.player.options.as_mut() {
             options.shuffling_context = shuffle;
         }
+
+        if !shuffle {
+            self.shuffle_context = None;
+
+            let (ctx, _) = self.context.as_mut().ok_or(ConnectStateError::NoContext)?;
+            let new_index = Self::find_index_in_context(ctx, &self.player.track.uri)?;
+
+            self.reset_playback_context(Some(new_index))?;
+            return Ok(());
+        }
+
+        self.shuffle()
     }
 
-    pub fn set_playing_track_index(&mut self, new_index: u32) {
-        if let Some(index) = self.player.index.as_mut() {
-            index.track = new_index;
+    pub fn shuffle(&mut self) -> Result<(), Error> {
+        let (ctx, _) = self.context.as_mut().ok_or(ConnectStateError::NoContext)?;
+
+        self.player.prev_tracks.clear();
+
+        // respect queued track and don't throw them out of our next played tracks
+        let first_non_queued_track = self
+            .player
+            .next_tracks
+            .iter()
+            .enumerate()
+            .find(|(_, track)| track.provider != QUEUE_PROVIDER);
+        if let Some((non_queued_track, _)) = first_non_queued_track {
+            while self.player.next_tracks.pop().is_some()
+                && self.player.next_tracks.len() > non_queued_track
+            {}
         }
-        todo!("remove later")
+
+        let mut shuffle_context = ctx.clone();
+        let mut rng = rand::thread_rng();
+        shuffle_context.tracks.shuffle(&mut rng);
+
+        self.shuffle_context = Some((shuffle_context, ContextIndex::new()));
+        self.fill_up_next_tracks_from_current_context()?;
+
+        Ok(())
     }
 
     pub(crate) fn set_status(&mut self, status: &SpircPlayStatus) {
@@ -266,32 +304,29 @@ impl ConnectState {
         }
 
         let new_track = self.player.next_tracks.remove(0);
-
-        let (ctx, ctx_index) = match self.context.as_mut() {
-            None => todo!("handle no context available"),
-            Some(ctx) => ctx,
-        };
-
-        ctx_index.track = Self::top_up_list(
-            &mut self.player.next_tracks,
-            (&ctx.tracks, &ctx_index.track),
-            SPOTIFY_MAX_NEXT_TRACKS_SIZE,
-            false,
-        ) as u32;
+        self.fill_up_next_tracks_from_current_context()?;
 
         let is_queued_track = new_track.provider == QUEUE_PROVIDER;
-        self.player.track = MessageField::some(new_track);
-
         if is_queued_track {
             // the index isn't send when we are a queued track, but we have to preserve it for later
             self.player_index = self.player.index.take();
             self.player.index = MessageField::none()
         } else if let Some(index) = self.player.index.as_mut() {
-            index.track += 1;
+            if self.player.options.shuffling_context {
+                let (ctx, _) = self.context.as_ref().ok_or(ConnectStateError::NoContext)?;
+                let new_index = Self::find_index_in_context(ctx, &new_track.uri);
+                match new_index {
+                    Err(why) => {
+                        error!("didn't find the shuffled track in the current context: {why}")
+                    }
+                    Ok(new_index) => index.track = new_index as u32,
+                }
+            } else {
+                index.track += 1;
+            }
         };
 
-        // the web-player needs a revision update
-        self.player.queue_revision = self.new_queue_revision();
+        self.player.track = MessageField::some(new_track);
 
         Ok(self.player.index.track)
     }
@@ -317,17 +352,7 @@ impl ConnectState {
             .pop()
             .ok_or(ConnectStateError::NoPrevTrack)?;
 
-        let (ctx, index) = match self.context.as_mut() {
-            None => todo!("handle no context available"),
-            Some(ctx) => ctx,
-        };
-
-        index.track = Self::top_up_list(
-            &mut self.player.next_tracks,
-            (&ctx.tracks, &index.track),
-            SPOTIFY_MAX_NEXT_TRACKS_SIZE,
-            false,
-        ) as u32;
+        self.fill_up_next_tracks_from_current_context()?;
 
         self.player.track = MessageField::some(new_track);
         let index = self
@@ -340,46 +365,51 @@ impl ConnectState {
 
         index.track -= 1;
 
-        // the web-player needs a revision update
-        self.player.queue_revision = self.new_queue_revision();
-
         Ok(&self.player.track)
     }
 
-    pub fn reset_playback_context(&mut self) -> Result<(), Error> {
+    pub fn reset_playback_context(&mut self, new_index: Option<usize>) -> Result<(), Error> {
         let (context, context_index) = self.context.as_mut().ok_or(ConnectStateError::NoContext)?;
         if context_index.page != 0 {
             // todo: hmm, probably needs to resolve the correct context_page
             return Err(ConnectStateError::NotFirstContextPage.into());
         }
 
+        let new_index = new_index.unwrap_or(0);
         if let Some(player_index) = self.player.index.as_mut() {
-            player_index.track = 0;
+            player_index.track = new_index as u32;
         }
 
-        let new_track = context.tracks.first().ok_or(ConnectStateError::NoContext)?;
+        let new_track = context
+            .tracks
+            .get(new_index)
+            .ok_or(ConnectStateError::CanNotFindTrackInContext)?;
+
         let is_unavailable = self.unavailable_uri.contains(&new_track.uri);
         let new_track = Self::context_to_provided_track(new_track, is_unavailable);
-
         self.player.track = MessageField::some(new_track);
-        context_index.track = 1;
+
+        context_index.track = new_index as u32 + 1;
+
         self.player.prev_tracks.clear();
         self.player.next_tracks.clear();
 
-        while self.player.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-            if let Some(track) = context.tracks.get(context_index.track as usize) {
+        if new_index > 0 {
+            let rev_ctx = context
+                .tracks
+                .iter()
+                .rev()
+                .skip(context.tracks.len() - new_index)
+                .take(SPOTIFY_MAX_PREV_TRACKS_SIZE);
+            for track in rev_ctx {
                 let is_unavailable = self.unavailable_uri.contains(&track.uri);
                 self.player
-                    .next_tracks
-                    .push(Self::context_to_provided_track(track, is_unavailable));
-                context_index.track += 1;
-            } else {
-                break;
+                    .prev_tracks
+                    .push(Self::context_to_provided_track(track, is_unavailable))
             }
         }
 
-        // the web-player needs a revision update
-        self.player.queue_revision = self.new_queue_revision();
+        self.fill_up_next_tracks_from_current_context()?;
 
         Ok(())
     }
@@ -462,37 +492,46 @@ impl ConnectState {
             .await
     }
 
+    fn fill_up_next_tracks_from_current_context(&mut self) -> Result<(), ConnectStateError> {
+        let current_context = if self.player.options.shuffling_context {
+            self.shuffle_context.as_mut()
+        } else {
+            self.context.as_mut()
+        };
+
+        let (ctx, ctx_index) = current_context.ok_or(ConnectStateError::NoContext)?;
+        let mut new_index = ctx_index.track as usize;
+
+        while self.player.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+            let track = match ctx.tracks.get(new_index + 1) {
+                None => break,
+                Some(ct) => Self::context_to_provided_track(ct, false),
+            };
+
+            new_index += 1;
+            self.player.next_tracks.push(track);
+        }
+
+        ctx_index.track = new_index as u32;
+
+        // the web-player needs a revision update, otherwise the queue isn't updated in the ui
+        self.player.queue_revision = self.new_queue_revision();
+
+        Ok(())
+    }
+
+    fn find_index_in_context(ctx: &ContextPage, uri: &str) -> Result<usize, ConnectStateError> {
+        ctx.tracks
+            .iter()
+            .position(|track| track.uri == uri)
+            .ok_or(ConnectStateError::CanNotFindTrackInContext)
+    }
+
     fn mark_as_unavailable_for_match(track: &mut ProvidedTrack, id: &str) {
         debug!("Marked <{}:{}> as unavailable", track.provider, track.uri);
         if track.uri == id {
             track.provider = UNAVAILABLE_PROVIDER.to_string();
         }
-    }
-
-    fn top_up_list(
-        list: &mut Vec<ProvidedTrack>,
-        (context, index): (&Vec<ContextTrack>, &u32),
-        limit: usize,
-        add_to_top: bool,
-    ) -> usize {
-        let mut new_index = *index as usize;
-
-        while list.len() < limit {
-            new_index += 1;
-
-            let track = match context.get(new_index) {
-                None => return new_index - 1,
-                Some(ct) => Self::context_to_provided_track(ct, false),
-            };
-
-            if add_to_top {
-                list.insert(0, track)
-            } else {
-                list.push(track);
-            }
-        }
-
-        new_index
     }
 
     pub fn context_to_provided_track(
