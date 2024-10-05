@@ -220,7 +220,10 @@ impl ConnectState {
             return Ok(());
         }
 
-        self.shuffle()
+        self.shuffle()?;
+        self.update_restrictions();
+
+        Ok(())
     }
 
     pub fn shuffle(&mut self) -> Result<(), Error> {
@@ -316,6 +319,8 @@ impl ConnectState {
 
         self.player.track = MessageField::some(new_track);
 
+        self.update_restrictions();
+
         Ok(self.player.index.track)
     }
 
@@ -352,6 +357,8 @@ impl ConnectState {
             ))?;
 
         index.track -= 1;
+
+        self.update_restrictions();
 
         Ok(&self.player.track)
     }
@@ -398,6 +405,7 @@ impl ConnectState {
 
         self.clear_next_tracks();
         self.fill_up_next_tracks_from_current_context()?;
+        self.update_restrictions();
 
         Ok(())
     }
@@ -478,6 +486,29 @@ impl ConnectState {
             .spclient()
             .put_connect_state_request(put_state)
             .await
+    }
+
+    pub fn update_restrictions(&mut self) {
+        const NO_PREV: &str = "no previous tracks";
+        const NO_NEXT: &str = "no next tracks";
+
+        if let Some(restrictions) = self.player.restrictions.as_mut() {
+            if self.player.prev_tracks.is_empty() {
+                restrictions.disallow_peeking_prev_reasons = vec![ NO_PREV.to_string() ];
+                restrictions.disallow_skipping_prev_reasons = vec![ NO_PREV.to_string() ];
+            } else {
+                restrictions.disallow_peeking_prev_reasons.clear();
+                restrictions.disallow_skipping_prev_reasons.clear();
+            }
+
+            if self.player.next_tracks.is_empty() {
+                restrictions.disallow_peeking_next_reasons = vec![ NO_NEXT.to_string() ];
+                restrictions.disallow_skipping_next_reasons = vec![ NO_NEXT.to_string() ];
+            } else {
+                restrictions.disallow_peeking_next_reasons.clear();
+                restrictions.disallow_skipping_next_reasons.clear();
+            }
+        }
     }
     
     fn clear_next_tracks(&mut self) {
