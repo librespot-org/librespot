@@ -224,22 +224,10 @@ impl ConnectState {
     }
 
     pub fn shuffle(&mut self) -> Result<(), Error> {
-        let (ctx, _) = self.context.as_mut().ok_or(ConnectStateError::NoContext)?;
-
         self.player.prev_tracks.clear();
+        self.clear_next_tracks();
 
-        // respect queued track and don't throw them out of our next played tracks
-        let first_non_queued_track = self
-            .player
-            .next_tracks
-            .iter()
-            .enumerate()
-            .find(|(_, track)| track.provider != QUEUE_PROVIDER);
-        if let Some((non_queued_track, _)) = first_non_queued_track {
-            while self.player.next_tracks.pop().is_some()
-                && self.player.next_tracks.len() > non_queued_track
-            {}
-        }
+        let (ctx, _) = self.context.as_mut().ok_or(ConnectStateError::NoContext)?;
 
         let mut shuffle_context = ctx.clone();
         let mut rng = rand::thread_rng();
@@ -392,7 +380,6 @@ impl ConnectState {
         context_index.track = new_index as u32 + 1;
 
         self.player.prev_tracks.clear();
-        self.player.next_tracks.clear();
 
         if new_index > 0 {
             let rev_ctx = context
@@ -409,6 +396,7 @@ impl ConnectState {
             }
         }
 
+        self.clear_next_tracks();
         self.fill_up_next_tracks_from_current_context()?;
 
         Ok(())
@@ -490,6 +478,19 @@ impl ConnectState {
             .spclient()
             .put_connect_state_request(put_state)
             .await
+    }
+    
+    fn clear_next_tracks(&mut self) {
+        // respect queued track and don't throw them out of our next played tracks
+        let first_non_queued_track = self
+            .player
+            .next_tracks
+            .iter()
+            .enumerate()
+            .find(|(_, track)| track.provider != QUEUE_PROVIDER);
+        if let Some((non_queued_track, _)) = first_non_queued_track {
+            while self.player.next_tracks.len() > non_queued_track && self.player.next_tracks.pop().is_some() {}
+        }
     }
 
     fn fill_up_next_tracks_from_current_context(&mut self) -> Result<(), ConnectStateError> {
