@@ -550,6 +550,11 @@ impl SpircTask {
     }
 
     async fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
+        if let PlayerEvent::TrackChanged { audio_item } = event {
+            self.connect_state.player.duration = audio_item.duration_ms.into();
+            return Ok(())
+        }
+        
         // update play_request_id
         if let PlayerEvent::PlayRequestIdChanged { play_request_id } = event {
             self.play_request_id = Some(play_request_id);
