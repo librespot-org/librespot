@@ -552,9 +552,9 @@ impl SpircTask {
     async fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
         if let PlayerEvent::TrackChanged { audio_item } = event {
             self.connect_state.player.duration = audio_item.duration_ms.into();
-            return Ok(())
+            return Ok(());
         }
-        
+
         // update play_request_id
         if let PlayerEvent::PlayRequestIdChanged { play_request_id } = event {
             self.play_request_id = Some(play_request_id);
@@ -790,7 +790,6 @@ impl SpircTask {
     }
 
     async fn handle_set_volume(&mut self, set_volume_command: SetVolumeCommand) {
-
         let volume_difference = set_volume_command.volume - self.connect_state.device.volume as i32;
         if volume_difference < self.connect_state.device.capabilities.volume_steps {
             return;
@@ -1204,8 +1203,8 @@ impl SpircTask {
                 // force reloading the current context with an autoplay context
                 self.autoplay_context = true;
                 self.resolve_context = Some(context_uri);
-                todo!("update tracks from context: autoplay");
                 self.player.set_auto_normalise_as_album(false);
+                todo!("update tracks from context: autoplay");
             } else {
                 if self.connect_state.player.options.shuffling_context {
                     self.connect_state.shuffle()?

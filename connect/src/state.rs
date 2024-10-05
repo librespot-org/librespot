@@ -494,23 +494,23 @@ impl ConnectState {
 
         if let Some(restrictions) = self.player.restrictions.as_mut() {
             if self.player.prev_tracks.is_empty() {
-                restrictions.disallow_peeking_prev_reasons = vec![ NO_PREV.to_string() ];
-                restrictions.disallow_skipping_prev_reasons = vec![ NO_PREV.to_string() ];
+                restrictions.disallow_peeking_prev_reasons = vec![NO_PREV.to_string()];
+                restrictions.disallow_skipping_prev_reasons = vec![NO_PREV.to_string()];
             } else {
                 restrictions.disallow_peeking_prev_reasons.clear();
                 restrictions.disallow_skipping_prev_reasons.clear();
             }
 
             if self.player.next_tracks.is_empty() {
-                restrictions.disallow_peeking_next_reasons = vec![ NO_NEXT.to_string() ];
-                restrictions.disallow_skipping_next_reasons = vec![ NO_NEXT.to_string() ];
+                restrictions.disallow_peeking_next_reasons = vec![NO_NEXT.to_string()];
+                restrictions.disallow_skipping_next_reasons = vec![NO_NEXT.to_string()];
             } else {
                 restrictions.disallow_peeking_next_reasons.clear();
                 restrictions.disallow_skipping_next_reasons.clear();
             }
         }
     }
-    
+
     fn clear_next_tracks(&mut self) {
         // respect queued track and don't throw them out of our next played tracks
         let first_non_queued_track = self
@@ -520,7 +520,9 @@ impl ConnectState {
             .enumerate()
             .find(|(_, track)| track.provider != QUEUE_PROVIDER);
         if let Some((non_queued_track, _)) = first_non_queued_track {
-            while self.player.next_tracks.len() > non_queued_track && self.player.next_tracks.pop().is_some() {}
+            while self.player.next_tracks.len() > non_queued_track
+                && self.player.next_tracks.pop().is_some()
+            {}
         }
     }
 

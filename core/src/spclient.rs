@@ -539,7 +539,10 @@ impl SpClient {
     }
 
     pub async fn put_connect_state_inactive(&self, notify: bool) -> SpClientResult {
-        let endpoint = format!("/connect-state/v1/devices/{}/inactive?notify={notify}", self.session().device_id());
+        let endpoint = format!(
+            "/connect-state/v1/devices/{}/inactive?notify={notify}",
+            self.session().device_id()
+        );
 
         let mut headers = HeaderMap::new();
         headers.insert(CONNECTION_ID, self.session().connection_id().parse()?);
