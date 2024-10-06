@@ -59,6 +59,7 @@ https://github.com/librespot-org/librespot
 - [core] `Credentials.username` is now an `Option` (breaking)
 - [core] `Session::connect` tries multiple access points, retrying each one.
 - [core] Each access point connection now timesout after 3 seconds.
+- [core] Listen on both IPV4 and IPV6 on non-windows hosts
 - [main] `autoplay {on|off}` now acts as an override. If unspecified, `librespot`
   now follows the setting in the Connect client that controls it. (breaking)
 - [metadata] Most metadata is now retrieved with the `spclient` (breaking)
