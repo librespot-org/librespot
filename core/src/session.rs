@@ -755,11 +755,16 @@ where
                     // TODO: Optionally reconnect (with cached/last credentials?)
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::TimedOut,
-                        "session lost connection to server",
+                        format!(
+                            "session lost connection to server ({:?})",
+                            this.keep_alive_state
+                        ),
                     )));
                 }
                 PendingPong => {
                     trace!("Sending Pong");
+                    // TODO: Ideally, this should flush the `Framed<TcpStream> as Sink`
+                    // before starting the timeout.
                     let _ = session.send_packet(PacketType::Pong, vec![0, 0, 0, 0]);
                     *this.keep_alive_state = ExpectingPongAck;
                     this.timeout
