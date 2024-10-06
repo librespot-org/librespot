@@ -2,9 +2,8 @@ use std::{
     borrow::Cow,
     collections::BTreeMap,
     convert::Infallible,
-    net::{IpAddr, SocketAddr, TcpListener},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener},
     pin::Pin,
-    str::FromStr,
     sync::{Arc, Mutex},
     task::{Context, Poll},
 };
@@ -267,7 +266,12 @@ pub struct DiscoveryServer {
 impl DiscoveryServer {
     pub fn new(config: Config, port: &mut u16) -> Result<Self, Error> {
         let (discovery, cred_rx) = RequestHandler::new(config);
-        let address = SocketAddr::new(IpAddr::from_str("::0").unwrap(), *port);
+        let address = if cfg!(windows) {
+            SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), *port)
+        } else {
+            // this creates a dual stack socket on non-windows systems
+            SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), *port)
+        };
 
         let (close_tx, close_rx) = oneshot::channel();
 
