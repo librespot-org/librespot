@@ -212,12 +212,11 @@ struct Setup {
     credentials: Option<Credentials>,
     enable_oauth: bool,
     oauth_port: Option<u16>,
-    enable_discovery: bool,
     zeroconf_port: u16,
     player_event_program: Option<String>,
     emit_sink_events: bool,
     zeroconf_ip: Vec<std::net::IpAddr>,
-    zeroconf_backend: librespot::discovery::ServiceBuilder,
+    zeroconf_backend: Option<librespot::discovery::ServiceBuilder>,
 }
 
 fn get_setup() -> Setup {
@@ -1199,9 +1198,22 @@ fn get_setup() -> Setup {
         }
     };
 
-    let enable_discovery = !opt_present(DISABLE_DISCOVERY);
+    let no_discovery_reason = if !cfg!(any(
+        feature = "with-libmdns",
+        feature = "with-dns-sd",
+        feature = "with-avahi"
+    )) {
+        Some("librespot compiled without zeroconf backend".to_owned())
+    } else if opt_present(DISABLE_DISCOVERY) {
+        Some(format!(
+            "the `--{}` / `-{}` flag set",
+            DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT,
+        ))
+    } else {
+        None
+    };
 
-    if credentials.is_none() && !enable_discovery && !enable_oauth {
+    if credentials.is_none() && no_discovery_reason.is_some() && !enable_oauth {
         error!("Credentials are required if discovery and oauth login are disabled.");
         exit(1);
     }
@@ -1234,14 +1246,16 @@ fn get_setup() -> Setup {
         Some(5588)
     };
 
-    if !enable_discovery && opt_present(ZEROCONF_PORT) {
-        warn!(
-            "With the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
-            DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
-        );
+    if let Some(reason) = no_discovery_reason.as_deref() {
+        if opt_present(ZEROCONF_PORT) {
+            warn!(
+                "With {} `--{}` / `-{}` has no effect.",
+                reason, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
+            );
+        }
     }
 
-    let zeroconf_port = if enable_discovery {
+    let zeroconf_port = if no_discovery_reason.is_none() {
         opt_str(ZEROCONF_PORT)
             .map(|port| match port.parse::<u16>() {
                 Ok(value) if value != 0 => value,
@@ -1277,6 +1291,15 @@ fn get_setup() -> Setup {
         None => SessionConfig::default().autoplay,
     };
 
+    if let Some(reason) = no_discovery_reason.as_deref() {
+        if opt_present(ZEROCONF_INTERFACE) {
+            warn!(
+                "With {} `--{}` / `-{}` has no effect.",
+                reason, ZEROCONF_INTERFACE, ZEROCONF_INTERFACE_SHORT
+            );
+        }
+    }
+
     let zeroconf_ip: Vec<std::net::IpAddr> = if opt_present(ZEROCONF_INTERFACE) {
         if let Some(zeroconf_ip) = opt_str(ZEROCONF_INTERFACE) {
             zeroconf_ip
@@ -1302,9 +1325,18 @@ fn get_setup() -> Setup {
         vec![]
     };
 
+    if let Some(reason) = no_discovery_reason.as_deref() {
+        if opt_present(ZEROCONF_BACKEND) {
+            warn!(
+                "With {} `--{}` / `-{}` has no effect.",
+                reason, ZEROCONF_BACKEND, ZEROCONF_BACKEND_SHORT
+            );
+        }
+    }
+
     let zeroconf_backend_name = opt_str(ZEROCONF_BACKEND);
-    let zeroconf_backend = librespot::discovery::find(zeroconf_backend_name.as_deref())
-        .unwrap_or_else(|_| {
+    let zeroconf_backend = no_discovery_reason.is_none().then(|| {
+        librespot::discovery::find(zeroconf_backend_name.as_deref()).unwrap_or_else(|_| {
             let available_backends: Vec<_> = librespot::discovery::BACKENDS
                 .iter()
                 .filter_map(|(id, launch_svc)| launch_svc.map(|_| *id))
@@ -1323,7 +1355,8 @@ fn get_setup() -> Setup {
             );
 
             exit(1);
-        });
+        })
+    });
 
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
@@ -1766,7 +1799,6 @@ fn get_setup() -> Setup {
         credentials,
         enable_oauth,
         oauth_port,
-        enable_discovery,
         zeroconf_port,
         player_event_program,
         emit_sink_events,
@@ -1800,7 +1832,7 @@ async fn main() {
 
     let mut sys = System::new();
 
-    if setup.enable_discovery {
+    if let Some(zeroconf_backend) = setup.zeroconf_backend {
         // When started at boot as a service discovery may fail due to it
         // trying to bind to interfaces before the network is actually up.
         // This could be prevented in systemd by starting the service after
@@ -1820,7 +1852,7 @@ async fn main() {
                 .is_group(setup.connect_config.is_group)
                 .port(setup.zeroconf_port)
                 .zeroconf_ip(setup.zeroconf_ip.clone())
-                .zeroconf_backend(setup.zeroconf_backend)
+                .zeroconf_backend(zeroconf_backend)
                 .launch()
             {
                 Ok(d) => break Some(d),
