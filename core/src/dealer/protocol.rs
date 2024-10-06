@@ -175,7 +175,7 @@ where
 {
     use serde::de::Error;
 
-    let v: serde_json::Value = Deserialize::deserialize(de)?;
+    let v: JsonValue = Deserialize::deserialize(de)?;
     protobuf_json_mapping::parse_from_str(&v.to_string()).map_err(|why| {
         warn!("deserialize_json_proto: {v}");
         error!("deserialize_json_proto: {why}");
@@ -190,7 +190,7 @@ where
 {
     use serde::de::Error;
 
-    let v: serde_json::Value = Deserialize::deserialize(de)?;
+    let v: JsonValue = Deserialize::deserialize(de)?;
     protobuf_json_mapping::parse_from_str(&v.to_string())
         .map(Some)
         .map_err(|why| {
@@ -198,6 +198,26 @@ where
             error!("deserialize_json_proto: {why}");
             Error::custom(why)
         })
+}
+
+fn deserialize_vec_json_proto<'de, T, D>(de: D) -> Result<Vec<T>, D::Error>
+where
+    T: MessageFull,
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let v: JsonValue = Deserialize::deserialize(de)?;
+    let array = match v {
+        JsonValue::Array(array) => array,
+        _ => return Err(Error::custom("the value wasn't an array")),
+    };
+
+    let res = array
+        .into_iter()
+        .flat_map(|elem| protobuf_json_mapping::parse_from_str::<T>(&elem.to_string()))
+        .collect();
+    Ok(res)
 }
 
 fn boxed<'de, T, D>(de: D) -> Result<Box<T>, D::Error>

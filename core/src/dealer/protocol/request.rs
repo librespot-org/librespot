@@ -1,6 +1,4 @@
-use librespot_protocol::player::{
-    Context, ContextPlayerOptionOverrides, PlayOrigin, TransferState,
-};
+use librespot_protocol::player::{Context, ContextPlayerOptionOverrides, PlayOrigin, ProvidedTrack, TransferState};
 use serde::Deserialize;
 use std::fmt::{Display, Formatter};
 
@@ -24,6 +22,8 @@ pub enum RequestCommand {
     Pause(PauseCommand),
     SeekTo(SeekToCommand),
     SetShufflingContext(SetShufflingCommand),
+    AddToQueue(AddToQueueCommand),
+    SetQueue(SetQueueCommand),
     // commands that don't send any context
     SkipNext(GenericCommand),
     SkipPrev(GenericCommand),
@@ -44,6 +44,8 @@ impl Display for RequestCommand {
                 RequestCommand::Pause(_) => "pause",
                 RequestCommand::SeekTo(_) => "seek_to",
                 RequestCommand::SetShufflingContext(_) => "set_shuffling_context",
+                RequestCommand::AddToQueue(_) => "add_to_queue",
+                RequestCommand::SetQueue(_) => "set_queue",
                 RequestCommand::SkipNext(_) => "skip_next",
                 RequestCommand::SkipPrev(_) => "skip_prev",
                 RequestCommand::Resume(_) => "resume",
@@ -95,6 +97,25 @@ pub struct SetShufflingCommand {
     pub value: bool,
     pub logging_params: LoggingParams,
 }
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct AddToQueueCommand {
+    #[serde(deserialize_with = "deserialize_json_proto")]
+    pub track: ProvidedTrack,
+    pub logging_params: LoggingParams
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SetQueueCommand {
+    #[serde(deserialize_with = "deserialize_vec_json_proto")]
+    pub next_tracks: Vec<ProvidedTrack>,
+    #[serde(deserialize_with = "deserialize_vec_json_proto")]
+    pub prev_tracks: Vec<ProvidedTrack>,
+    // this queue revision is actually the last revision, so using it will not update the web ui
+    // might be that internally they use the last revision to create the next revision  
+    pub queue_revision: String,
+    pub logging_params: LoggingParams
+} 
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct GenericCommand {

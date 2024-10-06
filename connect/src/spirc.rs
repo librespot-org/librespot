@@ -20,7 +20,7 @@ use crate::{
 };
 use futures_util::{FutureExt, Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
-use librespot_core::dealer::protocol::{PayloadValue, RequestCommand};
+use librespot_core::dealer::protocol::{PayloadValue, RequestCommand, SetQueueCommand};
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
 use librespot_protocol::player::{Context, TransferState};
 use protobuf::Message;
@@ -848,6 +848,14 @@ impl SpircTask {
                 self.connect_state.set_shuffle(shuffle.value)?;
                 self.notify().await.map(|_| Reply::Success)?
             }
+            RequestCommand::AddToQueue(add_to_queue) => {
+                self.connect_state.add_to_queue(add_to_queue.track);
+                self.notify().await.map(|_| Reply::Success)?
+            }
+            RequestCommand::SetQueue(set_queue) => {
+                self.handle_set_queue(set_queue);
+                self.notify().await.map(|_| Reply::Success)?
+            }
             RequestCommand::SkipNext(_) => {
                 self.handle_next()?;
                 self.notify().await.map(|_| Reply::Success)?
@@ -1323,6 +1331,12 @@ impl SpircTask {
                 self.player.emit_volume_changed_event(volume);
             }
         }
+    }
+    
+    fn handle_set_queue(&mut self, set_queue_command: SetQueueCommand) {
+        self.connect_state.player.next_tracks = set_queue_command.next_tracks;
+        self.connect_state.player.prev_tracks = set_queue_command.prev_tracks;
+        self.connect_state.player.queue_revision = self.connect_state.new_queue_revision();
     }
 }
 

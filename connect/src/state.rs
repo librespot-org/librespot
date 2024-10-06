@@ -155,7 +155,7 @@ impl ConnectState {
     }
 
     // todo: is there maybe a better way to calculate the hash?
-    fn new_queue_revision(&self) -> String {
+    pub fn new_queue_revision(&self) -> String {
         let mut hasher = DefaultHasher::new();
         for track in &self.player.next_tracks {
             if let Ok(bytes) = track.write_to_bytes() {
@@ -303,17 +303,13 @@ impl ConnectState {
             self.player_index = self.player.index.take();
             self.player.index = MessageField::none()
         } else if let Some(index) = self.player.index.as_mut() {
-            if self.player.options.shuffling_context {
-                let (ctx, _) = self.context.as_ref().ok_or(ConnectStateError::NoContext)?;
-                let new_index = Self::find_index_in_context(ctx, &new_track.uri);
-                match new_index {
-                    Err(why) => {
-                        error!("didn't find the shuffled track in the current context: {why}")
-                    }
-                    Ok(new_index) => index.track = new_index as u32,
+            let (ctx, _) = self.context.as_ref().ok_or(ConnectStateError::NoContext)?;
+            let new_index = Self::find_index_in_context(ctx, &new_track.uri);
+            match new_index {
+                Err(why) => {
+                    error!("didn't find the shuffled track in the current context: {why}")
                 }
-            } else {
-                index.track += 1;
+                Ok(new_index) => index.track = new_index as u32,
             }
         };
 
@@ -408,6 +404,35 @@ impl ConnectState {
         self.update_restrictions();
 
         Ok(())
+    }
+
+    pub fn add_to_queue(&mut self, mut track: ProvidedTrack) {
+        const IS_QUEUED: &str = "is_queued";
+
+        track.provider = QUEUE_PROVIDER.to_string();
+        if !track.metadata.contains_key(IS_QUEUED) {
+            track
+                .metadata
+                .insert(IS_QUEUED.to_string(), true.to_string());
+        }
+
+        if let Some(next_not_queued_track) = self
+            .player
+            .next_tracks
+            .iter()
+            .position(|track| track.provider != QUEUE_PROVIDER)
+        {
+            self.player.next_tracks.insert(next_not_queued_track, track);
+        } else {
+            self.player.next_tracks.push(track)
+        }
+
+        while self.player.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+            self.player.next_tracks.pop();
+        }
+
+        self.player.queue_revision = self.new_queue_revision();
+        self.update_restrictions();
     }
 
     pub fn update_context(&mut self, context: Option<ContextPage>) {
