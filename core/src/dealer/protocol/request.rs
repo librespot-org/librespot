@@ -1,4 +1,6 @@
-use librespot_protocol::player::{Context, ContextPlayerOptionOverrides, PlayOrigin, ProvidedTrack, TransferState};
+use librespot_protocol::player::{
+    Context, ContextPlayerOptionOverrides, PlayOrigin, ProvidedTrack, TransferState,
+};
 use serde::Deserialize;
 use std::fmt::{Display, Formatter};
 
@@ -21,11 +23,11 @@ pub enum RequestCommand {
     Play(Box<PlayCommand>),
     Pause(PauseCommand),
     SeekTo(SeekToCommand),
+    SkipNext(SkipNextCommand),
     SetShufflingContext(SetShufflingCommand),
     AddToQueue(AddToQueueCommand),
     SetQueue(SetQueueCommand),
-    // commands that don't send any context
-    SkipNext(GenericCommand),
+    // commands that don't send any context (at least not usually...)
     SkipPrev(GenericCommand),
     Resume(GenericCommand),
     // catch unknown commands, so that we can implement them later
@@ -93,6 +95,13 @@ pub struct SeekToCommand {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct SkipNextCommand {
+    #[serde(default, deserialize_with = "deserialize_option_json_proto")]
+    pub track: Option<ProvidedTrack>,
+    pub logging_params: LoggingParams,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct SetShufflingCommand {
     pub value: bool,
     pub logging_params: LoggingParams,
@@ -102,7 +111,7 @@ pub struct SetShufflingCommand {
 pub struct AddToQueueCommand {
     #[serde(deserialize_with = "deserialize_json_proto")]
     pub track: ProvidedTrack,
-    pub logging_params: LoggingParams
+    pub logging_params: LoggingParams,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -112,10 +121,10 @@ pub struct SetQueueCommand {
     #[serde(deserialize_with = "deserialize_vec_json_proto")]
     pub prev_tracks: Vec<ProvidedTrack>,
     // this queue revision is actually the last revision, so using it will not update the web ui
-    // might be that internally they use the last revision to create the next revision  
+    // might be that internally they use the last revision to create the next revision
     pub queue_revision: String,
-    pub logging_params: LoggingParams
-} 
+    pub logging_params: LoggingParams,
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct GenericCommand {

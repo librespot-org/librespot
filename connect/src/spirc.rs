@@ -22,7 +22,7 @@ use futures_util::{FutureExt, Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
 use librespot_core::dealer::protocol::{PayloadValue, RequestCommand, SetQueueCommand};
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
-use librespot_protocol::player::{Context, TransferState};
+use librespot_protocol::player::{Context, ProvidedTrack, TransferState};
 use protobuf::Message;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -493,7 +493,7 @@ impl SpircTask {
                     self.notify().await
                 }
                 SpircCommand::Next => {
-                    self.handle_next()?;
+                    self.handle_next(None)?;
                     self.notify().await
                 }
                 SpircCommand::VolumeUp => {
@@ -856,8 +856,8 @@ impl SpircTask {
                 self.handle_set_queue(set_queue);
                 self.notify().await.map(|_| Reply::Success)?
             }
-            RequestCommand::SkipNext(_) => {
-                self.handle_next()?;
+            RequestCommand::SkipNext(skip_next) => {
+                self.handle_next(skip_next.track)?;
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SkipPrev(_) => {
@@ -1164,14 +1164,24 @@ impl SpircTask {
         self.handle_preload_next_track();
     }
 
-    fn handle_next(&mut self) -> Result<(), Error> {
+    fn handle_next(&mut self, track: Option<ProvidedTrack>) -> Result<(), Error> {
         let context_uri = self.connect_state.player.context_uri.to_owned();
         let mut continue_playing = self.connect_state.player.is_playing;
 
-        let new_track_index = match self.connect_state.move_to_next_track() {
-            Ok(index) => Some(index),
-            Err(ConnectStateError::NoNextTrack) => None,
-            Err(why) => return Err(why.into()),
+        let new_track_index = loop {
+            let index = match self.connect_state.move_to_next_track() {
+                Ok(index) => Some(index),
+                Err(ConnectStateError::NoNextTrack) => break None,
+                Err(why) => return Err(why.into()),
+            };
+
+            if track.is_some()
+                && matches!(track, Some(ref track) if self.connect_state.player.track.uri != track.uri)
+            {
+                continue;
+            } else {
+                break index;
+            }
         };
 
         let (ctx, ctx_index) = self
@@ -1271,7 +1281,7 @@ impl SpircTask {
     }
 
     async fn handle_end_of_track(&mut self) -> Result<(), Error> {
-        self.handle_next()?;
+        self.handle_next(None)?;
         self.notify().await
     }
 
@@ -1332,7 +1342,7 @@ impl SpircTask {
             }
         }
     }
-    
+
     fn handle_set_queue(&mut self, set_queue_command: SetQueueCommand) {
         self.connect_state.player.next_tracks = set_queue_command.next_tracks;
         self.connect_state.player.prev_tracks = set_queue_command.prev_tracks;
