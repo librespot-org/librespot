@@ -811,12 +811,22 @@ fn get_setup() -> Setup {
         exit(0);
     }
 
+    // Can't use `-> fmt::Arguments` due to https://github.com/rust-lang/rust/issues/92698
+    fn format_flag(long: &str, short: &str) -> String {
+        if short.is_empty() {
+            format!("`--{long}`")
+        } else {
+            format!("`--{long}` / `-{short}`")
+        }
+    }
+
     let invalid_error_msg =
         |long: &str, short: &str, invalid: &str, valid_values: &str, default_value: &str| {
-            error!("Invalid `--{long}` / `-{short}`: \"{invalid}\"");
+            let flag = format_flag(long, short);
+            error!("Invalid {flag}: \"{invalid}\"");
 
             if !valid_values.is_empty() {
-                println!("Valid `--{long}` / `-{short}` values: {valid_values}");
+                println!("Valid {flag} values: {valid_values}");
             }
 
             if !default_value.is_empty() {
@@ -1294,8 +1304,9 @@ fn get_setup() -> Setup {
     if let Some(reason) = no_discovery_reason.as_deref() {
         if opt_present(ZEROCONF_INTERFACE) {
             warn!(
-                "With {} `--{}` / `-{}` has no effect.",
-                reason, ZEROCONF_INTERFACE, ZEROCONF_INTERFACE_SHORT
+                "With {} {} has no effect.",
+                reason,
+                format_flag(ZEROCONF_INTERFACE, ZEROCONF_INTERFACE_SHORT),
             );
         }
     }
