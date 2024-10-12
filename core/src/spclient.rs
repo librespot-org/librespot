@@ -120,6 +120,8 @@ impl SpClient {
     }
 
     pub async fn client_token(&self) -> Result<String, Error> {
+        let _lock = self.unique_lock().await?;
+
         let client_token = self.lock(|inner| {
             if let Some(token) = &inner.client_token {
                 if token.is_expired() {
