@@ -2,11 +2,15 @@ use crate::spclient::CLIENT_TOKEN;
 use crate::token::Token;
 use crate::{util, Error, SessionConfig};
 use bytes::Bytes;
-use http::header::ACCEPT;
-use http::{HeaderValue, Method, Request};
-use librespot_protocol::hashcash::HashcashSolution;
-use librespot_protocol::login5::{
-    ChallengeSolution, Challenges, LoginError, LoginRequest, LoginResponse,
+use http::{header::ACCEPT, HeaderValue, Method, Request};
+use librespot_protocol::{
+    client_info::ClientInfo,
+    credentials::{Password, StoredCredential},
+    hashcash::HashcashSolution,
+    login5::{
+        login_request::Login_method, ChallengeSolution, Challenges, LoginError, LoginOk,
+        LoginRequest, LoginResponse,
+    },
 };
 use protobuf::well_known_types::duration::Duration as ProtoDuration;
 use protobuf::{Message, MessageField};
@@ -39,7 +43,7 @@ impl From<Login5Error> for Error {
 }
 
 impl Login5Manager {
-    async fn auth_token_request(&self, message: &LoginRequest) -> Result<Bytes, Error> {
+    async fn request(&self, message: &LoginRequest) -> Result<Bytes, Error> {
         let client_token = self.session().spclient().client_token().await?;
         let body = message.write_to_bytes()?;
 
@@ -53,24 +57,97 @@ impl Login5Manager {
         self.session().http_client().request_body(request).await
     }
 
-    fn new_login_request(&self) -> LoginRequest {
+    fn new_login_request(&self, login: Login_method) -> LoginRequest {
         let client_id = match OS {
             "macos" | "windows" => self.session().client_id(),
             _ => SessionConfig::default().client_id,
         };
 
-        let mut login_request = LoginRequest::new();
-        login_request.client_info.mut_or_insert_default().client_id = client_id;
-        login_request.client_info.mut_or_insert_default().device_id =
-            self.session().device_id().to_string();
-
-        let stored_credential = login_request.mut_stored_credential();
-        stored_credential.username = self.session().username().to_string();
-        stored_credential.data = self.session().auth_data().clone();
-
-        login_request
+        LoginRequest {
+            client_info: MessageField::some(ClientInfo {
+                client_id,
+                device_id: self.session().device_id().to_string(),
+                special_fields: Default::default(),
+            }),
+            login_method: Some(login),
+            ..Default::default()
+        }
     }
 
+    async fn login5_request(&self, login: Login_method) -> Result<LoginOk, Error> {
+        let mut login_request = self.new_login_request(login.clone());
+
+        let mut response = self.request(&login_request).await?;
+        let mut count = 0;
+
+        loop {
+            count += 1;
+
+            let message = LoginResponse::parse_from_bytes(&response)?;
+            if message.has_ok() {
+                break Ok(message.ok().to_owned());
+            }
+
+            if message.has_error() {
+                match message.error() {
+                    LoginError::TIMEOUT | LoginError::TOO_MANY_ATTEMPTS => {
+                        sleep(LOGIN_TIMEOUT).await
+                    }
+                    others => return Err(Login5Error::FaultyRequest(others).into()),
+                }
+            }
+
+            if message.has_challenges() {
+                login_request.login_context = message.login_context.clone();
+                Self::handle_challenges(&mut login_request, message.challenges())?;
+            }
+
+            if count < MAX_LOGIN_TRIES {
+                response = self.request(&login_request).await?;
+            } else {
+                return Err(Error::failed_precondition(format!(
+                    "Unable to solve any of {MAX_LOGIN_TRIES} hash cash challenges"
+                )));
+            }
+        }
+    }
+
+    /// Login for android and ios
+    ///
+    /// This request doesn't require a connected session as it is the entrypoint for android or ios
+    ///
+    /// This request will only work when:
+    /// - client_id => android or ios | can be easily adjusted in [SessionConfig::default_for_os]
+    /// - user-agent => android or ios | has to be adjusted in [HttpClient::new](crate::http_client::HttpClient::new)
+    pub async fn login(
+        &self,
+        id: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Result<(Token, Vec<u8>), Error> {
+        if !matches!(OS, "android" | "ios") {
+            // by manipulating the user-agent and client-id it can be also used/tested on desktop
+            return Err(Error::unavailable(
+                "login5 login only works for android and ios",
+            ));
+        }
+
+        let method = Login_method::Password(Password {
+            id: id.into(),
+            password: password.into(),
+            ..Default::default()
+        });
+
+        let token_response = self.login5_request(method).await?;
+        let auth_token = Self::token_from_login(&token_response);
+
+        Ok((auth_token, token_response.stored_credential))
+    }
+
+    /// Retrieve the access_token via login5
+    ///
+    /// This request will only work when the store credentials match the client-id. Meaning that
+    /// stored credentials generated with the keymaster client-id will not work, for example, with
+    /// the android client-id.
     pub async fn auth_token(&self) -> Result<Token, Error> {
         let _lock = self.unique_lock().await?;
 
@@ -87,56 +164,14 @@ impl Login5Manager {
             return Ok(auth_token);
         }
 
-        let mut login_request = self.new_login_request();
+        let method = Login_method::StoredCredential(StoredCredential {
+            username: self.session().username().to_string(),
+            data: self.session().auth_data().clone(),
+            ..Default::default()
+        });
 
-        let mut response = self.auth_token_request(&login_request).await?;
-        let mut count = 0;
-
-        let token_response = loop {
-            count += 1;
-
-            let message = LoginResponse::parse_from_bytes(&response)?;
-            if message.has_ok() {
-                break message.ok().to_owned();
-            }
-
-            if message.has_error() {
-                match message.error() {
-                    LoginError::TIMEOUT | LoginError::TOO_MANY_ATTEMPTS => {
-                        sleep(LOGIN_TIMEOUT).await
-                    }
-                    others => return Err(Login5Error::FaultyRequest(others).into()),
-                }
-            }
-
-            if message.has_challenges() {
-                login_request = self.new_login_request();
-                login_request.login_context = message.login_context.clone();
-
-                Self::handle_challenges(&mut login_request, message.challenges())?;
-            }
-
-            if count < MAX_LOGIN_TRIES {
-                response = self.auth_token_request(&login_request).await?;
-            } else {
-                return Err(Error::failed_precondition(format!(
-                    "Unable to solve any of {MAX_LOGIN_TRIES} hash cash challenges"
-                )));
-            }
-        };
-
-        let auth_token = Token {
-            access_token: token_response.access_token.clone(),
-            expires_in: Duration::from_secs(
-                token_response
-                    .access_token_expires_in
-                    .try_into()
-                    .unwrap_or(3600),
-            ),
-            token_type: "Bearer".to_string(),
-            scopes: vec![],
-            timestamp: Instant::now(),
-        };
+        let token_response = self.login5_request(method).await?;
+        let auth_token = Self::token_from_login(&token_response);
 
         self.lock(|inner| {
             inner.auth_token = Some(auth_token.clone());
@@ -197,5 +232,17 @@ impl Login5Manager {
         }
 
         Ok(())
+    }
+
+    fn token_from_login(login: &LoginOk) -> Token {
+        Token {
+            access_token: login.access_token.clone(),
+            expires_in: Duration::from_secs(
+                login.access_token_expires_in.try_into().unwrap_or(3600),
+            ),
+            token_type: "Bearer".to_string(),
+            scopes: vec![],
+            timestamp: Instant::now(),
+        }
     }
 }
