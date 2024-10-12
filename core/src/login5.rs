@@ -53,6 +53,24 @@ impl Login5Manager {
         self.session().http_client().request_body(request).await
     }
 
+    fn new_login_request(&self) -> LoginRequest {
+        let client_id = match OS {
+            "macos" | "windows" => self.session().client_id(),
+            _ => SessionConfig::default().client_id,
+        };
+
+        let mut login_request = LoginRequest::new();
+        login_request.client_info.mut_or_insert_default().client_id = client_id;
+        login_request.client_info.mut_or_insert_default().device_id =
+            self.session().device_id().to_string();
+
+        let stored_credential = login_request.mut_stored_credential();
+        stored_credential.username = self.session().username().to_string();
+        stored_credential.data = self.session().auth_data().clone();
+
+        login_request
+    }
+
     pub async fn auth_token(&self) -> Result<Token, Error> {
         let _lock = self.unique_lock().await?;
 
@@ -69,19 +87,7 @@ impl Login5Manager {
             return Ok(auth_token);
         }
 
-        let client_id = match OS {
-            "macos" | "windows" => self.session().client_id(),
-            _ => SessionConfig::default().client_id,
-        };
-
-        let mut login_request = LoginRequest::new();
-        login_request.client_info.mut_or_insert_default().client_id = client_id;
-        login_request.client_info.mut_or_insert_default().device_id =
-            self.session().device_id().to_string();
-
-        let stored_credential = login_request.mut_stored_credential();
-        stored_credential.username = self.session().username().to_string();
-        stored_credential.data = self.session().auth_data().clone();
+        let mut login_request = self.new_login_request();
 
         let mut response = self.auth_token_request(&login_request).await?;
         let mut count = 0;
@@ -104,7 +110,10 @@ impl Login5Manager {
             }
 
             if message.has_challenges() {
-                Self::handle_challenges(&mut login_request, message.challenges())?
+                login_request = self.new_login_request();
+                login_request.login_context = message.login_context.clone();
+
+                Self::handle_challenges(&mut login_request, message.challenges())?;
             }
 
             if count < MAX_LOGIN_TRIES {
