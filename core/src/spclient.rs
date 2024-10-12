@@ -193,10 +193,12 @@ impl SpClient {
                 ios_data.user_interface_idiom = 0;
                 ios_data.target_iphone_simulator = false;
                 ios_data.hw_machine = "iPhone14,5".to_string();
+                // example system_version: 17
                 ios_data.system_version = os_version;
             }
             "android" => {
                 let android_data = platform_data.mut_android();
+                // example android_version: 30
                 android_data.android_version = os_version;
                 android_data.api_version = 31;
                 "Pixel".clone_into(&mut android_data.device_name);
