@@ -205,7 +205,7 @@ impl HttpClient {
                     }
                 }
 
-                if code != StatusCode::OK {
+                if !code.is_success() {
                     return Err(HttpClientError::StatusCode(code).into());
                 }
             }

@@ -345,7 +345,6 @@ impl DealerShared {
                 return;
             }
         };
-        debug!("request command: {payload_request:?}");
 
         // ResponseSender will automatically send "success: false" if it is dropped without an answer.
         let responder = Responder::new(request.key.clone(), send_tx.clone());

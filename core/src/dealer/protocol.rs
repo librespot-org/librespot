@@ -120,7 +120,6 @@ impl WebsocketRequest {
 
         let payload = handle_transfer_encoding(&self.headers, payload_bytes)?;
         let payload = String::from_utf8(payload)?;
-        debug!("request: {payload}");
 
         serde_json::from_str(&payload)
             .map_err(ProtocolError::Deserialization)

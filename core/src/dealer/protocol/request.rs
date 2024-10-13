@@ -149,8 +149,8 @@ pub struct PlayOptions {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SkipTo {
-    pub track_uid: String,
-    pub track_uri: String,
+    pub track_uid: Option<String>,
+    pub track_uri: Option<String>,
     pub track_index: u32,
 }
 

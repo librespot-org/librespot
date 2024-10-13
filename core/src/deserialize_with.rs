@@ -10,11 +10,10 @@ const IGNORE_UNKNOWN: protobuf_json_mapping::ParseOptions = protobuf_json_mappin
     _future_options: (),
 };
 
-fn parse_value_to_msg<T: MessageFull>(value: &Value) -> Result<T, protobuf_json_mapping::ParseError> {
-    protobuf_json_mapping::parse_from_str_with_options::<T>(
-        &value.to_string(),
-        &IGNORE_UNKNOWN,
-    )
+fn parse_value_to_msg<T: MessageFull>(
+    value: &Value,
+) -> Result<T, protobuf_json_mapping::ParseError> {
+    protobuf_json_mapping::parse_from_str_with_options::<T>(&value.to_string(), &IGNORE_UNKNOWN)
 }
 
 pub fn base64_proto<'de, T, D>(de: D) -> Result<Option<T>, D::Error>
@@ -55,13 +54,7 @@ where
     use serde::de::Error;
 
     let v: Value = Deserialize::deserialize(de)?;
-    parse_value_to_msg(&v)
-        .map(Some)
-        .map_err(|why| {
-            warn!("deserialize_json_proto: {v}");
-            error!("deserialize_json_proto: {why}");
-            Error::custom(why)
-        })
+    parse_value_to_msg(&v).map(Some).map_err(|why| Error::custom(why))
 }
 
 pub fn vec_json_proto<'de, T, D>(de: D) -> Result<Vec<T>, D::Error>
