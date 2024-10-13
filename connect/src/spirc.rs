@@ -1,12 +1,6 @@
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+use crate::state::{
+    ConnectState, ConnectStateConfig, ConnectStateError, CONTEXT_PROVIDER, QUEUE_PROVIDER,
 };
-
-use crate::state::{ConnectState, ConnectStateConfig, ConnectStateError};
 use crate::{
     context::PageContext,
     core::{authentication::Credentials, session::UserAttributes, Error, Session, SpotifyId},
@@ -23,7 +17,14 @@ use librespot_core::dealer::manager::{Reply, RequestReply};
 use librespot_core::dealer::protocol::{PayloadValue, RequestCommand, SetQueueCommand};
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
 use librespot_protocol::player::{Context, ProvidedTrack, TransferState};
-use protobuf::Message;
+use protobuf::{Message, MessageField};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::atomic::{AtomicUsize, Ordering},
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -348,7 +349,7 @@ impl SpircTask {
                 },
                 connect_state_command = self.connect_state_command.next() => match connect_state_command {
                     Some(request) => if let Err(e) = self.handle_connect_state_command(request).await {
-                        error!("could handle connect state command: {}", e);
+                        error!("couldn't handle connect state command: {}", e);
                     },
                     None => {
                         error!("connect state command selected, but none received");
@@ -406,9 +407,10 @@ impl SpircTask {
                     } else {
                         let previous_tracks = self
                             .connect_state
-                            .player.prev_tracks
+                            .player
+                            .prev_tracks
                             .iter()
-                            .map(SpotifyId::try_from)
+                            .map(|t| SpotifyId::from_uri(&t.uri))
                             .filter_map(Result::ok)
                             .collect();
 
@@ -437,7 +439,11 @@ impl SpircTask {
                                     None
                                 }
                             };
-                            self.connect_state.update_context(context)
+                            self.connect_state.update_context(Context {
+                                uri: self.connect_state.player.context_uri.to_owned(),
+                                pages: context.map(|page| vec!(page)).unwrap_or_default(),
+                                ..Default::default()
+                            })
                         },
                         Err(err) => {
                             error!("ContextError: {:?}", err)
@@ -509,7 +515,7 @@ impl SpircTask {
                     self.notify().await
                 }
                 SpircCommand::Shuffle(shuffle) => {
-                    self.connect_state.set_shuffle(shuffle)?;
+                    self.handle_shuffle(shuffle)?;
                     self.notify().await
                 }
                 SpircCommand::Repeat(repeat) => {
@@ -766,12 +772,13 @@ impl SpircTask {
 
         info!("cluster update! {reason:?} for {device_ids} from {devices} has {prev_tracks:?} previous tracks and {next_tracks} next tracks");
 
-        let state = &mut self.connect_state;
-
-        if let Some(mut cluster) = cluster_update.cluster.take() {
-            if let Some(player_state) = cluster.player_state.take() {
-                state.player = player_state;
-            }
+        if let Some(cluster) = cluster_update.cluster.take() {
+            // // we could transfer the player state here, which would result in less work that we
+            // // need to do, but it's probably better to handle it ourselves, otherwise we will
+            // // only notice problems after the tracks from the transferred player state have ended
+            // if let Some(player_state) = cluster.player_state.take() {
+            //     state.player = player_state;
+            // }
 
             let became_inactive =
                 self.connect_state.active && cluster.active_device_id != self.session.device_id();
@@ -796,6 +803,9 @@ impl SpircTask {
         }
 
         self.set_volume(set_volume_command.volume as u16);
+
+        // todo: we only want to notify after we didn't receive an update for like one or two seconds,
+        //  otherwise we will run in 429er errors
         if let Err(why) = self.notify().await {
             error!("couldn't notify after updating the volume: {why}")
         }
@@ -826,14 +836,19 @@ impl SpircTask {
             }
             RequestCommand::Play(play) => {
                 self.handle_load(SpircLoadCommand {
-                    context_uri: play.context.uri,
+                    context_uri: play.context.uri.clone(),
                     start_playing: true,
                     playing_track_index: play.options.skip_to.track_index,
-                    shuffle: false,
-                    repeat: false,
-                    repeat_track: false,
+                    shuffle: self.connect_state.player.options.shuffling_context,
+                    repeat: self.connect_state.player.options.repeating_context,
+                    repeat_track: self.connect_state.player.options.repeating_track,
                 })
                 .await?;
+
+                self.connect_state.player.context_uri = play.context.uri;
+                self.connect_state.player.context_uri = play.context.url;
+                self.connect_state.player.play_origin = MessageField::some(play.play_origin);
+
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::Pause(_) => {
@@ -845,11 +860,11 @@ impl SpircTask {
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SetShufflingContext(shuffle) => {
-                self.connect_state.set_shuffle(shuffle.value)?;
+                self.handle_shuffle(shuffle.value)?;
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::AddToQueue(add_to_queue) => {
-                self.connect_state.add_to_queue(add_to_queue.track);
+                self.connect_state.add_to_queue(add_to_queue.track, true);
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SetQueue(set_queue) => {
@@ -880,9 +895,9 @@ impl SpircTask {
 
     async fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         if let Some(session) = transfer.current_session.as_mut() {
-            if let Some(ctx) = session.context.as_mut() {
-                self.resolve_context(ctx).await?;
-                self.connect_state.update_context(ctx.pages.pop())
+            if let Some(mut ctx) = session.context.take() {
+                self.resolve_context(&mut ctx).await?;
+                self.connect_state.update_context(ctx)
             }
         }
 
@@ -903,10 +918,16 @@ impl SpircTask {
         }
 
         state.player.play_origin = transfer.current_session.play_origin.clone();
-        state.player.context_uri = transfer.current_session.context.uri.clone();
-        state.player.context_url = transfer.current_session.context.url.clone();
-        state.player.context_restrictions = transfer.current_session.context.restrictions.clone();
-        state.player.suppressions = transfer.current_session.suppressions.clone();
+
+        if let Some(suppressions) = transfer.current_session.suppressions.as_ref() {
+            state.player.suppressions = MessageField::some(suppressions.clone());
+        }
+
+        if let Some(context) = transfer.current_session.context.as_ref() {
+            state.player.context_uri = context.uri.clone();
+            state.player.context_url = context.url.clone();
+            state.player.context_restrictions = context.restrictions.clone();
+        }
 
         for (key, value) in &transfer.current_session.context.metadata {
             state
@@ -924,21 +945,49 @@ impl SpircTask {
             }
         }
 
-        if state.player.track.is_none() {
-            // todo: now we need to resolve this stuff, we can ignore this to some degree for now if we come from an already running context
-            todo!("resolving player_state required")
-        }
-
         // update position if the track continued playing
         let position = if transfer.playback.is_paused {
             state.player.position_as_of_timestamp
         } else {
-            let time_since_position_update = timestamp - state.player.timestamp;
+            let time_since_position_update = timestamp - transfer.playback.timestamp;
             state.player.position_as_of_timestamp + time_since_position_update
         };
 
-        if self.connect_state.player.options.shuffling_context {
-            self.connect_state.set_shuffle(true)?;
+        let current_index = if transfer.queue.is_playing_queue {
+            debug!("queued track is playing, {}", transfer.queue.tracks.len());
+
+            if let Some(queue) = transfer.queue.as_mut() {
+                let mut provided_track =
+                    state.context_to_provided_track(&queue.tracks.remove(0))?;
+                provided_track.provider = QUEUE_PROVIDER.to_string();
+
+                state.player.track = MessageField::some(provided_track);
+            } else {
+                error!("if we are playing we should at least have a single queued track")
+            }
+
+            state.find_index_in_context(|c| c.uid == transfer.current_session.current_uid)
+        } else if transfer.playback.current_track.uri.is_empty()
+            && !transfer.playback.current_track.gid.is_empty()
+        {
+            let uri = SpotifyId::from_raw(&transfer.playback.current_track.gid)?.to_uri()?;
+            let uri = uri.replace("unknown", "track");
+
+            state.find_index_in_context(|c| c.uri == uri)
+        } else {
+            state.find_index_in_context(|c| c.uri == transfer.playback.current_track.uri)
+        }?;
+
+        debug!(
+            "setting up next and prev: index is at {current_index} while shuffle {}",
+            state.player.options.shuffling_context
+        );
+
+        if state.player.options.shuffling_context {
+            self.connect_state.set_shuffle(true);
+            self.connect_state.shuffle()?;
+        } else {
+            state.reset_playback_context(Some(current_index))?;
         }
 
         self.load_track(self.connect_state.player.is_playing, position.try_into()?)
@@ -958,7 +1007,7 @@ impl SpircTask {
         let resolved_ctx = self.session.spclient().get_context(&ctx.uri).await?;
 
         debug!(
-            "context was resolved {} pages and {} tracks",
+            "context resolved {} pages and {} tracks in total",
             resolved_ctx.pages.len(),
             resolved_ctx
                 .pages
@@ -1030,11 +1079,20 @@ impl SpircTask {
         };
 
         self.resolve_context(&mut ctx).await?;
-        self.connect_state.update_context(ctx.pages.pop());
-        self.connect_state
-            .reset_playback_context(Some(cmd.playing_track_index as usize))?;
+        self.connect_state.update_context(ctx);
 
-        self.connect_state.set_shuffle(cmd.shuffle)?;
+        self.connect_state.player.next_tracks.clear();
+        self.connect_state.player.track = MessageField::none();
+
+        let index = cmd.playing_track_index as usize;
+        self.connect_state.set_shuffle(cmd.shuffle);
+        if cmd.shuffle {
+            self.connect_state.set_current_track(index)?;
+            self.connect_state.shuffle()?;
+        } else {
+            self.connect_state.reset_playback_context(Some(index))?;
+        }
+
         self.connect_state.set_repeat_context(cmd.repeat);
         self.connect_state.set_repeat_track(cmd.repeat_track);
 
@@ -1132,7 +1190,7 @@ impl SpircTask {
 
     fn preview_next_track(&mut self) -> Option<SpotifyId> {
         let next = self.connect_state.player.next_tracks.first()?;
-        SpotifyId::try_from(next).ok()
+        SpotifyId::from_uri(&next.uri).ok()
     }
 
     fn handle_preload_next_track(&mut self) {
@@ -1298,7 +1356,7 @@ impl SpircTask {
     }
 
     fn load_track(&mut self, start_playing: bool, position_ms: u32) -> Result<(), Error> {
-        let track_to_load = match self.connect_state.player.track.as_ref() {
+        let track_to_load = match self.connect_state.player.track.as_mut() {
             None => {
                 self.handle_stop();
                 return Ok(());
@@ -1306,8 +1364,21 @@ impl SpircTask {
             Some(track) => track,
         };
 
-        let id = SpotifyId::try_from(track_to_load)?;
+        let id = SpotifyId::from_uri(&track_to_load.uri)?;
         self.player.load(id, start_playing, position_ms);
+
+        const CONTEXT_URI_METADATA: &str = "context_uri";
+        const ENTITY_URI_METADATA: &str = "entity_uri";
+        if track_to_load.provider == CONTEXT_PROVIDER {
+            track_to_load.metadata.insert(
+                CONTEXT_URI_METADATA.to_string(),
+                self.connect_state.player.context_uri.to_owned(),
+            );
+            track_to_load.metadata.insert(
+                ENTITY_URI_METADATA.to_string(),
+                self.connect_state.player.context_uri.to_owned(),
+            );
+        }
 
         self.update_state_position(position_ms);
         if start_playing {
@@ -1340,6 +1411,17 @@ impl SpircTask {
             if self.connect_state.active {
                 self.player.emit_volume_changed_event(volume);
             }
+        }
+    }
+
+    fn handle_shuffle(&mut self, shuffle: bool) -> Result<(), Error> {
+        self.connect_state.set_shuffle(shuffle);
+
+        if shuffle {
+            self.connect_state.shuffle()
+        } else {
+            self.connect_state.shuffle_context = None;
+            self.connect_state.reset_playback_to_current_track()
         }
     }
 
