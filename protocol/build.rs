@@ -38,7 +38,6 @@ fn compile() {
         proto_dir.join("keyexchange.proto"),
         proto_dir.join("mercury.proto"),
         proto_dir.join("pubsub.proto"),
-        proto_dir.join("spirc.proto"),
     ];
 
     let slices = files.iter().map(Deref::deref).collect::<Vec<_>>();

@@ -796,7 +796,6 @@ impl SpClient {
     }
 
     pub async fn get_context(&self, uri: &str) -> Result<Context, Error> {
-        // requesting this endpoint with metrics results in a somewhat consistent 502 errors
         let uri = format!("/context-resolve/v1/{uri}");
 
         let res = self.request(&Method::GET, &uri, None, None).await?;
@@ -804,5 +803,13 @@ impl SpClient {
         let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json)?;
 
         Ok(ctx)
+    }
+
+    pub async fn get_rootlist(&self, from: usize, length: Option<usize>) -> SpClientResult {
+        let length = length.unwrap_or(120);
+        let user = self.session().username();
+        let endpoint = format!("/playlist/v2/user/{user}/rootlist?decorate=revision,attributes,length,owner,capabilities,status_code&from={from}&length={length}");
+
+        self.request(&Method::GET, &endpoint, None, None).await
     }
 }

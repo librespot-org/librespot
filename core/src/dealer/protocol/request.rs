@@ -1,10 +1,10 @@
+use crate::deserialize_with::*;
 use librespot_protocol::player::{
     Context, ContextPlayerOptionOverrides, PlayOrigin, ProvidedTrack, TransferState,
 };
 use serde::Deserialize;
+use serde_json::Value;
 use std::fmt::{Display, Formatter};
-
-use super::*;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Request {
@@ -32,7 +32,7 @@ pub enum RequestCommand {
     Resume(GenericCommand),
     // catch unknown commands, so that we can implement them later
     #[serde(untagged)]
-    Unknown(JsonValue),
+    Unknown(Value),
 }
 
 impl Display for RequestCommand {
@@ -64,7 +64,7 @@ impl Display for RequestCommand {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct TransferCommand {
-    #[serde(default, deserialize_with = "deserialize_base64_proto")]
+    #[serde(default, deserialize_with = "base64_proto")]
     pub data: Option<TransferState>,
     pub options: TransferOptions,
     pub from_device_identifier: String,
@@ -73,9 +73,9 @@ pub struct TransferCommand {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct PlayCommand {
-    #[serde(deserialize_with = "deserialize_json_proto")]
+    #[serde(deserialize_with = "json_proto")]
     pub context: Context,
-    #[serde(deserialize_with = "deserialize_json_proto")]
+    #[serde(deserialize_with = "json_proto")]
     pub play_origin: PlayOrigin,
     pub options: PlayOptions,
     pub logging_params: LoggingParams,
@@ -96,7 +96,7 @@ pub struct SeekToCommand {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SkipNextCommand {
-    #[serde(default, deserialize_with = "deserialize_option_json_proto")]
+    #[serde(default, deserialize_with = "option_json_proto")]
     pub track: Option<ProvidedTrack>,
     pub logging_params: LoggingParams,
 }
@@ -109,16 +109,16 @@ pub struct SetShufflingCommand {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct AddToQueueCommand {
-    #[serde(deserialize_with = "deserialize_json_proto")]
+    #[serde(deserialize_with = "json_proto")]
     pub track: ProvidedTrack,
     pub logging_params: LoggingParams,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SetQueueCommand {
-    #[serde(deserialize_with = "deserialize_vec_json_proto")]
+    #[serde(deserialize_with = "vec_json_proto")]
     pub next_tracks: Vec<ProvidedTrack>,
-    #[serde(deserialize_with = "deserialize_vec_json_proto")]
+    #[serde(deserialize_with = "vec_json_proto")]
     pub prev_tracks: Vec<ProvidedTrack>,
     // this queue revision is actually the last revision, so using it will not update the web ui
     // might be that internally they use the last revision to create the next revision
@@ -142,7 +142,7 @@ pub struct TransferOptions {
 #[derive(Clone, Debug, Deserialize)]
 pub struct PlayOptions {
     pub skip_to: SkipTo,
-    #[serde(default, deserialize_with = "deserialize_option_json_proto")]
+    #[serde(default, deserialize_with = "option_json_proto")]
     pub player_option_overrides: Option<ContextPlayerOptionOverrides>,
     pub license: String,
 }

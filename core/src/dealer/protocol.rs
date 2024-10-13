@@ -9,8 +9,7 @@ use crate::Error;
 use base64::prelude::BASE64_STANDARD;
 use base64::{DecodeError, Engine};
 use flate2::read::GzDecoder;
-use protobuf::MessageFull;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use serde_json::Error as SerdeError;
 use thiserror::Error;
 
@@ -151,80 +150,4 @@ fn handle_transfer_encoding(
         )),
         Err(why) => Err(ProtocolError::GZip(why).into()),
     }
-}
-
-fn deserialize_base64_proto<'de, T, D>(de: D) -> Result<Option<T>, D::Error>
-where
-    T: MessageFull,
-    D: Deserializer<'de>,
-{
-    use serde::de::Error;
-
-    let v: String = Deserialize::deserialize(de)?;
-    let bytes = BASE64_STANDARD
-        .decode(v)
-        .map_err(|e| Error::custom(e.to_string()))?;
-
-    T::parse_from_bytes(&bytes).map(Some).map_err(Error::custom)
-}
-
-fn deserialize_json_proto<'de, T, D>(de: D) -> Result<T, D::Error>
-where
-    T: MessageFull,
-    D: Deserializer<'de>,
-{
-    use serde::de::Error;
-
-    let v: JsonValue = Deserialize::deserialize(de)?;
-    protobuf_json_mapping::parse_from_str(&v.to_string()).map_err(|why| {
-        warn!("deserialize_json_proto: {v}");
-        error!("deserialize_json_proto: {why}");
-        Error::custom(why)
-    })
-}
-
-fn deserialize_option_json_proto<'de, T, D>(de: D) -> Result<Option<T>, D::Error>
-where
-    T: MessageFull,
-    D: Deserializer<'de>,
-{
-    use serde::de::Error;
-
-    let v: JsonValue = Deserialize::deserialize(de)?;
-    protobuf_json_mapping::parse_from_str(&v.to_string())
-        .map(Some)
-        .map_err(|why| {
-            warn!("deserialize_json_proto: {v}");
-            error!("deserialize_json_proto: {why}");
-            Error::custom(why)
-        })
-}
-
-fn deserialize_vec_json_proto<'de, T, D>(de: D) -> Result<Vec<T>, D::Error>
-where
-    T: MessageFull,
-    D: Deserializer<'de>,
-{
-    use serde::de::Error;
-
-    let v: JsonValue = Deserialize::deserialize(de)?;
-    let array = match v {
-        JsonValue::Array(array) => array,
-        _ => return Err(Error::custom("the value wasn't an array")),
-    };
-
-    let res = array
-        .into_iter()
-        .flat_map(|elem| protobuf_json_mapping::parse_from_str::<T>(&elem.to_string()))
-        .collect();
-    Ok(res)
-}
-
-fn boxed<'de, T, D>(de: D) -> Result<Box<T>, D::Error>
-where
-    T: Deserialize<'de>,
-    D: Deserializer<'de>,
-{
-    let v: T = Deserialize::deserialize(de)?;
-    Ok(Box::new(v))
 }
