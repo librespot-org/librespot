@@ -1,6 +1,6 @@
 [package]
 name = "librespot-core"
-version = "0.5.0"
+version = "0.5.0-dev"
 rust-version = "1.74"
 authors = ["Paul Lietar <paul@lietar.net>"]
 build = "build.rs"
@@ -11,11 +11,11 @@ edition = "2021"
 
 [dependencies.librespot-oauth]
 path = "../oauth"
-version = "0.5.0"
+version = "0.5.0-dev"
 
 [dependencies.librespot-protocol]
 path = "../protocol"
-version = "0.5.0"
+version = "0.5.0-dev"
 
 [dependencies]
 aes = "0.8"
