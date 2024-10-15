@@ -518,10 +518,10 @@ enum KeepAliveState {
     ExpectingPongAck,
 }
 
-const INITIAL_PING_TIMEOUT: TokioDuration = TokioDuration::from_secs(5);
-const PING_TIMEOUT: TokioDuration = TokioDuration::from_secs(65);
+const INITIAL_PING_TIMEOUT: TokioDuration = TokioDuration::from_secs(20);
+const PING_TIMEOUT: TokioDuration = TokioDuration::from_secs(80); // 60s expected + 20s buffer
 const PONG_DELAY: TokioDuration = TokioDuration::from_secs(60);
-const PONG_ACK_TIMEOUT: TokioDuration = TokioDuration::from_secs(5);
+const PONG_ACK_TIMEOUT: TokioDuration = TokioDuration::from_secs(20);
 
 impl KeepAliveState {
     fn debug(&self, sleep: &Sleep) {
@@ -729,7 +729,7 @@ where
             }
         }
 
-        // Handle the keee-alive sequence, returning an error when we haven't received a
+        // Handle the keep-alive sequence, returning an error when we haven't received a
         // Ping/PongAck for too long.
         //
         // The expected keepalive sequence is
@@ -741,10 +741,11 @@ where
         // - repeat
         //
         // This means that we silently lost connection to Spotify servers if
-        // - we don't receive a Ping 60s after the last PongAck, or
+        // - we don't receive Ping immediately after connecting,
+        // - we don't receive a Ping 60s after the last PongAck or
         // - we don't receive a PongAck immediately after our Pong.
         //
-        // Currently, we add a safety margin of 5s to these expected deadlines.
+        // Currently, we add a safety margin of 20s to these expected deadlines.
         let mut this = self.as_mut().project();
         if let Poll::Ready(()) = this.timeout.as_mut().poll(cx) {
             match this.keep_alive_state {
