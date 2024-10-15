@@ -59,7 +59,7 @@ thiserror = "1.0"
 time = { version = "0.3", features = ["formatting", "parsing"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "parking_lot", "rt", "sync", "time"] }
 tokio-stream = "0.1"
-tokio-tungstenite = { version = "*", default-features = false, features = ["rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["rustls-tls-native-roots"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 url = "2"
 uuid = { version = "1", default-features = false, features = ["fast-rng", "v4"] }
