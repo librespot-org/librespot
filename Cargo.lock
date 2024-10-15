@@ -2031,6 +2031,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "serde_repr",
  "sha1",
  "thiserror",
  "tokio",

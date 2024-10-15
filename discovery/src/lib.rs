@@ -57,7 +57,7 @@ impl DnsSdHandle {
     }
 }
 
-pub type ServiceBuilder = fn(
+pub type DnsSdServiceBuilder = fn(
     Cow<'static, str>,
     Vec<std::net::IpAddr>,
     u16,
@@ -69,7 +69,7 @@ pub type ServiceBuilder = fn(
 pub const BACKENDS: &[(
     &str,
     // If None, the backend is known but wasn't compiled.
-    Option<ServiceBuilder>,
+    Option<DnsSdServiceBuilder>,
 )] = &[
     #[cfg(feature = "with-avahi")]
     ("avahi", Some(launch_avahi)),
@@ -85,7 +85,7 @@ pub const BACKENDS: &[(
     ("libmdns", None),
 ];
 
-pub fn find(name: Option<&str>) -> Result<ServiceBuilder, Error> {
+pub fn find(name: Option<&str>) -> Result<DnsSdServiceBuilder, Error> {
     if let Some(ref name) = name {
         match BACKENDS.iter().find(|(id, _)| name == id) {
             Some((_id, Some(launch_svc))) => Ok(*launch_svc),
@@ -127,7 +127,7 @@ pub struct Builder {
     server_config: server::Config,
     port: u16,
     zeroconf_ip: Vec<std::net::IpAddr>,
-    zeroconf_backend: Option<ServiceBuilder>,
+    zeroconf_backend: Option<DnsSdServiceBuilder>,
 }
 
 /// Errors that can occur while setting up a [`Discovery`] instance.
@@ -468,7 +468,7 @@ impl Builder {
     }
 
     /// Set the zeroconf (MDNS and DNS-SD) implementation to use.
-    pub fn zeroconf_backend(mut self, zeroconf_backend: ServiceBuilder) -> Self {
+    pub fn zeroconf_backend(mut self, zeroconf_backend: DnsSdServiceBuilder) -> Self {
         self.zeroconf_backend = Some(zeroconf_backend);
         self
     }
