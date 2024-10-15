@@ -5,9 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) since v0.2.0.
 
-## [0.5.0-dev] - YYYY-MM-DD
+## [0.5.0-dev] - 2024-10-15
 
-This version will be a major departure from the architecture up until now. It
+This version is be a major departure from the architecture up until now. It
 focuses on implementing the "new Spotify API". This  means moving large parts
 of the Spotify protocol from Mercury to HTTP. A lot of this was reverse
 engineered before by @devgianlu of librespot-java. It was long overdue that we
@@ -17,7 +17,7 @@ hopefully upcoming Spotify HiFi depend on it.
 Splitting up the work on the new Spotify API, v0.5.0 brings HTTP-based file
 downloads and metadata access. Implementing the "dealer" (replacing the current
 Mercury-based SPIRC message bus with WebSockets, also required for social plays)
-is separate large effort, to be targeted for v0.6.0.
+is a large and separate effort, slated for some later release.
 
 While at it, we are taking the liberty to do some major refactoring to make
 librespot more robust. Consequently not only the Spotify API changed but large
@@ -39,6 +39,7 @@ https://github.com/librespot-org/librespot
 - [all] Use a single `player` instance. Eliminates occasional `player` and
   `audio backend` restarts, which can cause issues with some playback
   configurations.
+- [all] Updated and removed unused dependencies
 - [audio] Files are now downloaded over the HTTPS CDN (breaking)
 - [audio] Improve file opening and seeking performance (breaking)
 - [core] MSRV is now 1.74 (breaking)
@@ -46,6 +47,7 @@ https://github.com/librespot-org/librespot
 - [connect] Update and expose all `spirc` context fields (breaking)
 - [connect] Add `Clone, Defaut` traits to `spirc` contexts
 - [connect] Autoplay contexts are now retrieved with the `spclient` (breaking)
+- [contrib] Updated Docker image
 - [core] Message listeners are registered before authenticating. As a result
   there now is a separate `Session::new` and subsequent `session.connect`.
   (breaking)
@@ -77,6 +79,7 @@ https://github.com/librespot-org/librespot
 
 - [all] Check that array indexes are within bounds (panic safety)
 - [all] Wrap errors in librespot `Error` type (breaking)
+- [audio] Make audio fetch parameters tunable
 - [connect] Add option on which zeroconf will bind. Defaults to all interfaces. Ignored by DNS-SD.
 - [connect] Add session events
 - [connect] Add `repeat`, `set_position_ms` and `set_volume` to `spirc.rs`
@@ -96,6 +99,8 @@ https://github.com/librespot-org/librespot
 - [core] Support parsing `SpotifyId` for local files
 - [core] Support parsing `SpotifyId` for named playlists
 - [core] Add checks and handling for stale server connections.
+- [core] Fix potential deadlock waiting for audio decryption keys.
+- [discovery] Add option to show playback device as a group
 - [main] Add all player events to `player_event_handler.rs`
 - [main] Add an event worker thread that runs async to the main thread(s) but
   sync to itself to prevent potential data races for event consumers
@@ -119,11 +124,15 @@ https://github.com/librespot-org/librespot
 - [connect] Loading previous or next tracks, or looping back on repeat, will
   only start playback when we were already playing
 - [connect, playback] Clean up and de-noise events and event firing
+- [core] Fixed frequent disconnections for some users
+- [core] More strict Spotify ID parsing
+- [discovery] Update active user field upon connection
 - [playback] Handle invalid track start positions by just starting the track
   from the beginning
 - [playback] Handle disappearing and invalid devices better
 - [playback] Handle seek, pause, and play commands while loading
 - [playback] Handle disabled normalisation correctly when using fixed volume
+- [playback] Do not stop sink in gapless mode
 - [metadata] Fix missing colon when converting named spotify IDs to URIs
 
 ## [0.4.2] - 2022-07-29
