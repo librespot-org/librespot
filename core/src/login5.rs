@@ -149,8 +149,6 @@ impl Login5Manager {
     /// stored credentials generated with the keymaster client-id will not work, for example, with
     /// the android client-id.
     pub async fn auth_token(&self) -> Result<Token, Error> {
-        let _lock = self.unique_lock().await?;
-
         let auth_token = self.lock(|inner| {
             if let Some(token) = &inner.auth_token {
                 if token.is_expired() {
