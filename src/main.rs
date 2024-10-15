@@ -22,6 +22,7 @@ use librespot::{
         authentication::Credentials, cache::Cache, config::DeviceType, version, Session,
         SessionConfig,
     },
+    discovery::DnsSdServiceBuilder,
     playback::{
         audio_backend::{self, SinkBuilder, BACKENDS},
         config::{
@@ -216,7 +217,7 @@ struct Setup {
     player_event_program: Option<String>,
     emit_sink_events: bool,
     zeroconf_ip: Vec<std::net::IpAddr>,
-    zeroconf_backend: Option<librespot::discovery::ServiceBuilder>,
+    zeroconf_backend: Option<DnsSdServiceBuilder>,
 }
 
 fn get_setup() -> Setup {
@@ -2051,8 +2052,6 @@ async fn main() {
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => (),
-        _ = async {
-            while shutdown_tasks.join_next().await.is_some() {}
-        } => (),
+        _ = shutdown_tasks.join_all() => (),
     }
 }

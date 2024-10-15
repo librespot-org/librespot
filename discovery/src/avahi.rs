@@ -34,10 +34,10 @@ mod server {
 }
 
 mod entry_group {
-    use serde::Deserialize;
+    use serde_repr::Deserialize_repr;
     use zbus::zvariant;
 
-    #[derive(Clone, Copy, Debug, Deserialize)]
+    #[derive(Clone, Copy, Debug, Deserialize_repr)]
     #[repr(i32)]
     pub enum EntryGroupState {
         // The group has not yet been committed, the user must still call avahi_entry_group_commit()
