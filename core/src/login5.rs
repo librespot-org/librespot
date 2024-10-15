@@ -3,13 +3,14 @@ use crate::token::Token;
 use crate::{util, Error, SessionConfig};
 use bytes::Bytes;
 use http::{header::ACCEPT, HeaderValue, Method, Request};
+use librespot_protocol::login5::login_response::Response;
 use librespot_protocol::{
     client_info::ClientInfo,
     credentials::{Password, StoredCredential},
     hashcash::HashcashSolution,
     login5::{
-        login_request::Login_method, ChallengeSolution, Challenges, LoginError, LoginOk,
-        LoginRequest, LoginResponse,
+        login_request::Login_method, ChallengeSolution, LoginError, LoginOk, LoginRequest,
+        LoginResponse,
     },
 };
 use protobuf::well_known_types::duration::Duration as ProtoDuration;
@@ -30,15 +31,29 @@ component! {
 
 #[derive(Debug, Error)]
 enum Login5Error {
-    #[error("Requesting login failed: {0:?}")]
+    #[error("Login request was denied: {0:?}")]
     FaultyRequest(LoginError),
-    #[error("doesn't support code challenge")]
+    #[error("Code challenge is not supported")]
     CodeChallenge,
+    #[error("Tried to acquire token without stored credentials")]
+    NoStoredCredentials,
+    #[error("Couldn't successfully authenticate after {0} times")]
+    RetriesFailed(u8),
+    #[error("Login via login5 is only allowed for android or ios")]
+    OnlyForMobile,
 }
 
 impl From<Login5Error> for Error {
     fn from(err: Login5Error) -> Self {
-        Error::failed_precondition(err)
+        match err {
+            Login5Error::NoStoredCredentials | Login5Error::OnlyForMobile => {
+                Error::unavailable(err)
+            }
+            Login5Error::RetriesFailed(_) | Login5Error::FaultyRequest(_) => {
+                Error::failed_precondition(err)
+            }
+            Login5Error::CodeChallenge => Error::unimplemented(err),
+        }
     }
 }
 
@@ -57,13 +72,13 @@ impl Login5Manager {
         self.session().http_client().request_body(request).await
     }
 
-    fn new_login_request(&self, login: Login_method) -> LoginRequest {
+    async fn login5_request(&self, login: Login_method) -> Result<LoginOk, Error> {
         let client_id = match OS {
             "macos" | "windows" => self.session().client_id(),
             _ => SessionConfig::default().client_id,
         };
 
-        LoginRequest {
+        let mut login_request = LoginRequest {
             client_info: MessageField::some(ClientInfo {
                 client_id,
                 device_id: self.session().device_id().to_string(),
@@ -71,11 +86,7 @@ impl Login5Manager {
             }),
             login_method: Some(login),
             ..Default::default()
-        }
-    }
-
-    async fn login5_request(&self, login: Login_method) -> Result<LoginOk, Error> {
-        let mut login_request = self.new_login_request(login.clone());
+        };
 
         let mut response = self.request(&login_request).await?;
         let mut count = 0;
@@ -84,8 +95,8 @@ impl Login5Manager {
             count += 1;
 
             let message = LoginResponse::parse_from_bytes(&response)?;
-            if message.has_ok() {
-                break Ok(message.ok().to_owned());
+            if let Some(Response::Ok(ok)) = message.response {
+                break Ok(ok);
             }
 
             if message.has_error() {
@@ -98,16 +109,14 @@ impl Login5Manager {
             }
 
             if message.has_challenges() {
-                login_request.login_context = message.login_context.clone();
-                Self::handle_challenges(&mut login_request, message.challenges())?;
+                // handles the challenges, and updates the login context with the response
+                Self::handle_challenges(&mut login_request, message)?;
             }
 
             if count < MAX_LOGIN_TRIES {
                 response = self.request(&login_request).await?;
             } else {
-                return Err(Error::failed_precondition(format!(
-                    "Unable to solve any of {MAX_LOGIN_TRIES} hash cash challenges"
-                )));
+                return Err(Login5Error::RetriesFailed(MAX_LOGIN_TRIES).into());
             }
         }
     }
@@ -126,9 +135,7 @@ impl Login5Manager {
     ) -> Result<(Token, Vec<u8>), Error> {
         if !matches!(OS, "android" | "ios") {
             // by manipulating the user-agent and client-id it can be also used/tested on desktop
-            return Err(Error::unavailable(
-                "login5 login only works for android and ios",
-            ));
+            return Err(Login5Error::OnlyForMobile.into());
         }
 
         let method = Login_method::Password(Password {
@@ -138,7 +145,10 @@ impl Login5Manager {
         });
 
         let token_response = self.login5_request(method).await?;
-        let auth_token = Self::token_from_login(&token_response);
+        let auth_token = Self::token_from_login(
+            token_response.access_token,
+            token_response.access_token_expires_in,
+        );
 
         Ok((auth_token, token_response.stored_credential))
     }
@@ -149,6 +159,11 @@ impl Login5Manager {
     /// stored credentials generated with the keymaster client-id will not work, for example, with
     /// the android client-id.
     pub async fn auth_token(&self) -> Result<Token, Error> {
+        let auth_data = self.session().auth_data();
+        if auth_data.is_empty() {
+            return Err(Login5Error::NoStoredCredentials.into());
+        }
+
         let auth_token = self.lock(|inner| {
             if let Some(token) = &inner.auth_token {
                 if token.is_expired() {
@@ -164,37 +179,41 @@ impl Login5Manager {
 
         let method = Login_method::StoredCredential(StoredCredential {
             username: self.session().username().to_string(),
-            data: self.session().auth_data().clone(),
+            data: auth_data,
             ..Default::default()
         });
 
         let token_response = self.login5_request(method).await?;
-        let auth_token = Self::token_from_login(&token_response);
+        let auth_token = Self::token_from_login(
+            token_response.access_token,
+            token_response.access_token_expires_in,
+        );
 
-        self.lock(|inner| {
+        let token = self.lock(|inner| {
             inner.auth_token = Some(auth_token.clone());
+            inner.auth_token.clone()
         });
 
         trace!("Got auth token: {:?}", auth_token);
 
-        Ok(auth_token)
+        token.ok_or(Login5Error::NoStoredCredentials.into())
     }
 
     fn handle_challenges(
         login_request: &mut LoginRequest,
-        challenges: &Challenges,
+        message: LoginResponse,
     ) -> Result<(), Error> {
-        info!(
-            "login5 response has {} challenges...",
+        let challenges = message.challenges();
+        debug!(
+            "Received {} challenges, solving...",
             challenges.challenges.len()
         );
 
         for challenge in &challenges.challenges {
             if challenge.has_code() {
-                debug!("empty challenge, skipping");
                 return Err(Login5Error::CodeChallenge.into());
             } else if !challenge.has_hashcash() {
-                debug!("empty challenge, skipping");
+                debug!("Challenge was empty, skipping...");
                 continue;
             }
 
@@ -202,14 +221,14 @@ impl Login5Manager {
 
             let mut suffix = [0u8; 0x10];
             let duration = util::solve_hash_cash(
-                &login_request.login_context,
+                &message.login_context,
                 &hash_cash_challenge.prefix,
                 hash_cash_challenge.length,
                 &mut suffix,
             )?;
 
             let (seconds, nanos) = (duration.as_secs() as i64, duration.subsec_nanos() as i32);
-            info!("solving login5 hashcash took {seconds}.{nanos}s");
+            debug!("Solving hashcash took {seconds}s {nanos}ns");
 
             let mut solution = ChallengeSolution::new();
             solution.set_hashcash(HashcashSolution {
@@ -229,15 +248,15 @@ impl Login5Manager {
                 .push(solution);
         }
 
+        login_request.login_context = message.login_context;
+
         Ok(())
     }
 
-    fn token_from_login(login: &LoginOk) -> Token {
+    fn token_from_login(token: String, expires_in: i32) -> Token {
         Token {
-            access_token: login.access_token.clone(),
-            expires_in: Duration::from_secs(
-                login.access_token_expires_in.try_into().unwrap_or(3600),
-            ),
+            access_token: token,
+            expires_in: Duration::from_secs(expires_in.try_into().unwrap_or(3600)),
             token_type: "Bearer".to_string(),
             scopes: vec![],
             timestamp: Instant::now(),
