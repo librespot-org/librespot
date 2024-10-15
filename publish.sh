@@ -8,15 +8,19 @@ cd $WORKINGDIR
 
 crates=( "protocol" "oauth" "core" "discovery" "audio" "metadata" "playback" "connect" "librespot" )
 
-OS=`uname`
 function replace_in_file() {
-    if [ "$OS" == 'darwin' ]; then
-        # for MacOS
-        sed -i '' -e "$1" "$2"
-    else
-        # for Linux and Windows
-        sed -i'' -e "$1" "$2"
-    fi
+  OS=`uname`
+  shopt -s nocasematch
+  case "$OS" in
+    darwin)
+      # for macOS
+      sed -i '' -e "$1" "$2"
+      ;;
+    *)
+      # for Linux and Windows
+      sed -i'' -e "$1" "$2"
+      ;;
+  esac
 }
 
 function switchBranch {
