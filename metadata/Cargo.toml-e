@@ -1,6 +1,6 @@
 [package]
 name = "librespot-metadata"
-version = "0.5.0-dev"
+version = "0.5.0"
 rust-version = "1.74"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The metadata logic for librespot"
@@ -20,8 +20,8 @@ serde_json = "1.0"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies.librespot-protocol]
 path = "../protocol"
-version = "0.5.0-dev"
+version = "0.5.0"

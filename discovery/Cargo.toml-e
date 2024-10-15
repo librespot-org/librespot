@@ -1,6 +1,6 @@
 [package]
 name = "librespot-discovery"
-version = "0.5.0-dev"
+version = "0.5.0"
 rust-version = "1.74"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The discovery logic for librespot"
@@ -31,7 +31,7 @@ tokio = { version = "1", features = ["parking_lot", "sync", "rt"] }
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dev-dependencies]
 futures = "0.3"

@@ -1,6 +1,6 @@
 [package]
 name = "librespot-audio"
-version = "0.5.0-dev"
+version = "0.5.0"
 rust-version = "1.74"
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The audio fetching logic for librespot"
@@ -10,7 +10,7 @@ edition = "2021"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies]
 aes = "0.8"
