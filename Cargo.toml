@@ -1,7 +1,7 @@
 [package]
 name = "librespot"
 version = "0.5.0-dev"
-rust-version = "1.74"
+rust-version = "1.75"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
@@ -62,8 +62,11 @@ log = "0.4"
 sha1 = "0.10"
 sysinfo = { version = "0.31.3", default-features = false, features = ["system"] }
 thiserror = "1.0"
+time = { version = "0.3", features = ["formatting"] }
 tokio = { version = "1", features = ["rt", "macros", "signal", "sync", "parking_lot", "process"] }
 url = "2.2"
+zbus = { version = "4", default-features = false, features = ["tokio"], optional = true }
+zvariant = { version = "4", default-features = false, optional = true }
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
@@ -79,7 +82,9 @@ with-dns-sd = ["librespot-core/with-dns-sd", "librespot-discovery/with-dns-sd"]
 
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
-default = ["rodio-backend"]
+with-mpris = ["dep:zbus", "dep:zvariant"]
+
+default = ["rodio-backend", "with-mpris"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
