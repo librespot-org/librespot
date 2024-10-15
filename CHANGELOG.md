@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- [core] The `access_token` for http requests is now acquired by `login5`
+
 ### Added
 
-### Changed
+- [core] Add `login` (mobile) and `auth_token` retrieval via login5
 
 ### Removed
 
