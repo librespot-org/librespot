@@ -6,7 +6,7 @@ FROM rust:${rust_version}-${debian_version}
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
 ENV RUST_BACKTRACE=1
-ENV RUSTFLAGS="-D warnings -A renamed-and-removed-lints"
+ENV RUSTFLAGS="-D warnings"
 
 
 RUN apt-get update && \

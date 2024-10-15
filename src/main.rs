@@ -1092,6 +1092,8 @@ fn get_setup() -> Setup {
         tmp_dir
     });
 
+    let enable_oauth = opt_present(ENABLE_OAUTH);
+
     let cache = {
         let volume_dir = opt_str(SYSTEM_CACHE)
             .or_else(|| opt_str(CACHE))
@@ -1139,16 +1141,20 @@ fn get_setup() -> Setup {
             );
         }
 
-        match Cache::new(cred_dir, volume_dir, audio_dir, limit) {
+        let cache = match Cache::new(cred_dir.clone(), volume_dir, audio_dir, limit) {
             Ok(cache) => Some(cache),
             Err(e) => {
                 warn!("Cannot create cache: {}", e);
                 None
             }
-        }
-    };
+        };
 
-    let enable_oauth = opt_present(ENABLE_OAUTH);
+        if enable_oauth && (cache.is_none() || cred_dir.is_none()) {
+            warn!("Credential caching is unavailable, but advisable when using OAuth login.");
+        }
+
+        cache
+    };
 
     let credentials = {
         let cached_creds = cache.as_ref().and_then(Cache::credentials);

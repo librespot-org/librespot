@@ -901,7 +901,7 @@ impl PlayerTrackLoader {
         }
     }
 
-    fn stream_data_rate(&self, format: AudioFileFormat) -> usize {
+    fn stream_data_rate(&self, format: AudioFileFormat) -> Option<usize> {
         let kbps = match format {
             AudioFileFormat::OGG_VORBIS_96 => 12,
             AudioFileFormat::OGG_VORBIS_160 => 20,
@@ -913,9 +913,17 @@ impl PlayerTrackLoader {
             AudioFileFormat::MP3_160_ENC => 20,
             AudioFileFormat::AAC_24 => 3,
             AudioFileFormat::AAC_48 => 6,
+            AudioFileFormat::AAC_160 => 20,
+            AudioFileFormat::AAC_320 => 40,
+            AudioFileFormat::MP4_128 => 16,
+            AudioFileFormat::OTHER5 => 40,
             AudioFileFormat::FLAC_FLAC => 112, // assume 900 kbit/s on average
+            AudioFileFormat::UNKNOWN_FORMAT => {
+                error!("Unknown stream data rate");
+                return None;
+            }
         };
-        kbps * 1024
+        Some(kbps * 1024)
     }
 
     async fn load_track(
@@ -993,7 +1001,7 @@ impl PlayerTrackLoader {
                 }
             };
 
-        let bytes_per_second = self.stream_data_rate(format);
+        let bytes_per_second = self.stream_data_rate(format)?;
 
         // This is only a loop to be able to reload the file if an error occurred
         // while opening a cached file.

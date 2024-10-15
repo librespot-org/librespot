@@ -37,7 +37,7 @@ on:
 
 env:
   RUST_BACKTRACE: 1
-  RUSTFLAGS: -D warnings -A renamed-and-removed-lints
+  RUSTFLAGS: -D warnings
 
 # The layering here is as follows:
 #  1. code formatting
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v4.2.1
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain stable  -y
       - run: cargo fmt --all -- --check
@@ -68,7 +68,7 @@ jobs:
         toolchain: [stable]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v4.2.1
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain ${{ matrix.toolchain }}  -y
@@ -79,7 +79,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.0.2
+        uses: actions/cache@v4.1.1
         with:
           path: |
             ~/.cargo/registry/index
@@ -119,7 +119,7 @@ jobs:
             experimental: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v4.2.1
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -130,7 +130,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.0.2
+        uses: actions/cache@v4.1.1
         with:
           path: |
             ~/.cargo/registry/index
@@ -142,7 +142,8 @@ jobs:
       - name: Install developer package dependencies
         run: sudo apt-get update && sudo apt install -y libunwind-dev && sudo apt-get install libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev gstreamer1.0-dev libgstreamer-plugins-base1.0-dev libavahi-compat-libdnssd-dev
 
-      - run: cargo build --workspace --examples
+      - run: cargo fetch --locked
+      - run: cargo build --frozen --workspace --examples
       - run: cargo test --workspace
 
       - run: cargo install cargo-hack
@@ -167,7 +168,7 @@ jobs:
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v4.2.1
     
       # hyper-rustls >=0.27 uses aws-lc as default backend which requires NASM to build
       - name: Install NASM
@@ -182,7 +183,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.0.2
+        uses: actions/cache@v4.1.1
         with:
           path: |
             ~/.cargo/registry/index
@@ -191,7 +192,8 @@ jobs:
             target
           key: ${{ runner.os }}-${{ steps.get-rustc-version.outputs.version }}-${{ hashFiles('Cargo.lock') }}
 
-      - run: cargo build --workspace --examples
+      - run: cargo fetch --locked
+      - run: cargo build --frozen --workspace --examples
       - run: cargo test --workspace
 
       - run: cargo install cargo-hack
@@ -217,7 +219,7 @@ jobs:
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v4.2.1
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -228,7 +230,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.0.2
+        uses: actions/cache@v4.1.1
         with:
           path: |
             ~/.cargo/registry/index
@@ -268,8 +270,10 @@ jobs:
               echo "CARGO_TARGET_${target}_LINKER=riscv64-linux-gnu-gcc" >> $GITHUB_ENV
             fi
             
+      - name: Fetch
+        run: cargo fetch --locked
       - name: Build
-        run: cargo build --verbose --target ${{ matrix.target }} --no-default-features
+        run: cargo build --frozen --verbose --target ${{ matrix.target }} --no-default-features
       
       - name: Check binary
         run: file target/${{ matrix.target }}/debug/librespot

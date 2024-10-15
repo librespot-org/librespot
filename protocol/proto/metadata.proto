@@ -288,7 +288,7 @@ message ExternalId {
 message AudioFile {
     optional bytes file_id = 1;
     
-    optional Format format = 2;
+    optional Format format = 2 [default = UNKNOWN_FORMAT];
     enum Format {
         OGG_VORBIS_96 = 0;
         OGG_VORBIS_160 = 1;
@@ -300,7 +300,12 @@ message AudioFile {
         MP3_160_ENC = 7;
         AAC_24 = 8;
         AAC_48 = 9;
+        AAC_160 = 10;
+        AAC_320 = 11;
+        MP4_128 = 12;
+        OTHER5 = 13;
         FLAC_FLAC = 16;
+        UNKNOWN_FORMAT = 255;
     }
 }
 
