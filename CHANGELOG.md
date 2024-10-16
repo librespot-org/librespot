@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- [discovery] Added a new MDNS/DNS-SD backend which connects to Avahi via D-Bus.
 
 ### Changed
 
@@ -50,7 +51,7 @@ https://github.com/librespot-org/librespot
 - [all] Updated and removed unused dependencies
 - [audio] Files are now downloaded over the HTTPS CDN (breaking)
 - [audio] Improve file opening and seeking performance (breaking)
-- [core] MSRV is now 1.74 (breaking)
+- [core] MSRV is now 1.75 (breaking)
 - [connect] `DeviceType` moved out of `connect` into `core` (breaking)
 - [connect] Update and expose all `spirc` context fields (breaking)
 - [connect] Add `Clone, Defaut` traits to `spirc` contexts
@@ -70,6 +71,9 @@ https://github.com/librespot-org/librespot
 - [core] `Session::connect` tries multiple access points, retrying each one.
 - [core] Each access point connection now timesout after 3 seconds.
 - [core] Listen on both IPV4 and IPV6 on non-windows hosts
+- [discovery] librespot can now be compiled with multiple MDNS/DNS-SD backends
+  (avahi, dns_sd, libmdns) which can be selected using a CLI flag. The defaults
+  are unchanged.
 - [main] `autoplay {on|off}` now acts as an override. If unspecified, `librespot`
   now follows the setting in the Connect client that controls it. (breaking)
 - [metadata] Most metadata is now retrieved with the `spclient` (breaking)

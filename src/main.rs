@@ -22,6 +22,7 @@ use librespot::{
         authentication::Credentials, cache::Cache, config::DeviceType, version, Session,
         SessionConfig,
     },
+    discovery::DnsSdServiceBuilder,
     playback::{
         audio_backend::{self, SinkBuilder, BACKENDS},
         config::{
@@ -212,11 +213,11 @@ struct Setup {
     credentials: Option<Credentials>,
     enable_oauth: bool,
     oauth_port: Option<u16>,
-    enable_discovery: bool,
     zeroconf_port: u16,
     player_event_program: Option<String>,
     emit_sink_events: bool,
     zeroconf_ip: Vec<std::net::IpAddr>,
+    zeroconf_backend: Option<DnsSdServiceBuilder>,
 }
 
 fn get_setup() -> Setup {
@@ -277,6 +278,7 @@ fn get_setup() -> Setup {
     const VOLUME_RANGE: &str = "volume-range";
     const ZEROCONF_PORT: &str = "zeroconf-port";
     const ZEROCONF_INTERFACE: &str = "zeroconf-interface";
+    const ZEROCONF_BACKEND: &str = "zeroconf-backend";
 
     // Mostly arbitrary.
     const AP_PORT_SHORT: &str = "a";
@@ -327,6 +329,7 @@ fn get_setup() -> Setup {
     const NORMALISATION_RELEASE_SHORT: &str = "y";
     const NORMALISATION_THRESHOLD_SHORT: &str = "Z";
     const ZEROCONF_PORT_SHORT: &str = "z";
+    const ZEROCONF_BACKEND_SHORT: &str = ""; // no short flag
 
     // Options that have different descriptions
     // depending on what backends were enabled at build time.
@@ -638,6 +641,12 @@ fn get_setup() -> Setup {
         ZEROCONF_INTERFACE,
         "Comma-separated interface IP addresses on which zeroconf will bind. Defaults to all interfaces. Ignored by DNS-SD.",
         "IP"
+    )
+    .optopt(
+        ZEROCONF_BACKEND_SHORT,
+        ZEROCONF_BACKEND,
+        "Zeroconf (MDNS/DNS-SD) backend to use. Valid values are 'avahi', 'dns-sd' and 'libmdns', if librespot is compiled with the corresponding feature flags.",
+        "BACKEND"
     );
 
     #[cfg(feature = "passthrough-decoder")]
@@ -803,12 +812,22 @@ fn get_setup() -> Setup {
         exit(0);
     }
 
+    // Can't use `-> fmt::Arguments` due to https://github.com/rust-lang/rust/issues/92698
+    fn format_flag(long: &str, short: &str) -> String {
+        if short.is_empty() {
+            format!("`--{long}`")
+        } else {
+            format!("`--{long}` / `-{short}`")
+        }
+    }
+
     let invalid_error_msg =
         |long: &str, short: &str, invalid: &str, valid_values: &str, default_value: &str| {
-            error!("Invalid `--{long}` / `-{short}`: \"{invalid}\"");
+            let flag = format_flag(long, short);
+            error!("Invalid {flag}: \"{invalid}\"");
 
             if !valid_values.is_empty() {
-                println!("Valid `--{long}` / `-{short}` values: {valid_values}");
+                println!("Valid {flag} values: {valid_values}");
             }
 
             if !default_value.is_empty() {
@@ -1190,9 +1209,22 @@ fn get_setup() -> Setup {
         }
     };
 
-    let enable_discovery = !opt_present(DISABLE_DISCOVERY);
+    let no_discovery_reason = if !cfg!(any(
+        feature = "with-libmdns",
+        feature = "with-dns-sd",
+        feature = "with-avahi"
+    )) {
+        Some("librespot compiled without zeroconf backend".to_owned())
+    } else if opt_present(DISABLE_DISCOVERY) {
+        Some(format!(
+            "the `--{}` / `-{}` flag set",
+            DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT,
+        ))
+    } else {
+        None
+    };
 
-    if credentials.is_none() && !enable_discovery && !enable_oauth {
+    if credentials.is_none() && no_discovery_reason.is_some() && !enable_oauth {
         error!("Credentials are required if discovery and oauth login are disabled.");
         exit(1);
     }
@@ -1225,14 +1257,16 @@ fn get_setup() -> Setup {
         Some(5588)
     };
 
-    if !enable_discovery && opt_present(ZEROCONF_PORT) {
-        warn!(
-            "With the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
-            DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
-        );
+    if let Some(reason) = no_discovery_reason.as_deref() {
+        if opt_present(ZEROCONF_PORT) {
+            warn!(
+                "With {} `--{}` / `-{}` has no effect.",
+                reason, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
+            );
+        }
     }
 
-    let zeroconf_port = if enable_discovery {
+    let zeroconf_port = if no_discovery_reason.is_none() {
         opt_str(ZEROCONF_PORT)
             .map(|port| match port.parse::<u16>() {
                 Ok(value) if value != 0 => value,
@@ -1268,6 +1302,16 @@ fn get_setup() -> Setup {
         None => SessionConfig::default().autoplay,
     };
 
+    if let Some(reason) = no_discovery_reason.as_deref() {
+        if opt_present(ZEROCONF_INTERFACE) {
+            warn!(
+                "With {} {} has no effect.",
+                reason,
+                format_flag(ZEROCONF_INTERFACE, ZEROCONF_INTERFACE_SHORT),
+            );
+        }
+    }
+
     let zeroconf_ip: Vec<std::net::IpAddr> = if opt_present(ZEROCONF_INTERFACE) {
         if let Some(zeroconf_ip) = opt_str(ZEROCONF_INTERFACE) {
             zeroconf_ip
@@ -1292,6 +1336,39 @@ fn get_setup() -> Setup {
     } else {
         vec![]
     };
+
+    if let Some(reason) = no_discovery_reason.as_deref() {
+        if opt_present(ZEROCONF_BACKEND) {
+            warn!(
+                "With {} `--{}` / `-{}` has no effect.",
+                reason, ZEROCONF_BACKEND, ZEROCONF_BACKEND_SHORT
+            );
+        }
+    }
+
+    let zeroconf_backend_name = opt_str(ZEROCONF_BACKEND);
+    let zeroconf_backend = no_discovery_reason.is_none().then(|| {
+        librespot::discovery::find(zeroconf_backend_name.as_deref()).unwrap_or_else(|_| {
+            let available_backends: Vec<_> = librespot::discovery::BACKENDS
+                .iter()
+                .filter_map(|(id, launch_svc)| launch_svc.map(|_| *id))
+                .collect();
+            let default_backend = librespot::discovery::BACKENDS
+                .iter()
+                .find_map(|(id, launch_svc)| launch_svc.map(|_| *id))
+                .unwrap_or("<none>");
+
+            invalid_error_msg(
+                ZEROCONF_BACKEND,
+                ZEROCONF_BACKEND_SHORT,
+                &zeroconf_backend_name.unwrap_or_default(),
+                &available_backends.join(", "),
+                default_backend,
+            );
+
+            exit(1);
+        })
+    });
 
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
@@ -1734,11 +1811,11 @@ fn get_setup() -> Setup {
         credentials,
         enable_oauth,
         oauth_port,
-        enable_discovery,
         zeroconf_port,
         player_event_program,
         emit_sink_events,
         zeroconf_ip,
+        zeroconf_backend,
     }
 }
 
@@ -1767,7 +1844,7 @@ async fn main() {
 
     let mut sys = System::new();
 
-    if setup.enable_discovery {
+    if let Some(zeroconf_backend) = setup.zeroconf_backend {
         // When started at boot as a service discovery may fail due to it
         // trying to bind to interfaces before the network is actually up.
         // This could be prevented in systemd by starting the service after
@@ -1787,6 +1864,7 @@ async fn main() {
                 .is_group(setup.connect_config.is_group)
                 .port(setup.zeroconf_port)
                 .zeroconf_ip(setup.zeroconf_ip.clone())
+                .zeroconf_backend(zeroconf_backend)
                 .launch()
             {
                 Ok(d) => break Some(d),
@@ -1955,18 +2033,25 @@ async fn main() {
 
     info!("Gracefully shutting down");
 
+    let mut shutdown_tasks = tokio::task::JoinSet::new();
+
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
         if let Err(e) = spirc.shutdown() {
             error!("error sending spirc shutdown message: {}", e);
         }
 
-        if let Some(mut spirc_task) = spirc_task {
-            tokio::select! {
-                _ = tokio::signal::ctrl_c() => (),
-                _ = spirc_task.as_mut() => (),
-                else => (),
-            }
+        if let Some(spirc_task) = spirc_task {
+            shutdown_tasks.spawn(spirc_task);
         }
+    }
+
+    if let Some(discovery) = discovery {
+        shutdown_tasks.spawn(discovery.shutdown());
+    }
+
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => (),
+        _ = shutdown_tasks.join_all() => (),
     }
 }
