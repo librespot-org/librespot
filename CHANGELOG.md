@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+### Fixed 
+
+- [connect] Fixes initial volume showing zero despite playing in full volume instead
+
 ## [0.5.0] - 2024-10-15
 
 This version is be a major departure from the architecture up until now. It

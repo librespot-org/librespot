@@ -1509,7 +1509,7 @@ impl SpircTask {
     fn set_volume(&mut self, volume: u16) {
         let old_volume = self.device.volume();
         let new_volume = volume as u32;
-        if old_volume != new_volume {
+        if old_volume != new_volume || self.mixer.volume() != volume {
             self.device.set_volume(new_volume);
             self.mixer.set_volume(volume);
             if let Some(cache) = self.session.cache() {
