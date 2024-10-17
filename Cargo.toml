@@ -98,3 +98,6 @@ assets = [
     ["contrib/librespot.service", "lib/systemd/system/", "644"],
     ["contrib/librespot.user.service", "lib/systemd/user/", "644"]
 ]
+
+[workspace.package]
+rust-version = "1.74"
