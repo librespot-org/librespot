@@ -124,6 +124,7 @@ enum PlayerCommand {
     EmitFilterExplicitContentChangedEvent(bool),
     EmitShuffleChangedEvent(bool),
     EmitRepeatChangedEvent(bool),
+    EmitRepeatOneChangedEvent(bool),
     EmitAutoPlayChangedEvent(bool),
 }
 
@@ -219,6 +220,9 @@ pub enum PlayerEvent {
     },
     RepeatChanged {
         repeat: bool,
+    },
+    RepeatOneChanged {
+        repeat_one: bool,
     },
     AutoPlayChanged {
         auto_play: bool,
@@ -478,7 +482,6 @@ impl Player {
                 player_id,
                 play_request_id_generator: SeqGenerator::new(0),
             };
-
             // While PlayerInternal is written as a future, it still contains blocking code.
             // It must be run by using block_on() in a dedicated thread.
             let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
@@ -609,6 +612,10 @@ impl Player {
 
     pub fn emit_repeat_changed_event(&self, repeat: bool) {
         self.command(PlayerCommand::EmitRepeatChangedEvent(repeat));
+    }
+
+    pub fn emit_repeat_one_changed_event(&self, repeat_one: bool) {
+        self.command(PlayerCommand::EmitRepeatOneChangedEvent(repeat_one));
     }
 
     pub fn emit_auto_play_changed_event(&self, auto_play: bool) {
@@ -2339,6 +2346,10 @@ impl fmt::Debug for PlayerCommand {
             PlayerCommand::EmitRepeatChangedEvent(repeat) => f
                 .debug_tuple("EmitRepeatChangedEvent")
                 .field(&repeat)
+                .finish(),
+            PlayerCommand::EmitRepeatOneChangedEvent(repeat_one) => f
+                .debug_tuple("EmitRepeatOneChangedEvent")
+                .field(&repeat_one)
                 .finish(),
             PlayerCommand::EmitAutoPlayChangedEvent(auto_play) => f
                 .debug_tuple("EmitAutoPlayChangedEvent")
