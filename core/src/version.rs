@@ -17,16 +17,16 @@ pub const SEMVER: &str = env!("CARGO_PKG_VERSION");
 pub const BUILD_ID: &str = env!("LIBRESPOT_BUILD_ID");
 
 /// The protocol version of the Spotify desktop client.
-pub const SPOTIFY_VERSION: u64 = 117300517;
+pub const SPOTIFY_VERSION: u64 = 124200290;
 
 /// The semantic version of the Spotify desktop client.
 pub const SPOTIFY_SEMANTIC_VERSION: &str = "1.2.31.1205.g4d59ad7c";
 
 /// The protocol version of the Spotify mobile app.
-pub const SPOTIFY_MOBILE_VERSION: &str = "8.6.84";
+pub const SPOTIFY_MOBILE_VERSION: &str = "8.9.82.620";
 
 /// The user agent to fall back to, if one could not be determined dynamically.
-pub const FALLBACK_USER_AGENT: &str = "Spotify/117300517 Linux/0 (librespot)";
+pub const FALLBACK_USER_AGENT: &str = "Spotify/124200290 Linux/0 (librespot)";
 
 pub fn spotify_version() -> String {
     match std::env::consts::OS {
