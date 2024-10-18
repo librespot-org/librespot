@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::hash::{DefaultHasher, Hasher};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -17,6 +18,8 @@ use protobuf::{EnumOrUnknown, Message, MessageField};
 use rand::prelude::SliceRandom;
 use thiserror::Error;
 
+type ContextState = (ContextPage, ContextIndex);
+
 // these limitations are essential, otherwise to many tracks will overload the web-player
 const SPOTIFY_MAX_PREV_TRACKS_SIZE: usize = 10;
 const SPOTIFY_MAX_NEXT_TRACKS_SIZE: usize = 80;
@@ -31,23 +34,21 @@ pub const QUEUE_PROVIDER: &str = "queue";
 const UNAVAILABLE_PROVIDER: &str = "unavailable";
 
 #[derive(Debug, Error)]
-pub enum ConnectStateError {
+pub enum StateError {
     #[error("no next track available")]
     NoNextTrack,
     #[error("no prev track available")]
     NoPrevTrack,
     #[error("message field {0} was not available")]
     MessageFieldNone(String),
-    #[error("context is not available")]
-    NoContext,
-    #[error("not the first context page")]
-    NotFirstContextPage,
+    #[error("context is not available. shuffle: {0}")]
+    NoContext(bool),
     #[error("could not find track {0:?} in context of {1}")]
     CanNotFindTrackInContext(Option<usize>, usize),
 }
 
-impl From<ConnectStateError> for Error {
-    fn from(err: ConnectStateError) -> Self {
+impl From<StateError> for Error {
+    fn from(err: StateError) -> Self {
         Error::failed_precondition(err)
     }
 }
@@ -75,7 +76,7 @@ impl Default for ConnectStateConfig {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug)]
 pub struct ConnectState {
     pub active: bool,
     pub active_since: Option<SystemTime>,
@@ -87,16 +88,22 @@ pub struct ConnectState {
     unavailable_uri: Vec<String>,
     // is only some when we're playing a queued item and have to preserve the index
     player_index: Option<ContextIndex>,
+
     // index: 0 based, so the first track is index 0
-    // prev_track: bottom => top, aka the last track is the prev track
-    // next_track: top => bottom, aka the first track is the next track
+    // prev_track: bottom => top, aka the last track of the list is the prev track
+    // next_track: top => bottom, aka the first track of the list is the next track
     pub player: PlayerState,
+
+    // we don't work directly on the lists of the player state, because
+    // we mostly need to push and pop at the beginning of both
+    pub prev_tracks: VecDeque<ProvidedTrack>,
+    pub next_tracks: VecDeque<ProvidedTrack>,
 
     // the context from which we play, is used to top up prev and next tracks
     // the index is used to keep track which tracks are already loaded into next tracks
-    pub context: Option<(ContextPage, ContextIndex)>,
+    pub context: Option<ContextState>,
     // a context to keep track of our shuffled context, should be only available when option.shuffling_context is true
-    pub shuffle_context: Option<(ContextPage, ContextIndex)>,
+    pub shuffle_context: Option<ContextState>,
 
     pub last_command: Option<Request>,
 }
@@ -116,7 +123,7 @@ impl ConnectState {
                 is_group: cfg.is_group,
                 capabilities: MessageField::some(Capabilities {
                     volume_steps: cfg.volume_steps,
-                    hidden: false,
+                    hidden: false, // could be exposed later to only observe the playback
                     gaia_eq_connect_id: true,
                     can_be_player: true,
 
@@ -126,7 +133,7 @@ impl ConnectState {
                     is_controllable: true,
 
                     supports_logout: cfg.zeroconf_enabled,
-                    supported_types: vec!["audio/episode".to_string(), "audio/track".to_string()],
+                    supported_types: vec!["audio/episode".into(), "audio/track".into()],
                     supports_playlist_v2: true,
                     supports_transfer_command: true,
                     supports_command_request: true,
@@ -141,7 +148,7 @@ impl ConnectState {
                     connect_disabled: false,
                     supports_rename: false,
                     supports_external_episodes: false,
-                    supports_set_backend_metadata: false, // TODO: impl
+                    supports_set_backend_metadata: false,
                     supports_hifi: MessageField::none(),
 
                     command_acks: true,
@@ -149,27 +156,16 @@ impl ConnectState {
                 }),
                 ..Default::default()
             },
+            prev_tracks: VecDeque::with_capacity(SPOTIFY_MAX_PREV_TRACKS_SIZE),
+            next_tracks: VecDeque::with_capacity(SPOTIFY_MAX_NEXT_TRACKS_SIZE),
             ..Default::default()
         };
         state.reset();
         state
     }
 
-    // todo: is there maybe a better way to calculate the hash?
-    pub fn new_queue_revision(&self) -> String {
-        let mut hasher = DefaultHasher::new();
-        for track in &self.player.next_tracks {
-            if let Ok(bytes) = track.write_to_bytes() {
-                hasher.write(&bytes)
-            }
-        }
-
-        hasher.finish().to_string()
-    }
-
     pub fn reset(&mut self) {
-        self.active = false;
-        self.active_since = None;
+        self.set_active(false);
         self.player = PlayerState {
             is_system_initiated: true,
             playback_speed: 1.,
@@ -192,73 +188,6 @@ impl ConnectState {
             self.active = false;
             self.active_since = None
         }
-    }
-
-    fn add_options_if_empty(&mut self) {
-        if self.player.options.is_none() {
-            self.player.options = MessageField::some(ContextPlayerOptions::new())
-        }
-    }
-
-    pub fn set_repeat_context(&mut self, repeat: bool) {
-        self.add_options_if_empty();
-        if let Some(options) = self.player.options.as_mut() {
-            options.repeating_context = repeat;
-        }
-    }
-
-    pub fn set_repeat_track(&mut self, repeat: bool) {
-        self.add_options_if_empty();
-        if let Some(options) = self.player.options.as_mut() {
-            options.repeating_track = repeat;
-        }
-    }
-
-    pub fn set_shuffle(&mut self, shuffle: bool) {
-        self.add_options_if_empty();
-        if let Some(options) = self.player.options.as_mut() {
-            options.shuffling_context = shuffle;
-        }
-    }
-
-    pub fn reset_playback_to_current_track(&mut self) -> Result<(), Error> {
-        let new_index = self.find_index_in_context(|c| c.uri == self.player.track.uri)?;
-        self.reset_playback_context(Some(new_index))
-    }
-
-    pub fn set_current_track(&mut self, index: usize) -> Result<(), Error> {
-        let (context, _) = self.context.as_ref().ok_or(ConnectStateError::NoContext)?;
-        let new_track =
-            context
-                .tracks
-                .get(index)
-                .ok_or(ConnectStateError::CanNotFindTrackInContext(
-                    Some(index),
-                    context.tracks.len(),
-                ))?;
-
-        debug!("track: {}", new_track.uri);
-
-        let new_track = self.context_to_provided_track(new_track)?;
-        self.player.track = MessageField::some(new_track);
-
-        Ok(())
-    }
-
-    pub fn shuffle(&mut self) -> Result<(), Error> {
-        self.player.prev_tracks.clear();
-        self.clear_next_tracks();
-
-        let (ctx, _) = self.context.as_mut().ok_or(ConnectStateError::NoContext)?;
-
-        let mut shuffle_context = ctx.clone();
-        let mut rng = rand::thread_rng();
-        shuffle_context.tracks.shuffle(&mut rng);
-
-        self.shuffle_context = Some((shuffle_context, ContextIndex::new()));
-        self.fill_up_next_tracks_from_current_context()?;
-
-        Ok(())
     }
 
     pub(crate) fn set_status(&mut self, status: &SpircPlayStatus) {
@@ -295,26 +224,117 @@ impl ConnectState {
         }
     }
 
-    pub fn move_to_next_track(&mut self) -> Result<u32, ConnectStateError> {
-        let old_track = self.player.track.take();
-
-        if let Some(old_track) = old_track {
-            // only add songs not from the queue to our previous tracks
-            if old_track.provider != QUEUE_PROVIDER {
-                // add old current track to prev tracks, while preserving a length of 10
-                if self.player.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
-                    self.player.prev_tracks.remove(0);
-                }
-                self.player.prev_tracks.push(old_track);
+    // todo: is there maybe a better or more efficient way to calculate the hash?
+    pub fn new_queue_revision(&self) -> String {
+        let mut hasher = DefaultHasher::new();
+        for track in &self.next_tracks {
+            if let Ok(bytes) = track.write_to_bytes() {
+                hasher.write(&bytes)
             }
         }
 
-        if self.player.next_tracks.is_empty() {
-            return Err(ConnectStateError::NoNextTrack);
+        hasher.finish().to_string()
+    }
+
+    // region options (shuffle, repeat)
+
+    fn add_options_if_empty(&mut self) {
+        if self.player.options.is_none() {
+            self.player.options = MessageField::some(ContextPlayerOptions::new())
+        }
+    }
+
+    pub fn set_repeat_context(&mut self, repeat: bool) {
+        self.add_options_if_empty();
+        if let Some(options) = self.player.options.as_mut() {
+            options.repeating_context = repeat;
+        }
+    }
+
+    pub fn set_repeat_track(&mut self, repeat: bool) {
+        self.add_options_if_empty();
+        if let Some(options) = self.player.options.as_mut() {
+            options.repeating_track = repeat;
+        }
+    }
+
+    pub fn set_shuffle(&mut self, shuffle: bool) {
+        self.add_options_if_empty();
+        if let Some(options) = self.player.options.as_mut() {
+            options.shuffling_context = shuffle;
+        }
+    }
+
+    pub fn shuffle(&mut self) -> Result<(), Error> {
+        self.prev_tracks.clear();
+        self.clear_next_tracks();
+
+        let (ctx, _) = self.context.as_mut().ok_or(StateError::NoContext(false))?;
+
+        let mut shuffle_context = ctx.clone();
+        let mut rng = rand::thread_rng();
+        shuffle_context.tracks.shuffle(&mut rng);
+
+        self.shuffle_context = Some((shuffle_context, ContextIndex::new()));
+        self.fill_up_next_tracks()?;
+
+        Ok(())
+    }
+
+    // endregion
+
+    pub fn set_current_track(&mut self, index: usize, shuffle_context: bool) -> Result<(), Error> {
+        let (context, _) = if shuffle_context {
+            self.shuffle_context.as_ref()
+        } else {
+            self.context.as_ref()
+        }
+        .ok_or(StateError::NoContext(shuffle_context))?;
+
+        let new_track = context
+            .tracks
+            .get(index)
+            .ok_or(StateError::CanNotFindTrackInContext(
+                Some(index),
+                context.tracks.len(),
+            ))?;
+
+        debug!(
+            "set track to: {} at {index} of {} tracks",
+            new_track.uri,
+            context.tracks.len()
+        );
+
+        let new_track = self.context_to_provided_track(new_track)?;
+        self.player.track = MessageField::some(new_track);
+
+        Ok(())
+    }
+
+    /// Move to the next track
+    ///
+    /// Updates the current track to the next track. Adds the old track
+    /// to prev tracks and fills up the next tracks from the current context
+    pub fn next_track(&mut self) -> Result<u32, StateError> {
+        let old_track = self.player.track.take();
+
+        if let Some(old_track) = old_track {
+            // only add songs from our context to our previous tracks
+            if old_track.provider == CONTEXT_PROVIDER {
+                // add old current track to prev tracks, while preserving a length of 10
+                if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
+                    self.prev_tracks.pop_front();
+                }
+                self.prev_tracks.push_back(old_track);
+            }
         }
 
-        let new_track = self.player.next_tracks.remove(0);
-        self.fill_up_next_tracks_from_current_context()?;
+        let new_track = self
+            .next_tracks
+            .pop_front()
+            .ok_or(StateError::NoNextTrack)?;
+
+        self.fill_up_next_tracks()?;
 
         let is_queued_track = new_track.provider == QUEUE_PROVIDER;
         let update_index = if is_queued_track {
@@ -345,37 +365,34 @@ impl ConnectState {
         Ok(self.player.index.track)
     }
 
-    pub fn move_to_prev_track(
-        &mut self,
-    ) -> Result<&MessageField<ProvidedTrack>, ConnectStateError> {
+    /// Move to the prev track
+    ///
+    /// Updates the current track to the prev track. Adds the old track
+    /// to next tracks (when from the context) and fills up the prev tracks from the
+    /// current context
+    pub fn prev_track(&mut self) -> Result<&MessageField<ProvidedTrack>, StateError> {
         let old_track = self.player.track.take();
 
         if let Some(old_track) = old_track {
-            if old_track.provider != QUEUE_PROVIDER {
-                self.player.next_tracks.insert(0, old_track);
+            if old_track.provider == CONTEXT_PROVIDER {
+                self.next_tracks.push_front(old_track);
             }
         }
 
-        while self.player.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-            let _ = self.player.next_tracks.pop();
+        while self.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+            let _ = self.next_tracks.pop_back();
         }
 
-        let new_track = self
-            .player
-            .prev_tracks
-            .pop()
-            .ok_or(ConnectStateError::NoPrevTrack)?;
+        let new_track = self.prev_tracks.pop_back().ok_or(StateError::NoPrevTrack)?;
 
-        self.fill_up_next_tracks_from_current_context()?;
+        self.fill_up_next_tracks()?;
 
         self.player.track = MessageField::some(new_track);
         let index = self
             .player
             .index
             .as_mut()
-            .ok_or(ConnectStateError::MessageFieldNone(
-                "player.index".to_string(),
-            ))?;
+            .ok_or(StateError::MessageFieldNone("player.index".to_string()))?;
 
         index.track -= 1;
 
@@ -384,40 +401,35 @@ impl ConnectState {
         Ok(&self.player.track)
     }
 
-    fn update_player_index(&mut self, new_index: Option<usize>) -> Result<usize, Error> {
-        let new_index = new_index.unwrap_or(0);
-        if let Some(player_index) = self.player.index.as_mut() {
-            player_index.track = new_index as u32;
-        }
-
-        Ok(new_index)
-    }
-
-    fn update_context_index(&mut self, new_index: usize) -> Result<(), ConnectStateError> {
+    fn update_context_index(&mut self, new_index: usize) -> Result<(), StateError> {
         let (_, context_index) = if self.player.options.shuffling_context {
             self.shuffle_context.as_mut()
         } else {
             self.context.as_mut()
         }
-        .ok_or(ConnectStateError::NoContext)?;
+        .ok_or(StateError::NoContext(self.player.options.shuffling_context))?;
 
         context_index.track = new_index as u32;
         Ok(())
     }
 
     pub fn reset_playback_context(&mut self, new_index: Option<usize>) -> Result<(), Error> {
-        let new_index = self.update_player_index(new_index)?;
-        self.update_context_index(new_index + 1)?;
-
-        debug!("resetting playback state to {new_index}");
-
-        if self.player.track.provider != QUEUE_PROVIDER {
-            self.set_current_track(new_index)?;
+        let new_index = new_index.unwrap_or(0);
+        if let Some(player_index) = self.player.index.as_mut() {
+            player_index.track = new_index as u32;
         }
 
-        self.player.prev_tracks.clear();
+        self.update_context_index(new_index + 1)?;
 
-        let (context, _) = self.context.as_ref().ok_or(ConnectStateError::NoContext)?;
+        debug!("reset playback state to {new_index}");
+
+        if self.player.track.provider != QUEUE_PROVIDER {
+            self.set_current_track(new_index, self.player.options.shuffling_context)?;
+        }
+
+        self.prev_tracks.clear();
+
+        let (context, _) = self.context.as_ref().ok_or(StateError::NoContext(false))?;
         if new_index > 0 {
             let rev_ctx = context
                 .tracks
@@ -427,14 +439,13 @@ impl ConnectState {
                 .take(SPOTIFY_MAX_PREV_TRACKS_SIZE);
 
             for track in rev_ctx {
-                self.player
-                    .prev_tracks
-                    .push(self.context_to_provided_track(track)?)
+                self.prev_tracks
+                    .push_back(self.context_to_provided_track(track)?)
             }
         }
 
         self.clear_next_tracks();
-        self.fill_up_next_tracks_from_current_context()?;
+        self.fill_up_next_tracks()?;
         self.update_restrictions();
 
         Ok(())
@@ -456,13 +467,13 @@ impl ConnectState {
             .iter()
             .position(|track| track.provider != QUEUE_PROVIDER)
         {
-            self.player.next_tracks.insert(next_not_queued_track, track);
+            self.next_tracks.insert(next_not_queued_track, track);
         } else {
-            self.player.next_tracks.push(track)
+            self.next_tracks.push_back(track)
         }
 
-        while self.player.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-            self.player.next_tracks.pop();
+        while self.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+            self.next_tracks.pop_back();
         }
 
         if rev_update {
@@ -498,72 +509,15 @@ impl ConnectState {
             Err(_) => return,
         };
 
-        for next_track in &mut self.player.next_tracks {
+        for next_track in &mut self.next_tracks {
             Self::mark_as_unavailable_for_match(next_track, &id)
         }
 
-        for prev_track in &mut self.player.prev_tracks {
+        for prev_track in &mut self.prev_tracks {
             Self::mark_as_unavailable_for_match(prev_track, &id)
         }
 
         self.unavailable_uri.push(id);
-    }
-
-    pub async fn update_state(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
-        if matches!(reason, PutStateReason::BECAME_INACTIVE) {
-            return session.spclient().put_connect_state_inactive(false).await;
-        }
-
-        let now = SystemTime::now();
-        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-        let client_side_timestamp = u64::try_from(since_the_epoch.as_millis())?;
-
-        let member_type = EnumOrUnknown::new(MemberType::CONNECT_STATE);
-        let put_state_reason = EnumOrUnknown::new(reason);
-
-        let state = self.clone();
-
-        let is_active = state.active;
-        let device = MessageField::some(Device {
-            device_info: MessageField::some(state.device),
-            player_state: MessageField::some(state.player),
-            ..Default::default()
-        });
-
-        let mut put_state = PutStateRequest {
-            client_side_timestamp,
-            member_type,
-            put_state_reason,
-            is_active,
-            device,
-            ..Default::default()
-        };
-
-        if let Some(has_been_playing_for) = state.has_been_playing_for {
-            match has_been_playing_for.elapsed().as_millis().try_into() {
-                Ok(ms) => put_state.has_been_playing_for_ms = ms,
-                Err(why) => warn!("couldn't update has been playing for because {why}"),
-            }
-        }
-
-        if let Some(active_since) = state.active_since {
-            if let Ok(active_since_duration) = active_since.duration_since(UNIX_EPOCH) {
-                match active_since_duration.as_millis().try_into() {
-                    Ok(active_since_ms) => put_state.started_playing_at = active_since_ms,
-                    Err(why) => warn!("couldn't update active since because {why}"),
-                }
-            }
-        }
-
-        if let Some(request) = state.last_command {
-            put_state.last_command_message_id = request.message_id;
-            put_state.last_command_sent_by_device_id = request.sent_by_device_id;
-        }
-
-        session
-            .spclient()
-            .put_connect_state_request(put_state)
-            .await
     }
 
     pub fn update_restrictions(&mut self) {
@@ -571,7 +525,7 @@ impl ConnectState {
         const NO_NEXT: &str = "no next tracks";
 
         if let Some(restrictions) = self.player.restrictions.as_mut() {
-            if self.player.prev_tracks.is_empty() {
+            if self.prev_tracks.is_empty() {
                 restrictions.disallow_peeking_prev_reasons = vec![NO_PREV.to_string()];
                 restrictions.disallow_skipping_prev_reasons = vec![NO_PREV.to_string()];
             } else {
@@ -579,7 +533,7 @@ impl ConnectState {
                 restrictions.disallow_skipping_prev_reasons.clear();
             }
 
-            if self.player.next_tracks.is_empty() {
+            if self.next_tracks.is_empty() {
                 restrictions.disallow_peeking_next_reasons = vec![NO_NEXT.to_string()];
                 restrictions.disallow_skipping_next_reasons = vec![NO_NEXT.to_string()];
             } else {
@@ -592,29 +546,28 @@ impl ConnectState {
     fn clear_next_tracks(&mut self) {
         // respect queued track and don't throw them out of our next played tracks
         let first_non_queued_track = self
-            .player
             .next_tracks
             .iter()
             .enumerate()
             .find(|(_, track)| track.provider != QUEUE_PROVIDER);
 
         if let Some((non_queued_track, _)) = first_non_queued_track {
-            while self.player.next_tracks.len() > non_queued_track
-                && self.player.next_tracks.pop().is_some()
-            {}
+            while self.next_tracks.len() > non_queued_track && self.next_tracks.pop_back().is_some()
+            {
+            }
         }
     }
 
-    fn fill_up_next_tracks_from_current_context(&mut self) -> Result<(), ConnectStateError> {
+    fn fill_up_next_tracks(&mut self) -> Result<(), StateError> {
         let (ctx, ctx_index) = if self.player.options.shuffling_context {
             self.shuffle_context.as_ref()
         } else {
             self.context.as_ref()
         }
-        .ok_or(ConnectStateError::NoContext)?;
+        .ok_or(StateError::NoContext(self.player.options.shuffling_context))?;
 
         let mut new_index = ctx_index.track as usize;
-        while self.player.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+        while self.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
             let track = match ctx.tracks.get(new_index) {
                 None => {
                     // todo: what do we do if we can't fill up anymore? autoplay?
@@ -631,7 +584,7 @@ impl ConnectState {
             };
 
             new_index += 1;
-            self.player.next_tracks.push(track);
+            self.next_tracks.push_back(track);
         }
 
         self.update_context_index(new_index)?;
@@ -645,16 +598,13 @@ impl ConnectState {
     pub fn find_index_in_context<F: Fn(&ContextTrack) -> bool>(
         &self,
         f: F,
-    ) -> Result<usize, ConnectStateError> {
-        let (ctx, _) = self.context.as_ref().ok_or(ConnectStateError::NoContext)?;
+    ) -> Result<usize, StateError> {
+        let (ctx, _) = self.context.as_ref().ok_or(StateError::NoContext(false))?;
 
         ctx.tracks
             .iter()
             .position(f)
-            .ok_or(ConnectStateError::CanNotFindTrackInContext(
-                None,
-                ctx.tracks.len(),
-            ))
+            .ok_or(StateError::CanNotFindTrackInContext(None, ctx.tracks.len()))
     }
 
     fn mark_as_unavailable_for_match(track: &mut ProvidedTrack, id: &str) {
@@ -695,5 +645,68 @@ impl ConnectState {
             provider: provider.to_string(),
             ..Default::default()
         })
+    }
+
+    // todo: i would like to refrain from copying the next and prev track lists... will have to see what we can come up with
+    /// Updates the connect state for the connect session
+    ///
+    /// Prepares a [PutStateRequest] from the current connect state
+    pub async fn update_state(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
+        if matches!(reason, PutStateReason::BECAME_INACTIVE) {
+            return session.spclient().put_connect_state_inactive(false).await;
+        }
+
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        let client_side_timestamp = u64::try_from(since_the_epoch.as_millis())?;
+
+        let member_type = EnumOrUnknown::new(MemberType::CONNECT_STATE);
+        let put_state_reason = EnumOrUnknown::new(reason);
+
+        let mut player_state = self.player.clone();
+        player_state.next_tracks = self.next_tracks.clone().into();
+        player_state.prev_tracks = self.prev_tracks.clone().into();
+
+        let is_active = self.active;
+        let device = MessageField::some(Device {
+            device_info: MessageField::some(self.device.clone()),
+            player_state: MessageField::some(player_state),
+            ..Default::default()
+        });
+
+        let mut put_state = PutStateRequest {
+            client_side_timestamp,
+            member_type,
+            put_state_reason,
+            is_active,
+            device,
+            ..Default::default()
+        };
+
+        if let Some(has_been_playing_for) = self.has_been_playing_for {
+            match has_been_playing_for.elapsed().as_millis().try_into() {
+                Ok(ms) => put_state.has_been_playing_for_ms = ms,
+                Err(why) => warn!("couldn't update has been playing for because {why}"),
+            }
+        }
+
+        if let Some(active_since) = self.active_since {
+            if let Ok(active_since_duration) = active_since.duration_since(UNIX_EPOCH) {
+                match active_since_duration.as_millis().try_into() {
+                    Ok(active_since_ms) => put_state.started_playing_at = active_since_ms,
+                    Err(why) => warn!("couldn't update active since because {why}"),
+                }
+            }
+        }
+
+        if let Some(request) = self.last_command.clone() {
+            put_state.last_command_message_id = request.message_id;
+            put_state.last_command_sent_by_device_id = request.sent_by_device_id;
+        }
+
+        session
+            .spclient()
+            .put_connect_state_request(put_state)
+            .await
     }
 }

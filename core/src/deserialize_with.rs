@@ -54,7 +54,9 @@ where
     use serde::de::Error;
 
     let v: Value = Deserialize::deserialize(de)?;
-    parse_value_to_msg(&v).map(Some).map_err(|why| Error::custom(why))
+    parse_value_to_msg(&v)
+        .map(Some)
+        .map_err(|why| Error::custom(why))
 }
 
 pub fn vec_json_proto<'de, T, D>(de: D) -> Result<Vec<T>, D::Error>
