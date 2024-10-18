@@ -1,5 +1,5 @@
 use crate::state::{
-    ConnectState, ConnectStateConfig, ConnectStateError, CONTEXT_PROVIDER, QUEUE_PROVIDER,
+    ConnectState, ConnectStateConfig, StateError, CONTEXT_PROVIDER, QUEUE_PROVIDER,
 };
 use crate::{
     context::PageContext,
@@ -407,7 +407,6 @@ impl SpircTask {
                     } else {
                         let previous_tracks = self
                             .connect_state
-                            .player
                             .prev_tracks
                             .iter()
                             .map(|t| SpotifyId::from_uri(&t.uri))
@@ -1081,13 +1080,13 @@ impl SpircTask {
         self.resolve_context(&mut ctx).await?;
         self.connect_state.update_context(ctx);
 
-        self.connect_state.player.next_tracks.clear();
+        self.connect_state.next_tracks.clear();
         self.connect_state.player.track = MessageField::none();
 
         let index = cmd.playing_track_index as usize;
         self.connect_state.set_shuffle(cmd.shuffle);
         if cmd.shuffle {
-            self.connect_state.set_current_track(index)?;
+            self.connect_state.set_current_track(index, false)?;
             self.connect_state.shuffle()?;
         } else {
             self.connect_state.reset_playback_context(Some(index))?;
@@ -1096,7 +1095,7 @@ impl SpircTask {
         self.connect_state.set_repeat_context(cmd.repeat);
         self.connect_state.set_repeat_track(cmd.repeat_track);
 
-        if !self.connect_state.player.next_tracks.is_empty() {
+        if !self.connect_state.next_tracks.is_empty() {
             self.load_track(self.connect_state.player.is_playing, 0)?;
         } else {
             info!("No more tracks left in queue");
@@ -1189,7 +1188,7 @@ impl SpircTask {
     }
 
     fn preview_next_track(&mut self) -> Option<SpotifyId> {
-        let next = self.connect_state.player.next_tracks.first()?;
+        let next = self.connect_state.next_tracks.front()?;
         SpotifyId::from_uri(&next.uri).ok()
     }
 
@@ -1227,9 +1226,9 @@ impl SpircTask {
         let mut continue_playing = self.connect_state.player.is_playing;
 
         let new_track_index = loop {
-            let index = match self.connect_state.move_to_next_track() {
+            let index = match self.connect_state.next_track() {
                 Ok(index) => Some(index),
-                Err(ConnectStateError::NoNextTrack) => break None,
+                Err(StateError::NoNextTrack) => break None,
                 Err(why) => return Err(why.into()),
             };
 
@@ -1246,7 +1245,7 @@ impl SpircTask {
             .connect_state
             .context
             .as_ref()
-            .ok_or(ConnectStateError::NoContext)?;
+            .ok_or(StateError::NoContext(false))?;
         let context_length = ctx.tracks.len() as u32;
         let context_index = ctx_index.track;
 
@@ -1311,9 +1310,9 @@ impl SpircTask {
         // Under 3s it goes to the previous song (starts playing)
         // Over 3s it seeks to zero (retains previous play status)
         if self.position() < 3000 {
-            let new_track_index = match self.connect_state.move_to_prev_track() {
+            let new_track_index = match self.connect_state.prev_track() {
                 Ok(index) => Some(index),
-                Err(ConnectStateError::NoPrevTrack) => None,
+                Err(StateError::NoPrevTrack) => None,
                 Err(why) => return Err(why.into()),
             };
 
@@ -1421,13 +1420,22 @@ impl SpircTask {
             self.connect_state.shuffle()
         } else {
             self.connect_state.shuffle_context = None;
-            self.connect_state.reset_playback_to_current_track()
+
+            let state = &mut self.connect_state;
+            let current_index = match state.player.track.as_ref() {
+                None => None,
+                Some(track) => state
+                    .find_index_in_context(|c| c.uri == track.uri)
+                    .map(Some)?,
+            };
+
+            state.reset_playback_context(current_index)
         }
     }
 
     fn handle_set_queue(&mut self, set_queue_command: SetQueueCommand) {
-        self.connect_state.player.next_tracks = set_queue_command.next_tracks;
-        self.connect_state.player.prev_tracks = set_queue_command.prev_tracks;
+        self.connect_state.next_tracks = set_queue_command.next_tracks.into();
+        self.connect_state.prev_tracks = set_queue_command.prev_tracks.into();
         self.connect_state.player.queue_revision = self.connect_state.new_queue_revision();
     }
 }
