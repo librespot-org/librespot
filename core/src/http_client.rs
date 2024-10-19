@@ -109,7 +109,9 @@ impl HttpClient {
         let os_version = System::os_version().unwrap_or_else(|| zero_str.clone());
 
         let (spotify_platform, os_version) = match OS {
+            // example os_version: 30
             "android" => ("Android", os_version),
+            // example os_version: 17
             "ios" => ("iOS", os_version),
             "macos" => ("OSX", zero_str),
             "windows" => ("Win32", zero_str),

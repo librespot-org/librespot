@@ -1,12 +1,16 @@
+use crate::Error;
+use byteorder::{BigEndian, ByteOrder};
+use futures_core::ready;
+use futures_util::{future, FutureExt, Sink, SinkExt};
+use hmac::digest::Digest;
+use sha1::Sha1;
+use std::time::{Duration, Instant};
 use std::{
     future::Future,
     mem,
     pin::Pin,
     task::{Context, Poll},
 };
-
-use futures_core::ready;
-use futures_util::{future, FutureExt, Sink, SinkExt};
 use tokio::{task::JoinHandle, time::timeout};
 
 /// Returns a future that will flush the sink, even if flushing is temporarily completed.
@@ -119,4 +123,45 @@ impl<T: Seq> SeqGenerator<T> {
         let value = self.0.next();
         mem::replace(&mut self.0, value)
     }
+}
+
+pub fn solve_hash_cash(
+    ctx: &[u8],
+    prefix: &[u8],
+    length: i32,
+    dst: &mut [u8],
+) -> Result<Duration, Error> {
+    // after a certain number of seconds, the challenge expires
+    const TIMEOUT: u64 = 5; // seconds
+    let now = Instant::now();
+
+    let md = Sha1::digest(ctx);
+
+    let mut counter: i64 = 0;
+    let target: i64 = BigEndian::read_i64(&md[12..20]);
+
+    let suffix = loop {
+        if now.elapsed().as_secs() >= TIMEOUT {
+            return Err(Error::deadline_exceeded(format!(
+                "{TIMEOUT} seconds expired"
+            )));
+        }
+
+        let suffix = [(target + counter).to_be_bytes(), counter.to_be_bytes()].concat();
+
+        let mut hasher = Sha1::new();
+        hasher.update(prefix);
+        hasher.update(&suffix);
+        let md = hasher.finalize();
+
+        if BigEndian::read_i64(&md[12..20]).trailing_zeros() >= (length as u32) {
+            break suffix;
+        }
+
+        counter += 1;
+    };
+
+    dst.copy_from_slice(&suffix);
+
+    Ok(now.elapsed())
 }
