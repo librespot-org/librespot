@@ -404,57 +404,7 @@ impl SpircTask {
                     }
                 },
                 context_uri = async { self.resolve_context.take() }, if self.resolve_context.is_some() => {
-                    let context_uri = context_uri.unwrap(); // guaranteed above
-                    if context_uri.contains("spotify:show:") || context_uri.contains("spotify:episode:") {
-                        continue; // not supported by apollo stations
-                    }
-
-                    let context = if context_uri.starts_with("hm://") {
-                        self.session.spclient().get_next_page(&context_uri).await
-                    } else {
-                        let previous_tracks = self
-                            .connect_state
-                            .prev_tracks
-                            .iter()
-                            .map(|t| SpotifyId::from_uri(&t.uri))
-                            .filter_map(Result::ok)
-                            .collect();
-
-                        let scope = if self.autoplay_context {
-                            "stations" // this returns a `StationContext` but we deserialize it into a `PageContext`
-                        } else {
-                            "tracks" // this returns a `PageContext`
-                        };
-
-                        self.session.spclient().get_apollo_station(scope, &context_uri, None, previous_tracks, self.autoplay_context).await
-                    };
-
-                    match context {
-                        Ok(value) => {
-                            let context = match serde_json::from_slice::<PageContext>(&value) {
-                                Ok(context) => {
-                                    info!(
-                                        "Resolved {:?} tracks from <{:?}>",
-                                        context.tracks.len(),
-                                        self.connect_state.player.context_uri,
-                                    );
-                                    Some(context.into())
-                                }
-                                Err(e) => {
-                                    error!("Unable to parse JSONContext {:?}", e);
-                                    None
-                                }
-                            };
-                            self.connect_state.update_context(Context {
-                                uri: self.connect_state.player.context_uri.to_owned(),
-                                pages: context.map(|page| vec!(page)).unwrap_or_default(),
-                                ..Default::default()
-                            })
-                        },
-                        Err(err) => {
-                            error!("ContextError: {:?}", err)
-                        }
-                    }
+                    self.handle_resolve_context(context_uri.unwrap()).await
                 },
                 _ = async { sleep(Duration::from_millis(VOLUME_UPDATE_DELAY_MS)).await }, if self.update_volume => {
                     self.update_volume = false;
@@ -469,6 +419,68 @@ impl SpircTask {
         }
 
         self.session.dealer().close().await;
+    }
+
+    async fn handle_resolve_context(&mut self, context_uri: String) {
+        if context_uri.contains("spotify:show:") || context_uri.contains("spotify:episode:") {
+            return; // not supported by apollo stations
+        }
+
+        let context = if context_uri.starts_with("hm://") {
+            self.session.spclient().get_next_page(&context_uri).await
+        } else {
+            let previous_tracks = self
+                .connect_state
+                .prev_tracks
+                .iter()
+                .map(|t| SpotifyId::from_uri(&t.uri))
+                .filter_map(Result::ok)
+                .collect();
+
+            let scope = if self.autoplay_context {
+                "stations" // this returns a `StationContext` but we deserialize it into a `PageContext`
+            } else {
+                "tracks" // this returns a `PageContext`
+            };
+
+            self.session
+                .spclient()
+                .get_apollo_station(
+                    scope,
+                    &context_uri,
+                    None,
+                    previous_tracks,
+                    self.autoplay_context,
+                )
+                .await
+        };
+
+        match context {
+            Ok(value) => {
+                let context = match serde_json::from_slice::<PageContext>(&value) {
+                    Ok(context) => {
+                        info!(
+                            "Resolved {:?} tracks from <{:?}>",
+                            context.tracks.len(),
+                            self.connect_state.player.context_uri,
+                        );
+                        Some(context.into())
+                    }
+                    Err(e) => {
+                        error!("Unable to parse JSONContext {:?}", e);
+                        None
+                    }
+                };
+                self.connect_state.update_context(Context {
+                    uri: self.connect_state.player.context_uri.to_owned(),
+                    pages: context.map(|page| vec![page]).unwrap_or_default(),
+                    ..Default::default()
+                })
+            }
+            Err(err) => {
+                error!("ContextError: {:?}", err)
+            }
+        }
     }
 
     fn now_ms(&self) -> i64 {
