@@ -23,10 +23,10 @@ use std::{
     pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time::sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[derive(Debug, Error)]
@@ -96,6 +96,7 @@ struct SpircTask {
     shutdown: bool,
     session: Session,
     resolve_context: Option<String>,
+    update_volume: bool,
     autoplay_context: bool,
 
     spirc_id: usize,
@@ -137,6 +138,7 @@ pub struct SpircLoadCommand {
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
 
 const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
+const VOLUME_UPDATE_DELAY_MS: u64 = 2000;
 
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
@@ -256,6 +258,7 @@ impl Spirc {
             session,
 
             resolve_context: None,
+            update_volume: false,
             autoplay_context: false,
 
             spirc_id,
@@ -263,6 +266,7 @@ impl Spirc {
 
         let spirc = Spirc { commands: cmd_tx };
         task.set_volume(initial_volume as u16 - 1);
+        task.update_volume = false;
 
         Ok((spirc, task.run()))
     }
@@ -339,7 +343,10 @@ impl SpircTask {
                 },
                 volume_update = self.connect_state_volume_update.next() => match volume_update {
                     Some(result) => match result {
-                        Ok(volume_update) => self.handle_set_volume(volume_update).await,
+                        Ok(volume_update) => match volume_update.volume.try_into() {
+                            Ok(volume) => self.set_volume(volume),
+                            Err(why) => error!("can't update volume, failed to parse i32 to u16: {why}")
+                        },
                         Err(e) => error!("could not parse set volume update request: {}", e),
                     }
                     None => {
@@ -447,6 +454,14 @@ impl SpircTask {
                         Err(err) => {
                             error!("ContextError: {:?}", err)
                         }
+                    }
+                },
+                _ = async { sleep(Duration::from_millis(VOLUME_UPDATE_DELAY_MS)).await }, if self.update_volume => {
+                    self.update_volume = false;
+
+                    info!("delayed volume update for all devices: volume is now {}", self.connect_state.device.volume);
+                    if let Err(why) = self.notify().await {
+                        error!("error updating connect state for volume update: {why}")
                     }
                 },
                 else => break
@@ -793,21 +808,6 @@ impl SpircTask {
         }
 
         Ok(())
-    }
-
-    async fn handle_set_volume(&mut self, set_volume_command: SetVolumeCommand) {
-        let volume_difference = set_volume_command.volume - self.connect_state.device.volume as i32;
-        if volume_difference < self.connect_state.device.capabilities.volume_steps {
-            return;
-        }
-
-        self.set_volume(set_volume_command.volume as u16);
-
-        // todo: we only want to notify after we didn't receive an update for like one or two seconds,
-        //  otherwise we will run in 429er errors
-        if let Err(why) = self.notify().await {
-            error!("couldn't notify after updating the volume: {why}")
-        }
     }
 
     async fn handle_connect_state_command(
@@ -1402,6 +1402,8 @@ impl SpircTask {
         let old_volume = self.connect_state.device.volume;
         let new_volume = volume as u32;
         if old_volume != new_volume {
+            self.update_volume = true;
+
             self.connect_state.device.volume = new_volume;
             self.mixer.set_volume(volume);
             if let Some(cache) = self.session.cache() {
