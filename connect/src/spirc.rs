@@ -119,6 +119,7 @@ pub enum SpircCommand {
     Shutdown,
     Shuffle(bool),
     Repeat(bool),
+    RepeatOne(bool),
     Disconnect,
     SetPosition(u32),
     SetVolume(u16),
@@ -133,6 +134,7 @@ pub struct SpircLoadCommand {
     pub start_playing: bool,
     pub shuffle: bool,
     pub repeat: bool,
+    pub repeat_one: bool,
     pub playing_track_index: u32,
     pub tracks: Vec<TrackRef>,
 }
@@ -148,6 +150,7 @@ impl From<SpircLoadCommand> for State {
         });
         state.set_shuffle(command.shuffle);
         state.set_repeat(command.repeat);
+        state.set_repeat_one(command.repeat_one);
         state.set_playing_track_index(command.playing_track_index);
         state.track = command.tracks;
         state
@@ -167,6 +170,7 @@ pub struct Spirc {
 fn initial_state() -> State {
     let mut frame = protocol::spirc::State::new();
     frame.set_repeat(false);
+    frame.set_repeat_one(false);
     frame.set_shuffle(false);
     frame.set_status(PlayStatus::kPlayStatusStop);
     frame.set_position_ms(0);
@@ -432,6 +436,9 @@ impl Spirc {
     pub fn repeat(&self, repeat: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Repeat(repeat))?)
     }
+    pub fn repeat_one(&self, repeat_one: bool) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::RepeatOne(repeat_one))?)
+    }
     pub fn set_volume(&self, volume: u16) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetVolume(volume))?)
     }
@@ -649,6 +656,10 @@ impl SpircTask {
                 }
                 SpircCommand::Repeat(repeat) => {
                     self.state.set_repeat(repeat);
+                    self.notify(None)
+                }
+                SpircCommand::RepeatOne(repeat_one) => {
+                    self.state.set_repeat_one(repeat_one);
                     self.notify(None)
                 }
                 SpircCommand::SetPosition(position) => {
@@ -943,6 +954,22 @@ impl SpircTask {
                 self.state.set_repeat(repeat);
 
                 self.player.emit_repeat_changed_event(repeat);
+
+                self.notify(None)
+            }
+
+            MessageType::kMessageTypeRepeatOne => {
+                let repeat_one = update.state.repeat_one();
+                if repeat_one && !self.state.repeat() {
+                    self.state.set_repeat(true);
+                    self.player.emit_repeat_changed_event(true);
+                } else if !repeat_one && self.state.repeat() {
+                    self.state.set_repeat(false);
+                    self.player.emit_repeat_changed_event(false);
+                }
+                self.state.set_repeat_one(repeat_one);
+
+                self.player.emit_repeat_one_changed_event(repeat_one);
 
                 self.notify(None)
             }
