@@ -719,18 +719,25 @@ impl SpircTask {
             }
         };
 
-        if let Some(mut cluster) = response {
+        if let Some(cluster) = response {
+            if !cluster.transfer_data.is_empty() {
+                if let Ok(transfer_state) = TransferState::parse_from_bytes(&cluster.transfer_data)
+                {
+                    if !transfer_state.current_session.context.pages.is_empty() {
+                        info!("received transfer state with context, trying to take over control again");
+                        match self.handle_transfer(transfer_state).await {
+                            Ok(_) => info!("successfully re-acquired control"),
+                            Err(why) => error!("failed handling transfer state: {why}"),
+                        }
+                    }
+                }
+            }
+
             debug!(
                 "successfully put connect state for {} with connection-id {connection_id}",
                 self.session.device_id()
             );
             info!("active device is {:?}", cluster.active_device_id);
-
-            if let Some(player_state) = cluster.player_state.take() {
-                self.connect_state.player = player_state;
-            } else {
-                warn!("couldn't take player state from cluster")
-            }
         }
     }
 
