@@ -12,7 +12,7 @@ use librespot_protocol::connect::{
 };
 use librespot_protocol::player::{
     Context, ContextIndex, ContextPage, ContextPlayerOptions, ContextTrack, PlayOrigin,
-    PlayerState, ProvidedTrack, Suppressions,
+    PlayerState, ProvidedTrack, Suppressions, TransferState,
 };
 use protobuf::{EnumOrUnknown, Message, MessageField};
 use rand::prelude::SliceRandom;
@@ -25,8 +25,8 @@ const SPOTIFY_MAX_PREV_TRACKS_SIZE: usize = 10;
 const SPOTIFY_MAX_NEXT_TRACKS_SIZE: usize = 80;
 
 // provider used by spotify
-pub const CONTEXT_PROVIDER: &str = "context";
-pub const QUEUE_PROVIDER: &str = "queue";
+pub(crate) const CONTEXT_PROVIDER: &str = "context";
+const QUEUE_PROVIDER: &str = "queue";
 // todo: there is a separator provider which is used to realise repeat
 
 // our own provider to flag tracks as a specific states
@@ -35,6 +35,8 @@ const UNAVAILABLE_PROVIDER: &str = "unavailable";
 
 #[derive(Debug, Error)]
 pub enum StateError {
+    #[error("the current track couldn't be resolved from the transfer state")]
+    CouldNotResolveTrackFromTransfer,
     #[error("no next track available")]
     NoNextTrack,
     #[error("no prev track available")]
@@ -104,6 +106,9 @@ pub struct ConnectState {
     pub context: Option<ContextState>,
     // a context to keep track of our shuffled context, should be only available when option.shuffling_context is true
     pub shuffle_context: Option<ContextState>,
+
+    // is set when we receive a transfer state and are loading the context asynchronously
+    pub transfer_state: Option<TransferState>,
 
     pub last_command: Option<Request>,
 }
@@ -499,6 +504,55 @@ impl ConnectState {
         if !context.metadata.is_empty() {
             self.player.context_metadata = context.metadata;
         }
+
+        if let Some(transfer_state) = self.transfer_state.take() {
+            if let Err(why) = self.setup_current_state(transfer_state) {
+                error!("setting up current state failed after updating the context: {why}")
+            }
+        }
+    }
+
+    pub fn try_get_current_track_from_transfer(
+        &self,
+        transfer: &TransferState,
+    ) -> Result<ProvidedTrack, Error> {
+        let track = if transfer.queue.is_playing_queue {
+            transfer.queue.tracks.first()
+        } else {
+            transfer.playback.current_track.as_ref()
+        }
+        .ok_or(StateError::CouldNotResolveTrackFromTransfer)?;
+
+        self.context_to_provided_track(track)
+    }
+
+    pub fn setup_current_state(&mut self, transfer: TransferState) -> Result<(), Error> {
+        let track = match self.player.track.as_ref() {
+            None => self.try_get_current_track_from_transfer(&transfer)?,
+            Some(track) => track.clone(),
+        };
+
+        let current_index =
+            self.find_index_in_context(|c| c.uri == track.uri || c.uid == track.uid)?;
+        if self.player.track.is_none() {
+            self.player.track = MessageField::some(track);
+        }
+
+        debug!(
+            "setting up next and prev: index is at {current_index} while shuffle {}",
+            self.player.options.shuffling_context
+        );
+
+        if self.player.options.shuffling_context {
+            self.set_current_track(current_index, false)?;
+            self.set_shuffle(true);
+            self.shuffle()?;
+        } else {
+            // todo: it seems like, if we play a queued track and transfer we will reset that queued track...
+            self.reset_playback_context(Some(current_index))?;
+        }
+
+        Ok(())
     }
 
     // todo: for some reason, after we run once into an unavailable track,

@@ -1,6 +1,4 @@
-use crate::state::{
-    ConnectState, ConnectStateConfig, StateError, CONTEXT_PROVIDER, QUEUE_PROVIDER,
-};
+use crate::state::{ConnectState, ConnectStateConfig, StateError, CONTEXT_PROVIDER};
 use crate::{
     context::PageContext,
     core::{authentication::Credentials, session::UserAttributes, Error, Session, SpotifyId},
@@ -423,12 +421,13 @@ impl SpircTask {
 
     async fn handle_resolve_context(&mut self, context_uri: String) {
         if context_uri.contains("spotify:show:") || context_uri.contains("spotify:episode:") {
+            // todo: did check and it is supported by context-resolve, maybe remove this check or adjust it
             return; // not supported by apollo stations
         }
 
         let context = if context_uri.starts_with("hm://") {
             self.session.spclient().get_next_page(&context_uri).await
-        } else {
+        } else if self.autoplay_context {
             let previous_tracks = self
                 .connect_state
                 .prev_tracks
@@ -437,22 +436,25 @@ impl SpircTask {
                 .filter_map(Result::ok)
                 .collect();
 
-            let scope = if self.autoplay_context {
-                "stations" // this returns a `StationContext` but we deserialize it into a `PageContext`
-            } else {
-                "tracks" // this returns a `PageContext`
-            };
-
             self.session
                 .spclient()
                 .get_apollo_station(
-                    scope,
+                    "stations", // this returns a `StationContext` but we deserialize it into a `PageContext`
                     &context_uri,
                     None,
                     previous_tracks,
                     self.autoplay_context,
                 )
                 .await
+        } else {
+            match self.session.spclient().get_context(&context_uri).await {
+                Err(why) => error!("failed to resolve context '{context_uri}': {why}"),
+                Ok(ctx) => self.connect_state.update_context(ctx),
+            };
+            if let Err(why) = self.notify().await {
+                error!("failed to update connect state, after updating the context: {why}")
+            }
+            return;
         };
 
         match context {
@@ -906,9 +908,13 @@ impl SpircTask {
 
     async fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         if let Some(session) = transfer.current_session.as_mut() {
-            if let Some(mut ctx) = session.context.take() {
-                self.resolve_context(&mut ctx).await?;
-                self.connect_state.update_context(ctx)
+            if let Some(ctx) = session.context.take() {
+                if ctx.pages.is_empty() {
+                    // resolve context asynchronously
+                    self.resolve_context = Some(ctx.uri)
+                } else {
+                    self.connect_state.update_context(ctx)
+                }
             }
         }
 
@@ -918,7 +924,9 @@ impl SpircTask {
         state.set_active(true);
         state.player.is_buffering = false;
 
-        state.player.options = transfer.options;
+        if let Some(options) = transfer.options.take() {
+            state.player.options = MessageField::some(options);
+        }
         state.player.is_paused = transfer.playback.is_paused;
         state.player.is_playing = !transfer.playback.is_paused;
 
@@ -964,41 +972,18 @@ impl SpircTask {
             state.player.position_as_of_timestamp + time_since_position_update
         };
 
-        let current_index = if transfer.queue.is_playing_queue {
-            debug!("queued track is playing, {}", transfer.queue.tracks.len());
-
-            if let Some(queue) = transfer.queue.as_mut() {
-                let mut provided_track =
-                    state.context_to_provided_track(&queue.tracks.remove(0))?;
-                provided_track.provider = QUEUE_PROVIDER.to_string();
-
-                state.player.track = MessageField::some(provided_track);
-            } else {
-                error!("if we are playing we should at least have a single queued track")
+        if self.connect_state.context.is_some() {
+            self.connect_state.setup_current_state(transfer)?;
+        } else {
+            match self
+                .connect_state
+                .try_get_current_track_from_transfer(&transfer)
+            {
+                Err(why) => warn!("{why}"),
+                Ok(track) => self.connect_state.player.track = MessageField::some(track),
             }
 
-            state.find_index_in_context(|c| c.uid == transfer.current_session.current_uid)
-        } else if transfer.playback.current_track.uri.is_empty()
-            && !transfer.playback.current_track.gid.is_empty()
-        {
-            let uri = SpotifyId::from_raw(&transfer.playback.current_track.gid)?.to_uri()?;
-            let uri = uri.replace("unknown", "track");
-
-            state.find_index_in_context(|c| c.uri == uri)
-        } else {
-            state.find_index_in_context(|c| c.uri == transfer.playback.current_track.uri)
-        }?;
-
-        debug!(
-            "setting up next and prev: index is at {current_index} while shuffle {}",
-            state.player.options.shuffling_context
-        );
-
-        if state.player.options.shuffling_context {
-            self.connect_state.set_shuffle(true);
-            self.connect_state.shuffle()?;
-        } else {
-            state.reset_playback_context(Some(current_index))?;
+            self.connect_state.transfer_state = Some(transfer);
         }
 
         self.load_track(self.connect_state.player.is_playing, position.try_into()?)
@@ -1378,6 +1363,7 @@ impl SpircTask {
         let id = SpotifyId::from_uri(&track_to_load.uri)?;
         self.player.load(id, start_playing, position_ms);
 
+        // todo: move into state.rs
         const CONTEXT_URI_METADATA: &str = "context_uri";
         const ENTITY_URI_METADATA: &str = "entity_uri";
         if track_to_load.provider == CONTEXT_PROVIDER {
