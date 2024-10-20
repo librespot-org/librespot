@@ -110,7 +110,7 @@ where
     let mut client_nonce = vec![0; 0x10];
     thread_rng().fill_bytes(&mut client_nonce);
 
-    let platform = match std::env::consts::OS {
+    let platform = match crate::config::OS {
         "android" => Platform::PLATFORM_ANDROID_ARM,
         "freebsd" | "netbsd" | "openbsd" => match ARCH {
             "x86_64" => Platform::PLATFORM_FREEBSD_X86_64,

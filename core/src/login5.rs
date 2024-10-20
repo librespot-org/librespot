@@ -1,3 +1,4 @@
+use crate::config::OS;
 use crate::spclient::CLIENT_TOKEN;
 use crate::token::Token;
 use crate::{util, Error, SessionConfig};
@@ -15,7 +16,6 @@ use librespot_protocol::{
 };
 use protobuf::well_known_types::duration::Duration as ProtoDuration;
 use protobuf::{Message, MessageField};
-use std::env::consts::OS;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::time::sleep;
