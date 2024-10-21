@@ -22,7 +22,6 @@ aes = "0.8"
 base64 = "0.22"
 byteorder = "1.4"
 bytes = "1"
-dns-sd = { version = "0.1", optional = true }
 form_urlencoded = "1.0"
 futures-core = "0.3"
 futures-util = { version = "0.3", features = ["alloc", "bilock", "sink", "unstable"] }
@@ -71,6 +70,3 @@ vergen-gitcl = { version = "1.0.0", default-features = false, features = ["build
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "parking_lot"] }
-
-[features]
-with-dns-sd = ["dns-sd"]

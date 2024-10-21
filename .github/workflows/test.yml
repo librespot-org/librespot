@@ -109,7 +109,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         toolchain:
-          - "1.74" # MSRV (Minimum supported rust version)
+          - "1.75" # MSRV (Minimum supported rust version)
           - stable
         experimental: [false]
         # Ignore failures in beta
@@ -164,7 +164,7 @@ jobs:
       matrix:
         os: [windows-latest]
         toolchain:
-          - "1.74" # MSRV (Minimum supported rust version)
+          - "1.75" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code
@@ -215,7 +215,7 @@ jobs:
           - aarch64-unknown-linux-gnu
           - riscv64gc-unknown-linux-gnu
         toolchain:
-          - "1.74" # MSRV (Minimum supported rust version)
+          - "1.75" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code

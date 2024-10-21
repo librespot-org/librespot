@@ -56,6 +56,17 @@ On Fedora systems:
 sudo dnf install alsa-lib-devel
 ```
 
+### Zeroconf library dependencies
+Depending on the chosen backend, specific development libraries are required.
+
+*_Note this is an non-exhaustive list, open a PR to add to it!_*
+
+| Zeroconf backend   | Debian/Ubuntu                | Fedora                            | macOS       |
+|--------------------|------------------------------|-----------------------------------|-------------|
+|avahi               |                              |                                   |             |
+|dns_sd              | `libavahi-compat-libdnssd-dev pkg-config` | `avahi-compat-libdns_sd-devel` |   |
+|libmdns (default)   |                              |                                   |             |
+
 ### Getting the Source
 
 The recommended method is to first fork the repo, so that you have a copy that you have read/write access to. After that, it’s a simple case of cloning your fork.
