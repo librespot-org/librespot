@@ -12,7 +12,6 @@ mod server;
 
 use std::{
     borrow::Cow,
-    convert::Infallible,
     error::Error as StdError,
     pin::Pin,
     task::{Context, Poll},
@@ -39,9 +38,13 @@ pub enum DiscoveryEvent {
     ZeroconfError(DiscoveryError),
 }
 
+enum ZeroconfCmd {
+    Shutdown,
+}
+
 pub struct DnsSdHandle {
     task_handle: tokio::task::JoinHandle<()>,
-    shutdown_tx: oneshot::Sender<Infallible>,
+    shutdown_tx: oneshot::Sender<ZeroconfCmd>,
 }
 
 impl DnsSdHandle {
@@ -51,9 +54,12 @@ impl DnsSdHandle {
             task_handle,
             shutdown_tx,
         } = self;
-        std::mem::drop(shutdown_tx);
-        let _ = task_handle.await;
-        log::debug!("Zeroconf responder stopped");
+        if shutdown_tx.send(ZeroconfCmd::Shutdown).is_err() {
+            log::warn!("Zeroconf responder unexpectedly disappeared");
+        } else {
+            let _ = task_handle.await;
+            log::debug!("Zeroconf responder stopped");
+        }
     }
 }
 
