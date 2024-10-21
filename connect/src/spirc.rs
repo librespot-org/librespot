@@ -408,7 +408,7 @@ impl SpircTask {
                     self.update_volume = false;
 
                     info!("delayed volume update for all devices: volume is now {}", self.connect_state.device.volume);
-                    if let Err(why) = self.notify().await {
+                    if let Err(why) = self.connect_state.update_state(&self.session, PutStateReason::VOLUME_CHANGED).await {
                         error!("error updating connect state for volume update: {why}")
                     }
                 },
@@ -866,7 +866,7 @@ impl SpircTask {
                 .await?;
 
                 self.connect_state.player.context_uri = play.context.uri;
-                self.connect_state.player.context_uri = play.context.url;
+                self.connect_state.player.context_url = play.context.url;
                 self.connect_state.player.play_origin = MessageField::some(play.play_origin);
 
                 self.notify().await.map(|_| Reply::Success)?
@@ -876,7 +876,9 @@ impl SpircTask {
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SeekTo(seek_to) => {
-                self.handle_seek(seek_to.position);
+                // for some reason the position is stored in value, not in position
+                trace!("seek to {seek_to:?}");
+                self.handle_seek(seek_to.value);
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SetShufflingContext(shuffle) => {
@@ -976,7 +978,7 @@ impl SpircTask {
             state.player.position_as_of_timestamp
         } else {
             let time_since_position_update = timestamp - transfer.playback.timestamp;
-            state.player.position_as_of_timestamp + time_since_position_update
+            i64::from(transfer.playback.position_as_of_timestamp) + time_since_position_update
         };
 
         if self.connect_state.context.is_some() {

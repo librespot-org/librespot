@@ -122,7 +122,7 @@ impl DealerManager {
 
     pub async fn start(&self) -> Result<(), Error> {
         let url = self.get_url().await?;
-        debug!("Launching dealer at {url}");
+        debug!("Launching dealer");
 
         let get_url = move || {
             let url = url.clone();

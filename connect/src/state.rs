@@ -467,7 +467,6 @@ impl ConnectState {
         }
 
         if let Some(next_not_queued_track) = self
-            .player
             .next_tracks
             .iter()
             .position(|track| track.provider != QUEUE_PROVIDER)
