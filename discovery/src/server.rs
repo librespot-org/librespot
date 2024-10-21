@@ -1,7 +1,6 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    convert::Infallible,
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener},
     sync::{Arc, Mutex},
 };
@@ -252,8 +251,12 @@ impl RequestHandler {
     }
 }
 
+pub(crate) enum DiscoveryServerCmd {
+    Shutdown,
+}
+
 pub struct DiscoveryServer {
-    close_tx: oneshot::Sender<Infallible>,
+    close_tx: oneshot::Sender<DiscoveryServerCmd>,
     task_handle: tokio::task::JoinHandle<()>,
 }
 
@@ -324,14 +327,12 @@ impl DiscoveryServer {
                         });
                     }
                     _ = &mut close_rx => {
-                        debug!("Shutting down discovery server");
                         break;
                     }
                 }
             }
 
             graceful.shutdown().await;
-            debug!("Discovery server stopped");
         });
 
         Ok(Self {
@@ -346,7 +347,12 @@ impl DiscoveryServer {
             task_handle,
             ..
         } = self;
-        std::mem::drop(close_tx);
-        let _ = task_handle.await;
+        log::debug!("Shutting down discovery server");
+        if close_tx.send(DiscoveryServerCmd::Shutdown).is_err() {
+            log::warn!("Discovery server unexpectedly disappeared");
+        } else {
+            let _ = task_handle.await;
+            log::debug!("Discovery server stopped");
+        }
     }
 }
