@@ -1,5 +1,4 @@
 use std::{
-    env::consts::OS,
     fmt::Write,
     time::{Duration, Instant},
 };
@@ -18,6 +17,7 @@ use rand::RngCore;
 use sysinfo::System;
 use thiserror::Error;
 
+use crate::config::{os_version, OS};
 use crate::{
     apresolve::SocketAddress,
     cdn_url::CdnUrl,
@@ -162,7 +162,7 @@ impl SpClient {
             .platform_specific_data
             .mut_or_insert_default();
 
-        let os_version = System::os_version().unwrap_or_else(|| String::from("0"));
+        let os_version = os_version();
         let kernel_version = System::kernel_version().unwrap_or_else(|| String::from("0"));
 
         match os {
@@ -191,12 +191,10 @@ impl SpClient {
                 ios_data.user_interface_idiom = 0;
                 ios_data.target_iphone_simulator = false;
                 ios_data.hw_machine = "iPhone14,5".to_string();
-                // example system_version: 17
                 ios_data.system_version = os_version;
             }
             "android" => {
                 let android_data = platform_data.mut_android();
-                // example android_version: 30
                 android_data.android_version = os_version;
                 android_data.api_version = 31;
                 "Pixel".clone_into(&mut android_data.device_name);

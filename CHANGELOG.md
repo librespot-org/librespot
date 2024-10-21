@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [core] Add `login` (mobile) and `auth_token` retrieval via login5
+- [core] Add `OS` and `os_version` to `config.rs`
 
 ### Removed
 
