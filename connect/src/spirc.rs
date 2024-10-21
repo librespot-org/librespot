@@ -1232,11 +1232,7 @@ impl SpircTask {
         let mut continue_playing = self.connect_state.player.is_playing;
 
         let new_track_index = loop {
-            let index = match self.connect_state.next_track() {
-                Ok(index) => Some(index),
-                Err(StateError::NoNextTrack) => break None,
-                Err(why) => return Err(why.into()),
-            };
+            let index = self.connect_state.next_track()?;
 
             if track.is_some()
                 && matches!(track, Some(ref track) if self.connect_state.player.track.uri != track.uri)
@@ -1316,11 +1312,7 @@ impl SpircTask {
         // Under 3s it goes to the previous song (starts playing)
         // Over 3s it seeks to zero (retains previous play status)
         if self.position() < 3000 {
-            let new_track_index = match self.connect_state.prev_track() {
-                Ok(index) => Some(index),
-                Err(StateError::NoPrevTrack) => None,
-                Err(why) => return Err(why.into()),
-            };
+            let new_track_index = self.connect_state.prev_track()?;
 
             if new_track_index.is_none() && self.connect_state.player.options.repeating_context {
                 self.connect_state.reset_playback_context(None)?

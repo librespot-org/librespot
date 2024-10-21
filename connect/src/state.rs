@@ -37,10 +37,6 @@ const UNAVAILABLE_PROVIDER: &str = "unavailable";
 pub enum StateError {
     #[error("the current track couldn't be resolved from the transfer state")]
     CouldNotResolveTrackFromTransfer,
-    #[error("no next track available")]
-    NoNextTrack,
-    #[error("no prev track available")]
-    NoPrevTrack,
     #[error("message field {0} was not available")]
     MessageFieldNone(String),
     #[error("context is not available. shuffle: {0}")]
@@ -320,7 +316,7 @@ impl ConnectState {
     ///
     /// Updates the current track to the next track. Adds the old track
     /// to prev tracks and fills up the next tracks from the current context
-    pub fn next_track(&mut self) -> Result<u32, StateError> {
+    pub fn next_track(&mut self) -> Result<Option<u32>, StateError> {
         let old_track = self.player.track.take();
 
         if let Some(old_track) = old_track {
@@ -334,10 +330,10 @@ impl ConnectState {
             }
         }
 
-        let new_track = self
-            .next_tracks
-            .pop_front()
-            .ok_or(StateError::NoNextTrack)?;
+        let new_track = match self.next_tracks.pop_front() {
+            None => return Ok(None),
+            Some(t) => t,
+        };
 
         self.fill_up_next_tracks()?;
 
@@ -367,7 +363,7 @@ impl ConnectState {
 
         self.update_restrictions();
 
-        Ok(self.player.index.track)
+        Ok(Some(self.player.index.track))
     }
 
     /// Move to the prev track
@@ -375,7 +371,7 @@ impl ConnectState {
     /// Updates the current track to the prev track. Adds the old track
     /// to next tracks (when from the context) and fills up the prev tracks from the
     /// current context
-    pub fn prev_track(&mut self) -> Result<&MessageField<ProvidedTrack>, StateError> {
+    pub fn prev_track(&mut self) -> Result<Option<&MessageField<ProvidedTrack>>, StateError> {
         let old_track = self.player.track.take();
 
         if let Some(old_track) = old_track {
@@ -388,7 +384,10 @@ impl ConnectState {
             let _ = self.next_tracks.pop_back();
         }
 
-        let new_track = self.prev_tracks.pop_back().ok_or(StateError::NoPrevTrack)?;
+        let new_track = match self.prev_tracks.pop_back() {
+            None => return Ok(None),
+            Some(t) => t,
+        };
 
         self.fill_up_next_tracks()?;
 
@@ -403,7 +402,7 @@ impl ConnectState {
 
         self.update_restrictions();
 
-        Ok(&self.player.track)
+        Ok(Some(&self.player.track))
     }
 
     fn update_context_index(&mut self, new_index: usize) -> Result<(), StateError> {
