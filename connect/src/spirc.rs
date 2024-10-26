@@ -1,6 +1,5 @@
-use crate::state::{ConnectState, ConnectStateConfig, StateError, CONTEXT_PROVIDER};
+use crate::state::{ConnectState, ConnectStateConfig, ContextType, AUTOPLAY_PROVIDER};
 use crate::{
-    context::PageContext,
     core::{authentication::Credentials, session::UserAttributes, Error, Session, SpotifyId},
     playback::{
         mixer::Mixer,
@@ -12,9 +11,10 @@ use crate::{
 };
 use futures_util::{FutureExt, Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
-use librespot_core::dealer::protocol::{PayloadValue, RequestCommand, SetQueueCommand};
+use librespot_core::dealer::protocol::{PayloadValue, RequestCommand, SetQueueCommand, SkipTo};
+use librespot_protocol::autoplay_context_request::AutoplayContextRequest;
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
-use librespot_protocol::player::{Context, ProvidedTrack, TransferState};
+use librespot_protocol::player::{ProvidedTrack, TransferState};
 use protobuf::{Message, MessageField};
 use std::{
     future::Future,
@@ -39,13 +39,17 @@ pub enum SpircError {
     Ident(String),
     #[error("message pushed for another URI")]
     InvalidUri(String),
+    #[error("tried resolving not allowed context: {0:?}")]
+    NotAllowedContext(ResolveContext),
 }
 
 impl From<SpircError> for Error {
     fn from(err: SpircError) -> Self {
         use SpircError::*;
         match err {
-            NoData | UnsupportedLocalPlayBack | UnexpectedData(_) => Error::unavailable(err),
+            NoData | UnsupportedLocalPlayBack | UnexpectedData(_) | NotAllowedContext(_) => {
+                Error::unavailable(err)
+            }
             Ident(_) | InvalidUri(_) => Error::aborted(err),
         }
     }
@@ -68,6 +72,12 @@ pub(crate) enum SpircPlayStatus {
         position_ms: u32,
         preloading_of_next_track_triggered: bool,
     },
+}
+
+#[derive(Debug)]
+pub struct ResolveContext {
+    uri: String,
+    autoplay: bool,
 }
 
 type BoxedStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
@@ -93,9 +103,8 @@ struct SpircTask {
 
     shutdown: bool,
     session: Session,
-    resolve_context: Option<String>,
+    resolve_context: Vec<ResolveContext>,
     update_volume: bool,
-    autoplay_context: bool,
 
     spirc_id: usize,
 }
@@ -157,7 +166,7 @@ impl From<SkipTo> for PlayingTrack {
     }
 }
 
-const CONTEXT_FETCH_THRESHOLD: u32 = 5;
+const CONTEXT_FETCH_THRESHOLD: usize = 2;
 
 const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
 const VOLUME_UPDATE_DELAY_MS: u64 = 2000;
@@ -279,9 +288,8 @@ impl Spirc {
             shutdown: false,
             session,
 
-            resolve_context: None,
+            resolve_context: Vec::new(),
             update_volume: false,
-            autoplay_context: false,
 
             spirc_id,
         };
@@ -425,8 +433,10 @@ impl SpircTask {
                         error!("could not dispatch player event: {}", e);
                     }
                 },
-                context_uri = async { self.resolve_context.take() }, if self.resolve_context.is_some() => {
-                    self.handle_resolve_context(context_uri.unwrap()).await
+                _ = async {}, if !self.resolve_context.is_empty() => {
+                    if let Err(why) = self.handle_resolve_context().await {
+                        error!("ContextError: {why}")
+                    }
                 },
                 _ = async { sleep(Duration::from_millis(VOLUME_UPDATE_DELAY_MS)).await }, if self.update_volume => {
                     self.update_volume = false;
@@ -446,77 +456,70 @@ impl SpircTask {
         self.session.dealer().close().await;
     }
 
-    async fn handle_resolve_context(&mut self, context_uri: String) {
-        if context_uri.contains("spotify:show:") || context_uri.contains("spotify:episode:") {
-            // todo: did check and it is supported by context-resolve, maybe remove this check or adjust it
-            return; // not supported by apollo stations
+    async fn handle_resolve_context(&mut self) -> Result<(), Error> {
+        while let Some(resolve) = self.resolve_context.pop() {
+            self.resolve_context(resolve.uri, resolve.autoplay).await?;
         }
 
-        let context = if context_uri.starts_with("hm://") {
-            self.session.spclient().get_next_page(&context_uri).await
-        } else if self.autoplay_context {
-            let previous_tracks = self
-                .connect_state
-                .prev_tracks
-                .iter()
-                .map(|t| SpotifyId::from_uri(&t.uri))
-                .filter_map(Result::ok)
-                .collect();
+        self.connect_state.fill_up_next_tracks()?;
+        self.connect_state.update_restrictions();
 
-            self.session
-                .spclient()
-                .get_apollo_station(
-                    "stations", // this returns a `StationContext` but we deserialize it into a `PageContext`
-                    &context_uri,
-                    None,
-                    previous_tracks,
-                    self.autoplay_context,
-                )
-                .await
-        } else {
+        self.conditional_preload_autoplay(self.connect_state.player.context_uri.clone());
+
+        self.notify().await
+    }
+
+    async fn resolve_context(&mut self, context_uri: String, autoplay: bool) -> Result<(), Error> {
+        if !autoplay {
             match self.session.spclient().get_context(&context_uri).await {
                 Err(why) => error!("failed to resolve context '{context_uri}': {why}"),
-                Ok(ctx) => {
-                    if let Err(why) = self.connect_state.update_context(ctx) {
-                        error!("failed to resolve context '{context_uri}': {why}")
-                    }
-                }
+                Ok(ctx) => self.connect_state.update_context(ctx)?,
             };
             if let Err(why) = self.notify().await {
                 error!("failed to update connect state, after updating the context: {why}")
             }
-            return;
+            return Ok(());
+        }
+
+        if context_uri.contains("spotify:show:") || context_uri.contains("spotify:episode:") {
+            // autoplay is not supported for podcasts
+            return Err(SpircError::NotAllowedContext(ResolveContext {
+                uri: context_uri,
+                autoplay: true,
+            })
+            .into());
+        }
+
+        let mut previous_tracks = self
+            .connect_state
+            .prev_tracks
+            .iter()
+            .flat_map(|t| (t.provider == AUTOPLAY_PROVIDER).then_some(t.uri.clone()))
+            .collect::<Vec<_>>();
+
+        let current = &self.connect_state.player.track;
+        if current.provider == AUTOPLAY_PROVIDER {
+            previous_tracks.push(current.uri.clone());
+        }
+
+        debug!(
+            "loading autoplay context {context_uri} with {} previous tracks",
+            previous_tracks.len()
+        );
+
+        let ctx_request = AutoplayContextRequest {
+            context_uri: Some(context_uri.to_string()),
+            recent_track_uri: previous_tracks,
+            ..Default::default()
         };
 
-        match context {
-            Ok(value) => {
-                let context = match serde_json::from_slice::<PageContext>(&value) {
-                    Ok(context) => {
-                        info!(
-                            "Resolved {:?} tracks from <{:?}>",
-                            context.tracks.len(),
-                            self.connect_state.player.context_uri,
-                        );
-                        Some(context.into())
-                    }
-                    Err(e) => {
-                        error!("Unable to parse JSONContext {:?}", e);
-                        None
-                    }
-                };
+        let context = self
+            .session
+            .spclient()
+            .get_autoplay_context(&ctx_request)
+            .await?;
 
-                if let Err(why) = self.connect_state.update_context(Context {
-                    uri: self.connect_state.player.context_uri.to_owned(),
-                    pages: context.map(|page| vec![page]).unwrap_or_default(),
-                    ..Default::default()
-                }) {
-                    error!("failed updating context: {why}")
-                }
-            }
-            Err(err) => {
-                error!("ContextError: {:?}", err)
-            }
-        }
+        self.connect_state.update_autoplay_context(context)
     }
 
     fn now_ms(&self) -> i64 {
@@ -759,7 +762,7 @@ impl SpircTask {
                 {
                     if !transfer_state.current_session.context.pages.is_empty() {
                         info!("received transfer state with context, trying to take over control again");
-                        match self.handle_transfer(transfer_state).await {
+                        match self.handle_transfer(transfer_state) {
                             Ok(_) => info!("successfully re-acquired control"),
                             Err(why) => error!("failed handling transfer state: {why}"),
                         }
@@ -831,7 +834,7 @@ impl SpircTask {
         &mut self,
         mut cluster_update: ClusterUpdate,
     ) -> Result<(), Error> {
-        let reason = cluster_update.update_reason.enum_value_or_default();
+        let reason = cluster_update.update_reason.enum_value().ok();
 
         let device_ids = cluster_update.devices_that_changed.join(", ");
         let devices = cluster_update.cluster.device.len();
@@ -878,8 +881,7 @@ impl SpircTask {
 
         let response = match request.command {
             RequestCommand::Transfer(transfer) if transfer.data.is_some() => {
-                self.handle_transfer(transfer.data.expect("by condition checked"))
-                    .await?;
+                self.handle_transfer(transfer.data.expect("by condition checked"))?;
                 self.notify().await?;
 
                 Reply::Success
@@ -892,7 +894,7 @@ impl SpircTask {
                 self.handle_load(SpircLoadCommand {
                     context_uri: play.context.uri.clone(),
                     start_playing: true,
-                    playing_track_index: play.options.skip_to.track_index,
+                    playing_track: play.options.skip_to.into(),
                     shuffle: self.connect_state.player.options.shuffling_context,
                     repeat: self.connect_state.player.options.repeating_context,
                     repeat_track: self.connect_state.player.options.repeating_track,
@@ -949,17 +951,23 @@ impl SpircTask {
         sender.send(response).map_err(Into::into)
     }
 
-    async fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
-        if let Some(session) = transfer.current_session.as_mut() {
-            if let Some(ctx) = session.context.take() {
-                if ctx.pages.is_empty() {
-                    // resolve context asynchronously
-                    self.resolve_context = Some(ctx.uri)
-                } else {
-                    self.connect_state.update_context(ctx)?
-                }
-            }
+    fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
+        self.connect_state
+            .reset_context(&transfer.current_session.context.uri);
+
+        let mut ctx_uri = transfer.current_session.context.uri.to_owned();
+        let autoplay = ctx_uri.contains("station");
+
+        if autoplay {
+            ctx_uri = ctx_uri.replace("station:", "");
+            self.connect_state.active_context = ContextType::Autoplay;
         }
+
+        debug!("async resolve context for {}", ctx_uri);
+        self.resolve_context.push(ResolveContext {
+            autoplay: false,
+            uri: ctx_uri.clone(),
+        });
 
         let timestamp = self.now_ms();
         let state = &mut self.connect_state;
@@ -1018,50 +1026,32 @@ impl SpircTask {
         if self.connect_state.context.is_some() {
             self.connect_state.setup_current_state(transfer)?;
         } else {
+            debug!("trying to find initial track");
             match self
                 .connect_state
                 .try_get_current_track_from_transfer(&transfer)
             {
                 Err(why) => warn!("{why}"),
-                Ok(track) => self.connect_state.player.track = MessageField::some(track),
+                Ok(track) => {
+                    debug!("initial track found");
+                    self.connect_state.player.track = MessageField::some(track)
+                }
+            }
+
+            if self.connect_state.autoplay_context.is_none()
+                && (self.connect_state.player.track.provider == AUTOPLAY_PROVIDER || autoplay)
+            {
+                debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
+                self.resolve_context.push(ResolveContext {
+                    uri: ctx_uri,
+                    autoplay: true,
+                })
             }
 
             self.connect_state.transfer_state = Some(transfer);
         }
 
         self.load_track(self.connect_state.player.is_playing, position.try_into()?)
-    }
-
-    async fn resolve_context(&mut self, ctx: &mut Context) -> Result<(), Error> {
-        if ctx.uri.starts_with("spotify:local-files") {
-            return Err(SpircError::UnsupportedLocalPlayBack.into());
-        }
-
-        if !ctx.pages.is_empty() {
-            debug!("context already contains pages to use");
-            return Ok(());
-        }
-
-        debug!("context didn't had any tracks, resolving tracks...");
-        let resolved_ctx = self.session.spclient().get_context(&ctx.uri).await?;
-
-        debug!(
-            "context resolved {} pages and {} tracks in total",
-            resolved_ctx.pages.len(),
-            resolved_ctx
-                .pages
-                .iter()
-                .map(|p| p.tracks.len())
-                .sum::<usize>()
-        );
-
-        ctx.pages = resolved_ctx.pages;
-        ctx.metadata = resolved_ctx.metadata;
-        ctx.restrictions = resolved_ctx.restrictions;
-        ctx.loading = resolved_ctx.loading;
-        ctx.special_fields = resolved_ctx.special_fields;
-
-        Ok(())
     }
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
@@ -1108,25 +1098,44 @@ impl SpircTask {
     }
 
     async fn handle_load(&mut self, cmd: SpircLoadCommand) -> Result<(), Error> {
+        self.connect_state.reset_context(&cmd.context_uri);
+
         if !self.connect_state.active {
             self.handle_activate();
         }
 
-        let mut ctx = Context {
-            uri: cmd.context_uri,
-            ..Default::default()
-        };
-
-        self.resolve_context(&mut ctx).await?;
-        self.connect_state.update_context(ctx)?;
+        if self.connect_state.player.context_uri == cmd.context_uri
+            && self.connect_state.context.is_some()
+        {
+            debug!("context didn't change, no resolving required")
+        } else {
+            debug!("resolving context for load command");
+            self.resolve_context(cmd.context_uri.clone(), false).await?;
+        }
 
         self.connect_state.next_tracks.clear();
         self.connect_state.player.track = MessageField::none();
 
-        let index = cmd.playing_track_index as usize;
+        let index = match cmd.playing_track {
+            PlayingTrack::Index(i) => i as usize,
+            PlayingTrack::Uri(uri) => {
+                let ctx = self.connect_state.context.as_ref();
+                ConnectState::find_index_in_context(ctx, |t| t.uri == uri)?
+            }
+            PlayingTrack::Uid(uid) => {
+                let ctx = self.connect_state.context.as_ref();
+                ConnectState::find_index_in_context(ctx, |t| t.uid == uid)?
+            }
+        };
+
+        if let Some(i) = self.connect_state.player.index.as_mut() {
+            i.track = index as u32;
+        }
+
         self.connect_state.set_shuffle(cmd.shuffle);
         if cmd.shuffle {
-            self.connect_state.set_current_track(index, false)?;
+            self.connect_state.active_context = ContextType::Default;
+            self.connect_state.set_current_track(index)?;
             self.connect_state.shuffle()?;
         } else {
             self.connect_state.reset_playback_context(Some(index))?;
@@ -1135,12 +1144,20 @@ impl SpircTask {
         self.connect_state.set_repeat_context(cmd.repeat);
         self.connect_state.set_repeat_track(cmd.repeat_track);
 
-        if !self.connect_state.next_tracks.is_empty() {
-            self.load_track(self.connect_state.player.is_playing, 0)?;
+        if self.connect_state.player.track.is_some() {
+            self.load_track(cmd.start_playing, 0)?;
         } else {
-            info!("No more tracks left in queue");
+            info!("No active track, stopping");
             self.handle_stop();
         }
+
+        if self.connect_state.next_tracks.is_empty() && self.session.autoplay() {
+            self.resolve_context.push(ResolveContext {
+                uri: cmd.context_uri,
+                autoplay: true,
+            })
+        }
+
         Ok(())
     }
 
@@ -1250,8 +1267,6 @@ impl SpircTask {
 
         if let Some(track_id) = self.preview_next_track() {
             self.player.preload(track_id);
-        } else {
-            self.handle_stop();
         }
     }
 
@@ -1261,9 +1276,24 @@ impl SpircTask {
         self.handle_preload_next_track();
     }
 
+    fn conditional_preload_autoplay(&mut self, uri: String) {
+        let preload_autoplay = self.connect_state.next_tracks.len() < CONTEXT_FETCH_THRESHOLD
+            && self.session.autoplay();
+
+        // When in autoplay, keep topping up the playlist when it nears the end
+        if preload_autoplay {
+            debug!("Preloading autoplay context for <{}>", uri);
+            // resolve the next autoplay context
+            self.resolve_context.push(ResolveContext {
+                uri,
+                autoplay: true,
+            });
+        }
+    }
+
     fn handle_next(&mut self, track: Option<ProvidedTrack>) -> Result<(), Error> {
         let context_uri = self.connect_state.player.context_uri.to_owned();
-        let mut continue_playing = self.connect_state.player.is_playing;
+        let continue_playing = self.connect_state.player.is_playing;
 
         let new_track_index = loop {
             let index = self.connect_state.next_track()?;
@@ -1277,58 +1307,9 @@ impl SpircTask {
             }
         };
 
-        let ctx = self
-            .connect_state
-            .context
-            .as_ref()
-            .ok_or(StateError::NoContext(false))?;
-        let context_length = ctx.tracks.len() as u32;
-        let context_index = ctx.index.track;
+        self.conditional_preload_autoplay(context_uri.clone());
 
-        let update_tracks =
-            self.autoplay_context && context_length - context_index < CONTEXT_FETCH_THRESHOLD;
-
-        debug!(
-            "At context track {:?} of {:?} <{:?}> update [{}]",
-            context_index + 1,
-            context_length,
-            context_uri,
-            update_tracks,
-        );
-
-        // When in autoplay, keep topping up the playlist when it nears the end
-        if update_tracks {
-            todo!("update tracks from context: preloading");
-        }
-
-        // When not in autoplay, either start autoplay or loop back to the start
-        if matches!(new_track_index, Some(i) if i >= context_length) || new_track_index.is_none() {
-            // for some contexts there is no autoplay, such as shows and episodes
-            // in such cases there is no context in librespot.
-            if self.connect_state.context.is_some() && self.session.autoplay() {
-                // Extend the playlist
-                debug!("Starting autoplay for <{}>", context_uri);
-                // force reloading the current context with an autoplay context
-                self.autoplay_context = true;
-                self.resolve_context = Some(context_uri);
-                self.player.set_auto_normalise_as_album(false);
-                todo!("update tracks from context: autoplay");
-            } else {
-                if self.connect_state.player.options.shuffling_context {
-                    self.connect_state.shuffle()?
-                } else {
-                    self.connect_state.reset_playback_context(None)?;
-                }
-
-                continue_playing &= self.connect_state.player.options.repeating_context;
-                debug!(
-                    "Looping back to start, repeating_context is {}",
-                    continue_playing
-                );
-            }
-        }
-
-        if context_length > 0 {
+        if new_track_index.is_some() {
             self.load_track(continue_playing, 0)
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
@@ -1395,20 +1376,6 @@ impl SpircTask {
         let id = SpotifyId::from_uri(&track_to_load.uri)?;
         self.player.load(id, start_playing, position_ms);
 
-        // todo: move into state.rs
-        const CONTEXT_URI_METADATA: &str = "context_uri";
-        const ENTITY_URI_METADATA: &str = "entity_uri";
-        if track_to_load.provider == CONTEXT_PROVIDER {
-            track_to_load.metadata.insert(
-                CONTEXT_URI_METADATA.to_string(),
-                self.connect_state.player.context_uri.to_owned(),
-            );
-            track_to_load.metadata.insert(
-                ENTITY_URI_METADATA.to_string(),
-                self.connect_state.player.context_uri.to_owned(),
-            );
-        }
-
         self.update_state_position(position_ms);
         if start_playing {
             self.play_status = SpircPlayStatus::LoadingPlay { position_ms };
@@ -1452,13 +1419,15 @@ impl SpircTask {
             self.connect_state.shuffle()
         } else {
             self.connect_state.shuffle_context = None;
+            self.connect_state.active_context = ContextType::Default;
 
             let state = &mut self.connect_state;
             let current_index = match state.player.track.as_ref() {
                 None => None,
-                Some(track) => state
-                    .find_index_in_context(|c| c.uri == track.uri)
-                    .map(Some)?,
+                Some(track) => {
+                    let ctx = state.context.as_ref();
+                    ConnectState::find_index_in_context(ctx, |c| c.uri == track.uri).map(Some)?
+                }
             };
 
             state.reset_playback_context(current_index)

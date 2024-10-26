@@ -32,7 +32,7 @@ use hyper::{
     HeaderMap, Method, Request,
 };
 use hyper_util::client::legacy::ResponseFuture;
-use librespot_protocol::player::Context;
+use librespot_protocol::{autoplay_context_request::AutoplayContextRequest, player::Context};
 use protobuf::{Enum, Message, MessageFull};
 use rand::RngCore;
 use sha1::{Digest, Sha1};
@@ -799,6 +799,25 @@ impl SpClient {
         let uri = format!("/context-resolve/v1/{uri}");
 
         let res = self.request(&Method::GET, &uri, None, None).await?;
+        let ctx_json = String::from_utf8(res.to_vec())?;
+        let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json)?;
+
+        Ok(ctx)
+    }
+
+    pub async fn get_autoplay_context(
+        &self,
+        context_request: &AutoplayContextRequest,
+    ) -> Result<Context, Error> {
+        let res = self
+            .request_with_protobuf(
+                &Method::POST,
+                "/context-resolve/v1/autoplay",
+                None,
+                context_request,
+            )
+            .await?;
+
         let ctx_json = String::from_utf8(res.to_vec())?;
         let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json)?;
 
