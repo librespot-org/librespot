@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::hash::{DefaultHasher, Hasher};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -11,14 +11,13 @@ use librespot_protocol::connect::{
     Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest,
 };
 use librespot_protocol::player::{
-    Context, ContextIndex, ContextPage, ContextPlayerOptions, ContextTrack, PlayOrigin,
+    Context, ContextIndex, ContextPlayerOptions, ContextTrack, PlayOrigin,
     PlayerState, ProvidedTrack, Suppressions, TransferState,
 };
 use protobuf::{EnumOrUnknown, Message, MessageField};
 use rand::prelude::SliceRandom;
 use thiserror::Error;
 
-type ContextState = (ContextPage, ContextIndex);
 
 // these limitations are essential, otherwise to many tracks will overload the web-player
 const SPOTIFY_MAX_PREV_TRACKS_SIZE: usize = 10;
@@ -74,6 +73,13 @@ impl Default for ConnectStateConfig {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct StateContext {
+    pub tracks: Vec<ProvidedTrack>,
+    pub metadata: HashMap<String, String>,
+    pub index: ContextIndex,
+}
+
 #[derive(Default, Debug)]
 pub struct ConnectState {
     pub active: bool,
@@ -99,9 +105,9 @@ pub struct ConnectState {
 
     // the context from which we play, is used to top up prev and next tracks
     // the index is used to keep track which tracks are already loaded into next tracks
-    pub context: Option<ContextState>,
+    pub context: Option<StateContext>,
     // a context to keep track of our shuffled context, should be only available when option.shuffling_context is true
-    pub shuffle_context: Option<ContextState>,
+    pub shuffle_context: Option<StateContext>,
 
     // is set when we receive a transfer state and are loading the context asynchronously
     pub transfer_state: Option<TransferState>,
@@ -270,13 +276,20 @@ impl ConnectState {
         self.prev_tracks.clear();
         self.clear_next_tracks();
 
-        let (ctx, _) = self.context.as_mut().ok_or(StateError::NoContext(false))?;
+        let current_uri = &self.player.track.uri;
+        let current_track = self.find_index_in_context(|t| &t.uri == current_uri)?;
+
+        let ctx = self.context.as_mut().ok_or(StateError::NoContext(false))?;
 
         let mut shuffle_context = ctx.clone();
+        // we don't need to include the current track, because it is already being played
+        shuffle_context.tracks.remove(current_track);
+
         let mut rng = rand::thread_rng();
         shuffle_context.tracks.shuffle(&mut rng);
+        shuffle_context.index = ContextIndex::new();
 
-        self.shuffle_context = Some((shuffle_context, ContextIndex::new()));
+        self.shuffle_context = Some(shuffle_context);
         self.fill_up_next_tracks()?;
 
         Ok(())
@@ -285,7 +298,7 @@ impl ConnectState {
     // endregion
 
     pub fn set_current_track(&mut self, index: usize, shuffle_context: bool) -> Result<(), Error> {
-        let (context, _) = if shuffle_context {
+        let context = if shuffle_context {
             self.shuffle_context.as_ref()
         } else {
             self.context.as_ref()
@@ -306,8 +319,7 @@ impl ConnectState {
             context.tracks.len()
         );
 
-        let new_track = self.context_to_provided_track(new_track)?;
-        self.player.track = MessageField::some(new_track);
+        self.player.track = MessageField::some(new_track.clone());
 
         Ok(())
     }
@@ -347,7 +359,7 @@ impl ConnectState {
             match new_index {
                 Ok(new_index) => Some(new_index as u32),
                 Err(why) => {
-                    error!("didn't find the shuffled track in the current context: {why}");
+                    error!("didn't find the track in the current context: {why}");
                     None
                 }
             }
@@ -406,14 +418,14 @@ impl ConnectState {
     }
 
     fn update_context_index(&mut self, new_index: usize) -> Result<(), StateError> {
-        let (_, context_index) = if self.player.options.shuffling_context {
+        let context = if self.player.options.shuffling_context {
             self.shuffle_context.as_mut()
         } else {
             self.context.as_mut()
         }
         .ok_or(StateError::NoContext(self.player.options.shuffling_context))?;
 
-        context_index.track = new_index as u32;
+        context.index.track = new_index as u32;
         Ok(())
     }
 
@@ -433,7 +445,7 @@ impl ConnectState {
 
         self.prev_tracks.clear();
 
-        let (context, _) = self.context.as_ref().ok_or(StateError::NoContext(false))?;
+        let context = self.context.as_ref().ok_or(StateError::NoContext(false))?;
         if new_index > 0 {
             let rev_ctx = context
                 .tracks
@@ -443,8 +455,7 @@ impl ConnectState {
                 .take(SPOTIFY_MAX_PREV_TRACKS_SIZE);
 
             for track in rev_ctx {
-                self.prev_tracks
-                    .push_back(self.context_to_provided_track(track)?)
+                self.prev_tracks.push_back(track.clone())
             }
         }
 
@@ -485,12 +496,29 @@ impl ConnectState {
         self.update_restrictions();
     }
 
-    pub fn update_context(&mut self, mut context: Context) {
+    pub fn update_context(&mut self, mut context: Context) -> Result<(), Error> {
         debug!("context: {}, {}", context.uri, context.url);
-        self.context = context
-            .pages
-            .pop()
-            .map(|ctx| (ctx, ContextIndex::default()));
+        let page = context.pages.pop().ok_or(StateError::NoContext(false))?;
+
+        let tracks = page
+            .tracks
+            .iter()
+            .flat_map(
+                |track| match self.context_to_provided_track(track, None, None) {
+                    Ok(t) => Some(t),
+                    Err(_) => {
+                        error!("couldn't convert {track:#?} into ProvidedTrack");
+                        None
+                    }
+                },
+            )
+            .collect();
+
+        self.context = Some(StateContext {
+            tracks,
+            metadata: page.metadata,
+            index: ContextIndex::new(),
+        });
 
         self.player.context_url = format!("context://{}", context.uri);
         self.player.context_uri = context.uri;
@@ -504,10 +532,10 @@ impl ConnectState {
         }
 
         if let Some(transfer_state) = self.transfer_state.take() {
-            if let Err(why) = self.setup_current_state(transfer_state) {
-                error!("setting up current state failed after updating the context: {why}")
-            }
+            self.setup_current_state(transfer_state)?
         }
+
+        Ok(())
     }
 
     pub fn try_get_current_track_from_transfer(
@@ -521,7 +549,11 @@ impl ConnectState {
         }
         .ok_or(StateError::CouldNotResolveTrackFromTransfer)?;
 
-        self.context_to_provided_track(track)
+        self.context_to_provided_track(
+            track,
+            None,
+            transfer.queue.is_playing_queue.then_some(QUEUE_PROVIDER),
+        )
     }
 
     pub fn setup_current_state(&mut self, transfer: TransferState) -> Result<(), Error> {
@@ -532,6 +564,7 @@ impl ConnectState {
 
         let current_index =
             self.find_index_in_context(|c| c.uri == track.uri || c.uid == track.uid)?;
+
         if self.player.track.is_none() {
             self.player.track = MessageField::some(track);
         }
@@ -611,28 +644,21 @@ impl ConnectState {
     }
 
     fn fill_up_next_tracks(&mut self) -> Result<(), StateError> {
-        let (ctx, ctx_index) = if self.player.options.shuffling_context {
+        let ctx = if self.player.options.shuffling_context {
             self.shuffle_context.as_ref()
         } else {
             self.context.as_ref()
         }
         .ok_or(StateError::NoContext(self.player.options.shuffling_context))?;
 
-        let mut new_index = ctx_index.track as usize;
+        let mut new_index = ctx.index.track as usize;
         while self.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
             let track = match ctx.tracks.get(new_index) {
                 None => {
                     // todo: what do we do if we can't fill up anymore? autoplay?
                     break;
                 }
-                Some(ct) => match self.context_to_provided_track(ct) {
-                    Err(why) => {
-                        error!("bad thing happened: {why}");
-                        // todo: handle bad things probably
-                        break;
-                    }
-                    Ok(track) => track,
-                },
+                Some(ct) => ct.clone(),
             };
 
             new_index += 1;
@@ -647,11 +673,11 @@ impl ConnectState {
         Ok(())
     }
 
-    pub fn find_index_in_context<F: Fn(&ContextTrack) -> bool>(
+    pub fn find_index_in_context<F: Fn(&ProvidedTrack) -> bool>(
         &self,
         f: F,
     ) -> Result<usize, StateError> {
-        let (ctx, _) = self.context.as_ref().ok_or(StateError::NoContext(false))?;
+        let ctx = self.context.as_ref().ok_or(StateError::NoContext(false))?;
 
         ctx.tracks
             .iter()
@@ -669,31 +695,43 @@ impl ConnectState {
     pub fn context_to_provided_track(
         &self,
         ctx_track: &ContextTrack,
+        metadata: Option<HashMap<String, String>>,
+        provider: Option<&str>,
     ) -> Result<ProvidedTrack, Error> {
         let provider = if self.unavailable_uri.contains(&ctx_track.uri) {
             UNAVAILABLE_PROVIDER
         } else {
-            CONTEXT_PROVIDER
+            provider.unwrap_or(CONTEXT_PROVIDER)
         };
 
-        let uri = if !ctx_track.uri.is_empty() {
-            ctx_track.uri.to_owned()
+        let id = if !ctx_track.uri.is_empty() {
+            SpotifyId::from_uri(&ctx_track.uri)
         } else if !ctx_track.gid.is_empty() {
-            SpotifyId::from_raw(&ctx_track.gid)?
-                .to_uri()?
-                .replace("unknown", "track")
+            SpotifyId::from_raw(&ctx_track.gid)
         } else if !ctx_track.uid.is_empty() {
-            SpotifyId::from_raw(ctx_track.uid.as_bytes())?
-                .to_uri()?
-                .replace("unknown", "track")
+            SpotifyId::from_raw(ctx_track.uid.as_bytes())
         } else {
             return Err(Error::unavailable("track not available"));
+        }?;
+
+        let mut metadata = metadata.unwrap_or_default();
+
+        if !ctx_track.metadata.is_empty() {
+            for (k, v) in &ctx_track.metadata {
+                metadata.insert(k.to_string(), v.to_string());
+            }
+        }
+
+        let uid = if !ctx_track.uid.is_empty() {
+            ctx_track.uid.clone()
+        } else {
+            String::from_utf8(id.to_raw().to_vec()).unwrap_or_else(|_| "unknown".to_string())
         };
 
         Ok(ProvidedTrack {
-            uri,
-            uid: ctx_track.uid.to_string(),
-            metadata: ctx_track.metadata.clone(),
+            uri: id.to_uri()?.replace("unknown", "track"),
+            uid,
+            metadata,
             provider: provider.to_string(),
             ..Default::default()
         })

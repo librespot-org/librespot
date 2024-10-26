@@ -449,7 +449,11 @@ impl SpircTask {
         } else {
             match self.session.spclient().get_context(&context_uri).await {
                 Err(why) => error!("failed to resolve context '{context_uri}': {why}"),
-                Ok(ctx) => self.connect_state.update_context(ctx),
+                Ok(ctx) => {
+                    if let Err(why) = self.connect_state.update_context(ctx) {
+                        error!("failed to resolve context '{context_uri}': {why}")
+                    }
+                }
             };
             if let Err(why) = self.notify().await {
                 error!("failed to update connect state, after updating the context: {why}")
@@ -473,11 +477,14 @@ impl SpircTask {
                         None
                     }
                 };
-                self.connect_state.update_context(Context {
+
+                if let Err(why) = self.connect_state.update_context(Context {
                     uri: self.connect_state.player.context_uri.to_owned(),
                     pages: context.map(|page| vec![page]).unwrap_or_default(),
                     ..Default::default()
-                })
+                }) {
+                    error!("failed updating context: {why}")
+                }
             }
             Err(err) => {
                 error!("ContextError: {:?}", err)
@@ -922,7 +929,7 @@ impl SpircTask {
                     // resolve context asynchronously
                     self.resolve_context = Some(ctx.uri)
                 } else {
-                    self.connect_state.update_context(ctx)
+                    self.connect_state.update_context(ctx)?
                 }
             }
         }
@@ -964,7 +971,7 @@ impl SpircTask {
                 .insert(key.clone(), value.clone());
         }
 
-        if let Some((context, _)) = &state.context {
+        if let Some(context) = &state.context {
             for (key, value) in &context.metadata {
                 state
                     .player
@@ -1084,7 +1091,7 @@ impl SpircTask {
         };
 
         self.resolve_context(&mut ctx).await?;
-        self.connect_state.update_context(ctx);
+        self.connect_state.update_context(ctx)?;
 
         self.connect_state.next_tracks.clear();
         self.connect_state.player.track = MessageField::none();
@@ -1243,13 +1250,13 @@ impl SpircTask {
             }
         };
 
-        let (ctx, ctx_index) = self
+        let ctx = self
             .connect_state
             .context
             .as_ref()
             .ok_or(StateError::NoContext(false))?;
         let context_length = ctx.tracks.len() as u32;
-        let context_index = ctx_index.track;
+        let context_index = ctx.index.track;
 
         let update_tracks =
             self.autoplay_context && context_length - context_index < CONTEXT_FETCH_THRESHOLD;
@@ -1264,9 +1271,6 @@ impl SpircTask {
 
         // When in autoplay, keep topping up the playlist when it nears the end
         if update_tracks {
-            if let Some((ctx, _)) = self.connect_state.context.as_ref() {
-                self.resolve_context = Some(ctx.next_page_url.to_owned());
-            }
             todo!("update tracks from context: preloading");
         }
 
