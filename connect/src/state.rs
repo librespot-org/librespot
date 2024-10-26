@@ -569,6 +569,16 @@ impl ConnectState {
             self.player.track = MessageField::some(track);
         }
 
+        if let Some(index) = self.player.index.as_mut() {
+            index.track = current_index as u32;
+        } else {
+            self.player.index = MessageField::some(ContextIndex {
+                page: 0,
+                track: current_index as u32,
+                ..Default::default()
+            })
+        }
+
         debug!(
             "setting up next and prev: index is at {current_index} while shuffle {}",
             self.player.options.shuffling_context
@@ -582,6 +592,8 @@ impl ConnectState {
             // todo: it seems like, if we play a queued track and transfer we will reset that queued track...
             self.reset_playback_context(Some(current_index))?;
         }
+
+        self.update_restrictions();
 
         Ok(())
     }

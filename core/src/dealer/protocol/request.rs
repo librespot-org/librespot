@@ -145,13 +145,19 @@ pub struct PlayOptions {
     #[serde(default, deserialize_with = "option_json_proto")]
     pub player_option_overrides: Option<ContextPlayerOptionOverrides>,
     pub license: String,
+    // mobile
+    pub always_play_something: Option<bool>,
+    pub audio_stream: Option<String>,
+    pub initially_paused: Option<bool>,
+    pub prefetch_level: Option<String>,
+    pub system_initiated: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SkipTo {
     pub track_uid: Option<String>,
     pub track_uri: Option<String>,
-    pub track_index: u32,
+    pub track_index: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

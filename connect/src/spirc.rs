@@ -130,7 +130,31 @@ pub struct SpircLoadCommand {
     pub shuffle: bool,
     pub repeat: bool,
     pub repeat_track: bool,
-    pub playing_track_index: u32,
+    pub playing_track: PlayingTrack,
+}
+
+#[derive(Debug)]
+pub enum PlayingTrack {
+    Index(u32),
+    Uri(String),
+    Uid(String),
+}
+
+impl From<SkipTo> for PlayingTrack {
+    fn from(value: SkipTo) -> Self {
+        // order is important as it seems that the index can be 0,
+        // but there might still be a uid or uri provided, so we try the index as last resort
+        if let Some(uri) = value.track_uri {
+            PlayingTrack::Uri(uri)
+        } else if let Some(uid) = value.track_uid {
+            PlayingTrack::Uid(uid)
+        } else {
+            PlayingTrack::Index(value.track_index.unwrap_or_else(|| {
+                warn!("SkipTo didn't provided any point to skip to, falling back to index 0");
+                0
+            }))
+        }
+    }
 }
 
 const CONTEXT_FETCH_THRESHOLD: u32 = 5;
@@ -416,6 +440,9 @@ impl SpircTask {
             }
         }
 
+        if let Err(why) = self.notify().await {
+            warn!("last notify before shutdown couldn't be send: {why}")
+        }
         self.session.dealer().close().await;
     }
 
