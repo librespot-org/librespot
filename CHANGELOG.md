@@ -10,11 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - [core] The `access_token` for http requests is now acquired by `login5`
+- [core] MSRV is now 1.75 (breaking)
+- [discovery] librespot can now be compiled with multiple MDNS/DNS-SD backends
+  (avahi, dns_sd, libmdns) which can be selected using a CLI flag. The defaults
+  are unchanged (breaking).
 
 ### Added
 
 - [core] Add `login` (mobile) and `auth_token` retrieval via login5
 - [core] Add `OS` and `os_version` to `config.rs`
+- [discovery] Added a new MDNS/DNS-SD backend which connects to Avahi via D-Bus.
 
 ### Removed
 
