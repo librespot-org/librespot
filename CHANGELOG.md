@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- [core] Fix "source slice length (16) does not match destination slice length
+  (20)" panic on some tracks
+
 ### Changed
 
 - [core] The `access_token` for http requests is now acquired by `login5`

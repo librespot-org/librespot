@@ -4,13 +4,19 @@ use librespot_protocol as protocol;
 
 use crate::{spotify_id::to_base16, Error};
 
+const RAW_LEN: usize = 20;
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FileId(pub [u8; 20]);
+pub struct FileId(pub [u8; RAW_LEN]);
 
 impl FileId {
     pub fn from_raw(src: &[u8]) -> FileId {
-        let mut dst = [0u8; 20];
-        dst.clone_from_slice(src);
+        let mut dst = [0u8; RAW_LEN];
+        let len = src.len();
+        // some tracks return 16 instead of 20 bytes: #1188
+        if len <= RAW_LEN {
+            dst[..len].clone_from_slice(src);
+        }
         FileId(dst)
     }
 
