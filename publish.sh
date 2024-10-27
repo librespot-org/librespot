@@ -6,6 +6,7 @@ DRY_RUN='false'
 WORKINGDIR="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $WORKINGDIR
 
+# Order: dependencies first (so "librespot" using everything before it goes last)
 crates=( "protocol" "oauth" "core" "discovery" "audio" "metadata" "playback" "connect" "librespot" )
 
 function replace_in_file() {
