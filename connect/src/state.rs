@@ -708,15 +708,17 @@ impl ConnectState {
             Self::find_index_in_context(ctx, |c| c.uri == track.uri || c.uid == track.uid);
 
         debug!(
-            "current {:?} index is {current_index:?}",
-            self.active_context
+            "active track is <{}> with index {current_index:?} in {:?} context, has {} tracks",
+            track.uri,
+            self.active_context,
+            ctx.map(|c| c.tracks.len()).unwrap_or_default()
         );
-        let current_index = current_index.ok();
 
         if self.player.track.is_none() {
             self.player.track = MessageField::some(track);
         }
 
+        let current_index = current_index.ok();
         if let Some(current_index) = current_index {
             if let Some(index) = self.player.index.as_mut() {
                 index.track = current_index as u32;
@@ -951,7 +953,7 @@ impl ConnectState {
         let uid = if !ctx_track.uid.is_empty() {
             ctx_track.uid.clone()
         } else {
-            String::from_utf8(id.to_raw().to_vec()).unwrap_or_else(|_| "unknown".to_string())
+            String::from_utf8(id.to_raw().to_vec()).unwrap_or_else(|_| String::new())
         };
 
         Ok(ProvidedTrack {
