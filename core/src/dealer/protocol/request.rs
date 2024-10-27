@@ -27,6 +27,7 @@ pub enum RequestCommand {
     SetShufflingContext(SetShufflingCommand),
     AddToQueue(AddToQueueCommand),
     SetQueue(SetQueueCommand),
+    SetOptions(SetOptionsCommand),
     // commands that don't send any context (at least not usually...)
     SkipPrev(GenericCommand),
     Resume(GenericCommand),
@@ -48,6 +49,7 @@ impl Display for RequestCommand {
                 RequestCommand::SetShufflingContext(_) => "set_shuffling_context",
                 RequestCommand::AddToQueue(_) => "add_to_queue",
                 RequestCommand::SetQueue(_) => "set_queue",
+                RequestCommand::SetOptions(_) => "set_options",
                 RequestCommand::SkipNext(_) => "skip_next",
                 RequestCommand::SkipPrev(_) => "skip_prev",
                 RequestCommand::Resume(_) => "resume",
@@ -127,6 +129,14 @@ pub struct SetQueueCommand {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct SetOptionsCommand {
+    pub repeating_context: bool,
+    pub repeating_track: bool,
+    pub options: Option<OptionsOptions>,
+    pub logging_params: LoggingParams,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct GenericCommand {
     pub logging_params: LoggingParams,
 }
@@ -151,6 +161,13 @@ pub struct PlayOptions {
     pub initially_paused: Option<bool>,
     pub prefetch_level: Option<String>,
     pub system_initiated: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct OptionsOptions {
+    only_for_local_device: bool,
+    override_restrictions: bool,
+    system_initiated: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]

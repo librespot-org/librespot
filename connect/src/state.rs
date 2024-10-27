@@ -26,7 +26,8 @@ const SPOTIFY_MAX_NEXT_TRACKS_SIZE: usize = 80;
 pub const CONTEXT_PROVIDER: &str = "context";
 pub const QUEUE_PROVIDER: &str = "queue";
 pub const AUTOPLAY_PROVIDER: &str = "autoplay";
-// todo: there is a separator provider which is used to realise repeat
+
+pub const DELIMITER_IDENTIFIER: &str = "delimiter";
 
 // our own provider to flag tracks as a specific states
 // todo: we might just need to remove tracks that are unavailable to play, will have to see how the official clients handle this provider
@@ -45,6 +46,8 @@ pub enum StateError {
     NoContext(ContextType),
     #[error("could not find track {0:?} in context of {1}")]
     CanNotFindTrackInContext(Option<usize>, usize),
+    #[error("Currently {action} is not allowed because {reason}")]
+    CurrentlyDisallowed { action: String, reason: String },
 }
 
 impl From<StateError> for Error {
@@ -153,14 +156,12 @@ impl ConnectState {
                     is_observable: true,
                     is_controllable: true,
 
+                    supports_gzip_pushes: true,
                     supports_logout: cfg.zeroconf_enabled,
                     supported_types: vec!["audio/episode".into(), "audio/track".into()],
                     supports_playlist_v2: true,
                     supports_transfer_command: true,
                     supports_command_request: true,
-                    supports_gzip_pushes: true,
-
-                    // todo: not handled yet, repeat missing
                     supports_set_options_command: true,
 
                     is_voice_enabled: false,
@@ -288,6 +289,19 @@ impl ConnectState {
     }
 
     pub fn shuffle(&mut self) -> Result<(), Error> {
+        if let Some(reason) = self
+            .player
+            .restrictions
+            .disallow_toggling_shuffle_reasons
+            .first()
+        {
+            return Err(StateError::CurrentlyDisallowed {
+                action: "shuffle".to_string(),
+                reason: reason.clone(),
+            }
+            .into());
+        }
+
         self.prev_tracks.clear();
         self.clear_next_tracks();
 
@@ -344,6 +358,11 @@ impl ConnectState {
     /// Updates the current track to the next track. Adds the old track
     /// to prev tracks and fills up the next tracks from the current context
     pub fn next_track(&mut self) -> Result<Option<u32>, StateError> {
+        // when we skip in repeat track, we don't repeat the current track anymore
+        if self.player.options.repeating_track {
+            self.set_repeat_track(false);
+        }
+
         let old_track = self.player.track.take();
 
         if let Some(old_track) = old_track {
@@ -351,10 +370,23 @@ impl ConnectState {
             if old_track.provider == CONTEXT_PROVIDER || old_track.provider == AUTOPLAY_PROVIDER {
                 // add old current track to prev tracks, while preserving a length of 10
                 if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
-                    self.prev_tracks.pop_front();
+                    _ = self.prev_tracks.pop_front();
                 }
                 self.prev_tracks.push_back(old_track);
             }
+        }
+
+        // handle possible delimiter
+        if matches!(self.next_tracks.front(), Some(next) if next.uid.starts_with(DELIMITER_IDENTIFIER))
+        {
+            let delimiter = self
+                .next_tracks
+                .pop_front()
+                .expect("item that was prechecked");
+            if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
+                _ = self.prev_tracks.pop_front();
+            }
+            self.prev_tracks.push_back(delimiter)
         }
 
         let new_track = match self.next_tracks.pop_front() {
@@ -413,6 +445,19 @@ impl ConnectState {
             }
         }
 
+        // handle possible delimiter
+        if matches!(self.prev_tracks.back(), Some(prev) if prev.uid.starts_with(DELIMITER_IDENTIFIER))
+        {
+            let delimiter = self
+                .prev_tracks
+                .pop_back()
+                .expect("item that was prechecked");
+            if self.next_tracks.len() >= SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+                _ = self.next_tracks.pop_back();
+            }
+            self.next_tracks.push_front(delimiter)
+        }
+
         while self.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
             let _ = self.next_tracks.pop_back();
         }
@@ -457,15 +502,20 @@ impl ConnectState {
         Ok(())
     }
 
-    pub fn reset_context(&mut self, new_context: &str) {
+    pub fn reset_context(&mut self, new_context: Option<&str>) {
         self.active_context = ContextType::Default;
 
         self.autoplay_context = None;
         self.shuffle_context = None;
 
-        if self.player.context_uri != new_context {
+        if matches!(new_context, Some(ctx) if self.player.context_uri != ctx) {
             self.context = None;
+        } else if let Some(ctx) = self.context.as_mut() {
+            ctx.index.track = 0;
+            ctx.index.page = 0;
         }
+
+        self.update_restrictions()
     }
 
     pub fn reset_playback_context(&mut self, new_index: Option<usize>) -> Result<(), Error> {
@@ -720,7 +770,8 @@ impl ConnectState {
     pub fn update_restrictions(&mut self) {
         const NO_PREV: &str = "no previous tracks";
         const NO_NEXT: &str = "no next tracks";
-        const AUTOPLAY: &str = "autoplay"; // also seen as: endless_context
+        const AUTOPLAY: &str = "autoplay";
+        const ENDLESS_CONTEXT: &str = "endless_context";
 
         if self.player.restrictions.is_none() {
             self.player.restrictions = MessageField::some(Restrictions::new())
@@ -747,6 +798,8 @@ impl ConnectState {
                 restrictions.disallow_toggling_shuffle_reasons = vec![AUTOPLAY.to_string()];
                 restrictions.disallow_toggling_repeat_context_reasons = vec![AUTOPLAY.to_string()];
                 restrictions.disallow_toggling_repeat_track_reasons = vec![AUTOPLAY.to_string()];
+            } else if self.player.options.repeating_context {
+                restrictions.disallow_toggling_shuffle_reasons = vec![ENDLESS_CONTEXT.to_string()]
             } else {
                 restrictions.disallow_toggling_shuffle_reasons.clear();
                 restrictions
@@ -784,24 +837,36 @@ impl ConnectState {
     pub fn fill_up_next_tracks(&mut self) -> Result<(), StateError> {
         let ctx = self.get_current_context()?;
         let mut new_index = ctx.index.track as usize;
+        let mut iteration = ctx.index.page;
 
         while self.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
             let ctx = self.get_current_context()?;
             let track = match ctx.tracks.get(new_index) {
+                None if self.player.options.repeating_context => {
+                    let delimiter = Self::delimiter(iteration.into());
+                    iteration += 1;
+                    new_index = 0;
+                    delimiter
+                }
                 None if self.autoplay_context.is_some() => {
                     // transitional to autoplay as active context
                     self.active_context = ContextType::Autoplay;
 
                     match self.get_current_context()?.tracks.get(new_index) {
                         None => break,
-                        Some(ct) => ct.clone(),
+                        Some(ct) => {
+                            new_index += 1;
+                            ct.clone()
+                        }
                     }
                 }
                 None => break,
-                Some(ct) => ct.clone(),
+                Some(ct) => {
+                    new_index += 1;
+                    ct.clone()
+                }
             };
 
-            new_index += 1;
             self.next_tracks.push_back(track);
         }
 
@@ -831,6 +896,23 @@ impl ConnectState {
         debug!("Marked <{}:{}> as unavailable", track.provider, track.uri);
         if track.uri == id {
             track.provider = UNAVAILABLE_PROVIDER.to_string();
+        }
+    }
+
+    fn delimiter(iteration: i64) -> ProvidedTrack {
+        const HIDDEN: &str = "hidden";
+        const ITERATION: &str = "iteration";
+
+        let mut metadata = HashMap::new();
+        metadata.insert(HIDDEN.to_string(), true.to_string());
+        metadata.insert(ITERATION.to_string(), iteration.to_string());
+
+        ProvidedTrack {
+            uri: format!("spotify:{DELIMITER_IDENTIFIER}"),
+            uid: format!("{DELIMITER_IDENTIFIER}{iteration}"),
+            provider: CONTEXT_PROVIDER.to_string(),
+            metadata,
+            ..Default::default()
         }
     }
 
