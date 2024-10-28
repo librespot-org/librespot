@@ -35,6 +35,7 @@ const UNAVAILABLE_PROVIDER: &str = "unavailable";
 
 pub const METADATA_CONTEXT_URI: &str = "context_uri";
 pub const METADATA_ENTITY_URI: &str = "entity_uri";
+pub const METADATA_IS_QUEUED: &str = "is_queued";
 
 #[derive(Debug, Error)]
 pub enum StateError {
@@ -558,13 +559,11 @@ impl ConnectState {
     }
 
     pub fn add_to_queue(&mut self, mut track: ProvidedTrack, rev_update: bool) {
-        const IS_QUEUED: &str = "is_queued";
-
         track.provider = QUEUE_PROVIDER.to_string();
-        if !track.metadata.contains_key(IS_QUEUED) {
+        if !track.metadata.contains_key(METADATA_IS_QUEUED) {
             track
                 .metadata
-                .insert(IS_QUEUED.to_string(), true.to_string());
+                .insert(METADATA_IS_QUEUED.to_string(), true.to_string());
         }
 
         if let Some(next_not_queued_track) = self
@@ -934,8 +933,6 @@ impl ConnectState {
             SpotifyId::from_uri(&ctx_track.uri)
         } else if !ctx_track.gid.is_empty() {
             SpotifyId::from_raw(&ctx_track.gid)
-        } else if !ctx_track.uid.is_empty() {
-            SpotifyId::from_raw(ctx_track.uid.as_bytes())
         } else {
             return Err(Error::unavailable("track not available"));
         }?;

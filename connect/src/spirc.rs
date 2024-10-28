@@ -1,4 +1,7 @@
-use crate::state::{ConnectState, ConnectStateConfig, ContextType, AUTOPLAY_PROVIDER};
+use crate::state::{
+    ConnectState, ConnectStateConfig, ContextType, AUTOPLAY_PROVIDER, METADATA_IS_QUEUED,
+    QUEUE_PROVIDER,
+};
 use crate::{
     core::{authentication::Credentials, session::UserAttributes, Error, Session, SpotifyId},
     playback::{
@@ -1114,7 +1117,10 @@ impl SpircTask {
         if self.connect_state.player.context_uri == cmd.context_uri
             && self.connect_state.context.is_some()
         {
-            debug!("context didn't change, no resolving required")
+            debug!(
+                "context <{}> didn't change, no resolving required",
+                self.connect_state.player.context_uri
+            )
         } else {
             debug!("resolving context for load command");
             self.resolve_context(cmd.context_uri.clone(), false).await?;
@@ -1458,7 +1464,18 @@ impl SpircTask {
         }
     }
 
-    fn handle_set_queue(&mut self, set_queue_command: SetQueueCommand) {
+    fn handle_set_queue(&mut self, mut set_queue_command: SetQueueCommand) {
+        // mobile only sends a set_queue command instead of an add_to_queue command
+        // in addition to handling the mobile add_to_queue handling, this should also handle
+        // a mass queue addition
+        set_queue_command
+            .next_tracks
+            .iter_mut()
+            .filter(|t| t.metadata.contains_key(METADATA_IS_QUEUED))
+            .for_each(|t| {
+                t.provider = QUEUE_PROVIDER.to_string();
+            });
+
         self.connect_state.next_tracks = set_queue_command.next_tracks.into();
         self.connect_state.prev_tracks = set_queue_command.prev_tracks.into();
         self.connect_state.player.queue_revision = self.connect_state.new_queue_revision();
