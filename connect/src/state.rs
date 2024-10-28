@@ -478,7 +478,7 @@ impl ConnectState {
 
         self.player.track = MessageField::some(new_track);
 
-        if self.player.index.track <= 0 {
+        if self.player.index.track == 0 {
             warn!("prev: trying to skip into negative, index update skipped")
         } else if let Some(index) = self.player.index.as_mut() {
             index.track -= 1;
