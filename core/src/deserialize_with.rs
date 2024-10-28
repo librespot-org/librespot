@@ -21,8 +21,6 @@ where
     T: MessageFull,
     D: Deserializer<'de>,
 {
-    use serde::de::Error;
-
     let v: String = Deserialize::deserialize(de)?;
     let bytes = BASE64_STANDARD
         .decode(v)
@@ -36,8 +34,6 @@ where
     T: MessageFull,
     D: Deserializer<'de>,
 {
-    use serde::de::Error;
-
     let v: Value = Deserialize::deserialize(de)?;
     parse_value_to_msg(&v).map_err(|why| {
         warn!("deserialize_json_proto: {v}");
@@ -51,8 +47,6 @@ where
     T: MessageFull,
     D: Deserializer<'de>,
 {
-    use serde::de::Error;
-
     let v: Value = Deserialize::deserialize(de)?;
     parse_value_to_msg(&v).map(Some).map_err(Error::custom)
 }
@@ -62,8 +56,6 @@ where
     T: MessageFull,
     D: Deserializer<'de>,
 {
-    use serde::de::Error;
-
     let v: Value = Deserialize::deserialize(de)?;
     let array = match v {
         Value::Array(array) => array,
