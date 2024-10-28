@@ -1,5 +1,5 @@
-use std::collections::{HashMap, VecDeque};
-use std::hash::{DefaultHasher, Hasher};
+use std::collections::{hash_map::DefaultHasher, HashMap, VecDeque};
+use std::hash::Hasher;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::spirc::SpircPlayStatus;
