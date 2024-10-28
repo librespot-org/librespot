@@ -264,6 +264,9 @@ impl Spirc {
                 }),
         );
 
+        // pre-acquire client_token, preventing multiple request while running
+        let _ = session.spclient().client_token().await?;
+
         // Connect *after* all message listeners are registered
         session.connect(credentials, true).await?;
         session.dealer().start().await?;
@@ -749,6 +752,18 @@ impl SpircTask {
     async fn handle_connection_id_update(&mut self, connection_id: String) {
         trace!("Received connection ID update: {:?}", connection_id);
         self.session.set_connection_id(&connection_id);
+
+        // pre-acquire access_token, preventing multiple request while running
+        // pre-acquiring for the access_token will only last for one hour
+        //
+        // we need to fire the request after connecting, but can't do it right
+        // after, because by that we would miss certain packages, like this one
+        match self.session.login5().auth_token().await {
+            Ok(_) => debug!("successfully pre-acquire access_token and client_token"),
+            Err(why) => {
+                error!("{why}");
+            }
+        }
 
         let response = match self
             .connect_state
@@ -1429,7 +1444,7 @@ impl SpircTask {
     fn set_volume(&mut self, volume: u16) {
         let old_volume = self.connect_state.device.volume;
         let new_volume = volume as u32;
-        if old_volume != new_volume {
+        if old_volume != new_volume || self.mixer.volume() != volume {
             self.update_volume = true;
 
             self.connect_state.device.volume = new_volume;

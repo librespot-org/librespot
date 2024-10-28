@@ -3,7 +3,7 @@ mod handshake;
 
 pub use self::{codec::ApCodec, handshake::handshake};
 
-use std::io;
+use std::{io, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
 use num_traits::FromPrimitive;
@@ -63,9 +63,33 @@ impl From<APLoginFailed> for AuthenticationError {
 }
 
 pub async fn connect(host: &str, port: u16, proxy: Option<&Url>) -> io::Result<Transport> {
-    let socket = crate::socket::connect(host, port, proxy).await?;
+    const TIMEOUT: Duration = Duration::from_secs(3);
+    let socket = tokio::time::timeout(TIMEOUT, crate::socket::connect(host, port, proxy)).await??;
 
     handshake(socket).await
+}
+
+pub async fn connect_with_retry(
+    host: &str,
+    port: u16,
+    proxy: Option<&Url>,
+    max_retries: u8,
+) -> io::Result<Transport> {
+    let mut num_retries = 0;
+    loop {
+        match connect(host, port, proxy).await {
+            Ok(f) => return Ok(f),
+            Err(e) => {
+                debug!("Connection failed: {e}");
+                if num_retries < max_retries {
+                    num_retries += 1;
+                    debug!("Retry access point...");
+                    continue;
+                }
+                return Err(e);
+            }
+        }
+    }
 }
 
 pub async fn authenticate(
@@ -88,7 +112,7 @@ pub async fn authenticate(
         _ => CpuFamily::CPU_UNKNOWN,
     };
 
-    let os = match std::env::consts::OS {
+    let os = match crate::config::OS {
         "android" => Os::OS_ANDROID,
         "freebsd" | "netbsd" | "openbsd" => Os::OS_FREEBSD,
         "ios" => Os::OS_IPHONE,

@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    env::consts::OS,
     time::{Duration, Instant},
 };
 
@@ -21,11 +20,11 @@ use hyper_util::{
 use nonzero_ext::nonzero;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use sysinfo::System;
 use thiserror::Error;
 use url::Url;
 
 use crate::{
+    config::{os_version, OS},
     date::Date,
     version::{spotify_version, FALLBACK_USER_AGENT, VERSION_STRING},
     Error,
@@ -106,7 +105,7 @@ pub struct HttpClient {
 impl HttpClient {
     pub fn new(proxy_url: Option<&Url>) -> Self {
         let zero_str = String::from("0");
-        let os_version = System::os_version().unwrap_or_else(|| zero_str.clone());
+        let os_version = os_version();
 
         let (spotify_platform, os_version) = match OS {
             "android" => ("Android", os_version),

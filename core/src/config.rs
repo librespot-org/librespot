@@ -7,6 +7,20 @@ pub(crate) const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 pub(crate) const ANDROID_CLIENT_ID: &str = "9a8d2f0ce77a4e248bb71fefcb557637";
 pub(crate) const IOS_CLIENT_ID: &str = "58bd3c95768941ea9eb4350aaa033eb3";
 
+// Easily adjust the current platform to mock the behavior on it. If for example
+// android or ios needs to be mocked, the `os_version` has to be set to a valid version.
+// Otherwise, client-token or login5 requests will fail with a generic invalid-credential error.
+/// See [std::env::consts::OS]
+pub const OS: &str = std::env::consts::OS;
+
+// valid versions for some os:
+// 'android': 30
+// 'ios': 17
+/// See [sysinfo::System::os_version]
+pub fn os_version() -> String {
+    sysinfo::System::os_version().unwrap_or("0".into())
+}
+
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
     pub client_id: String,
@@ -40,7 +54,7 @@ impl SessionConfig {
 
 impl Default for SessionConfig {
     fn default() -> Self {
-        Self::default_for_os(std::env::consts::OS)
+        Self::default_for_os(OS)
     }
 }
 

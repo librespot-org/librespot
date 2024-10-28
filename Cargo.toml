@@ -1,7 +1,7 @@
 [package]
 name = "librespot"
-version = "0.5.0-dev"
-rust-version = "1.74"
+version = "0.5.0"
+rust-version = "1.75"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
@@ -23,35 +23,36 @@ doc = false
 
 [dependencies.librespot-audio]
 path = "audio"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies.librespot-connect]
 path = "connect"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies.librespot-core]
 path = "core"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies.librespot-discovery]
 path = "discovery"
-version = "0.5.0-dev"
+version = "0.5.0"
+default-features = false
 
 [dependencies.librespot-metadata]
 path = "metadata"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies.librespot-playback]
 path = "playback"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies.librespot-protocol]
 path = "protocol"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies.librespot-oauth]
 path = "oauth"
-version = "0.5.0-dev"
+version = "0.5.0"
 
 [dependencies]
 data-encoding = "2.5"
@@ -59,13 +60,11 @@ env_logger =  { version = "0.11.2", default-features = false, features = ["color
 futures-util = { version = "0.3", default-features = false }
 getopts = "0.2"
 log = "0.4"
-rpassword = "7.0"
 sha1 = "0.10"
 sysinfo = { version = "0.31.3", default-features = false, features = ["system"] }
 thiserror = "1.0"
-tokio = { version = "1", features = ["rt", "macros", "signal", "sync", "parking_lot", "process"] }
+tokio = { version = "1.40", features = ["rt", "macros", "signal", "sync", "parking_lot", "process"] }
 url = "2.2"
-webpki = "0.22.4"
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
@@ -77,11 +76,13 @@ rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 sdl-backend = ["librespot-playback/sdl-backend"]
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
 
-with-dns-sd = ["librespot-core/with-dns-sd", "librespot-discovery/with-dns-sd"]
+with-avahi = ["librespot-discovery/with-avahi"]
+with-dns-sd = ["librespot-discovery/with-dns-sd"]
+with-libmdns = ["librespot-discovery/with-libmdns"]
 
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
-default = ["rodio-backend"]
+default = ["rodio-backend", "with-libmdns"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
@@ -100,3 +101,6 @@ assets = [
     ["contrib/librespot.service", "lib/systemd/system/", "644"],
     ["contrib/librespot.user.service", "lib/systemd/user/", "644"]
 ]
+
+[workspace.package]
+rust-version = "1.74"

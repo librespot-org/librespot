@@ -5,9 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) since v0.2.0.
 
-## [0.5.0-dev] - YYYY-MM-DD
+## [Unreleased]
 
-This version will be a major departure from the architecture up until now. It
+### Fixed
+
+- [core] Fix "source slice length (16) does not match destination slice length
+  (20)" panic on some tracks
+
+### Changed
+
+- [core] The `access_token` for http requests is now acquired by `login5`
+- [core] MSRV is now 1.75 (breaking)
+- [discovery] librespot can now be compiled with multiple MDNS/DNS-SD backends
+  (avahi, dns_sd, libmdns) which can be selected using a CLI flag. The defaults
+  are unchanged (breaking).
+
+### Added
+
+- [core] Add `login` (mobile) and `auth_token` retrieval via login5
+- [core] Add `OS` and `os_version` to `config.rs`
+- [discovery] Added a new MDNS/DNS-SD backend which connects to Avahi via D-Bus.
+
+### Removed
+
+### Fixed 
+
+- [connect] Fixes initial volume showing zero despite playing in full volume instead
+
+## [0.5.0] - 2024-10-15
+
+This version is be a major departure from the architecture up until now. It
 focuses on implementing the "new Spotify API". This  means moving large parts
 of the Spotify protocol from Mercury to HTTP. A lot of this was reverse
 engineered before by @devgianlu of librespot-java. It was long overdue that we
@@ -17,7 +44,7 @@ hopefully upcoming Spotify HiFi depend on it.
 Splitting up the work on the new Spotify API, v0.5.0 brings HTTP-based file
 downloads and metadata access. Implementing the "dealer" (replacing the current
 Mercury-based SPIRC message bus with WebSockets, also required for social plays)
-is separate large effort, to be targeted for v0.6.0.
+is a large and separate effort, slated for some later release.
 
 While at it, we are taking the liberty to do some major refactoring to make
 librespot more robust. Consequently not only the Spotify API changed but large
@@ -39,6 +66,7 @@ https://github.com/librespot-org/librespot
 - [all] Use a single `player` instance. Eliminates occasional `player` and
   `audio backend` restarts, which can cause issues with some playback
   configurations.
+- [all] Updated and removed unused dependencies
 - [audio] Files are now downloaded over the HTTPS CDN (breaking)
 - [audio] Improve file opening and seeking performance (breaking)
 - [core] MSRV is now 1.74 (breaking)
@@ -46,6 +74,7 @@ https://github.com/librespot-org/librespot
 - [connect] Update and expose all `spirc` context fields (breaking)
 - [connect] Add `Clone, Defaut` traits to `spirc` contexts
 - [connect] Autoplay contexts are now retrieved with the `spclient` (breaking)
+- [contrib] Updated Docker image
 - [core] Message listeners are registered before authenticating. As a result
   there now is a separate `Session::new` and subsequent `session.connect`.
   (breaking)
@@ -56,7 +85,10 @@ https://github.com/librespot-org/librespot
 - [core] `FileId` is moved out of `SpotifyId`. For now it will be re-exported.
 - [core] Report actual platform data on login
 - [core] Support `Session` authentication with a Spotify access token
-- [core] `Credentials.username` is now an `Option` (breaking) 
+- [core] `Credentials.username` is now an `Option` (breaking)
+- [core] `Session::connect` tries multiple access points, retrying each one.
+- [core] Each access point connection now timesout after 3 seconds.
+- [core] Listen on both IPV4 and IPV6 on non-windows hosts
 - [main] `autoplay {on|off}` now acts as an override. If unspecified, `librespot`
   now follows the setting in the Connect client that controls it. (breaking)
 - [metadata] Most metadata is now retrieved with the `spclient` (breaking)
@@ -74,6 +106,7 @@ https://github.com/librespot-org/librespot
 
 - [all] Check that array indexes are within bounds (panic safety)
 - [all] Wrap errors in librespot `Error` type (breaking)
+- [audio] Make audio fetch parameters tunable
 - [connect] Add option on which zeroconf will bind. Defaults to all interfaces. Ignored by DNS-SD.
 - [connect] Add session events
 - [connect] Add `repeat`, `set_position_ms` and `set_volume` to `spirc.rs`
@@ -93,6 +126,8 @@ https://github.com/librespot-org/librespot
 - [core] Support parsing `SpotifyId` for local files
 - [core] Support parsing `SpotifyId` for named playlists
 - [core] Add checks and handling for stale server connections.
+- [core] Fix potential deadlock waiting for audio decryption keys.
+- [discovery] Add option to show playback device as a group
 - [main] Add all player events to `player_event_handler.rs`
 - [main] Add an event worker thread that runs async to the main thread(s) but
   sync to itself to prevent potential data races for event consumers
@@ -116,11 +151,15 @@ https://github.com/librespot-org/librespot
 - [connect] Loading previous or next tracks, or looping back on repeat, will
   only start playback when we were already playing
 - [connect, playback] Clean up and de-noise events and event firing
+- [core] Fixed frequent disconnections for some users
+- [core] More strict Spotify ID parsing
+- [discovery] Update active user field upon connection
 - [playback] Handle invalid track start positions by just starting the track
   from the beginning
 - [playback] Handle disappearing and invalid devices better
 - [playback] Handle seek, pause, and play commands while loading
 - [playback] Handle disabled normalisation correctly when using fixed volume
+- [playback] Do not stop sink in gapless mode
 - [metadata] Fix missing colon when converting named spotify IDs to URIs
 
 ## [0.4.2] - 2022-07-29
@@ -282,16 +321,17 @@ v0.4.x as a stable branch until then.
 
 ## [0.1.0] - 2019-11-06
 
-[0.5.0-dev]: https://github.com/librespot-org/librespot/compare/v0.4.1..HEAD
-[0.4.2]: https://github.com/librespot-org/librespot/compare/v0.4.1..v0.4.2
-[0.4.1]: https://github.com/librespot-org/librespot/compare/v0.4.0..v0.4.1
-[0.4.0]: https://github.com/librespot-org/librespot/compare/v0.3.1..v0.4.0
-[0.3.1]: https://github.com/librespot-org/librespot/compare/v0.3.0..v0.3.1
-[0.3.0]: https://github.com/librespot-org/librespot/compare/v0.2.0..v0.3.0
-[0.2.0]: https://github.com/librespot-org/librespot/compare/v0.1.6..v0.2.0
-[0.1.6]: https://github.com/librespot-org/librespot/compare/v0.1.5..v0.1.6
-[0.1.5]: https://github.com/librespot-org/librespot/compare/v0.1.3..v0.1.5
-[0.1.3]: https://github.com/librespot-org/librespot/compare/v0.1.2..v0.1.3
-[0.1.2]: https://github.com/librespot-org/librespot/compare/v0.1.1..v0.1.2
-[0.1.1]: https://github.com/librespot-org/librespot/compare/v0.1.0..v0.1.1
+[unreleased]: https://github.com/librespot-org/librespot/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/librespot-org/librespot/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/librespot-org/librespot/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/librespot-org/librespot/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/librespot-org/librespot/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/librespot-org/librespot/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/librespot-org/librespot/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/librespot-org/librespot/compare/v0.1.6...v0.2.0
+[0.1.6]: https://github.com/librespot-org/librespot/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/librespot-org/librespot/compare/v0.1.3...v0.1.5
+[0.1.3]: https://github.com/librespot-org/librespot/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/librespot-org/librespot/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/librespot-org/librespot/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/librespot-org/librespot/releases/tag/v0.1.0

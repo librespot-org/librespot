@@ -12,14 +12,18 @@ use std::{
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::TryStream;
-use futures_util::{future, ready, StreamExt, TryStreamExt};
+use futures_util::StreamExt;
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
+use pin_project_lite::pin_project;
 use quick_xml::events::Event;
 use thiserror::Error;
-use tokio::{sync::mpsc, time::Instant};
+use tokio::{
+    sync::mpsc,
+    time::{sleep, Duration as TokioDuration, Instant as TokioInstant, Sleep},
+};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::dealer::manager::DealerManager;
@@ -32,6 +36,7 @@ use crate::{
     config::SessionConfig,
     connection::{self, AuthenticationError, Transport},
     http_client::HttpClient,
+    login5::Login5Manager,
     mercury::MercuryManager,
     packet::PacketType,
     protocol::keyexchange::ErrorCode,
@@ -83,7 +88,6 @@ struct SessionData {
     time_delta: i64,
     invalid: bool,
     user_data: UserData,
-    last_ping: Option<Instant>,
 }
 
 struct SessionInternal {
@@ -100,6 +104,7 @@ struct SessionInternal {
     dealer: OnceCell<DealerManager>,
     spclient: OnceCell<SpClient>,
     token_provider: OnceCell<TokenProvider>,
+    login5: OnceCell<Login5Manager>,
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
@@ -141,19 +146,22 @@ impl Session {
             dealer: OnceCell::new(),
             spclient: OnceCell::new(),
             token_provider: OnceCell::new(),
+            login5: OnceCell::new(),
             handle: tokio::runtime::Handle::current(),
         }))
     }
 
     async fn connect_inner(
         &self,
-        access_point: SocketAddress,
+        access_point: &SocketAddress,
         credentials: Credentials,
     ) -> Result<(Credentials, Transport), Error> {
-        let mut transport = connection::connect(
+        const MAX_RETRIES: u8 = 1;
+        let mut transport = connection::connect_with_retry(
             &access_point.0,
             access_point.1,
             self.config().proxy.as_ref(),
+            MAX_RETRIES,
         )
         .await?;
         let mut reusable_credentials = connection::authenticate(
@@ -168,10 +176,11 @@ impl Session {
             trace!(
                 "Reconnect using stored credentials as token authed sessions cannot use keymaster."
             );
-            transport = connection::connect(
+            transport = connection::connect_with_retry(
                 &access_point.0,
                 access_point.1,
                 self.config().proxy.as_ref(),
+                MAX_RETRIES,
             )
             .await?;
             reusable_credentials = connection::authenticate(
@@ -190,19 +199,32 @@ impl Session {
         credentials: Credentials,
         store_credentials: bool,
     ) -> Result<(), Error> {
+        // There currently happen to be 6 APs but anything will do to avoid an infinite loop.
+        const MAX_AP_TRIES: u8 = 6;
+        let mut num_ap_tries = 0;
         let (reusable_credentials, transport) = loop {
             let ap = self.apresolver().resolve("accesspoint").await?;
             info!("Connecting to AP \"{}:{}\"", ap.0, ap.1);
-            match self.connect_inner(ap, credentials.clone()).await {
+            match self.connect_inner(&ap, credentials.clone()).await {
                 Ok(ct) => break ct,
                 Err(e) => {
+                    num_ap_tries += 1;
+                    if MAX_AP_TRIES == num_ap_tries {
+                        error!("Tried too many access points");
+                        return Err(e);
+                    }
                     if let Some(AuthenticationError::LoginFailed(ErrorCode::TryAnotherAP)) =
                         e.error.downcast_ref::<AuthenticationError>()
                     {
                         warn!("Instructed to try another access point...");
                         continue;
-                    } else {
+                    } else if let Some(AuthenticationError::LoginFailed(..)) =
+                        e.error.downcast_ref::<AuthenticationError>()
+                    {
                         return Err(e);
+                    } else {
+                        warn!("Try another access point...");
+                        continue;
                     }
                 }
             }
@@ -227,6 +249,8 @@ impl Session {
             }
         }
 
+        // This channel serves as a buffer for packets and serializes access to the TcpStream, such
+        // that `self.send_packet` can return immediately and needs no additional synchronization.
         let (tx_connection, rx_connection) = mpsc::unbounded_channel();
         self.0
             .tx_connection
@@ -237,16 +261,19 @@ impl Session {
         let sender_task = UnboundedReceiverStream::new(rx_connection)
             .map(Ok)
             .forward(sink);
-        let receiver_task = DispatchTask(stream, self.weak());
-        let timeout_task = Session::session_timeout(self.weak());
-
+        let session_weak = self.weak();
         tokio::spawn(async move {
-            let result = future::try_join3(sender_task, receiver_task, timeout_task).await;
-
-            if let Err(e) = result {
+            if let Err(e) = sender_task.await {
                 error!("{}", e);
+                if let Some(session) = session_weak.try_upgrade() {
+                    if !session.is_invalid() {
+                        session.shutdown();
+                    }
+                }
             }
         });
+
+        tokio::spawn(DispatchTask::new(self.weak(), stream));
 
         Ok(())
     }
@@ -295,31 +322,10 @@ impl Session {
             .get_or_init(|| TokenProvider::new(self.weak()))
     }
 
-    /// Returns an error, when we haven't received a ping for too long (2 minutes),
-    /// which means that we silently lost connection to Spotify servers.
-    async fn session_timeout(session: SessionWeak) -> io::Result<()> {
-        // pings are sent every 2 minutes and a 5 second margin should be fine
-        const SESSION_TIMEOUT: Duration = Duration::from_secs(125);
-
-        while let Some(session) = session.try_upgrade() {
-            if session.is_invalid() {
-                break;
-            }
-            let last_ping = session.0.data.read().last_ping.unwrap_or_else(Instant::now);
-            if last_ping.elapsed() >= SESSION_TIMEOUT {
-                session.shutdown();
-                // TODO: Optionally reconnect (with cached/last credentials?)
-                return Err(io::Error::new(
-                    io::ErrorKind::TimedOut,
-                    "session lost connection to server",
-                ));
-            }
-            // drop the strong reference before sleeping
-            drop(session);
-            // a potential timeout cannot occur at least until SESSION_TIMEOUT after the last_ping
-            tokio::time::sleep_until(last_ping + SESSION_TIMEOUT).await;
-        }
-        Ok(())
+    pub fn login5(&self) -> &Login5Manager {
+        self.0
+            .login5
+            .get_or_init(|| Login5Manager::new(self.weak()))
     }
 
     pub fn time_delta(&self) -> i64 {
@@ -350,96 +356,6 @@ impl Session {
 
                 // TODO: logout instead of exiting
                 exit(1);
-            }
-        }
-    }
-
-    fn dispatch(&self, cmd: u8, data: Bytes) -> Result<(), Error> {
-        use PacketType::*;
-
-        let packet_type = FromPrimitive::from_u8(cmd);
-        let cmd = match packet_type {
-            Some(cmd) => cmd,
-            None => {
-                trace!("Ignoring unknown packet {:x}", cmd);
-                return Err(SessionError::Packet(cmd).into());
-            }
-        };
-
-        match packet_type {
-            Some(Ping) => {
-                let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
-                let timestamp = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or(Duration::ZERO)
-                    .as_secs() as i64;
-
-                {
-                    let mut data = self.0.data.write();
-                    data.time_delta = server_timestamp.saturating_sub(timestamp);
-                    data.last_ping = Some(Instant::now());
-                }
-
-                self.debug_info();
-                self.send_packet(Pong, vec![0, 0, 0, 0])
-            }
-            Some(CountryCode) => {
-                let country = String::from_utf8(data.as_ref().to_owned())?;
-                info!("Country: {:?}", country);
-                self.0.data.write().user_data.country = country;
-                Ok(())
-            }
-            Some(StreamChunkRes) | Some(ChannelError) => self.channel().dispatch(cmd, data),
-            Some(AesKey) | Some(AesKeyError) => self.audio_key().dispatch(cmd, data),
-            Some(MercuryReq) | Some(MercurySub) | Some(MercuryUnsub) | Some(MercuryEvent) => {
-                self.mercury().dispatch(cmd, data)
-            }
-            Some(ProductInfo) => {
-                let data = std::str::from_utf8(&data)?;
-                let mut reader = quick_xml::Reader::from_str(data);
-
-                let mut buf = Vec::new();
-                let mut current_element = String::new();
-                let mut user_attributes: UserAttributes = HashMap::new();
-
-                loop {
-                    match reader.read_event_into(&mut buf) {
-                        Ok(Event::Start(ref element)) => {
-                            std::str::from_utf8(element)?.clone_into(&mut current_element)
-                        }
-                        Ok(Event::End(_)) => {
-                            current_element = String::new();
-                        }
-                        Ok(Event::Text(ref value)) => {
-                            if !current_element.is_empty() {
-                                let _ = user_attributes
-                                    .insert(current_element.clone(), value.unescape()?.to_string());
-                            }
-                        }
-                        Ok(Event::Eof) => break,
-                        Ok(_) => (),
-                        Err(e) => warn!(
-                            "Error parsing XML at position {}: {:?}",
-                            reader.buffer_position(),
-                            e
-                        ),
-                    }
-                }
-
-                trace!("Received product info: {:#?}", user_attributes);
-                Self::check_catalogue(&user_attributes);
-
-                self.0.data.write().user_data.attributes = user_attributes;
-                Ok(())
-            }
-            Some(PongAck)
-            | Some(SecretBlock)
-            | Some(LegacyWelcome)
-            | Some(UnknownDataAllZeros)
-            | Some(LicenseVersion) => Ok(()),
-            _ => {
-                trace!("Ignoring {:?} packet with data {:#?}", cmd, data);
-                Err(SessionError::Packet(cmd as u8).into())
             }
         }
     }
@@ -576,7 +492,7 @@ impl Session {
     }
 
     pub fn shutdown(&self) {
-        debug!("Invalidating session");
+        debug!("Shutdown: Invalidating session");
         self.0.data.write().invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
@@ -607,49 +523,277 @@ impl Drop for SessionInternal {
     }
 }
 
-struct DispatchTask<S>(S, SessionWeak)
-where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin;
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
+enum KeepAliveState {
+    #[default]
+    // Expecting a Ping from the server, either after startup or after a PongAck.
+    ExpectingPing,
 
-impl<S> Future for DispatchTask<S>
+    // We need to send a Pong at the given time.
+    PendingPong,
+
+    // We just sent a Pong and wait for it be ACK'd.
+    ExpectingPongAck,
+}
+
+const INITIAL_PING_TIMEOUT: TokioDuration = TokioDuration::from_secs(20);
+const PING_TIMEOUT: TokioDuration = TokioDuration::from_secs(80); // 60s expected + 20s buffer
+const PONG_DELAY: TokioDuration = TokioDuration::from_secs(60);
+const PONG_ACK_TIMEOUT: TokioDuration = TokioDuration::from_secs(20);
+
+impl KeepAliveState {
+    fn debug(&self, sleep: &Sleep) {
+        let delay = sleep
+            .deadline()
+            .checked_duration_since(TokioInstant::now())
+            .map(|t| t.as_secs_f64())
+            .unwrap_or(f64::INFINITY);
+
+        trace!("keep-alive state: {:?}, timeout in {:.1}", self, delay);
+    }
+}
+
+pin_project! {
+    struct DispatchTask<S>
+    where
+        S: TryStream<Ok = (u8, Bytes)>
+    {
+        session: SessionWeak,
+        keep_alive_state: KeepAliveState,
+        #[pin]
+        stream: S,
+        #[pin]
+        timeout: Sleep,
+    }
+
+    impl<S> PinnedDrop for DispatchTask<S>
+    where
+        S: TryStream<Ok = (u8, Bytes)>
+    {
+        fn drop(_this: Pin<&mut Self>) {
+            debug!("drop Dispatch");
+        }
+    }
+}
+
+impl<S> DispatchTask<S>
 where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin,
-    <S as TryStream>::Ok: std::fmt::Debug,
+    S: TryStream<Ok = (u8, Bytes)>,
 {
-    type Output = Result<(), S::Error>;
+    fn new(session: SessionWeak, stream: S) -> Self {
+        Self {
+            session,
+            keep_alive_state: KeepAliveState::ExpectingPing,
+            stream,
+            timeout: sleep(INITIAL_PING_TIMEOUT),
+        }
+    }
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let session = match self.1.try_upgrade() {
-            Some(session) => session,
-            None => return Poll::Ready(Ok(())),
+    fn dispatch(
+        mut self: Pin<&mut Self>,
+        session: &Session,
+        cmd: u8,
+        data: Bytes,
+    ) -> Result<(), Error> {
+        use KeepAliveState::*;
+        use PacketType::*;
+
+        let packet_type = FromPrimitive::from_u8(cmd);
+        let cmd = match packet_type {
+            Some(cmd) => cmd,
+            None => {
+                trace!("Ignoring unknown packet {:x}", cmd);
+                return Err(SessionError::Packet(cmd).into());
+            }
         };
 
-        loop {
-            let (cmd, data) = match ready!(self.0.try_poll_next_unpin(cx)) {
-                Some(Ok(t)) => t,
-                None => {
-                    warn!("Connection to server closed.");
-                    session.shutdown();
-                    return Poll::Ready(Ok(()));
+        match packet_type {
+            Some(Ping) => {
+                trace!("Received Ping");
+                if self.keep_alive_state != ExpectingPing {
+                    warn!("Received unexpected Ping from server")
                 }
-                Some(Err(e)) => {
-                    session.shutdown();
-                    return Poll::Ready(Err(e));
-                }
-            };
+                let mut this = self.as_mut().project();
+                *this.keep_alive_state = PendingPong;
+                this.timeout
+                    .as_mut()
+                    .reset(TokioInstant::now() + PONG_DELAY);
+                this.keep_alive_state.debug(&this.timeout);
 
-            if let Err(e) = session.dispatch(cmd, data) {
-                debug!("could not dispatch command: {}", e);
+                let server_timestamp = BigEndian::read_u32(data.as_ref()) as i64;
+                let timestamp = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap_or(Duration::ZERO)
+                    .as_secs() as i64;
+                {
+                    let mut data = session.0.data.write();
+                    data.time_delta = server_timestamp.saturating_sub(timestamp);
+                }
+
+                session.debug_info();
+
+                Ok(())
+            }
+            Some(PongAck) => {
+                trace!("Received PongAck");
+                if self.keep_alive_state != ExpectingPongAck {
+                    warn!("Received unexpected PongAck from server")
+                }
+                let mut this = self.as_mut().project();
+                *this.keep_alive_state = ExpectingPing;
+                this.timeout
+                    .as_mut()
+                    .reset(TokioInstant::now() + PING_TIMEOUT);
+                this.keep_alive_state.debug(&this.timeout);
+
+                Ok(())
+            }
+            Some(CountryCode) => {
+                let country = String::from_utf8(data.as_ref().to_owned())?;
+                info!("Country: {:?}", country);
+                session.0.data.write().user_data.country = country;
+                Ok(())
+            }
+            Some(StreamChunkRes) | Some(ChannelError) => session.channel().dispatch(cmd, data),
+            Some(AesKey) | Some(AesKeyError) => session.audio_key().dispatch(cmd, data),
+            Some(MercuryReq) | Some(MercurySub) | Some(MercuryUnsub) | Some(MercuryEvent) => {
+                session.mercury().dispatch(cmd, data)
+            }
+            Some(ProductInfo) => {
+                let data = std::str::from_utf8(&data)?;
+                let mut reader = quick_xml::Reader::from_str(data);
+
+                let mut buf = Vec::new();
+                let mut current_element = String::new();
+                let mut user_attributes: UserAttributes = HashMap::new();
+
+                loop {
+                    match reader.read_event_into(&mut buf) {
+                        Ok(Event::Start(ref element)) => {
+                            std::str::from_utf8(element)?.clone_into(&mut current_element)
+                        }
+                        Ok(Event::End(_)) => {
+                            current_element = String::new();
+                        }
+                        Ok(Event::Text(ref value)) => {
+                            if !current_element.is_empty() {
+                                let _ = user_attributes
+                                    .insert(current_element.clone(), value.unescape()?.to_string());
+                            }
+                        }
+                        Ok(Event::Eof) => break,
+                        Ok(_) => (),
+                        Err(e) => warn!(
+                            "Error parsing XML at position {}: {:?}",
+                            reader.buffer_position(),
+                            e
+                        ),
+                    }
+                }
+
+                trace!("Received product info: {:#?}", user_attributes);
+                Session::check_catalogue(&user_attributes);
+
+                session.0.data.write().user_data.attributes = user_attributes;
+                Ok(())
+            }
+            Some(SecretBlock)
+            | Some(LegacyWelcome)
+            | Some(UnknownDataAllZeros)
+            | Some(LicenseVersion) => Ok(()),
+            _ => {
+                trace!("Ignoring {:?} packet with data {:#?}", cmd, data);
+                Err(SessionError::Packet(cmd as u8).into())
             }
         }
     }
 }
 
-impl<S> Drop for DispatchTask<S>
+impl<S> Future for DispatchTask<S>
 where
-    S: TryStream<Ok = (u8, Bytes)> + Unpin,
+    S: TryStream<Ok = (u8, Bytes), Error = std::io::Error>,
+    <S as TryStream>::Ok: std::fmt::Debug,
 {
-    fn drop(&mut self) {
-        debug!("drop Dispatch");
+    type Output = Result<(), S::Error>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        use KeepAliveState::*;
+
+        let session = match self.session.try_upgrade() {
+            Some(session) => session,
+            None => return Poll::Ready(Ok(())),
+        };
+
+        // Process all messages that are immediately ready
+        loop {
+            match self.as_mut().project().stream.try_poll_next(cx) {
+                Poll::Ready(Some(Ok((cmd, data)))) => {
+                    let result = self.as_mut().dispatch(&session, cmd, data);
+                    if let Err(e) = result {
+                        debug!("could not dispatch command: {}", e);
+                    }
+                }
+                Poll::Ready(None) => {
+                    warn!("Connection to server closed.");
+                    session.shutdown();
+                    return Poll::Ready(Ok(()));
+                }
+                Poll::Ready(Some(Err(e))) => {
+                    error!("Connection to server closed.");
+                    session.shutdown();
+                    return Poll::Ready(Err(e));
+                }
+                Poll::Pending => break,
+            }
+        }
+
+        // Handle the keep-alive sequence, returning an error when we haven't received a
+        // Ping/PongAck for too long.
+        //
+        // The expected keepalive sequence is
+        // - Server: Ping
+        // - wait 60s
+        // - Client: Pong
+        // - Server: PongAck
+        // - wait 60s
+        // - repeat
+        //
+        // This means that we silently lost connection to Spotify servers if
+        // - we don't receive Ping immediately after connecting,
+        // - we don't receive a Ping 60s after the last PongAck or
+        // - we don't receive a PongAck immediately after our Pong.
+        //
+        // Currently, we add a safety margin of 20s to these expected deadlines.
+        let mut this = self.as_mut().project();
+        if let Poll::Ready(()) = this.timeout.as_mut().poll(cx) {
+            match this.keep_alive_state {
+                ExpectingPing | ExpectingPongAck => {
+                    if !session.is_invalid() {
+                        session.shutdown();
+                    }
+                    // TODO: Optionally reconnect (with cached/last credentials?)
+                    return Poll::Ready(Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        format!(
+                            "session lost connection to server ({:?})",
+                            this.keep_alive_state
+                        ),
+                    )));
+                }
+                PendingPong => {
+                    trace!("Sending Pong");
+                    // TODO: Ideally, this should flush the `Framed<TcpStream> as Sink`
+                    // before starting the timeout.
+                    let _ = session.send_packet(PacketType::Pong, vec![0, 0, 0, 0]);
+                    *this.keep_alive_state = ExpectingPongAck;
+                    this.timeout
+                        .as_mut()
+                        .reset(TokioInstant::now() + PONG_ACK_TIMEOUT);
+                    this.keep_alive_state.debug(&this.timeout);
+                }
+            }
+        }
+
+        Poll::Pending
     }
 }
