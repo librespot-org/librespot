@@ -31,7 +31,9 @@ pub const DELIMITER_IDENTIFIER: &str = "delimiter";
 
 // our own provider to flag tracks as a specific states
 // todo: we might just need to remove tracks that are unavailable to play, will have to see how the official clients handle this provider
-const UNAVAILABLE_PROVIDER: &str = "unavailable";
+//  it seems like spotify just knows that the track isn't available, currently i didn't found
+//  a solution to do the same, so we stay with the old solution for now
+pub const UNAVAILABLE_PROVIDER: &str = "unavailable";
 
 pub const METADATA_CONTEXT_URI: &str = "context_uri";
 pub const METADATA_ENTITY_URI: &str = "entity_uri";
@@ -236,12 +238,12 @@ impl ConnectState {
         );
 
         if let Some(restrictions) = self.player.restrictions.as_mut() {
-            if self.player.is_playing && !self.player.is_paused {
+            if self.player.is_playing {
                 restrictions.disallow_pausing_reasons.clear();
                 restrictions.disallow_resuming_reasons = vec!["not_paused".to_string()]
             }
 
-            if self.player.is_paused && !self.player.is_playing {
+            if self.player.is_paused {
                 restrictions.disallow_resuming_reasons.clear();
                 restrictions.disallow_pausing_reasons = vec!["not_playing".to_string()]
             }
@@ -377,20 +379,19 @@ impl ConnectState {
             }
         }
 
-        // handle possible delimiter
-        if matches!(self.next_tracks.front(), Some(next) if next.uid.starts_with(DELIMITER_IDENTIFIER))
-        {
-            let delimiter = self
-                .next_tracks
-                .pop_front()
-                .expect("item that was prechecked");
-            if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
-                _ = self.prev_tracks.pop_front();
-            }
-            self.prev_tracks.push_back(delimiter)
-        }
-
         let new_track = match self.next_tracks.pop_front() {
+            Some(next) if next.uid.starts_with(DELIMITER_IDENTIFIER) => {
+                if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
+                    _ = self.prev_tracks.pop_front();
+                }
+                self.prev_tracks.push_back(next);
+                self.next_tracks.pop_front()
+            }
+            Some(next) if next.provider == UNAVAILABLE_PROVIDER => self.next_tracks.pop_front(),
+            other => other,
+        };
+
+        let new_track = match new_track {
             None => return Ok(None),
             Some(t) => t,
         };
@@ -749,23 +750,34 @@ impl ConnectState {
         Ok(())
     }
 
-    // todo: for some reason, after we run once into an unavailable track,
-    //   a whole batch is marked as unavailable... have to look into that and see why and even how...
-    pub fn mark_all_as_unavailable(&mut self, id: SpotifyId) {
-        let id = match id.to_uri() {
-            Ok(uri) => uri,
-            Err(_) => return,
-        };
+    pub fn mark_unavailable(&mut self, id: SpotifyId) -> Result<(), Error> {
+        let uri = id.to_uri()?;
+
+        debug!("marking {uri} as unavailable");
 
         for next_track in &mut self.next_tracks {
-            Self::mark_as_unavailable_for_match(next_track, &id)
+            Self::mark_as_unavailable_for_match(next_track, &uri)
         }
 
         for prev_track in &mut self.prev_tracks {
-            Self::mark_as_unavailable_for_match(prev_track, &id)
+            Self::mark_as_unavailable_for_match(prev_track, &uri)
         }
 
-        self.unavailable_uri.push(id);
+        if self.player.track.uri != uri {
+            while let Some(pos) = self.next_tracks.iter().position(|t| t.uri == uri) {
+                _ = self.next_tracks.remove(pos);
+            }
+
+            while let Some(pos) = self.prev_tracks.iter().position(|t| t.uri == uri) {
+                _ = self.prev_tracks.remove(pos);
+            }
+
+            self.unavailable_uri.push(uri);
+            self.fill_up_next_tracks()?;
+            self.player.queue_revision = self.new_queue_revision();
+        }
+
+        Ok(())
     }
 
     pub fn update_restrictions(&mut self) {
@@ -862,6 +874,10 @@ impl ConnectState {
                     }
                 }
                 None => break,
+                Some(ct) if ct.provider == UNAVAILABLE_PROVIDER => {
+                    new_index += 1;
+                    continue;
+                }
                 Some(ct) => {
                     new_index += 1;
                     ct.clone()
@@ -893,9 +909,9 @@ impl ConnectState {
             .ok_or(StateError::CanNotFindTrackInContext(None, ctx.tracks.len()))
     }
 
-    fn mark_as_unavailable_for_match(track: &mut ProvidedTrack, id: &str) {
-        debug!("Marked <{}:{}> as unavailable", track.provider, track.uri);
-        if track.uri == id {
+    fn mark_as_unavailable_for_match(track: &mut ProvidedTrack, uri: &str) {
+        if track.uri == uri {
+            debug!("Marked <{}:{}> as unavailable", track.provider, track.uri);
             track.provider = UNAVAILABLE_PROVIDER.to_string();
         }
     }
