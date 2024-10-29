@@ -61,6 +61,11 @@ impl TokenProvider {
     // scopes must be comma-separated
     pub async fn get_token(&self, scopes: &str) -> Result<Token, Error> {
         let client_id = self.session().client_id();
+        return self.get_token_with_client_id(scopes, &client_id).await;
+    }
+
+    // scopes must be comma-separated
+    pub async fn get_token_with_client_id(&self, scopes: &str, client_id: &str) -> Result<Token, Error> {
         if client_id.is_empty() {
             return Err(Error::invalid_argument("Client ID cannot be empty"));
         }
