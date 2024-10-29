@@ -449,6 +449,14 @@ impl SpircTask {
                 _ = async { sleep(Duration::from_millis(VOLUME_UPDATE_DELAY_MS)).await }, if self.update_volume => {
                     self.update_volume = false;
 
+                    // for some reason the web-player does need two separate updates, so that the
+                    // position of the current track is retained, other clients also send a state
+                    // update before they send the volume update
+                    if let Err(why) = self.notify().await {
+                        error!("error updating connect state for volume update: {why}")
+                    }
+
+                    self.connect_state.update_position_in_relation(self.now_ms());
                     info!("delayed volume update for all devices: volume is now {}", self.connect_state.device.volume);
                     if let Err(why) = self.connect_state.update_state(&self.session, PutStateReason::VOLUME_CHANGED).await {
                         error!("error updating connect state for volume update: {why}")
@@ -458,9 +466,12 @@ impl SpircTask {
             }
         }
 
-        if let Err(why) = self.notify().await {
-            warn!("last notify before shutdown couldn't be send: {why}")
+        if !self.shutdown {
+            if let Err(why) = self.notify().await {
+                warn!("notify before unexpected shutdown couldn't be send: {why}")
+            }
         }
+
         self.session.dealer().close().await;
     }
 
@@ -1042,10 +1053,12 @@ impl SpircTask {
 
         // update position if the track continued playing
         let position = if transfer.playback.is_paused {
-            state.player.position_as_of_timestamp
-        } else {
+            transfer.playback.position_as_of_timestamp.into()
+        } else if transfer.playback.position_as_of_timestamp > 0 {
             let time_since_position_update = timestamp - transfer.playback.timestamp;
             i64::from(transfer.playback.position_as_of_timestamp) + time_since_position_update
+        } else {
+            0
         };
 
         if self.connect_state.context.is_some() {
@@ -1080,9 +1093,16 @@ impl SpircTask {
     }
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
-        self.connect_state.set_active(false);
-        self.notify().await?;
         self.handle_stop();
+
+        self.play_status = SpircPlayStatus::Stopped {};
+        self.connect_state
+            .update_position_in_relation(self.now_ms());
+        self.notify().await?;
+
+        self.connect_state
+            .update_state(&self.session, PutStateReason::BECAME_INACTIVE)
+            .await?;
 
         self.player
             .emit_session_disconnected_event(self.session.connection_id(), self.session.username());
@@ -1435,6 +1455,11 @@ impl SpircTask {
 
     async fn notify(&mut self) -> Result<(), Error> {
         self.connect_state.set_status(&self.play_status);
+
+        if self.connect_state.player.is_playing {
+            self.connect_state.update_position_in_relation(self.now_ms());
+        }
+
         self.connect_state
             .update_state(&self.session, PutStateReason::PLAYER_STATE_CHANGED)
             .await

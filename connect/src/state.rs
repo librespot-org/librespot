@@ -962,6 +962,17 @@ impl ConnectState {
         })
     }
 
+    pub fn update_position_in_relation(&mut self, timestamp: i64) {
+        let diff = timestamp - self.player.timestamp;
+        self.player.position_as_of_timestamp += diff;
+
+        debug!(
+            "update position to {} at {timestamp}",
+            self.player.position_as_of_timestamp
+        );
+        self.player.timestamp = timestamp;
+    }
+
     // todo: i would like to refrain from copying the next and prev track lists... will have to see what we can come up with
     /// Updates the connect state for the connect session
     ///
