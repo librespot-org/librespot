@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [core] Add `get_token_with_client_id()` to get a token for a specific vlient ID
 - [core] Add `login` (mobile) and `auth_token` retrieval via login5
 - [core] Add `OS` and `os_version` to `config.rs`
 - [discovery] Added a new MDNS/DNS-SD backend which connects to Avahi via D-Bus.
