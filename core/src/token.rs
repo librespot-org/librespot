@@ -58,6 +58,9 @@ impl TokenProvider {
         })
     }
 
+    // Not all combinations of scopes and client ID are allowed.
+    // Depending on the client ID currently used, the function may return an error for specific scopes.
+    // In this case get_token_with_client_id() can be used, where an appropriate client ID can be provided.
     // scopes must be comma-separated
     pub async fn get_token(&self, scopes: &str) -> Result<Token, Error> {
         let client_id = self.session().client_id();
