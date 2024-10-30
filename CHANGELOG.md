@@ -5,12 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) since v0.2.0.
 
-## [Unreleased]
+## [0.6.0] - 2024-10-30
 
-### Fixed
-
-- [core] Fix "source slice length (16) does not match destination slice length
-  (20)" panic on some tracks
+This version takes another step into the direction of the HTTP API, fixes a
+couple of bugs, and makes it easier for developers to mock a certain platform.
+Also it adds the option to choose avahi, dnssd or libmdns as your zeroconf
+backend for Spotify Connect discovery.
 
 ### Changed
 
@@ -27,11 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Add `OS` and `os_version` to `config.rs`
 - [discovery] Added a new MDNS/DNS-SD backend which connects to Avahi via D-Bus.
 
-### Removed
-
-### Fixed 
+### Fixed
 
 - [connect] Fixes initial volume showing zero despite playing in full volume instead
+- [core] Fix "source slice length (16) does not match destination slice length
+  (20)" panic on some tracks
 
 ## [0.5.0] - 2024-10-15
 
@@ -322,7 +322,7 @@ v0.4.x as a stable branch until then.
 
 ## [0.1.0] - 2019-11-06
 
-[unreleased]: https://github.com/librespot-org/librespot/compare/v0.5.0...HEAD
+[0.6.0]: https://github.com/librespot-org/librespot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/librespot-org/librespot/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/librespot-org/librespot/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/librespot-org/librespot/compare/v0.4.0...v0.4.1
