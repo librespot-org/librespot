@@ -223,14 +223,19 @@ impl ConnectState {
                 | SpircPlayStatus::Paused { .. }
                 | SpircPlayStatus::Stopped
         );
-        self.player.is_buffering = matches!(
-            status,
-            SpircPlayStatus::LoadingPause { .. } | SpircPlayStatus::LoadingPlay { .. }
-        );
-        self.player.is_playing = matches!(
-            status,
-            SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::Playing { .. }
-        );
+
+        // desktop and mobile want all 'states' set to true, when we are paused,
+        // otherwise the play button (desktop) is grayed out or the preview (mobile) can't be opened
+        self.player.is_buffering = self.player.is_paused
+            || matches!(
+                status,
+                SpircPlayStatus::LoadingPause { .. } | SpircPlayStatus::LoadingPlay { .. }
+            );
+        self.player.is_playing = self.player.is_paused
+            || matches!(
+                status,
+                SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::Playing { .. }
+            );
 
         debug!(
             "updated connect play status playing: {}, paused: {}, buffering: {}",
