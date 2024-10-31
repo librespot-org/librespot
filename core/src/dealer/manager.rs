@@ -5,10 +5,10 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use url::Url;
 
-use crate::dealer::{
-    Builder, Dealer, Request, RequestHandler, Responder, Response, Subscription, WsError,
+use super::{
+    Builder, Dealer, GetUrlResult, Request, RequestHandler, Responder, Response, Subscription,
 };
-use crate::Error;
+use crate::{Error, Session};
 
 component! {
     DealerManager: DealerManagerInner {
@@ -22,7 +22,7 @@ enum DealerError {
     #[error("Builder wasn't available")]
     BuilderNotAvailable,
     #[error("Websocket couldn't be started because: {0}")]
-    LaunchFailure(WsError),
+    LaunchFailure(Error),
     #[error("Failed to set dealer")]
     CouldNotSetDealer,
 }
@@ -77,17 +77,10 @@ impl RequestHandler for DealerRequestHandler {
 }
 
 impl DealerManager {
-    async fn get_url(&self) -> Result<Url, Error> {
-        let session = self.session();
-
+    async fn get_url(session: Session) -> GetUrlResult {
         let (host, port) = session.apresolver().resolve("dealer").await?;
-        let token = session
-            .token_provider()
-            .get_token("streaming")
-            .await?
-            .access_token;
+        let token = session.login5().auth_token().await?.access_token;
         let url = format!("wss://{host}:{port}/?access_token={token}");
-
         let url = Url::from_str(&url)?;
         Ok(url)
     }
@@ -121,13 +114,13 @@ impl DealerManager {
     }
 
     pub async fn start(&self) -> Result<(), Error> {
-        let url = self.get_url().await?;
         debug!("Launching dealer");
 
-        let get_url = move || {
-            let url = url.clone();
-            async move { url }
-        };
+        let session = self.session();
+        // the url has to be a function that can retrieve a new url,
+        // otherwise when we later try to reconnect with the initial url/token
+        // and the token is expired we will just get 401 error
+        let get_url = move || Self::get_url(session.clone());
 
         let dealer = self
             .lock(move |inner| inner.builder.take())

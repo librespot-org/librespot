@@ -29,10 +29,11 @@ use tokio_tungstenite::tungstenite;
 use tungstenite::error::UrlError;
 use url::Url;
 
-use self::maps::*;
-use crate::dealer::protocol::{
-    Message, MessageOrRequest, Request, WebsocketMessage, WebsocketRequest,
+use self::{
+    maps::*,
+    protocol::{Message, MessageOrRequest, Request, WebsocketMessage, WebsocketRequest},
 };
+
 use crate::{
     socket,
     util::{keep_flushing, CancelOnDrop, TimeoutOnDrop},
@@ -41,7 +42,14 @@ use crate::{
 
 type WsMessage = tungstenite::Message;
 type WsError = tungstenite::Error;
-type WsResult<T> = Result<T, tungstenite::Error>;
+type WsResult<T> = Result<T, Error>;
+type GetUrlResult = Result<Url, Error>;
+
+impl From<WsError> for Error {
+    fn from(err: WsError) -> Self {
+        Error::failed_precondition(err)
+    }
+}
 
 const WEBSOCKET_CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -271,20 +279,20 @@ impl Builder {
 
     pub fn launch_in_background<Fut, F>(self, get_url: F, proxy: Option<Url>) -> Dealer
     where
-        Fut: Future<Output = Url> + Send + 'static,
-        F: (FnMut() -> Fut) + Send + 'static,
+        Fut: Future<Output = GetUrlResult> + Send + 'static,
+        F: (Fn() -> Fut) + Send + 'static,
     {
         create_dealer!(self, shared -> run(shared, None, get_url, proxy))
     }
 
-    pub async fn launch<Fut, F>(self, mut get_url: F, proxy: Option<Url>) -> WsResult<Dealer>
+    pub async fn launch<Fut, F>(self, get_url: F, proxy: Option<Url>) -> WsResult<Dealer>
     where
-        Fut: Future<Output = Url> + Send + 'static,
-        F: (FnMut() -> Fut) + Send + 'static,
+        Fut: Future<Output = GetUrlResult> + Send + 'static,
+        F: (Fn() -> Fut) + Send + 'static,
     {
         let dealer = create_dealer!(self, shared -> {
             // Try to connect.
-            let url = get_url().await;
+            let url = get_url().await?;
             let tasks = connect(&url, proxy.as_ref(), &shared).await?;
 
             // If a connection is established, continue in a background task.
@@ -389,7 +397,7 @@ impl DealerShared {
 
 struct Dealer {
     shared: Arc<DealerShared>,
-    handle: TimeoutOnDrop<()>,
+    handle: TimeoutOnDrop<Result<(), Error>>,
 }
 
 impl Dealer {
@@ -434,7 +442,7 @@ async fn connect(
     let default_port = match address.scheme() {
         "ws" => 80,
         "wss" => 443,
-        _ => return Err(WsError::Url(UrlError::UnsupportedUrlScheme)),
+        _ => return Err(WsError::Url(UrlError::UnsupportedUrlScheme).into()),
     };
 
     let port = address.port().unwrap_or(default_port);
@@ -588,8 +596,9 @@ async fn run<F, Fut>(
     initial_tasks: Option<(JoinHandle<()>, JoinHandle<()>)>,
     mut get_url: F,
     proxy: Option<Url>,
-) where
-    Fut: Future<Output = Url> + Send + 'static,
+) -> Result<(), Error>
+where
+    Fut: Future<Output = GetUrlResult> + Send + 'static,
     F: (FnMut() -> Fut) + Send + 'static,
 {
     let init_task = |t| Some(TimeoutOnDrop::new(t, WEBSOCKET_CLOSE_TIMEOUT));
@@ -625,7 +634,7 @@ async fn run<F, Fut>(
                         break
                     },
                     e = get_url() => e
-                };
+                }?;
 
                 match connect(&url, proxy.as_ref(), &shared).await {
                     Ok((s, r)) => tasks = (init_task(s), init_task(r)),
@@ -641,4 +650,6 @@ async fn run<F, Fut>(
     let tasks = tasks.0.into_iter().chain(tasks.1);
 
     let _ = join_all(tasks).await;
+
+    Ok(())
 }
