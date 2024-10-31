@@ -1,19 +1,17 @@
 mod consts;
 pub(super) mod context;
+mod handle;
 mod options;
 pub(super) mod provider;
 mod restrictions;
 mod tracks;
-
-use std::collections::{hash_map::DefaultHasher, VecDeque};
-use std::hash::Hasher;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::spirc::SpircPlayStatus;
 use crate::state::consts::{METADATA_CONTEXT_URI, METADATA_IS_QUEUED};
 use crate::state::context::{ContextType, StateContext};
 use crate::state::provider::{IsProvider, Provider};
 use librespot_core::config::DeviceType;
+use librespot_core::date::Date;
 use librespot_core::dealer::protocol::Request;
 use librespot_core::spclient::SpClientResult;
 use librespot_core::{version, Error, Session, SpotifyId};
@@ -24,7 +22,11 @@ use librespot_protocol::player::{
     ContextIndex, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack, Suppressions,
     TransferState,
 };
+use log::LevelFilter;
 use protobuf::{EnumOrUnknown, Message, MessageField};
+use std::collections::{hash_map::DefaultHasher, VecDeque};
+use std::hash::Hasher;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 // these limitations are essential, otherwise to many tracks will overload the web-player
@@ -308,7 +310,7 @@ impl ConnectState {
         self.update_restrictions();
     }
 
-    pub fn try_get_current_track_from_transfer(
+    pub fn current_track_from_transfer(
         &self,
         transfer: &TransferState,
     ) -> Result<ProvidedTrack, Error> {
@@ -370,7 +372,7 @@ impl ConnectState {
 
     pub fn setup_current_state(&mut self, transfer: TransferState) -> Result<(), Error> {
         let track = match self.player.track.as_ref() {
-            None => self.try_get_current_track_from_transfer(&transfer)?,
+            None => self.current_track_from_transfer(&transfer)?,
             Some(track) => track.clone(),
         };
 

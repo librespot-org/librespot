@@ -13,9 +13,7 @@ use crate::{
 };
 use futures_util::{FutureExt, Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
-use librespot_core::dealer::protocol::{
-    PayloadValue, RequestCommand, SetOptionsCommand, SetQueueCommand, SkipTo,
-};
+use librespot_core::dealer::protocol::{PayloadValue, RequestCommand, SkipTo};
 use librespot_protocol::autoplay_context_request::AutoplayContextRequest;
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
 use librespot_protocol::player::{Context, TransferState};
@@ -455,7 +453,6 @@ impl SpircTask {
                         error!("error updating connect state for volume update: {why}")
                     }
 
-                    self.connect_state.update_position_in_relation(self.now_ms());
                     info!("delayed volume update for all devices: volume is now {}", self.connect_state.device.volume);
                     if let Err(why) = self.connect_state.update_state(&self.session, PutStateReason::VOLUME_CHANGED).await {
                         error!("error updating connect state for volume update: {why}")
@@ -483,7 +480,7 @@ impl SpircTask {
         self.connect_state.update_restrictions();
         self.connect_state.update_queue_revision();
 
-        self.conditional_preload_autoplay(self.connect_state.context_uri().clone());
+        self.preload_autoplay_when_required(self.connect_state.context_uri().clone());
 
         self.notify().await
     }
@@ -584,7 +581,7 @@ impl SpircTask {
                     self.notify().await
                 }
                 SpircCommand::Shuffle(shuffle) => {
-                    self.handle_shuffle(shuffle)?;
+                    self.connect_state.handle_shuffle(shuffle)?;
                     self.notify().await
                 }
                 SpircCommand::Repeat(repeat) => {
@@ -781,6 +778,9 @@ impl SpircTask {
             }
         };
 
+        // todo: handle received pages from transfer, important to not always shuffle the first 10 pages
+        //  also important when the dealer is restarted, currently we shuffle again, index should be changed...
+        //  maybe lookup current track of actual player
         if let Some(cluster) = response {
             if !cluster.transfer_data.is_empty() {
                 if let Ok(transfer_state) = TransferState::parse_from_bytes(&cluster.transfer_data)
@@ -966,7 +966,7 @@ impl SpircTask {
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SetShufflingContext(shuffle) => {
-                self.handle_shuffle(shuffle.value)?;
+                self.connect_state.handle_shuffle(shuffle.value)?;
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::AddToQueue(add_to_queue) => {
@@ -974,11 +974,11 @@ impl SpircTask {
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SetQueue(set_queue) => {
-                self.handle_set_queue(set_queue);
+                self.connect_state.handle_set_queue(set_queue);
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SetOptions(set_options) => {
-                self.handle_set_options(set_options)?;
+                self.connect_state.handle_set_options(set_options)?;
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SkipNext(skip_next) => {
@@ -1043,10 +1043,7 @@ impl SpircTask {
             self.connect_state.setup_current_state(transfer)?;
         } else {
             debug!("trying to find initial track");
-            match self
-                .connect_state
-                .try_get_current_track_from_transfer(&transfer)
-            {
+            match self.connect_state.current_track_from_transfer(&transfer) {
                 Err(why) => warn!("{why}"),
                 Ok(track) => {
                     debug!("initial track found");
@@ -1298,7 +1295,7 @@ impl SpircTask {
         Ok(())
     }
 
-    fn conditional_preload_autoplay(&mut self, uri: String) {
+    fn preload_autoplay_when_required(&mut self, uri: String) {
         let preload_autoplay = self
             .connect_state
             .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD))
@@ -1322,15 +1319,15 @@ impl SpircTask {
     fn handle_next(&mut self, track_uri: Option<String>) -> Result<(), Error> {
         let continue_playing = self.is_playing();
 
-        let mut has_next_track = matches!(track_uri, Some(ref track_uri) if self.connect_state.current_track(|t| &t.uri) == track_uri);
+        let current_uri = self.connect_state.current_track(|t| &t.uri);
+        let mut has_next_track = matches!(track_uri, Some(ref track_uri) if current_uri == track_uri);
 
         if !has_next_track {
             has_next_track = loop {
                 let index = self.connect_state.next_track()?;
 
-                if track_uri.is_some()
-                    && matches!(track_uri, Some(ref track_uri) if self.connect_state.current_track(|t| &t.uri) != track_uri)
-                {
+                let current_uri = self.connect_state.current_track(|t| &t.uri);
+                if matches!(track_uri, Some(ref track_uri) if current_uri != track_uri) {
                     continue;
                 } else {
                     break index.is_some();
@@ -1338,7 +1335,7 @@ impl SpircTask {
             };
         };
 
-        self.conditional_preload_autoplay(self.connect_state.context_uri().clone());
+        self.preload_autoplay_when_required(self.connect_state.context_uri().clone());
 
         if has_next_track {
             self.load_track(continue_playing, 0)
@@ -1451,62 +1448,6 @@ impl SpircTask {
                 self.player.emit_volume_changed_event(volume);
             }
         }
-    }
-
-    fn handle_shuffle(&mut self, shuffle: bool) -> Result<(), Error> {
-        self.connect_state.set_shuffle(shuffle);
-
-        if shuffle {
-            self.connect_state.shuffle()
-        } else {
-            self.connect_state.reset_context(None);
-
-            let state = &mut self.connect_state;
-
-            if state.current_track(MessageField::is_none) {
-                return Ok(());
-            }
-
-            let ctx = state.context.as_ref();
-            let current_index = ConnectState::find_index_in_context(ctx, |c| {
-                state.current_track(|t| c.uri == t.uri)
-            })?;
-
-            state.reset_playback_context(Some(current_index))
-        }
-    }
-
-    fn handle_set_queue(&mut self, set_queue: SetQueueCommand) {
-        self.connect_state.set_next_tracks(set_queue.next_tracks);
-        self.connect_state.set_prev_tracks(set_queue.prev_tracks);
-        self.connect_state.update_queue_revision();
-    }
-
-    fn handle_set_options(&mut self, set_options: SetOptionsCommand) -> Result<(), Error> {
-        let state = &mut self.connect_state;
-
-        if state.repeat_context() != set_options.repeating_context {
-            state.set_repeat_context(set_options.repeating_context);
-
-            if state.repeat_context() {
-                state.set_shuffle(false);
-                state.reset_context(None);
-
-                let ctx = state.context.as_ref();
-                let current_track = ConnectState::find_index_in_context(ctx, |t| {
-                    t.uri == state.current_track(|t| t.uri.as_ref())
-                })?;
-                state.reset_playback_context(Some(current_track))?;
-            } else {
-                state.update_restrictions();
-            }
-        }
-
-        // doesn't need any state updates, because it should only change how the current song is played
-        self.connect_state
-            .set_repeat_track(set_options.repeating_track);
-
-        Ok(())
     }
 }
 
