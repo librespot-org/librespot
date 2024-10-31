@@ -9,6 +9,7 @@ use crate::Error;
 use base64::prelude::BASE64_STANDARD;
 use base64::{DecodeError, Engine};
 use flate2::read::GzDecoder;
+use log::LevelFilter;
 use serde::Deserialize;
 use serde_json::Error as SerdeError;
 use thiserror::Error;
@@ -120,6 +121,10 @@ impl WebsocketRequest {
 
         let payload = handle_transfer_encoding(&self.headers, payload_bytes)?;
         let payload = String::from_utf8(payload)?;
+
+        if log::max_level() >= LevelFilter::Trace {
+            trace!("{:#?}", serde_json::from_str::<serde_json::Value>(&payload));
+        }
 
         serde_json::from_str(&payload)
             .map_err(ProtocolError::Deserialization)

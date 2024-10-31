@@ -465,10 +465,17 @@ impl ConnectState {
         let diff = timestamp - self.player.timestamp;
         self.player.position_as_of_timestamp += diff;
 
-        debug!(
-            "update position to {} at {timestamp}",
-            self.player.position_as_of_timestamp
-        );
+        if log::max_level() >= LevelFilter::Debug {
+            let pos = Duration::from_millis(self.player.position_as_of_timestamp as u64);
+            let time = Date::from_timestamp_ms(timestamp)
+                .map(|d| d.time().to_string())
+                .unwrap_or_else(|_| timestamp.to_string());
+
+            let sec = pos.as_secs();
+            let (min, sec) = (sec / 60, sec % 60);
+            debug!("update position to {min}:{sec:0>2} at {time}");
+        }
+
         self.player.timestamp = timestamp;
     }
 

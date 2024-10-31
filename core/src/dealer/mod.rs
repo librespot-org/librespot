@@ -344,7 +344,7 @@ impl DealerShared {
         request: WebsocketRequest,
         send_tx: &mpsc::UnboundedSender<WsMessage>,
     ) {
-        debug!("dealer request {}", &request.message_ident);
+        trace!("dealer request {}", &request.message_ident);
 
         let payload_request = match request.handle_payload() {
             Ok(payload) => payload,
