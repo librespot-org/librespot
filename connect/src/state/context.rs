@@ -44,6 +44,10 @@ impl ConnectState {
         .ok_or(StateError::NoContext(self.active_context))
     }
 
+    pub fn context_uri(&self) -> &String {
+        &self.player.context_uri
+    }
+
     pub fn reset_context(&mut self, new_context: Option<&str>) {
         self.active_context = ContextType::Default;
 
@@ -62,10 +66,22 @@ impl ConnectState {
 
     pub fn update_context(&mut self, mut context: Context) -> Result<(), Error> {
         debug!("context: {}, {}", context.uri, context.url);
-        let page = context
-            .pages
-            .pop()
-            .ok_or(StateError::NoContext(ContextType::Default))?;
+
+        self.player.context_url = format!("context://{}", context.uri);
+        self.player.context_uri = context.uri.clone();
+
+        if context.restrictions.is_some() {
+            self.player.context_restrictions = context.restrictions;
+        }
+
+        if !context.metadata.is_empty() {
+            self.player.context_metadata = context.metadata;
+        }
+
+        let page = match context.pages.pop() {
+            None => return Ok(()),
+            Some(page) => page,
+        };
 
         let tracks = page
             .tracks
@@ -86,17 +102,6 @@ impl ConnectState {
             metadata: page.metadata,
             index: ContextIndex::new(),
         });
-
-        self.player.context_url = format!("context://{}", context.uri);
-        self.player.context_uri = context.uri;
-
-        if context.restrictions.is_some() {
-            self.player.context_restrictions = context.restrictions;
-        }
-
-        if !context.metadata.is_empty() {
-            self.player.context_metadata = context.metadata;
-        }
 
         if let Some(transfer_state) = self.transfer_state.take() {
             self.setup_current_state(transfer_state)?

@@ -72,4 +72,16 @@ impl ConnectState {
 
         Ok(())
     }
+
+    pub fn shuffling_context(&self) -> bool {
+        self.player.options.shuffling_context
+    }
+
+    pub fn repeat_context(&self) -> bool {
+        self.player.options.repeating_context
+    }
+
+    pub fn repeat_track(&self) -> bool {
+        self.player.options.repeating_track
+    }
 }

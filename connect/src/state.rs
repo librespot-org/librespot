@@ -90,7 +90,7 @@ pub struct ConnectState {
     /// index: 0 based, so the first track is index 0
     /// prev_track: bottom => top, aka the last track of the list is the prev track
     /// next_track: top => bottom, aka the first track of the list is the next track
-    pub player: PlayerState,
+    player: PlayerState,
 
     /// we don't work directly on the lists of the player state, because
     /// we mostly need to push and pop at the beginning of both
@@ -222,8 +222,17 @@ impl ConnectState {
         self.update_restrictions()
     }
 
+    pub fn update_position(&mut self, position_ms: u32, timestamp: i64) {
+        self.player.position_as_of_timestamp = position_ms.into();
+        self.player.timestamp = timestamp;
+    }
+
+    pub fn update_duration(&mut self, duration: u32) {
+        self.player.duration = duration.into()
+    }
+
     // todo: is there maybe a better or more efficient way to calculate the hash?
-    pub fn new_queue_revision(&self) -> String {
+    pub fn update_queue_revision(&mut self) {
         let mut hasher = DefaultHasher::new();
         for track in &self.next_tracks {
             if let Ok(bytes) = track.write_to_bytes() {
@@ -231,7 +240,7 @@ impl ConnectState {
             }
         }
 
-        hasher.finish().to_string()
+        self.player.queue_revision = hasher.finish().to_string()
     }
 
     pub fn reset_playback_context(&mut self, new_index: Option<usize>) -> Result<(), Error> {
@@ -294,7 +303,7 @@ impl ConnectState {
         }
 
         if rev_update {
-            self.player.queue_revision = self.new_queue_revision();
+            self.update_queue_revision();
         }
         self.update_restrictions();
     }
@@ -315,6 +324,48 @@ impl ConnectState {
             transfer.current_session.context.uri.clone(),
             transfer.queue.is_playing_queue.then_some(Provider::Queue),
         )
+    }
+
+    pub fn transfer(&mut self, transfer: &mut TransferState) {
+        self.player.is_buffering = false;
+
+        if let Some(options) = transfer.options.take() {
+            self.player.options = MessageField::some(options);
+        }
+        self.player.is_paused = transfer.playback.is_paused;
+        self.player.is_playing = !transfer.playback.is_paused;
+
+        if transfer.playback.playback_speed != 0. {
+            self.player.playback_speed = transfer.playback.playback_speed
+        } else {
+            self.player.playback_speed = 1.;
+        }
+
+        self.player.play_origin = transfer.current_session.play_origin.clone();
+
+        if let Some(suppressions) = transfer.current_session.suppressions.as_ref() {
+            self.player.suppressions = MessageField::some(suppressions.clone());
+        }
+
+        if let Some(context) = transfer.current_session.context.as_ref() {
+            self.player.context_uri = context.uri.clone();
+            self.player.context_url = context.url.clone();
+            self.player.context_restrictions = context.restrictions.clone();
+        }
+
+        for (key, value) in &transfer.current_session.context.metadata {
+            self.player
+                .context_metadata
+                .insert(key.clone(), value.clone());
+        }
+
+        if let Some(context) = &self.context {
+            for (key, value) in &context.metadata {
+                self.player
+                    .context_metadata
+                    .insert(key.clone(), value.clone());
+            }
+        }
     }
 
     pub fn setup_current_state(&mut self, transfer: TransferState) -> Result<(), Error> {
@@ -354,10 +405,10 @@ impl ConnectState {
 
         debug!(
             "setting up next and prev: index is at {current_index:?} while shuffle {}",
-            self.player.options.shuffling_context
+            self.shuffling_context()
         );
 
-        if self.player.options.shuffling_context {
+        if self.shuffling_context() {
             self.set_current_track(current_index.unwrap_or_default())?;
             self.set_shuffle(true);
             self.shuffle()?;
@@ -395,7 +446,7 @@ impl ConnectState {
 
             self.unavailable_uri.push(uri);
             self.fill_up_next_tracks()?;
-            self.player.queue_revision = self.new_queue_revision();
+            self.update_queue_revision();
         }
 
         Ok(())
@@ -417,6 +468,10 @@ impl ConnectState {
             self.player.position_as_of_timestamp
         );
         self.player.timestamp = timestamp;
+    }
+
+    pub fn set_origin(&mut self, origin: PlayOrigin) {
+        self.player.play_origin = MessageField::some(origin)
     }
 
     // todo: i would like to refrain from copying the next and prev track lists... will have to see what we can come up with

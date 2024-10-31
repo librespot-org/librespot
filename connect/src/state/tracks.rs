@@ -9,7 +9,7 @@ use librespot_protocol::player::ProvidedTrack;
 use protobuf::MessageField;
 use std::collections::{HashMap, VecDeque};
 
-impl ConnectState {
+impl<'ct> ConnectState {
     fn new_delimiter(iteration: i64) -> ProvidedTrack {
         const HIDDEN: &str = "hidden";
         const ITERATION: &str = "iteration";
@@ -47,6 +47,10 @@ impl ConnectState {
 
         self.player.track = MessageField::some(new_track.clone());
 
+        if let Some(player_index) = self.player.index.as_mut() {
+            player_index.track = index as u32;
+        }
+
         Ok(())
     }
 
@@ -56,7 +60,7 @@ impl ConnectState {
     /// to prev tracks and fills up the next tracks from the current context
     pub fn next_track(&mut self) -> Result<Option<u32>, StateError> {
         // when we skip in repeat track, we don't repeat the current track anymore
-        if self.player.options.repeating_track {
+        if self.repeat_track() {
             self.set_repeat_track(false);
         }
 
@@ -184,6 +188,17 @@ impl ConnectState {
         Ok(Some(&self.player.track))
     }
 
+    pub fn current_track<F: Fn(&'ct MessageField<ProvidedTrack>) -> R, R>(
+        &'ct self,
+        access: F,
+    ) -> R {
+        access(&self.player.track)
+    }
+
+    pub fn set_track(&mut self, track: ProvidedTrack) {
+        self.player.track = MessageField::some(track)
+    }
+
     pub fn set_next_tracks(&mut self, mut tracks: Vec<ProvidedTrack>) {
         // mobile only sends a set_queue command instead of an add_to_queue command
         // in addition to handling the mobile add_to_queue handling, this should also handle
@@ -228,7 +243,7 @@ impl ConnectState {
         while self.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
             let ctx = self.get_current_context()?;
             let track = match ctx.tracks.get(new_index) {
-                None if self.player.options.repeating_context => {
+                None if self.repeat_context() => {
                     let delimiter = Self::new_delimiter(iteration.into());
                     iteration += 1;
                     new_index = 0;
@@ -263,13 +278,13 @@ impl ConnectState {
         self.update_context_index(new_index)?;
 
         // the web-player needs a revision update, otherwise the queue isn't updated in the ui
-        self.player.queue_revision = self.new_queue_revision();
+        self.update_queue_revision();
 
         Ok(())
     }
 
     pub fn preview_next_track(&mut self) -> Option<SpotifyId> {
-        let next = if self.player.options.repeating_track {
+        let next = if self.repeat_track() {
             &self.player.track.uri
         } else {
             &self.next_tracks.front()?.uri
@@ -280,7 +295,7 @@ impl ConnectState {
 
     pub fn has_next_tracks(&self, min: Option<usize>) -> bool {
         if let Some(min) = min {
-            self.next_tracks.len() >= min
+            self.next_tracks.len() <= min
         } else {
             !self.next_tracks.is_empty()
         }
