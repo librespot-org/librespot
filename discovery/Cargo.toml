@@ -1,6 +1,6 @@
 [package]
 name = "librespot-discovery"
-version = "0.6.0"
+version = "0.6.0-dev"
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
 description = "The discovery logic for librespot"
@@ -34,7 +34,7 @@ zbus = { version = "4", default-features = false, features = ["tokio"], optional
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.6.0"
+version = "0.6.0-dev"
 
 [dev-dependencies]
 futures = "0.3"

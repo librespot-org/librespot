@@ -1,6 +1,6 @@
 [package]
 name = "librespot-playback"
-version = "0.6.0"
+version = "0.6.0-dev"
 rust-version.workspace = true
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
 description = "The audio playback logic for librespot"
@@ -10,15 +10,15 @@ edition = "2021"
 
 [dependencies.librespot-audio]
 path = "../audio"
-version = "0.6.0"
+version = "0.6.0-dev"
 
 [dependencies.librespot-core]
 path = "../core"
-version = "0.6.0"
+version = "0.6.0-dev"
 
 [dependencies.librespot-metadata]
 path = "../metadata"
-version = "0.6.0"
+version = "0.6.0-dev"
 
 [dependencies]
 futures-util = "0.3"
