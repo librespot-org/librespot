@@ -40,7 +40,7 @@ impl ConnectState {
 
                 let ctx = self.context.as_ref();
                 let current_track = ConnectState::find_index_in_context(ctx, |t| {
-                    t.uri == self.current_track(|t| t.uri.as_ref())
+                    self.current_track(|t| &t.uri) == &t.uri
                 })?;
                 self.reset_playback_context(Some(current_track))?;
             } else {
