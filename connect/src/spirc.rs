@@ -1,7 +1,6 @@
-use crate::state::{
-    ConnectState, ConnectStateConfig, ContextType, AUTOPLAY_PROVIDER, METADATA_IS_QUEUED,
-    QUEUE_PROVIDER,
-};
+use crate::state::consts::{METADATA_IS_QUEUED, PROVIDER_AUTOPLAY, PROVIDER_QUEUE};
+use crate::state::context::ContextType;
+use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
     core::{authentication::Credentials, session::UserAttributes, Error, Session, SpotifyId},
     playback::{
@@ -514,11 +513,11 @@ impl SpircTask {
             .connect_state
             .prev_tracks
             .iter()
-            .flat_map(|t| (t.provider == AUTOPLAY_PROVIDER).then_some(t.uri.clone()))
+            .flat_map(|t| (t.provider == PROVIDER_AUTOPLAY).then_some(t.uri.clone()))
             .collect::<Vec<_>>();
 
         let current = &self.connect_state.player.track;
-        if current.provider == AUTOPLAY_PROVIDER {
+        if current.provider == PROVIDER_AUTOPLAY {
             previous_tracks.push(current.uri.clone());
         }
 
@@ -1080,7 +1079,7 @@ impl SpircTask {
             }
 
             if self.connect_state.autoplay_context.is_none()
-                && (self.connect_state.player.track.provider == AUTOPLAY_PROVIDER || autoplay)
+                && (self.connect_state.player.track.provider == PROVIDER_AUTOPLAY || autoplay)
             {
                 debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
                 self.resolve_context.push(ResolveContext {
@@ -1519,7 +1518,7 @@ impl SpircTask {
             .iter_mut()
             .filter(|t| t.metadata.contains_key(METADATA_IS_QUEUED))
             .for_each(|t| {
-                t.provider = QUEUE_PROVIDER.to_string();
+                t.provider = PROVIDER_QUEUE.to_string();
             });
 
         self.connect_state.next_tracks = set_queue_command.next_tracks.into();
