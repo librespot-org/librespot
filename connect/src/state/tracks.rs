@@ -1,13 +1,13 @@
-use crate::state::consts::IDENTIFIER_DELIMITER;
+use crate::state::consts::{IDENTIFIER_DELIMITER, METADATA_IS_QUEUED};
 use crate::state::context::ContextType;
 use crate::state::provider::{IsProvider, Provider};
 use crate::state::{
     ConnectState, StateError, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE,
 };
-use librespot_core::Error;
+use librespot_core::{Error, SpotifyId};
 use librespot_protocol::player::ProvidedTrack;
 use protobuf::MessageField;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 impl ConnectState {
     fn new_delimiter(iteration: i64) -> ProvidedTrack {
@@ -184,7 +184,28 @@ impl ConnectState {
         Ok(Some(&self.player.track))
     }
 
-    pub(super) fn clear_next_tracks(&mut self) {
+    pub fn set_next_tracks(&mut self, mut tracks: Vec<ProvidedTrack>) {
+        // mobile only sends a set_queue command instead of an add_to_queue command
+        // in addition to handling the mobile add_to_queue handling, this should also handle
+        // a mass queue addition
+        tracks
+            .iter_mut()
+            .filter(|t| t.metadata.contains_key(METADATA_IS_QUEUED))
+            .for_each(|t| t.set_provider(Provider::Queue));
+
+        self.next_tracks = tracks.into();
+    }
+
+    pub fn set_prev_tracks(&mut self, tracks: impl Into<VecDeque<ProvidedTrack>>) {
+        self.prev_tracks = tracks.into();
+    }
+
+    pub fn clear_next_tracks(&mut self, keep_queued: bool) {
+        if !keep_queued {
+            self.next_tracks.clear();
+            return;
+        }
+
         // respect queued track and don't throw them out of our next played tracks
         let first_non_queued_track = self
             .next_tracks
@@ -245,5 +266,38 @@ impl ConnectState {
         self.player.queue_revision = self.new_queue_revision();
 
         Ok(())
+    }
+
+    pub fn preview_next_track(&mut self) -> Option<SpotifyId> {
+        let next = if self.player.options.repeating_track {
+            &self.player.track.uri
+        } else {
+            &self.next_tracks.front()?.uri
+        };
+
+        SpotifyId::from_uri(next).ok()
+    }
+
+    pub fn has_next_tracks(&self, min: Option<usize>) -> bool {
+        if let Some(min) = min {
+            self.next_tracks.len() >= min
+        } else {
+            !self.next_tracks.is_empty()
+        }
+    }
+
+    pub fn prev_autoplay_track_uris(&self) -> Vec<String> {
+        let mut prev = self
+            .prev_tracks
+            .iter()
+            .flat_map(|t| t.is_autoplay().then_some(t.uri.clone()))
+            .collect::<Vec<_>>();
+
+        let current = &self.player.track;
+        if current.is_autoplay() {
+            prev.push(current.uri.clone());
+        }
+
+        prev
     }
 }

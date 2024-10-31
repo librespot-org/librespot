@@ -48,7 +48,7 @@ impl ConnectState {
         }
 
         self.prev_tracks.clear();
-        self.clear_next_tracks();
+        self.clear_next_tracks(true);
 
         let current_uri = &self.player.track.uri;
 

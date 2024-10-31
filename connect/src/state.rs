@@ -1,4 +1,4 @@
-pub(super) mod consts;
+mod consts;
 pub(super) mod context;
 mod options;
 pub(super) mod provider;
@@ -94,8 +94,8 @@ pub struct ConnectState {
 
     /// we don't work directly on the lists of the player state, because
     /// we mostly need to push and pop at the beginning of both
-    pub prev_tracks: VecDeque<ProvidedTrack>,
-    pub next_tracks: VecDeque<ProvidedTrack>,
+    prev_tracks: VecDeque<ProvidedTrack>,
+    next_tracks: VecDeque<ProvidedTrack>,
 
     pub active_context: ContextType,
     /// the context from which we play, is used to top up prev and next tracks
@@ -266,7 +266,7 @@ impl ConnectState {
             debug!("has {} prev tracks", self.prev_tracks.len())
         }
 
-        self.clear_next_tracks();
+        self.clear_next_tracks(true);
         self.fill_up_next_tracks()?;
         self.update_restrictions();
 

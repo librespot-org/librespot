@@ -1,6 +1,5 @@
-use crate::state::consts::METADATA_IS_QUEUED;
 use crate::state::context::ContextType;
-use crate::state::provider::{IsProvider, Provider};
+use crate::state::provider::IsProvider;
 use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
     core::{authentication::Credentials, session::UserAttributes, Error, Session, SpotifyId},
@@ -510,17 +509,7 @@ impl SpircTask {
             .into());
         }
 
-        let mut previous_tracks = self
-            .connect_state
-            .prev_tracks
-            .iter()
-            .flat_map(|t| t.is_autoplay().then_some(t.uri.clone()))
-            .collect::<Vec<_>>();
-
-        let current = &self.connect_state.player.track;
-        if current.is_autoplay() {
-            previous_tracks.push(current.uri.clone());
-        }
+        let previous_tracks = self.connect_state.prev_autoplay_track_uris();
 
         debug!(
             "loading autoplay context {context_uri} with {} previous tracks",
@@ -994,7 +983,7 @@ impl SpircTask {
         self.connect_state
             .reset_context(Some(&transfer.current_session.context.uri));
 
-        let mut ctx_uri = transfer.current_session.context.uri.to_owned();
+        let mut ctx_uri = transfer.current_session.context.uri.clone();
         let autoplay = ctx_uri.contains("station");
 
         if autoplay {
@@ -1164,7 +1153,7 @@ impl SpircTask {
             self.resolve_context(cmd.context_uri.clone(), false).await?;
         }
 
-        self.connect_state.next_tracks.clear();
+        self.connect_state.clear_next_tracks(false);
         self.connect_state.player.track = MessageField::none();
 
         let index = match cmd.playing_track {
@@ -1202,7 +1191,7 @@ impl SpircTask {
             self.handle_stop();
         }
 
-        if self.connect_state.next_tracks.is_empty() && self.session.autoplay() {
+        if !self.connect_state.has_next_tracks(None) && self.session.autoplay() {
             self.resolve_context.push(ResolveContext {
                 uri: cmd.context_uri,
                 autoplay: true,
@@ -1295,16 +1284,6 @@ impl SpircTask {
         };
     }
 
-    fn preview_next_track(&mut self) -> Option<SpotifyId> {
-        let next = if self.connect_state.player.options.repeating_track {
-            &self.connect_state.player.track.uri
-        } else {
-            &self.connect_state.next_tracks.front()?.uri
-        };
-
-        SpotifyId::from_uri(next).ok()
-    }
-
     fn handle_preload_next_track(&mut self) {
         // Requests the player thread to preload the next track
         match self.play_status {
@@ -1321,7 +1300,7 @@ impl SpircTask {
             _ => (),
         }
 
-        if let Some(track_id) = self.preview_next_track() {
+        if let Some(track_id) = self.connect_state.preview_next_track() {
             self.player.preload(track_id);
         }
     }
@@ -1335,7 +1314,9 @@ impl SpircTask {
     }
 
     fn conditional_preload_autoplay(&mut self, uri: String) {
-        let preload_autoplay = self.connect_state.next_tracks.len() < CONTEXT_FETCH_THRESHOLD
+        let preload_autoplay = self
+            .connect_state
+            .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD))
             && self.session.autoplay();
 
         // When in autoplay, keep topping up the playlist when it nears the end
@@ -1510,18 +1491,9 @@ impl SpircTask {
         }
     }
 
-    fn handle_set_queue(&mut self, mut set_queue_command: SetQueueCommand) {
-        // mobile only sends a set_queue command instead of an add_to_queue command
-        // in addition to handling the mobile add_to_queue handling, this should also handle
-        // a mass queue addition
-        set_queue_command
-            .next_tracks
-            .iter_mut()
-            .filter(|t| t.metadata.contains_key(METADATA_IS_QUEUED))
-            .for_each(|t| t.set_provider(Provider::Queue));
-
-        self.connect_state.next_tracks = set_queue_command.next_tracks.into();
-        self.connect_state.prev_tracks = set_queue_command.prev_tracks.into();
+    fn handle_set_queue(&mut self, set_queue: SetQueueCommand) {
+        self.connect_state.set_next_tracks(set_queue.next_tracks);
+        self.connect_state.set_prev_tracks(set_queue.prev_tracks);
         self.connect_state.player.queue_revision = self.connect_state.new_queue_revision();
     }
 
