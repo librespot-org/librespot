@@ -1320,7 +1320,8 @@ impl SpircTask {
         let continue_playing = self.is_playing();
 
         let current_uri = self.connect_state.current_track(|t| &t.uri);
-        let mut has_next_track = matches!(track_uri, Some(ref track_uri) if current_uri == track_uri);
+        let mut has_next_track =
+            matches!(track_uri, Some(ref track_uri) if current_uri == track_uri);
 
         if !has_next_track {
             has_next_track = loop {

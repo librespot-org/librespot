@@ -410,6 +410,16 @@ impl ConnectState {
             self.shuffling_context()
         );
 
+        for track in &transfer.queue.tracks {
+            if let Ok(queued_track) = self.context_to_provided_track(
+                track,
+                self.context_uri().clone(),
+                Some(Provider::Queue),
+            ) {
+                self.add_to_queue(queued_track, false);
+            }
+        }
+
         if self.shuffling_context() {
             self.set_current_track(current_index.unwrap_or_default())?;
             self.set_shuffle(true);
