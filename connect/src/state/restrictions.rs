@@ -1,4 +1,5 @@
-use crate::state::{ConnectState, PROVIDER_AUTOPLAY};
+use crate::state::provider::IsProvider;
+use crate::state::ConnectState;
 use librespot_protocol::player::Restrictions;
 use protobuf::MessageField;
 
@@ -42,7 +43,7 @@ impl ConnectState {
                 restrictions.disallow_skipping_next_reasons.clear();
             }
 
-            if self.player.track.provider == PROVIDER_AUTOPLAY {
+            if self.player.track.is_autoplay() {
                 restrictions.disallow_toggling_shuffle_reasons = vec![AUTOPLAY.to_string()];
                 restrictions.disallow_toggling_repeat_context_reasons = vec![AUTOPLAY.to_string()];
                 restrictions.disallow_toggling_repeat_track_reasons = vec![AUTOPLAY.to_string()];

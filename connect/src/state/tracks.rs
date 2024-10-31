@@ -1,7 +1,6 @@
-use crate::state::consts::{
-    IDENTIFIER_DELIMITER, PROVIDER_AUTOPLAY, PROVIDER_CONTEXT, PROVIDER_QUEUE, UNAVAILABLE_PROVIDER,
-};
+use crate::state::consts::IDENTIFIER_DELIMITER;
 use crate::state::context::ContextType;
+use crate::state::provider::{IsProvider, Provider};
 use crate::state::{
     ConnectState, StateError, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE,
 };
@@ -22,7 +21,7 @@ impl ConnectState {
         ProvidedTrack {
             uri: format!("spotify:{IDENTIFIER_DELIMITER}"),
             uid: format!("{IDENTIFIER_DELIMITER}{iteration}"),
-            provider: PROVIDER_CONTEXT.to_string(),
+            provider: Provider::Context.to_string(),
             metadata,
             ..Default::default()
         }
@@ -65,7 +64,7 @@ impl ConnectState {
 
         if let Some(old_track) = old_track {
             // only add songs from our context to our previous tracks
-            if old_track.provider == PROVIDER_CONTEXT || old_track.provider == PROVIDER_AUTOPLAY {
+            if old_track.is_context() || old_track.is_autoplay() {
                 // add old current track to prev tracks, while preserving a length of 10
                 if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
                     _ = self.prev_tracks.pop_front();
@@ -82,7 +81,7 @@ impl ConnectState {
                 self.prev_tracks.push_back(next);
                 self.next_tracks.pop_front()
             }
-            Some(next) if next.provider == UNAVAILABLE_PROVIDER => self.next_tracks.pop_front(),
+            Some(next) if next.is_unavailable() => self.next_tracks.pop_front(),
             other => other,
         };
 
@@ -93,13 +92,12 @@ impl ConnectState {
 
         self.fill_up_next_tracks()?;
 
-        let is_queued_track = new_track.provider == PROVIDER_QUEUE;
-        let is_autoplay = new_track.provider == PROVIDER_AUTOPLAY;
-        let update_index = if (is_queued_track || is_autoplay) && self.player.index.is_some() {
+        let is_queue_or_autoplay = new_track.is_queue() || new_track.is_autoplay();
+        let update_index = if is_queue_or_autoplay && self.player.index.is_some() {
             // the index isn't send when we are a queued track, but we have to preserve it for later
             self.player_index = self.player.index.take();
             None
-        } else if is_autoplay || is_queued_track {
+        } else if is_queue_or_autoplay {
             None
         } else {
             let ctx = self.context.as_ref();
@@ -137,7 +135,7 @@ impl ConnectState {
         let old_track = self.player.track.take();
 
         if let Some(old_track) = old_track {
-            if old_track.provider == PROVIDER_CONTEXT || old_track.provider == PROVIDER_AUTOPLAY {
+            if old_track.is_context() || old_track.is_autoplay() {
                 self.next_tracks.push_front(old_track);
             }
         }
@@ -164,8 +162,7 @@ impl ConnectState {
             Some(t) => t,
         };
 
-        if matches!(self.active_context, ContextType::Autoplay if new_track.provider == PROVIDER_CONTEXT)
-        {
+        if matches!(self.active_context, ContextType::Autoplay if new_track.is_context()) {
             // transition back to default context
             self.active_context = ContextType::Default;
         }
@@ -193,7 +190,7 @@ impl ConnectState {
             .next_tracks
             .iter()
             .enumerate()
-            .find(|(_, track)| track.provider != PROVIDER_QUEUE);
+            .find(|(_, track)| !track.is_queue());
 
         if let Some((non_queued_track, _)) = first_non_queued_track {
             while self.next_tracks.len() > non_queued_track && self.next_tracks.pop_back().is_some()
@@ -229,7 +226,7 @@ impl ConnectState {
                     }
                 }
                 None => break,
-                Some(ct) if ct.provider == UNAVAILABLE_PROVIDER => {
+                Some(ct) if ct.is_unavailable() => {
                     new_index += 1;
                     continue;
                 }

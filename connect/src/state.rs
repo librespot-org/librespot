@@ -1,6 +1,7 @@
 pub(super) mod consts;
 pub(super) mod context;
 mod options;
+pub(super) mod provider;
 mod restrictions;
 mod tracks;
 
@@ -9,11 +10,9 @@ use std::hash::Hasher;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::spirc::SpircPlayStatus;
-use crate::state::consts::{
-    METADATA_CONTEXT_URI, METADATA_IS_QUEUED, PROVIDER_AUTOPLAY, PROVIDER_CONTEXT, PROVIDER_QUEUE,
-    UNAVAILABLE_PROVIDER,
-};
+use crate::state::consts::{METADATA_CONTEXT_URI, METADATA_IS_QUEUED};
 use crate::state::context::{ContextType, StateContext};
+use crate::state::provider::{IsProvider, Provider};
 use librespot_core::config::DeviceType;
 use librespot_core::dealer::protocol::Request;
 use librespot_core::spclient::SpClientResult;
@@ -245,7 +244,7 @@ impl ConnectState {
 
         debug!("reset playback state to {new_index}");
 
-        if self.player.track.provider != PROVIDER_QUEUE {
+        if !self.player.track.is_queue() {
             self.set_current_track(new_index)?;
         }
 
@@ -275,17 +274,15 @@ impl ConnectState {
     }
 
     pub fn add_to_queue(&mut self, mut track: ProvidedTrack, rev_update: bool) {
-        track.provider = PROVIDER_QUEUE.to_string();
+        track.set_provider(Provider::Queue);
         if !track.metadata.contains_key(METADATA_IS_QUEUED) {
             track
                 .metadata
                 .insert(METADATA_IS_QUEUED.to_string(), true.to_string());
         }
 
-        if let Some(next_not_queued_track) = self
-            .next_tracks
-            .iter()
-            .position(|track| track.provider != PROVIDER_QUEUE)
+        if let Some(next_not_queued_track) =
+            self.next_tracks.iter().position(|track| !track.is_queue())
         {
             self.next_tracks.insert(next_not_queued_track, track);
         } else {
@@ -316,7 +313,7 @@ impl ConnectState {
         self.context_to_provided_track(
             track,
             transfer.current_session.context.uri.clone(),
-            transfer.queue.is_playing_queue.then_some(PROVIDER_QUEUE),
+            transfer.queue.is_playing_queue.then_some(Provider::Queue),
         )
     }
 
@@ -407,7 +404,7 @@ impl ConnectState {
     fn mark_as_unavailable_for_match(track: &mut ProvidedTrack, uri: &str) {
         if track.uri == uri {
             debug!("Marked <{}:{}> as unavailable", track.provider, track.uri);
-            track.provider = UNAVAILABLE_PROVIDER.to_string();
+            track.set_provider(Provider::Unavailable);
         }
     }
 

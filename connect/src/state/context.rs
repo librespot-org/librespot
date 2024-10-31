@@ -1,7 +1,6 @@
-use crate::state::consts::{METADATA_ENTITY_URI, UNAVAILABLE_PROVIDER};
-use crate::state::{
-    ConnectState, StateError, METADATA_CONTEXT_URI, PROVIDER_AUTOPLAY, PROVIDER_CONTEXT,
-};
+use crate::state::consts::METADATA_ENTITY_URI;
+use crate::state::provider::Provider;
+use crate::state::{ConnectState, StateError, METADATA_CONTEXT_URI};
 use librespot_core::{Error, SpotifyId};
 use librespot_protocol::player::{Context, ContextIndex, ContextTrack, ProvidedTrack};
 use std::collections::HashMap;
@@ -125,7 +124,7 @@ impl ConnectState {
                 match self.context_to_provided_track(
                     track,
                     context.uri.clone(),
-                    Some(PROVIDER_AUTOPLAY),
+                    Some(Provider::Autoplay),
                 ) {
                     Ok(t) => Some(t),
                     Err(_) => {
@@ -168,12 +167,12 @@ impl ConnectState {
         &self,
         ctx_track: &ContextTrack,
         context_uri: String,
-        provider: Option<&str>,
+        provider: Option<Provider>,
     ) -> Result<ProvidedTrack, Error> {
         let provider = if self.unavailable_uri.contains(&ctx_track.uri) {
-            UNAVAILABLE_PROVIDER
+            Provider::Unavailable
         } else {
-            provider.unwrap_or(PROVIDER_CONTEXT)
+            provider.unwrap_or(Provider::Context)
         };
 
         let id = if !ctx_track.uri.is_empty() {
