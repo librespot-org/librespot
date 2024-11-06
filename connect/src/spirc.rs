@@ -269,7 +269,9 @@ impl Spirc {
 
         // Connect *after* all message listeners are registered
         session.connect(credentials, true).await?;
-        session.dealer().start().await?;
+
+        // pre-acquire access_token (we need to be authenticated to retrieve a token)
+        let _ = session.login5().auth_token().await?;
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
@@ -362,6 +364,11 @@ impl Spirc {
 
 impl SpircTask {
     async fn run(mut self) {
+        if let Err(why) = self.session.dealer().start().await {
+            error!("starting dealer failed: {why}");
+            return;
+        }
+
         while !self.session.is_invalid() && !self.shutdown {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
@@ -762,18 +769,6 @@ impl SpircTask {
     async fn handle_connection_id_update(&mut self, connection_id: String) {
         trace!("Received connection ID update: {:?}", connection_id);
         self.session.set_connection_id(&connection_id);
-
-        // pre-acquire access_token, preventing multiple request while running
-        // pre-acquiring for the access_token will only last for one hour
-        //
-        // we need to fire the request after connecting, but can't do it right
-        // after, because by that we would miss certain packages, like this one
-        match self.session.login5().auth_token().await {
-            Ok(_) => debug!("successfully pre-acquire access_token and client_token"),
-            Err(why) => {
-                error!("{why}");
-            }
-        }
 
         let response = match self
             .connect_state
