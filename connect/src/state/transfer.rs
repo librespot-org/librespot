@@ -1,4 +1,4 @@
-use crate::state::provider::Provider;
+use crate::state::provider::{IsProvider, Provider};
 use crate::state::{ConnectState, StateError};
 use librespot_core::Error;
 use librespot_protocol::player::{ContextIndex, ProvidedTrack, TransferState};
@@ -23,7 +23,7 @@ impl ConnectState {
         )
     }
 
-    pub fn transfer(&mut self, transfer: &mut TransferState) {
+    pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState) {
         self.player.is_buffering = false;
 
         if let Some(options) = transfer.options.take() {
@@ -63,9 +63,12 @@ impl ConnectState {
                     .insert(key.clone(), value.clone());
             }
         }
+
+        self.prev_tracks.clear();
+        self.clear_next_tracks(false);
     }
 
-    pub fn setup_current_state(&mut self, transfer: TransferState) -> Result<(), Error> {
+    pub fn setup_state_from_transfer(&mut self, transfer: TransferState) -> Result<(), Error> {
         let track = match self.player.track.as_ref() {
             None => self.current_track_from_transfer(&transfer)?,
             Some(track) => track.clone(),
@@ -73,8 +76,12 @@ impl ConnectState {
 
         let ctx = self.get_current_context().ok();
 
-        let current_index =
-            Self::find_index_in_context(ctx, |c| c.uri == track.uri || c.uid == track.uid);
+        let current_index = if track.is_queue() {
+            Self::find_index_in_context(ctx, |c| c.uid == transfer.current_session.current_uid)
+                .map(|i| if i > 0 { i - 1 } else { i })
+        } else {
+            Self::find_index_in_context(ctx, |c| c.uri == track.uri || c.uid == track.uid)
+        };
 
         debug!(
             "active track is <{}> with index {current_index:?} in {:?} context, has {} tracks",
@@ -105,7 +112,13 @@ impl ConnectState {
             self.shuffling_context()
         );
 
-        for track in &transfer.queue.tracks {
+        for (i, track) in transfer.queue.tracks.iter().enumerate() {
+            if transfer.queue.is_playing_queue && i == 0 {
+                // if we are currently playing from the queue,
+                // don't add the first queued item, because we are currently playing that item
+                continue;
+            }
+
             if let Ok(queued_track) = self.context_to_provided_track(
                 track,
                 self.context_uri().clone(),

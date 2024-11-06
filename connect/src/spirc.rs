@@ -106,6 +106,9 @@ struct SpircTask {
     shutdown: bool,
     session: Session,
     resolve_context: Vec<ResolveContext>,
+    // is set when we receive a transfer state and are loading the context asynchronously
+    pub transfer_state: Option<TransferState>,
+
     update_volume: bool,
 
     spirc_id: usize,
@@ -294,6 +297,7 @@ impl Spirc {
             session,
 
             resolve_context: Vec::new(),
+            transfer_state: None,
             update_volume: false,
 
             spirc_id,
@@ -474,6 +478,11 @@ impl SpircTask {
     async fn handle_resolve_context(&mut self) -> Result<(), Error> {
         while let Some(resolve) = self.resolve_context.pop() {
             self.resolve_context(resolve.uri, resolve.autoplay).await?;
+        }
+
+        if let Some(transfer_state) = self.transfer_state.take() {
+            self.connect_state
+                .setup_state_from_transfer(transfer_state)?
         }
 
         self.connect_state.fill_up_next_tracks()?;
@@ -1025,7 +1034,7 @@ impl SpircTask {
         let state = &mut self.connect_state;
 
         state.set_active(true);
-        state.transfer(&mut transfer);
+        state.handle_initial_transfer(&mut transfer);
 
         // update position if the track continued playing
         let position = if transfer.playback.is_paused {
@@ -1040,7 +1049,7 @@ impl SpircTask {
         let is_playing = !transfer.playback.is_paused;
 
         if self.connect_state.context.is_some() {
-            self.connect_state.setup_current_state(transfer)?;
+            self.connect_state.setup_state_from_transfer(transfer)?;
         } else {
             debug!("trying to find initial track");
             match self.connect_state.current_track_from_transfer(&transfer) {
@@ -1061,7 +1070,7 @@ impl SpircTask {
                 })
             }
 
-            self.connect_state.transfer_state = Some(transfer);
+            self.transfer_state = Some(transfer);
         }
 
         self.load_track(is_playing, position.try_into()?)
@@ -1157,6 +1166,8 @@ impl SpircTask {
             self.connect_state.set_current_track(index)?;
             self.connect_state.shuffle()?;
         } else {
+            // set manually, so that we overwrite a possible current queue track
+            self.connect_state.set_current_track(index)?;
             self.connect_state.reset_playback_context(Some(index))?;
         }
 

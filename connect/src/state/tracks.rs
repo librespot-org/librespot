@@ -71,7 +71,7 @@ impl<'ct> ConnectState {
             if old_track.is_context() || old_track.is_autoplay() {
                 // add old current track to prev tracks, while preserving a length of 10
                 if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
-                    _ = self.prev_tracks.pop_front();
+                    let _ = self.prev_tracks.pop_front();
                 }
                 self.prev_tracks.push_back(old_track);
             }
@@ -80,7 +80,7 @@ impl<'ct> ConnectState {
         let new_track = match self.next_tracks.pop_front() {
             Some(next) if next.uid.starts_with(IDENTIFIER_DELIMITER) => {
                 if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
-                    _ = self.prev_tracks.pop_front();
+                    let _ = self.prev_tracks.pop_front();
                 }
                 self.prev_tracks.push_back(next);
                 self.next_tracks.pop_front()
@@ -152,7 +152,7 @@ impl<'ct> ConnectState {
                 .pop_back()
                 .expect("item that was prechecked");
             if self.next_tracks.len() >= SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-                _ = self.next_tracks.pop_back();
+                let _ = self.next_tracks.pop_back();
             }
             self.next_tracks.push_front(delimiter)
         }

@@ -103,10 +103,6 @@ impl ConnectState {
             index: ContextIndex::new(),
         });
 
-        if let Some(transfer_state) = self.transfer_state.take() {
-            self.setup_current_state(transfer_state)?
-        }
-
         Ok(())
     }
 
