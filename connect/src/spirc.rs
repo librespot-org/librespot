@@ -866,21 +866,9 @@ impl SpircTask {
         let reason = cluster_update.update_reason.enum_value().ok();
 
         let device_ids = cluster_update.devices_that_changed.join(", ");
-        let devices = cluster_update.cluster.device.len();
-
-        let prev_tracks = cluster_update.cluster.player_state.prev_tracks.len();
-        let next_tracks = cluster_update.cluster.player_state.next_tracks.len();
-
-        info!("cluster update! {reason:?} for {device_ids} from {devices} has {prev_tracks:?} previous tracks and {next_tracks} next tracks");
+        debug!("cluster update: {reason:?} from {device_ids}");
 
         if let Some(cluster) = cluster_update.cluster.take() {
-            // // we could transfer the player state here, which would result in less work that we
-            // // need to do, but it's probably better to handle it ourselves, otherwise we will
-            // // only notice problems after the tracks from the transferred player state have ended
-            // if let Some(player_state) = cluster.player_state.take() {
-            //     state.player = player_state;
-            // }
-
             let became_inactive =
                 self.connect_state.active && cluster.active_device_id != self.session.device_id();
             if became_inactive {
@@ -1138,7 +1126,7 @@ impl SpircTask {
             self.resolve_context(cmd.context_uri.clone(), false).await?;
         }
 
-        // for play commands with skip by uid, the context of the command contains 
+        // for play commands with skip by uid, the context of the command contains
         // tracks with uri and uid, so we merge the new context with the resolved/existing context
         self.connect_state.merge_context(context);
         self.connect_state.clear_next_tracks(false);
