@@ -71,11 +71,12 @@ impl ConnectState {
         self.player.context_uri = context.uri.clone();
 
         if context.restrictions.is_some() {
+            self.player.restrictions = context.restrictions.clone();
             self.player.context_restrictions = context.restrictions;
         }
 
-        if !context.metadata.is_empty() {
-            self.player.context_metadata = context.metadata;
+        for (key, value) in context.metadata {
+            self.player.context_metadata.insert(key, value);
         }
 
         let page = match context.pages.pop() {
@@ -112,6 +113,7 @@ impl ConnectState {
             context.uri,
             context.pages.len()
         );
+
         let page = context
             .pages
             .pop()
@@ -152,6 +154,29 @@ impl ConnectState {
         Ok(())
     }
 
+    pub fn merge_context(&mut self, context: Option<Context>) -> Option<()> {
+        let mut context = context?;
+        if context.uri != self.player.context_uri {
+            return None;
+        }
+
+        let mutable_context = self.context.as_mut()?;
+        let page = context.pages.pop()?;
+        for track in page.tracks {
+            if track.uid.is_empty() || track.uri.is_empty() {
+                continue;
+            }
+
+            if let Ok(position) =
+                Self::find_index_in_context(Some(mutable_context), |t| t.uri == track.uri)
+            {
+                mutable_context.tracks.get_mut(position)?.uid = track.uid
+            }
+        }
+
+        Some(())
+    }
+
     pub(super) fn update_context_index(&mut self, new_index: usize) -> Result<(), StateError> {
         let context = match self.active_context {
             ContextType::Default => self.context.as_mut(),
@@ -188,22 +213,13 @@ impl ConnectState {
         metadata.insert(METADATA_CONTEXT_URI.to_string(), context_uri.to_string());
         metadata.insert(METADATA_ENTITY_URI.to_string(), context_uri.to_string());
 
-        if !ctx_track.metadata.is_empty() {
-            for (k, v) in &ctx_track.metadata {
-                metadata.insert(k.to_string(), v.to_string());
-            }
+        for (k, v) in &ctx_track.metadata {
+            metadata.insert(k.to_string(), v.to_string());
         }
-
-        let uid = if !ctx_track.uid.is_empty() {
-            ctx_track.uid.clone()
-        } else {
-            // todo: this will never work, it is sadly not as simple :/
-            String::from_utf8(id.to_raw().to_vec()).unwrap_or_else(|_| String::new())
-        };
 
         Ok(ProvidedTrack {
             uri: id.to_uri()?.replace("unknown", "track"),
-            uid,
+            uid: ctx_track.uid.clone(),
             metadata,
             provider: provider.to_string(),
             ..Default::default()

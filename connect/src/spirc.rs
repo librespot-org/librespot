@@ -617,7 +617,7 @@ impl SpircTask {
                     self.notify().await
                 }
                 SpircCommand::Load(command) => {
-                    self.handle_load(command).await?;
+                    self.handle_load(command, None).await?;
                     self.notify().await
                 }
                 _ => Ok(()),
@@ -939,21 +939,18 @@ impl SpircTask {
                     .map(|o| o.repeating_track)
                     .unwrap_or_else(|| self.connect_state.repeat_track());
 
-                self.handle_load(SpircLoadCommand {
-                    context_uri: play.context.uri.clone(),
-                    start_playing: true,
-                    playing_track: play.options.skip_to.into(),
-                    shuffle,
-                    repeat,
-                    repeat_track,
-                })
+                self.handle_load(
+                    SpircLoadCommand {
+                        context_uri: play.context.uri.clone(),
+                        start_playing: true,
+                        playing_track: play.options.skip_to.into(),
+                        shuffle,
+                        repeat,
+                        repeat_track,
+                    },
+                    Some(play.context),
+                )
                 .await?;
-
-                self.connect_state.update_context(Context {
-                    uri: play.context.uri,
-                    url: play.context.url,
-                    ..Default::default()
-                })?;
 
                 self.connect_state.set_origin(play.play_origin);
 
@@ -1122,25 +1119,28 @@ impl SpircTask {
         );
     }
 
-    async fn handle_load(&mut self, cmd: SpircLoadCommand) -> Result<(), Error> {
+    async fn handle_load(
+        &mut self,
+        cmd: SpircLoadCommand,
+        context: Option<Context>,
+    ) -> Result<(), Error> {
         self.connect_state.reset_context(Some(&cmd.context_uri));
 
         if !self.connect_state.active {
             self.handle_activate();
         }
 
-        if self.connect_state.context_uri() == &cmd.context_uri
-            && self.connect_state.context.is_some()
-        {
-            debug!(
-                "context <{}> didn't change, no resolving required",
-                self.connect_state.context_uri()
-            )
+        let current_context_uri = self.connect_state.context_uri();
+        if current_context_uri == &cmd.context_uri && self.connect_state.context.is_some() {
+            debug!("context <{current_context_uri}> didn't change, no resolving required",)
         } else {
             debug!("resolving context for load command");
             self.resolve_context(cmd.context_uri.clone(), false).await?;
         }
 
+        // for play commands with skip by uid, the context of the command contains 
+        // tracks with uri and uid, so we merge the new context with the resolved/existing context
+        self.connect_state.merge_context(context);
         self.connect_state.clear_next_tracks(false);
 
         let index = match cmd.playing_track {
