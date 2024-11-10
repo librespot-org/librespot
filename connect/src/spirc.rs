@@ -879,6 +879,11 @@ impl SpircTask {
                     .connect_state
                     .update_state(&self.session, PutStateReason::BECAME_INACTIVE)
                     .await?;
+            } else if self.connect_state.active {
+                // fixme: workaround fix, because of missing information why it behaves like it does
+                //  background: when another device sends a connect-state update, some player's position de-syncs
+                //  tried: providing session_id, playback_id, track-metadata "track_player"
+                self.notify().await?;
             }
         }
 
