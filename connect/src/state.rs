@@ -107,6 +107,8 @@ pub struct ConnectState {
     pub shuffle_context: Option<StateContext>,
     /// a context to keep track of the autoplay context
     pub autoplay_context: Option<StateContext>,
+    
+    pub queue_count: u64,
 
     pub last_command: Option<Request>,
 }
@@ -168,6 +170,8 @@ impl ConnectState {
 
     pub fn reset(&mut self) {
         self.set_active(false);
+        self.queue_count = 0;
+
         self.player = PlayerState {
             is_system_initiated: true,
             playback_speed: 1.,
@@ -282,6 +286,9 @@ impl ConnectState {
     }
 
     pub fn add_to_queue(&mut self, mut track: ProvidedTrack, rev_update: bool) {
+        track.uid = format!("q{}", self.queue_count);
+        self.queue_count += 1;
+
         track.set_provider(Provider::Queue);
         if !track.metadata.contains_key(METADATA_IS_QUEUED) {
             track
@@ -372,9 +379,6 @@ impl ConnectState {
     /// Prepares a [PutStateRequest] from the current connect state
     pub async fn update_state(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
         if matches!(reason, PutStateReason::BECAME_INACTIVE) {
-            // todo: when another device takes over, and we currently play a queued item,
-            //  for some reason the other client thinks we still have the currently playing track
-            //  in our queue, figure out why it behave like it does
             return session.spclient().put_connect_state_inactive(false).await;
         }
 
