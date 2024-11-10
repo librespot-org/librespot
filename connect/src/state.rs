@@ -252,7 +252,7 @@ impl ConnectState {
 
         debug!("reset playback state to {new_index}");
 
-        if !self.player.track.is_queue() {
+        if !self.player.track.is_queued() {
             self.set_current_track(new_index)?;
         }
 
@@ -290,7 +290,7 @@ impl ConnectState {
         }
 
         if let Some(next_not_queued_track) =
-            self.next_tracks.iter().position(|track| !track.is_queue())
+            self.next_tracks.iter().position(|track| !track.is_queued())
         {
             self.next_tracks.insert(next_not_queued_track, track);
         } else {

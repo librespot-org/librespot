@@ -96,7 +96,7 @@ impl<'ct> ConnectState {
 
         self.fill_up_next_tracks()?;
 
-        let is_queue_or_autoplay = new_track.is_queue() || new_track.is_autoplay();
+        let is_queue_or_autoplay = new_track.is_queued() || new_track.is_autoplay();
         let update_index = if is_queue_or_autoplay && self.player.index.is_some() {
             // the index isn't send when we are a queued track, but we have to preserve it for later
             self.player_index = self.player.index.take();
@@ -226,7 +226,7 @@ impl<'ct> ConnectState {
             .next_tracks
             .iter()
             .enumerate()
-            .find(|(_, track)| !track.is_queue());
+            .find(|(_, track)| !track.is_queued());
 
         if let Some((non_queued_track, _)) = first_non_queued_track {
             while self.next_tracks.len() > non_queued_track && self.next_tracks.pop_back().is_some()

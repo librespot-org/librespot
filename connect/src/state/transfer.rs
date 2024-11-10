@@ -18,7 +18,7 @@ impl ConnectState {
 
         self.context_to_provided_track(
             track,
-            transfer.current_session.context.uri.clone(),
+            Some(&transfer.current_session.context.uri),
             transfer.queue.is_playing_queue.then_some(Provider::Queue),
         )
     }
@@ -76,7 +76,7 @@ impl ConnectState {
 
         let ctx = self.get_current_context().ok();
 
-        let current_index = if track.is_queue() {
+        let current_index = if track.is_queued() {
             Self::find_index_in_context(ctx, |c| c.uid == transfer.current_session.current_uid)
                 .map(|i| if i > 0 { i - 1 } else { i })
         } else {
@@ -121,7 +121,7 @@ impl ConnectState {
 
             if let Ok(queued_track) = self.context_to_provided_track(
                 track,
-                self.context_uri().clone(),
+                Some(self.context_uri()),
                 Some(Provider::Queue),
             ) {
                 self.add_to_queue(queued_track, false);
@@ -133,7 +133,6 @@ impl ConnectState {
             self.set_shuffle(true);
             self.shuffle()?;
         } else {
-            // todo: it seems like, if we play a queued track and transfer we will reset that queued track...
             self.reset_playback_context(current_index)?;
         }
 

@@ -7,9 +7,8 @@ const PROVIDER_QUEUE: &str = "queue";
 const PROVIDER_AUTOPLAY: &str = "autoplay";
 
 // custom providers, used to identify certain states that we can't handle preemptively, yet
-// todo: we might just need to remove tracks that are unavailable to play, will have to see how the official clients handle this provider
-//  it seems like spotify just knows that the track isn't available, currently i didn't found
-//  a solution to do the same, so we stay with the old solution for now
+/// it seems like spotify just knows that the track isn't available, currently we don't have an
+/// option to do the same, so we stay with the old solution for now
 const PROVIDER_UNAVAILABLE: &str = "unavailable";
 
 pub enum Provider {
@@ -37,7 +36,7 @@ impl Display for Provider {
 pub trait IsProvider {
     fn is_autoplay(&self) -> bool;
     fn is_context(&self) -> bool;
-    fn is_queue(&self) -> bool;
+    fn is_queued(&self) -> bool;
     fn is_unavailable(&self) -> bool;
 
     fn set_provider(&mut self, provider: Provider);
@@ -52,7 +51,7 @@ impl IsProvider for ProvidedTrack {
         self.provider == PROVIDER_CONTEXT
     }
 
-    fn is_queue(&self) -> bool {
+    fn is_queued(&self) -> bool {
         self.provider == PROVIDER_QUEUE
     }
 

@@ -88,7 +88,7 @@ impl ConnectState {
             .tracks
             .iter()
             .flat_map(|track| {
-                match self.context_to_provided_track(track, context.uri.clone(), None) {
+                match self.context_to_provided_track(track, Some(&context.uri), None) {
                     Ok(t) => Some(t),
                     Err(_) => {
                         error!("couldn't convert {track:#?} into ProvidedTrack");
@@ -126,7 +126,7 @@ impl ConnectState {
             .flat_map(|track| {
                 match self.context_to_provided_track(
                     track,
-                    context.uri.clone(),
+                    Some(&context.uri),
                     Some(Provider::Autoplay),
                 ) {
                     Ok(t) => Some(t),
@@ -192,7 +192,7 @@ impl ConnectState {
     pub fn context_to_provided_track(
         &self,
         ctx_track: &ContextTrack,
-        context_uri: String,
+        context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> Result<ProvidedTrack, Error> {
         let provider = if self.unavailable_uri.contains(&ctx_track.uri) {
@@ -210,8 +210,10 @@ impl ConnectState {
         }?;
 
         let mut metadata = HashMap::new();
-        metadata.insert(METADATA_CONTEXT_URI.to_string(), context_uri.to_string());
-        metadata.insert(METADATA_ENTITY_URI.to_string(), context_uri.to_string());
+        if let Some(context_uri) = context_uri {
+            metadata.insert(METADATA_CONTEXT_URI.to_string(), context_uri.to_string());
+            metadata.insert(METADATA_ENTITY_URI.to_string(), context_uri.to_string());
+        }
 
         for (k, v) in &ctx_track.metadata {
             metadata.insert(k.to_string(), v.to_string());
