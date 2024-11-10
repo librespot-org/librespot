@@ -1,5 +1,5 @@
 use crate::state::ConnectState;
-use librespot_core::dealer::protocol::{SetOptionsCommand, SetQueueCommand};
+use librespot_core::dealer::protocol::SetQueueCommand;
 use librespot_core::Error;
 use protobuf::MessageField;
 
@@ -30,27 +30,36 @@ impl ConnectState {
         self.update_queue_revision();
     }
 
-    pub fn handle_set_options(&mut self, set_options: SetOptionsCommand) -> Result<(), Error> {
-        if self.repeat_context() != set_options.repeating_context {
-            self.set_repeat_context(set_options.repeating_context);
-
-            if self.repeat_context() {
-                self.set_shuffle(false);
-                self.reset_context(None);
-
-                let ctx = self.context.as_ref();
-                let current_track = ConnectState::find_index_in_context(ctx, |t| {
-                    self.current_track(|t| &t.uri) == &t.uri
-                })?;
-                self.reset_playback_context(Some(current_track))?;
-            } else {
-                self.update_restrictions();
-            }
+    pub fn handle_set_repeat(
+        &mut self,
+        context: Option<bool>,
+        track: Option<bool>,
+    ) -> Result<(), Error> {
+        // doesn't need any state updates, because it should only change how the current song is played
+        if let Some(track) = track {
+            self.set_repeat_track(track);
         }
 
-        // doesn't need any state updates, because it should only change how the current song is played
-        self.set_repeat_track(set_options.repeating_track);
+        if matches!(context, Some(context) if self.repeat_context() == context) {
+            return Ok(());
+        }
 
-        Ok(())
+        if let Some(context) = context {
+            self.set_repeat_context(context);
+        }
+
+        if self.repeat_context() {
+            self.set_shuffle(false);
+            self.reset_context(None);
+
+            let ctx = self.context.as_ref();
+            let current_track = ConnectState::find_index_in_context(ctx, |t| {
+                self.current_track(|t| &t.uri) == &t.uri
+            })?;
+            self.reset_playback_context(Some(current_track))
+        } else {
+            self.update_restrictions();
+            Ok(())
+        }
     }
 }

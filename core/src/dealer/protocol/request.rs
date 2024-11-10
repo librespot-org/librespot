@@ -24,7 +24,9 @@ pub enum RequestCommand {
     Pause(PauseCommand),
     SeekTo(SeekToCommand),
     SkipNext(SkipNextCommand),
-    SetShufflingContext(SetShufflingCommand),
+    SetShufflingContext(SetValueCommand),
+    SetRepeatingTrack(SetValueCommand),
+    SetRepeatingContext(SetValueCommand),
     AddToQueue(AddToQueueCommand),
     SetQueue(SetQueueCommand),
     SetOptions(SetOptionsCommand),
@@ -47,6 +49,8 @@ impl Display for RequestCommand {
                 RequestCommand::Pause(_) => "pause",
                 RequestCommand::SeekTo(_) => "seek_to",
                 RequestCommand::SetShufflingContext(_) => "set_shuffling_context",
+                RequestCommand::SetRepeatingContext(_) => "set_repeating_context",
+                RequestCommand::SetRepeatingTrack(_) => "set_repeating_track",
                 RequestCommand::AddToQueue(_) => "add_to_queue",
                 RequestCommand::SetQueue(_) => "set_queue",
                 RequestCommand::SetOptions(_) => "set_options",
@@ -104,7 +108,7 @@ pub struct SkipNextCommand {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct SetShufflingCommand {
+pub struct SetValueCommand {
     pub value: bool,
     pub logging_params: LoggingParams,
 }

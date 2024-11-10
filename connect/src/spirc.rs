@@ -958,6 +958,16 @@ impl SpircTask {
                 self.connect_state.handle_shuffle(shuffle.value)?;
                 self.notify().await.map(|_| Reply::Success)?
             }
+            RequestCommand::SetRepeatingContext(repeat_context) => {
+                self.connect_state
+                    .handle_set_repeat(Some(repeat_context.value), None)?;
+                self.notify().await.map(|_| Reply::Success)?
+            }
+            RequestCommand::SetRepeatingTrack(repeat_track) => {
+                self.connect_state
+                    .handle_set_repeat(None, Some(repeat_track.value))?;
+                self.notify().await.map(|_| Reply::Success)?
+            }
             RequestCommand::AddToQueue(add_to_queue) => {
                 self.connect_state.add_to_queue(add_to_queue.track, true);
                 self.notify().await.map(|_| Reply::Success)?
@@ -967,7 +977,9 @@ impl SpircTask {
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SetOptions(set_options) => {
-                self.connect_state.handle_set_options(set_options)?;
+                let context = Some(set_options.repeating_context);
+                let track = Some(set_options.repeating_track);
+                self.connect_state.handle_set_repeat(context, track)?;
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SkipNext(skip_next) => {
