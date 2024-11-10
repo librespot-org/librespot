@@ -174,7 +174,7 @@ impl From<SkipTo> for PlayingTrack {
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
 
 const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
-const VOLUME_UPDATE_DELAY_MS: u64 = 2000;
+const VOLUME_UPDATE_DELAY: Duration = Duration::from_secs(2);
 
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
@@ -454,7 +454,7 @@ impl SpircTask {
                         error!("ContextError: {why}")
                     }
                 },
-                _ = async { sleep(Duration::from_millis(VOLUME_UPDATE_DELAY_MS)).await }, if self.update_volume => {
+                _ = async { sleep(VOLUME_UPDATE_DELAY).await }, if self.update_volume => {
                     self.update_volume = false;
 
                     // for some reason the web-player does need two separate updates, so that the

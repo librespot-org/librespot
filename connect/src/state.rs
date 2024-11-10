@@ -107,7 +107,7 @@ pub struct ConnectState {
     pub shuffle_context: Option<StateContext>,
     /// a context to keep track of the autoplay context
     pub autoplay_context: Option<StateContext>,
-    
+
     pub queue_count: u64,
 
     pub last_command: Option<Request>,
