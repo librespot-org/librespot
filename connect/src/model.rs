@@ -73,7 +73,7 @@ pub enum PlayingTrack {
 
 impl From<SkipTo> for PlayingTrack {
     fn from(value: SkipTo) -> Self {
-        // order of checks is important, as the index can be 0, but still has an uid or uri provided, 
+        // order of checks is important, as the index can be 0, but still has an uid or uri provided,
         // so we only use the index as last resort
         if let Some(uri) = value.track_uri {
             PlayingTrack::Uri(uri)

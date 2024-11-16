@@ -95,7 +95,7 @@ struct SpircTask {
 static SPIRC_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug)]
-pub enum SpircCommand {
+enum SpircCommand {
     Play,
     PlayPause,
     Pause,
@@ -784,9 +784,9 @@ impl SpircTask {
             }
         };
 
-        // todo: handle received pages from transfer, important to not always shuffle the first 10 pages
-        //  also important when the dealer is restarted, currently we shuffle again, index should be changed...
-        //  maybe lookup current track of actual player
+        // todo: handle received pages from transfer, important to not always shuffle the first 10 tracks
+        //  also important when the dealer is restarted, currently we just shuffle again, but at least
+        //  the 10 tracks provided should be used and after that the new shuffle context
         if let Some(cluster) = response {
             if !cluster.transfer_data.is_empty() {
                 if let Ok(transfer_state) = TransferState::parse_from_bytes(&cluster.transfer_data)
