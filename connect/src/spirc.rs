@@ -915,19 +915,19 @@ impl SpircTask {
             RequestCommand::Play(play) => {
                 let shuffle = play
                     .options
-                    .player_option_overrides
+                    .player_options_overrides
                     .as_ref()
                     .map(|o| o.shuffling_context)
                     .unwrap_or_else(|| self.connect_state.shuffling_context());
                 let repeat = play
                     .options
-                    .player_option_overrides
+                    .player_options_overrides
                     .as_ref()
                     .map(|o| o.repeating_context)
                     .unwrap_or_else(|| self.connect_state.repeat_context());
                 let repeat_track = play
                     .options
-                    .player_option_overrides
+                    .player_options_overrides
                     .as_ref()
                     .map(|o| o.repeating_track)
                     .unwrap_or_else(|| self.connect_state.repeat_track());
@@ -982,9 +982,15 @@ impl SpircTask {
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SetOptions(set_options) => {
-                let context = Some(set_options.repeating_context);
-                let track = Some(set_options.repeating_track);
+                let context = set_options.repeating_context;
+                let track = set_options.repeating_track;
                 self.connect_state.handle_set_repeat(context, track)?;
+
+                let shuffle = set_options.shuffling_context;
+                if let Some(shuffle) = shuffle {
+                    self.connect_state.handle_shuffle(shuffle)?;
+                }
+                
                 self.notify().await.map(|_| Reply::Success)?
             }
             RequestCommand::SkipNext(skip_next) => {

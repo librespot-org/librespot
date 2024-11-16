@@ -134,8 +134,9 @@ pub struct SetQueueCommand {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SetOptionsCommand {
-    pub repeating_context: bool,
-    pub repeating_track: bool,
+    pub shuffling_context: Option<bool>,
+    pub repeating_context: Option<bool>,
+    pub repeating_track: Option<bool>,
     pub options: Option<OptionsOptions>,
     pub logging_params: LoggingParams,
 }
@@ -157,7 +158,7 @@ pub struct TransferOptions {
 pub struct PlayOptions {
     pub skip_to: SkipTo,
     #[serde(default, deserialize_with = "option_json_proto")]
-    pub player_option_overrides: Option<ContextPlayerOptionOverrides>,
+    pub player_options_overrides: Option<ContextPlayerOptionOverrides>,
     pub license: String,
     // mobile
     pub always_play_something: Option<bool>,

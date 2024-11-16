@@ -40,7 +40,8 @@ impl ConnectState {
             self.set_repeat_track(track);
         }
 
-        if matches!(context, Some(context) if self.repeat_context() == context) {
+        if matches!(context, Some(context) if self.repeat_context() == context) || context.is_none()
+        {
             return Ok(());
         }
 
