@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - YYYY-MM-DD
 
 ### Changed
+- [oauth] Open authorization URL in default browser
+- [oauth] Allow optionally passing success message to display on browser return page
+- [oauth] Throw specific errors on failure states
 
 ### Added
 

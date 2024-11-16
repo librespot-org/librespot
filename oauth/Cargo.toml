@@ -13,6 +13,7 @@ log = "0.4"
 oauth2 = "4.4"
 thiserror = "1.0"
 url = "2.2"
+open = "5.3.1"
 
 [dev-dependencies]
 env_logger =  { version = "0.11.2", default-features = false, features = ["color", "humantime", "auto-color"] }
