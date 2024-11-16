@@ -1,4 +1,4 @@
-use crate::model::ResolveContext;
+use crate::model::{PlayingTrack, ResolveContext, SpircLoadCommand, SpircPlayStatus};
 use crate::state::context::ContextType;
 use crate::state::provider::IsProvider;
 use crate::state::{ConnectState, ConnectStateConfig};
@@ -14,7 +14,7 @@ use crate::{
 };
 use futures_util::{FutureExt, Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
-use librespot_core::dealer::protocol::{PayloadValue, RequestCommand, SkipTo};
+use librespot_core::dealer::protocol::{PayloadValue, RequestCommand};
 use librespot_protocol::autoplay_context_request::AutoplayContextRequest;
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
 use librespot_protocol::player::{Context, TransferState};
@@ -57,25 +57,6 @@ impl From<SpircError> for Error {
             Ident(_) | InvalidUri(_) => Error::aborted(err),
         }
     }
-}
-
-#[derive(Debug)]
-pub(crate) enum SpircPlayStatus {
-    Stopped,
-    LoadingPlay {
-        position_ms: u32,
-    },
-    LoadingPause {
-        position_ms: u32,
-    },
-    Playing {
-        nominal_start_time: i64,
-        preloading_of_next_track_triggered: bool,
-    },
-    Paused {
-        position_ms: u32,
-        preloading_of_next_track_triggered: bool,
-    },
 }
 
 type BoxedStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
@@ -131,41 +112,6 @@ pub enum SpircCommand {
     SetVolume(u16),
     Activate,
     Load(SpircLoadCommand),
-}
-
-#[derive(Debug)]
-pub struct SpircLoadCommand {
-    pub context_uri: String,
-    /// Whether the given tracks should immediately start playing, or just be initially loaded.
-    pub start_playing: bool,
-    pub shuffle: bool,
-    pub repeat: bool,
-    pub repeat_track: bool,
-    pub playing_track: PlayingTrack,
-}
-
-#[derive(Debug)]
-pub enum PlayingTrack {
-    Index(u32),
-    Uri(String),
-    Uid(String),
-}
-
-impl From<SkipTo> for PlayingTrack {
-    fn from(value: SkipTo) -> Self {
-        // order is important as it seems that the index can be 0,
-        // but there might still be a uid or uri provided, so we try the index as last resort
-        if let Some(uri) = value.track_uri {
-            PlayingTrack::Uri(uri)
-        } else if let Some(uid) = value.track_uid {
-            PlayingTrack::Uid(uid)
-        } else {
-            PlayingTrack::Index(value.track_index.unwrap_or_else(|| {
-                warn!("SkipTo didn't provided any point to skip to, falling back to index 0");
-                0
-            }))
-        }
-    }
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;

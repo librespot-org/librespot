@@ -7,7 +7,7 @@ mod restrictions;
 mod tracks;
 mod transfer;
 
-use crate::spirc::SpircPlayStatus;
+use crate::model::SpircPlayStatus;
 use crate::state::consts::{METADATA_CONTEXT_URI, METADATA_IS_QUEUED};
 use crate::state::context::{ContextType, StateContext};
 use crate::state::provider::{IsProvider, Provider};
