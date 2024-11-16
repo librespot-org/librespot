@@ -1,4 +1,4 @@
-use crate::model::{PlayingTrack, ResolveContext, SpircLoadCommand, SpircPlayStatus};
+use crate::model::{ResolveContext, SpircPlayStatus};
 use crate::state::context::ContextType;
 use crate::state::provider::IsProvider;
 use crate::state::{ConnectState, ConnectStateConfig};
@@ -30,6 +30,8 @@ use std::{
 use thiserror::Error;
 use tokio::{sync::mpsc, time::sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+
+pub use crate::model::{PlayingTrack, SpircLoadCommand};
 
 #[derive(Debug, Error)]
 pub enum SpircError {
