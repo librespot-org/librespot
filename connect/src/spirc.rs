@@ -919,19 +919,19 @@ impl SpircTask {
             RequestCommand::Play(play) => {
                 let shuffle = play
                     .options
-                    .player_options_overrides
+                    .player_options_override
                     .as_ref()
                     .map(|o| o.shuffling_context)
                     .unwrap_or_else(|| self.connect_state.shuffling_context());
                 let repeat = play
                     .options
-                    .player_options_overrides
+                    .player_options_override
                     .as_ref()
                     .map(|o| o.repeating_context)
                     .unwrap_or_else(|| self.connect_state.repeat_context());
                 let repeat_track = play
                     .options
-                    .player_options_overrides
+                    .player_options_override
                     .as_ref()
                     .map(|o| o.repeating_track)
                     .unwrap_or_else(|| self.connect_state.repeat_track());
@@ -1179,7 +1179,14 @@ impl SpircTask {
             }
         };
 
+        debug!(
+            "loading with shuffle: <{}>, repeat track: <{}> context: <{}>",
+            cmd.shuffle, cmd.repeat, cmd.repeat_track
+        );
+
         self.connect_state.set_shuffle(cmd.shuffle);
+        self.connect_state.set_repeat_context(cmd.repeat);
+
         if cmd.shuffle {
             self.connect_state.active_context = ContextType::Default;
             self.connect_state.set_current_track(index)?;
@@ -1190,7 +1197,6 @@ impl SpircTask {
             self.connect_state.reset_playback_context(Some(index))?;
         }
 
-        self.connect_state.set_repeat_context(cmd.repeat);
         self.connect_state.set_repeat_track(cmd.repeat_track);
 
         if self.connect_state.current_track(MessageField::is_some) {

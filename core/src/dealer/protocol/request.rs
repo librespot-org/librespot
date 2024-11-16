@@ -167,7 +167,7 @@ pub struct TransferOptions {
 pub struct PlayOptions {
     pub skip_to: SkipTo,
     #[serde(default, deserialize_with = "option_json_proto")]
-    pub player_options_overrides: Option<ContextPlayerOptionOverrides>,
+    pub player_options_override: Option<ContextPlayerOptionOverrides>,
     pub license: String,
     // mobile
     pub always_play_something: Option<bool>,
