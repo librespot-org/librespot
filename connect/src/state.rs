@@ -23,9 +23,9 @@ use librespot_protocol::player::{
     ContextIndex, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack, Suppressions,
 };
 use log::LevelFilter;
-use protobuf::{EnumOrUnknown, Message, MessageField};
+use protobuf::{EnumOrUnknown, MessageField};
 use std::collections::{hash_map::DefaultHasher, VecDeque};
-use std::hash::Hasher;
+use std::hash::{Hash, Hasher};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
@@ -234,16 +234,10 @@ impl ConnectState {
         self.player.duration = duration.into()
     }
 
-    // todo: is there maybe a better or more efficient way to calculate the hash?
     pub fn update_queue_revision(&mut self) {
-        let mut hasher = DefaultHasher::new();
-        for track in &self.next_tracks {
-            if let Ok(bytes) = track.write_to_bytes() {
-                hasher.write(&bytes)
-            }
-        }
-
-        self.player.queue_revision = hasher.finish().to_string()
+        let mut state = DefaultHasher::new();
+        self.next_tracks.iter().for_each(|t| t.uri.hash(&mut state));
+        self.player.queue_revision = state.finish().to_string()
     }
 
     pub fn reset_playback_context(&mut self, new_index: Option<usize>) -> Result<(), Error> {
@@ -373,7 +367,6 @@ impl ConnectState {
         self.player.play_origin = MessageField::some(origin)
     }
 
-    // todo: i would like to refrain from copying the next and prev track lists... will have to see what we can come up with
     /// Updates the connect state for the connect session
     ///
     /// Prepares a [PutStateRequest] from the current connect state
@@ -389,7 +382,9 @@ impl ConnectState {
         let member_type = EnumOrUnknown::new(MemberType::CONNECT_STATE);
         let put_state_reason = EnumOrUnknown::new(reason);
 
+        // we copy the player state, which only contains the infos, not the next and prev tracks
         let mut player_state = self.player.clone();
+        // cloning seems to be fine, because the cloned lists get dropped after the method call
         player_state.next_tracks = self.next_tracks.clone().into();
         player_state.prev_tracks = self.prev_tracks.clone().into();
 
