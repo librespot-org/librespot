@@ -67,14 +67,15 @@ impl ConnectState {
     pub fn update_context(&mut self, mut context: Context) -> Result<(), Error> {
         debug!("context: {}, {}", context.uri, context.url);
 
-        self.player.context_url = format!("context://{}", context.uri);
-        self.player.context_uri = context.uri.clone();
-
         if context.restrictions.is_some() {
             self.player.restrictions = context.restrictions.clone();
             self.player.context_restrictions = context.restrictions;
+        } else {
+            self.player.context_restrictions = Default::default();
+            self.player.restrictions = Default::default()
         }
 
+        self.player.context_metadata.clear();
         for (key, value) in context.metadata {
             self.player.context_metadata.insert(key, value);
         }
@@ -84,11 +85,25 @@ impl ConnectState {
             Some(page) => page,
         };
 
+        debug!(
+            "updated context from {} ({} tracks) to {} ({} tracks)",
+            self.player.context_uri,
+            self.context
+                .as_ref()
+                .map(|c| c.tracks.len())
+                .unwrap_or_default(),
+            &context.uri,
+            page.tracks.len()
+        );
+
+        self.player.context_url = format!("context://{}", &context.uri);
+        self.player.context_uri = context.uri;
+
         let tracks = page
             .tracks
             .iter()
             .flat_map(|track| {
-                match self.context_to_provided_track(track, Some(&context.uri), None) {
+                match self.context_to_provided_track(track, Some(&self.player.context_uri), None) {
                     Ok(t) => Some(t),
                     Err(_) => {
                         error!("couldn't convert {track:#?} into ProvidedTrack");

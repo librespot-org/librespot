@@ -23,13 +23,14 @@ pub enum RequestCommand {
     Play(Box<PlayCommand>),
     Pause(PauseCommand),
     SeekTo(SeekToCommand),
-    SkipNext(SkipNextCommand),
     SetShufflingContext(SetValueCommand),
     SetRepeatingTrack(SetValueCommand),
     SetRepeatingContext(SetValueCommand),
     AddToQueue(AddToQueueCommand),
     SetQueue(SetQueueCommand),
     SetOptions(SetOptionsCommand),
+    UpdateContext(UpdateContextCommand),
+    SkipNext(SkipNextCommand),
     // commands that don't send any context (at least not usually...)
     SkipPrev(GenericCommand),
     Resume(GenericCommand),
@@ -54,6 +55,7 @@ impl Display for RequestCommand {
                 RequestCommand::AddToQueue(_) => "add_to_queue",
                 RequestCommand::SetQueue(_) => "set_queue",
                 RequestCommand::SetOptions(_) => "set_options",
+                RequestCommand::UpdateContext(_) => "update_context",
                 RequestCommand::SkipNext(_) => "skip_next",
                 RequestCommand::SkipPrev(_) => "skip_prev",
                 RequestCommand::Resume(_) => "resume",
@@ -139,6 +141,13 @@ pub struct SetOptionsCommand {
     pub repeating_track: Option<bool>,
     pub options: Option<OptionsOptions>,
     pub logging_params: LoggingParams,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct UpdateContextCommand {
+    #[serde(deserialize_with = "json_proto")]
+    pub context: Context,
+    pub session_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
