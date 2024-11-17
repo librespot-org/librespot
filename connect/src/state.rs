@@ -43,8 +43,10 @@ pub enum StateError {
     NoContext(ContextType),
     #[error("could not find track {0:?} in context of {1}")]
     CanNotFindTrackInContext(Option<usize>, usize),
-    #[error("Currently {action} is not allowed because {reason}")]
+    #[error("currently {action} is not allowed because {reason}")]
     CurrentlyDisallowed { action: String, reason: String },
+    #[error("the provided context has no tracks")]
+    ContextHasNoTracks,
 }
 
 impl From<StateError> for Error {

@@ -67,6 +67,14 @@ impl ConnectState {
     pub fn update_context(&mut self, mut context: Context) -> Result<(), Error> {
         debug!("context: {}, {}", context.uri, context.url);
 
+        let page = match context.pages.pop() {
+            None => return Ok(()),
+            Some(page) if page.tracks.is_empty() => {
+                return Err(StateError::ContextHasNoTracks.into())
+            }
+            Some(page) => page,
+        };
+
         if context.restrictions.is_some() {
             self.player.restrictions = context.restrictions.clone();
             self.player.context_restrictions = context.restrictions;
@@ -79,11 +87,6 @@ impl ConnectState {
         for (key, value) in context.metadata {
             self.player.context_metadata.insert(key, value);
         }
-
-        let page = match context.pages.pop() {
-            None => return Ok(()),
-            Some(page) => page,
-        };
 
         debug!(
             "updated context from {} ({} tracks) to {} ({} tracks)",
