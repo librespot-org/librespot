@@ -67,12 +67,16 @@ impl ConnectState {
     pub fn update_context(&mut self, mut context: Context) -> Result<(), Error> {
         debug!("context: {}, {}", context.uri, context.url);
 
-        let page = match context.pages.pop() {
+        let page = match context.pages.first() {
             None => return Ok(()),
             Some(page) if page.tracks.is_empty() => {
                 return Err(StateError::ContextHasNoTracks.into())
             }
-            Some(page) => page,
+            // todo: handle multiple pages
+            //  currently i only expected a context to only have a single page, because playlists,
+            //  albums and the collection behaves like it
+            //  but the artist context sends multiple pages for example
+            Some(_) => context.pages.swap_remove(0),
         };
 
         if context.restrictions.is_some() {
