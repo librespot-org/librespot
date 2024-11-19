@@ -21,7 +21,7 @@ impl ConnectState {
         let current_index =
             ConnectState::find_index_in_context(ctx, |c| self.current_track(|t| c.uri == t.uri))?;
 
-        self.reset_playback_context(Some(current_index))
+        self.reset_playback_to_position(Some(current_index))
     }
 
     pub fn handle_set_queue(&mut self, set_queue: SetQueueCommand) {
@@ -57,7 +57,7 @@ impl ConnectState {
             let current_track = ConnectState::find_index_in_context(ctx, |t| {
                 self.current_track(|t| &t.uri) == &t.uri
             })?;
-            self.reset_playback_context(Some(current_track))
+            self.reset_playback_to_position(Some(current_track))
         } else {
             self.update_restrictions();
             Ok(())

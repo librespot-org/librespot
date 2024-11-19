@@ -245,7 +245,7 @@ impl ConnectState {
         self.player.queue_revision = state.finish().to_string()
     }
 
-    pub fn reset_playback_context(&mut self, new_index: Option<usize>) -> Result<(), Error> {
+    pub fn reset_playback_to_position(&mut self, new_index: Option<usize>) -> Result<(), Error> {
         let new_index = new_index.unwrap_or(0);
         if let Some(player_index) = self.player.index.as_mut() {
             player_index.track = new_index as u32;

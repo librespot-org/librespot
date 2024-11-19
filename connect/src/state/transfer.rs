@@ -133,7 +133,7 @@ impl ConnectState {
             self.set_shuffle(true);
             self.shuffle()?;
         } else {
-            self.reset_playback_context(current_index)?;
+            self.reset_playback_to_position(current_index)?;
         }
 
         self.update_restrictions();

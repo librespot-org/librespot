@@ -1210,7 +1210,7 @@ impl SpircTask {
         } else {
             // set manually, so that we overwrite a possible current queue track
             self.connect_state.set_current_track(index)?;
-            self.connect_state.reset_playback_context(Some(index))?;
+            self.connect_state.reset_playback_to_position(Some(index))?;
         }
 
         self.connect_state.set_repeat_track(cmd.repeat_track);
@@ -1408,7 +1408,7 @@ impl SpircTask {
             self.load_track(continue_playing, 0)
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
-            self.connect_state.reset_playback_context(None)?;
+            self.connect_state.reset_playback_to_position(None)?;
             self.handle_stop();
             Ok(())
         }
@@ -1422,7 +1422,7 @@ impl SpircTask {
             let new_track_index = self.connect_state.prev_track()?;
 
             if new_track_index.is_none() && self.connect_state.repeat_context() {
-                self.connect_state.reset_playback_context(None)?
+                self.connect_state.reset_playback_to_position(None)?
             }
 
             self.load_track(self.is_playing(), 0)
