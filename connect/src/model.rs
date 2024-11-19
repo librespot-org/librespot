@@ -37,9 +37,9 @@ impl ResolveContext {
     // expected page_url: hm://artistplaycontext/v1/page/spotify/album/5LFzwirfFwBKXJQGfwmiMY/km_artist
     pub fn from_page_url(page_url: String) -> Self {
         let split = if let Some(rest) = page_url.strip_prefix("hm://") {
-            rest.split("/")
+            rest.split('/')
         } else {
-            page_url.split("/")
+            page_url.split('/')
         };
 
         let uri = split

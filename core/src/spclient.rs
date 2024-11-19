@@ -48,7 +48,9 @@ component! {
 
 pub type SpClientResult = Result<Bytes, Error>;
 
+#[allow(clippy::declare_interior_mutable_const)]
 pub const CLIENT_TOKEN: HeaderName = HeaderName::from_static("client-token");
+#[allow(clippy::declare_interior_mutable_const)]
 const CONNECTION_ID: HeaderName = HeaderName::from_static("x-spotify-connection-id");
 
 #[derive(Debug, Error)]

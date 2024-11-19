@@ -216,24 +216,25 @@ impl ConnectState {
     ) -> Result<ProvidedTrack, Error> {
         let question_mark_idx = ctx_track
             .uri
-            .contains("?")
+            .contains('?')
             .then(|| ctx_track.uri.find('?'))
             .flatten();
 
         let ctx_track_uri = if let Some(idx) = question_mark_idx {
-            &ctx_track.uri[..idx].to_string()
+            &ctx_track.uri[..idx]
         } else {
             &ctx_track.uri
-        };
+        }
+        .to_string();
 
-        let provider = if self.unavailable_uri.contains(ctx_track_uri) {
+        let provider = if self.unavailable_uri.contains(&ctx_track_uri) {
             Provider::Unavailable
         } else {
             provider.unwrap_or(Provider::Context)
         };
 
         let id = if !ctx_track_uri.is_empty() {
-            SpotifyId::from_uri(ctx_track_uri)
+            SpotifyId::from_uri(&ctx_track_uri)
         } else if !ctx_track.gid.is_empty() {
             SpotifyId::from_raw(&ctx_track.gid)
         } else {
