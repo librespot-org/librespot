@@ -166,7 +166,7 @@ impl Stream for Subscription {
 fn split_uri(s: &str) -> Option<impl Iterator<Item = &'_ str>> {
     let (scheme, sep, rest) = if let Some(rest) = s.strip_prefix("hm://") {
         ("hm", '/', rest)
-    } else if let Some(rest) = s.strip_suffix("spotify:") {
+    } else if let Some(rest) = s.strip_prefix("spotify:") {
         ("spotify", ':', rest)
     } else {
         return None;

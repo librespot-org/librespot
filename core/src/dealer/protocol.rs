@@ -26,13 +26,18 @@ enum ProtocolError {
     Deserialization(SerdeError),
     #[error("payload had more then one value. had {0} values")]
     MoreThenOneValue(usize),
+    #[error("received unexpected data {0:#?}")]
+    UnexpectedData(PayloadValue),
     #[error("payload was empty")]
     Empty,
 }
 
 impl From<ProtocolError> for Error {
     fn from(err: ProtocolError) -> Self {
-        Error::failed_precondition(err)
+        match err {
+            ProtocolError::UnexpectedData(_) => Error::unavailable(err),
+            _ => Error::failed_precondition(err),
+        }
     }
 }
 
@@ -79,6 +84,17 @@ pub(super) enum MessageOrRequest {
 pub enum PayloadValue {
     Empty,
     Raw(Vec<u8>),
+}
+
+impl PayloadValue {
+    pub fn into_message<M: protobuf::Message>(self) -> Result<M, Error> {
+        match self {
+            PayloadValue::Raw(bytes) => {
+                M::parse_from_bytes(&bytes).map_err(Error::failed_precondition)
+            }
+            other => Err(ProtocolError::UnexpectedData(other).into()),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

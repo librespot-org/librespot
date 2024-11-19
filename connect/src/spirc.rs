@@ -12,9 +12,9 @@ use crate::{
         explicit_content_pubsub::UserAttributesUpdate, user_attributes::UserAttributesMutation,
     },
 };
-use futures_util::{FutureExt, Stream, StreamExt};
+use futures_util::{Stream, StreamExt};
 use librespot_core::dealer::manager::{Reply, RequestReply};
-use librespot_core::dealer::protocol::{PayloadValue, RequestCommand};
+use librespot_core::dealer::protocol::RequestCommand;
 use librespot_protocol::autoplay_context_request::AutoplayContextRequest;
 use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
 use librespot_protocol::player::{Context, TransferState};
@@ -37,8 +37,6 @@ pub use crate::model::{PlayingTrack, SpircLoadCommand};
 pub enum SpircError {
     #[error("response payload empty")]
     NoData,
-    #[error("received unexpected data {0:#?}")]
-    UnexpectedData(PayloadValue),
     #[error("playback of local files is not supported")]
     UnsupportedLocalPlayBack,
     #[error("message addressed at another ident: {0}")]
@@ -53,9 +51,7 @@ impl From<SpircError> for Error {
     fn from(err: SpircError) -> Self {
         use SpircError::*;
         match err {
-            NoData | UnsupportedLocalPlayBack | UnexpectedData(_) | NotAllowedContext(_) => {
-                Error::unavailable(err)
-            }
+            NoData | UnsupportedLocalPlayBack | NotAllowedContext(_) => Error::unavailable(err),
             Ident(_) | InvalidUri(_) => Error::aborted(err),
         }
     }
@@ -159,35 +155,21 @@ impl Spirc {
             session
                 .dealer()
                 .listen_for("hm://connect-state/v1/cluster")?
-                .map(|msg| -> Result<ClusterUpdate, Error> {
-                    match msg.payload {
-                        PayloadValue::Raw(bytes) => ClusterUpdate::parse_from_bytes(&bytes)
-                            .map_err(Error::failed_precondition),
-                        other => Err(SpircError::UnexpectedData(other).into()),
-                    }
-                }),
+                .map(|msg| msg.payload.into_message()),
         );
 
         let connect_state_volume_update = Box::pin(
             session
                 .dealer()
                 .listen_for("hm://connect-state/v1/connect/volume")?
-                .map(|msg| match msg.payload {
-                    PayloadValue::Raw(bytes) => SetVolumeCommand::parse_from_bytes(&bytes)
-                        .map_err(Error::failed_precondition),
-                    other => Err(SpircError::UnexpectedData(other).into()),
-                }),
+                .map(|msg| msg.payload.into_message()),
         );
 
         let playlist_update = Box::pin(
             session
                 .dealer()
                 .listen_for("hm://playlist/v2/playlist/")?
-                .map(|msg| match msg.payload {
-                    PayloadValue::Raw(bytes) => PlaylistModificationInfo::parse_from_bytes(&bytes)
-                        .map_err(Error::failed_precondition),
-                    other => Err(SpircError::UnexpectedData(other).into()),
-                }),
+                .map(|msg| msg.payload.into_message()),
         );
 
         let connect_state_command = Box::pin(
@@ -197,30 +179,19 @@ impl Spirc {
                 .map(UnboundedReceiverStream::new)?,
         );
 
-        // todo: remove later? probably have to find the equivalent for the dealer
         let user_attributes_update = Box::pin(
             session
-                .mercury()
-                .listen_for("spotify:user:attributes:update")
-                .map(UnboundedReceiverStream::new)
-                .flatten_stream()
-                .map(|response| -> Result<UserAttributesUpdate, Error> {
-                    let data = response.payload.first().ok_or(SpircError::NoData)?;
-                    Ok(UserAttributesUpdate::parse_from_bytes(data)?)
-                }),
+                .dealer()
+                .listen_for("spotify:user:attributes:update")?
+                .map(|msg| msg.payload.into_message()),
         );
 
-        // todo: remove later? probably have to find the equivalent for the dealer
+        // can be trigger by toggling autoplay in a desktop client
         let user_attributes_mutation = Box::pin(
             session
-                .mercury()
-                .listen_for("spotify:user:attributes:mutated")
-                .map(UnboundedReceiverStream::new)
-                .flatten_stream()
-                .map(|response| -> Result<UserAttributesMutation, Error> {
-                    let data = response.payload.first().ok_or(SpircError::NoData)?;
-                    Ok(UserAttributesMutation::parse_from_bytes(data)?)
-                }),
+                .dealer()
+                .listen_for("spotify:user:attributes:mutated")?
+                .map(|msg| msg.payload.into_message()),
         );
 
         // pre-acquire client_token, preventing multiple request while running
