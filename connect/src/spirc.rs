@@ -140,7 +140,6 @@ impl Spirc {
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Spirc[{}]", spirc_id);
 
-        let initial_volume = config.initial_volume;
         let connect_state = ConnectState::new(config, &session);
 
         let connection_id_update = Box::pin(
@@ -267,8 +266,14 @@ impl Spirc {
         };
 
         let spirc = Spirc { commands: cmd_tx };
-        task.set_volume(initial_volume as u16 - 1);
-        task.update_volume = false;
+
+        let initial_volume = task.connect_state.device.volume;
+        task.connect_state.device.volume = 0;
+
+        match initial_volume.try_into() {
+            Ok(volume) => task.set_volume(volume),
+            Err(why) => error!("failed to update initial volume: {why}"),
+        };
 
         Ok((spirc, task.run()))
     }
