@@ -11,6 +11,7 @@ const PROVIDER_AUTOPLAY: &str = "autoplay";
 /// option to do the same, so we stay with the old solution for now
 const PROVIDER_UNAVAILABLE: &str = "unavailable";
 
+#[derive(Debug, Clone)]
 pub enum Provider {
     Context,
     Queue,

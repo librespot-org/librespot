@@ -295,7 +295,7 @@ impl<'ct> ConnectState {
 
     pub fn has_next_tracks(&self, min: Option<usize>) -> bool {
         if let Some(min) = min {
-            self.next_tracks.len() <= min
+            self.next_tracks.len() >= min
         } else {
             !self.next_tracks.is_empty()
         }

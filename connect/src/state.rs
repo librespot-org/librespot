@@ -20,7 +20,8 @@ use librespot_protocol::connect::{
     Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest,
 };
 use librespot_protocol::player::{
-    ContextIndex, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack, Suppressions,
+    ContextIndex, ContextPage, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack,
+    Suppressions,
 };
 use log::LevelFilter;
 use protobuf::{EnumOrUnknown, MessageField};
@@ -92,19 +93,21 @@ pub struct ConnectState {
     player_index: Option<ContextIndex>,
 
     /// index: 0 based, so the first track is index 0
-    /// prev_track: bottom => top, aka the last track of the list is the prev track
-    /// next_track: top => bottom, aka the first track of the list is the next track
     player: PlayerState,
 
-    /// we don't work directly on the lists of the player state, because
-    /// we mostly need to push and pop at the beginning of both
+    // we don't work directly on the track lists of the player state, because
+    // we mostly need to push and pop at the beginning of them
+    /// bottom => top, aka the last track of the list is the prev track
     prev_tracks: VecDeque<ProvidedTrack>,
+    /// top => bottom, aka the first track of the list is the next track
     next_tracks: VecDeque<ProvidedTrack>,
 
     pub active_context: ContextType,
     /// the context from which we play, is used to top up prev and next tracks
     /// the index is used to keep track which tracks are already loaded into next tracks
     pub context: Option<StateContext>,
+    /// upcoming contexts, usually directly provided by the context-resolver
+    pub next_contexts: Vec<ContextPage>,
     /// a context to keep track of our shuffled context, should be only available when option.shuffling_context is true
     pub shuffle_context: Option<StateContext>,
     /// a context to keep track of the autoplay context

@@ -1,5 +1,5 @@
 use crate::model::{ResolveContext, SpircPlayStatus};
-use crate::state::context::ContextType;
+use crate::state::context::{ContextType, LoadNext};
 use crate::state::provider::IsProvider;
 use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
@@ -467,7 +467,7 @@ impl SpircTask {
                 // the autoplay endpoint can return a 404, when it tries to retrieve an
                 // autoplay context for an empty playlist as it seems
                 if let Err(why) = self
-                    .resolve_context(resolve.uri(), resolve.autoplay())
+                    .resolve_context(resolve.uri(), resolve.autoplay(), resolve.update_all())
                     .await
                 {
                     error!("failed resolving context <{resolve}>: {why}");
@@ -489,13 +489,7 @@ impl SpircTask {
             if matches!(ctx, Some(ctx) if ctx.tracks.is_empty()) {
                 self.connect_state.clear_next_tracks(true);
                 self.handle_next(None)?;
-            } else {
-                let current_index = ConnectState::find_index_in_context(ctx, |t| {
-                    self.connect_state.current_track(|t| &t.uri) == &t.uri
-                })
-                .ok();
-                self.connect_state.reset_playback_context(current_index)?;
-            };
+            }
         }
 
         self.connect_state.fill_up_next_tracks()?;
@@ -507,11 +501,28 @@ impl SpircTask {
         self.notify().await
     }
 
-    async fn resolve_context(&mut self, context_uri: &str, autoplay: bool) -> Result<(), Error> {
+    async fn resolve_context(
+        &mut self,
+        context_uri: &str,
+        autoplay: bool,
+        update_all: bool,
+    ) -> Result<(), Error> {
         if !autoplay {
             match self.session.spclient().get_context(context_uri).await {
                 Err(why) => error!("failed to resolve context '{context_uri}': {why}"),
-                Ok(ctx) => self.connect_state.update_context(ctx)?,
+                Ok(ctx) if update_all => {
+                    debug!("update entire context");
+                    self.connect_state.update_context(ctx)?
+                }
+                Ok(mut ctx) if matches!(ctx.pages.first(), Some(p) if !p.tracks.is_empty()) => {
+                    debug!("update context from single page, context {} had {} pages", ctx.uri, ctx.pages.len());
+                    self.connect_state.update_context_from_page(
+                        ctx.pages.remove(0),
+                        None,
+                        None,
+                    );
+                }
+                Ok(ctx) => error!("resolving context should only update the tracks, but had no page, or track. {ctx:#?}"),
             };
             if let Err(why) = self.notify().await {
                 error!("failed to update connect state, after updating the context: {why}")
@@ -1159,7 +1170,7 @@ impl SpircTask {
             debug!("context <{current_context_uri}> didn't change, no resolving required",)
         } else {
             debug!("resolving context for load command");
-            self.resolve_context(&cmd.context_uri, false).await?;
+            self.resolve_context(&cmd.context_uri, false, true).await?;
         }
 
         // for play commands with skip by uid, the context of the command contains
@@ -1330,17 +1341,35 @@ impl SpircTask {
     }
 
     fn preload_autoplay_when_required(&mut self, uri: String) {
-        let preload_autoplay = self
+        let require_load_new = !self
             .connect_state
-            .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD))
-            && self.session.autoplay();
+            .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD));
 
-        // When in autoplay, keep topping up the playlist when it nears the end
-        if preload_autoplay {
-            debug!("Preloading autoplay context for <{}>", uri);
-            // resolve the next autoplay context
-            self.resolve_context
-                .push(ResolveContext::from_uri(uri, true));
+        if !require_load_new {
+            return;
+        }
+
+        match self.connect_state.try_load_next_context() {
+            Err(why) => error!("failed loading next context: {why}"),
+            Ok(next) => {
+                match next {
+                    LoadNext::Done => info!("loaded next context"),
+                    LoadNext::PageUrl(page_url) => {
+                        self.resolve_context
+                            .push(ResolveContext::from_page_url(page_url));
+                    }
+                    LoadNext::Empty if self.session.autoplay() => {
+                        // When in autoplay, keep topping up the playlist when it nears the end
+                        debug!("Preloading autoplay context for <{}>", uri);
+                        // resolve the next autoplay context
+                        self.resolve_context
+                            .push(ResolveContext::from_uri(uri, true));
+                    }
+                    LoadNext::Empty => {
+                        debug!("next context is empty and autoplay isn't enabled, no preloading required")
+                    }
+                }
+            }
         }
     }
 

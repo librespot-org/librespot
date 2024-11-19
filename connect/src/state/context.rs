@@ -2,7 +2,7 @@ use crate::state::consts::METADATA_ENTITY_URI;
 use crate::state::provider::Provider;
 use crate::state::{ConnectState, StateError, METADATA_CONTEXT_URI};
 use librespot_core::{Error, SpotifyId};
-use librespot_protocol::player::{Context, ContextIndex, ContextTrack, ProvidedTrack};
+use librespot_protocol::player::{Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -18,6 +18,12 @@ pub enum ContextType {
     Default,
     Shuffle,
     Autoplay,
+}
+
+pub enum LoadNext {
+    Done,
+    PageUrl(String),
+    Empty,
 }
 
 impl ConnectState {
@@ -64,19 +70,28 @@ impl ConnectState {
         self.update_restrictions()
     }
 
-    pub fn update_context(&mut self, mut context: Context) -> Result<(), Error> {
+    pub fn update_context(&mut self, context: Context) -> Result<(), Error> {
         debug!("context: {}, {}", context.uri, context.url);
 
-        let page = match context.pages.first() {
-            None => return Ok(()),
-            Some(page) if page.tracks.is_empty() => {
-                return Err(StateError::ContextHasNoTracks.into())
+        if context.pages.iter().all(|p| p.tracks.is_empty()) {
+            error!("context didn't have any tracks: {context:#?}");
+            return Err(StateError::ContextHasNoTracks.into());
+        }
+
+        self.next_contexts.clear();
+
+        let mut first_page = None;
+        for page in context.pages {
+            if first_page.is_none() && !page.tracks.is_empty() {
+                first_page = Some(page);
+            } else {
+                self.next_contexts.push(page)
             }
-            // todo: handle multiple pages
-            //  currently i only expected a context to only have a single page, because playlists,
-            //  albums and the collection behaves like it
-            //  but the artist context sends multiple pages for example
-            Some(_) => context.pages.swap_remove(0),
+        }
+
+        let page = match first_page {
+            None => return Err(StateError::ContextHasNoTracks.into()),
+            Some(p) => p,
         };
 
         if context.restrictions.is_some() {
@@ -92,39 +107,10 @@ impl ConnectState {
             self.player.context_metadata.insert(key, value);
         }
 
-        debug!(
-            "updated context from {} ({} tracks) to {} ({} tracks)",
-            self.player.context_uri,
-            self.context
-                .as_ref()
-                .map(|c| c.tracks.len())
-                .unwrap_or_default(),
-            &context.uri,
-            page.tracks.len()
-        );
+        self.update_context_from_page(page, Some(&context.uri), None);
 
         self.player.context_url = format!("context://{}", &context.uri);
         self.player.context_uri = context.uri;
-
-        let tracks = page
-            .tracks
-            .iter()
-            .flat_map(|track| {
-                match self.context_to_provided_track(track, Some(&self.player.context_uri), None) {
-                    Ok(t) => Some(t),
-                    Err(_) => {
-                        error!("couldn't convert {track:#?} into ProvidedTrack");
-                        None
-                    }
-                }
-            })
-            .collect();
-
-        self.context = Some(StateContext {
-            tracks,
-            metadata: page.metadata,
-            index: ContextIndex::new(),
-        });
 
         Ok(())
     }
@@ -142,15 +128,35 @@ impl ConnectState {
             .ok_or(StateError::NoContext(ContextType::Autoplay))?;
         debug!("autoplay-context size: {}", page.tracks.len());
 
+        self.update_context_from_page(page, Some(&context.uri), Some(Provider::Autoplay));
+
+        Ok(())
+    }
+
+    pub fn update_context_from_page(
+        &mut self,
+        page: ContextPage,
+        new_context_uri: Option<&str>,
+        provider: Option<Provider>,
+    ) {
+        let new_context_uri = new_context_uri.unwrap_or(&self.player.context_uri);
+        debug!(
+            "updated context from {} ({} tracks) to {} ({} tracks)",
+            self.player.context_uri,
+            self.context
+                .as_ref()
+                .map(|c| c.tracks.len())
+                .unwrap_or_default(),
+            new_context_uri,
+            page.tracks.len()
+        );
+
         let tracks = page
             .tracks
             .iter()
             .flat_map(|track| {
-                match self.context_to_provided_track(
-                    track,
-                    Some(&context.uri),
-                    Some(Provider::Autoplay),
-                ) {
+                match self.context_to_provided_track(track, Some(new_context_uri), provider.clone())
+                {
                     Ok(t) => Some(t),
                     Err(_) => {
                         error!("couldn't convert {track:#?} into ProvidedTrack");
@@ -158,22 +164,13 @@ impl ConnectState {
                     }
                 }
             })
-            .collect::<Vec<_>>();
+            .collect();
 
-        // add the tracks to the context if we already have an autoplay context
-        if let Some(autoplay_context) = self.autoplay_context.as_mut() {
-            for track in tracks {
-                autoplay_context.tracks.push(track)
-            }
-        } else {
-            self.autoplay_context = Some(StateContext {
-                tracks,
-                metadata: page.metadata,
-                index: ContextIndex::new(),
-            })
-        }
-
-        Ok(())
+        self.context = Some(StateContext {
+            tracks,
+            metadata: page.metadata,
+            index: ContextIndex::new(),
+        })
     }
 
     pub fn merge_context(&mut self, context: Option<Context>) -> Option<()> {
@@ -217,14 +214,26 @@ impl ConnectState {
         context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> Result<ProvidedTrack, Error> {
-        let provider = if self.unavailable_uri.contains(&ctx_track.uri) {
+        let question_mark_idx = ctx_track
+            .uri
+            .contains("?")
+            .then(|| ctx_track.uri.find('?'))
+            .flatten();
+
+        let ctx_track_uri = if let Some(idx) = question_mark_idx {
+            &ctx_track.uri[..idx].to_string()
+        } else {
+            &ctx_track.uri
+        };
+
+        let provider = if self.unavailable_uri.contains(ctx_track_uri) {
             Provider::Unavailable
         } else {
             provider.unwrap_or(Provider::Context)
         };
 
-        let id = if !ctx_track.uri.is_empty() {
-            SpotifyId::from_uri(&ctx_track.uri)
+        let id = if !ctx_track_uri.is_empty() {
+            SpotifyId::from_uri(ctx_track_uri)
         } else if !ctx_track.gid.is_empty() {
             SpotifyId::from_raw(&ctx_track.gid)
         } else {
@@ -248,5 +257,21 @@ impl ConnectState {
             provider: provider.to_string(),
             ..Default::default()
         })
+    }
+
+    pub fn try_load_next_context(&mut self) -> Result<LoadNext, Error> {
+        let next = match self.next_contexts.first() {
+            None => return Ok(LoadNext::Empty),
+            Some(_) => self.next_contexts.remove(0),
+        };
+
+        if next.tracks.is_empty() {
+            return Ok(LoadNext::PageUrl(next.page_url));
+        }
+
+        self.update_context_from_page(next, None, None);
+        self.fill_up_next_tracks()?;
+
+        Ok(LoadNext::Done)
     }
 }
