@@ -113,6 +113,18 @@ impl DealerManager {
         })
     }
 
+    pub fn handles(&self, uri: &str) -> bool {
+        self.lock(|inner| {
+            if let Some(dealer) = inner.dealer.get() {
+                dealer.handles(uri)
+            } else if let Some(builder) = inner.builder.get() {
+                builder.handles(uri)
+            } else {
+                false
+            }
+        })
+    }
+
     pub async fn start(&self) -> Result<(), Error> {
         debug!("Launching dealer");
 

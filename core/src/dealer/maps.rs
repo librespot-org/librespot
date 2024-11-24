@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use thiserror::Error;
-
 use crate::Error;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum HandlerMapError {
@@ -28,6 +27,10 @@ impl<T> Default for HandlerMap<T> {
 }
 
 impl<T> HandlerMap<T> {
+    pub fn contains(&self, path: &str) -> bool {
+        matches!(self, HandlerMap::Branch(map) if map.contains_key(path))
+    }
+
     pub fn insert<'a>(
         &mut self,
         mut path: impl Iterator<Item = &'a str>,
@@ -105,6 +108,22 @@ impl<T> SubscriberMap<T> {
         } else {
             self.subscribed.push(handler);
         }
+    }
+
+    pub fn contains<'a>(&self, mut path: impl Iterator<Item = &'a str>) -> bool {
+        if !self.subscribed.is_empty() {
+            return true;
+        }
+
+        if let Some(next) = path.next() {
+            if let Some(next_map) = self.children.get(next) {
+                return next_map.contains(path);
+            }
+        } else {
+            return !self.is_empty();
+        }
+
+        false
     }
 
     pub fn is_empty(&self) -> bool {

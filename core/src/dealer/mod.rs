@@ -234,6 +234,21 @@ fn subscribe(
     Ok(Subscription(rx))
 }
 
+fn handles(
+    req_map: &HandlerMap<Box<dyn RequestHandler>>,
+    msg_map: &SubscriberMap<MessageHandler>,
+    uri: &str,
+) -> bool {
+    if req_map.contains(uri) {
+        return true;
+    }
+
+    match split_uri(uri) {
+        None => false,
+        Some(mut split) => msg_map.contains(&mut split),
+    }
+}
+
 #[derive(Default)]
 struct Builder {
     message_handlers: SubscriberMap<MessageHandler>,
@@ -275,6 +290,10 @@ impl Builder {
 
     pub fn subscribe(&mut self, uris: &[&str]) -> Result<Subscription, Error> {
         subscribe(&mut self.message_handlers, uris)
+    }
+
+    pub fn handles(&self, uri: &str) -> bool {
+        handles(&self.request_handlers, &self.message_handlers, uri)
     }
 
     pub fn launch_in_background<Fut, F>(self, get_url: F, proxy: Option<Url>) -> Dealer
@@ -414,6 +433,14 @@ impl Dealer {
 
     pub fn subscribe(&self, uris: &[&str]) -> Result<Subscription, Error> {
         subscribe(&mut self.shared.message_handlers.lock(), uris)
+    }
+
+    pub fn handles(&self, uri: &str) -> bool {
+        handles(
+            &self.shared.request_handlers.lock(),
+            &self.shared.message_handlers.lock(),
+            uri,
+        )
     }
 
     pub async fn close(mut self) {
