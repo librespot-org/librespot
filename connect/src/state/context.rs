@@ -1,6 +1,6 @@
-use crate::state::consts::METADATA_ENTITY_URI;
+use crate::state::metadata::Metadata;
 use crate::state::provider::Provider;
-use crate::state::{ConnectState, StateError, METADATA_CONTEXT_URI};
+use crate::state::{ConnectState, StateError};
 use librespot_core::{Error, SpotifyId};
 use librespot_protocol::player::{Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack};
 use std::collections::HashMap;
@@ -273,22 +273,24 @@ impl ConnectState {
         }?;
 
         let mut metadata = HashMap::new();
-        if let Some(context_uri) = context_uri {
-            metadata.insert(METADATA_CONTEXT_URI.to_string(), context_uri.to_string());
-            metadata.insert(METADATA_ENTITY_URI.to_string(), context_uri.to_string());
-        }
-
         for (k, v) in &ctx_track.metadata {
             metadata.insert(k.to_string(), v.to_string());
         }
 
-        Ok(ProvidedTrack {
+        let mut track = ProvidedTrack {
             uri: id.to_uri()?.replace("unknown", "track"),
             uid: ctx_track.uid.clone(),
             metadata,
             provider: provider.to_string(),
             ..Default::default()
-        })
+        };
+
+        if let Some(context_uri) = context_uri {
+            track.add_context_uri(context_uri.to_string());
+            track.add_entity_uri(context_uri.to_string());
+        }
+
+        Ok(track)
     }
 
     pub fn fill_context_from_page(&mut self, page: ContextPage) -> Result<(), Error> {

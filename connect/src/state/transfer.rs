@@ -76,7 +76,7 @@ impl ConnectState {
 
         let ctx = self.get_current_context().ok();
 
-        let current_index = if track.is_queued() {
+        let current_index = if track.is_queue() {
             Self::find_index_in_context(ctx, |c| c.uid == transfer.current_session.current_uid)
                 .map(|i| if i > 0 { i - 1 } else { i })
         } else {

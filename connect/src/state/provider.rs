@@ -37,7 +37,7 @@ impl Display for Provider {
 pub trait IsProvider {
     fn is_autoplay(&self) -> bool;
     fn is_context(&self) -> bool;
-    fn is_queued(&self) -> bool;
+    fn is_queue(&self) -> bool;
     fn is_unavailable(&self) -> bool;
 
     fn set_provider(&mut self, provider: Provider);
@@ -52,7 +52,7 @@ impl IsProvider for ProvidedTrack {
         self.provider == PROVIDER_CONTEXT
     }
 
-    fn is_queued(&self) -> bool {
+    fn is_queue(&self) -> bool {
         self.provider == PROVIDER_QUEUE
     }
 

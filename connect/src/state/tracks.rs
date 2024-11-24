@@ -1,5 +1,5 @@
-use crate::state::consts::{IDENTIFIER_DELIMITER, METADATA_IS_QUEUED};
 use crate::state::context::ContextType;
+use crate::state::metadata::Metadata;
 use crate::state::provider::{IsProvider, Provider};
 use crate::state::{
     ConnectState, StateError, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE,
@@ -8,6 +8,9 @@ use librespot_core::{Error, SpotifyId};
 use librespot_protocol::player::ProvidedTrack;
 use protobuf::MessageField;
 use std::collections::{HashMap, VecDeque};
+
+// identifier used as part of the uid
+pub const IDENTIFIER_DELIMITER: &str = "delimiter";
 
 impl<'ct> ConnectState {
     fn new_delimiter(iteration: i64) -> ProvidedTrack {
@@ -96,7 +99,7 @@ impl<'ct> ConnectState {
 
         self.fill_up_next_tracks()?;
 
-        let is_queue_or_autoplay = new_track.is_queued() || new_track.is_autoplay();
+        let is_queue_or_autoplay = new_track.is_queue() || new_track.is_autoplay();
         let update_index = if is_queue_or_autoplay && self.player.index.is_some() {
             // the index isn't send when we are a queued track, but we have to preserve it for later
             self.player_index = self.player.index.take();
@@ -203,16 +206,13 @@ impl<'ct> ConnectState {
         // mobile only sends a set_queue command instead of an add_to_queue command
         // in addition to handling the mobile add_to_queue handling, this should also handle
         // a mass queue addition
-        tracks
-            .iter_mut()
-            .filter(|t| t.metadata.contains_key(METADATA_IS_QUEUED))
-            .for_each(|t| {
-                t.set_provider(Provider::Queue);
-                // technically we could preserve the queue-uid here,
-                // but it seems to work without that, so we just override it
-                t.uid = format!("q{}", self.queue_count);
-                self.queue_count += 1;
-            });
+        tracks.iter_mut().filter(|t| t.is_queued()).for_each(|t| {
+            t.set_provider(Provider::Queue);
+            // technically we could preserve the queue-uid here,
+            // but it seems to work without that, so we just override it
+            t.uid = format!("q{}", self.queue_count);
+            self.queue_count += 1;
+        });
 
         self.next_tracks = tracks.into();
     }
@@ -232,7 +232,7 @@ impl<'ct> ConnectState {
             .next_tracks
             .iter()
             .enumerate()
-            .find(|(_, track)| !track.is_queued());
+            .find(|(_, track)| !track.is_queue());
 
         if let Some((non_queued_track, _)) = first_non_queued_track {
             while self.next_tracks.len() > non_queued_track && self.next_tracks.pop_back().is_some()

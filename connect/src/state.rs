@@ -1,6 +1,6 @@
-mod consts;
 pub(super) mod context;
 mod handle;
+mod metadata;
 mod options;
 pub(super) mod provider;
 mod restrictions;
@@ -8,8 +8,8 @@ mod tracks;
 mod transfer;
 
 use crate::model::SpircPlayStatus;
-use crate::state::consts::{METADATA_CONTEXT_URI, METADATA_IS_QUEUED};
 use crate::state::context::{ContextType, StateContext};
+use crate::state::metadata::Metadata;
 use crate::state::provider::{IsProvider, Provider};
 use librespot_core::config::DeviceType;
 use librespot_core::date::Date;
@@ -279,7 +279,7 @@ impl ConnectState {
 
         debug!("reset playback state to {new_index}");
 
-        if !self.player.track.is_queued() {
+        if !self.player.track.is_queue() {
             self.set_current_track(new_index)?;
         }
 
@@ -313,14 +313,12 @@ impl ConnectState {
         self.queue_count += 1;
 
         track.set_provider(Provider::Queue);
-        if !track.metadata.contains_key(METADATA_IS_QUEUED) {
-            track
-                .metadata
-                .insert(METADATA_IS_QUEUED.to_string(), true.to_string());
+        if !track.is_queued() {
+            track.add_queued();
         }
 
         if let Some(next_not_queued_track) =
-            self.next_tracks.iter().position(|track| !track.is_queued())
+            self.next_tracks.iter().position(|track| !track.is_queue())
         {
             self.next_tracks.insert(next_not_queued_track, track);
         } else {
@@ -413,7 +411,7 @@ impl ConnectState {
         player_state.next_tracks = self.next_tracks.clone().into();
         player_state.prev_tracks = self.prev_tracks.clone().into();
 
-        if let Some(context_uri) = player_state.track.metadata.get(METADATA_CONTEXT_URI) {
+        if let Some(context_uri) = player_state.track.get_context_uri() {
             player_state.context_uri = context_uri.to_owned();
             player_state.context_url = format!("context://{context_uri}");
         }
