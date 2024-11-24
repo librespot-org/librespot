@@ -378,7 +378,10 @@ impl SpircTask {
                 },
                 connection_id_update = self.connection_id_update.next() => match connection_id_update {
                     Some(result) => match result {
-                        Ok(connection_id) => self.handle_connection_id_update(connection_id).await,
+                        Ok(connection_id) => if let Err(why) = self.handle_connection_id_update(connection_id).await {
+                            error!("failed handling connection id update: {why}");
+                            break;
+                        },
                         Err(e) => error!("could not parse connection ID update: {}", e),
                     }
                     None => {
@@ -751,11 +754,11 @@ impl SpircTask {
         }
     }
 
-    async fn handle_connection_id_update(&mut self, connection_id: String) {
+    async fn handle_connection_id_update(&mut self, connection_id: String) -> Result<(), Error> {
         trace!("Received connection ID update: {:?}", connection_id);
         self.session.set_connection_id(&connection_id);
 
-        let response = match self
+        let cluster = match self
             .connect_state
             .update_state(&self.session, PutStateReason::NEW_DEVICE)
             .await
@@ -765,31 +768,35 @@ impl SpircTask {
                 error!("{why:?}");
                 None
             }
-        };
+        }
+        .ok_or(SpircError::FailedDealerSetup)?;
+
+        debug!(
+            "successfully put connect state for {} with connection-id {connection_id}",
+            self.session.device_id()
+        );
+
+        if !cluster.active_device_id.is_empty() {
+            info!("active device is <{}>", cluster.active_device_id);
+            return Ok(());
+        } else if cluster.transfer_data.is_empty() {
+            debug!("got empty transfer state, do nothing");
+            return Ok(());
+        } else {
+            info!("trying to take over control automatically")
+        }
 
         // todo: handle received pages from transfer, important to not always shuffle the first 10 tracks
         //  also important when the dealer is restarted, currently we just shuffle again, but at least
         //  the 10 tracks provided should be used and after that the new shuffle context
-        if let Some(cluster) = response {
-            if !cluster.transfer_data.is_empty() {
-                if let Ok(transfer_state) = TransferState::parse_from_bytes(&cluster.transfer_data)
-                {
-                    if !transfer_state.current_session.context.pages.is_empty() {
-                        info!("received transfer state with context, trying to take over control again");
-                        match self.handle_transfer(transfer_state) {
-                            Ok(_) => info!("successfully re-acquired control"),
-                            Err(why) => error!("failed handling transfer state: {why}"),
-                        }
-                    }
-                }
+        if let Ok(transfer_state) = TransferState::parse_from_bytes(&cluster.transfer_data) {
+            if !transfer_state.current_session.context.pages.is_empty() {
+                info!("received transfer state with context, trying to take over control again");
+                self.handle_transfer(transfer_state)?
             }
-
-            debug!(
-                "successfully put connect state for {} with connection-id {connection_id}",
-                self.session.device_id()
-            );
-            info!("active device is {:?}", cluster.active_device_id);
         }
+
+        Ok(())
     }
 
     fn handle_user_attributes_update(&mut self, update: UserAttributesUpdate) {
