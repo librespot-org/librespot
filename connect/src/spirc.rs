@@ -524,7 +524,10 @@ impl SpircTask {
             match self.session.spclient().get_context(context_uri).await {
                 Err(why) => error!("failed to resolve context '{context_uri}': {why}"),
                 Ok(ctx) if update => {
-                    self.connect_state.update_context(ctx, UpdateContext::Default)?
+                    if let Err(why) = self.connect_state.update_context(ctx, UpdateContext::Default) {
+                        error!("failed loading context: {why}");
+                        self.handle_stop()
+                    }
                 }
                 Ok(mut ctx) if matches!(ctx.pages.first(), Some(p) if !p.tracks.is_empty()) => {
                     debug!("update context from single page, context {} had {} pages", ctx.uri, ctx.pages.len());
@@ -1036,8 +1039,8 @@ impl SpircTask {
             RequestCommand::UpdateContext(update_context) => {
                 if &update_context.context.uri != self.connect_state.context_uri() {
                     debug!(
-                        "ignoring context update for <{}>, because it isn't the current context",
-                        update_context.context.uri
+                        "ignoring context update for <{}>, because it isn't the current context <{}>",
+                        update_context.context.uri, self.connect_state.context_uri()
                     )
                 } else {
                     self.resolve_context

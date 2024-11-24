@@ -98,11 +98,15 @@ impl ConnectState {
             Some(p) => p,
         };
 
+        let prev_context = match ty {
+            UpdateContext::Default => self.context.as_ref(),
+            UpdateContext::Autoplay => self.autoplay_context.as_ref(),
+        };
+
         debug!(
             "updated context {ty:?} from {} ({} tracks) to {} ({} tracks)",
             self.player.context_uri,
-            self.context
-                .as_ref()
+            prev_context
                 .map(|c| c.tracks.len().to_string())
                 .unwrap_or_else(|| "-".to_string()),
             context.uri,
@@ -124,7 +128,33 @@ impl ConnectState {
 
         match ty {
             UpdateContext::Default => {
-                self.context = Some(self.state_context_from_page(page, Some(&context.uri), None))
+                let mut new_context = self.state_context_from_page(page, Some(&context.uri), None);
+
+                // when we update the same context, we should try to preserve the previous position
+                // otherwise we might load the entire context twice
+                if self.player.context_uri == context.uri {
+                    match Self::find_index_in_context(Some(&new_context), |t| {
+                        self.player.track.uri == t.uri
+                    }) {
+                        Ok(new_pos) => {
+                            debug!("found new index of current track, updating new_context index to {new_pos}");
+                            new_context.index.track = (new_pos + 1) as u32;
+                        }
+                        // the track isn't anymore in the context
+                        Err(_) => {
+                            warn!("current tracks was removed, setting pos to last known index");
+                            new_context.index.track = self.player.index.track
+                        }
+                    }
+                    // enforce reloading the context
+                    self.clear_next_tracks(true);
+                    self.active_context = ContextType::Default;
+                }
+
+                self.context = Some(new_context);
+
+                self.player.context_url = format!("context://{}", &context.uri);
+                self.player.context_uri = context.uri;
             }
             UpdateContext::Autoplay => {
                 self.autoplay_context = Some(self.state_context_from_page(
@@ -134,9 +164,6 @@ impl ConnectState {
                 ))
             }
         }
-
-        self.player.context_url = format!("context://{}", &context.uri);
-        self.player.context_uri = context.uri;
 
         Ok(())
     }
