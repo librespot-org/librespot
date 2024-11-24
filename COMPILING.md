@@ -110,6 +110,29 @@ For example, to build with the ALSA audio and libmdns discovery backend:
 cargo build --no-default-features --features "alsa-backend with-libmdns"
 ```
 
+#### Cross Compiling for Raspberry Pi
+
+To cross compile for Raspberry pi, get the arm-unknown-gnueabihf target for Rust:
+
+```bash
+rustup target add armv7-unknown-linux-gnueabi
+```
+
+You need to manually add a linker, which can be installed with apt:
+
+```bash
+sudo apt install gcc-arm-linux-gnueabihf
+```
+
+The target must be specified to cargo along with the linker.
+This can be done via `.cargo/config.toml`, or via command line:
+
+```bash
+RUSTFLAGS="-C linker=arm-linux-gnueabihf-gcc" cargo build --no-default-features --target armv7-unknown-linux-gnueabihf
+```
+
+Note that this does not work with armv6 (found e.g. in Raspberry Pi 1 and Zero). Previously, you could use the linker in https://github.com/raspberrypi/tools, but this is now too old and will give an error when compiling Librespot (since `3e85d77bfb3520e16c35bb7db3912c76e8cc90d7`). More info: https://github.com/japaric/rust-cross/issues/42
+
 ### Running
 
 Assuming you just compiled a ```debug``` build, you can run librespot with the following command:
