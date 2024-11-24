@@ -26,6 +26,12 @@ pub enum LoadNext {
     Empty,
 }
 
+#[derive(Debug)]
+pub enum UpdateContext {
+    Default,
+    Autoplay,
+}
+
 impl ConnectState {
     pub fn find_index_in_context<F: Fn(&ProvidedTrack) -> bool>(
         context: Option<&StateContext>,
@@ -70,9 +76,7 @@ impl ConnectState {
         self.update_restrictions()
     }
 
-    pub fn update_context(&mut self, context: Context) -> Result<(), Error> {
-        debug!("context: {}, {}", context.uri, context.url);
-
+    pub fn update_context(&mut self, context: Context, ty: UpdateContext) -> Result<(), Error> {
         if context.pages.iter().all(|p| p.tracks.is_empty()) {
             error!("context didn't have any tracks: {context:#?}");
             return Err(StateError::ContextHasNoTracks.into());
@@ -94,6 +98,17 @@ impl ConnectState {
             Some(p) => p,
         };
 
+        debug!(
+            "updated context {ty:?} from {} ({} tracks) to {} ({} tracks)",
+            self.player.context_uri,
+            self.context
+                .as_ref()
+                .map(|c| c.tracks.len().to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            context.uri,
+            page.tracks.len()
+        );
+
         if context.restrictions.is_some() {
             self.player.restrictions = context.restrictions.clone();
             self.player.context_restrictions = context.restrictions;
@@ -107,7 +122,18 @@ impl ConnectState {
             self.player.context_metadata.insert(key, value);
         }
 
-        self.context = Some(self.state_context_from_page(page, Some(&context.uri), None));
+        match ty {
+            UpdateContext::Default => {
+                self.context = Some(self.state_context_from_page(page, Some(&context.uri), None))
+            }
+            UpdateContext::Autoplay => {
+                self.autoplay_context = Some(self.state_context_from_page(
+                    page,
+                    Some(&context.uri),
+                    Some(Provider::Autoplay),
+                ))
+            }
+        }
 
         self.player.context_url = format!("context://{}", &context.uri);
         self.player.context_uri = context.uri;
@@ -115,42 +141,13 @@ impl ConnectState {
         Ok(())
     }
 
-    pub fn update_autoplay_context(&mut self, mut context: Context) -> Result<(), Error> {
-        debug!(
-            "autoplay-context: {}, pages: {}",
-            context.uri,
-            context.pages.len()
-        );
-
-        let page = context
-            .pages
-            .pop()
-            .ok_or(StateError::NoContext(ContextType::Autoplay))?;
-        debug!("autoplay-context size: {}", page.tracks.len());
-
-        self.autoplay_context =
-            Some(self.state_context_from_page(page, Some(&context.uri), Some(Provider::Autoplay)));
-
-        Ok(())
-    }
-
-    pub fn state_context_from_page(
+    fn state_context_from_page(
         &mut self,
         page: ContextPage,
         new_context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> StateContext {
         let new_context_uri = new_context_uri.unwrap_or(&self.player.context_uri);
-        debug!(
-            "updated context from {} ({} tracks) to {} ({} tracks)",
-            self.player.context_uri,
-            self.context
-                .as_ref()
-                .map(|c| c.tracks.len().to_string())
-                .unwrap_or_else(|| "-".to_string()),
-            new_context_uri,
-            page.tracks.len()
-        );
 
         let tracks = page
             .tracks

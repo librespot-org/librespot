@@ -1,5 +1,5 @@
 use crate::model::{ResolveContext, SpircPlayStatus};
-use crate::state::context::{ContextType, LoadNext};
+use crate::state::context::{ContextType, LoadNext, UpdateContext};
 use crate::state::provider::IsProvider;
 use crate::state::{ConnectState, ConnectStateConfig};
 use crate::{
@@ -487,8 +487,7 @@ impl SpircTask {
             match self.session.spclient().get_context(context_uri).await {
                 Err(why) => error!("failed to resolve context '{context_uri}': {why}"),
                 Ok(ctx) if update => {
-                    debug!("update entire context");
-                    self.connect_state.update_context(ctx)?
+                    self.connect_state.update_context(ctx, UpdateContext::Default)?
                 }
                 Ok(mut ctx) if matches!(ctx.pages.first(), Some(p) if !p.tracks.is_empty()) => {
                     debug!("update context from single page, context {} had {} pages", ctx.uri, ctx.pages.len());
@@ -528,7 +527,8 @@ impl SpircTask {
             .get_autoplay_context(&ctx_request)
             .await?;
 
-        self.connect_state.update_autoplay_context(context)
+        self.connect_state
+            .update_context(context, UpdateContext::Autoplay)
     }
 
     fn now_ms(&self) -> i64 {
