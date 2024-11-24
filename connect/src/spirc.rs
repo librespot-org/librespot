@@ -240,7 +240,12 @@ impl Spirc {
         task.connect_state.device.volume = 0;
 
         match initial_volume.try_into() {
-            Ok(volume) => task.set_volume(volume),
+            Ok(volume) => {
+                task.set_volume(volume);
+                // we don't want to update the volume initially,
+                // we just want to set the mixer to the correct volume
+                task.update_volume = false;
+            }
             Err(why) => error!("failed to update initial volume: {why}"),
         };
 
@@ -858,7 +863,10 @@ impl SpircTask {
         let reason = cluster_update.update_reason.enum_value().ok();
 
         let device_ids = cluster_update.devices_that_changed.join(", ");
-        debug!("cluster update: {reason:?} from {device_ids}");
+        debug!(
+            "cluster update: {reason:?} from {device_ids}, active device: {}",
+            cluster_update.cluster.active_device_id
+        );
 
         if let Some(cluster) = cluster_update.cluster.take() {
             let became_inactive =
