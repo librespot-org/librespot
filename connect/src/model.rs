@@ -6,12 +6,12 @@ use std::fmt::{Display, Formatter};
 pub struct ResolveContext {
     context: Context,
     autoplay: bool,
-    /// if `true` updates the entire context, otherwise only updates the context from the next
+    /// if `true` updates the entire context, otherwise only fills the context from the next
     /// retrieve page, it is usually used when loading the next page of an already established context
     ///
     /// like for example:
     /// - playing an artists profile
-    update_all: bool,
+    update: bool,
 }
 
 impl ResolveContext {
@@ -22,7 +22,7 @@ impl ResolveContext {
                 ..Default::default()
             },
             autoplay,
-            update_all: true,
+            update: true,
         }
     }
 
@@ -30,7 +30,7 @@ impl ResolveContext {
         Self {
             context,
             autoplay,
-            update_all: true,
+            update: true,
         }
     }
 
@@ -39,6 +39,7 @@ impl ResolveContext {
         let split = if let Some(rest) = page_url.strip_prefix("hm://") {
             rest.split('/')
         } else {
+            warn!("page_url didn't started with hm://. got page_url: {page_url}");
             page_url.split('/')
         };
 
@@ -48,12 +49,14 @@ impl ResolveContext {
             .collect::<Vec<&str>>()
             .join(":");
 
+        trace!("created an ResolveContext from page_url <{page_url}> as uri <{uri}>");
+
         Self {
             context: Context {
                 uri,
                 ..Default::default()
             },
-            update_all: false,
+            update: false,
             autoplay: false,
         }
     }
@@ -66,8 +69,8 @@ impl ResolveContext {
         self.autoplay
     }
 
-    pub fn update_all(&self) -> bool {
-        self.update_all
+    pub fn update(&self) -> bool {
+        self.update
     }
 }
 
@@ -75,8 +78,8 @@ impl Display for ResolveContext {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "uri: {}, autoplay: {}, update_all: {}",
-            self.context.uri, self.autoplay, self.update_all
+            "uri: {}, autoplay: {}, update: {}",
+            self.context.uri, self.autoplay, self.update
         )
     }
 }
@@ -85,9 +88,9 @@ impl PartialEq for ResolveContext {
     fn eq(&self, other: &Self) -> bool {
         let eq_context = self.context.uri == other.context.uri;
         let eq_autoplay = self.autoplay == other.autoplay;
-        let eq_update_all = self.update_all == other.update_all;
+        let eq_update = self.update == other.update;
 
-        eq_autoplay && eq_context && eq_update_all
+        eq_autoplay && eq_context && eq_update
     }
 }
 

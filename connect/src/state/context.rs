@@ -107,7 +107,7 @@ impl ConnectState {
             self.player.context_metadata.insert(key, value);
         }
 
-        self.update_context_from_page(page, Some(&context.uri), None);
+        self.context = Some(self.state_context_from_page(page, Some(&context.uri), None));
 
         self.player.context_url = format!("context://{}", &context.uri);
         self.player.context_uri = context.uri;
@@ -128,25 +128,26 @@ impl ConnectState {
             .ok_or(StateError::NoContext(ContextType::Autoplay))?;
         debug!("autoplay-context size: {}", page.tracks.len());
 
-        self.update_context_from_page(page, Some(&context.uri), Some(Provider::Autoplay));
+        self.autoplay_context =
+            Some(self.state_context_from_page(page, Some(&context.uri), Some(Provider::Autoplay)));
 
         Ok(())
     }
 
-    pub fn update_context_from_page(
+    pub fn state_context_from_page(
         &mut self,
         page: ContextPage,
         new_context_uri: Option<&str>,
         provider: Option<Provider>,
-    ) {
+    ) -> StateContext {
         let new_context_uri = new_context_uri.unwrap_or(&self.player.context_uri);
         debug!(
             "updated context from {} ({} tracks) to {} ({} tracks)",
             self.player.context_uri,
             self.context
                 .as_ref()
-                .map(|c| c.tracks.len())
-                .unwrap_or_default(),
+                .map(|c| c.tracks.len().to_string())
+                .unwrap_or_else(|| "-".to_string()),
             new_context_uri,
             page.tracks.len()
         );
@@ -164,13 +165,13 @@ impl ConnectState {
                     }
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
 
-        self.context = Some(StateContext {
+        StateContext {
             tracks,
             metadata: page.metadata,
             index: ContextIndex::new(),
-        })
+        }
     }
 
     pub fn merge_context(&mut self, context: Option<Context>) -> Option<()> {
@@ -260,6 +261,20 @@ impl ConnectState {
         })
     }
 
+    pub fn fill_context_from_page(&mut self, page: ContextPage) -> Result<(), Error> {
+        let context = self.state_context_from_page(page, None, None);
+        let ctx = self
+            .context
+            .as_mut()
+            .ok_or(StateError::NoContext(ContextType::Default))?;
+
+        for t in context.tracks {
+            ctx.tracks.push(t)
+        }
+
+        Ok(())
+    }
+
     pub fn try_load_next_context(&mut self) -> Result<LoadNext, Error> {
         let next = match self.next_contexts.first() {
             None => return Ok(LoadNext::Empty),
@@ -270,7 +285,7 @@ impl ConnectState {
             return Ok(LoadNext::PageUrl(next.page_url));
         }
 
-        self.update_context_from_page(next, None, None);
+        self.fill_context_from_page(next)?;
         self.fill_up_next_tracks()?;
 
         Ok(LoadNext::Done)

@@ -443,7 +443,7 @@ impl SpircTask {
                 // the autoplay endpoint can return a 404, when it tries to retrieve an
                 // autoplay context for an empty playlist as it seems
                 if let Err(why) = self
-                    .resolve_context(resolve.uri(), resolve.autoplay(), resolve.update_all())
+                    .resolve_context(resolve.uri(), resolve.autoplay(), resolve.update())
                     .await
                 {
                     error!("failed resolving context <{resolve}>: {why}");
@@ -481,22 +481,18 @@ impl SpircTask {
         &mut self,
         context_uri: &str,
         autoplay: bool,
-        update_all: bool,
+        update: bool,
     ) -> Result<(), Error> {
         if !autoplay {
             match self.session.spclient().get_context(context_uri).await {
                 Err(why) => error!("failed to resolve context '{context_uri}': {why}"),
-                Ok(ctx) if update_all => {
+                Ok(ctx) if update => {
                     debug!("update entire context");
                     self.connect_state.update_context(ctx)?
                 }
                 Ok(mut ctx) if matches!(ctx.pages.first(), Some(p) if !p.tracks.is_empty()) => {
                     debug!("update context from single page, context {} had {} pages", ctx.uri, ctx.pages.len());
-                    self.connect_state.update_context_from_page(
-                        ctx.pages.remove(0),
-                        None,
-                        None,
-                    );
+                    self.connect_state.fill_context_from_page(ctx.pages.remove(0))?;
                 }
                 Ok(ctx) => error!("resolving context should only update the tracks, but had no page, or track. {ctx:#?}"),
             };
