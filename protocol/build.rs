@@ -38,6 +38,7 @@ fn compile() {
         proto_dir.join("storage-resolve.proto"),
         proto_dir.join("user_attributes.proto"),
         proto_dir.join("autoplay_context_request.proto"),
+        proto_dir.join("social_connect_v2.proto"),
         // TODO: remove these legacy protobufs when we are on the new API completely
         proto_dir.join("authentication.proto"),
         proto_dir.join("canvaz.proto"),

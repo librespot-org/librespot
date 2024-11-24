@@ -168,6 +168,8 @@ fn split_uri(s: &str) -> Option<impl Iterator<Item = &'_ str>> {
         ("hm", '/', rest)
     } else if let Some(rest) = s.strip_prefix("spotify:") {
         ("spotify", ':', rest)
+    } else if s.contains('/') {
+        ("", '/', s)
     } else {
         return None;
     };

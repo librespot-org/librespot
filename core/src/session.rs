@@ -9,23 +9,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use byteorder::{BigEndian, ByteOrder};
-use bytes::Bytes;
-use futures_core::TryStream;
-use futures_util::StreamExt;
-use librespot_protocol::authentication::AuthenticationType;
-use num_traits::FromPrimitive;
-use once_cell::sync::OnceCell;
-use parking_lot::RwLock;
-use pin_project_lite::pin_project;
-use quick_xml::events::Event;
-use thiserror::Error;
-use tokio::{
-    sync::mpsc,
-    time::{sleep, Duration as TokioDuration, Instant as TokioInstant, Sleep},
-};
-use tokio_stream::wrappers::UnboundedReceiverStream;
-
 use crate::dealer::manager::DealerManager;
 use crate::{
     apresolve::{ApResolver, SocketAddress},
@@ -44,6 +27,23 @@ use crate::{
     token::TokenProvider,
     Error,
 };
+use byteorder::{BigEndian, ByteOrder};
+use bytes::Bytes;
+use futures_core::TryStream;
+use futures_util::StreamExt;
+use librespot_protocol::authentication::AuthenticationType;
+use num_traits::FromPrimitive;
+use once_cell::sync::OnceCell;
+use parking_lot::RwLock;
+use pin_project_lite::pin_project;
+use quick_xml::events::Event;
+use thiserror::Error;
+use tokio::{
+    sync::mpsc,
+    time::{sleep, Duration as TokioDuration, Instant as TokioInstant, Sleep},
+};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use uuid::Uuid;
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -79,6 +79,7 @@ pub struct UserData {
 
 #[derive(Debug, Clone, Default)]
 struct SessionData {
+    session_id: String,
     client_id: String,
     client_name: String,
     client_brand_name: String,
@@ -130,6 +131,8 @@ impl Session {
 
         let session_data = SessionData {
             client_id: config.client_id.clone(),
+            // can be any guid, doesn't need to be simple
+            session_id: Uuid::new_v4().as_simple().to_string(),
             ..SessionData::default()
         };
 
@@ -380,6 +383,14 @@ impl Session {
     // locks.
     pub fn user_data(&self) -> UserData {
         self.0.data.read().user_data.clone()
+    }
+
+    pub fn session_id(&self) -> String {
+        self.0.data.read().session_id.clone()
+    }
+
+    pub fn set_session_id(&self, session_id: String) {
+        self.0.data.write().session_id = session_id.to_owned();
     }
 
     pub fn device_id(&self) -> &str {

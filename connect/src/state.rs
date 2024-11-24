@@ -68,6 +68,7 @@ impl From<StateError> for Error {
 
 #[derive(Debug, Clone)]
 pub struct ConnectStateConfig {
+    pub session_id: String,
     pub initial_volume: u32,
     pub name: String,
     pub device_type: DeviceType,
@@ -79,6 +80,7 @@ pub struct ConnectStateConfig {
 impl Default for ConnectStateConfig {
     fn default() -> Self {
         Self {
+            session_id: String::new(),
             initial_volume: u32::from(u16::MAX) / 2,
             name: "librespot".to_string(),
             device_type: DeviceType::Speaker,
@@ -91,6 +93,7 @@ impl Default for ConnectStateConfig {
 
 #[derive(Default, Debug)]
 pub struct ConnectState {
+    pub session_id: String,
     pub active: bool,
     pub active_since: Option<SystemTime>,
 
@@ -131,6 +134,7 @@ pub struct ConnectState {
 impl ConnectState {
     pub fn new(cfg: ConnectStateConfig, session: &Session) -> Self {
         let mut state = Self {
+            session_id: cfg.session_id,
             device: DeviceInfo {
                 can_play: true,
                 volume: cfg.initial_volume,
@@ -188,6 +192,7 @@ impl ConnectState {
         self.queue_count = 0;
 
         self.player = PlayerState {
+            session_id: self.session_id.clone(),
             is_system_initiated: true,
             playback_speed: 1.,
             play_origin: MessageField::some(PlayOrigin::new()),
@@ -209,6 +214,15 @@ impl ConnectState {
             self.active = false;
             self.active_since = None
         }
+    }
+
+    pub fn set_origin(&mut self, origin: PlayOrigin) {
+        self.player.play_origin = MessageField::some(origin)
+    }
+
+    pub fn set_session_id(&mut self, session_id: String) {
+        self.session_id = session_id.clone();
+        self.player.session_id = session_id;
     }
 
     pub(crate) fn set_status(&mut self, status: &SpircPlayStatus) {
@@ -376,10 +390,6 @@ impl ConnectState {
         }
 
         self.player.timestamp = timestamp;
-    }
-
-    pub fn set_origin(&mut self, origin: PlayOrigin) {
-        self.player.play_origin = MessageField::some(origin)
     }
 
     /// Updates the connect state for the connect session

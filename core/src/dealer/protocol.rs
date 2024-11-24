@@ -14,6 +14,11 @@ use serde::Deserialize;
 use serde_json::Error as SerdeError;
 use thiserror::Error;
 
+const IGNORE_UNKNOWN: protobuf_json_mapping::ParseOptions = protobuf_json_mapping::ParseOptions {
+    ignore_unknown_fields: true,
+    _future_options: (),
+};
+
 type JsonValue = serde_json::Value;
 
 #[derive(Debug, Error)]
@@ -84,17 +89,7 @@ pub(super) enum MessageOrRequest {
 pub enum PayloadValue {
     Empty,
     Raw(Vec<u8>),
-}
-
-impl PayloadValue {
-    pub fn into_message<M: protobuf::Message>(self) -> Result<M, Error> {
-        match self {
-            PayloadValue::Raw(bytes) => {
-                M::parse_from_bytes(&bytes).map_err(Error::failed_precondition)
-            }
-            other => Err(ProtocolError::UnexpectedData(other).into()),
-        }
-    }
+    Json(String),
 }
 
 #[derive(Clone, Debug)]
@@ -102,6 +97,31 @@ pub struct Message {
     pub headers: HashMap<String, String>,
     pub payload: PayloadValue,
     pub uri: String,
+}
+
+impl Message {
+    pub fn from_json<M: protobuf::MessageFull>(value: Self) -> Result<M, Error> {
+        use protobuf_json_mapping::*;
+        match value.payload {
+            PayloadValue::Json(json) => match parse_from_str::<M>(&json) {
+                Ok(message) => Ok(message),
+                Err(_) => match parse_from_str_with_options(&json, &IGNORE_UNKNOWN) {
+                    Ok(message) => Ok(message),
+                    Err(why) => Err(Error::failed_precondition(why)),
+                },
+            },
+            other => Err(ProtocolError::UnexpectedData(other).into()),
+        }
+    }
+
+    pub fn from_raw<M: protobuf::Message>(value: Self) -> Result<M, Error> {
+        match value.payload {
+            PayloadValue::Raw(bytes) => {
+                M::parse_from_bytes(&bytes).map_err(Error::failed_precondition)
+            }
+            other => Err(ProtocolError::UnexpectedData(other).into()),
+        }
+    }
 }
 
 impl WebsocketMessage {
@@ -118,11 +138,7 @@ impl WebsocketMessage {
                 .decode(string)
                 .map_err(ProtocolError::Base64)?,
             MessagePayloadValue::Bytes(bytes) => bytes,
-            MessagePayloadValue::Json(json) => {
-                return Err(Error::unimplemented(format!(
-                    "Received unknown data from websocket message: {json:?}"
-                )))
-            }
+            MessagePayloadValue::Json(json) => return Ok(PayloadValue::Json(json.to_string())),
         };
 
         handle_transfer_encoding(&self.headers, bytes).map(PayloadValue::Raw)

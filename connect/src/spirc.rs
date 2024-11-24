@@ -1,25 +1,38 @@
-use crate::model::{ResolveContext, SpircPlayStatus};
-use crate::state::context::{ContextType, LoadNext, UpdateContext};
-use crate::state::provider::IsProvider;
-use crate::state::{ConnectState, ConnectStateConfig};
+pub use crate::model::{PlayingTrack, SpircLoadCommand};
 use crate::{
-    core::{authentication::Credentials, session::UserAttributes, Error, Session, SpotifyId},
+    core::{
+        authentication::Credentials,
+        dealer::{
+            manager::{Reply, RequestReply},
+            protocol::{Message, RequestCommand},
+        },
+        session::UserAttributes,
+        Error, Session, SpotifyId,
+    },
     playback::{
         mixer::Mixer,
         player::{Player, PlayerEvent, PlayerEventChannel},
     },
     protocol::{
-        explicit_content_pubsub::UserAttributesUpdate, user_attributes::UserAttributesMutation,
+        autoplay_context_request::AutoplayContextRequest,
+        connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand},
+        explicit_content_pubsub::UserAttributesUpdate,
+        player::{Context, TransferState},
+        playlist4_external::PlaylistModificationInfo,
+        social_connect_v2::{session::_host_active_device_id, SessionUpdate},
+        user_attributes::UserAttributesMutation,
+    },
+};
+use crate::{
+    model::{ResolveContext, SpircPlayStatus},
+    state::{
+        context::{ContextType, LoadNext, UpdateContext},
+        provider::IsProvider,
+        {ConnectState, ConnectStateConfig},
     },
 };
 use futures_util::{Stream, StreamExt};
-use librespot_core::dealer::manager::{Reply, RequestReply};
-use librespot_core::dealer::protocol::RequestCommand;
-use librespot_protocol::autoplay_context_request::AutoplayContextRequest;
-use librespot_protocol::connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand};
-use librespot_protocol::player::{Context, TransferState};
-use librespot_protocol::playlist4_external::PlaylistModificationInfo;
-use protobuf::{Message, MessageField};
+use protobuf::MessageField;
 use std::{
     future::Future,
     pin::Pin,
@@ -30,8 +43,6 @@ use std::{
 use thiserror::Error;
 use tokio::{sync::mpsc, time::sleep};
 use tokio_stream::wrappers::UnboundedReceiverStream;
-
-pub use crate::model::{PlayingTrack, SpircLoadCommand};
 
 #[derive(Debug, Error)]
 pub enum SpircError {
@@ -56,6 +67,7 @@ impl From<SpircError> for Error {
 }
 
 type BoxedStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
+type BoxedStreamResult<T> = BoxedStream<Result<T, Error>>;
 
 struct SpircTask {
     player: Arc<Player>,
@@ -66,13 +78,14 @@ struct SpircTask {
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
 
-    connection_id_update: BoxedStream<Result<String, Error>>,
-    connect_state_update: BoxedStream<Result<ClusterUpdate, Error>>,
-    connect_state_volume_update: BoxedStream<Result<SetVolumeCommand, Error>>,
-    playlist_update: BoxedStream<Result<PlaylistModificationInfo, Error>>,
+    connection_id_update: BoxedStreamResult<String>,
+    connect_state_update: BoxedStreamResult<ClusterUpdate>,
+    connect_state_volume_update: BoxedStreamResult<SetVolumeCommand>,
+    playlist_update: BoxedStreamResult<PlaylistModificationInfo>,
+    session_update: BoxedStreamResult<SessionUpdate>,
     connect_state_command: BoxedStream<RequestReply>,
-    user_attributes_update: BoxedStream<Result<UserAttributesUpdate, Error>>,
-    user_attributes_mutation: BoxedStream<Result<UserAttributesMutation, Error>>,
+    user_attributes_update: BoxedStreamResult<UserAttributesUpdate>,
+    user_attributes_mutation: BoxedStreamResult<UserAttributesMutation>,
 
     commands: Option<mpsc::UnboundedReceiver<SpircCommand>>,
     player_events: Option<PlayerEventChannel>,
@@ -153,21 +166,28 @@ impl Spirc {
             session
                 .dealer()
                 .listen_for("hm://connect-state/v1/cluster")?
-                .map(|msg| msg.payload.into_message()),
+                .map(Message::from_raw),
         );
 
         let connect_state_volume_update = Box::pin(
             session
                 .dealer()
                 .listen_for("hm://connect-state/v1/connect/volume")?
-                .map(|msg| msg.payload.into_message()),
+                .map(Message::from_raw),
         );
 
         let playlist_update = Box::pin(
             session
                 .dealer()
                 .listen_for("hm://playlist/v2/playlist/")?
-                .map(|msg| msg.payload.into_message()),
+                .map(Message::from_raw),
+        );
+
+        let session_update = Box::pin(
+            session
+                .dealer()
+                .listen_for("social-connect/v2/session_update")?
+                .map(Message::from_json),
         );
 
         let connect_state_command = Box::pin(
@@ -181,7 +201,7 @@ impl Spirc {
             session
                 .dealer()
                 .listen_for("spotify:user:attributes:update")?
-                .map(|msg| msg.payload.into_message()),
+                .map(Message::from_raw),
         );
 
         // can be trigger by toggling autoplay in a desktop client
@@ -189,7 +209,7 @@ impl Spirc {
             session
                 .dealer()
                 .listen_for("spotify:user:attributes:mutated")?
-                .map(|msg| msg.payload.into_message()),
+                .map(Message::from_raw),
         );
 
         // pre-acquire client_token, preventing multiple request while running
@@ -218,6 +238,7 @@ impl Spirc {
             connect_state_update,
             connect_state_volume_update,
             playlist_update,
+            session_update,
             connect_state_command,
             user_attributes_update,
             user_attributes_mutation,
@@ -394,6 +415,16 @@ impl SpircTask {
                         break;
                     }
                 },
+                session_update = self.session_update.next() => match session_update {
+                    Some(result) => match result {
+                        Ok(session_update) => self.handle_session_update(session_update),
+                        Err(e) => error!("could not parse session update: {}", e),
+                    }
+                    None => {
+                        error!("session update selected, but none received");
+                        break;
+                    }
+                },
                 cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
                     if let Err(e) = self.handle_command(cmd).await {
                         debug!("could not dispatch command: {}", e);
@@ -428,7 +459,7 @@ impl SpircTask {
             }
         }
 
-        if !self.shutdown {
+        if !self.shutdown && self.connect_state.active {
             if let Err(why) = self.notify().await {
                 warn!("notify before unexpected shutdown couldn't be send: {why}")
             }
@@ -781,15 +812,23 @@ impl SpircTask {
             self.session.device_id()
         );
 
-        if !cluster.active_device_id.is_empty() {
-            info!("active device is <{}>", cluster.active_device_id);
+        if !cluster.active_device_id.is_empty() || !cluster.player_state.session_id.is_empty() {
+            info!(
+                "active device is <{}> with session <{}>",
+                cluster.active_device_id, cluster.player_state.session_id
+            );
             return Ok(());
         } else if cluster.transfer_data.is_empty() {
             debug!("got empty transfer state, do nothing");
             return Ok(());
         } else {
-            info!("trying to take over control automatically")
+            info!(
+                "trying to take over control automatically, session_id: {}",
+                cluster.player_state.session_id
+            )
         }
+
+        use protobuf::Message;
 
         // todo: handle received pages from transfer, important to not always shuffle the first 10 tracks
         //  also important when the dealer is restarted, currently we just shuffle again, but at least
@@ -860,7 +899,7 @@ impl SpircTask {
         &mut self,
         mut cluster_update: ClusterUpdate,
     ) -> Result<(), Error> {
-        let reason = cluster_update.update_reason.enum_value().ok();
+        let reason = cluster_update.update_reason.enum_value();
 
         let device_ids = cluster_update.devices_that_changed.join(", ");
         debug!(
@@ -1449,6 +1488,48 @@ impl SpircTask {
             .push(ResolveContext::from_uri(uri, false));
 
         Ok(())
+    }
+
+    fn handle_session_update(&mut self, mut session_update: SessionUpdate) {
+        let reason = session_update.reason.enum_value();
+
+        let mut session = match session_update.session.take() {
+            None => return,
+            Some(session) => session,
+        };
+
+        let active_device = session._host_active_device_id.take().map(|id| match id {
+            _host_active_device_id::HostActiveDeviceId(id) => id,
+            other => {
+                warn!("unexpected active device id {other:?}");
+                String::new()
+            }
+        });
+
+        if matches!(active_device, Some(ref device) if device == self.session.device_id()) {
+            info!(
+                "session update: <{:?}> for self, current session_id {}, new session_id {}",
+                reason,
+                self.session.session_id(),
+                session.session_id
+            );
+
+            if self.session.session_id() != session.session_id {
+                self.session.set_session_id(session.session_id.clone());
+                self.connect_state.set_session_id(session.session_id);
+            }
+        } else {
+            debug!("session update: <{reason:?}> from active session host: <{active_device:?}>");
+        }
+
+        // this seems to be used for jams or handling the current session_id
+        //
+        // handling this event was intended to keep the playback when other clients (primarily
+        // mobile) connects, otherwise they would steel the current playback when there was no
+        // session_id provided on the initial PutStateReason::NEW_DEVICE state update
+        //
+        // by generating an initial session_id from the get-go we prevent that behavior and
+        // currently don't need to handle this event, might still be useful for later "jam" support
     }
 
     fn position(&mut self) -> u32 {
