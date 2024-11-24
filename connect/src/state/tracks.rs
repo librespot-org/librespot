@@ -206,7 +206,13 @@ impl<'ct> ConnectState {
         tracks
             .iter_mut()
             .filter(|t| t.metadata.contains_key(METADATA_IS_QUEUED))
-            .for_each(|t| t.set_provider(Provider::Queue));
+            .for_each(|t| {
+                t.set_provider(Provider::Queue);
+                // technically we could preserve the queue-uid here,
+                // but it seems to work without that, so we just override it
+                t.uid = format!("q{}", self.queue_count);
+                self.queue_count += 1;
+            });
 
         self.next_tracks = tracks.into();
     }
