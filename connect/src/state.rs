@@ -48,11 +48,21 @@ pub enum StateError {
     CurrentlyDisallowed { action: String, reason: String },
     #[error("the provided context has no tracks")]
     ContextHasNoTracks,
+    #[error("playback of local files is not supported")]
+    UnsupportedLocalPlayBack,
 }
 
 impl From<StateError> for Error {
     fn from(err: StateError) -> Self {
-        Error::failed_precondition(err)
+        use StateError::*;
+        match err {
+            CouldNotResolveTrackFromTransfer
+            | MessageFieldNone(_)
+            | NoContext(_)
+            | CanNotFindTrackInContext(_, _)
+            | ContextHasNoTracks => Error::failed_precondition(err),
+            CurrentlyDisallowed { .. } | UnsupportedLocalPlayBack => Error::unavailable(err),
+        }
     }
 }
 
@@ -382,13 +392,13 @@ impl ConnectState {
 
         let now = SystemTime::now();
         let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-        let client_side_timestamp = u64::try_from(since_the_epoch.as_millis())?;
 
+        let client_side_timestamp = u64::try_from(since_the_epoch.as_millis())?;
         let member_type = EnumOrUnknown::new(MemberType::CONNECT_STATE);
         let put_state_reason = EnumOrUnknown::new(reason);
 
-        // we copy the player state, which only contains the infos, not the next and prev tracks
         let mut player_state = self.player.clone();
+        // we copy the player state, which only contains the infos, not the next and prev tracks
         // cloning seems to be fine, because the cloned lists get dropped after the method call
         player_state.next_tracks = self.next_tracks.clone().into();
         player_state.prev_tracks = self.prev_tracks.clone().into();

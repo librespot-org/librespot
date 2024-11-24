@@ -37,22 +37,20 @@ pub use crate::model::{PlayingTrack, SpircLoadCommand};
 pub enum SpircError {
     #[error("response payload empty")]
     NoData,
-    #[error("playback of local files is not supported")]
-    UnsupportedLocalPlayBack,
-    #[error("message addressed at another ident: {0}")]
-    Ident(String),
     #[error("message pushed for another URI")]
     InvalidUri(String),
     #[error("tried resolving not allowed context: {0:?}")]
     NotAllowedContext(ResolveContext),
+    #[error("failed to put connect state for new device")]
+    FailedDealerSetup,
 }
 
 impl From<SpircError> for Error {
     fn from(err: SpircError) -> Self {
         use SpircError::*;
         match err {
-            NoData | UnsupportedLocalPlayBack | NotAllowedContext(_) => Error::unavailable(err),
-            Ident(_) | InvalidUri(_) => Error::aborted(err),
+            NoData | NotAllowedContext(_) => Error::unavailable(err),
+            InvalidUri(_) | FailedDealerSetup => Error::aborted(err),
         }
     }
 }

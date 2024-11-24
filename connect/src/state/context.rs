@@ -212,6 +212,12 @@ impl ConnectState {
         context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> Result<ProvidedTrack, Error> {
+        // completely ignore local playback.
+        if matches!(context_uri, Some(context_uri) if context_uri.starts_with("spotify:local-files"))
+        {
+            return Err(StateError::UnsupportedLocalPlayBack.into());
+        }
+
         let question_mark_idx = ctx_track
             .uri
             .contains('?')
