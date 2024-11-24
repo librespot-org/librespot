@@ -975,6 +975,7 @@ impl SpircTask {
                     SpircLoadCommand {
                         context_uri: play.context.uri.clone(),
                         start_playing: true,
+                        seek_to: play.options.seek_to.unwrap_or_default(),
                         playing_track: play.options.skip_to.into(),
                         shuffle,
                         repeat,
@@ -1235,7 +1236,7 @@ impl SpircTask {
         self.connect_state.set_repeat_track(cmd.repeat_track);
 
         if self.connect_state.current_track(MessageField::is_some) {
-            self.load_track(cmd.start_playing, 0)?;
+            self.load_track(cmd.start_playing, cmd.seek_to)?;
         } else {
             info!("No active track, stopping");
             self.handle_stop();

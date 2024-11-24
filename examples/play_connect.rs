@@ -79,6 +79,7 @@ async fn main() {
             .load(SpircLoadCommand {
                 context_uri,
                 start_playing: true,
+                seek_to: 0,
                 shuffle: false,
                 repeat: false,
                 repeat_track: false,

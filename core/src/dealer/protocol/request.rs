@@ -168,7 +168,9 @@ pub struct PlayOptions {
     pub skip_to: SkipTo,
     #[serde(default, deserialize_with = "option_json_proto")]
     pub player_options_override: Option<ContextPlayerOptionOverrides>,
-    pub license: String,
+    pub license: Option<String>,
+    // possible to send wie web-api
+    pub seek_to: Option<u32>,
     // mobile
     pub always_play_something: Option<bool>,
     pub audio_stream: Option<String>,

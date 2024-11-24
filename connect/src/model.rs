@@ -105,6 +105,7 @@ pub struct SpircLoadCommand {
     pub context_uri: String,
     /// Whether the given tracks should immediately start playing, or just be initially loaded.
     pub start_playing: bool,
+    pub seek_to: u32,
     pub shuffle: bool,
     pub repeat: bool,
     pub repeat_track: bool,
