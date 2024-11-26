@@ -530,10 +530,7 @@ impl SpircTask {
             match self.session.spclient().get_context(context_uri).await {
                 Err(why) => error!("failed to resolve context '{context_uri}': {why}"),
                 Ok(ctx) if update => {
-                    if let Err(why) = self.connect_state.update_context(ctx, UpdateContext::Default) {
-                        error!("failed loading context: {why}");
-                        self.handle_stop()
-                    }
+                    self.connect_state.update_context(ctx, UpdateContext::Default)?
                 }
                 Ok(mut ctx) if matches!(ctx.pages.first(), Some(p) if !p.tracks.is_empty()) => {
                     debug!("update context from single page, context {} had {} pages", ctx.uri, ctx.pages.len());
@@ -921,12 +918,8 @@ impl SpircTask {
                 self.connect_state.active && cluster.active_device_id != self.session.device_id();
             if became_inactive {
                 info!("device became inactive");
+                self.connect_state.became_inactive(&self.session).await?;
                 self.handle_stop();
-                self.connect_state.reset();
-                let _ = self
-                    .connect_state
-                    .update_state(&self.session, PutStateReason::BECAME_INACTIVE)
-                    .await?;
             } else if self.connect_state.active {
                 // fixme: workaround fix, because of missing information why it behaves like it does
                 //  background: when another device sends a connect-state update, some player's position de-syncs
@@ -1125,9 +1118,7 @@ impl SpircTask {
             .update_position_in_relation(self.now_ms());
         self.notify().await?;
 
-        self.connect_state
-            .update_state(&self.session, PutStateReason::BECAME_INACTIVE)
-            .await?;
+        self.connect_state.became_inactive(&self.session).await?;
 
         self.player
             .emit_session_disconnected_event(self.session.connection_id(), self.session.username());
@@ -1538,6 +1529,7 @@ impl SpircTask {
 
     fn load_track(&mut self, start_playing: bool, position_ms: u32) -> Result<(), Error> {
         if self.connect_state.current_track(MessageField::is_none) {
+            debug!("current track is none, stopping playback");
             self.handle_stop();
             return Ok(());
         }

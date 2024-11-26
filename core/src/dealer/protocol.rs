@@ -155,7 +155,11 @@ impl WebsocketRequest {
         let payload = String::from_utf8(payload)?;
 
         if log::max_level() >= LevelFilter::Trace {
-            trace!("{:#?}", serde_json::from_str::<serde_json::Value>(&payload));
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&payload) {
+                trace!("websocket request: {json:#?}");
+            } else {
+                trace!("websocket request: {payload}");
+            }
         }
 
         serde_json::from_str(&payload)

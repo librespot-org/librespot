@@ -397,12 +397,19 @@ impl ConnectState {
         self.player.timestamp = timestamp;
     }
 
+    pub async fn became_inactive(&mut self, session: &Session) -> SpClientResult {
+        self.reset();
+        self.reset_context(None);
+
+        session.spclient().put_connect_state_inactive(false).await
+    }
+
     /// Updates the connect state for the connect session
     ///
     /// Prepares a [PutStateRequest] from the current connect state
     pub async fn update_state(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
         if matches!(reason, PutStateReason::BECAME_INACTIVE) {
-            return session.spclient().put_connect_state_inactive(false).await;
+            warn!("should use <ConnectState::became_inactive> instead")
         }
 
         let now = SystemTime::now();

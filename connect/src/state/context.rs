@@ -67,7 +67,9 @@ impl ConnectState {
         self.autoplay_context = None;
         self.shuffle_context = None;
 
-        if matches!(new_context, Some(ctx) if self.player.context_uri != ctx) {
+        let reset_default_context = new_context.is_none()
+            || matches!(new_context, Some(ctx) if self.player.context_uri != ctx);
+        if reset_default_context {
             self.context = None;
             self.next_contexts.clear();
         } else if let Some(ctx) = self.context.as_mut() {
