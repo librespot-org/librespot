@@ -802,10 +802,28 @@ impl SpClient {
         self.request_url(&url).await
     }
 
+    /// Request the context for an uri
+    ///
+    /// ## Query entry found in the wild:
+    /// - include_video=true
+    /// ## Remarks:
+    /// - track
+    ///   - returns a single page with a single track
+    ///   - when requesting a single track with a query in the request, the returned track uri
+    ///     **will** contain the query
+    /// - artists
+    ///   - returns 2 pages with tracks: 10 most popular tracks and latest/popular album
+    ///   - remaining pages are albums of the artists and are only provided as page_url
+    /// - search
+    ///   - is massively influenced by the provided query
+    ///   - the query result shown by the search expects no query at all
+    ///   - uri looks like "spotify:search:never+gonna"
     pub async fn get_context(&self, uri: &str) -> Result<Context, Error> {
         let uri = format!("/context-resolve/v1/{uri}");
 
-        let res = self.request(&Method::GET, &uri, None, None).await?;
+        let res = self
+            .request_with_options(&Method::GET, &uri, None, None, &NO_METRICS_AND_SALT)
+            .await?;
         let ctx_json = String::from_utf8(res.to_vec())?;
         let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json)?;
 
@@ -817,11 +835,12 @@ impl SpClient {
         context_request: &AutoplayContextRequest,
     ) -> Result<Context, Error> {
         let res = self
-            .request_with_protobuf(
+            .request_with_protobuf_and_options(
                 &Method::POST,
                 "/context-resolve/v1/autoplay",
                 None,
                 context_request,
+                &NO_METRICS_AND_SALT,
             )
             .await?;
 

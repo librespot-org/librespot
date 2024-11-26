@@ -50,6 +50,8 @@ pub enum StateError {
     ContextHasNoTracks,
     #[error("playback of local files is not supported")]
     UnsupportedLocalPlayBack,
+    #[error("track uri <{0}> contains invalid characters")]
+    InvalidTrackUri(String),
 }
 
 impl From<StateError> for Error {
@@ -60,7 +62,8 @@ impl From<StateError> for Error {
             | MessageFieldNone(_)
             | NoContext(_)
             | CanNotFindTrackInContext(_, _)
-            | ContextHasNoTracks => Error::failed_precondition(err),
+            | ContextHasNoTracks
+            | InvalidTrackUri(_) => Error::failed_precondition(err),
             CurrentlyDisallowed { .. } | UnsupportedLocalPlayBack => Error::unavailable(err),
         }
     }

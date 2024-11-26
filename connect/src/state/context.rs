@@ -6,6 +6,8 @@ use librespot_protocol::player::{Context, ContextIndex, ContextPage, ContextTrac
 use std::collections::HashMap;
 use uuid::Uuid;
 
+const LOCAL_FILES_IDENTIFIER: &str = "spotify:local-files";
+
 #[derive(Debug, Clone)]
 pub struct StateContext {
     pub tracks: Vec<ProvidedTrack>,
@@ -84,6 +86,8 @@ impl ConnectState {
         if context.pages.iter().all(|p| p.tracks.is_empty()) {
             error!("context didn't have any tracks: {context:#?}");
             return Err(StateError::ContextHasNoTracks.into());
+        } else if context.uri.starts_with(LOCAL_FILES_IDENTIFIER) {
+            return Err(StateError::UnsupportedLocalPlayBack.into());
         }
 
         self.next_contexts.clear();
@@ -98,7 +102,7 @@ impl ConnectState {
         }
 
         let page = match first_page {
-            None => return Err(StateError::ContextHasNoTracks.into()),
+            None => Err(StateError::ContextHasNoTracks)?,
             Some(p) => p,
         };
 
@@ -244,38 +248,23 @@ impl ConnectState {
         context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> Result<ProvidedTrack, Error> {
-        // completely ignore local playback.
-        if matches!(context_uri, Some(context_uri) if context_uri.starts_with("spotify:local-files"))
-        {
-            return Err(StateError::UnsupportedLocalPlayBack.into());
-        }
+        let id = if !ctx_track.uri.is_empty() {
+            if ctx_track.uri.contains(['?', '%']) {
+                Err(StateError::InvalidTrackUri(ctx_track.uri.clone()))?
+            }
 
-        let question_mark_idx = ctx_track
-            .uri
-            .contains('?')
-            .then(|| ctx_track.uri.find('?'))
-            .flatten();
-
-        let ctx_track_uri = if let Some(idx) = question_mark_idx {
-            &ctx_track.uri[..idx]
+            SpotifyId::from_uri(&ctx_track.uri)?
+        } else if !ctx_track.gid.is_empty() {
+            SpotifyId::from_raw(&ctx_track.gid)?
         } else {
-            &ctx_track.uri
-        }
-        .to_string();
+            Err(StateError::InvalidTrackUri(String::new()))?
+        };
 
-        let provider = if self.unavailable_uri.contains(&ctx_track_uri) {
+        let provider = if self.unavailable_uri.contains(&ctx_track.uri) {
             Provider::Unavailable
         } else {
             provider.unwrap_or(Provider::Context)
         };
-
-        let id = if !ctx_track_uri.is_empty() {
-            SpotifyId::from_uri(&ctx_track_uri)
-        } else if !ctx_track.gid.is_empty() {
-            SpotifyId::from_raw(&ctx_track.gid)
-        } else {
-            return Err(Error::unavailable("track not available"));
-        }?;
 
         // assumption: the uid is used as unique-id of any item
         //  - queue resorting is done by each client and orients itself by the given uid

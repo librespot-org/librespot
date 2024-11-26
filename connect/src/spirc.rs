@@ -546,9 +546,10 @@ impl SpircTask {
 
         if context_uri.contains("spotify:show:") || context_uri.contains("spotify:episode:") {
             // autoplay is not supported for podcasts
-            return Err(
-                SpircError::NotAllowedContext(ResolveContext::from_uri(context_uri, true)).into(),
-            );
+            Err(SpircError::NotAllowedContext(ResolveContext::from_uri(
+                context_uri,
+                true,
+            )))?
         }
 
         let previous_tracks = self.connect_state.prev_autoplay_track_uris();

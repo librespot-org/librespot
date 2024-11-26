@@ -40,11 +40,10 @@ impl ConnectState {
             .disallow_toggling_shuffle_reasons
             .first()
         {
-            return Err(StateError::CurrentlyDisallowed {
+            Err(StateError::CurrentlyDisallowed {
                 action: "shuffle".to_string(),
                 reason: reason.clone(),
-            }
-            .into());
+            })?
         }
 
         self.prev_tracks.clear();
