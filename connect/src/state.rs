@@ -102,8 +102,6 @@ pub struct ConnectState {
     pub device: DeviceInfo,
 
     unavailable_uri: Vec<String>,
-    /// is only some when we're playing a queued item and have to preserve the index
-    player_index: Option<ContextIndex>,
 
     /// index: 0 based, so the first track is index 0
     player: PlayerState,
@@ -254,6 +252,17 @@ impl ConnectState {
         self.update_restrictions()
     }
 
+    pub fn update_current_index(&mut self, f: impl Fn(&mut ContextIndex)) {
+        match self.player.index.as_mut() {
+            Some(player_index) => f(player_index),
+            None => {
+                let mut new_index = ContextIndex::new();
+                f(&mut new_index);
+                self.player.index = MessageField::some(new_index)
+            }
+        }
+    }
+
     pub fn update_position(&mut self, position_ms: u32, timestamp: i64) {
         self.player.position_as_of_timestamp = position_ms.into();
         self.player.timestamp = timestamp;
@@ -271,9 +280,7 @@ impl ConnectState {
 
     pub fn reset_playback_to_position(&mut self, new_index: Option<usize>) -> Result<(), Error> {
         let new_index = new_index.unwrap_or(0);
-        if let Some(player_index) = self.player.index.as_mut() {
-            player_index.track = new_index as u32;
-        }
+        self.update_current_index(|i| i.track = new_index as u32);
 
         self.update_context_index(new_index + 1)?;
 

@@ -69,6 +69,7 @@ impl ConnectState {
 
         if matches!(new_context, Some(ctx) if self.player.context_uri != ctx) {
             self.context = None;
+            self.next_contexts.clear();
         } else if let Some(ctx) = self.context.as_mut() {
             ctx.index.track = 0;
             ctx.index.page = 0;
@@ -275,7 +276,7 @@ impl ConnectState {
         }?;
 
         // assumption: the uid is used as unique-id of any item
-        //  - queue resorting is done by each client and orients itself by the given uid 
+        //  - queue resorting is done by each client and orients itself by the given uid
         //  - if no uid is present, resorting doesn't work or behaves not as intended
         let uid = if ctx_track.uid.is_empty() {
             // so setting providing a unique id should allow to resort the queue
@@ -326,6 +327,7 @@ impl ConnectState {
         };
 
         if next.tracks.is_empty() {
+            self.update_current_index(|i| i.page += 1);
             return Ok(LoadNext::PageUrl(next.page_url));
         }
 

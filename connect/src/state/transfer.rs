@@ -1,7 +1,7 @@
 use crate::state::provider::{IsProvider, Provider};
 use crate::state::{ConnectState, StateError};
 use librespot_core::Error;
-use librespot_protocol::player::{ContextIndex, ProvidedTrack, TransferState};
+use librespot_protocol::player::{ProvidedTrack, TransferState};
 use protobuf::MessageField;
 
 impl ConnectState {
@@ -96,15 +96,7 @@ impl ConnectState {
 
         let current_index = current_index.ok();
         if let Some(current_index) = current_index {
-            if let Some(index) = self.player.index.as_mut() {
-                index.track = current_index as u32;
-            } else {
-                self.player.index = MessageField::some(ContextIndex {
-                    page: 0,
-                    track: current_index as u32,
-                    ..Default::default()
-                })
-            }
+            self.update_current_index(|i| i.track = current_index as u32);
         }
 
         debug!(

@@ -50,9 +50,7 @@ impl<'ct> ConnectState {
 
         self.player.track = MessageField::some(new_track.clone());
 
-        if let Some(player_index) = self.player.index.as_mut() {
-            player_index.track = index as u32;
-        }
+        self.update_current_index(|i| i.track = index as u32);
 
         Ok(())
     }
@@ -100,11 +98,7 @@ impl<'ct> ConnectState {
         self.fill_up_next_tracks()?;
 
         let is_queue_or_autoplay = new_track.is_queue() || new_track.is_autoplay();
-        let update_index = if is_queue_or_autoplay && self.player.index.is_some() {
-            // the index isn't send when we are a queued track, but we have to preserve it for later
-            self.player_index = self.player.index.take();
-            None
-        } else if is_queue_or_autoplay {
+        let update_index = if is_queue_or_autoplay {
             None
         } else {
             let ctx = self.context.as_ref();
@@ -119,11 +113,7 @@ impl<'ct> ConnectState {
         };
 
         if let Some(update_index) = update_index {
-            if let Some(index) = self.player.index.as_mut() {
-                index.track = update_index
-            } else {
-                debug!("next: index can't be updated, no index available")
-            }
+            self.update_current_index(|i| i.track = update_index)
         }
 
         self.player.track = MessageField::some(new_track);
@@ -180,10 +170,8 @@ impl<'ct> ConnectState {
 
         if self.player.index.track == 0 {
             warn!("prev: trying to skip into negative, index update skipped")
-        } else if let Some(index) = self.player.index.as_mut() {
-            index.track -= 1;
         } else {
-            debug!("prev: index can't be decreased, no index available")
+            self.update_current_index(|i| i.track -= 1)
         }
 
         self.update_restrictions();
