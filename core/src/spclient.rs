@@ -53,6 +53,11 @@ pub const CLIENT_TOKEN: HeaderName = HeaderName::from_static("client-token");
 #[allow(clippy::declare_interior_mutable_const)]
 const CONNECTION_ID: HeaderName = HeaderName::from_static("x-spotify-connection-id");
 
+const NO_METRICS_AND_SALT: RequestOptions = RequestOptions {
+    metrics: false,
+    salt: false,
+};
+
 #[derive(Debug, Error)]
 pub enum SpClientError {
     #[error("missing attribute {0}")]
@@ -74,6 +79,20 @@ pub enum RequestStrategy {
 impl Default for RequestStrategy {
     fn default() -> Self {
         RequestStrategy::TryTimes(10)
+    }
+}
+
+pub struct RequestOptions {
+    metrics: bool,
+    salt: bool,
+}
+
+impl Default for RequestOptions {
+    fn default() -> Self {
+        Self {
+            metrics: true,
+            salt: true,
+        }
     }
 }
 
@@ -356,6 +375,24 @@ impl SpClient {
         headers: Option<HeaderMap>,
         message: &M,
     ) -> SpClientResult {
+        self.request_with_protobuf_and_options(
+            method,
+            endpoint,
+            headers,
+            message,
+            &Default::default(),
+        )
+        .await
+    }
+
+    pub async fn request_with_protobuf_and_options<M: Message + MessageFull>(
+        &self,
+        method: &Method,
+        endpoint: &str,
+        headers: Option<HeaderMap>,
+        message: &M,
+        options: &RequestOptions,
+    ) -> SpClientResult {
         let body = message.write_to_bytes()?;
 
         let mut headers = headers.unwrap_or_default();
@@ -364,7 +401,7 @@ impl SpClient {
             HeaderValue::from_static("application/x-protobuf"),
         );
 
-        self.request(method, endpoint, Some(headers), Some(&body))
+        self.request_with_options(method, endpoint, Some(headers), Some(&body), options)
             .await
     }
 
@@ -389,6 +426,18 @@ impl SpClient {
         headers: Option<HeaderMap>,
         body: Option<&[u8]>,
     ) -> SpClientResult {
+        self.request_with_options(method, endpoint, headers, body, &Default::default())
+            .await
+    }
+
+    pub async fn request_with_options(
+        &self,
+        method: &Method,
+        endpoint: &str,
+        headers: Option<HeaderMap>,
+        body: Option<&[u8]>,
+        options: &RequestOptions,
+    ) -> SpClientResult {
         let mut tries: usize = 0;
         let mut last_response;
 
@@ -411,16 +460,18 @@ impl SpClient {
             // `vodafone-uk` but we've yet to discover how we can find that value.
             // For the sake of documentation you could also do "product=free" but
             // we only support premium anyway.
-            let _ = write!(
-                url,
-                "{}product=0&country={}",
-                separator,
-                self.session().country()
-            );
+            if options.metrics {
+                let _ = write!(
+                    url,
+                    "{}product=0&country={}",
+                    separator,
+                    self.session().country()
+                );
+            }
 
             // Defeat caches. Spotify-generated URLs already contain this.
-            if !url.contains("salt=") {
-                let _ = write!(url, "&salt={}", rand::thread_rng().next_u32());
+            if options.salt && !url.contains("salt=") {
+                let _ = write!(url, "{separator}salt={}", rand::thread_rng().next_u32());
             }
 
             let mut request = Request::builder()
