@@ -1,6 +1,6 @@
 [package]
 name = "librespot-oauth"
-version = "0.5.0"
+version = "0.6.0-dev"
 rust-version.workspace = true
 authors = ["Nick Steel <nick@nsteel.co.uk>"]
 description = "OAuth authorization code flow with PKCE for obtaining a Spotify access token"

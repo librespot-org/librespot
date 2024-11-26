@@ -97,15 +97,17 @@ You will most likely want to build debug builds when developing, as they compile
 
 There are also a number of compiler feature flags that you can add, in the event that you want to have certain additional features also compiled. The list of these is available on the [wiki](https://github.com/librespot-org/librespot/wiki/Compiling#addition-features).
 
-By default, librespot compiles with the ```rodio-backend``` feature. To compile without default features, you can run with:
+By default, librespot compiles with the ```rodio-backend``` and ```with-libmdns``` features. To compile without default features, you can run with:
 
 ```bash
 cargo build --no-default-features
 ```
 
-Similarly, to build with the ALSA backend:
+Note that this will also disable zeroconf discovery backends for Spotify Connect. For normal use cases, select at least one audio and discovery backend.
+For example, to build with the ALSA audio and libmdns discovery backend:
+
 ```bash
-cargo build --no-default-features --features "alsa-backend"
+cargo build --no-default-features --features "alsa-backend with-libmdns"
 ```
 
 ### Running
