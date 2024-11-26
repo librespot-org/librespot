@@ -4,7 +4,7 @@ use crate::{
         authentication::Credentials,
         dealer::{
             manager::{Reply, RequestReply},
-            protocol::{Message, RequestCommand},
+            protocol::{Command, Message, Request},
         },
         session::UserAttributes,
         Error, Session, SpotifyId,
@@ -54,6 +54,8 @@ pub enum SpircError {
     NotAllowedContext(ResolveContext),
     #[error("failed to put connect state for new device")]
     FailedDealerSetup,
+    #[error("unknown endpoint: {0:#?}")]
+    UnknownEndpoint(serde_json::Value),
 }
 
 impl From<SpircError> for Error {
@@ -62,6 +64,7 @@ impl From<SpircError> for Error {
         match err {
             NoData | NotAllowedContext(_) => Error::unavailable(err),
             InvalidUri(_) | FailedDealerSetup => Error::aborted(err),
+            UnknownEndpoint(_) => Error::unimplemented(err),
         }
     }
 }
@@ -334,6 +337,7 @@ impl SpircTask {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
             tokio::select! {
+                // main dealer update of any remote device updates
                 cluster_update = self.connect_state_update.next() => match cluster_update {
                     Some(result) => match result {
                         Ok(cluster_update) => {
@@ -348,6 +352,17 @@ impl SpircTask {
                         break;
                     }
                 },
+                // main dealer request handling (dealer expects an answer)
+                request = self.connect_state_command.next() => match request {
+                    Some(request) => if let Err(e) = self.handle_connect_state_request(request).await {
+                        error!("couldn't handle connect state command: {}", e);
+                    },
+                    None => {
+                        error!("connect state command selected, but none received");
+                        break;
+                    }
+                },
+                // volume request handling is send separately (it's more like a fire forget)
                 volume_update = self.connect_state_volume_update.next() => match volume_update {
                     Some(result) => match result {
                         Ok(volume_update) => match volume_update.volume.try_into() {
@@ -370,15 +385,6 @@ impl SpircTask {
                     }
                     None => {
                         error!("playlist update selected, but none received");
-                        break;
-                    }
-                },
-                connect_state_command = self.connect_state_command.next() => match connect_state_command {
-                    Some(request) => if let Err(e) = self.handle_connect_state_command(request).await {
-                        error!("couldn't handle connect state command: {}", e);
-                    },
-                    None => {
-                        error!("connect state command selected, but none received");
                         break;
                     }
                 },
@@ -932,7 +938,7 @@ impl SpircTask {
         Ok(())
     }
 
-    async fn handle_connect_state_command(
+    async fn handle_connect_state_request(
         &mut self,
         (request, sender): RequestReply,
     ) -> Result<(), Error> {
@@ -943,18 +949,45 @@ impl SpircTask {
             request.command, request.sent_by_device_id
         );
 
-        let response = match request.command {
-            RequestCommand::Transfer(transfer) if transfer.data.is_some() => {
-                self.handle_transfer(transfer.data.expect("by condition checked"))?;
-                self.notify().await?;
-
-                Reply::Success
-            }
-            RequestCommand::Transfer(_) => {
-                warn!("transfer endpoint didn't contain any data to transfer");
+        let response = match self.handle_request(request).await {
+            Ok(_) => Reply::Success,
+            Err(why) => {
+                error!("failed to handle request: {why}");
                 Reply::Failure
             }
-            RequestCommand::Play(play) => {
+        };
+
+        sender.send(response).map_err(Into::into)
+    }
+
+    async fn handle_request(&mut self, request: Request) -> Result<(), Error> {
+        use Command::*;
+
+        match request.command {
+            // errors and unknown commands
+            Transfer(transfer) if transfer.data.is_none() => {
+                warn!("transfer endpoint didn't contain any data to transfer");
+                Err(SpircError::NoData)?
+            }
+            Unknown(unknown) => Err(SpircError::UnknownEndpoint(unknown))?,
+            // implicit update of the connect_state
+            UpdateContext(update_context) => {
+                if &update_context.context.uri != self.connect_state.context_uri() {
+                    debug!(
+                        "ignoring context update for <{}>, because it isn't the current context <{}>",
+                        update_context.context.uri, self.connect_state.context_uri()
+                    )
+                } else {
+                    self.resolve_context
+                        .push(ResolveContext::from_context(update_context.context, false));
+                }
+                return Ok(());
+            }
+            // modification and update of the connect_state
+            Transfer(transfer) => {
+                self.handle_transfer(transfer.data.expect("by condition checked"))?
+            }
+            Play(play) => {
                 let shuffle = play
                     .options
                     .player_options_override
@@ -988,43 +1021,24 @@ impl SpircTask {
                 )
                 .await?;
 
-                self.connect_state.set_origin(play.play_origin);
-
-                self.notify().await.map(|_| Reply::Success)?
+                self.connect_state.set_origin(play.play_origin)
             }
-            RequestCommand::Pause(_) => {
-                self.handle_pause();
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::SeekTo(seek_to) => {
+            Pause(_) => self.handle_pause(),
+            SeekTo(seek_to) => {
                 // for some reason the position is stored in value, not in position
                 trace!("seek to {seek_to:?}");
-                self.handle_seek(seek_to.value);
-                self.notify().await.map(|_| Reply::Success)?
+                self.handle_seek(seek_to.value)
             }
-            RequestCommand::SetShufflingContext(shuffle) => {
-                self.connect_state.handle_shuffle(shuffle.value)?;
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::SetRepeatingContext(repeat_context) => {
-                self.connect_state
-                    .handle_set_repeat(Some(repeat_context.value), None)?;
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::SetRepeatingTrack(repeat_track) => {
-                self.connect_state
-                    .handle_set_repeat(None, Some(repeat_track.value))?;
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::AddToQueue(add_to_queue) => {
-                self.connect_state.add_to_queue(add_to_queue.track, true);
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::SetQueue(set_queue) => {
-                self.connect_state.handle_set_queue(set_queue);
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::SetOptions(set_options) => {
+            SetShufflingContext(shuffle) => self.connect_state.handle_shuffle(shuffle.value)?,
+            SetRepeatingContext(repeat_context) => self
+                .connect_state
+                .handle_set_repeat(Some(repeat_context.value), None)?,
+            SetRepeatingTrack(repeat_track) => self
+                .connect_state
+                .handle_set_repeat(None, Some(repeat_track.value))?,
+            AddToQueue(add_to_queue) => self.connect_state.add_to_queue(add_to_queue.track, true),
+            SetQueue(set_queue) => self.connect_state.handle_set_queue(set_queue),
+            SetOptions(set_options) => {
                 let context = set_options.repeating_context;
                 let track = set_options.repeating_track;
                 self.connect_state.handle_set_repeat(context, track)?;
@@ -1033,41 +1047,13 @@ impl SpircTask {
                 if let Some(shuffle) = shuffle {
                     self.connect_state.handle_shuffle(shuffle)?;
                 }
+            }
+            SkipNext(skip_next) => self.handle_next(skip_next.track.map(|t| t.uri))?,
+            SkipPrev(_) => self.handle_prev()?,
+            Resume(_) => self.handle_play(),
+        }
 
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::UpdateContext(update_context) => {
-                if &update_context.context.uri != self.connect_state.context_uri() {
-                    debug!(
-                        "ignoring context update for <{}>, because it isn't the current context <{}>",
-                        update_context.context.uri, self.connect_state.context_uri()
-                    )
-                } else {
-                    self.resolve_context
-                        .push(ResolveContext::from_context(update_context.context, false));
-                }
-                Reply::Success
-            }
-            RequestCommand::SkipNext(skip_next) => {
-                self.handle_next(skip_next.track.map(|t| t.uri))?;
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::SkipPrev(_) => {
-                self.handle_prev()?;
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::Resume(_) => {
-                self.handle_play();
-                self.notify().await.map(|_| Reply::Success)?
-            }
-            RequestCommand::Unknown(unknown) => {
-                warn!("unknown request command: {unknown}");
-                // we just don't handle the command, by that we don't lose our connect state
-                Reply::Success
-            }
-        };
-
-        sender.send(response).map_err(Into::into)
+        self.notify().await
     }
 
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
@@ -1205,6 +1191,8 @@ impl SpircTask {
         // tracks with uri and uid, so we merge the new context with the resolved/existing context
         self.connect_state.merge_context(context);
         self.connect_state.clear_next_tracks(false);
+
+        debug!("play track <{:?}>", cmd.playing_track);
 
         let index = match cmd.playing_track {
             PlayingTrack::Index(i) => i as usize,

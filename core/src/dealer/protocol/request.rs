@@ -12,12 +12,12 @@ pub struct Request {
     // todo: did only send target_alias_id: null so far, maybe we just ignore it, will see
     // pub target_alias_id: Option<()>,
     pub sent_by_device_id: String,
-    pub command: RequestCommand,
+    pub command: Command,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "endpoint", rename_all = "snake_case")]
-pub enum RequestCommand {
+pub enum Command {
     Transfer(TransferCommand),
     #[serde(deserialize_with = "boxed")]
     Play(Box<PlayCommand>),
@@ -39,27 +39,32 @@ pub enum RequestCommand {
     Unknown(Value),
 }
 
-impl Display for RequestCommand {
+impl Display for Command {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use Command::*;
+
         write!(
             f,
-            "endpoint: {}",
+            "endpoint: {}{}",
+            matches!(self, Unknown(_))
+                .then_some("unknown ")
+                .unwrap_or_default(),
             match self {
-                RequestCommand::Transfer(_) => "transfer",
-                RequestCommand::Play(_) => "play",
-                RequestCommand::Pause(_) => "pause",
-                RequestCommand::SeekTo(_) => "seek_to",
-                RequestCommand::SetShufflingContext(_) => "set_shuffling_context",
-                RequestCommand::SetRepeatingContext(_) => "set_repeating_context",
-                RequestCommand::SetRepeatingTrack(_) => "set_repeating_track",
-                RequestCommand::AddToQueue(_) => "add_to_queue",
-                RequestCommand::SetQueue(_) => "set_queue",
-                RequestCommand::SetOptions(_) => "set_options",
-                RequestCommand::UpdateContext(_) => "update_context",
-                RequestCommand::SkipNext(_) => "skip_next",
-                RequestCommand::SkipPrev(_) => "skip_prev",
-                RequestCommand::Resume(_) => "resume",
-                RequestCommand::Unknown(json) => {
+                Transfer(_) => "transfer",
+                Play(_) => "play",
+                Pause(_) => "pause",
+                SeekTo(_) => "seek_to",
+                SetShufflingContext(_) => "set_shuffling_context",
+                SetRepeatingContext(_) => "set_repeating_context",
+                SetRepeatingTrack(_) => "set_repeating_track",
+                AddToQueue(_) => "add_to_queue",
+                SetQueue(_) => "set_queue",
+                SetOptions(_) => "set_options",
+                UpdateContext(_) => "update_context",
+                SkipNext(_) => "skip_next",
+                SkipPrev(_) => "skip_prev",
+                Resume(_) => "resume",
+                Unknown(json) => {
                     json.as_object()
                         .and_then(|obj| obj.get("endpoint").map(|v| v.as_str()))
                         .flatten()
