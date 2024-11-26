@@ -4,6 +4,7 @@ use crate::state::{ConnectState, StateError};
 use librespot_core::{Error, SpotifyId};
 use librespot_protocol::player::{Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct StateContext {
@@ -183,8 +184,8 @@ impl ConnectState {
                 match self.context_to_provided_track(track, Some(new_context_uri), provider.clone())
                 {
                     Ok(t) => Some(t),
-                    Err(_) => {
-                        error!("couldn't convert {track:#?} into ProvidedTrack");
+                    Err(why) => {
+                        error!("couldn't convert {track:#?} into ProvidedTrack: {why}");
                         None
                     }
                 }
@@ -204,17 +205,18 @@ impl ConnectState {
             return None;
         }
 
-        let mutable_context = self.context.as_mut()?;
-        let page = context.pages.pop()?;
-        for track in page.tracks {
-            if track.uid.is_empty() || track.uri.is_empty() {
+        let current_context = self.context.as_mut()?;
+        let new_page = context.pages.pop()?;
+        for new_track in new_page.tracks {
+            if new_track.uid.is_empty() || new_track.uri.is_empty() {
                 continue;
             }
 
             if let Ok(position) =
-                Self::find_index_in_context(Some(mutable_context), |t| t.uri == track.uri)
+                Self::find_index_in_context(Some(current_context), |t| t.uri == new_track.uri)
             {
-                mutable_context.tracks.get_mut(position)?.uid = track.uid
+                // the uid provided from another context might be actual uid of an item
+                current_context.tracks.get_mut(position)?.uid = new_track.uid
             }
         }
 
@@ -272,6 +274,16 @@ impl ConnectState {
             return Err(Error::unavailable("track not available"));
         }?;
 
+        // assumption: the uid is used as unique-id of any item
+        //  - queue resorting is done by each client and orients itself by the given uid 
+        //  - if no uid is present, resorting doesn't work or behaves not as intended
+        let uid = if ctx_track.uid.is_empty() {
+            // so setting providing a unique id should allow to resort the queue
+            Uuid::new_v4().as_simple().to_string()
+        } else {
+            ctx_track.uid.to_string()
+        };
+
         let mut metadata = HashMap::new();
         for (k, v) in &ctx_track.metadata {
             metadata.insert(k.to_string(), v.to_string());
@@ -279,7 +291,7 @@ impl ConnectState {
 
         let mut track = ProvidedTrack {
             uri: id.to_uri()?.replace("unknown", "track"),
-            uid: ctx_track.uid.clone(),
+            uid,
             metadata,
             provider: provider.to_string(),
             ..Default::default()
