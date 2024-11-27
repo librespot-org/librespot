@@ -1487,7 +1487,6 @@ fn get_setup() -> Setup {
                 device_type,
                 is_group,
                 initial_volume: initial_volume.into(),
-                zeroconf_enabled: zeroconf_backend.is_some(),
                 ..Default::default()
             }
         } else {
@@ -1495,7 +1494,6 @@ fn get_setup() -> Setup {
                 name,
                 device_type,
                 is_group,
-                zeroconf_enabled: zeroconf_backend.is_some(),
                 ..Default::default()
             }
         }

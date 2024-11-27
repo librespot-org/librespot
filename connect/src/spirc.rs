@@ -15,7 +15,7 @@ use crate::{
     },
     protocol::{
         autoplay_context_request::AutoplayContextRequest,
-        connect::{Cluster, ClusterUpdate, PutStateReason, SetVolumeCommand},
+        connect::{Cluster, ClusterUpdate, LogoutCommand, PutStateReason, SetVolumeCommand},
         explicit_content_pubsub::UserAttributesUpdate,
         player::{Context, TransferState},
         playlist4_external::PlaylistModificationInfo,
@@ -84,6 +84,7 @@ struct SpircTask {
     connection_id_update: BoxedStreamResult<String>,
     connect_state_update: BoxedStreamResult<ClusterUpdate>,
     connect_state_volume_update: BoxedStreamResult<SetVolumeCommand>,
+    connect_state_logout_request: BoxedStreamResult<LogoutCommand>,
     playlist_update: BoxedStreamResult<PlaylistModificationInfo>,
     session_update: BoxedStreamResult<SessionUpdate>,
     connect_state_command: BoxedStream<RequestReply>,
@@ -179,6 +180,13 @@ impl Spirc {
                 .map(Message::from_raw),
         );
 
+        let connect_state_logout_request = Box::pin(
+            session
+                .dealer()
+                .listen_for("hm://connect-state/v1/connect/logout")?
+                .map(Message::from_raw),
+        );
+
         let playlist_update = Box::pin(
             session
                 .dealer()
@@ -240,6 +248,7 @@ impl Spirc {
             connection_id_update,
             connect_state_update,
             connect_state_volume_update,
+            connect_state_logout_request,
             playlist_update,
             session_update,
             connect_state_command,
@@ -373,6 +382,19 @@ impl SpircTask {
                     }
                     None => {
                         error!("volume update selected, but none received");
+                        break;
+                    }
+                },
+                logout_request = self.connect_state_logout_request.next() => match logout_request {
+                    Some(result) => match result {
+                        Ok(logout_request) => {
+                            error!("received logout request, currently not supported: {logout_request:#?}");
+                            // todo: call logout handling
+                        },
+                        Err(e) => error!("could not parse logout request: {}", e),
+                    }
+                    None => {
+                        error!("logout request selected, but none received");
                         break;
                     }
                 },

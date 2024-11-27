@@ -75,7 +75,6 @@ pub struct ConnectStateConfig {
     pub initial_volume: u32,
     pub name: String,
     pub device_type: DeviceType,
-    pub zeroconf_enabled: bool,
     pub volume_steps: i32,
     pub is_group: bool,
 }
@@ -87,7 +86,6 @@ impl Default for ConnectStateConfig {
             initial_volume: u32::from(u16::MAX) / 2,
             name: "librespot".to_string(),
             device_type: DeviceType::Speaker,
-            zeroconf_enabled: false,
             volume_steps: 64,
             is_group: false,
         }
@@ -158,7 +156,8 @@ impl ConnectState {
                     is_controllable: true,
 
                     supports_gzip_pushes: true,
-                    supports_logout: cfg.zeroconf_enabled,
+                    // todo: enable after logout handling is implemented, see spirc logout_request
+                    supports_logout: false,
                     supported_types: vec!["audio/episode".into(), "audio/track".into()],
                     supports_playlist_v2: true,
                     supports_transfer_command: true,
