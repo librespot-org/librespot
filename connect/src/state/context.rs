@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 const LOCAL_FILES_IDENTIFIER: &str = "spotify:local-files";
+const SEARCH_IDENTIFIER: &str = "spotify:search";
 
 #[derive(Debug, Clone)]
 pub struct StateContext {
@@ -80,6 +81,38 @@ impl ConnectState {
         }
 
         self.update_restrictions()
+    }
+
+    pub fn handle_possible_search_uri(&self, context: &mut Context) -> Result<(), Error> {
+        if !context.uri.starts_with(SEARCH_IDENTIFIER) {
+            return Ok(());
+        }
+
+        let first_page = context
+            .pages
+            .first_mut()
+            .ok_or(StateError::ContextHasNoTracks)?;
+
+        debug!(
+            "search context <{}> isn't used directly, playing only first track of {}",
+            context.uri,
+            first_page.tracks.len()
+        );
+
+        let first_track = first_page
+            .tracks
+            .first_mut()
+            .ok_or(StateError::ContextHasNoTracks)?;
+
+        // enrich with context_uri, so that the context is displayed correctly
+        first_track.add_context_uri(context.uri.clone());
+        first_track.add_entity_uri(context.uri.clone());
+
+        // there might be a chance that the uri isn't provided
+        // so we handle the track first before using the uri
+        context.uri = self.context_to_provided_track(first_track, None, None)?.uri;
+
+        Ok(())
     }
 
     pub fn update_context(&mut self, context: Context, ty: UpdateContext) -> Result<(), Error> {
@@ -214,16 +247,24 @@ impl ConnectState {
 
         let current_context = self.context.as_mut()?;
         let new_page = context.pages.pop()?;
+
         for new_track in new_page.tracks {
-            if new_track.uid.is_empty() || new_track.uri.is_empty() {
+            if new_track.uri.is_empty() {
                 continue;
             }
 
             if let Ok(position) =
                 Self::find_index_in_context(Some(current_context), |t| t.uri == new_track.uri)
             {
+                let context_track = current_context.tracks.get_mut(position)?;
+
+                for (key, value) in new_track.metadata {
+                    warn!("merging metadata {key} {value}");
+                    context_track.metadata.insert(key, value);
+                }
+
                 // the uid provided from another context might be actual uid of an item
-                current_context.tracks.get_mut(position)?.uid = new_track.uid
+                context_track.uid = new_track.uid;
             }
         }
 

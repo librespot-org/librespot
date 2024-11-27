@@ -324,7 +324,7 @@ impl ConnectState {
 
         track.set_provider(Provider::Queue);
         if !track.is_queued() {
-            track.add_queued();
+            track.set_queued();
         }
 
         if let Some(next_not_queued_track) =

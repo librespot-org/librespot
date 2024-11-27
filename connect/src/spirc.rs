@@ -981,7 +981,7 @@ impl SpircTask {
             Transfer(transfer) => {
                 self.handle_transfer(transfer.data.expect("by condition checked"))?
             }
-            Play(play) => {
+            Play(mut play) => {
                 let shuffle = play
                     .options
                     .player_options_override
@@ -1000,6 +1000,9 @@ impl SpircTask {
                     .as_ref()
                     .map(|o| o.repeating_track)
                     .unwrap_or_else(|| self.connect_state.repeat_track());
+
+                self.connect_state
+                    .handle_possible_search_uri(&mut play.context)?;
 
                 self.handle_load(
                     SpircLoadCommand {
@@ -1053,6 +1056,12 @@ impl SpircTask {
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         self.connect_state
             .reset_context(Some(&transfer.current_session.context.uri));
+
+        if let Some(session) = transfer.current_session.as_mut() {
+            if let Some(context) = session.context.as_mut() {
+                self.connect_state.handle_possible_search_uri(context)?
+            }
+        }
 
         let mut ctx_uri = transfer.current_session.context.uri.clone();
         let autoplay = ctx_uri.contains("station");
