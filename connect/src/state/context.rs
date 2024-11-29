@@ -51,13 +51,13 @@ impl ConnectState {
             .ok_or(StateError::CanNotFindTrackInContext(None, ctx.tracks.len()))
     }
 
-    pub(super) fn get_current_context(&self) -> Result<&StateContext, StateError> {
-        match self.active_context {
+    pub(super) fn get_context(&self, ty: &ContextType) -> Result<&StateContext, StateError> {
+        match ty {
             ContextType::Default => self.context.as_ref(),
             ContextType::Shuffle => self.shuffle_context.as_ref(),
             ContextType::Autoplay => self.autoplay_context.as_ref(),
         }
-        .ok_or(StateError::NoContext(self.active_context))
+        .ok_or(StateError::NoContext(*ty))
     }
 
     pub fn context_uri(&self) -> &String {
@@ -66,6 +66,7 @@ impl ConnectState {
 
     pub fn reset_context(&mut self, new_context: Option<&str>) {
         self.active_context = ContextType::Default;
+        self.fill_up_context = ContextType::Default;
 
         self.autoplay_context = None;
         self.shuffle_context = None;

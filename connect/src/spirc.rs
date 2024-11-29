@@ -1091,6 +1091,7 @@ impl SpircTask {
         if autoplay {
             ctx_uri = ctx_uri.replace("station:", "");
             self.connect_state.active_context = ContextType::Autoplay;
+            self.connect_state.fill_up_context = ContextType::Autoplay;
         }
 
         debug!("async resolve context for {}", ctx_uri);
@@ -1238,11 +1239,10 @@ impl SpircTask {
         self.connect_state.set_repeat_context(cmd.repeat);
 
         if cmd.shuffle {
-            self.connect_state.active_context = ContextType::Default;
             self.connect_state.set_current_track(index)?;
             self.connect_state.shuffle()?;
         } else {
-            // set manually, so that we overwrite a possible current queue track
+            // manually overwrite a possible current queued track
             self.connect_state.set_current_track(index)?;
             self.connect_state.reset_playback_to_position(Some(index))?;
         }
@@ -1453,17 +1453,20 @@ impl SpircTask {
         // Under 3s it goes to the previous song (starts playing)
         // Over 3s it seeks to zero (retains previous play status)
         if self.position() < 3000 {
-            let new_track_index = self.connect_state.prev_track()?;
-
-            if new_track_index.is_none() && self.connect_state.repeat_context() {
-                self.connect_state.reset_playback_to_position(None)?
+            let repeat_context = self.connect_state.repeat_context();
+            match self.connect_state.prev_track()? {
+                None if repeat_context => self.connect_state.reset_playback_to_position(None)?,
+                None => {
+                    self.connect_state.reset_playback_to_position(None)?;
+                    self.handle_stop()
+                }
+                Some(_) => self.load_track(self.is_playing(), 0)?,
             }
-
-            self.load_track(self.is_playing(), 0)
         } else {
             self.handle_seek(0);
-            Ok(())
         }
+
+        Ok(())
     }
 
     fn handle_volume_up(&mut self) {

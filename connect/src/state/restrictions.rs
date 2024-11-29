@@ -6,7 +6,6 @@ use protobuf::MessageField;
 impl ConnectState {
     pub fn update_restrictions(&mut self) {
         const NO_PREV: &str = "no previous tracks";
-        const NO_NEXT: &str = "no next tracks";
         const AUTOPLAY: &str = "autoplay";
         const ENDLESS_CONTEXT: &str = "endless_context";
 
@@ -33,14 +32,6 @@ impl ConnectState {
             } else {
                 restrictions.disallow_peeking_prev_reasons.clear();
                 restrictions.disallow_skipping_prev_reasons.clear();
-            }
-
-            if self.next_tracks.is_empty() {
-                restrictions.disallow_peeking_next_reasons = vec![NO_NEXT.to_string()];
-                restrictions.disallow_skipping_next_reasons = vec![NO_NEXT.to_string()];
-            } else {
-                restrictions.disallow_peeking_next_reasons.clear();
-                restrictions.disallow_skipping_next_reasons.clear();
             }
 
             if self.player.track.is_autoplay() {

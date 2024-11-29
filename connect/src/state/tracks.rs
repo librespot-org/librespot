@@ -31,7 +31,7 @@ impl<'ct> ConnectState {
     }
 
     pub fn set_current_track(&mut self, index: usize) -> Result<(), Error> {
-        let context = self.get_current_context()?;
+        let context = self.get_context(&self.active_context)?;
 
         let new_track = context
             .tracks
@@ -97,8 +97,10 @@ impl<'ct> ConnectState {
 
         self.fill_up_next_tracks()?;
 
-        let is_queue_or_autoplay = new_track.is_queue() || new_track.is_autoplay();
-        let update_index = if is_queue_or_autoplay {
+        let update_index = if new_track.is_queue() {
+            None
+        } else if new_track.is_autoplay() {
+            self.active_context = ContextType::Autoplay;
             None
         } else {
             let ctx = self.context.as_ref();
@@ -230,12 +232,12 @@ impl<'ct> ConnectState {
     }
 
     pub fn fill_up_next_tracks(&mut self) -> Result<(), StateError> {
-        let ctx = self.get_current_context()?;
+        let ctx = self.get_context(&self.fill_up_context)?;
         let mut new_index = ctx.index.track as usize;
         let mut iteration = ctx.index.page;
 
         while self.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-            let ctx = self.get_current_context()?;
+            let ctx = self.get_context(&self.fill_up_context)?;
             let track = match ctx.tracks.get(new_index) {
                 None if self.repeat_context() => {
                     let delimiter = Self::new_delimiter(iteration.into());
@@ -244,10 +246,14 @@ impl<'ct> ConnectState {
                     delimiter
                 }
                 None if self.autoplay_context.is_some() => {
-                    // transitional to autoplay as active context
-                    self.active_context = ContextType::Autoplay;
+                    // transition to autoplay as fill up context
+                    self.fill_up_context = ContextType::Autoplay;
 
-                    match self.get_current_context()?.tracks.get(new_index) {
+                    match self
+                        .get_context(&ContextType::Autoplay)?
+                        .tracks
+                        .get(new_index)
+                    {
                         None => break,
                         Some(ct) => {
                             new_index += 1;

@@ -114,7 +114,11 @@ pub struct ConnectState {
     /// top => bottom, aka the first track of the list is the next track
     next_tracks: VecDeque<ProvidedTrack>,
 
+    // separation is necessary because we could have already loaded
+    // the autoplay context but are still playing from the default context
     pub active_context: ContextType,
+    pub fill_up_context: ContextType,
+
     /// the context from which we play, is used to top up prev and next tracks
     /// the index is used to keep track which tracks are already loaded into next tracks
     pub context: Option<StateContext>,
@@ -295,7 +299,7 @@ impl ConnectState {
         self.prev_tracks.clear();
 
         if new_index > 0 {
-            let context = self.get_current_context()?;
+            let context = self.get_context(&self.active_context)?;
 
             let before_new_track = context.tracks.len() - new_index;
             self.prev_tracks = context

@@ -74,7 +74,7 @@ impl ConnectState {
             Some(track) => track.clone(),
         };
 
-        let ctx = self.get_current_context().ok();
+        let ctx = self.get_context(&self.active_context).ok();
 
         let current_index = if track.is_queue() {
             Self::find_index_in_context(ctx, |c| c.uid == transfer.current_session.current_uid)
