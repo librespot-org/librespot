@@ -494,6 +494,10 @@ impl SpircTask {
             }
         }
 
+        // clears the session id, leaving an empty state
+        if let Err(why) = self.session.spclient().delete_connect_state_request().await {
+            warn!("deleting connect_state failed before unexpected shutdown: {why}")
+        }
         self.session.dealer().close().await;
     }
 

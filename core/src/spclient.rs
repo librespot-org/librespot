@@ -545,6 +545,11 @@ impl SpClient {
             .await
     }
 
+    pub async fn delete_connect_state_request(&self) -> SpClientResult {
+        let endpoint = format!("/connect-state/v1/devices/{}", self.session().device_id());
+        self.request(&Method::DELETE, &endpoint, None, None).await
+    }
+
     pub async fn put_connect_state_inactive(&self, notify: bool) -> SpClientResult {
         let endpoint = format!(
             "/connect-state/v1/devices/{}/inactive?notify={notify}",
