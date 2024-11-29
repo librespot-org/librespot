@@ -23,7 +23,7 @@ impl ConnectState {
         )
     }
 
-    pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState) {
+    pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState, ctx_uri: String) {
         self.player.is_buffering = false;
 
         if let Some(options) = transfer.options.take() {
@@ -44,9 +44,10 @@ impl ConnectState {
             self.player.suppressions = MessageField::some(suppressions.clone());
         }
 
+        self.player.context_url = format!("context://{ctx_uri}");
+        self.player.context_uri = ctx_uri;
+
         if let Some(context) = transfer.current_session.context.as_ref() {
-            self.player.context_uri = context.uri.clone();
-            self.player.context_url = context.url.clone();
             self.player.context_restrictions = context.restrictions.clone();
         }
 

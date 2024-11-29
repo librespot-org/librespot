@@ -431,11 +431,6 @@ impl ConnectState {
         player_state.next_tracks = self.next_tracks.clone().into();
         player_state.prev_tracks = self.prev_tracks.clone().into();
 
-        if let Some(context_uri) = player_state.track.get_context_uri() {
-            player_state.context_uri = context_uri.to_owned();
-            player_state.context_url = format!("context://{context_uri}");
-        }
-
         let is_active = self.active;
         let device = MessageField::some(Device {
             device_info: MessageField::some(self.device.clone()),

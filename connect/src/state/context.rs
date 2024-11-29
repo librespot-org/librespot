@@ -84,36 +84,15 @@ impl ConnectState {
         self.update_restrictions()
     }
 
-    pub fn handle_possible_search_uri(&self, context: &mut Context) -> Result<(), Error> {
+    pub fn get_context_uri_from_context(context: &Context) -> Option<&String> {
         if !context.uri.starts_with(SEARCH_IDENTIFIER) {
-            return Ok(());
+            return Some(&context.uri);
         }
 
-        let first_page = context
+        context
             .pages
-            .first_mut()
-            .ok_or(StateError::ContextHasNoTracks)?;
-
-        debug!(
-            "search context <{}> isn't used directly, playing only first track of {}",
-            context.uri,
-            first_page.tracks.len()
-        );
-
-        let first_track = first_page
-            .tracks
-            .first_mut()
-            .ok_or(StateError::ContextHasNoTracks)?;
-
-        // enrich with context_uri, so that the context is displayed correctly
-        first_track.add_context_uri(context.uri.clone());
-        first_track.add_entity_uri(context.uri.clone());
-
-        // there might be a chance that the uri isn't provided
-        // so we handle the track first before using the uri
-        context.uri = self.context_to_provided_track(first_track, None, None)?.uri;
-
-        Ok(())
+            .first()
+            .and_then(|p| p.tracks.first().map(|t| &t.uri))
     }
 
     pub fn update_context(&mut self, context: Context, ty: UpdateContext) -> Result<(), Error> {
