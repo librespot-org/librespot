@@ -1,4 +1,5 @@
 pub use crate::model::{PlayingTrack, SpircLoadCommand};
+use crate::state::metadata::Metadata;
 use crate::{
     core::{
         authentication::Credentials,
@@ -870,11 +871,9 @@ impl SpircTask {
         // todo: handle received pages from transfer, important to not always shuffle the first 10 tracks
         //  also important when the dealer is restarted, currently we just shuffle again, but at least
         //  the 10 tracks provided should be used and after that the new shuffle context
-        if let Ok(transfer_state) = TransferState::parse_from_bytes(&cluster.transfer_data) {
-            if !transfer_state.current_session.context.pages.is_empty() {
-                info!("received transfer state with context, trying to take over control again");
-                self.handle_transfer(transfer_state)?
-            }
+        match TransferState::parse_from_bytes(&cluster.transfer_data) {
+            Ok(transfer_state) => self.handle_transfer(transfer_state)?,
+            Err(why) => error!("failed to take over control: {why}"),
         }
 
         Ok(())
@@ -1090,13 +1089,6 @@ impl SpircTask {
                     transfer.current_session.context.uri.clone(),
                 ))?
                 .clone();
-        let autoplay = ctx_uri.contains("station");
-
-        if autoplay {
-            ctx_uri = ctx_uri.replace("station:", "");
-            self.connect_state.active_context = ContextType::Autoplay;
-            self.connect_state.fill_up_context = ContextType::Autoplay;
-        }
 
         debug!("trying to find initial track");
         match self.connect_state.current_track_from_transfer(&transfer) {
@@ -1106,6 +1098,13 @@ impl SpircTask {
                 self.connect_state.set_track(track)
             }
         };
+
+        let autoplay = self.connect_state.current_track(|t| t.is_from_autoplay());
+        if autoplay {
+            ctx_uri = ctx_uri.replace("station:", "");
+            self.connect_state.active_context = ContextType::Autoplay;
+            self.connect_state.fill_up_context = ContextType::Autoplay;
+        }
 
         let fallback_uri = self.connect_state.current_track(|t| &t.uri).clone();
 

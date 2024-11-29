@@ -103,7 +103,9 @@ impl ConnectState {
             return Err(StateError::UnsupportedLocalPlayBack.into());
         }
 
-        self.next_contexts.clear();
+        if matches!(ty, UpdateContext::Default) {
+            self.next_contexts.clear();
+        }
 
         let mut first_page = None;
         for page in context.pages {
@@ -162,14 +164,14 @@ impl ConnectState {
                             new_context.index.track = (new_pos + 1) as u32;
                         }
                         // the track isn't anymore in the context
-                        Err(_) => {
-                            warn!("current tracks was removed, setting pos to last known index");
+                        Err(_) if matches!(self.active_context, ContextType::Default) => {
+                            warn!("current track was removed, setting pos to last known index");
                             new_context.index.track = self.player.index.track
                         }
+                        Err(_) => {}
                     }
                     // enforce reloading the context
                     self.clear_next_tracks(true);
-                    self.active_context = ContextType::Default;
                 }
 
                 self.context = Some(new_context);
@@ -313,6 +315,10 @@ impl ConnectState {
         if let Some(context_uri) = context_uri {
             track.add_context_uri(context_uri.to_string());
             track.add_entity_uri(context_uri.to_string());
+        }
+
+        if matches!(provider, Provider::Autoplay) {
+            track.set_autoplay(true)
         }
 
         Ok(track)

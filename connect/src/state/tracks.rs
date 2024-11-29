@@ -196,13 +196,16 @@ impl<'ct> ConnectState {
         // mobile only sends a set_queue command instead of an add_to_queue command
         // in addition to handling the mobile add_to_queue handling, this should also handle
         // a mass queue addition
-        tracks.iter_mut().filter(|t| t.is_queued()).for_each(|t| {
-            t.set_provider(Provider::Queue);
-            // technically we could preserve the queue-uid here,
-            // but it seems to work without that, so we just override it
-            t.uid = format!("q{}", self.queue_count);
-            self.queue_count += 1;
-        });
+        tracks
+            .iter_mut()
+            .filter(|t| t.is_from_queue())
+            .for_each(|t| {
+                t.set_provider(Provider::Queue);
+                // technically we could preserve the queue-uid here,
+                // but it seems to work without that, so we just override it
+                t.uid = format!("q{}", self.queue_count);
+                self.queue_count += 1;
+            });
 
         self.next_tracks = tracks.into();
     }

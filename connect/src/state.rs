@@ -1,6 +1,6 @@
 pub(super) mod context;
 mod handle;
-mod metadata;
+pub mod metadata;
 mod options;
 pub(super) mod provider;
 mod restrictions;
@@ -326,8 +326,8 @@ impl ConnectState {
         self.queue_count += 1;
 
         track.set_provider(Provider::Queue);
-        if !track.is_queued() {
-            track.set_queued();
+        if !track.is_from_queue() {
+            track.set_queued(true);
         }
 
         if let Some(next_not_queued_track) =
