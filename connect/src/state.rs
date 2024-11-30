@@ -40,7 +40,7 @@ pub enum StateError {
     CouldNotResolveTrackFromTransfer,
     #[error("message field {0} was not available")]
     MessageFieldNone(String),
-    #[error("context is not available. shuffle: {0:?}")]
+    #[error("context is not available. type: {0:?}")]
     NoContext(ContextType),
     #[error("could not find track {0:?} in context of {1}")]
     CanNotFindTrackInContext(Option<usize>, usize),

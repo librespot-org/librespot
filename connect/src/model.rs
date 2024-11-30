@@ -61,7 +61,7 @@ pub(super) enum SpircPlayStatus {
 #[derive(Debug, Clone)]
 pub(super) struct ResolveContext {
     context: Context,
-    fallback: Option<String>,
+    resolve_uri: Option<String>,
     autoplay: bool,
     /// if `true` updates the entire context, otherwise only fills the context from the next
     /// retrieve page, it is usually used when loading the next page of an already established context
@@ -74,24 +74,29 @@ pub(super) struct ResolveContext {
 impl ResolveContext {
     pub fn from_uri(
         uri: impl Into<String>,
-        fallback_uri: impl Into<String>,
+        resolve_uri: impl Into<String>,
         autoplay: bool,
     ) -> Self {
+        let fallback_uri = resolve_uri.into();
         Self {
             context: Context {
                 uri: uri.into(),
                 ..Default::default()
             },
-            fallback: Some(fallback_uri.into()),
+            resolve_uri: (!fallback_uri.is_empty()).then_some(fallback_uri),
             autoplay,
             update: true,
         }
     }
 
     pub fn from_context(context: Context, autoplay: bool) -> Self {
+        let resolve_uri = ConnectState::get_context_uri_from_context(&context)
+            .and_then(|s| (!s.is_empty()).then_some(s))
+            .cloned();
+
         Self {
             context,
-            fallback: None,
+            resolve_uri,
             autoplay,
             update: true,
         }
@@ -119,7 +124,7 @@ impl ResolveContext {
                 uri,
                 ..Default::default()
             },
-            fallback: None,
+            resolve_uri: None,
             update: false,
             autoplay: false,
         }
@@ -127,7 +132,7 @@ impl ResolveContext {
 
     /// the uri which should be used to resolve the context, might not be the context uri
     pub fn resolve_uri(&self) -> Option<&String> {
-        ConnectState::get_context_uri_from_context(&self.context).or(self.fallback.as_ref())
+        self.resolve_uri.as_ref()
     }
 
     /// the actual context uri
@@ -148,9 +153,9 @@ impl Display for ResolveContext {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "context_uri: {}, resolve_uri: {:?}, autoplay: {}, update: {}",
-            self.context.uri,
+            "resolve_uri: <{:?}>, context_uri: <{}>, autoplay: <{}>, update: <{}>",
             self.resolve_uri(),
+            self.context.uri,
             self.autoplay,
             self.update
         )
@@ -159,11 +164,12 @@ impl Display for ResolveContext {
 
 impl PartialEq for ResolveContext {
     fn eq(&self, other: &Self) -> bool {
-        let eq_context = self.context.uri == other.context.uri;
+        let eq_context = self.context_uri() == other.context_uri();
+        let eq_resolve = self.resolve_uri() == other.resolve_uri();
         let eq_autoplay = self.autoplay == other.autoplay;
         let eq_update = self.update == other.update;
 
-        eq_autoplay && eq_context && eq_update
+        eq_context && eq_resolve && eq_autoplay && eq_update
     }
 }
 

@@ -127,7 +127,7 @@ impl ConnectState {
         };
 
         debug!(
-            "updated context {ty:?} from {} ({} tracks) to {} ({} tracks)",
+            "updated context {ty:?} from <{}> ({} tracks) to <{}> ({} tracks)",
             self.player.context_uri,
             prev_context
                 .map(|c| c.tracks.len().to_string())
