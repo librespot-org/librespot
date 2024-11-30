@@ -527,7 +527,7 @@ impl SpircTask {
                 {
                     error!("failed resolving context <{resolve}>: {why}");
                     self.connect_state.reset_context(None);
-                    self.handle_stop()
+                    self.handle_stop()?
                 }
 
                 self.connect_state.merge_context(Some(resolve.into()));
@@ -953,7 +953,7 @@ impl SpircTask {
             if became_inactive {
                 info!("device became inactive");
                 self.connect_state.became_inactive(&self.session).await?;
-                self.handle_stop();
+                self.handle_stop()?;
             } else if self.connect_state.active {
                 // fixme: workaround fix, because of missing information why it behaves like it does
                 //  background: when another device sends a connect-state update, some player's position de-syncs
@@ -1077,6 +1077,9 @@ impl SpircTask {
             }
             SkipNext(skip_next) => self.handle_next(skip_next.track.map(|t| t.uri))?,
             SkipPrev(_) => self.handle_prev()?,
+            Resume(_) if matches!(self.play_status, SpircPlayStatus::Stopped) => {
+                self.load_track(true, 0)?
+            }
             Resume(_) => self.handle_play(),
         }
 
@@ -1156,7 +1159,7 @@ impl SpircTask {
     }
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
-        self.handle_stop();
+        self.handle_stop()?;
 
         self.play_status = SpircPlayStatus::Stopped {};
         self.connect_state
@@ -1171,8 +1174,11 @@ impl SpircTask {
         Ok(())
     }
 
-    fn handle_stop(&mut self) {
+    fn handle_stop(&mut self) -> Result<(), Error> {
         self.player.stop();
+        self.connect_state.update_position(0, self.now_ms());
+        self.connect_state.clear_next_tracks(true);
+        self.connect_state.fill_up_next_tracks().map_err(Into::into)
     }
 
     fn handle_activate(&mut self) {
@@ -1276,7 +1282,7 @@ impl SpircTask {
             self.load_track(cmd.start_playing, cmd.seek_to)?;
         } else {
             info!("No active track, stopping");
-            self.handle_stop();
+            self.handle_stop()?;
         }
 
         if !self.connect_state.has_next_tracks(None) && self.session.autoplay() {
@@ -1474,8 +1480,7 @@ impl SpircTask {
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
             self.connect_state.reset_playback_to_position(None)?;
-            self.handle_stop();
-            Ok(())
+            self.handle_stop()
         }
     }
 
@@ -1489,7 +1494,7 @@ impl SpircTask {
                 None if repeat_context => self.connect_state.reset_playback_to_position(None)?,
                 None => {
                     self.connect_state.reset_playback_to_position(None)?;
-                    self.handle_stop()
+                    self.handle_stop()?
                 }
                 Some(_) => self.load_track(self.is_playing(), 0)?,
             }
@@ -1599,7 +1604,7 @@ impl SpircTask {
     fn load_track(&mut self, start_playing: bool, position_ms: u32) -> Result<(), Error> {
         if self.connect_state.current_track(MessageField::is_none) {
             debug!("current track is none, stopping playback");
-            self.handle_stop();
+            self.handle_stop()?;
             return Ok(());
         }
 
