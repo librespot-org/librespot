@@ -61,7 +61,7 @@ pub(super) enum SpircPlayStatus {
 #[derive(Debug, Clone)]
 pub(super) struct ResolveContext {
     context: Context,
-    resolve_uri: Option<String>,
+    fallback: Option<String>,
     autoplay: bool,
     /// if `true` updates the entire context, otherwise only fills the context from the next
     /// retrieve page, it is usually used when loading the next page of an already established context
@@ -72,31 +72,23 @@ pub(super) struct ResolveContext {
 }
 
 impl ResolveContext {
-    pub fn from_uri(
-        uri: impl Into<String>,
-        resolve_uri: impl Into<String>,
-        autoplay: bool,
-    ) -> Self {
-        let fallback_uri = resolve_uri.into();
+    pub fn from_uri(uri: impl Into<String>, fallback: impl Into<String>, autoplay: bool) -> Self {
+        let fallback_uri = fallback.into();
         Self {
             context: Context {
                 uri: uri.into(),
                 ..Default::default()
             },
-            resolve_uri: (!fallback_uri.is_empty()).then_some(fallback_uri),
+            fallback: (!fallback_uri.is_empty()).then_some(fallback_uri),
             autoplay,
             update: true,
         }
     }
 
     pub fn from_context(context: Context, autoplay: bool) -> Self {
-        let resolve_uri = ConnectState::get_context_uri_from_context(&context)
-            .and_then(|s| (!s.is_empty()).then_some(s))
-            .cloned();
-
         Self {
             context,
-            resolve_uri,
+            fallback: None,
             autoplay,
             update: true,
         }
@@ -124,7 +116,7 @@ impl ResolveContext {
                 uri,
                 ..Default::default()
             },
-            resolve_uri: None,
+            fallback: None,
             update: false,
             autoplay: false,
         }
@@ -132,7 +124,11 @@ impl ResolveContext {
 
     /// the uri which should be used to resolve the context, might not be the context uri
     pub fn resolve_uri(&self) -> Option<&String> {
-        self.resolve_uri.as_ref()
+        // it's important to call this always, or at least for every ResolveContext
+        // otherwise we might not even check if we need to fallback and just use the fallback uri
+        ConnectState::get_context_uri_from_context(&self.context)
+            .and_then(|s| (!s.is_empty()).then_some(s))
+            .or(self.fallback.as_ref())
     }
 
     /// the actual context uri

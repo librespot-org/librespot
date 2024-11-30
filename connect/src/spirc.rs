@@ -1122,14 +1122,11 @@ impl SpircTask {
             self.connect_state.fill_up_context = ContextType::Autoplay;
         }
 
-        let resolve_uri = self.connect_state.current_track(|t| &t.uri).clone();
+        let fallback = self.connect_state.current_track(|t| &t.uri).clone();
 
         debug!("async resolve context for <{}>", ctx_uri);
-        self.resolve_context.push(ResolveContext::from_uri(
-            ctx_uri.clone(),
-            &resolve_uri,
-            false,
-        ));
+        self.resolve_context
+            .push(ResolveContext::from_uri(ctx_uri.clone(), &fallback, false));
 
         let timestamp = self.now_ms();
         let state = &mut self.connect_state;
@@ -1158,7 +1155,7 @@ impl SpircTask {
                 debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
 
                 self.resolve_context
-                    .push(ResolveContext::from_uri(ctx_uri, resolve_uri, true))
+                    .push(ResolveContext::from_uri(ctx_uri, fallback, true))
             }
 
             self.transfer_state = Some(transfer);
@@ -1234,7 +1231,7 @@ impl SpircTask {
         }
 
         let current_context_uri = self.connect_state.context_uri();
-        let resolve_uri = if let Some(ref ctx) = context {
+        let fallback = if let Some(ref ctx) = context {
             match ConnectState::get_context_uri_from_context(ctx) {
                 Some(ctx_uri) => ctx_uri,
                 None => Err(SpircError::InvalidUri(cmd.context_uri.clone()))?,
@@ -1244,11 +1241,11 @@ impl SpircTask {
         }
         .clone();
 
-        if current_context_uri == &cmd.context_uri && resolve_uri == cmd.context_uri {
+        if current_context_uri == &cmd.context_uri && fallback == cmd.context_uri {
             debug!("context <{current_context_uri}> didn't change, no resolving required")
         } else {
             debug!("resolving context for load command");
-            self.resolve_context(&resolve_uri, &cmd.context_uri, false, true)
+            self.resolve_context(&fallback, &cmd.context_uri, false, true)
                 .await?;
         }
 
@@ -1298,11 +1295,8 @@ impl SpircTask {
         }
 
         if !self.connect_state.has_next_tracks(None) && self.session.autoplay() {
-            self.resolve_context.push(ResolveContext::from_uri(
-                &cmd.context_uri,
-                resolve_uri,
-                true,
-            ))
+            self.resolve_context
+                .push(ResolveContext::from_uri(&cmd.context_uri, fallback, true))
         }
 
         Ok(())
@@ -1443,8 +1437,8 @@ impl SpircTask {
                     }
                     LoadNext::Empty if self.session.autoplay() => {
                         let current_context = self.connect_state.context_uri();
-                        let resolve = self.connect_state.current_track(|t| &t.uri);
-                        let resolve = ResolveContext::from_uri(current_context, resolve, true);
+                        let fallback = self.connect_state.current_track(|t| &t.uri);
+                        let resolve = ResolveContext::from_uri(current_context, fallback, true);
 
                         // When in autoplay, keep topping up the playlist when it nears the end
                         debug!("Preloading autoplay: {resolve}");
