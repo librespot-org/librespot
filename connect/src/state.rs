@@ -8,14 +8,15 @@ mod tracks;
 mod transfer;
 
 use crate::model::SpircPlayStatus;
-use crate::state::context::{ContextType, StateContext};
-use crate::state::metadata::Metadata;
-use crate::state::provider::{IsProvider, Provider};
-use librespot_core::config::DeviceType;
-use librespot_core::date::Date;
-use librespot_core::dealer::protocol::Request;
-use librespot_core::spclient::SpClientResult;
-use librespot_core::{version, Error, Session, SpotifyId};
+use crate::state::{
+    context::{ContextType, ResetContext, StateContext},
+    metadata::Metadata,
+    provider::{IsProvider, Provider},
+};
+use librespot_core::{
+    config::DeviceType, date::Date, dealer::protocol::Request, spclient::SpClientResult, version,
+    Error, Session, SpotifyId,
+};
 use librespot_protocol::connect::{
     Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest,
 };
@@ -405,7 +406,7 @@ impl ConnectState {
 
     pub async fn became_inactive(&mut self, session: &Session) -> SpClientResult {
         self.reset();
-        self.reset_context(None);
+        self.reset_context(ResetContext::Completely);
 
         session.spclient().put_connect_state_inactive(false).await
     }

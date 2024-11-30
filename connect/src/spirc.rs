@@ -1,5 +1,5 @@
 pub use crate::model::{PlayingTrack, SpircLoadCommand};
-use crate::state::metadata::Metadata;
+use crate::state::{context::ResetContext, metadata::Metadata};
 use crate::{
     core::{
         authentication::Credentials,
@@ -531,7 +531,7 @@ impl SpircTask {
                     .await
                 {
                     error!("failed resolving context <{resolve}>: {why}");
-                    self.connect_state.reset_context(None);
+                    self.connect_state.reset_context(ResetContext::Completely);
                     self.handle_stop()
                 }
 
@@ -1102,7 +1102,9 @@ impl SpircTask {
 
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         self.connect_state
-            .reset_context(Some(&transfer.current_session.context.uri));
+            .reset_context(ResetContext::WhenDifferent(
+                &transfer.current_session.context.uri,
+            ));
 
         let mut ctx_uri = transfer.current_session.context.uri.clone();
 
@@ -1224,7 +1226,8 @@ impl SpircTask {
         cmd: SpircLoadCommand,
         context: Option<Context>,
     ) -> Result<(), Error> {
-        self.connect_state.reset_context(Some(&cmd.context_uri));
+        self.connect_state
+            .reset_context(ResetContext::WhenDifferent(&cmd.context_uri));
 
         if !self.connect_state.active {
             self.handle_activate();

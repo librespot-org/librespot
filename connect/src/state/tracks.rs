@@ -244,7 +244,7 @@ impl<'ct> ConnectState {
                     new_index = 0;
                     delimiter
                 }
-                None if matches!(self.fill_up_context, ContextType::Default)
+                None if !matches!(self.fill_up_context, ContextType::Autoplay)
                     && self.autoplay_context.is_some() =>
                 {
                     // transition to autoplay as fill up context

@@ -1,6 +1,5 @@
-use crate::state::ConnectState;
-use librespot_core::dealer::protocol::SetQueueCommand;
-use librespot_core::Error;
+use crate::state::{context::ResetContext, ConnectState};
+use librespot_core::{dealer::protocol::SetQueueCommand, Error};
 use protobuf::MessageField;
 
 impl ConnectState {
@@ -11,7 +10,7 @@ impl ConnectState {
             return self.shuffle();
         }
 
-        self.reset_context(None);
+        self.reset_context(ResetContext::DefaultIndexWithoutAutoplay);
 
         if self.current_track(MessageField::is_none) {
             return Ok(());
@@ -51,7 +50,7 @@ impl ConnectState {
 
         if self.repeat_context() {
             self.set_shuffle(false);
-            self.reset_context(None);
+            self.reset_context(ResetContext::DefaultIndexWithoutAutoplay);
 
             let ctx = self.context.as_ref();
             let current_track = ConnectState::find_index_in_context(ctx, |t| {

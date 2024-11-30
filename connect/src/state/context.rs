@@ -36,6 +36,13 @@ pub enum UpdateContext {
     Autoplay,
 }
 
+pub enum ResetContext<'s> {
+    Completely,
+    DefaultIndex,
+    DefaultIndexWithoutAutoplay,
+    WhenDifferent(&'s str),
+}
+
 impl ConnectState {
     pub fn find_index_in_context<F: Fn(&ProvidedTrack) -> bool>(
         context: Option<&StateContext>,
@@ -64,21 +71,31 @@ impl ConnectState {
         &self.player.context_uri
     }
 
-    pub fn reset_context(&mut self, new_context: Option<&str>) {
+    pub fn reset_context(&mut self, reset_as: ResetContext) {
         self.active_context = ContextType::Default;
         self.fill_up_context = ContextType::Default;
 
-        self.autoplay_context = None;
+        if !matches!(reset_as, ResetContext::DefaultIndexWithoutAutoplay) {
+            self.autoplay_context = None;
+        }
         self.shuffle_context = None;
 
-        let reset_default_context = new_context.is_none()
-            || matches!(new_context, Some(ctx) if self.player.context_uri != ctx);
-        if reset_default_context {
-            self.context = None;
-            self.next_contexts.clear();
-        } else if let Some(ctx) = self.context.as_mut() {
-            ctx.index.track = 0;
-            ctx.index.page = 0;
+        match reset_as {
+            ResetContext::Completely => {
+                self.context = None;
+                self.next_contexts.clear();
+            }
+            ResetContext::WhenDifferent(ctx) if self.player.context_uri != ctx => {
+                self.context = None;
+                self.next_contexts.clear();
+            }
+            ResetContext::WhenDifferent(_) => debug!("context didn't change, no reset"),
+            ResetContext::DefaultIndex | ResetContext::DefaultIndexWithoutAutoplay => {
+                if let Some(ctx) = self.context.as_mut() {
+                    ctx.index.track = 0;
+                    ctx.index.page = 0;
+                }
+            }
         }
 
         self.update_restrictions()
