@@ -7,27 +7,23 @@ use crate::state::{
 use librespot_core::{Error, SpotifyId};
 use librespot_protocol::player::ProvidedTrack;
 use protobuf::MessageField;
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 // identifier used as part of the uid
 pub const IDENTIFIER_DELIMITER: &str = "delimiter";
 
 impl<'ct> ConnectState {
     fn new_delimiter(iteration: i64) -> ProvidedTrack {
-        const HIDDEN: &str = "hidden";
-        const ITERATION: &str = "iteration";
-
-        let mut metadata = HashMap::new();
-        metadata.insert(HIDDEN.to_string(), true.to_string());
-        metadata.insert(ITERATION.to_string(), iteration.to_string());
-
-        ProvidedTrack {
+        let mut delimiter = ProvidedTrack {
             uri: format!("spotify:{IDENTIFIER_DELIMITER}"),
             uid: format!("{IDENTIFIER_DELIMITER}{iteration}"),
             provider: Provider::Context.to_string(),
-            metadata,
             ..Default::default()
-        }
+        };
+        delimiter.set_hidden(true);
+        delimiter.add_iteration(iteration);
+
+        delimiter
     }
 
     pub fn set_current_track(&mut self, index: usize) -> Result<(), Error> {

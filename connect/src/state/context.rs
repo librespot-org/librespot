@@ -313,8 +313,8 @@ impl ConnectState {
         };
 
         if let Some(context_uri) = context_uri {
-            track.add_context_uri(context_uri.to_string());
-            track.add_entity_uri(context_uri.to_string());
+            track.set_context_uri(context_uri.to_string());
+            track.set_entity_uri(context_uri.to_string());
         }
 
         if matches!(provider, Provider::Autoplay) {

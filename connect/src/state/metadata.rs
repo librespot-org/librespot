@@ -6,6 +6,9 @@ const ENTITY_URI: &str = "entity_uri";
 const IS_QUEUED: &str = "is_queued";
 const IS_AUTOPLAY: &str = "autoplay.is_autoplay";
 
+const HIDDEN: &str = "hidden";
+const ITERATION: &str = "iteration";
+
 #[allow(dead_code)]
 pub trait Metadata {
     fn metadata(&self) -> &HashMap<String, String>;
@@ -19,8 +22,16 @@ pub trait Metadata {
         matches!(self.metadata().get(IS_AUTOPLAY), Some(is_autoplay) if is_autoplay.eq("true"))
     }
 
+    fn is_hidden(&self) -> bool {
+        matches!(self.metadata().get(HIDDEN), Some(is_hidden) if is_hidden.eq("true"))
+    }
+
     fn get_context_uri(&self) -> Option<&String> {
         self.metadata().get(CONTEXT_URI)
+    }
+
+    fn get_iteration(&self) -> Option<&String> {
+        self.metadata().get(ITERATION)
     }
 
     fn set_queued(&mut self, queued: bool) {
@@ -33,12 +44,22 @@ pub trait Metadata {
             .insert(IS_AUTOPLAY.to_string(), autoplay.to_string());
     }
 
-    fn add_context_uri(&mut self, uri: String) {
+    fn set_hidden(&mut self, hidden: bool) {
+        self.metadata_mut()
+            .insert(HIDDEN.to_string(), hidden.to_string());
+    }
+
+    fn set_context_uri(&mut self, uri: String) {
         self.metadata_mut().insert(CONTEXT_URI.to_string(), uri);
     }
 
-    fn add_entity_uri(&mut self, uri: String) {
+    fn set_entity_uri(&mut self, uri: String) {
         self.metadata_mut().insert(ENTITY_URI.to_string(), uri);
+    }
+
+    fn add_iteration(&mut self, iter: i64) {
+        self.metadata_mut()
+            .insert(ITERATION.to_string(), iter.to_string());
     }
 }
 
