@@ -338,6 +338,25 @@ impl Spirc {
 
 impl SpircTask {
     async fn run(mut self) {
+        // simplify unwrapping of received item or parsed result
+        macro_rules! unwrap {
+            ( $next:expr, |$some:ident| $use_some:expr ) => {
+                match $next {
+                    Some($some) => $use_some,
+                    None => {
+                        error!("{} selected, but none received", stringify!($next));
+                        break;
+                    }
+                }
+            };
+            ( $next:expr, match |$ok:ident| $use_ok:expr ) => {
+                unwrap!($next, |$ok| match $ok {
+                    Ok($ok) => $use_ok,
+                    Err(why) => error!("could not parse {}: {}", stringify!($ok), why),
+                })
+            };
+        }
+
         if let Err(why) = self.session.dealer().start().await {
             error!("starting dealer failed: {why}");
             return;
@@ -346,113 +365,62 @@ impl SpircTask {
         while !self.session.is_invalid() && !self.shutdown {
             let commands = self.commands.as_mut();
             let player_events = self.player_events.as_mut();
+
             tokio::select! {
-                // main dealer update of any remote device updates
-                cluster_update = self.connect_state_update.next() => match cluster_update {
-                    Some(result) => match result {
-                        Ok(cluster_update) => {
-                            if let Err(e) = self.handle_cluster_update(cluster_update).await {
-                                error!("could not dispatch connect state update: {}", e);
-                            }
-                        },
-                        Err(e) => error!("could not parse connect state update: {}", e),
-                    }
-                    None => {
-                        error!("connect state update selected, but none received");
+                // startup of the dealer requires a connection_id, which is retrieved at the very beginning
+                connection_id_update = self.connection_id_update.next() => unwrap! {
+                    connection_id_update,
+                    match |connection_id| if let Err(why) = self.handle_connection_id_update(connection_id).await {
+                        error!("failed handling connection id update: {why}");
                         break;
+                    }
+                },
+                // main dealer update of any remote device updates
+                cluster_update = self.connect_state_update.next() => unwrap! {
+                    cluster_update,
+                    match |cluster_update| if let Err(e) = self.handle_cluster_update(cluster_update).await {
+                        error!("could not dispatch connect state update: {}", e);
                     }
                 },
                 // main dealer request handling (dealer expects an answer)
-                request = self.connect_state_command.next() => match request {
-                    Some(request) => if let Err(e) = self.handle_connect_state_request(request).await {
+                request = self.connect_state_command.next() => unwrap! {
+                    request,
+                    |request| if let Err(e) = self.handle_connect_state_request(request).await {
                         error!("couldn't handle connect state command: {}", e);
-                    },
-                    None => {
-                        error!("connect state command selected, but none received");
-                        break;
                     }
                 },
                 // volume request handling is send separately (it's more like a fire forget)
-                volume_update = self.connect_state_volume_update.next() => match volume_update {
-                    Some(result) => match result {
-                        Ok(volume_update) => match volume_update.volume.try_into() {
-                            Ok(volume) => self.set_volume(volume),
-                            Err(why) => error!("can't update volume, failed to parse i32 to u16: {why}")
-                        },
-                        Err(e) => error!("could not parse set volume update request: {}", e),
-                    }
-                    None => {
-                        error!("volume update selected, but none received");
-                        break;
+                volume_update = self.connect_state_volume_update.next() => unwrap! {
+                    volume_update,
+                    match |volume_update| match volume_update.volume.try_into() {
+                        Ok(volume) => self.set_volume(volume),
+                        Err(why) => error!("can't update volume, failed to parse i32 to u16: {why}")
                     }
                 },
-                logout_request = self.connect_state_logout_request.next() => match logout_request {
-                    Some(result) => match result {
-                        Ok(logout_request) => {
-                            error!("received logout request, currently not supported: {logout_request:#?}");
-                            // todo: call logout handling
-                        },
-                        Err(e) => error!("could not parse logout request: {}", e),
-                    }
-                    None => {
-                        error!("logout request selected, but none received");
-                        break;
+                logout_request = self.connect_state_logout_request.next() => unwrap! {
+                    logout_request,
+                    |logout_request| {
+                        error!("received logout request, currently not supported: {logout_request:#?}");
+                        // todo: call logout handling
                     }
                 },
-                playlist_update = self.playlist_update.next() => match playlist_update {
-                    Some(result) => match result {
-                        Ok(update) => if let Err(why) = self.handle_playlist_modification(update) {
-                            error!("failed to handle playlist modificationL: {why}")
-                        },
-                        Err(e) => error!("could not parse playlist update: {}", e),
-                    }
-                    None => {
-                        error!("playlist update selected, but none received");
-                        break;
+                playlist_update = self.playlist_update.next() => unwrap! {
+                    playlist_update,
+                    match |playlist_update| if let Err(why) = self.handle_playlist_modification(playlist_update) {
+                        error!("failed to handle playlist modification: {why}")
                     }
                 },
-                user_attributes_update = self.user_attributes_update.next() => match user_attributes_update {
-                    Some(result) => match result {
-                        Ok(attributes) => self.handle_user_attributes_update(attributes),
-                        Err(e) => error!("could not parse user attributes update: {}", e),
-                    }
-                    None => {
-                        error!("user attributes update selected, but none received");
-                        break;
-                    }
+                user_attributes_update = self.user_attributes_update.next() => unwrap! {
+                    user_attributes_update,
+                    match |attributes| self.handle_user_attributes_update(attributes)
                 },
-                user_attributes_mutation = self.user_attributes_mutation.next() => match user_attributes_mutation {
-                    Some(result) => match result {
-                        Ok(attributes) => self.handle_user_attributes_mutation(attributes),
-                        Err(e) => error!("could not parse user attributes mutation: {}", e),
-                    }
-                    None => {
-                        error!("user attributes mutation selected, but none received");
-                        break;
-                    }
+                user_attributes_mutation = self.user_attributes_mutation.next() => unwrap! {
+                    user_attributes_mutation,
+                    match |attributes| self.handle_user_attributes_mutation(attributes)
                 },
-                connection_id_update = self.connection_id_update.next() => match connection_id_update {
-                    Some(result) => match result {
-                        Ok(connection_id) => if let Err(why) = self.handle_connection_id_update(connection_id).await {
-                            error!("failed handling connection id update: {why}");
-                            break;
-                        },
-                        Err(e) => error!("could not parse connection ID update: {}", e),
-                    }
-                    None => {
-                        error!("connection ID update selected, but none received");
-                        break;
-                    }
-                },
-                session_update = self.session_update.next() => match session_update {
-                    Some(result) => match result {
-                        Ok(session_update) => self.handle_session_update(session_update),
-                        Err(e) => error!("could not parse session update: {}", e),
-                    }
-                    None => {
-                        error!("session update selected, but none received");
-                        break;
-                    }
+                session_update = self.session_update.next() => unwrap! {
+                    session_update,
+                    match |session_update| self.handle_session_update(session_update)
                 },
                 cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
                     if let Err(e) = self.handle_command(cmd).await {
