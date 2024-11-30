@@ -244,10 +244,15 @@ impl<'ct> ConnectState {
                     new_index = 0;
                     delimiter
                 }
-                None if self.autoplay_context.is_some() => {
+                None if matches!(self.fill_up_context, ContextType::Default)
+                    && self.autoplay_context.is_some() =>
+                {
                     // transition to autoplay as fill up context
                     self.fill_up_context = ContextType::Autoplay;
-
+                    // add delimiter to only display the current context
+                    Self::new_delimiter(iteration.into())
+                }
+                None if self.autoplay_context.is_some() => {
                     match self
                         .get_context(&ContextType::Autoplay)?
                         .tracks
