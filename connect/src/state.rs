@@ -289,7 +289,7 @@ impl ConnectState {
         let new_index = new_index.unwrap_or(0);
         self.update_current_index(|i| i.track = new_index as u32);
 
-        self.update_context_index(new_index + 1)?;
+        self.update_context_index(self.active_context, new_index + 1)?;
 
         debug!("reset playback state to {new_index}");
 

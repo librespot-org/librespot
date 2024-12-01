@@ -10,7 +10,7 @@ impl ConnectState {
             return self.shuffle();
         }
 
-        self.reset_context(ResetContext::DefaultIndexWithoutAutoplay);
+        self.reset_context(ResetContext::DefaultIndex);
 
         if self.current_track(MessageField::is_none) {
             return Ok(());
@@ -50,7 +50,7 @@ impl ConnectState {
 
         if self.repeat_context() {
             self.set_shuffle(false);
-            self.reset_context(ResetContext::DefaultIndexWithoutAutoplay);
+            self.reset_context(ResetContext::DefaultIndex);
 
             let ctx = self.context.as_ref();
             let current_track = ConnectState::find_index_in_context(ctx, |t| {

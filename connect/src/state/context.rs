@@ -39,7 +39,6 @@ pub enum UpdateContext {
 pub enum ResetContext<'s> {
     Completely,
     DefaultIndex,
-    DefaultIndexWithoutAutoplay,
     WhenDifferent(&'s str),
 }
 
@@ -71,27 +70,28 @@ impl ConnectState {
         &self.player.context_uri
     }
 
-    pub fn reset_context(&mut self, reset_as: ResetContext) {
+    pub fn reset_context(&mut self, mut reset_as: ResetContext) {
         self.active_context = ContextType::Default;
         self.fill_up_context = ContextType::Default;
 
-        if !matches!(reset_as, ResetContext::DefaultIndexWithoutAutoplay) {
-            self.autoplay_context = None;
+        if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.player.context_uri != ctx) {
+            reset_as = ResetContext::Completely
         }
         self.shuffle_context = None;
 
         match reset_as {
             ResetContext::Completely => {
                 self.context = None;
+                self.autoplay_context = None;
                 self.next_contexts.clear();
-            }
-            ResetContext::WhenDifferent(ctx) if self.player.context_uri != ctx => {
-                self.context = None;
-                self.next_contexts.clear();
+                self.player.context_restrictions.clear()
             }
             ResetContext::WhenDifferent(_) => debug!("context didn't change, no reset"),
-            ResetContext::DefaultIndex | ResetContext::DefaultIndexWithoutAutoplay => {
-                if let Some(ctx) = self.context.as_mut() {
+            ResetContext::DefaultIndex => {
+                for ctx in [self.context.as_mut(), self.autoplay_context.as_mut()]
+                    .into_iter()
+                    .flatten()
+                {
                     ctx.index.track = 0;
                     ctx.index.page = 0;
                 }
@@ -263,20 +263,26 @@ impl ConnectState {
                 }
 
                 // the uid provided from another context might be actual uid of an item
-                context_track.uid = new_track.uid;
+                if !new_track.uid.is_empty() {
+                    context_track.uid = new_track.uid;
+                }
             }
         }
 
         Some(())
     }
 
-    pub(super) fn update_context_index(&mut self, new_index: usize) -> Result<(), StateError> {
-        let context = match self.active_context {
+    pub(super) fn update_context_index(
+        &mut self,
+        ty: ContextType,
+        new_index: usize,
+    ) -> Result<(), StateError> {
+        let context = match ty {
             ContextType::Default => self.context.as_mut(),
             ContextType::Shuffle => self.shuffle_context.as_mut(),
             ContextType::Autoplay => self.autoplay_context.as_mut(),
         }
-        .ok_or(StateError::NoContext(self.active_context))?;
+        .ok_or(StateError::NoContext(ty))?;
 
         context.index.track = new_index as u32;
         Ok(())

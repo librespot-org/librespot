@@ -247,8 +247,12 @@ impl<'ct> ConnectState {
                 None if !matches!(self.fill_up_context, ContextType::Autoplay)
                     && self.autoplay_context.is_some() =>
                 {
+                    self.update_context_index(self.fill_up_context, new_index)?;
+
                     // transition to autoplay as fill up context
                     self.fill_up_context = ContextType::Autoplay;
+                    new_index = self.get_context(&ContextType::Autoplay)?.index.track as usize;
+
                     // add delimiter to only display the current context
                     Self::new_delimiter(iteration.into())
                 }
@@ -279,7 +283,7 @@ impl<'ct> ConnectState {
             self.next_tracks.push_back(track);
         }
 
-        self.update_context_index(new_index)?;
+        self.update_context_index(self.fill_up_context, new_index)?;
 
         // the web-player needs a revision update, otherwise the queue isn't updated in the ui
         self.update_queue_revision();
