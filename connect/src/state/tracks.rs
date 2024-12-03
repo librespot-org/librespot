@@ -77,7 +77,7 @@ impl<'ct> ConnectState {
 
         debug!(
             "set track to: {} at {} of {} tracks",
-            index + 1,
+            index,
             new_track.uri,
             context.tracks.len()
         );
@@ -93,7 +93,7 @@ impl<'ct> ConnectState {
     ///
     /// Updates the current track to the next track. Adds the old track
     /// to prev tracks and fills up the next tracks from the current context
-    pub fn next_track(&mut self) -> Result<Option<u32>, StateError> {
+    pub fn next_track(&mut self) -> Result<Option<u32>, Error> {
         // when we skip in repeat track, we don't repeat the current track anymore
         if self.repeat_track() {
             self.set_repeat_track(false);
@@ -129,7 +129,7 @@ impl<'ct> ConnectState {
         let update_index = if new_track.is_queue() {
             None
         } else if new_track.is_autoplay() {
-            self.active_context = ContextType::Autoplay;
+            self.set_active_context(ContextType::Autoplay)?;
             None
         } else {
             let ctx = self.context.as_ref();
@@ -160,7 +160,7 @@ impl<'ct> ConnectState {
     /// Updates the current track to the prev track. Adds the old track
     /// to next tracks (when from the context) and fills up the prev tracks from the
     /// current context
-    pub fn prev_track(&mut self) -> Result<Option<&MessageField<ProvidedTrack>>, StateError> {
+    pub fn prev_track(&mut self) -> Result<Option<&MessageField<ProvidedTrack>>, Error> {
         let old_track = self.player_mut().track.take();
 
         if let Some(old_track) = old_track {
@@ -197,7 +197,7 @@ impl<'ct> ConnectState {
 
         if matches!(self.active_context, ContextType::Autoplay if new_track.is_context()) {
             // transition back to default context
-            self.active_context = ContextType::Default;
+            self.set_active_context(ContextType::Default)?;
         }
 
         self.fill_up_next_tracks()?;

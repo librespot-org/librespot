@@ -1,3 +1,5 @@
+use crate::state::context::ContextType;
+use crate::state::metadata::Metadata;
 use crate::state::provider::{IsProvider, Provider};
 use crate::state::{ConnectState, StateError};
 use librespot_core::Error;
@@ -23,6 +25,7 @@ impl ConnectState {
         )
     }
 
+    /// handles the initially transferable data
     pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState, ctx_uri: String) {
         let current_context_metadata = self.context.as_ref().map(|c| c.metadata.clone());
         let player = self.player_mut();
@@ -41,22 +44,20 @@ impl ConnectState {
             player.playback_speed = 1.;
         }
 
-        player.play_origin = transfer.current_session.play_origin.clone();
+        if let Some(session) = transfer.current_session.as_mut() {
+            player.play_origin = session.play_origin.take().into();
+            player.suppressions = session.suppressions.take().into();
 
-        if let Some(suppressions) = transfer.current_session.suppressions.as_ref() {
-            player.suppressions = MessageField::some(suppressions.clone());
+            if let Some(mut ctx) = session.context.take() {
+                player.context_restrictions = ctx.restrictions.take().into();
+                for (key, value) in ctx.metadata {
+                    player.context_metadata.insert(key, value);
+                }
+            }
         }
 
         player.context_url = format!("context://{ctx_uri}");
         player.context_uri = ctx_uri;
-
-        if let Some(context) = transfer.current_session.context.as_ref() {
-            player.context_restrictions = context.restrictions.clone();
-        }
-
-        for (key, value) in &transfer.current_session.context.metadata {
-            player.context_metadata.insert(key.clone(), value.clone());
-        }
 
         if let Some(metadata) = current_context_metadata {
             for (key, value) in metadata {
@@ -68,11 +69,21 @@ impl ConnectState {
         self.clear_next_tracks(false);
     }
 
-    pub fn setup_state_from_transfer(&mut self, transfer: TransferState) -> Result<(), Error> {
+    /// completes the transfer, loading the queue and updating metadata
+    pub fn finish_transfer(&mut self, transfer: TransferState) -> Result<(), Error> {
         let track = match self.player().track.as_ref() {
             None => self.current_track_from_transfer(&transfer)?,
             Some(track) => track.clone(),
         };
+
+        let context_ty = if self.current_track(|t| t.is_from_autoplay()) {
+            ContextType::Autoplay
+        } else {
+            ContextType::Default
+        };
+
+        self.set_active_context(context_ty)?;
+        self.fill_up_context = context_ty;
 
         let ctx = self.get_context(&self.active_context).ok();
 

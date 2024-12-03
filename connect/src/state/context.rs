@@ -1,8 +1,9 @@
-use crate::state::metadata::Metadata;
-use crate::state::provider::Provider;
-use crate::state::{ConnectState, StateError};
+use crate::state::{metadata::Metadata, provider::Provider, ConnectState, StateError};
 use librespot_core::{Error, SpotifyId};
-use librespot_protocol::player::{Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack};
+use librespot_protocol::player::{
+    Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack, Restrictions,
+};
+use protobuf::MessageField;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -13,6 +14,7 @@ const SEARCH_IDENTIFIER: &str = "spotify:search";
 pub struct StateContext {
     pub tracks: Vec<ProvidedTrack>,
     pub metadata: HashMap<String, String>,
+    pub restrictions: Option<Restrictions>,
     /// is used to keep track which tracks are already loaded into the next_tracks
     pub index: ContextIndex,
 }
@@ -72,7 +74,9 @@ impl ConnectState {
     }
 
     pub fn reset_context(&mut self, mut reset_as: ResetContext) {
-        self.active_context = ContextType::Default;
+        if let Err(why) = self.set_active_context(ContextType::Default) {
+            warn!("switching to active context had issues: {why}")
+        }
         self.fill_up_context = ContextType::Default;
 
         if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.context_uri() != ctx) {
@@ -113,7 +117,32 @@ impl ConnectState {
             .and_then(|p| p.tracks.first().map(|t| &t.uri))
     }
 
-    pub fn update_context(&mut self, context: Context, ty: UpdateContext) -> Result<(), Error> {
+    pub fn set_active_context(&mut self, new_context: ContextType) -> Result<(), Error> {
+        self.active_context = new_context;
+
+        let ctx = self.get_context(&new_context)?;
+        let mut restrictions = ctx.restrictions.clone();
+        let metadata = ctx.metadata.clone();
+
+        let player = self.player_mut();
+
+        player.context_metadata.clear();
+        player.context_restrictions.clear();
+        player.restrictions.clear();
+
+        if let Some(restrictions) = restrictions.take() {
+            player.context_restrictions = MessageField::some(restrictions.clone());
+            player.restrictions = MessageField::some(restrictions);
+        }
+
+        for (key, value) in metadata {
+            player.context_metadata.insert(key, value);
+        }
+
+        Ok(())
+    }
+
+    pub fn update_context(&mut self, mut context: Context, ty: UpdateContext) -> Result<(), Error> {
         if context.pages.iter().all(|p| p.tracks.is_empty()) {
             error!("context didn't have any tracks: {context:#?}");
             return Err(StateError::ContextHasNoTracks.into());
@@ -154,27 +183,20 @@ impl ConnectState {
             page.tracks.len()
         );
 
-        let player = self.player_mut();
-        if context.restrictions.is_some() {
-            player.restrictions = context.restrictions.clone();
-            player.context_restrictions = context.restrictions;
-        } else {
-            player.context_restrictions = Default::default();
-            player.restrictions = Default::default()
-        }
-
-        player.context_metadata.clear();
-        for (key, value) in context.metadata {
-            player.context_metadata.insert(key, value);
-        }
-
         match ty {
             UpdateContext::Default => {
-                let mut new_context = self.state_context_from_page(page, Some(&context.uri), None);
+                let mut new_context = self.state_context_from_page(
+                    page,
+                    context.restrictions.take(),
+                    Some(&context.uri),
+                    None,
+                );
 
                 // when we update the same context, we should try to preserve the previous position
                 // otherwise we might load the entire context twice
-                if self.context_uri() == &context.uri {
+                if !self.context_uri().contains(SEARCH_IDENTIFIER)
+                    && self.context_uri() == &context.uri
+                {
                     match Self::find_index_in_context(Some(&new_context), |t| {
                         self.current_track(|t| &t.uri) == &t.uri
                     }) {
@@ -195,12 +217,13 @@ impl ConnectState {
 
                 self.context = Some(new_context);
 
-                self.player_mut().context_url = format!("context://{}", &context.uri);
+                self.player_mut().context_url = context.url;
                 self.player_mut().context_uri = context.uri;
             }
             UpdateContext::Autoplay => {
                 self.autoplay_context = Some(self.state_context_from_page(
                     page,
+                    context.restrictions.take(),
                     Some(&context.uri),
                     Some(Provider::Autoplay),
                 ))
@@ -213,6 +236,7 @@ impl ConnectState {
     fn state_context_from_page(
         &mut self,
         page: ContextPage,
+        restrictions: Option<Restrictions>,
         new_context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> StateContext {
@@ -235,6 +259,7 @@ impl ConnectState {
 
         StateContext {
             tracks,
+            restrictions,
             metadata: page.metadata,
             index: ContextIndex::new(),
         }
@@ -350,7 +375,7 @@ impl ConnectState {
     }
 
     pub fn fill_context_from_page(&mut self, page: ContextPage) -> Result<(), Error> {
-        let context = self.state_context_from_page(page, None, None);
+        let context = self.state_context_from_page(page, None, None, None);
         let ctx = self
             .context
             .as_mut()

@@ -106,6 +106,7 @@ pub struct ConnectState {
 
     // separation is necessary because we could have already loaded
     // the autoplay context but are still playing from the default context
+    /// to update the active context use [switch_active_context](ConnectState::set_active_context)
     pub active_context: ContextType,
     pub fill_up_context: ContextType,
 
@@ -346,10 +347,7 @@ impl ConnectState {
     pub fn reset_playback_to_position(&mut self, new_index: Option<usize>) -> Result<(), Error> {
         let new_index = new_index.unwrap_or(0);
         self.update_current_index(|i| i.track = new_index as u32);
-
         self.update_context_index(self.active_context, new_index + 1)?;
-
-        debug!("reset playback state to {new_index}");
 
         if !self.current_track(|t| t.is_queue()) {
             self.set_current_track(new_index)?;

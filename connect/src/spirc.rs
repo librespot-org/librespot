@@ -508,8 +508,7 @@ impl SpircTask {
         }
 
         if let Some(transfer_state) = self.transfer_state.take() {
-            self.connect_state
-                .setup_state_from_transfer(transfer_state)?
+            self.connect_state.finish_transfer(transfer_state)?
         }
 
         if matches!(self.connect_state.active_context, ContextType::Default) {
@@ -570,7 +569,7 @@ impl SpircTask {
         let previous_tracks = self.connect_state.prev_autoplay_track_uris();
 
         debug!(
-            "loading autoplay context <{resolve_uri}> with {} previous tracks",
+            "requesting autoplay context <{resolve_uri}> with {} previous tracks",
             previous_tracks.len()
         );
 
@@ -1089,8 +1088,6 @@ impl SpircTask {
         let autoplay = self.connect_state.current_track(|t| t.is_from_autoplay());
         if autoplay {
             ctx_uri = ctx_uri.replace("station:", "");
-            self.connect_state.active_context = ContextType::Autoplay;
-            self.connect_state.fill_up_context = ContextType::Autoplay;
         }
 
         let fallback = self.connect_state.current_track(|t| &t.uri).clone();
@@ -1117,18 +1114,14 @@ impl SpircTask {
 
         let is_playing = !transfer.playback.is_paused;
 
-        if self.connect_state.context.is_some() {
-            self.connect_state.setup_state_from_transfer(transfer)?;
-        } else {
-            if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
-                debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
+        if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
+            debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
 
-                self.resolve_context
-                    .push(ResolveContext::from_uri(ctx_uri, fallback, true))
-            }
-
-            self.transfer_state = Some(transfer);
+            self.resolve_context
+                .push(ResolveContext::from_uri(ctx_uri, fallback, true))
         }
+
+        self.transfer_state = Some(transfer);
 
         self.load_track(is_playing, position.try_into()?)
     }
@@ -1264,10 +1257,7 @@ impl SpircTask {
             self.handle_stop()
         }
 
-        if !self.connect_state.has_next_tracks(None) && self.session.autoplay() {
-            self.resolve_context
-                .push(ResolveContext::from_uri(&cmd.context_uri, fallback, true))
-        }
+        self.preload_autoplay_when_required();
 
         Ok(())
     }
