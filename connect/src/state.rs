@@ -322,63 +322,6 @@ impl ConnectState {
         Ok(())
     }
 
-    pub fn add_to_queue(&mut self, mut track: ProvidedTrack, rev_update: bool) {
-        track.uid = format!("q{}", self.queue_count);
-        self.queue_count += 1;
-
-        track.set_provider(Provider::Queue);
-        if !track.is_from_queue() {
-            track.set_queued(true);
-        }
-
-        if let Some(next_not_queued_track) =
-            self.next_tracks.iter().position(|track| !track.is_queue())
-        {
-            self.next_tracks.insert(next_not_queued_track, track);
-        } else {
-            self.next_tracks.push_back(track)
-        }
-
-        while self.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-            self.next_tracks.pop_back();
-        }
-
-        if rev_update {
-            self.update_queue_revision();
-        }
-        self.update_restrictions();
-    }
-
-    pub fn mark_unavailable(&mut self, id: SpotifyId) -> Result<(), Error> {
-        let uri = id.to_uri()?;
-
-        debug!("marking {uri} as unavailable");
-
-        for next_track in &mut self.next_tracks {
-            Self::mark_as_unavailable_for_match(next_track, &uri)
-        }
-
-        for prev_track in &mut self.prev_tracks {
-            Self::mark_as_unavailable_for_match(prev_track, &uri)
-        }
-
-        if self.player.track.uri != uri {
-            while let Some(pos) = self.next_tracks.iter().position(|t| t.uri == uri) {
-                let _ = self.next_tracks.remove(pos);
-            }
-
-            while let Some(pos) = self.prev_tracks.iter().position(|t| t.uri == uri) {
-                let _ = self.prev_tracks.remove(pos);
-            }
-
-            self.unavailable_uri.push(uri);
-            self.fill_up_next_tracks()?;
-            self.update_queue_revision();
-        }
-
-        Ok(())
-    }
-
     fn mark_as_unavailable_for_match(track: &mut ProvidedTrack, uri: &str) {
         if track.uri == uri {
             debug!("Marked <{}:{}> as unavailable", track.provider, track.uri);
