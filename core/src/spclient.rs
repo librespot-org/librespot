@@ -451,27 +451,27 @@ impl SpClient {
             let mut url = self.base_url().await?;
             url.push_str(endpoint);
 
-            let separator = match url.find('?') {
-                Some(_) => "&",
-                None => "?",
-            };
-
             // Add metrics. There is also an optional `partner` key with a value like
             // `vodafone-uk` but we've yet to discover how we can find that value.
             // For the sake of documentation you could also do "product=free" but
             // we only support premium anyway.
-            if options.metrics {
+            if options.metrics && !url.contains("product=0") {
                 let _ = write!(
                     url,
                     "{}product=0&country={}",
-                    separator,
+                    util::get_next_query_separator(&url),
                     self.session().country()
                 );
             }
 
             // Defeat caches. Spotify-generated URLs already contain this.
             if options.salt && !url.contains("salt=") {
-                let _ = write!(url, "{separator}salt={}", rand::thread_rng().next_u32());
+                let _ = write!(
+                    url,
+                    "{}salt={}",
+                    util::get_next_query_separator(&url),
+                    rand::thread_rng().next_u32()
+                );
             }
 
             let mut request = Request::builder()
