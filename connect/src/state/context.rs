@@ -89,7 +89,6 @@ impl ConnectState {
                 self.context = None;
                 self.autoplay_context = None;
                 self.next_contexts.clear();
-                self.player_mut().context_restrictions.clear()
             }
             ResetContext::WhenDifferent(_) => debug!("context didn't change, no reset"),
             ResetContext::DefaultIndex => {
@@ -127,11 +126,9 @@ impl ConnectState {
         let player = self.player_mut();
 
         player.context_metadata.clear();
-        player.context_restrictions.clear();
         player.restrictions.clear();
 
         if let Some(restrictions) = restrictions.take() {
-            player.context_restrictions = MessageField::some(restrictions.clone());
             player.restrictions = MessageField::some(restrictions);
         }
 
@@ -217,7 +214,11 @@ impl ConnectState {
 
                 self.context = Some(new_context);
 
-                self.player_mut().context_url = context.url;
+                if !context.url.contains(SEARCH_IDENTIFIER) {
+                    self.player_mut().context_url = context.url;
+                } else {
+                    self.player_mut().context_url.clear()
+                }
                 self.player_mut().context_uri = context.uri;
             }
             UpdateContext::Autoplay => {

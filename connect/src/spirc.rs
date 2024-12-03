@@ -540,6 +540,8 @@ impl SpircTask {
 
             if update {
                 ctx.uri = context_uri.to_string();
+                ctx.url = format!("context://{context_uri}");
+
                 self.connect_state
                     .update_context(ctx, UpdateContext::Default)?
             } else if matches!(ctx.pages.first(), Some(p) if !p.tracks.is_empty()) {

@@ -49,14 +49,14 @@ impl ConnectState {
             player.suppressions = session.suppressions.take().into();
 
             if let Some(mut ctx) = session.context.take() {
-                player.context_restrictions = ctx.restrictions.take().into();
+                player.restrictions = ctx.restrictions.take().into();
                 for (key, value) in ctx.metadata {
                     player.context_metadata.insert(key, value);
                 }
             }
         }
 
-        player.context_url = format!("context://{ctx_uri}");
+        player.context_url.clear();
         player.context_uri = ctx_uri;
 
         if let Some(metadata) = current_context_metadata {
