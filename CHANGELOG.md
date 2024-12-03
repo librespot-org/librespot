@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [core] Fix "no native root CA certificates found" on platforms unsupported
+  by `rustls-native-certs`.
+
 ### Removed
 
 ## [0.6.0] - 2024-10-30
