@@ -944,6 +944,8 @@ impl SpircTask {
                 //  tried: providing session_id, playback_id, track-metadata "track_player"
                 self.notify().await?;
             }
+        } else if self.connect_state.is_active() {
+            self.connect_state.became_inactive(&self.session).await?;
         }
 
         Ok(())
