@@ -535,13 +535,13 @@ impl SpClient {
         last_response
     }
 
-    pub async fn put_connect_state_request(&self, state: PutStateRequest) -> SpClientResult {
+    pub async fn put_connect_state_request(&self, state: &PutStateRequest) -> SpClientResult {
         let endpoint = format!("/connect-state/v1/devices/{}", self.session().device_id());
 
         let mut headers = HeaderMap::new();
         headers.insert(CONNECTION_ID, self.session().connection_id().parse()?);
 
-        self.request_with_protobuf(&Method::PUT, &endpoint, Some(headers), &state)
+        self.request_with_protobuf(&Method::PUT, &endpoint, Some(headers), state)
             .await
     }
 

@@ -7,35 +7,35 @@ use rand::prelude::SliceRandom;
 
 impl ConnectState {
     fn add_options_if_empty(&mut self) {
-        if self.player.options.is_none() {
-            self.player.options = MessageField::some(ContextPlayerOptions::new())
+        if self.player().options.is_none() {
+            self.player_mut().options = MessageField::some(ContextPlayerOptions::new())
         }
     }
 
     pub fn set_repeat_context(&mut self, repeat: bool) {
         self.add_options_if_empty();
-        if let Some(options) = self.player.options.as_mut() {
+        if let Some(options) = self.player_mut().options.as_mut() {
             options.repeating_context = repeat;
         }
     }
 
     pub fn set_repeat_track(&mut self, repeat: bool) {
         self.add_options_if_empty();
-        if let Some(options) = self.player.options.as_mut() {
+        if let Some(options) = self.player_mut().options.as_mut() {
             options.repeating_track = repeat;
         }
     }
 
     pub fn set_shuffle(&mut self, shuffle: bool) {
         self.add_options_if_empty();
-        if let Some(options) = self.player.options.as_mut() {
+        if let Some(options) = self.player_mut().options.as_mut() {
             options.shuffling_context = shuffle;
         }
     }
 
     pub fn shuffle(&mut self) -> Result<(), Error> {
         if let Some(reason) = self
-            .player
+            .player()
             .restrictions
             .disallow_toggling_shuffle_reasons
             .first()
@@ -46,15 +46,16 @@ impl ConnectState {
             })?
         }
 
-        self.prev_tracks.clear();
+        self.clear_prev_track();
         self.clear_next_tracks(true);
 
-        let current_uri = &self.player.track.uri;
+        let current_uri = self.current_track(|t| &t.uri);
 
         let ctx = self
             .context
-            .as_mut()
+            .as_ref()
             .ok_or(StateError::NoContext(ContextType::Default))?;
+
         let current_track = Self::find_index_in_context(Some(ctx), |t| &t.uri == current_uri)?;
 
         let mut shuffle_context = ctx.clone();
@@ -74,14 +75,14 @@ impl ConnectState {
     }
 
     pub fn shuffling_context(&self) -> bool {
-        self.player.options.shuffling_context
+        self.player().options.shuffling_context
     }
 
     pub fn repeat_context(&self) -> bool {
-        self.player.options.repeating_context
+        self.player().options.repeating_context
     }
 
     pub fn repeat_track(&self) -> bool {
-        self.player.options.repeating_track
+        self.player().options.repeating_track
     }
 }

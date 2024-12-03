@@ -24,53 +24,52 @@ impl ConnectState {
     }
 
     pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState, ctx_uri: String) {
-        self.player.is_buffering = false;
+        let current_context_metadata = self.context.as_ref().map(|c| c.metadata.clone());
+        let player = self.player_mut();
+
+        player.is_buffering = false;
 
         if let Some(options) = transfer.options.take() {
-            self.player.options = MessageField::some(options);
+            player.options = MessageField::some(options);
         }
-        self.player.is_paused = transfer.playback.is_paused;
-        self.player.is_playing = !transfer.playback.is_paused;
+        player.is_paused = transfer.playback.is_paused;
+        player.is_playing = !transfer.playback.is_paused;
 
         if transfer.playback.playback_speed != 0. {
-            self.player.playback_speed = transfer.playback.playback_speed
+            player.playback_speed = transfer.playback.playback_speed
         } else {
-            self.player.playback_speed = 1.;
+            player.playback_speed = 1.;
         }
 
-        self.player.play_origin = transfer.current_session.play_origin.clone();
+        player.play_origin = transfer.current_session.play_origin.clone();
 
         if let Some(suppressions) = transfer.current_session.suppressions.as_ref() {
-            self.player.suppressions = MessageField::some(suppressions.clone());
+            player.suppressions = MessageField::some(suppressions.clone());
         }
 
-        self.player.context_url = format!("context://{ctx_uri}");
-        self.player.context_uri = ctx_uri;
+        player.context_url = format!("context://{ctx_uri}");
+        player.context_uri = ctx_uri;
 
         if let Some(context) = transfer.current_session.context.as_ref() {
-            self.player.context_restrictions = context.restrictions.clone();
+            player.context_restrictions = context.restrictions.clone();
         }
 
         for (key, value) in &transfer.current_session.context.metadata {
-            self.player
-                .context_metadata
-                .insert(key.clone(), value.clone());
+            player.context_metadata.insert(key.clone(), value.clone());
         }
 
-        if let Some(context) = &self.context {
-            for (key, value) in &context.metadata {
-                self.player
-                    .context_metadata
-                    .insert(key.clone(), value.clone());
+        if let Some(metadata) = current_context_metadata {
+            for (key, value) in metadata {
+                player.context_metadata.insert(key, value);
             }
         }
 
-        self.prev_tracks.clear();
+        self.clear_prev_track();
         self.clear_next_tracks(false);
     }
 
     pub fn setup_state_from_transfer(&mut self, transfer: TransferState) -> Result<(), Error> {
-        let track = match self.player.track.as_ref() {
+        let track = match self.player().track.as_ref() {
             None => self.current_track_from_transfer(&transfer)?,
             Some(track) => track.clone(),
         };
@@ -91,8 +90,8 @@ impl ConnectState {
             ctx.map(|c| c.tracks.len()).unwrap_or_default()
         );
 
-        if self.player.track.is_none() {
-            self.player.track = MessageField::some(track);
+        if self.player().track.is_none() {
+            self.set_track(track);
         }
 
         let current_index = current_index.ok();

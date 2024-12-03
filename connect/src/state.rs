@@ -10,12 +10,11 @@ mod transfer;
 use crate::model::SpircPlayStatus;
 use crate::state::{
     context::{ContextType, ResetContext, StateContext},
-    metadata::Metadata,
     provider::{IsProvider, Provider},
 };
 use librespot_core::{
     config::DeviceType, date::Date, dealer::protocol::Request, spclient::SpClientResult, version,
-    Error, Session, SpotifyId,
+    Error, Session,
 };
 use librespot_protocol::connect::{
     Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest,
@@ -26,9 +25,11 @@ use librespot_protocol::player::{
 };
 use log::LevelFilter;
 use protobuf::{EnumOrUnknown, MessageField};
-use std::collections::{hash_map::DefaultHasher, VecDeque};
-use std::hash::{Hash, Hasher};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use thiserror::Error;
 
 // these limitations are essential, otherwise to many tracks will overload the web-player
@@ -95,25 +96,13 @@ impl Default for ConnectStateConfig {
 
 #[derive(Default, Debug)]
 pub struct ConnectState {
-    pub session_id: String,
-    pub active: bool,
-    pub active_since: Option<SystemTime>,
-
-    pub has_been_playing_for: Option<Instant>,
-
-    pub device: DeviceInfo,
+    /// the entire state that is updated to the remote server
+    request: PutStateRequest,
 
     unavailable_uri: Vec<String>,
 
-    /// index: 0 based, so the first track is index 0
-    player: PlayerState,
-
-    // we don't work directly on the track lists of the player state, because
-    // we mostly need to push and pop at the beginning of them
-    /// bottom => top, aka the last track of the list is the prev track
-    prev_tracks: VecDeque<ProvidedTrack>,
-    /// top => bottom, aka the first track of the list is the next track
-    next_tracks: VecDeque<ProvidedTrack>,
+    pub active_since: Option<SystemTime>,
+    queue_count: u64,
 
     // separation is necessary because we could have already loaded
     // the autoplay context but are still playing from the default context
@@ -121,131 +110,196 @@ pub struct ConnectState {
     pub fill_up_context: ContextType,
 
     /// the context from which we play, is used to top up prev and next tracks
-    /// the index is used to keep track which tracks are already loaded into next tracks
     pub context: Option<StateContext>,
-    /// upcoming contexts, usually directly provided by the context-resolver
-    pub next_contexts: Vec<ContextPage>,
-    /// a context to keep track of our shuffled context, should be only available when option.shuffling_context is true
-    pub shuffle_context: Option<StateContext>,
+    /// upcoming contexts, directly provided by the context-resolver
+    next_contexts: Vec<ContextPage>,
+
+    /// a context to keep track of our shuffled context,
+    /// should be only available when `player.option.shuffling_context` is true
+    shuffle_context: Option<StateContext>,
     /// a context to keep track of the autoplay context
-    pub autoplay_context: Option<StateContext>,
-
-    pub queue_count: u64,
-
-    pub last_command: Option<Request>,
+    autoplay_context: Option<StateContext>,
 }
 
 impl ConnectState {
     pub fn new(cfg: ConnectStateConfig, session: &Session) -> Self {
+        let device_info = DeviceInfo {
+            can_play: true,
+            volume: cfg.initial_volume,
+            name: cfg.name,
+            device_id: session.device_id().to_string(),
+            device_type: EnumOrUnknown::new(cfg.device_type.into()),
+            device_software_version: version::SEMVER.to_string(),
+            spirc_version: version::SPOTIFY_SPIRC_VERSION.to_string(),
+            client_id: session.client_id(),
+            is_group: cfg.is_group,
+            capabilities: MessageField::some(Capabilities {
+                volume_steps: cfg.volume_steps,
+                hidden: false, // could be exposed later to only observe the playback
+                gaia_eq_connect_id: true,
+                can_be_player: true,
+
+                needs_full_player_state: true,
+
+                is_observable: true,
+                is_controllable: true,
+
+                supports_gzip_pushes: true,
+                // todo: enable after logout handling is implemented, see spirc logout_request
+                supports_logout: false,
+                supported_types: vec!["audio/episode".into(), "audio/track".into()],
+                supports_playlist_v2: true,
+                supports_transfer_command: true,
+                supports_command_request: true,
+                supports_set_options_command: true,
+
+                is_voice_enabled: false,
+                restrict_to_local: false,
+                disable_volume: false,
+                connect_disabled: false,
+                supports_rename: false,
+                supports_external_episodes: false,
+                supports_set_backend_metadata: false,
+                supports_hifi: MessageField::none(),
+
+                command_acks: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
         let mut state = Self {
-            session_id: cfg.session_id,
-            device: DeviceInfo {
-                can_play: true,
-                volume: cfg.initial_volume,
-                name: cfg.name,
-                device_id: session.device_id().to_string(),
-                device_type: EnumOrUnknown::new(cfg.device_type.into()),
-                device_software_version: version::SEMVER.to_string(),
-                spirc_version: version::SPOTIFY_SPIRC_VERSION.to_string(),
-                client_id: session.client_id(),
-                is_group: cfg.is_group,
-                capabilities: MessageField::some(Capabilities {
-                    volume_steps: cfg.volume_steps,
-                    hidden: false, // could be exposed later to only observe the playback
-                    gaia_eq_connect_id: true,
-                    can_be_player: true,
-
-                    needs_full_player_state: true,
-
-                    is_observable: true,
-                    is_controllable: true,
-
-                    supports_gzip_pushes: true,
-                    // todo: enable after logout handling is implemented, see spirc logout_request
-                    supports_logout: false,
-                    supported_types: vec!["audio/episode".into(), "audio/track".into()],
-                    supports_playlist_v2: true,
-                    supports_transfer_command: true,
-                    supports_command_request: true,
-                    supports_set_options_command: true,
-
-                    is_voice_enabled: false,
-                    restrict_to_local: false,
-                    disable_volume: false,
-                    connect_disabled: false,
-                    supports_rename: false,
-                    supports_external_episodes: false,
-                    supports_set_backend_metadata: false,
-                    supports_hifi: MessageField::none(),
-
-                    command_acks: true,
+            request: PutStateRequest {
+                member_type: EnumOrUnknown::new(MemberType::CONNECT_STATE),
+                put_state_reason: EnumOrUnknown::new(PutStateReason::PLAYER_STATE_CHANGED),
+                device: MessageField::some(Device {
+                    device_info: MessageField::some(device_info),
+                    player_state: MessageField::some(PlayerState {
+                        session_id: cfg.session_id,
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }),
                 ..Default::default()
             },
-            // + 1, so that we have a buffer where we can swap elements
-            prev_tracks: VecDeque::with_capacity(SPOTIFY_MAX_PREV_TRACKS_SIZE + 1),
-            next_tracks: VecDeque::with_capacity(SPOTIFY_MAX_NEXT_TRACKS_SIZE + 1),
             ..Default::default()
         };
         state.reset();
         state
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.set_active(false);
         self.queue_count = 0;
 
-        self.player = PlayerState {
-            session_id: self.session_id.clone(),
+        // preserve the session_id
+        let session_id = self.player().session_id.clone();
+
+        self.device_mut().player_state = MessageField::some(PlayerState {
+            session_id,
             is_system_initiated: true,
             playback_speed: 1.,
             play_origin: MessageField::some(PlayOrigin::new()),
             suppressions: MessageField::some(Suppressions::new()),
             options: MessageField::some(ContextPlayerOptions::new()),
+            // + 1, so that we have a buffer where we can swap elements
+            prev_tracks: Vec::with_capacity(SPOTIFY_MAX_PREV_TRACKS_SIZE + 1),
+            next_tracks: Vec::with_capacity(SPOTIFY_MAX_NEXT_TRACKS_SIZE + 1),
             ..Default::default()
+        });
+    }
+
+    fn device_mut(&mut self) -> &mut Device {
+        self.request
+            .device
+            .as_mut()
+            .expect("the request is always available")
+    }
+
+    fn player_mut(&mut self) -> &mut PlayerState {
+        self.device_mut()
+            .player_state
+            .as_mut()
+            .expect("the player_state has to be always given")
+    }
+
+    pub fn device_info(&self) -> &DeviceInfo {
+        &self.request.device.device_info
+    }
+
+    pub fn player(&self) -> &PlayerState {
+        &self.request.device.player_state
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.request.is_active
+    }
+
+    pub fn set_volume(&mut self, volume: u32) {
+        self.device_mut()
+            .device_info
+            .as_mut()
+            .expect("the device_info has to be always given")
+            .volume = volume;
+    }
+
+    pub fn set_last_command(&mut self, command: Request) {
+        self.request.last_command_message_id = command.message_id;
+        self.request.last_command_sent_by_device_id = command.sent_by_device_id;
+    }
+
+    pub fn set_now(&mut self, now: u64) {
+        self.request.client_side_timestamp = now;
+
+        if let Some(active_since) = self.active_since {
+            if let Ok(active_since_duration) = active_since.duration_since(UNIX_EPOCH) {
+                match active_since_duration.as_millis().try_into() {
+                    Ok(active_since_ms) => self.request.started_playing_at = active_since_ms,
+                    Err(why) => warn!("couldn't update active since because {why}"),
+                }
+            }
         }
     }
 
     pub fn set_active(&mut self, value: bool) {
         if value {
-            if self.active {
+            if self.request.is_active {
                 return;
             }
 
-            self.active = true;
+            self.request.is_active = true;
             self.active_since = Some(SystemTime::now())
         } else {
-            self.active = false;
+            self.request.is_active = false;
             self.active_since = None
         }
     }
 
     pub fn set_origin(&mut self, origin: PlayOrigin) {
-        self.player.play_origin = MessageField::some(origin)
+        self.player_mut().play_origin = MessageField::some(origin)
     }
 
     pub fn set_session_id(&mut self, session_id: String) {
-        self.session_id = session_id.clone();
-        self.player.session_id = session_id;
+        self.player_mut().session_id = session_id;
     }
 
     pub(crate) fn set_status(&mut self, status: &SpircPlayStatus) {
-        self.player.is_paused = matches!(
+        let player = self.player_mut();
+        player.is_paused = matches!(
             status,
             SpircPlayStatus::LoadingPause { .. }
                 | SpircPlayStatus::Paused { .. }
                 | SpircPlayStatus::Stopped
         );
 
-        // desktop and mobile want all 'states' set to true, when we are paused,
+        // desktop and mobile require all 'states' set to true, when we are paused,
         // otherwise the play button (desktop) is grayed out or the preview (mobile) can't be opened
-        self.player.is_buffering = self.player.is_paused
+        player.is_buffering = player.is_paused
             || matches!(
                 status,
                 SpircPlayStatus::LoadingPause { .. } | SpircPlayStatus::LoadingPlay { .. }
             );
-        self.player.is_playing = self.player.is_paused
+        player.is_playing = player.is_paused
             || matches!(
                 status,
                 SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::Playing { .. }
@@ -253,36 +307,40 @@ impl ConnectState {
 
         debug!(
             "updated connect play status playing: {}, paused: {}, buffering: {}",
-            self.player.is_playing, self.player.is_paused, self.player.is_buffering
+            player.is_playing, player.is_paused, player.is_buffering
         );
 
         self.update_restrictions()
     }
 
+    /// index is 0 based, so the first track is index 0
     pub fn update_current_index(&mut self, f: impl Fn(&mut ContextIndex)) {
-        match self.player.index.as_mut() {
+        match self.player_mut().index.as_mut() {
             Some(player_index) => f(player_index),
             None => {
                 let mut new_index = ContextIndex::new();
                 f(&mut new_index);
-                self.player.index = MessageField::some(new_index)
+                self.player_mut().index = MessageField::some(new_index)
             }
         }
     }
 
     pub fn update_position(&mut self, position_ms: u32, timestamp: i64) {
-        self.player.position_as_of_timestamp = position_ms.into();
-        self.player.timestamp = timestamp;
+        let player = self.player_mut();
+        player.position_as_of_timestamp = position_ms.into();
+        player.timestamp = timestamp;
     }
 
     pub fn update_duration(&mut self, duration: u32) {
-        self.player.duration = duration.into()
+        self.player_mut().duration = duration.into()
     }
 
     pub fn update_queue_revision(&mut self) {
         let mut state = DefaultHasher::new();
-        self.next_tracks.iter().for_each(|t| t.uri.hash(&mut state));
-        self.player.queue_revision = state.finish().to_string()
+        self.next_tracks()
+            .iter()
+            .for_each(|t| t.uri.hash(&mut state));
+        self.player_mut().queue_revision = state.finish().to_string()
     }
 
     pub fn reset_playback_to_position(&mut self, new_index: Option<usize>) -> Result<(), Error> {
@@ -293,17 +351,17 @@ impl ConnectState {
 
         debug!("reset playback state to {new_index}");
 
-        if !self.player.track.is_queue() {
+        if !self.current_track(|t| t.is_queue()) {
             self.set_current_track(new_index)?;
         }
 
-        self.prev_tracks.clear();
+        self.clear_prev_track();
 
         if new_index > 0 {
             let context = self.get_context(&self.active_context)?;
 
             let before_new_track = context.tracks.len() - new_index;
-            self.prev_tracks = context
+            self.player_mut().prev_tracks = context
                 .tracks
                 .iter()
                 .rev()
@@ -312,7 +370,7 @@ impl ConnectState {
                 .rev()
                 .cloned()
                 .collect();
-            debug!("has {} prev tracks", self.prev_tracks.len())
+            debug!("has {} prev tracks", self.prev_tracks().len())
         }
 
         self.clear_next_tracks(true);
@@ -330,11 +388,13 @@ impl ConnectState {
     }
 
     pub fn update_position_in_relation(&mut self, timestamp: i64) {
-        let diff = timestamp - self.player.timestamp;
-        self.player.position_as_of_timestamp += diff;
+        let player = self.player_mut();
+
+        let diff = timestamp - player.timestamp;
+        player.position_as_of_timestamp += diff;
 
         if log::max_level() >= LevelFilter::Debug {
-            let pos = Duration::from_millis(self.player.position_as_of_timestamp as u64);
+            let pos = Duration::from_millis(player.position_as_of_timestamp as u64);
             let time = Date::from_timestamp_ms(timestamp)
                 .map(|d| d.time().to_string())
                 .unwrap_or_else(|_| timestamp.to_string());
@@ -344,7 +404,7 @@ impl ConnectState {
             debug!("update position to {min}:{sec:0>2} at {time}");
         }
 
-        self.player.timestamp = timestamp;
+        player.timestamp = timestamp;
     }
 
     pub async fn became_inactive(&mut self, session: &Session) -> SpClientResult {
@@ -354,67 +414,37 @@ impl ConnectState {
         session.spclient().put_connect_state_inactive(false).await
     }
 
-    /// Updates the connect state for the connect session
-    ///
-    /// Prepares a [PutStateRequest] from the current connect state
-    pub async fn update_state(&self, session: &Session, reason: PutStateReason) -> SpClientResult {
-        if matches!(reason, PutStateReason::BECAME_INACTIVE) {
-            warn!("should use <ConnectState::became_inactive> instead")
-        }
+    async fn send_with_reason(
+        &mut self,
+        session: &Session,
+        reason: PutStateReason,
+    ) -> SpClientResult {
+        let prev_reason = self.request.put_state_reason;
 
-        let now = SystemTime::now();
-        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        self.request.put_state_reason = EnumOrUnknown::new(reason);
+        let res = self.send_state(session).await;
 
-        let client_side_timestamp = u64::try_from(since_the_epoch.as_millis())?;
-        let member_type = EnumOrUnknown::new(MemberType::CONNECT_STATE);
-        let put_state_reason = EnumOrUnknown::new(reason);
+        self.request.put_state_reason = prev_reason;
+        res
+    }
 
-        let mut player_state = self.player.clone();
-        // we copy the player state, which only contains the infos, not the next and prev tracks
-        // cloning seems to be fine, because the cloned lists get dropped after the method call
-        player_state.next_tracks = self.next_tracks.clone().into();
-        player_state.prev_tracks = self.prev_tracks.clone().into();
+    /// Notifies the remote server about a new device
+    pub async fn notify_new_device_appeared(&mut self, session: &Session) -> SpClientResult {
+        self.send_with_reason(session, PutStateReason::NEW_DEVICE)
+            .await
+    }
 
-        let is_active = self.active;
-        let device = MessageField::some(Device {
-            device_info: MessageField::some(self.device.clone()),
-            player_state: MessageField::some(player_state),
-            ..Default::default()
-        });
+    /// Notifies the remote server about a new volume
+    pub async fn notify_volume_changed(&mut self, session: &Session) -> SpClientResult {
+        self.send_with_reason(session, PutStateReason::VOLUME_CHANGED)
+            .await
+    }
 
-        let mut put_state = PutStateRequest {
-            client_side_timestamp,
-            member_type,
-            put_state_reason,
-            is_active,
-            device,
-            ..Default::default()
-        };
-
-        if let Some(has_been_playing_for) = self.has_been_playing_for {
-            match has_been_playing_for.elapsed().as_millis().try_into() {
-                Ok(ms) => put_state.has_been_playing_for_ms = ms,
-                Err(why) => warn!("couldn't update has been playing for because {why}"),
-            }
-        }
-
-        if let Some(active_since) = self.active_since {
-            if let Ok(active_since_duration) = active_since.duration_since(UNIX_EPOCH) {
-                match active_since_duration.as_millis().try_into() {
-                    Ok(active_since_ms) => put_state.started_playing_at = active_since_ms,
-                    Err(why) => warn!("couldn't update active since because {why}"),
-                }
-            }
-        }
-
-        if let Some(request) = self.last_command.clone() {
-            put_state.last_command_message_id = request.message_id;
-            put_state.last_command_sent_by_device_id = request.sent_by_device_id;
-        }
-
+    /// Sends the connect state for the connect session to the remote server
+    pub async fn send_state(&self, session: &Session) -> SpClientResult {
         session
             .spclient()
-            .put_connect_state_request(put_state)
+            .put_connect_state_request(&self.request)
             .await
     }
 }

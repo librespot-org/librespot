@@ -13,6 +13,7 @@ const SEARCH_IDENTIFIER: &str = "spotify:search";
 pub struct StateContext {
     pub tracks: Vec<ProvidedTrack>,
     pub metadata: HashMap<String, String>,
+    /// is used to keep track which tracks are already loaded into the next_tracks
     pub index: ContextIndex,
 }
 
@@ -67,14 +68,14 @@ impl ConnectState {
     }
 
     pub fn context_uri(&self) -> &String {
-        &self.player.context_uri
+        &self.player().context_uri
     }
 
     pub fn reset_context(&mut self, mut reset_as: ResetContext) {
         self.active_context = ContextType::Default;
         self.fill_up_context = ContextType::Default;
 
-        if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.player.context_uri != ctx) {
+        if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.context_uri() != ctx) {
             reset_as = ResetContext::Completely
         }
         self.shuffle_context = None;
@@ -84,7 +85,7 @@ impl ConnectState {
                 self.context = None;
                 self.autoplay_context = None;
                 self.next_contexts.clear();
-                self.player.context_restrictions.clear()
+                self.player_mut().context_restrictions.clear()
             }
             ResetContext::WhenDifferent(_) => debug!("context didn't change, no reset"),
             ResetContext::DefaultIndex => {
@@ -145,7 +146,7 @@ impl ConnectState {
 
         debug!(
             "updated context {ty:?} from <{}> ({} tracks) to <{}> ({} tracks)",
-            self.player.context_uri,
+            self.context_uri(),
             prev_context
                 .map(|c| c.tracks.len().to_string())
                 .unwrap_or_else(|| "-".to_string()),
@@ -153,17 +154,18 @@ impl ConnectState {
             page.tracks.len()
         );
 
+        let player = self.player_mut();
         if context.restrictions.is_some() {
-            self.player.restrictions = context.restrictions.clone();
-            self.player.context_restrictions = context.restrictions;
+            player.restrictions = context.restrictions.clone();
+            player.context_restrictions = context.restrictions;
         } else {
-            self.player.context_restrictions = Default::default();
-            self.player.restrictions = Default::default()
+            player.context_restrictions = Default::default();
+            player.restrictions = Default::default()
         }
 
-        self.player.context_metadata.clear();
+        player.context_metadata.clear();
         for (key, value) in context.metadata {
-            self.player.context_metadata.insert(key, value);
+            player.context_metadata.insert(key, value);
         }
 
         match ty {
@@ -172,9 +174,9 @@ impl ConnectState {
 
                 // when we update the same context, we should try to preserve the previous position
                 // otherwise we might load the entire context twice
-                if self.player.context_uri == context.uri {
+                if self.context_uri() == &context.uri {
                     match Self::find_index_in_context(Some(&new_context), |t| {
-                        self.player.track.uri == t.uri
+                        self.current_track(|t| &t.uri) == &t.uri
                     }) {
                         Ok(new_pos) => {
                             debug!("found new index of current track, updating new_context index to {new_pos}");
@@ -183,7 +185,7 @@ impl ConnectState {
                         // the track isn't anymore in the context
                         Err(_) if matches!(self.active_context, ContextType::Default) => {
                             warn!("current track was removed, setting pos to last known index");
-                            new_context.index.track = self.player.index.track
+                            new_context.index.track = self.player().index.track
                         }
                         Err(_) => {}
                     }
@@ -193,8 +195,8 @@ impl ConnectState {
 
                 self.context = Some(new_context);
 
-                self.player.context_url = format!("context://{}", &context.uri);
-                self.player.context_uri = context.uri;
+                self.player_mut().context_url = format!("context://{}", &context.uri);
+                self.player_mut().context_uri = context.uri;
             }
             UpdateContext::Autoplay => {
                 self.autoplay_context = Some(self.state_context_from_page(
@@ -214,7 +216,7 @@ impl ConnectState {
         new_context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> StateContext {
-        let new_context_uri = new_context_uri.unwrap_or(&self.player.context_uri);
+        let new_context_uri = new_context_uri.unwrap_or(self.context_uri());
 
         let tracks = page
             .tracks
@@ -240,7 +242,7 @@ impl ConnectState {
 
     pub fn merge_context(&mut self, context: Option<Context>) -> Option<()> {
         let mut context = context?;
-        if context.uri != self.player.context_uri {
+        if self.context_uri() != &context.uri {
             return None;
         }
 

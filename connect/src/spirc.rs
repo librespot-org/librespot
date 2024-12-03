@@ -16,7 +16,7 @@ use crate::{
     },
     protocol::{
         autoplay_context_request::AutoplayContextRequest,
-        connect::{Cluster, ClusterUpdate, LogoutCommand, PutStateReason, SetVolumeCommand},
+        connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
         explicit_content_pubsub::UserAttributesUpdate,
         player::{Context, TransferState},
         playlist4_external::PlaylistModificationInfo,
@@ -270,8 +270,8 @@ impl Spirc {
 
         let spirc = Spirc { commands: cmd_tx };
 
-        let initial_volume = task.connect_state.device.volume;
-        task.connect_state.device.volume = 0;
+        let initial_volume = task.connect_state.device_info().volume;
+        task.connect_state.set_volume(0);
 
         match initial_volume.try_into() {
             Ok(volume) => {
@@ -440,8 +440,8 @@ impl SpircTask {
                 _ = async { sleep(VOLUME_UPDATE_DELAY).await }, if self.update_volume => {
                     self.update_volume = false;
 
-                    info!("delayed volume update for all devices: volume is now {}", self.connect_state.device.volume);
-                    if let Err(why) = self.connect_state.update_state(&self.session, PutStateReason::VOLUME_CHANGED).await {
+                    info!("delayed volume update for all devices: volume is now {}", self.connect_state.device_info().volume);
+                    if let Err(why) = self.connect_state.notify_volume_changed(&self.session).await {
                         error!("error updating connect state for volume update: {why}")
                     }
 
@@ -456,7 +456,7 @@ impl SpircTask {
             }
         }
 
-        if !self.shutdown && self.connect_state.active {
+        if !self.shutdown && self.connect_state.is_active() {
             if let Err(why) = self.notify().await {
                 warn!("notify before unexpected shutdown couldn't be send: {why}")
             }
@@ -590,6 +590,7 @@ impl SpircTask {
             .update_context(context, UpdateContext::Autoplay)
     }
 
+    // todo: time_delta still necessary?
     fn now_ms(&self) -> i64 {
         let dur = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -607,7 +608,7 @@ impl SpircTask {
                 rx.close()
             }
             Ok(())
-        } else if self.connect_state.active {
+        } else if self.connect_state.is_active() {
             trace!("Received SpircCommand::{:?}", cmd);
             match cmd {
                 SpircCommand::Play => {
@@ -818,7 +819,7 @@ impl SpircTask {
 
         let cluster = match self
             .connect_state
-            .update_state(&self.session, PutStateReason::NEW_DEVICE)
+            .notify_new_device_appeared(&self.session)
             .await
         {
             Ok(res) => Cluster::parse_from_bytes(&res).ok(),
@@ -930,13 +931,13 @@ impl SpircTask {
         );
 
         if let Some(cluster) = cluster_update.cluster.take() {
-            let became_inactive =
-                self.connect_state.active && cluster.active_device_id != self.session.device_id();
+            let became_inactive = self.connect_state.is_active()
+                && cluster.active_device_id != self.session.device_id();
             if became_inactive {
                 info!("device became inactive");
                 self.connect_state.became_inactive(&self.session).await?;
                 self.handle_stop()
-            } else if self.connect_state.active {
+            } else if self.connect_state.is_active() {
                 // fixme: workaround fix, because of missing information why it behaves like it does
                 //  background: when another device sends a connect-state update, some player's position de-syncs
                 //  tried: providing session_id, playback_id, track-metadata "track_player"
@@ -951,7 +952,7 @@ impl SpircTask {
         &mut self,
         (request, sender): RequestReply,
     ) -> Result<(), Error> {
-        self.connect_state.last_command = Some(request.clone());
+        self.connect_state.set_last_command(request.clone());
 
         debug!(
             "handling: '{}' from {}",
@@ -1119,9 +1120,7 @@ impl SpircTask {
         if self.connect_state.context.is_some() {
             self.connect_state.setup_state_from_transfer(transfer)?;
         } else {
-            if self.connect_state.autoplay_context.is_none()
-                && (self.connect_state.current_track(|t| t.is_autoplay()) || autoplay)
-            {
+            if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
                 debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
 
                 self.resolve_context
@@ -1172,7 +1171,7 @@ impl SpircTask {
         );
 
         self.player
-            .emit_volume_changed_event(self.connect_state.device.volume as u16);
+            .emit_volume_changed_event(self.connect_state.device_info().volume as u16);
 
         self.player
             .emit_auto_play_changed_event(self.session.autoplay());
@@ -1197,7 +1196,7 @@ impl SpircTask {
         self.connect_state
             .reset_context(ResetContext::WhenDifferent(&cmd.context_uri));
 
-        if !self.connect_state.active {
+        if !self.connect_state.is_active() {
             self.handle_activate();
         }
 
@@ -1485,12 +1484,14 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let volume = (self.connect_state.device.volume as u16).saturating_add(VOLUME_STEP_SIZE);
+        let volume =
+            (self.connect_state.device_info().volume as u16).saturating_add(VOLUME_STEP_SIZE);
         self.set_volume(volume);
     }
 
     fn handle_volume_down(&mut self) {
-        let volume = (self.connect_state.device.volume as u16).saturating_sub(VOLUME_STEP_SIZE);
+        let volume =
+            (self.connect_state.device_info().volume as u16).saturating_sub(VOLUME_STEP_SIZE);
         self.set_volume(volume);
     }
 
@@ -1611,24 +1612,26 @@ impl SpircTask {
                 .update_position_in_relation(self.now_ms());
         }
 
+        self.connect_state.set_now(self.now_ms() as u64);
+
         self.connect_state
-            .update_state(&self.session, PutStateReason::PLAYER_STATE_CHANGED)
+            .send_state(&self.session)
             .await
             .map(|_| ())
     }
 
     fn set_volume(&mut self, volume: u16) {
-        let old_volume = self.connect_state.device.volume;
+        let old_volume = self.connect_state.device_info().volume;
         let new_volume = volume as u32;
         if old_volume != new_volume || self.mixer.volume() != volume {
             self.update_volume = true;
 
-            self.connect_state.device.volume = new_volume;
+            self.connect_state.set_volume(new_volume);
             self.mixer.set_volume(volume);
             if let Some(cache) = self.session.cache() {
                 cache.save_volume(volume)
             }
-            if self.connect_state.active {
+            if self.connect_state.is_active() {
                 self.player.emit_volume_changed_event(volume);
             }
         }

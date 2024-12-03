@@ -1,13 +1,12 @@
-use crate::state::context::ContextType;
-use crate::state::metadata::Metadata;
-use crate::state::provider::{IsProvider, Provider};
 use crate::state::{
+    context::ContextType,
+    metadata::Metadata,
+    provider::{IsProvider, Provider},
     ConnectState, StateError, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE,
 };
 use librespot_core::{Error, SpotifyId};
 use librespot_protocol::player::ProvidedTrack;
 use protobuf::MessageField;
-use std::collections::VecDeque;
 
 // identifier used as part of the uid
 pub const IDENTIFIER_DELIMITER: &str = "delimiter";
@@ -24,6 +23,45 @@ impl<'ct> ConnectState {
         delimiter.add_iteration(iteration);
 
         delimiter
+    }
+
+    fn push_prev(&mut self, prev: ProvidedTrack) {
+        let prev_tracks = self.prev_tracks_mut();
+        // add prev track, while preserving a length of 10
+        if prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
+            // todo: O(n), but technically only maximal O(SPOTIFY_MAX_PREV_TRACKS_SIZE) aka O(10)
+            let _ = prev_tracks.remove(0);
+        }
+        prev_tracks.push(prev)
+    }
+
+    fn get_next_track(&mut self) -> Option<ProvidedTrack> {
+        if self.next_tracks().is_empty() {
+            None
+        } else {
+            // todo: O(n), but technically only maximal O(SPOTIFY_MAX_NEXT_TRACKS_SIZE) aka O(80)
+            Some(self.next_tracks_mut().remove(0))
+        }
+    }
+
+    /// bottom => top, aka the last track of the list is the prev track
+    fn prev_tracks_mut(&mut self) -> &mut Vec<ProvidedTrack> {
+        &mut self.player_mut().prev_tracks
+    }
+
+    /// bottom => top, aka the last track of the list is the prev track
+    pub(super) fn prev_tracks(&self) -> &Vec<ProvidedTrack> {
+        &self.player().prev_tracks
+    }
+
+    /// top => bottom, aka the first track of the list is the next track
+    fn next_tracks_mut(&mut self) -> &mut Vec<ProvidedTrack> {
+        &mut self.player_mut().next_tracks
+    }
+
+    /// top => bottom, aka the first track of the list is the next track
+    pub(super) fn next_tracks(&self) -> &Vec<ProvidedTrack> {
+        &self.player().next_tracks
     }
 
     pub fn set_current_track(&mut self, index: usize) -> Result<(), Error> {
@@ -44,7 +82,7 @@ impl<'ct> ConnectState {
             context.tracks.len()
         );
 
-        self.player.track = MessageField::some(new_track.clone());
+        self.set_track(new_track.clone());
 
         self.update_current_index(|i| i.track = index as u32);
 
@@ -61,29 +99,24 @@ impl<'ct> ConnectState {
             self.set_repeat_track(false);
         }
 
-        let old_track = self.player.track.take();
+        let old_track = self.player_mut().track.take();
 
         if let Some(old_track) = old_track {
             // only add songs from our context to our previous tracks
             if old_track.is_context() || old_track.is_autoplay() {
-                // add old current track to prev tracks, while preserving a length of 10
-                if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
-                    let _ = self.prev_tracks.pop_front();
-                }
-                self.prev_tracks.push_back(old_track);
+                self.push_prev(old_track)
             }
         }
 
-        let new_track = match self.next_tracks.pop_front() {
-            Some(next) if next.uid.starts_with(IDENTIFIER_DELIMITER) => {
-                if self.prev_tracks.len() >= SPOTIFY_MAX_PREV_TRACKS_SIZE {
-                    let _ = self.prev_tracks.pop_front();
+        let new_track = loop {
+            match self.get_next_track() {
+                Some(next) if next.uid.starts_with(IDENTIFIER_DELIMITER) => {
+                    self.push_prev(next);
+                    continue;
                 }
-                self.prev_tracks.push_back(next);
-                self.next_tracks.pop_front()
-            }
-            Some(next) if next.is_unavailable() => self.next_tracks.pop_front(),
-            other => other,
+                Some(next) if next.is_unavailable() => continue,
+                other => break other,
+            };
         };
 
         let new_track = match new_track {
@@ -112,13 +145,14 @@ impl<'ct> ConnectState {
 
         if let Some(update_index) = update_index {
             self.update_current_index(|i| i.track = update_index)
+        } else {
+            self.player_mut().index.clear()
         }
 
-        self.player.track = MessageField::some(new_track);
-
+        self.set_track(new_track);
         self.update_restrictions();
 
-        Ok(Some(self.player.index.track))
+        Ok(Some(self.player().index.track))
     }
 
     /// Move to the prev track
@@ -127,32 +161,36 @@ impl<'ct> ConnectState {
     /// to next tracks (when from the context) and fills up the prev tracks from the
     /// current context
     pub fn prev_track(&mut self) -> Result<Option<&MessageField<ProvidedTrack>>, StateError> {
-        let old_track = self.player.track.take();
+        let old_track = self.player_mut().track.take();
 
         if let Some(old_track) = old_track {
             if old_track.is_context() || old_track.is_autoplay() {
-                self.next_tracks.push_front(old_track);
+                // todo: O(n)
+                self.next_tracks_mut().insert(0, old_track);
             }
         }
 
         // handle possible delimiter
-        if matches!(self.prev_tracks.back(), Some(prev) if prev.uid.starts_with(IDENTIFIER_DELIMITER))
+        if matches!(self.prev_tracks().last(), Some(prev) if prev.uid.starts_with(IDENTIFIER_DELIMITER))
         {
             let delimiter = self
-                .prev_tracks
-                .pop_back()
+                .prev_tracks_mut()
+                .pop()
                 .expect("item that was prechecked");
-            if self.next_tracks.len() >= SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-                let _ = self.next_tracks.pop_back();
+
+            let next_tracks = self.next_tracks_mut();
+            if next_tracks.len() >= SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+                let _ = next_tracks.pop();
             }
-            self.next_tracks.push_front(delimiter)
+            // todo: O(n)
+            next_tracks.insert(0, delimiter)
         }
 
-        while self.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-            let _ = self.next_tracks.pop_back();
+        while self.next_tracks().len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+            let _ = self.next_tracks_mut().pop();
         }
 
-        let new_track = match self.prev_tracks.pop_back() {
+        let new_track = match self.prev_tracks_mut().pop() {
             None => return Ok(None),
             Some(t) => t,
         };
@@ -163,10 +201,9 @@ impl<'ct> ConnectState {
         }
 
         self.fill_up_next_tracks()?;
+        self.set_track(new_track);
 
-        self.player.track = MessageField::some(new_track);
-
-        if self.player.index.track == 0 {
+        if self.player().index.track == 0 {
             warn!("prev: trying to skip into negative, index update skipped")
         } else {
             self.update_current_index(|i| i.track -= 1)
@@ -174,18 +211,18 @@ impl<'ct> ConnectState {
 
         self.update_restrictions();
 
-        Ok(Some(&self.player.track))
+        Ok(Some(self.current_track(|t| t)))
     }
 
     pub fn current_track<F: Fn(&'ct MessageField<ProvidedTrack>) -> R, R>(
         &'ct self,
         access: F,
     ) -> R {
-        access(&self.player.track)
+        access(&self.player().track)
     }
 
     pub fn set_track(&mut self, track: ProvidedTrack) {
-        self.player.track = MessageField::some(track)
+        self.player_mut().track = MessageField::some(track)
     }
 
     pub fn set_next_tracks(&mut self, mut tracks: Vec<ProvidedTrack>) {
@@ -203,30 +240,34 @@ impl<'ct> ConnectState {
                 self.queue_count += 1;
             });
 
-        self.next_tracks = tracks.into();
+        self.player_mut().next_tracks = tracks;
     }
 
-    pub fn set_prev_tracks(&mut self, tracks: impl Into<VecDeque<ProvidedTrack>>) {
-        self.prev_tracks = tracks.into();
+    pub fn set_prev_tracks(&mut self, tracks: Vec<ProvidedTrack>) {
+        self.player_mut().prev_tracks = tracks;
+    }
+
+    pub fn clear_prev_track(&mut self) {
+        self.prev_tracks_mut().clear()
     }
 
     pub fn clear_next_tracks(&mut self, keep_queued: bool) {
         if !keep_queued {
-            self.next_tracks.clear();
+            self.next_tracks_mut().clear();
             return;
         }
 
         // respect queued track and don't throw them out of our next played tracks
         let first_non_queued_track = self
-            .next_tracks
+            .next_tracks()
             .iter()
             .enumerate()
             .find(|(_, track)| !track.is_queue());
 
         if let Some((non_queued_track, _)) = first_non_queued_track {
-            while self.next_tracks.len() > non_queued_track && self.next_tracks.pop_back().is_some()
-            {
-            }
+            while self.next_tracks().len() > non_queued_track
+                && self.next_tracks_mut().pop().is_some()
+            {}
         }
     }
 
@@ -235,7 +276,7 @@ impl<'ct> ConnectState {
         let mut new_index = ctx.index.track as usize;
         let mut iteration = ctx.index.page;
 
-        while self.next_tracks.len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+        while self.next_tracks().len() < SPOTIFY_MAX_NEXT_TRACKS_SIZE {
             let ctx = self.get_context(&self.fill_up_context)?;
             let track = match ctx.tracks.get(new_index) {
                 None if self.repeat_context() => {
@@ -280,7 +321,7 @@ impl<'ct> ConnectState {
                 }
             };
 
-            self.next_tracks.push_back(track);
+            self.next_tracks_mut().push(track);
         }
 
         self.update_context_index(self.fill_up_context, new_index)?;
@@ -293,9 +334,9 @@ impl<'ct> ConnectState {
 
     pub fn preview_next_track(&mut self) -> Option<SpotifyId> {
         let next = if self.repeat_track() {
-            &self.player.track.uri
+            self.current_track(|t| &t.uri)
         } else {
-            &self.next_tracks.front()?.uri
+            &self.next_tracks().first()?.uri
         };
 
         SpotifyId::from_uri(next).ok()
@@ -303,22 +344,21 @@ impl<'ct> ConnectState {
 
     pub fn has_next_tracks(&self, min: Option<usize>) -> bool {
         if let Some(min) = min {
-            self.next_tracks.len() >= min
+            self.next_tracks().len() >= min
         } else {
-            !self.next_tracks.is_empty()
+            !self.next_tracks().is_empty()
         }
     }
 
     pub fn prev_autoplay_track_uris(&self) -> Vec<String> {
         let mut prev = self
-            .prev_tracks
+            .prev_tracks()
             .iter()
             .flat_map(|t| t.is_autoplay().then_some(t.uri.clone()))
             .collect::<Vec<_>>();
 
-        let current = &self.player.track;
-        if current.is_autoplay() {
-            prev.push(current.uri.clone());
+        if self.current_track(|t| t.is_autoplay()) {
+            prev.push(self.current_track(|t| t.uri.clone()));
         }
 
         prev
@@ -329,27 +369,27 @@ impl<'ct> ConnectState {
 
         debug!("marking {uri} as unavailable");
 
-        for next_track in &mut self.next_tracks {
+        let next_tracks = self.next_tracks_mut();
+        while let Some(pos) = next_tracks.iter().position(|t| t.uri == uri) {
+            let _ = next_tracks.remove(pos);
+        }
+
+        for next_track in next_tracks {
             Self::mark_as_unavailable_for_match(next_track, &uri)
         }
 
-        for prev_track in &mut self.prev_tracks {
+        let prev_tracks = self.prev_tracks_mut();
+        while let Some(pos) = prev_tracks.iter().position(|t| t.uri == uri) {
+            let _ = prev_tracks.remove(pos);
+        }
+
+        for prev_track in prev_tracks {
             Self::mark_as_unavailable_for_match(prev_track, &uri)
         }
 
-        if self.player.track.uri != uri {
-            while let Some(pos) = self.next_tracks.iter().position(|t| t.uri == uri) {
-                let _ = self.next_tracks.remove(pos);
-            }
-
-            while let Some(pos) = self.prev_tracks.iter().position(|t| t.uri == uri) {
-                let _ = self.prev_tracks.remove(pos);
-            }
-
-            self.unavailable_uri.push(uri);
-            self.fill_up_next_tracks()?;
-            self.update_queue_revision();
-        }
+        self.unavailable_uri.push(uri);
+        self.fill_up_next_tracks()?;
+        self.update_queue_revision();
 
         Ok(())
     }
@@ -363,16 +403,15 @@ impl<'ct> ConnectState {
             track.set_queued(true);
         }
 
-        if let Some(next_not_queued_track) =
-            self.next_tracks.iter().position(|track| !track.is_queue())
-        {
-            self.next_tracks.insert(next_not_queued_track, track);
+        let next_tracks = self.next_tracks_mut();
+        if let Some(next_not_queued_track) = next_tracks.iter().position(|t| !t.is_queue()) {
+            next_tracks.insert(next_not_queued_track, track);
         } else {
-            self.next_tracks.push_back(track)
+            next_tracks.push(track)
         }
 
-        while self.next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
-            self.next_tracks.pop_back();
+        while next_tracks.len() > SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+            next_tracks.pop();
         }
 
         if rev_update {
