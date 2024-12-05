@@ -75,6 +75,11 @@ impl Login5Manager {
     async fn login5_request(&self, login: Login_method) -> Result<LoginOk, Error> {
         let client_id = match OS {
             "macos" | "windows" => self.session().client_id(),
+            // StoredCredential is used to get an access_token from Session credentials.
+            // Using the session client_id allows user to use Keymaster on Android/IOS
+            // if their Credentials::with_access_token was obtained there, assuming
+            // they have overriden the SessionConfig::client_id with the Keymaster's.
+            _ if matches!(login, Login_method::StoredCredential(_)) => self.session().client_id(),
             _ => SessionConfig::default().client_id,
         };
 

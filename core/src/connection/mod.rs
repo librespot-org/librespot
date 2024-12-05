@@ -101,7 +101,7 @@ pub async fn authenticate(
 
     let cpu_family = match std::env::consts::ARCH {
         "blackfin" => CpuFamily::CPU_BLACKFIN,
-        "arm" | "arm64" => CpuFamily::CPU_ARM,
+        "arm" | "aarch64" => CpuFamily::CPU_ARM,
         "ia64" => CpuFamily::CPU_IA64,
         "mips" => CpuFamily::CPU_MIPS,
         "ppc" => CpuFamily::CPU_PPC,
