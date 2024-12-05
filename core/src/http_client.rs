@@ -145,12 +145,16 @@ impl HttpClient {
 
     fn try_create_hyper_client(proxy_url: Option<&Url>) -> Result<HyperClient, Error> {
         // configuring TLS is expensive and should be done once per process
-        let https_connector = HttpsConnectorBuilder::new()
-            .with_native_roots()?
-            .https_or_http()
-            .enable_http1()
-            .enable_http2()
-            .build();
+
+        // On supported platforms, use native roots
+        #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+        let tls = HttpsConnectorBuilder::new().with_native_roots()?;
+
+        // Otherwise, use webpki roots
+        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+        let tls = HttpsConnectorBuilder::new().with_webpki_roots();
+
+        let https_connector = tls.https_or_http().enable_http1().enable_http2().build();
 
         // When not using a proxy a dummy proxy is configured that will not intercept any traffic.
         // This prevents needing to carry the Client Connector generics through the whole project
