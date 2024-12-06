@@ -64,7 +64,10 @@ sha1 = "0.10"
 sysinfo = { version = "0.31.3", default-features = false, features = ["system"] }
 thiserror = "1.0"
 tokio = { version = "1.40", features = ["rt", "macros", "signal", "sync", "parking_lot", "process"] }
+time = { version = "0.3", features = ["formatting"] }
 url = "2.2"
+zbus = { version = "4", default-features = false, features = ["tokio"], optional = true }
+zvariant = { version = "4", default-features = false, optional = true }
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]
@@ -82,7 +85,9 @@ with-libmdns = ["librespot-discovery/with-libmdns"]
 
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
-default = ["rodio-backend", "with-libmdns"]
+with-mpris = ["dep:zbus", "dep:zvariant"]
+
+default = ["rodio-backend", "with-libmdns", "with-mpris"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
