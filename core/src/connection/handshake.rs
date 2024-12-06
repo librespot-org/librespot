@@ -229,8 +229,8 @@ where
     Ok(message)
 }
 
-async fn read_into_accumulator<'a, 'b, T: AsyncRead + Unpin>(
-    connection: &'a mut T,
+async fn read_into_accumulator<'b, T: AsyncRead + Unpin>(
+    connection: &mut T,
     size: usize,
     acc: &'b mut Vec<u8>,
 ) -> io::Result<&'b mut [u8]> {
