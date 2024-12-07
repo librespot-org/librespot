@@ -34,6 +34,8 @@ use crate::{
 };
 use futures_util::{Stream, StreamExt};
 use protobuf::MessageField;
+use std::collections::HashMap;
+use std::time::Instant;
 use std::{
     future::Future,
     pin::Pin,
@@ -98,6 +100,9 @@ struct SpircTask {
     shutdown: bool,
     session: Session,
     resolve_context: Vec<ResolveContext>,
+    /// contexts may not be resolvable at the moment so we should ignore any further request
+    unavailable_contexts: HashMap<ResolveContext, Instant>,
+
     // is set when we receive a transfer state and are loading the context asynchronously
     pub transfer_state: Option<TransferState>,
 
@@ -134,6 +139,8 @@ const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
 
 // delay to resolve a bundle of context updates, delaying the update prevents duplicate context updates of the same type
 const RESOLVE_CONTEXT_DELAY: Duration = Duration::from_millis(500);
+// time after which an unavailable context is retried
+const RETRY_UNAVAILABLE: Duration = Duration::from_secs(3600);
 // delay to update volume after a certain amount of time, instead on each update request
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_secs(2);
 
@@ -262,6 +269,7 @@ impl Spirc {
             session,
 
             resolve_context: Vec::new(),
+            unavailable_contexts: HashMap::new(),
             transfer_state: None,
             update_volume: false,
 
@@ -499,8 +507,8 @@ impl SpircTask {
                     .await
                 {
                     error!("failed resolving context <{resolve}>: {why}");
-                    self.connect_state.reset_context(ResetContext::Completely);
-                    self.handle_stop()
+                    self.unavailable_contexts.insert(resolve, Instant::now());
+                    continue;
                 }
 
                 self.connect_state.merge_context(Some(resolve.into()));
@@ -589,6 +597,33 @@ impl SpircTask {
 
         self.connect_state
             .update_context(context, UpdateContext::Autoplay)
+    }
+
+    fn add_resolve_context(&mut self, resolve: ResolveContext) {
+        let last_try = self
+            .unavailable_contexts
+            .get(&resolve)
+            .map(|i| i.duration_since(Instant::now()));
+
+        let last_try = if matches!(last_try, Some(last_try) if last_try > RETRY_UNAVAILABLE) {
+            let _ = self.unavailable_contexts.remove(&resolve);
+            debug!(
+                "context was requested {}s ago, trying again to resolve the requested context",
+                last_try.expect("checked by condition").as_secs()
+            );
+            None
+        } else {
+            last_try
+        };
+
+        if last_try.is_none() {
+            // When in autoplay, keep topping up the playlist when it nears the end
+            debug!("Preloading autoplay: {resolve}");
+            // resolve the next autoplay context
+            self.resolve_context.push(resolve);
+        } else {
+            debug!("tried loading unavailable context: {resolve}")
+        }
     }
 
     // todo: time_delta still necessary?
@@ -993,8 +1028,10 @@ impl SpircTask {
                         update_context.context.uri, self.connect_state.context_uri()
                     )
                 } else {
-                    self.resolve_context
-                        .push(ResolveContext::from_context(update_context.context, false));
+                    self.add_resolve_context(ResolveContext::from_context(
+                        update_context.context,
+                        false,
+                    ))
                 }
                 return Ok(());
             }
@@ -1099,8 +1136,7 @@ impl SpircTask {
         let fallback = self.connect_state.current_track(|t| &t.uri).clone();
 
         debug!("async resolve context for <{}>", ctx_uri);
-        self.resolve_context
-            .push(ResolveContext::from_uri(ctx_uri.clone(), &fallback, false));
+        self.add_resolve_context(ResolveContext::from_uri(ctx_uri.clone(), &fallback, false));
 
         let timestamp = self.now_ms();
         let state = &mut self.connect_state;
@@ -1123,8 +1159,7 @@ impl SpircTask {
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
             debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
 
-            self.resolve_context
-                .push(ResolveContext::from_uri(ctx_uri, fallback, true))
+            self.add_resolve_context(ResolveContext::from_uri(ctx_uri, fallback, true))
         }
 
         self.transfer_state = Some(transfer);
@@ -1398,18 +1433,14 @@ impl SpircTask {
                 match next {
                     LoadNext::Done => info!("loaded next context"),
                     LoadNext::PageUrl(page_url) => {
-                        self.resolve_context
-                            .push(ResolveContext::from_page_url(page_url));
+                        self.add_resolve_context(ResolveContext::from_page_url(page_url))
                     }
                     LoadNext::Empty if self.session.autoplay() => {
                         let current_context = self.connect_state.context_uri();
                         let fallback = self.connect_state.current_track(|t| &t.uri);
                         let resolve = ResolveContext::from_uri(current_context, fallback, true);
 
-                        // When in autoplay, keep topping up the playlist when it nears the end
-                        debug!("Preloading autoplay: {resolve}");
-                        // resolve the next autoplay context
-                        self.resolve_context.push(resolve);
+                        self.add_resolve_context(resolve)
                     }
                     LoadNext::Empty => {
                         debug!("next context is empty and autoplay isn't enabled, no preloading required")
@@ -1514,7 +1545,7 @@ impl SpircTask {
         }
 
         debug!("playlist modification for current context: {uri}");
-        self.resolve_context.push(ResolveContext::from_uri(
+        self.add_resolve_context(ResolveContext::from_uri(
             uri,
             self.connect_state.current_track(|t| &t.uri),
             false,

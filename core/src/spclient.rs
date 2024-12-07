@@ -62,6 +62,8 @@ const NO_METRICS_AND_SALT: RequestOptions = RequestOptions {
 pub enum SpClientError {
     #[error("missing attribute {0}")]
     Attribute(String),
+    #[error("expected data but received none")]
+    NoData,
 }
 
 impl From<SpClientError> for Error {
@@ -830,9 +832,17 @@ impl SpClient {
             .request_with_options(&Method::GET, &uri, None, None, &NO_METRICS_AND_SALT)
             .await?;
         let ctx_json = String::from_utf8(res.to_vec())?;
-        let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json)?;
+        if ctx_json.is_empty() {
+            Err(SpClientError::NoData)?
+        }
 
-        Ok(ctx)
+        let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json);
+
+        if ctx.is_err() {
+            trace!("failed parsing context: {ctx_json}")
+        }
+
+        Ok(ctx?)
     }
 
     pub async fn get_autoplay_context(
@@ -850,9 +860,17 @@ impl SpClient {
             .await?;
 
         let ctx_json = String::from_utf8(res.to_vec())?;
-        let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json)?;
+        if ctx_json.is_empty() {
+            Err(SpClientError::NoData)?
+        }
 
-        Ok(ctx)
+        let ctx = protobuf_json_mapping::parse_from_str::<Context>(&ctx_json);
+
+        if ctx.is_err() {
+            trace!("failed parsing context: {ctx_json}")
+        }
+
+        Ok(ctx?)
     }
 
     pub async fn get_rootlist(&self, from: usize, length: Option<usize>) -> SpClientResult {

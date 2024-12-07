@@ -2,6 +2,7 @@ use crate::state::ConnectState;
 use librespot_core::dealer::protocol::SkipTo;
 use librespot_protocol::player::Context;
 use std::fmt::{Display, Formatter};
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug)]
 pub struct SpircLoadCommand {
@@ -166,6 +167,17 @@ impl PartialEq for ResolveContext {
         let eq_update = self.update == other.update;
 
         eq_context && eq_resolve && eq_autoplay && eq_update
+    }
+}
+
+impl Eq for ResolveContext {}
+
+impl Hash for ResolveContext {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.context_uri().hash(state);
+        self.resolve_uri().hash(state);
+        self.autoplay.hash(state);
+        self.update.hash(state);
     }
 }
 
