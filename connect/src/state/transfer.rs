@@ -82,7 +82,7 @@ impl ConnectState {
             ContextType::Default
         };
 
-        self.set_active_context(context_ty)?;
+        self.set_active_context(context_ty);
         self.fill_up_context = context_ty;
 
         let ctx = self.get_context(&self.active_context).ok();

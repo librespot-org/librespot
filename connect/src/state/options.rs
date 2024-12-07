@@ -67,7 +67,7 @@ impl ConnectState {
         shuffle_context.index = ContextIndex::new();
 
         self.shuffle_context = Some(shuffle_context);
-        self.set_active_context(ContextType::Shuffle)?;
+        self.set_active_context(ContextType::Shuffle);
         self.fill_up_context = ContextType::Shuffle;
         self.fill_up_next_tracks()?;
 

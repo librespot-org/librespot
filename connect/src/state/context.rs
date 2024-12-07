@@ -74,9 +74,7 @@ impl ConnectState {
     }
 
     pub fn reset_context(&mut self, mut reset_as: ResetContext) {
-        if let Err(why) = self.set_active_context(ContextType::Default) {
-            warn!("switching to active context had issues: {why}")
-        }
+        self.set_active_context(ContextType::Default);
         self.fill_up_context = ContextType::Default;
 
         if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.context_uri() != ctx) {
@@ -116,10 +114,17 @@ impl ConnectState {
             .and_then(|p| p.tracks.first().map(|t| &t.uri))
     }
 
-    pub fn set_active_context(&mut self, new_context: ContextType) -> Result<(), Error> {
+    pub fn set_active_context(&mut self, new_context: ContextType) {
         self.active_context = new_context;
 
-        let ctx = self.get_context(&new_context)?;
+        let ctx = match self.get_context(&new_context) {
+            Err(why) => {
+                debug!("couldn't load context info because: {why}");
+                return;
+            }
+            Ok(ctx) => ctx,
+        };
+
         let mut restrictions = ctx.restrictions.clone();
         let metadata = ctx.metadata.clone();
 
@@ -135,8 +140,6 @@ impl ConnectState {
         for (key, value) in metadata {
             player.context_metadata.insert(key, value);
         }
-
-        Ok(())
     }
 
     pub fn update_context(&mut self, mut context: Context, ty: UpdateContext) -> Result<(), Error> {

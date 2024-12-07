@@ -129,7 +129,7 @@ impl<'ct> ConnectState {
         let update_index = if new_track.is_queue() {
             None
         } else if new_track.is_autoplay() {
-            self.set_active_context(ContextType::Autoplay)?;
+            self.set_active_context(ContextType::Autoplay);
             None
         } else {
             let ctx = self.context.as_ref();
@@ -197,7 +197,7 @@ impl<'ct> ConnectState {
 
         if matches!(self.active_context, ContextType::Autoplay if new_track.is_context()) {
             // transition back to default context
-            self.set_active_context(ContextType::Default)?;
+            self.set_active_context(ContextType::Default);
         }
 
         self.fill_up_next_tracks()?;
