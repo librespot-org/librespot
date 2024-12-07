@@ -836,7 +836,9 @@ impl SpircTask {
             self.session.device_id()
         );
 
-        if !cluster.active_device_id.is_empty() || !cluster.player_state.session_id.is_empty() {
+        let same_session = cluster.player_state.session_id == self.session.session_id()
+            || cluster.player_state.session_id.is_empty();
+        if !cluster.active_device_id.is_empty() || !same_session {
             info!(
                 "active device is <{}> with session <{}>",
                 cluster.active_device_id, cluster.player_state.session_id
