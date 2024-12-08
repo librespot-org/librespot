@@ -4,7 +4,7 @@ use crate::{
     core::{
         authentication::Credentials,
         dealer::{
-            manager::{Reply, RequestReply},
+            manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
             protocol::{Command, Message, Request},
         },
         session::UserAttributes,
@@ -32,20 +32,18 @@ use crate::{
         {ConnectState, ConnectStateConfig},
     },
 };
-use futures_util::{Stream, StreamExt};
+use futures_util::StreamExt;
 use protobuf::MessageField;
 use std::collections::HashMap;
 use std::time::Instant;
 use std::{
     future::Future,
-    pin::Pin,
     sync::atomic::{AtomicUsize, Ordering},
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
 use tokio::{sync::mpsc, time::sleep};
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[derive(Debug, Error)]
 pub enum SpircError {
@@ -71,9 +69,6 @@ impl From<SpircError> for Error {
         }
     }
 }
-
-type BoxedStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
-type BoxedStreamResult<T> = BoxedStream<Result<T, Error>>;
 
 struct SpircTask {
     player: Arc<Player>,
@@ -156,80 +151,55 @@ impl Spirc {
         player: Arc<Player>,
         mixer: Arc<dyn Mixer>,
     ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
+        fn extract_connection_id(msg: Message) -> Result<String, Error> {
+            let connection_id = msg
+                .headers
+                .get("Spotify-Connection-Id")
+                .ok_or_else(|| SpircError::InvalidUri(msg.uri.clone()))?;
+            Ok(connection_id.to_owned())
+        }
+
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Spirc[{}]", spirc_id);
 
         let connect_state = ConnectState::new(config, &session);
 
-        let connection_id_update = Box::pin(
-            session
-                .dealer()
-                .listen_for("hm://pusher/v1/connections/")?
-                .map(|response| -> Result<String, Error> {
-                    let connection_id = response
-                        .headers
-                        .get("Spotify-Connection-Id")
-                        .ok_or_else(|| SpircError::InvalidUri(response.uri.clone()))?;
-                    Ok(connection_id.to_owned())
-                }),
-        );
+        let connection_id_update = session
+            .dealer()
+            .listen_for("hm://pusher/v1/connections/", extract_connection_id)?;
 
-        let connect_state_update = Box::pin(
-            session
-                .dealer()
-                .listen_for("hm://connect-state/v1/cluster")?
-                .map(Message::from_raw),
-        );
+        let connect_state_update = session
+            .dealer()
+            .listen_for("hm://connect-state/v1/cluster", Message::from_raw)?;
 
-        let connect_state_volume_update = Box::pin(
-            session
-                .dealer()
-                .listen_for("hm://connect-state/v1/connect/volume")?
-                .map(Message::from_raw),
-        );
+        let connect_state_volume_update = session
+            .dealer()
+            .listen_for("hm://connect-state/v1/connect/volume", Message::from_raw)?;
 
-        let connect_state_logout_request = Box::pin(
-            session
-                .dealer()
-                .listen_for("hm://connect-state/v1/connect/logout")?
-                .map(Message::from_raw),
-        );
+        let connect_state_logout_request = session
+            .dealer()
+            .listen_for("hm://connect-state/v1/connect/logout", Message::from_raw)?;
 
-        let playlist_update = Box::pin(
-            session
-                .dealer()
-                .listen_for("hm://playlist/v2/playlist/")?
-                .map(Message::from_raw),
-        );
+        let playlist_update = session
+            .dealer()
+            .listen_for("hm://playlist/v2/playlist/", Message::from_raw)?;
 
-        let session_update = Box::pin(
-            session
-                .dealer()
-                .listen_for("social-connect/v2/session_update")?
-                .map(Message::from_json),
-        );
+        let session_update = session
+            .dealer()
+            .listen_for("social-connect/v2/session_update", Message::from_json)?;
 
-        let connect_state_command = Box::pin(
-            session
-                .dealer()
-                .handle_for("hm://connect-state/v1/player/command")
-                .map(UnboundedReceiverStream::new)?,
-        );
-
-        let user_attributes_update = Box::pin(
-            session
-                .dealer()
-                .listen_for("spotify:user:attributes:update")?
-                .map(Message::from_raw),
-        );
+        let user_attributes_update = session
+            .dealer()
+            .listen_for("spotify:user:attributes:update", Message::from_raw)?;
 
         // can be trigger by toggling autoplay in a desktop client
-        let user_attributes_mutation = Box::pin(
-            session
-                .dealer()
-                .listen_for("spotify:user:attributes:mutated")?
-                .map(Message::from_raw),
-        );
+        let user_attributes_mutation = session
+            .dealer()
+            .listen_for("spotify:user:attributes:mutated", Message::from_raw)?;
+
+        let connect_state_command = session
+            .dealer()
+            .handle_for("hm://connect-state/v1/player/command")?;
 
         // pre-acquire client_token, preventing multiple request while running
         let _ = session.spclient().client_token().await?;

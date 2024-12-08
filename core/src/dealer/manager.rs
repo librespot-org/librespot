@@ -1,12 +1,14 @@
-use std::cell::OnceCell;
-use std::str::FromStr;
-
+use futures_core::Stream;
+use futures_util::StreamExt;
+use std::{cell::OnceCell, pin::Pin, str::FromStr};
 use thiserror::Error;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use url::Url;
 
 use super::{
-    Builder, Dealer, GetUrlResult, Request, RequestHandler, Responder, Response, Subscription,
+    protocol::Message, Builder, Dealer, GetUrlResult, Request, RequestHandler, Responder, Response,
+    Subscription,
 };
 use crate::{Error, Session};
 
@@ -16,6 +18,9 @@ component! {
         dealer: OnceCell<Dealer> = OnceCell::new(),
     }
 }
+
+pub type BoxedStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
+pub type BoxedStreamResult<T> = BoxedStream<Result<T, Error>>;
 
 #[derive(Error, Debug)]
 enum DealerError {
@@ -85,7 +90,7 @@ impl DealerManager {
         Ok(url)
     }
 
-    pub fn listen_for(&self, url: impl Into<String>) -> Result<Subscription, Error> {
+    pub fn add_listen_for(&self, url: impl Into<String>) -> Result<Subscription, Error> {
         let url = url.into();
         self.lock(|inner| {
             if let Some(dealer) = inner.dealer.get() {
@@ -98,7 +103,15 @@ impl DealerManager {
         })
     }
 
-    pub fn handle_for(&self, url: impl Into<String>) -> Result<RequestReceiver, Error> {
+    pub fn listen_for<T>(
+        &self,
+        uri: impl Into<String>,
+        t: impl Fn(Message) -> Result<T, Error> + Send + 'static,
+    ) -> Result<BoxedStreamResult<T>, Error> {
+        Ok(Box::pin(self.add_listen_for(uri)?.map(t)))
+    }
+
+    pub fn add_handle_for(&self, url: impl Into<String>) -> Result<RequestReceiver, Error> {
         let url = url.into();
 
         let (handler, receiver) = DealerRequestHandler::new();
@@ -111,6 +124,12 @@ impl DealerManager {
                 Err(DealerError::BuilderNotAvailable.into())
             }
         })
+    }
+
+    pub fn handle_for(&self, uri: impl Into<String>) -> Result<BoxedStream<RequestReply>, Error> {
+        Ok(Box::pin(
+            self.add_handle_for(uri).map(UnboundedReceiverStream::new)?,
+        ))
     }
 
     pub fn handles(&self, uri: &str) -> bool {
