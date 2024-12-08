@@ -4,6 +4,13 @@ use librespot_protocol::player::Restrictions;
 use protobuf::MessageField;
 
 impl ConnectState {
+    pub fn clear_restrictions(&mut self) {
+        let player = self.player_mut();
+
+        player.restrictions.clear();
+        player.context_restrictions.clear();
+    }
+
     pub fn update_restrictions(&mut self) {
         const NO_PREV: &str = "no previous tracks";
         const AUTOPLAY: &str = "autoplay";

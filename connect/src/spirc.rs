@@ -1257,6 +1257,7 @@ impl SpircTask {
         // tracks with uri and uid, so we merge the new context with the resolved/existing context
         self.connect_state.merge_context(context);
         self.connect_state.clear_next_tracks(false);
+        self.connect_state.clear_restrictions();
 
         debug!("play track <{:?}>", cmd.playing_track);
 
