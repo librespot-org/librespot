@@ -399,6 +399,10 @@ impl ConnectState {
         };
 
         if next.tracks.is_empty() {
+            if next.page_url.is_empty() {
+                Err(StateError::NoContext(ContextType::Default))?
+            }
+
             self.update_current_index(|i| i.page += 1);
             return Ok(LoadNext::PageUrl(next.page_url));
         }

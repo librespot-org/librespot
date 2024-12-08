@@ -617,9 +617,7 @@ impl SpircTask {
         };
 
         if last_try.is_none() {
-            // When in autoplay, keep topping up the playlist when it nears the end
-            debug!("Preloading autoplay: {resolve}");
-            // resolve the next autoplay context
+            debug!("add resolve request: {resolve}");
             self.resolve_context.push(resolve);
         } else {
             debug!("tried loading unavailable context: {resolve}")
@@ -1119,11 +1117,10 @@ impl SpircTask {
 
         let mut ctx_uri = transfer.current_session.context.uri.clone();
 
-        debug!("trying to find initial track");
         match self.connect_state.current_track_from_transfer(&transfer) {
-            Err(why) => warn!("{why}"),
+            Err(why) => warn!("didn't find initial track: {why}"),
             Ok(track) => {
-                debug!("found initial track");
+                debug!("found initial track <{}>", track.uri);
                 self.connect_state.set_track(track)
             }
         };
@@ -1135,14 +1132,13 @@ impl SpircTask {
 
         let fallback = self.connect_state.current_track(|t| &t.uri).clone();
 
-        debug!("async resolve context for <{}>", ctx_uri);
         self.add_resolve_context(ResolveContext::from_uri(ctx_uri.clone(), &fallback, false));
 
         let timestamp = self.now_ms();
         let state = &mut self.connect_state;
 
         state.set_active(true);
-        state.handle_initial_transfer(&mut transfer, ctx_uri.clone());
+        state.handle_initial_transfer(&mut transfer);
 
         // update position if the track continued playing
         let position = if transfer.playback.is_paused {
