@@ -74,6 +74,7 @@ struct SpircTask {
     player: Arc<Player>,
     mixer: Arc<dyn Mixer>,
 
+    /// the state management object
     connect_state: ConnectState,
 
     play_request_id: Option<u64>,
@@ -94,13 +95,20 @@ struct SpircTask {
 
     shutdown: bool,
     session: Session,
+
+    /// the list of contexts to resolve
     resolve_context: Vec<ResolveContext>,
+
     /// contexts may not be resolvable at the moment so we should ignore any further request
+    ///
+    /// an unavailable context is retried after [RETRY_UNAVAILABLE]
     unavailable_contexts: HashMap<ResolveContext, Instant>,
 
-    // is set when we receive a transfer state and are loading the context asynchronously
+    /// is set when transferring, and used after resolving the contexts to finish the transfer
     pub transfer_state: Option<TransferState>,
 
+    /// when set to true, it will update the volume after [VOLUME_UPDATE_DELAY],
+    /// when no other future resolves, otherwise resets the delay
     update_volume: bool,
 
     spirc_id: usize,
