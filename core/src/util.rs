@@ -165,3 +165,10 @@ pub fn solve_hash_cash(
 
     Ok(now.elapsed())
 }
+
+pub fn get_next_query_separator(url: &str) -> &'static str {
+    match url.find('?') {
+        Some(_) => "&",
+        None => "?",
+    }
+}

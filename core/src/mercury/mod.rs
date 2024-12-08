@@ -276,12 +276,15 @@ impl MercuryManager {
                 });
             });
 
-            if !found {
+            if found {
+                Ok(())
+            } else if self.session().dealer().handles(&response.uri) {
+                trace!("mercury response <{}> is handled by dealer", response.uri);
+                Ok(())
+            } else {
                 debug!("unknown subscription uri={}", &response.uri);
                 trace!("response pushed over Mercury: {:?}", response);
                 Err(MercuryError::Response(response).into())
-            } else {
-                Ok(())
             }
         } else if let Some(cb) = pending.callback {
             cb.send(Ok(response)).map_err(|_| MercuryError::Channel)?;

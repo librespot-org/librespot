@@ -94,7 +94,7 @@ impl<'a> Open for PortAudioSink<'a> {
     }
 }
 
-impl<'a> Sink for PortAudioSink<'a> {
+impl Sink for PortAudioSink<'_> {
     fn start(&mut self) -> SinkResult<()> {
         macro_rules! start_sink {
             (ref mut $stream: ident, ref $parameters: ident) => {{
@@ -175,12 +175,12 @@ impl<'a> Sink for PortAudioSink<'a> {
     }
 }
 
-impl<'a> Drop for PortAudioSink<'a> {
+impl Drop for PortAudioSink<'_> {
     fn drop(&mut self) {
         portaudio_rs::terminate().unwrap();
     }
 }
 
-impl<'a> PortAudioSink<'a> {
+impl PortAudioSink<'_> {
     pub const NAME: &'static str = "portaudio";
 }

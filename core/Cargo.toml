@@ -60,6 +60,8 @@ tokio-util = { version = "0.7", features = ["codec"] }
 url = "2"
 uuid = { version = "1", default-features = false, features = ["fast-rng", "v4"] }
 data-encoding = "2.5"
+flate2 = "1.0.33"
+protobuf-json-mapping = "3.5"
 
 # Eventually, this should use rustls-platform-verifier to unify the platform-specific dependencies
 # but currently, hyper-proxy2 and tokio-tungstenite do not support it.

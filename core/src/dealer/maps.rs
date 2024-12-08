@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use thiserror::Error;
-
 use crate::Error;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum HandlerMapError {
@@ -28,6 +27,10 @@ impl<T> Default for HandlerMap<T> {
 }
 
 impl<T> HandlerMap<T> {
+    pub fn contains(&self, path: &str) -> bool {
+        matches!(self, HandlerMap::Branch(map) if map.contains_key(path))
+    }
+
     pub fn insert<'a>(
         &mut self,
         mut path: impl Iterator<Item = &'a str>,
@@ -107,6 +110,22 @@ impl<T> SubscriberMap<T> {
         }
     }
 
+    pub fn contains<'a>(&self, mut path: impl Iterator<Item = &'a str>) -> bool {
+        if !self.subscribed.is_empty() {
+            return true;
+        }
+
+        if let Some(next) = path.next() {
+            if let Some(next_map) = self.children.get(next) {
+                return next_map.contains(path);
+            }
+        } else {
+            return !self.is_empty();
+        }
+
+        false
+    }
+
     pub fn is_empty(&self) -> bool {
         self.children.is_empty() && self.subscribed.is_empty()
     }
@@ -115,16 +134,22 @@ impl<T> SubscriberMap<T> {
         &mut self,
         mut path: impl Iterator<Item = &'a str>,
         fun: &mut impl FnMut(&T) -> bool,
-    ) {
-        self.subscribed.retain(|x| fun(x));
+    ) -> bool {
+        let mut handled_by_any = false;
+        self.subscribed.retain(|x| {
+            handled_by_any = true;
+            fun(x)
+        });
 
         if let Some(next) = path.next() {
             if let Some(y) = self.children.get_mut(next) {
-                y.retain(path, fun);
+                handled_by_any = handled_by_any || y.retain(path, fun);
                 if y.is_empty() {
                     self.children.remove(next);
                 }
             }
         }
+
+        handled_by_any
     }
 }

@@ -1,3 +1,4 @@
+pub mod manager;
 mod maps;
 pub mod protocol;
 
@@ -28,8 +29,10 @@ use tokio_tungstenite::tungstenite;
 use tungstenite::error::UrlError;
 use url::Url;
 
-use self::maps::*;
-use self::protocol::*;
+use self::{
+    maps::*,
+    protocol::{Message, MessageOrRequest, Request, WebsocketMessage, WebsocketRequest},
+};
 
 use crate::{
     socket,
@@ -39,7 +42,14 @@ use crate::{
 
 type WsMessage = tungstenite::Message;
 type WsError = tungstenite::Error;
-type WsResult<T> = Result<T, tungstenite::Error>;
+type WsResult<T> = Result<T, Error>;
+type GetUrlResult = Result<Url, Error>;
+
+impl From<WsError> for Error {
+    fn from(err: WsError) -> Self {
+        Error::failed_precondition(err)
+    }
+}
 
 const WEBSOCKET_CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -48,11 +58,11 @@ const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
 
-pub struct Response {
+struct Response {
     pub success: bool,
 }
 
-pub struct Responder {
+struct Responder {
     key: String,
     tx: mpsc::UnboundedSender<WsMessage>,
     sent: bool,
@@ -101,7 +111,7 @@ impl Drop for Responder {
     }
 }
 
-pub trait IntoResponse {
+trait IntoResponse {
     fn respond(self, responder: Responder);
 }
 
@@ -132,7 +142,7 @@ where
     }
 }
 
-pub trait RequestHandler: Send + 'static {
+trait RequestHandler: Send + 'static {
     fn handle_request(&self, request: Request, responder: Responder);
 }
 
@@ -156,8 +166,10 @@ impl Stream for Subscription {
 fn split_uri(s: &str) -> Option<impl Iterator<Item = &'_ str>> {
     let (scheme, sep, rest) = if let Some(rest) = s.strip_prefix("hm://") {
         ("hm", '/', rest)
-    } else if let Some(rest) = s.strip_suffix("spotify:") {
+    } else if let Some(rest) = s.strip_prefix("spotify:") {
         ("spotify", ':', rest)
+    } else if s.contains('/') {
+        ("", '/', s)
     } else {
         return None;
     };
@@ -169,7 +181,7 @@ fn split_uri(s: &str) -> Option<impl Iterator<Item = &'_ str>> {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum AddHandlerError {
+enum AddHandlerError {
     #[error("There is already a handler for the given uri")]
     AlreadyHandled,
     #[error("The specified uri {0} is invalid")]
@@ -186,7 +198,7 @@ impl From<AddHandlerError> for Error {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum SubscriptionError {
+enum SubscriptionError {
     #[error("The specified uri is invalid")]
     InvalidUri(String),
 }
@@ -224,8 +236,23 @@ fn subscribe(
     Ok(Subscription(rx))
 }
 
+fn handles(
+    req_map: &HandlerMap<Box<dyn RequestHandler>>,
+    msg_map: &SubscriberMap<MessageHandler>,
+    uri: &str,
+) -> bool {
+    if req_map.contains(uri) {
+        return true;
+    }
+
+    match split_uri(uri) {
+        None => false,
+        Some(mut split) => msg_map.contains(&mut split),
+    }
+}
+
 #[derive(Default)]
-pub struct Builder {
+struct Builder {
     message_handlers: SubscriberMap<MessageHandler>,
     request_handlers: HandlerMap<Box<dyn RequestHandler>>,
 }
@@ -267,22 +294,26 @@ impl Builder {
         subscribe(&mut self.message_handlers, uris)
     }
 
+    pub fn handles(&self, uri: &str) -> bool {
+        handles(&self.request_handlers, &self.message_handlers, uri)
+    }
+
     pub fn launch_in_background<Fut, F>(self, get_url: F, proxy: Option<Url>) -> Dealer
     where
-        Fut: Future<Output = Url> + Send + 'static,
-        F: (FnMut() -> Fut) + Send + 'static,
+        Fut: Future<Output = GetUrlResult> + Send + 'static,
+        F: (Fn() -> Fut) + Send + 'static,
     {
         create_dealer!(self, shared -> run(shared, None, get_url, proxy))
     }
 
-    pub async fn launch<Fut, F>(self, mut get_url: F, proxy: Option<Url>) -> WsResult<Dealer>
+    pub async fn launch<Fut, F>(self, get_url: F, proxy: Option<Url>) -> WsResult<Dealer>
     where
-        Fut: Future<Output = Url> + Send + 'static,
-        F: (FnMut() -> Fut) + Send + 'static,
+        Fut: Future<Output = GetUrlResult> + Send + 'static,
+        F: (Fn() -> Fut) + Send + 'static,
     {
         let dealer = create_dealer!(self, shared -> {
             // Try to connect.
-            let url = get_url().await;
+            let url = get_url().await?;
             let tasks = connect(&url, proxy.as_ref(), &shared).await?;
 
             // If a connection is established, continue in a background task.
@@ -303,15 +334,47 @@ struct DealerShared {
 }
 
 impl DealerShared {
-    fn dispatch_message(&self, msg: Message) {
+    fn dispatch_message(&self, mut msg: WebsocketMessage) {
+        let msg = match msg.handle_payload() {
+            Ok(value) => Message {
+                headers: msg.headers,
+                payload: value,
+                uri: msg.uri,
+            },
+            Err(why) => {
+                warn!("failure during data parsing for {}: {why}", msg.uri);
+                return;
+            }
+        };
+
         if let Some(split) = split_uri(&msg.uri) {
-            self.message_handlers
+            if self
+                .message_handlers
                 .lock()
-                .retain(split, &mut |tx| tx.send(msg.clone()).is_ok());
+                .retain(split, &mut |tx| tx.send(msg.clone()).is_ok())
+            {
+                return;
+            }
         }
+
+        warn!("No subscriber for msg.uri: {}", msg.uri);
     }
 
-    fn dispatch_request(&self, request: Request, send_tx: &mpsc::UnboundedSender<WsMessage>) {
+    fn dispatch_request(
+        &self,
+        request: WebsocketRequest,
+        send_tx: &mpsc::UnboundedSender<WsMessage>,
+    ) {
+        trace!("dealer request {}", &request.message_ident);
+
+        let payload_request = match request.handle_payload() {
+            Ok(payload) => payload,
+            Err(why) => {
+                warn!("request payload handling failed because of {why}");
+                return;
+            }
+        };
+
         // ResponseSender will automatically send "success: false" if it is dropped without an answer.
         let responder = Responder::new(request.key.clone(), send_tx.clone());
 
@@ -325,13 +388,11 @@ impl DealerShared {
             return;
         };
 
-        {
-            let handler_map = self.request_handlers.lock();
+        let handler_map = self.request_handlers.lock();
 
-            if let Some(handler) = handler_map.get(split) {
-                handler.handle_request(request, responder);
-                return;
-            }
+        if let Some(handler) = handler_map.get(split) {
+            handler.handle_request(payload_request, responder);
+            return;
         }
 
         warn!("No handler for message_ident: {}", &request.message_ident);
@@ -355,9 +416,9 @@ impl DealerShared {
     }
 }
 
-pub struct Dealer {
+struct Dealer {
     shared: Arc<DealerShared>,
-    handle: TimeoutOnDrop<()>,
+    handle: TimeoutOnDrop<Result<(), Error>>,
 }
 
 impl Dealer {
@@ -374,6 +435,14 @@ impl Dealer {
 
     pub fn subscribe(&self, uris: &[&str]) -> Result<Subscription, Error> {
         subscribe(&mut self.shared.message_handlers.lock(), uris)
+    }
+
+    pub fn handles(&self, uri: &str) -> bool {
+        handles(
+            &self.shared.request_handlers.lock(),
+            &self.shared.message_handlers.lock(),
+            uri,
+        )
     }
 
     pub async fn close(mut self) {
@@ -402,7 +471,7 @@ async fn connect(
     let default_port = match address.scheme() {
         "ws" => 80,
         "wss" => 443,
-        _ => return Err(WsError::Url(UrlError::UnsupportedUrlScheme)),
+        _ => return Err(WsError::Url(UrlError::UnsupportedUrlScheme).into()),
     };
 
     let port = address.port().unwrap_or(default_port);
@@ -484,13 +553,13 @@ async fn connect(
                     Some(Ok(msg)) => match msg {
                         WsMessage::Text(t) => match serde_json::from_str(&t) {
                             Ok(m) => shared.dispatch(m, &send_tx),
-                            Err(e) => info!("Received invalid message: {}", e),
+                            Err(e) => warn!("Message couldn't be parsed: {e}. Message was {t}"),
                         },
                         WsMessage::Binary(_) => {
                             info!("Received invalid binary message");
                         }
                         WsMessage::Pong(_) => {
-                            debug!("Received pong");
+                            trace!("Received pong");
                             pong_received.store(true, atomic::Ordering::Relaxed);
                         }
                         _ => (), // tungstenite handles Close and Ping automatically
@@ -522,7 +591,7 @@ async fn connect(
                     break;
                 }
 
-                debug!("Sent ping");
+                trace!("Sent ping");
 
                 sleep(PING_TIMEOUT).await;
 
@@ -556,8 +625,9 @@ async fn run<F, Fut>(
     initial_tasks: Option<(JoinHandle<()>, JoinHandle<()>)>,
     mut get_url: F,
     proxy: Option<Url>,
-) where
-    Fut: Future<Output = Url> + Send + 'static,
+) -> Result<(), Error>
+where
+    Fut: Future<Output = GetUrlResult> + Send + 'static,
     F: (FnMut() -> Fut) + Send + 'static,
 {
     let init_task = |t| Some(TimeoutOnDrop::new(t, WEBSOCKET_CLOSE_TIMEOUT));
@@ -593,7 +663,7 @@ async fn run<F, Fut>(
                         break
                     },
                     e = get_url() => e
-                };
+                }?;
 
                 match connect(&url, proxy.as_ref(), &shared).await {
                     Ok((s, r)) => tasks = (init_task(s), init_task(r)),
@@ -609,4 +679,6 @@ async fn run<F, Fut>(
     let tasks = tasks.0.into_iter().chain(tasks.1);
 
     let _ = join_all(tasks).await;
+
+    Ok(())
 }

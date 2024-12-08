@@ -499,3 +499,9 @@ impl From<Utf8Error> for Error {
         Self::new(ErrorKind::FailedPrecondition, err)
     }
 }
+
+impl From<protobuf_json_mapping::ParseError> for Error {
+    fn from(err: protobuf_json_mapping::ParseError) -> Self {
+        Self::failed_precondition(err)
+    }
+}
