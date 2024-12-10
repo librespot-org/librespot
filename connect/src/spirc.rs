@@ -27,7 +27,7 @@ use crate::{
 use crate::{
     model::{ResolveContext, SpircPlayStatus},
     state::{
-        context::{ContextType, LoadNext, UpdateContext},
+        context::{ContextType, UpdateContext},
         provider::IsProvider,
         {ConnectState, ConnectStateConfig},
     },
@@ -488,12 +488,7 @@ impl SpircTask {
                 // the autoplay endpoint can return a 404, when it tries to retrieve an
                 // autoplay context for an empty playlist as it seems
                 if let Err(why) = self
-                    .resolve_context(
-                        resolve_uri,
-                        resolve.context_uri(),
-                        resolve.autoplay(),
-                        resolve.update(),
-                    )
+                    .resolve_context(resolve_uri, resolve.context_uri(), resolve.autoplay())
                     .await
                 {
                     error!("failed resolving context <{resolve}>: {why}");
@@ -537,37 +532,29 @@ impl SpircTask {
         resolve_uri: &str,
         context_uri: &str,
         autoplay: bool,
-        update: bool,
     ) -> Result<(), Error> {
         if !autoplay {
             let mut ctx = self.session.spclient().get_context(resolve_uri).await?;
+            ctx.uri = context_uri.to_string();
+            ctx.url = format!("context://{context_uri}");
 
-            if update {
-                ctx.uri = context_uri.to_string();
-                ctx.url = format!("context://{context_uri}");
-
-                self.connect_state
-                    .update_context(ctx, UpdateContext::Default)?
-            } else if matches!(ctx.pages.first(), Some(p) if !p.tracks.is_empty()) {
-                debug!(
-                    "update context from single page, context {} had {} pages",
-                    ctx.uri,
-                    ctx.pages.len()
-                );
-                self.connect_state
-                    .fill_context_from_page(ctx.pages.remove(0))?;
-            } else {
-                error!("resolving context should only update the tracks, but had no page, or track. {ctx:#?}");
-            };
+            if let Some(remaining) = self
+                .connect_state
+                .update_context(ctx, UpdateContext::Default)?
+            {
+                self.try_resolve_remaining(remaining).await;
+            }
 
             return Ok(());
         }
 
+        // refuse resolve of not supported autoplay context
         if resolve_uri.contains("spotify:show:") || resolve_uri.contains("spotify:episode:") {
             // autoplay is not supported for podcasts
             Err(SpircError::NotAllowedContext(resolve_uri.to_string()))?
         }
 
+        // resolve autoplay
         let previous_tracks = self.connect_state.prev_autoplay_track_uris();
 
         debug!(
@@ -587,8 +574,40 @@ impl SpircTask {
             .get_autoplay_context(&ctx_request)
             .await?;
 
-        self.connect_state
-            .update_context(context, UpdateContext::Autoplay)
+        if let Some(remaining) = self
+            .connect_state
+            .update_context(context, UpdateContext::Autoplay)?
+        {
+            self.try_resolve_remaining(remaining).await;
+        }
+
+        Ok(())
+    }
+
+    async fn try_resolve_remaining(&mut self, remaining: Vec<String>) {
+        for resolve_uri in remaining {
+            let mut ctx = match self.session.spclient().get_context(&resolve_uri).await {
+                Ok(ctx) => ctx,
+                Err(why) => {
+                    warn!("failed to retrieve context for remaining <{resolve_uri}>: {why}");
+                    continue;
+                }
+            };
+
+            if ctx.pages.len() > 1 {
+                warn!("context contained more page then expected: {ctx:#?}");
+                continue;
+            }
+
+            debug!("appending context from single page, adding: <{}>", ctx.uri);
+
+            if let Err(why) = self
+                .connect_state
+                .fill_context_from_page(ctx.pages.remove(0))
+            {
+                warn!("failed appending context <{resolve_uri}>: {why}");
+            }
+        }
     }
 
     fn add_resolve_context(&mut self, resolve: ResolveContext) {
@@ -1193,7 +1212,7 @@ impl SpircTask {
             debug!("context <{current_context_uri}> didn't change, no resolving required")
         } else {
             debug!("resolving context for load command");
-            self.resolve_context(&fallback, &cmd.context_uri, false, true)
+            self.resolve_context(&fallback, &cmd.context_uri, false)
                 .await?;
         }
 
@@ -1366,33 +1385,18 @@ impl SpircTask {
     fn preload_autoplay_when_required(&mut self) {
         let require_load_new = !self
             .connect_state
-            .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD));
+            .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD))
+            && self.session.autoplay();
 
         if !require_load_new {
             return;
         }
 
-        match self.connect_state.try_load_next_context() {
-            Err(why) => error!("failed loading next context: {why}"),
-            Ok(next) => {
-                match next {
-                    LoadNext::Done => info!("loaded next context"),
-                    LoadNext::PageUrl(page_url) => {
-                        self.add_resolve_context(ResolveContext::from_page_url(page_url))
-                    }
-                    LoadNext::Empty if self.session.autoplay() => {
-                        let current_context = self.connect_state.context_uri();
-                        let fallback = self.connect_state.current_track(|t| &t.uri);
-                        let resolve = ResolveContext::from_uri(current_context, fallback, true);
+        let current_context = self.connect_state.context_uri();
+        let fallback = self.connect_state.current_track(|t| &t.uri);
+        let resolve = ResolveContext::from_uri(current_context, fallback, true);
 
-                        self.add_resolve_context(resolve)
-                    }
-                    LoadNext::Empty => {
-                        debug!("next context is empty and autoplay isn't enabled, no preloading required")
-                    }
-                }
-            }
-        }
+        self.add_resolve_context(resolve);
     }
 
     fn is_playing(&self) -> bool {

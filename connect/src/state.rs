@@ -20,8 +20,7 @@ use librespot_protocol::connect::{
     Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest,
 };
 use librespot_protocol::player::{
-    ContextIndex, ContextPage, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack,
-    Suppressions,
+    ContextIndex, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack, Suppressions,
 };
 use log::LevelFilter;
 use protobuf::{EnumOrUnknown, MessageField};
@@ -112,8 +111,6 @@ pub struct ConnectState {
 
     /// the context from which we play, is used to top up prev and next tracks
     pub context: Option<StateContext>,
-    /// upcoming contexts, directly provided by the context-resolver
-    next_contexts: Vec<ContextPage>,
 
     /// a context to keep track of our shuffled context,
     /// should be only available when `player.option.shuffling_context` is true

@@ -27,12 +27,6 @@ pub enum ContextType {
     Autoplay,
 }
 
-pub enum LoadNext {
-    Done,
-    PageUrl(String),
-    Empty,
-}
-
 #[derive(Debug)]
 pub enum UpdateContext {
     Default,
@@ -43,6 +37,27 @@ pub enum ResetContext<'s> {
     Completely,
     DefaultIndex,
     WhenDifferent(&'s str),
+}
+
+/// Extracts the spotify uri from a given page_url
+///
+/// Just extracts "spotify/album/5LFzwirfFwBKXJQGfwmiMY" and replaces the slash's with colon's
+///
+/// Expected `page_url` should look something like the following:
+/// `hm://artistplaycontext/v1/page/spotify/album/5LFzwirfFwBKXJQGfwmiMY/km_artist`
+fn page_url_to_uri(page_url: &str) -> String {
+    let split = if let Some(rest) = page_url.strip_prefix("hm://") {
+        rest.split('/')
+    } else {
+        warn!("page_url didn't started with hm://. got page_url: {page_url}");
+        page_url.split('/')
+    };
+
+    split
+        .skip_while(|s| s != &"spotify")
+        .take(3)
+        .collect::<Vec<&str>>()
+        .join(":")
 }
 
 impl ConnectState {
@@ -86,7 +101,6 @@ impl ConnectState {
             ResetContext::Completely => {
                 self.context = None;
                 self.autoplay_context = None;
-                self.next_contexts.clear();
             }
             ResetContext::WhenDifferent(_) => debug!("context didn't change, no reset"),
             ResetContext::DefaultIndex => {
@@ -142,7 +156,11 @@ impl ConnectState {
         }
     }
 
-    pub fn update_context(&mut self, mut context: Context, ty: UpdateContext) -> Result<(), Error> {
+    pub fn update_context(
+        &mut self,
+        mut context: Context,
+        ty: UpdateContext,
+    ) -> Result<Option<Vec<String>>, Error> {
         if context.pages.iter().all(|p| p.tracks.is_empty()) {
             error!("context didn't have any tracks: {context:#?}");
             return Err(StateError::ContextHasNoTracks.into());
@@ -150,16 +168,13 @@ impl ConnectState {
             return Err(StateError::UnsupportedLocalPlayBack.into());
         }
 
-        if matches!(ty, UpdateContext::Default) {
-            self.next_contexts.clear();
-        }
-
+        let mut next_contexts = Vec::new();
         let mut first_page = None;
         for page in context.pages {
             if first_page.is_none() && !page.tracks.is_empty() {
                 first_page = Some(page);
             } else {
-                self.next_contexts.push(page)
+                next_contexts.push(page)
             }
         }
 
@@ -234,7 +249,27 @@ impl ConnectState {
             }
         }
 
-        Ok(())
+        if next_contexts.is_empty() {
+            return Ok(None);
+        }
+
+        // load remaining contexts
+        let next_contexts = next_contexts
+            .into_iter()
+            .flat_map(|page| {
+                if !page.tracks.is_empty() {
+                    self.fill_context_from_page(page).ok()?;
+                    None
+                } else if !page.page_url.is_empty() {
+                    Some(page_url_to_uri(&page.page_url))
+                } else {
+                    warn!("unhandled context page: {page:#?}");
+                    None
+                }
+            })
+            .collect();
+
+        Ok(Some(next_contexts))
     }
 
     fn state_context_from_page(
@@ -390,26 +425,5 @@ impl ConnectState {
         }
 
         Ok(())
-    }
-
-    pub fn try_load_next_context(&mut self) -> Result<LoadNext, Error> {
-        let next = match self.next_contexts.first() {
-            None => return Ok(LoadNext::Empty),
-            Some(_) => self.next_contexts.remove(0),
-        };
-
-        if next.tracks.is_empty() {
-            if next.page_url.is_empty() {
-                Err(StateError::NoContext(ContextType::Default))?
-            }
-
-            self.update_current_index(|i| i.page += 1);
-            return Ok(LoadNext::PageUrl(next.page_url));
-        }
-
-        self.fill_context_from_page(next)?;
-        self.fill_up_next_tracks()?;
-
-        Ok(LoadNext::Done)
     }
 }
