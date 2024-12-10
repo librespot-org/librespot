@@ -79,7 +79,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.1.2
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.cargo/registry/index
@@ -130,7 +130,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.1.2
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.cargo/registry/index
@@ -183,7 +183,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.1.2
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.cargo/registry/index
@@ -230,7 +230,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.1.2
+        uses: actions/cache@v4.2.0
         with:
           path: |
             ~/.cargo/registry/index
