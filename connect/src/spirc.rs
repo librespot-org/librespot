@@ -690,22 +690,22 @@ impl SpircTask {
                 SpircPlayStatus::LoadingPlay { position_ms } => {
                     self.connect_state
                         .update_position(position_ms, self.now_ms());
-                    trace!("==> kPlayStatusPlay");
+                    trace!("==> LoadingPlay");
                 }
                 SpircPlayStatus::LoadingPause { position_ms } => {
                     self.connect_state
                         .update_position(position_ms, self.now_ms());
-                    trace!("==> kPlayStatusPause");
+                    trace!("==> LoadingPause");
                 }
                 _ => {
                     self.connect_state.update_position(0, self.now_ms());
-                    trace!("==> kPlayStatusLoading");
+                    trace!("==> Loading");
                 }
             },
             PlayerEvent::Playing { position_ms, .. }
             | PlayerEvent::PositionCorrection { position_ms, .. }
             | PlayerEvent::Seeked { position_ms, .. } => {
-                trace!("==> kPlayStatusPlay");
+                trace!("==> Playing");
                 let new_nominal_start_time = self.now_ms() - position_ms as i64;
                 match self.play_status {
                     SpircPlayStatus::Playing {
@@ -735,7 +735,7 @@ impl SpircTask {
                 position_ms: new_position_ms,
                 ..
             } => {
-                trace!("==> kPlayStatusPause");
+                trace!("==> Paused");
                 match self.play_status {
                     SpircPlayStatus::Paused { .. } | SpircPlayStatus::Playing { .. } => {
                         self.connect_state
@@ -757,7 +757,7 @@ impl SpircTask {
                 }
             }
             PlayerEvent::Stopped { .. } => {
-                trace!("==> kPlayStatusStop");
+                trace!("==> Stopped");
                 match self.play_status {
                     SpircPlayStatus::Stopped => return Ok(()),
                     _ => self.play_status = SpircPlayStatus::Stopped,
