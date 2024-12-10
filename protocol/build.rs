@@ -37,6 +37,8 @@ fn compile() {
         proto_dir.join("spotify/login5/v3/user_info.proto"),
         proto_dir.join("storage-resolve.proto"),
         proto_dir.join("user_attributes.proto"),
+        proto_dir.join("autoplay_context_request.proto"),
+        proto_dir.join("social_connect_v2.proto"),
         // TODO: remove these legacy protobufs when we are on the new API completely
         proto_dir.join("authentication.proto"),
         proto_dir.join("canvaz.proto"),
@@ -45,7 +47,6 @@ fn compile() {
         proto_dir.join("keyexchange.proto"),
         proto_dir.join("mercury.proto"),
         proto_dir.join("pubsub.proto"),
-        proto_dir.join("spirc.proto"),
     ];
 
     let slices = files.iter().map(Deref::deref).collect::<Vec<_>>();

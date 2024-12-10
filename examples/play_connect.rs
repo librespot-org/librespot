@@ -9,13 +9,13 @@ use librespot::{
         player::Player,
     },
 };
+use librespot_connect::spirc::PlayingTrack;
 use librespot_connect::{
-    config::ConnectConfig,
     spirc::{Spirc, SpircLoadCommand},
+    state::ConnectStateConfig,
 };
 use librespot_metadata::{Album, Metadata};
 use librespot_playback::mixer::{softmixer::SoftMixer, Mixer, MixerConfig};
-use librespot_protocol::spirc::TrackRef;
 use std::env;
 use std::sync::Arc;
 use tokio::join;
@@ -25,7 +25,7 @@ async fn main() {
     let session_config = SessionConfig::default();
     let player_config = PlayerConfig::default();
     let audio_format = AudioFormat::default();
-    let connect_config = ConnectConfig::default();
+    let connect_config = ConnectStateConfig::default();
 
     let mut args: Vec<_> = env::args().collect();
     let context_uri = if args.len() == 3 {
@@ -64,14 +64,6 @@ async fn main() {
         let album = Album::get(&session, &SpotifyId::from_uri(&context_uri).unwrap())
             .await
             .unwrap();
-        let tracks = album
-            .tracks()
-            .map(|track_id| {
-                let mut track = TrackRef::new();
-                track.set_gid(Vec::from(track_id.to_raw()));
-                track
-            })
-            .collect();
 
         println!(
             "Playing album: {} by {}",
@@ -87,10 +79,12 @@ async fn main() {
             .load(SpircLoadCommand {
                 context_uri,
                 start_playing: true,
+                seek_to: 0,
                 shuffle: false,
                 repeat: false,
-                playing_track_index: 0, // the index specifies which track in the context starts playing, in this case the first in the album
-                tracks,
+                repeat_track: false,
+                // the index specifies which track in the context starts playing, in this case the first in the album
+                playing_track: PlayingTrack::Index(0),
             })
             .unwrap();
     });

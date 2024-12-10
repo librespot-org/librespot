@@ -145,7 +145,7 @@ fn create_sink(
         },
         Some(device_name) => {
             host.output_devices()?
-                .find(|d| d.name().ok().map_or(false, |name| name == device_name)) // Ignore devices for which getting name fails
+                .find(|d| d.name().ok().is_some_and(|name| name == device_name)) // Ignore devices for which getting name fails
                 .ok_or_else(|| RodioError::DeviceNotAvailable(device_name.to_string()))?
         }
         None => host

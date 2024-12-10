@@ -9,7 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- [connect] Replaced `ConnectConfig` with `ConnectStateConfig` (breaking)
+- [connect] Replaced `playing_track_index` field of `SpircLoadCommand` with `playing_track` (breaking)
+- [connect] Replaced Mercury usage in `Spirc` with Dealer
+
 ### Added
+
+- [connect] Add `seek_to` field to `SpircLoadCommand` (breaking)
+- [connect] Add `repeat_track` field to `SpircLoadCommand` (breaking)
+- [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
+- [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
 
 ### Fixed
 

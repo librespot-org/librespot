@@ -631,6 +631,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc32fast"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a97769d94ddab943e4510d138150169a2758b5ef3eb191a9ee688de3e23ef7b3"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
 name = "crossbeam-utils"
 version = "0.8.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -893,6 +902,16 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+
+[[package]]
+name = "flate2"
+version = "1.0.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "324a1be68054ef05ad64b861cc9eaf1d623d2d8cb25b4bf2cb9cdd902b4bf253"
+dependencies = [
+ "crc32fast",
+ "miniz_oxide",
+]
 
 [[package]]
 name = "fnv"
@@ -1941,7 +1960,6 @@ dependencies = [
 name = "librespot-connect"
 version = "0.6.0-dev"
 dependencies = [
- "form_urlencoded",
  "futures-util",
  "librespot-core",
  "librespot-playback",
@@ -1949,11 +1967,11 @@ dependencies = [
  "log",
  "protobuf",
  "rand",
- "serde",
  "serde_json",
  "thiserror",
  "tokio",
  "tokio-stream",
+ "uuid",
 ]
 
 [[package]]
@@ -1965,6 +1983,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "data-encoding",
+ "flate2",
  "form_urlencoded",
  "futures-core",
  "futures-util",
@@ -1991,6 +2010,7 @@ dependencies = [
  "pin-project-lite",
  "priority-queue",
  "protobuf",
+ "protobuf-json-mapping",
  "quick-xml",
  "rand",
  "rsa",
@@ -2741,6 +2761,17 @@ dependencies = [
  "protobuf-parse",
  "regex",
  "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "protobuf-json-mapping"
+version = "3.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b445cf83c9303695e6c423d269759e139b6182d2f1171e18afda7078a764336"
+dependencies = [
+ "protobuf",
+ "protobuf-support",
  "thiserror",
 ]
 

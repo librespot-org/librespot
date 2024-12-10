@@ -16,7 +16,8 @@ pub mod config;
 mod connection;
 pub mod date;
 #[allow(dead_code)]
-mod dealer;
+pub mod dealer;
+pub mod deserialize_with;
 #[doc(hidden)]
 pub mod diffie_hellman;
 pub mod error;

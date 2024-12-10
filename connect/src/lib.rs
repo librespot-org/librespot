@@ -5,6 +5,6 @@ use librespot_core as core;
 use librespot_playback as playback;
 use librespot_protocol as protocol;
 
-pub mod config;
-pub mod context;
+mod model;
 pub mod spirc;
+pub mod state;
