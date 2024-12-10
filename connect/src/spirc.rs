@@ -612,88 +612,45 @@ impl SpircTask {
     }
 
     async fn handle_command(&mut self, cmd: SpircCommand) -> Result<(), Error> {
-        if matches!(cmd, SpircCommand::Shutdown) {
-            trace!("Received SpircCommand::Shutdown");
-            self.handle_disconnect().await?;
-            self.shutdown = true;
-            if let Some(rx) = self.commands.as_mut() {
-                rx.close()
-            }
-            Ok(())
-        } else if self.connect_state.is_active() {
-            trace!("Received SpircCommand::{:?}", cmd);
-            match cmd {
-                SpircCommand::Play => {
-                    self.handle_play();
-                    self.notify().await
-                }
-                SpircCommand::PlayPause => {
-                    self.handle_play_pause();
-                    self.notify().await
-                }
-                SpircCommand::Pause => {
-                    self.handle_pause();
-                    self.notify().await
-                }
-                SpircCommand::Prev => {
-                    self.handle_prev()?;
-                    self.notify().await
-                }
-                SpircCommand::Next => {
-                    self.handle_next(None)?;
-                    self.notify().await
-                }
-                SpircCommand::VolumeUp => {
-                    self.handle_volume_up();
-                    self.notify().await
-                }
-                SpircCommand::VolumeDown => {
-                    self.handle_volume_down();
-                    self.notify().await
-                }
-                SpircCommand::Disconnect => {
-                    self.handle_disconnect().await?;
-                    self.notify().await
-                }
-                SpircCommand::Shuffle(shuffle) => {
-                    self.connect_state.handle_shuffle(shuffle)?;
-                    self.notify().await
-                }
-                SpircCommand::Repeat(repeat) => {
-                    self.connect_state.set_repeat_context(repeat);
-                    self.notify().await
-                }
-                SpircCommand::RepeatTrack(repeat) => {
-                    self.connect_state.set_repeat_track(repeat);
-                    self.notify().await
-                }
-                SpircCommand::SetPosition(position) => {
-                    self.handle_seek(position);
-                    self.notify().await
-                }
-                SpircCommand::SetVolume(volume) => {
-                    self.set_volume(volume);
-                    self.notify().await
-                }
-                SpircCommand::Load(command) => {
-                    self.handle_load(command, None).await?;
-                    self.notify().await
-                }
-                _ => Ok(()),
-            }
-        } else {
-            match cmd {
-                SpircCommand::Activate => {
-                    trace!("Received SpircCommand::{:?}", cmd);
-                    self.handle_activate();
-                    self.notify().await
-                }
-                _ => {
-                    warn!("SpircCommand::{:?} will be ignored while Not Active", cmd);
-                    Ok(())
+        trace!("Received SpircCommand::{:?}", cmd);
+        match cmd {
+            SpircCommand::Shutdown => {
+                trace!("Received SpircCommand::Shutdown");
+                self.handle_disconnect().await?;
+                self.shutdown = true;
+                if let Some(rx) = self.commands.as_mut() {
+                    rx.close()
                 }
             }
-        }
+            SpircCommand::Activate if !self.connect_state.is_active() => {
+                trace!("Received SpircCommand::{:?}", cmd);
+                self.handle_activate();
+                return self.notify().await;
+            }
+            SpircCommand::Activate => warn!(
+                "SpircCommand::{:?} will be ignored while already active",
+                cmd
+            ),
+            _ if !self.connect_state.is_active() => {
+                warn!("SpircCommand::{:?} will be ignored while Not Active", cmd)
+            }
+            SpircCommand::Play => self.handle_play(),
+            SpircCommand::PlayPause => self.handle_play_pause(),
+            SpircCommand::Pause => self.handle_pause(),
+            SpircCommand::Prev => self.handle_prev()?,
+            SpircCommand::Next => self.handle_next(None)?,
+            SpircCommand::VolumeUp => self.handle_volume_up(),
+            SpircCommand::VolumeDown => self.handle_volume_down(),
+            SpircCommand::Disconnect => self.handle_disconnect().await?,
+            SpircCommand::Shuffle(shuffle) => self.connect_state.handle_shuffle(shuffle)?,
+            SpircCommand::Repeat(repeat) => self.connect_state.set_repeat_context(repeat),
+            SpircCommand::RepeatTrack(repeat) => self.connect_state.set_repeat_track(repeat),
+            SpircCommand::SetPosition(position) => self.handle_seek(position),
+            SpircCommand::SetVolume(volume) => self.set_volume(volume),
+            SpircCommand::Load(command) => self.handle_load(command, None).await?,
+        };
+
+        self.notify().await
     }
 
     async fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
