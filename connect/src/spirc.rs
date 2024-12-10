@@ -664,122 +664,119 @@ impl SpircTask {
             self.play_request_id = Some(play_request_id);
             return Ok(());
         }
+
+        let is_current_track = matches! {
+            (event.get_play_request_id(), self.play_request_id),
+            (Some(event_id), Some(current_id)) if event_id == current_id
+        };
         // we only process events if the play_request_id matches. If it doesn't, it is
         // an event that belongs to a previous track and only arrives now due to a race
         // condition. In this case we have updated the state already and don't want to
         // mess with it.
-        if let Some(play_request_id) = event.get_play_request_id() {
-            if Some(play_request_id) == self.play_request_id {
-                match event {
-                    PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track().await,
-                    PlayerEvent::Loading { .. } => {
-                        match self.play_status {
-                            SpircPlayStatus::LoadingPlay { position_ms } => {
-                                self.connect_state
-                                    .update_position(position_ms, self.now_ms());
-                                trace!("==> kPlayStatusPlay");
-                            }
-                            SpircPlayStatus::LoadingPause { position_ms } => {
-                                self.connect_state
-                                    .update_position(position_ms, self.now_ms());
-                                trace!("==> kPlayStatusPause");
-                            }
-                            _ => {
-                                self.connect_state.update_position(0, self.now_ms());
-                                trace!("==> kPlayStatusLoading");
-                            }
-                        }
-                        self.notify().await
-                    }
-                    PlayerEvent::Playing { position_ms, .. }
-                    | PlayerEvent::PositionCorrection { position_ms, .. }
-                    | PlayerEvent::Seeked { position_ms, .. } => {
-                        trace!("==> kPlayStatusPlay");
-                        let new_nominal_start_time = self.now_ms() - position_ms as i64;
-                        match self.play_status {
-                            SpircPlayStatus::Playing {
-                                ref mut nominal_start_time,
-                                ..
-                            } => {
-                                if (*nominal_start_time - new_nominal_start_time).abs() > 100 {
-                                    *nominal_start_time = new_nominal_start_time;
-                                    self.connect_state
-                                        .update_position(position_ms, self.now_ms());
-                                    self.notify().await
-                                } else {
-                                    Ok(())
-                                }
-                            }
-                            SpircPlayStatus::LoadingPlay { .. }
-                            | SpircPlayStatus::LoadingPause { .. } => {
-                                self.connect_state
-                                    .update_position(position_ms, self.now_ms());
-                                self.play_status = SpircPlayStatus::Playing {
-                                    nominal_start_time: new_nominal_start_time,
-                                    preloading_of_next_track_triggered: false,
-                                };
-                                self.notify().await
-                            }
-                            _ => Ok(()),
-                        }
-                    }
-                    PlayerEvent::Paused {
-                        position_ms: new_position_ms,
+        if !is_current_track {
+            return Ok(());
+        }
+
+        match event {
+            PlayerEvent::EndOfTrack { .. } => {
+                let next_track = self
+                    .connect_state
+                    .repeat_track()
+                    .then(|| self.connect_state.current_track(|t| t.uri.clone()));
+
+                self.handle_next(next_track)?
+            }
+            PlayerEvent::Loading { .. } => match self.play_status {
+                SpircPlayStatus::LoadingPlay { position_ms } => {
+                    self.connect_state
+                        .update_position(position_ms, self.now_ms());
+                    trace!("==> kPlayStatusPlay");
+                }
+                SpircPlayStatus::LoadingPause { position_ms } => {
+                    self.connect_state
+                        .update_position(position_ms, self.now_ms());
+                    trace!("==> kPlayStatusPause");
+                }
+                _ => {
+                    self.connect_state.update_position(0, self.now_ms());
+                    trace!("==> kPlayStatusLoading");
+                }
+            },
+            PlayerEvent::Playing { position_ms, .. }
+            | PlayerEvent::PositionCorrection { position_ms, .. }
+            | PlayerEvent::Seeked { position_ms, .. } => {
+                trace!("==> kPlayStatusPlay");
+                let new_nominal_start_time = self.now_ms() - position_ms as i64;
+                match self.play_status {
+                    SpircPlayStatus::Playing {
+                        ref mut nominal_start_time,
                         ..
                     } => {
-                        trace!("==> kPlayStatusPause");
-                        match self.play_status {
-                            SpircPlayStatus::Paused { .. } | SpircPlayStatus::Playing { .. } => {
-                                self.connect_state
-                                    .update_position(new_position_ms, self.now_ms());
-                                self.play_status = SpircPlayStatus::Paused {
-                                    position_ms: new_position_ms,
-                                    preloading_of_next_track_triggered: false,
-                                };
-                                self.notify().await
-                            }
-                            SpircPlayStatus::LoadingPlay { .. }
-                            | SpircPlayStatus::LoadingPause { .. } => {
-                                self.connect_state
-                                    .update_position(new_position_ms, self.now_ms());
-                                self.play_status = SpircPlayStatus::Paused {
-                                    position_ms: new_position_ms,
-                                    preloading_of_next_track_triggered: false,
-                                };
-                                self.notify().await
-                            }
-                            _ => Ok(()),
+                        if (*nominal_start_time - new_nominal_start_time).abs() > 100 {
+                            *nominal_start_time = new_nominal_start_time;
+                            self.connect_state
+                                .update_position(position_ms, self.now_ms());
+                        } else {
+                            return Ok(());
                         }
                     }
-                    PlayerEvent::Stopped { .. } => {
-                        trace!("==> kPlayStatusStop");
-                        match self.play_status {
-                            SpircPlayStatus::Stopped => Ok(()),
-                            _ => {
-                                self.play_status = SpircPlayStatus::Stopped;
-                                self.notify().await
-                            }
-                        }
+                    SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::LoadingPause { .. } => {
+                        self.connect_state
+                            .update_position(position_ms, self.now_ms());
+                        self.play_status = SpircPlayStatus::Playing {
+                            nominal_start_time: new_nominal_start_time,
+                            preloading_of_next_track_triggered: false,
+                        };
                     }
-                    PlayerEvent::TimeToPreloadNextTrack { .. } => {
-                        self.handle_preload_next_track();
-                        Ok(())
-                    }
-                    PlayerEvent::Unavailable { track_id, .. } => {
-                        self.handle_unavailable(track_id)?;
-                        if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri()? {
-                            self.handle_next(None)?;
-                        }
-                        self.notify().await
-                    }
-                    _ => Ok(()),
+                    _ => return Ok(()),
                 }
-            } else {
-                Ok(())
             }
-        } else {
-            Ok(())
+            PlayerEvent::Paused {
+                position_ms: new_position_ms,
+                ..
+            } => {
+                trace!("==> kPlayStatusPause");
+                match self.play_status {
+                    SpircPlayStatus::Paused { .. } | SpircPlayStatus::Playing { .. } => {
+                        self.connect_state
+                            .update_position(new_position_ms, self.now_ms());
+                        self.play_status = SpircPlayStatus::Paused {
+                            position_ms: new_position_ms,
+                            preloading_of_next_track_triggered: false,
+                        };
+                    }
+                    SpircPlayStatus::LoadingPlay { .. } | SpircPlayStatus::LoadingPause { .. } => {
+                        self.connect_state
+                            .update_position(new_position_ms, self.now_ms());
+                        self.play_status = SpircPlayStatus::Paused {
+                            position_ms: new_position_ms,
+                            preloading_of_next_track_triggered: false,
+                        };
+                    }
+                    _ => return Ok(()),
+                }
+            }
+            PlayerEvent::Stopped { .. } => {
+                trace!("==> kPlayStatusStop");
+                match self.play_status {
+                    SpircPlayStatus::Stopped => return Ok(()),
+                    _ => self.play_status = SpircPlayStatus::Stopped,
+                }
+            }
+            PlayerEvent::TimeToPreloadNextTrack { .. } => {
+                self.handle_preload_next_track();
+                return Ok(());
+            }
+            PlayerEvent::Unavailable { track_id, .. } => {
+                self.handle_unavailable(track_id)?;
+                if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri()? {
+                    self.handle_next(None)?
+                }
+            }
+            _ => return Ok(()),
         }
+
+        self.notify().await
     }
 
     async fn handle_connection_id_update(&mut self, connection_id: String) -> Result<(), Error> {
@@ -1452,16 +1449,6 @@ impl SpircTask {
         let volume =
             (self.connect_state.device_info().volume as u16).saturating_sub(VOLUME_STEP_SIZE);
         self.set_volume(volume);
-    }
-
-    async fn handle_end_of_track(&mut self) -> Result<(), Error> {
-        let next_track = self
-            .connect_state
-            .repeat_track()
-            .then(|| self.connect_state.current_track(|t| t.uri.clone()));
-
-        self.handle_next(next_track)?;
-        self.notify().await
     }
 
     fn handle_playlist_modification(
