@@ -293,6 +293,12 @@ impl ConnectState {
                 | SpircPlayStatus::Stopped
         );
 
+        if player.is_paused {
+            player.playback_speed = 0.;
+        } else {
+            player.playback_speed = 1.;
+        }
+
         // desktop and mobile require all 'states' set to true, when we are paused,
         // otherwise the play button (desktop) is grayed out or the preview (mobile) can't be opened
         player.is_buffering = player.is_paused
