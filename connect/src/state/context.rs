@@ -1,7 +1,9 @@
-use crate::state::{metadata::Metadata, provider::Provider, ConnectState, StateError};
-use librespot_core::{Error, SpotifyId};
-use librespot_protocol::player::{
-    Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack, Restrictions,
+use crate::{
+    core::{Error, SpotifyId},
+    protocol::player::{
+        Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack, Restrictions,
+    },
+    state::{metadata::Metadata, provider::Provider, ConnectState, StateError},
 };
 use protobuf::MessageField;
 use std::collections::HashMap;
@@ -27,7 +29,7 @@ pub enum ContextType {
     Autoplay,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Hash, Copy, Clone)]
 pub enum UpdateContext {
     Default,
     Autoplay,
@@ -62,26 +64,22 @@ fn page_url_to_uri(page_url: &str) -> String {
 
 impl ConnectState {
     pub fn find_index_in_context<F: Fn(&ProvidedTrack) -> bool>(
-        context: Option<&StateContext>,
+        ctx: &StateContext,
         f: F,
     ) -> Result<usize, StateError> {
-        let ctx = context
-            .as_ref()
-            .ok_or(StateError::NoContext(ContextType::Default))?;
-
         ctx.tracks
             .iter()
             .position(f)
             .ok_or(StateError::CanNotFindTrackInContext(None, ctx.tracks.len()))
     }
 
-    pub(super) fn get_context(&self, ty: &ContextType) -> Result<&StateContext, StateError> {
+    pub fn get_context(&self, ty: ContextType) -> Result<&StateContext, StateError> {
         match ty {
             ContextType::Default => self.context.as_ref(),
             ContextType::Shuffle => self.shuffle_context.as_ref(),
             ContextType::Autoplay => self.autoplay_context.as_ref(),
         }
-        .ok_or(StateError::NoContext(*ty))
+        .ok_or(StateError::NoContext(ty))
     }
 
     pub fn context_uri(&self) -> &String {
@@ -117,21 +115,24 @@ impl ConnectState {
         self.update_restrictions()
     }
 
-    pub fn get_context_uri_from_context(context: &Context) -> Option<&String> {
-        if !context.uri.starts_with(SEARCH_IDENTIFIER) {
-            return Some(&context.uri);
-        }
+    pub fn valid_resolve_uri(uri: &str) -> Option<&str> {
+        (!uri.starts_with(SEARCH_IDENTIFIER)).then_some(uri)
+    }
 
-        context
-            .pages
-            .first()
-            .and_then(|p| p.tracks.first().map(|t| &t.uri))
+    pub fn get_context_uri_from_context(context: &Context) -> Option<&str> {
+        match Self::valid_resolve_uri(&context.uri) {
+            Some(uri) => Some(uri),
+            None => context
+                .pages
+                .first()
+                .and_then(|p| p.tracks.first().map(|t| t.uri.as_ref())),
+        }
     }
 
     pub fn set_active_context(&mut self, new_context: ContextType) {
         self.active_context = new_context;
 
-        let ctx = match self.get_context(&new_context) {
+        let ctx = match self.get_context(new_context) {
             Err(why) => {
                 debug!("couldn't load context info because: {why}");
                 return;
@@ -213,7 +214,7 @@ impl ConnectState {
                 if !self.context_uri().contains(SEARCH_IDENTIFIER)
                     && self.context_uri() == &context.uri
                 {
-                    match Self::find_index_in_context(Some(&new_context), |t| {
+                    match Self::find_index_in_context(&new_context, |t| {
                         self.current_track(|t| &t.uri) == &t.uri
                     }) {
                         Ok(new_pos) => {
@@ -326,12 +327,11 @@ impl ConnectState {
             }
 
             if let Ok(position) =
-                Self::find_index_in_context(Some(current_context), |t| t.uri == new_track.uri)
+                Self::find_index_in_context(current_context, |t| t.uri == new_track.uri)
             {
                 let context_track = current_context.tracks.get_mut(position)?;
 
                 for (key, value) in new_track.metadata {
-                    warn!("merging metadata {key} {value}");
                     context_track.metadata.insert(key, value);
                 }
 

@@ -86,7 +86,7 @@ impl ConnectState {
         self.set_active_context(context_ty);
         self.fill_up_context = context_ty;
 
-        let ctx = self.get_context(&self.active_context).ok();
+        let ctx = self.get_context(self.active_context)?;
 
         let current_index = if track.is_queue() {
             Self::find_index_in_context(ctx, |c| c.uid == transfer.current_session.current_uid)
@@ -99,7 +99,7 @@ impl ConnectState {
             "active track is <{}> with index {current_index:?} in {:?} context, has {} tracks",
             track.uri,
             self.active_context,
-            ctx.map(|c| c.tracks.len()).unwrap_or_default()
+            ctx.tracks.len()
         );
 
         if self.player().track.is_none() {
