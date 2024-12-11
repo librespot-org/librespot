@@ -202,6 +202,7 @@ impl ConnectState {
             UpdateContext::Default => {
                 let mut new_context = self.state_context_from_page(
                     page,
+                    context.metadata,
                     context.restrictions.take(),
                     Some(&context.uri),
                     None,
@@ -242,6 +243,7 @@ impl ConnectState {
             UpdateContext::Autoplay => {
                 self.autoplay_context = Some(self.state_context_from_page(
                     page,
+                    context.metadata,
                     context.restrictions.take(),
                     Some(&context.uri),
                     Some(Provider::Autoplay),
@@ -275,6 +277,7 @@ impl ConnectState {
     fn state_context_from_page(
         &mut self,
         page: ContextPage,
+        metadata: HashMap<String, String>,
         restrictions: Option<Restrictions>,
         new_context_uri: Option<&str>,
         provider: Option<Provider>,
@@ -285,8 +288,12 @@ impl ConnectState {
             .tracks
             .iter()
             .flat_map(|track| {
-                match self.context_to_provided_track(track, Some(new_context_uri), provider.clone())
-                {
+                match self.context_to_provided_track(
+                    track,
+                    Some(new_context_uri),
+                    Some(&page.metadata),
+                    provider.clone(),
+                ) {
                     Ok(t) => Some(t),
                     Err(why) => {
                         error!("couldn't convert {track:#?} into ProvidedTrack: {why}");
@@ -299,7 +306,7 @@ impl ConnectState {
         StateContext {
             tracks,
             restrictions,
-            metadata: page.metadata,
+            metadata,
             index: ContextIndex::new(),
         }
     }
@@ -358,6 +365,7 @@ impl ConnectState {
         &self,
         ctx_track: &ContextTrack,
         context_uri: Option<&str>,
+        page_metadata: Option<&HashMap<String, String>>,
         provider: Option<Provider>,
     ) -> Result<ProvidedTrack, Error> {
         let id = if !ctx_track.uri.is_empty() {
@@ -388,7 +396,7 @@ impl ConnectState {
             ctx_track.uid.to_string()
         };
 
-        let mut metadata = HashMap::new();
+        let mut metadata = page_metadata.cloned().unwrap_or_default();
         for (k, v) in &ctx_track.metadata {
             metadata.insert(k.to_string(), v.to_string());
         }
@@ -414,7 +422,7 @@ impl ConnectState {
     }
 
     pub fn fill_context_from_page(&mut self, page: ContextPage) -> Result<(), Error> {
-        let context = self.state_context_from_page(page, None, None, None);
+        let context = self.state_context_from_page(page, HashMap::new(), None, None, None);
         let ctx = self
             .context
             .as_mut()
