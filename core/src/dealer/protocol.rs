@@ -175,6 +175,8 @@ fn handle_transfer_encoding(
     let encoding = headers.get("Transfer-Encoding").map(String::as_str);
     if let Some(encoding) = encoding {
         trace!("message was send with {encoding} encoding ");
+    } else {
+        trace!("message was send with no encoding ");
     }
 
     if !matches!(encoding, Some("gzip")) {
