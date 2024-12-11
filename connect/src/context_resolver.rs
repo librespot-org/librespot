@@ -1,3 +1,4 @@
+use crate::state::context::ContextType;
 use crate::{
     core::{Error, Session},
     protocol::{
@@ -6,6 +7,7 @@ use crate::{
     },
     state::{context::UpdateContext, ConnectState},
 };
+use std::cmp::PartialEq;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::{Display, Formatter},
@@ -75,10 +77,9 @@ impl ResolveContext {
         // otherwise we might not even check if we need to fallback and just use the fallback uri
         match self.resolve {
             Resolve::Uri(ref uri) => ConnectState::valid_resolve_uri(uri),
-            Resolve::Context(ref ctx) => {
-                ConnectState::get_context_uri_from_context(ctx).or(self.fallback.as_deref())
-            }
+            Resolve::Context(ref ctx) => ConnectState::get_context_uri_from_context(ctx),
         }
+        .or(self.fallback.as_deref())
     }
 
     /// the actual context uri
@@ -147,6 +148,8 @@ pub struct ContextResolver {
 // time after which an unavailable context is retried
 const RETRY_UNAVAILABLE: Duration = Duration::from_secs(3600);
 
+const CONCERNING_AMOUNT_OF_SKIPS: usize = 1_000;
+
 impl ContextResolver {
     pub fn new(session: Session) -> Self {
         Self {
@@ -208,6 +211,8 @@ impl ContextResolver {
         loop {
             let next = self.queue.front()?;
             match next.resolve_uri() {
+                // this is here to prevent an endless amount of skips
+                None if idx > CONCERNING_AMOUNT_OF_SKIPS => unreachable!(),
                 None => {
                     warn!("skipped {idx} because of no valid resolve_uri: {next}");
                     idx += 1;
@@ -318,7 +323,16 @@ impl ContextResolver {
             return false;
         }
 
-        debug!("last item of type <{:?}> finishing state", next.update);
+        debug!("last item of type <{:?}>, finishing state", next.update);
+
+        match (next.update, state.active_context) {
+            (UpdateContext::Default, ContextType::Default) => {}
+            (UpdateContext::Default, _) => {
+                debug!("skipped finishing default, because it isn't the active context");
+                return false;
+            }
+            (UpdateContext::Autoplay, _) => {}
+        }
 
         if let Some(transfer_state) = transfer_state.take() {
             if let Err(why) = state.finish_transfer(transfer_state) {
@@ -328,8 +342,17 @@ impl ContextResolver {
 
         let res = if state.shuffling_context() {
             state.shuffle()
+        } else if let Ok(ctx) = state.get_context(state.active_context) {
+            let idx = ConnectState::find_index_in_context(ctx, |t| {
+                state.current_track(|c| t.uri == c.uri)
+            })
+            .ok();
+
+            state
+                .reset_playback_to_position(idx)
+                .and_then(|_| state.fill_up_next_tracks())
         } else {
-            state.reset_playback_to_position(Some(state.player().index.track as usize))
+            state.fill_up_next_tracks()
         };
 
         if let Err(why) = res {

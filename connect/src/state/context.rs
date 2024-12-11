@@ -7,6 +7,7 @@ use crate::{
 };
 use protobuf::MessageField;
 use std::collections::HashMap;
+use std::ops::Deref;
 use uuid::Uuid;
 
 const LOCAL_FILES_IDENTIFIER: &str = "spotify:local-files";
@@ -21,7 +22,7 @@ pub struct StateContext {
     pub index: ContextIndex,
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub enum ContextType {
     #[default]
     Default,
@@ -33,6 +34,17 @@ pub enum ContextType {
 pub enum UpdateContext {
     Default,
     Autoplay,
+}
+
+impl Deref for UpdateContext {
+    type Target = ContextType;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            UpdateContext::Default => &ContextType::Default,
+            UpdateContext::Autoplay => &ContextType::Autoplay,
+        }
+    }
 }
 
 pub enum ResetContext<'s> {
@@ -86,11 +98,16 @@ impl ConnectState {
         &self.player().context_uri
     }
 
+    fn different_context_uri(&self, uri: &str) -> bool {
+        // search identifier is always different
+        self.context_uri() != uri || uri.starts_with(SEARCH_IDENTIFIER)
+    }
+
     pub fn reset_context(&mut self, mut reset_as: ResetContext) {
         self.set_active_context(ContextType::Default);
         self.fill_up_context = ContextType::Default;
 
-        if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.context_uri() != ctx) {
+        if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.different_context_uri(ctx)) {
             reset_as = ResetContext::Completely
         }
         self.shuffle_context = None;
@@ -134,7 +151,7 @@ impl ConnectState {
 
         let ctx = match self.get_context(new_context) {
             Err(why) => {
-                debug!("couldn't load context info because: {why}");
+                warn!("couldn't load context info because: {why}");
                 return;
             }
             Ok(ctx) => ctx,
@@ -184,17 +201,8 @@ impl ConnectState {
             Some(p) => p,
         };
 
-        let prev_context = match ty {
-            UpdateContext::Default => self.context.as_ref(),
-            UpdateContext::Autoplay => self.autoplay_context.as_ref(),
-        };
-
         debug!(
-            "updated context {ty:?} from <{}> ({} tracks) to <{}> ({} tracks)",
-            self.context_uri(),
-            prev_context
-                .map(|c| c.tracks.len().to_string())
-                .unwrap_or_else(|| "-".to_string()),
+            "updated context {ty:?} to <{}> ({} tracks)",
             context.uri,
             page.tracks.len()
         );
@@ -210,8 +218,8 @@ impl ConnectState {
                 );
 
                 // when we update the same context, we should try to preserve the previous position
-                // otherwise we might load the entire context twice
-                if !self.context_uri().contains(SEARCH_IDENTIFIER)
+                // otherwise we might load the entire context twice, unless it's the search context
+                if !self.context_uri().starts_with(SEARCH_IDENTIFIER)
                     && self.context_uri() == &context.uri
                 {
                     match Self::find_index_in_context(&new_context, |t| {
@@ -234,7 +242,7 @@ impl ConnectState {
 
                 self.context = Some(new_context);
 
-                if !context.url.contains(SEARCH_IDENTIFIER) {
+                if !context.url.starts_with(SEARCH_IDENTIFIER) {
                     self.player_mut().context_url = context.url;
                 } else {
                     self.player_mut().context_url.clear()

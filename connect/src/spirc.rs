@@ -985,6 +985,13 @@ impl SpircTask {
         state.set_active(true);
         state.handle_initial_transfer(&mut transfer);
 
+        // adjust active context, so resolve knows for which context it should set up the state
+        state.active_context = if autoplay {
+            ContextType::Autoplay
+        } else {
+            ContextType::Default
+        };
+
         // update position if the track continued playing
         let position = if transfer.playback.is_paused {
             transfer.playback.position_as_of_timestamp.into()
@@ -1110,6 +1117,8 @@ impl SpircTask {
         // for play commands with skip by uid, the context of the command contains
         // tracks with uri and uid, so we merge the new context with the resolved/existing context
         self.connect_state.merge_context(context);
+
+        // load here, so that we clear the queue only after we definitely retrieved a new context
         self.connect_state.clear_next_tracks(false);
         self.connect_state.clear_restrictions();
 
@@ -1143,10 +1152,12 @@ impl SpircTask {
                 self.connect_state.update_queue_revision()
             } else {
                 self.connect_state.shuffle()?;
+                self.add_autoplay_resolving_when_required();
             }
         } else {
             self.connect_state.set_current_track(index)?;
             self.connect_state.reset_playback_to_position(Some(index))?;
+            self.add_autoplay_resolving_when_required();
         }
 
         if self.connect_state.current_track(MessageField::is_some) {
@@ -1327,9 +1338,8 @@ impl SpircTask {
             };
         };
 
-        self.add_autoplay_resolving_when_required();
-
         if has_next_track {
+            self.add_autoplay_resolving_when_required();
             self.load_track(continue_playing, 0)
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");

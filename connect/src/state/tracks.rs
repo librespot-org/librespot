@@ -128,6 +128,8 @@ impl<'ct> ConnectState {
             };
         };
 
+        debug!("next track is {new_track:#?}");
+
         let new_track = match new_track {
             None => return Ok(None),
             Some(t) => t,
@@ -280,7 +282,7 @@ impl<'ct> ConnectState {
         }
     }
 
-    pub fn fill_up_next_tracks(&mut self) -> Result<(), StateError> {
+    pub fn fill_up_next_tracks(&mut self) -> Result<(), Error> {
         let ctx = self.get_context(self.fill_up_context)?;
         let mut new_index = ctx.index.track as usize;
         let mut iteration = ctx.index.page;
