@@ -1,6 +1,15 @@
 pub use crate::model::{PlayingTrack, SpircLoadCommand};
 use crate::state::{context::ResetContext, metadata::Metadata};
 use crate::{
+    context_resolver::ResolveContext,
+    model::SpircPlayStatus,
+    state::{
+        context::{ContextType, UpdateContext},
+        provider::IsProvider,
+        {ConnectState, ConnectStateConfig},
+    },
+};
+use crate::{
     core::{
         authentication::Credentials,
         dealer::{
@@ -22,14 +31,6 @@ use crate::{
         playlist4_external::PlaylistModificationInfo,
         social_connect_v2::{session::_host_active_device_id, SessionUpdate},
         user_attributes::UserAttributesMutation,
-    },
-};
-use crate::{
-    model::{ResolveContext, SpircPlayStatus},
-    state::{
-        context::{ContextType, UpdateContext},
-        provider::IsProvider,
-        {ConnectState, ConnectStateConfig},
     },
 };
 use futures_util::StreamExt;
