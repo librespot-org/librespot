@@ -128,8 +128,6 @@ impl<'ct> ConnectState {
             };
         };
 
-        debug!("next track is {new_track:#?}");
-
         let new_track = match new_track {
             None => return Ok(None),
             Some(t) => t,
