@@ -333,6 +333,11 @@ impl<'ct> ConnectState {
             self.next_tracks_mut().push(track);
         }
 
+        debug!(
+            "finished filling up next_tracks ({})",
+            self.next_tracks().len()
+        );
+
         self.update_context_index(self.fill_up_context, new_index)?;
 
         // the web-player needs a revision update, otherwise the queue isn't updated in the ui

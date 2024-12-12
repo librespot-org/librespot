@@ -348,9 +348,15 @@ impl ConnectState {
     }
 
     pub fn reset_playback_to_position(&mut self, new_index: Option<usize>) -> Result<(), Error> {
+        debug!(
+            "reset_playback with active ctx <{:?}> fill_up ctx <{:?}>",
+            self.active_context, self.fill_up_context
+        );
+
         let new_index = new_index.unwrap_or(0);
         self.update_current_index(|i| i.track = new_index as u32);
         self.update_context_index(self.active_context, new_index + 1)?;
+        self.fill_up_context = self.active_context;
 
         if !self.current_track(|t| t.is_queue()) {
             self.set_current_track(new_index)?;

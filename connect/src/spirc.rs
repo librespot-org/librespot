@@ -1042,7 +1042,7 @@ impl SpircTask {
         self.connect_state.update_position(0, self.now_ms());
         self.connect_state.clear_next_tracks(true);
 
-        if let Err(why) = self.connect_state.fill_up_next_tracks() {
+        if let Err(why) = self.connect_state.reset_playback_to_position(None) {
             warn!("failed filling up next_track during stopping: {why}")
         }
     }
@@ -1343,7 +1343,6 @@ impl SpircTask {
             self.load_track(continue_playing, 0)
         } else {
             info!("Not playing next track because there are no more tracks left in queue.");
-            self.connect_state.reset_playback_to_position(None)?;
             self.handle_stop();
             Ok(())
         }
