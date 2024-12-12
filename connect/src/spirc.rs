@@ -607,9 +607,13 @@ impl SpircTask {
                     trace!("==> Loading");
                 }
             },
+            PlayerEvent::Seeked { position_ms, .. } => {
+                trace!("==> Seeked");
+                self.connect_state
+                    .update_position(position_ms, self.now_ms())
+            }
             PlayerEvent::Playing { position_ms, .. }
-            | PlayerEvent::PositionCorrection { position_ms, .. }
-            | PlayerEvent::Seeked { position_ms, .. } => {
+            | PlayerEvent::PositionCorrection { position_ms, .. } => {
                 trace!("==> Playing");
                 let new_nominal_start_time = self.now_ms() - position_ms as i64;
                 match self.play_status {
