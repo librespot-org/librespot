@@ -170,7 +170,7 @@ pub struct TransferOptions {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct PlayOptions {
-    pub skip_to: SkipTo,
+    pub skip_to: Option<SkipTo>,
     #[serde(default, deserialize_with = "option_json_proto")]
     pub player_options_override: Option<ContextPlayerOptionOverrides>,
     pub license: Option<String>,

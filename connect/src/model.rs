@@ -23,19 +23,26 @@ pub enum PlayingTrack {
     Uid(String),
 }
 
-impl From<SkipTo> for PlayingTrack {
-    fn from(value: SkipTo) -> Self {
-        // order of checks is important, as the index can be 0, but still has an uid or uri provided,
-        // so we only use the index as last resort
-        if let Some(uri) = value.track_uri {
-            PlayingTrack::Uri(uri)
-        } else if let Some(uid) = value.track_uid {
-            PlayingTrack::Uid(uid)
-        } else {
-            PlayingTrack::Index(value.track_index.unwrap_or_else(|| {
-                warn!("SkipTo didn't provided any point to skip to, falling back to index 0");
-                0
-            }))
+impl From<Option<SkipTo>> for PlayingTrack {
+    fn from(value: Option<SkipTo>) -> Self {
+        match value {
+            Some(value) => {
+                // order of checks is important, as the index can be 0, but still has an uid or uri provided,
+                // so we only use the index as last resort
+                if let Some(uri) = value.track_uri {
+                    PlayingTrack::Uri(uri)
+                } else if let Some(uid) = value.track_uid {
+                    PlayingTrack::Uid(uid)
+                } else {
+                    PlayingTrack::Index(value.track_index.unwrap_or_else(|| {
+                        warn!(
+                            "SkipTo didn't provided any point to skip to, falling back to index 0"
+                        );
+                        0
+                    }))
+                }
+            }
+            None => PlayingTrack::Index(0),
         }
     }
 }
