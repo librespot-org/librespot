@@ -191,7 +191,7 @@ pub struct OptionsOptions {
     system_initiated: bool,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Default)]
 pub struct SkipTo {
     pub track_uid: Option<String>,
     pub track_uri: Option<String>,
