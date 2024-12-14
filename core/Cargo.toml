@@ -44,7 +44,7 @@ pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 pin-project-lite = "0.2"
 priority-queue = "2.0"
 protobuf = "3.5"
-quick-xml = { version = "0.36.1", features = ["serialize"] }
+quick-xml = { version = "0.37.1", features = ["serialize"] }
 rand = "0.8"
 rsa = "0.9.2"
 serde = { version = "1.0", features = ["derive"] }
