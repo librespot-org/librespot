@@ -19,3 +19,5 @@ cargo check -p librespot-core
 cargo hack check --no-dev-deps --each-feature -p librespot-discovery
 cargo hack check --no-dev-deps --each-feature -p librespot-playback
 cargo hack check --no-dev-deps --each-feature
+
+cargo clean
