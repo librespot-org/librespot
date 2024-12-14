@@ -452,7 +452,7 @@ impl SpircTask {
                         self.connect_state.prev_autoplay_track_uris()
                     }).await
                 }, if allow_context_resolving && self.context_resolver.has_next() => {
-                    self.handle_context(next_context)
+                    self.handle_next_context(next_context)
                 },
                 else => break
             }
@@ -471,7 +471,7 @@ impl SpircTask {
         self.session.dealer().close().await;
     }
 
-    fn handle_context(&mut self, next_context: Result<Context, Error>) {
+    fn handle_next_context(&mut self, next_context: Result<Context, Error>) {
         let next_context = match next_context {
             Err(why) => {
                 self.context_resolver.mark_next_unavailable();
@@ -1026,7 +1026,7 @@ impl SpircTask {
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
         self.context_resolver.clear();
-        self.handle_stop();
+        self.handle_pause();
 
         self.play_status = SpircPlayStatus::Stopped {};
         self.connect_state
@@ -1115,7 +1115,7 @@ impl SpircTask {
                 ContextAction::Replace,
             ));
             let context = self.context_resolver.get_next_context(Vec::new).await;
-            self.handle_context(context);
+            self.handle_next_context(context);
         }
 
         // for play commands with skip by uid, the context of the command contains

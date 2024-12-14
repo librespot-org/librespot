@@ -148,8 +148,6 @@ pub struct ContextResolver {
 // time after which an unavailable context is retried
 const RETRY_UNAVAILABLE: Duration = Duration::from_secs(3600);
 
-const CONCERNING_AMOUNT_OF_SKIPS: usize = 1_000;
-
 impl ContextResolver {
     pub fn new(session: Session) -> Self {
         Self {
@@ -211,14 +209,12 @@ impl ContextResolver {
         loop {
             let next = self.queue.front()?;
             match next.resolve_uri() {
-                // this is here to prevent an endless amount of skips
-                None if idx > CONCERNING_AMOUNT_OF_SKIPS => unreachable!(),
-                None => {
+                None if idx < self.queue.len() => {
                     warn!("skipped {idx} because of no valid resolve_uri: {next}");
                     idx += 1;
                     continue;
                 }
-                Some(uri) => break Some((next, uri, idx)),
+                value => break value.map(|uri| (next, uri, idx)),
             }
         }
     }
