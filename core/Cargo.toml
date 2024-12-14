@@ -25,7 +25,7 @@ bytes = "1"
 form_urlencoded = "1.0"
 futures-core = "0.3"
 futures-util = { version = "0.3", features = ["alloc", "bilock", "sink", "unstable"] }
-governor = { version = "0.6", default-features = false, features = ["std", "jitter"] }
+governor = { version = "0.8", default-features = false, features = ["std", "jitter"] }
 hmac = "0.12"
 httparse = "1.7"
 http = "1.0"
