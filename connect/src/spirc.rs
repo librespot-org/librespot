@@ -1040,7 +1040,7 @@ impl SpircTask {
                         context_uri: play.context.uri.clone(),
                         start_playing: true,
                         seek_to: play.options.seek_to.unwrap_or_default(),
-                        playing_track: play.options.skip_to.into(),
+                        playing_track: play.options.skip_to.unwrap_or_default().into(),
                         shuffle,
                         repeat,
                         repeat_track,
