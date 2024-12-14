@@ -48,7 +48,7 @@ macro_rules! sink_as_bytes {
     () => {
         fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {
             use crate::convert::i24;
-            use zerocopy::AsBytes;
+            use zerocopy::IntoBytes;
             match packet {
                 AudioPacket::Samples(samples) => match self.format {
                     AudioFormat::F64 => self.write_bytes(samples.as_bytes()),

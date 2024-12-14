@@ -27,7 +27,7 @@ parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 shell-words = "1.1"
 thiserror = "2.0"
 tokio = { version = "1", features = ["parking_lot", "rt", "rt-multi-thread", "sync"] }
-zerocopy = { version = "0.7.32", features = ["derive"] }
+zerocopy = { version = "0.8.13", features = ["derive"] }
 
 # Backends
 alsa            = { version = "0.9.0", optional = true }
