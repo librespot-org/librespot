@@ -23,5 +23,5 @@ http-body-util = "0.1.1"
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 tempfile = "3"
-thiserror = "1.0"
+thiserror = "2.0"
 tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }

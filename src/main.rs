@@ -1872,7 +1872,7 @@ async fn main() {
             {
                 Ok(d) => break Some(d),
                 Err(e) => {
-                    sys.refresh_processes(ProcessesToUpdate::All);
+                    sys.refresh_processes(ProcessesToUpdate::All, true);
 
                     if System::uptime() <= 1 {
                         debug!("Retrying to initialise discovery: {e}");
