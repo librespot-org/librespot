@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG alpine_version=alpine3.18
-ARG rust_version=1.74.0
+ARG rust_version=1.75.0
 FROM rust:${rust_version}-${alpine_version}
 
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
