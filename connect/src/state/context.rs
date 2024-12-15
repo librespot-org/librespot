@@ -63,7 +63,7 @@ fn page_url_to_uri(page_url: &str) -> String {
     let split = if let Some(rest) = page_url.strip_prefix("hm://") {
         rest.split('/')
     } else {
-        warn!("page_url didn't started with hm://. got page_url: {page_url}");
+        warn!("page_url didn't start with hm://. got page_url: {page_url}");
         page_url.split('/')
     };
 

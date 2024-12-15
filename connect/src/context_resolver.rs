@@ -207,7 +207,7 @@ impl ContextResolver {
     fn find_next(&self) -> Option<(&ResolveContext, &str, usize)> {
         let mut idx = 0;
         loop {
-            let next = self.queue.front()?;
+            let next = self.queue.get(idx)?;
             match next.resolve_uri() {
                 None if idx < self.queue.len() => {
                     warn!("skipped {idx} because of no valid resolve_uri: {next}");
