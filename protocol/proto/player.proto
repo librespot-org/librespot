@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -8,6 +8,14 @@ option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.connectstate.model";
 
 message PlayerState {
+    reserved 26;
+    reserved 27;
+    reserved 28;
+    reserved 29;
+    reserved 30;
+    reserved 31;
+    reserved 34;
+
     int64 timestamp = 1;
     string context_uri = 2;
     string context_url = 3;
@@ -33,16 +41,14 @@ message PlayerState {
     string session_id = 23;
     string queue_revision = 24;
     int64 position = 25;
-    string entity_uri = 26;
-    repeated ProvidedTrack reverse = 27;
-    repeated ProvidedTrack future = 28;
-    string audio_stream = 29;
-    bool is_optional = 30 [deprecated = true];
-    int64 bitrate = 31 [deprecated = true];
     PlaybackQuality playback_quality = 32;
+    repeated string signals = 33;
+    string session_command_id = 35;
 }
 
 message ProvidedTrack {
+    reserved 11;
+
     string uri = 1;
     string uid = 2;
     map<string, string> metadata = 3;
@@ -53,7 +59,6 @@ message ProvidedTrack {
     string album_uri = 8;
     repeated string disallow_reasons = 9;
     string artist_uri = 10;
-    repeated string disallow_undecided = 11;
 }
 
 message ContextIndex {
@@ -61,7 +66,18 @@ message ContextIndex {
     uint32 track = 2;
 }
 
+message ModeRestrictions {
+    map<string, RestrictionReasons> values = 1;
+}
+
+message RestrictionReasons {
+    repeated string reasons = 1;
+}
+
 message Restrictions {
+    reserved 26;
+    reserved 27;
+
     repeated string disallow_pausing_reasons = 1;
     repeated string disallow_resuming_reasons = 2;
     repeated string disallow_seeking_reasons = 3;
@@ -85,6 +101,10 @@ message Restrictions {
     repeated string disallow_updating_context_reasons = 21;
     repeated string disallow_playing_reasons = 22;
     repeated string disallow_stopping_reasons = 23;
+    repeated string disallow_add_to_queue_reasons = 24;
+    repeated string disallow_setting_playback_speed_reasons = 25;
+    map<string, ModeRestrictions> disallow_setting_modes = 28;
+    map<string, RestrictionReasons> disallow_signals = 29;
 }
 
 message PlayOrigin {
@@ -95,87 +115,19 @@ message PlayOrigin {
     string referrer_identifier = 5;
     string device_identifier = 6;
     repeated string feature_classes = 7;
+    string restriction_identifier = 8;
 }
 
 message ContextPlayerOptions {
     bool shuffling_context = 1;
     bool repeating_context = 2;
     bool repeating_track = 3;
+    map<string, string> modes = 5;
+    optional float playback_speed = 4;
 }
 
 message Suppressions {
     repeated string providers = 1;
-}
-
-message InstrumentationParams {
-    repeated string interaction_ids = 6;
-    repeated string page_instance_ids = 7;
-}
-
-message Playback {
-    int64 timestamp = 1;
-    int32 position_as_of_timestamp = 2;
-    double playback_speed = 3;
-    bool is_paused = 4;
-    ContextTrack current_track = 5;
-}
-
-message Queue {
-    repeated ContextTrack tracks = 1;
-    bool is_playing_queue = 2;
-}
-
-message Session {
-    PlayOrigin play_origin = 1;
-    Context context = 2;
-    string current_uid = 3;
-    ContextPlayerOptionOverrides option_overrides = 4;
-    Suppressions suppressions = 5;
-    InstrumentationParams instrumentation_params = 6;
-}
-
-message TransferState {
-    ContextPlayerOptions options = 1;
-    Playback playback = 2;
-    Session current_session = 3;
-    Queue queue = 4;
-}
-
-message ContextTrack {
-    string uri = 1;
-    string uid = 2;
-    bytes gid = 3;
-    map<string, string> metadata = 4;
-}
-
-message ContextPlayerOptionOverrides {
-    bool shuffling_context = 1;
-    bool repeating_context = 2;
-    bool repeating_track = 3;
-}
-
-message Context {
-    string uri = 1;
-    string url = 2;
-    map<string, string> metadata = 3;
-    Restrictions restrictions = 4;
-    repeated ContextPage pages = 5;
-    bool loading = 6;
-}
-
-message ContextPage {
-    string page_url = 1;
-    string next_page_url = 2;
-    map<string, string> metadata = 3;
-    repeated ContextTrack tracks = 4;
-    bool loading = 5;
-}
-
-message PlayerQueue {
-    string revision = 1;
-    repeated ProvidedTrack next_tracks = 2;
-    repeated ProvidedTrack prev_tracks = 3;
-    ProvidedTrack track = 4;
 }
 
 message PlaybackQuality {
@@ -193,6 +145,7 @@ enum BitrateLevel {
     high = 3;
     very_high = 4;
     hifi = 5;
+    hifi24 = 6;
 }
 
 enum BitrateStrategy {

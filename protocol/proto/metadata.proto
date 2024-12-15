@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -9,6 +9,7 @@ option java_outer_classname = "Metadata";
 option java_package = "com.spotify.metadata.proto";
 
 message Artist {
+    reserved 9;
     optional bytes gid = 1;
     optional string name = 2;
     optional sint32 popularity = 3;
@@ -17,7 +18,6 @@ message Artist {
     repeated AlbumGroup single_group = 6;
     repeated AlbumGroup compilation_group = 7;
     repeated AlbumGroup appears_on_group = 8;
-    repeated string genre = 9;
     repeated ExternalId external_id = 10;
     repeated Image portrait = 11;
     repeated Biography biography = 12;
@@ -31,10 +31,12 @@ message Artist {
 }
 
 message Album {
+    reserved 8;
+
     optional bytes gid = 1;
     optional string name = 2;
     repeated Artist artist = 3;
-    
+
     optional Type type = 4;
     enum Type {
         ALBUM = 1;
@@ -44,11 +46,10 @@ message Album {
         AUDIOBOOK = 5;
         PODCAST = 6;
     }
-    
+
     optional string label = 5;
     optional Date date = 6;
     optional sint32 popularity = 7;
-    repeated string genre = 8;
     repeated Image cover = 9;
     repeated ExternalId external_id = 10;
     repeated Disc disc = 11;
@@ -86,17 +87,16 @@ message Track {
     repeated Availability availability = 19;
     optional Licensor licensor = 21;
     repeated string language_of_performance = 22;
+    optional Audio original_audio = 24;
     repeated ContentRating content_rating = 25;
     optional string original_title = 27;
     optional string version_title = 28;
     repeated ArtistWithRole artist_with_role = 32;
+    optional string canonical_uri = 36;
+    repeated Video original_video = 38;
 }
 
 message ArtistWithRole {
-    optional bytes artist_gid = 1;
-    optional string artist_name = 2;
-    
-    optional ArtistRole role = 3;
     enum ArtistRole {
         ARTIST_ROLE_UNKNOWN = 0;
         ARTIST_ROLE_MAIN_ARTIST = 1;
@@ -107,6 +107,10 @@ message ArtistWithRole {
         ARTIST_ROLE_CONDUCTOR = 6;
         ARTIST_ROLE_ORCHESTRA = 7;
     }
+
+    optional bytes artist_gid = 1;
+    optional string artist_name = 2;
+    optional ArtistRole role = 3;
 }
 
 message Show {
@@ -122,25 +126,26 @@ message Show {
     repeated Copyright copyright = 71;
     repeated Restriction restriction = 72;
     repeated string keyword = 73;
-    
+
     optional MediaType media_type = 74;
     enum MediaType {
         MIXED = 0;
         AUDIO = 1;
         VIDEO = 2;
     }
-    
+
     optional ConsumptionOrder consumption_order = 75;
     enum ConsumptionOrder {
         SEQUENTIAL = 1;
         EPISODIC = 2;
         RECENT = 3;
     }
-    
+
     repeated Availability availability = 78;
     optional string trailer_uri = 83;
     optional bool music_and_talk = 85;
     optional bool is_audiobook = 89;
+    optional bool is_creator_channel = 90;
 }
 
 message Episode {
@@ -165,20 +170,26 @@ message Episode {
     optional bool allow_background_playback = 81;
     repeated Availability availability = 82;
     optional string external_url = 83;
-    
-    optional EpisodeType type = 87;
+    optional Audio original_audio = 84;
+
+    optional Episode.EpisodeType type = 87;
     enum EpisodeType {
         FULL = 0;
         TRAILER = 1;
         BONUS = 2;
     }
-    
+
     optional bool music_and_talk = 91;
     repeated ContentRating content_rating = 95;
     optional bool is_audiobook_chapter = 96;
+    optional bool is_podcast_short = 97;
 }
 
 message Licensor {
+    optional bytes uuid = 1;
+}
+
+message Audio {
     optional bytes uuid = 1;
 }
 
@@ -206,16 +217,15 @@ message Date {
 }
 
 message Image {
-    optional bytes file_id = 1;
-    
-    optional Size size = 2;
     enum Size {
         DEFAULT = 0;
         SMALL = 1;
         LARGE = 2;
         XLARGE = 3;
     }
-    
+
+    optional bytes file_id = 1;
+    optional Size size = 2;
     optional sint32 width = 3;
     optional sint32 height = 4;
 }
@@ -237,17 +247,16 @@ message Disc {
 }
 
 message Copyright {
-    optional Type type = 1;
     enum Type {
         P = 0;
         C = 1;
     }
-    
+
+    optional Type type = 1;
     optional string text = 2;
 }
 
 message Restriction {
-    repeated Catalogue catalogue = 1;
     enum Catalogue {
         AD = 0;
         SUBSCRIPTION = 1;
@@ -255,14 +264,14 @@ message Restriction {
         SHUFFLE = 3;
         COMMERCIAL = 4;
     }
-    
-    optional Type type = 4;
+
     enum Type {
         STREAMING = 0;
     }
-    
+
+    repeated Catalogue catalogue = 1;
+    optional Type type = 4;
     repeated string catalogue_str = 5;
-    
     oneof country_restriction {
         string countries_allowed = 2;
         string countries_forbidden = 3;
@@ -286,9 +295,6 @@ message ExternalId {
 }
 
 message AudioFile {
-    optional bytes file_id = 1;
-    
-    optional Format format = 2 [default = UNKNOWN_FORMAT];
     enum Format {
         OGG_VORBIS_96 = 0;
         OGG_VORBIS_160 = 1;
@@ -300,13 +306,19 @@ message AudioFile {
         MP3_160_ENC = 7;
         AAC_24 = 8;
         AAC_48 = 9;
-        AAC_160 = 10;
-        AAC_320 = 11;
-        MP4_128 = 12;
-        OTHER5 = 13;
         FLAC_FLAC = 16;
-        UNKNOWN_FORMAT = 255;
+        XHE_AAC_24 = 18;
+        XHE_AAC_16 = 19;
+        XHE_AAC_12 = 20;
+        FLAC_FLAC_24BIT = 22;
     }
+
+    optional bytes file_id = 1;
+    optional Format format = 2;
+}
+
+message Video {
+    optional bytes gid = 1;
 }
 
 message VideoFile {

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -44,6 +44,8 @@ message PlaylistMetadata {
     optional string load_state = 19;
     optional User made_for = 20;
     repeated cosmos_util.proto.Extension extension = 21;
+    optional uint32 length_ignoring_text_filter = 22;
+    optional string ai_curation_reference_id = 23;
 }
 
 message PlaylistOfflineState {

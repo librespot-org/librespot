@@ -1,8 +1,10 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.playlist_esperanto.proto;
+
+import "policy/supported_link_types_in_playlists.proto";
 
 option objc_class_prefix = "ESP";
 option java_multiple_files = true;
@@ -24,10 +26,14 @@ message PlaylistQuery {
         NOT_BANNED = 4;
         NOT_EXPLICIT = 5;
         NOT_EPISODE = 6;
+        NOT_RECOMMENDATION = 7;
+        UNPLAYED = 8;
+        IN_PROGRESS = 9;
+        NOT_FULLY_PLAYED = 10;
     }
-    
+
     string text_filter = 2;
-    
+
     SortBy sort_by = 3;
     enum SortBy {
         NO_SORT = 0;
@@ -45,8 +51,16 @@ message PlaylistQuery {
         NAME_DESC = 12;
         ADD_TIME_ASC = 13;
         ADD_TIME_DESC = 14;
+        ADDED_BY_ASC = 15;
+        ADDED_BY_DESC = 16;
+        DURATION_ASC = 17;
+        DURATION_DESC = 18;
+        SHOW_NAME_ASC = 19;
+        SHOW_NAME_DESC = 20;
+        PUBLISH_DATE_ASC = 21;
+        PUBLISH_DATE_DESC = 22;
     }
-    
+
     PlaylistRange range = 4;
     int32 update_throttling_ms = 5;
     bool group = 6;
@@ -54,6 +68,16 @@ message PlaylistQuery {
     bool show_unavailable = 8;
     bool always_show_windowed = 9;
     bool load_recommendations = 10;
+    repeated playlist.cosmos.proto.LinkType supported_placeholder_types = 11;
+    repeated string descriptor_filter = 12;
+    string item_id_filter = 13;
+
+    repeated AttributeFilter attribute_filter = 14;
+    message AttributeFilter {
+        repeated string contains_one_of = 1;
+    }
+
+    bool include_all_placeholders = 15;
 }
 
 enum PlaylistSourceRestriction {

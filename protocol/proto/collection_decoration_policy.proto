@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -7,7 +7,12 @@ package spotify.collection_cosmos.proto;
 import "policy/artist_decoration_policy.proto";
 import "policy/album_decoration_policy.proto";
 import "policy/track_decoration_policy.proto";
+import "policy/show_decoration_policy.proto";
+import "policy/episode_decoration_policy.proto";
 
+option java_package = "spotify.collection.esperanto.proto";
+option java_multiple_files = true;
+option objc_class_prefix = "ESP";
 option optimize_for = CODE_SIZE;
 
 message CollectionArtistDecorationPolicy {
@@ -35,4 +40,22 @@ message CollectionTrackDecorationPolicy {
     CollectionAlbumDecorationPolicy album_policy = 5;
     cosmos_util.proto.ArtistDecorationPolicy artist_policy = 6;
     bool decorated = 7;
+    cosmos_util.proto.ArtistCollectionDecorationPolicy artist_collection_policy = 8;
 }
+
+message CollectionShowDecorationPolicy {
+    cosmos_util.proto.ShowDecorationPolicy show_policy = 1;
+    cosmos_util.proto.ShowPlayedStateDecorationPolicy played_state_policy = 2;
+    cosmos_util.proto.ShowCollectionDecorationPolicy collection_policy = 3;
+    bool decorated = 4;
+}
+
+message CollectionEpisodeDecorationPolicy {
+    cosmos_util.proto.EpisodeDecorationPolicy episode_policy = 1;
+    cosmos_util.proto.EpisodeCollectionDecorationPolicy collection_policy = 2;
+    cosmos_util.proto.EpisodeSyncDecorationPolicy sync_policy = 3;
+    cosmos_util.proto.EpisodePlayedStateDecorationPolicy played_state_policy = 4;
+    CollectionShowDecorationPolicy show_policy = 5;
+    bool decorated = 6;
+}
+

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -13,4 +13,6 @@ message NetFortuneResponse {
 message NetFortuneV2Response {
     string predict_id = 1;
     int32 estimated_max_bitrate = 2;
+    optional int32 advised_prefetch_bitrate_metered = 3;
+    optional int32 advised_prefetch_bitrate_non_metered = 4;
 }

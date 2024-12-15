@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -14,7 +14,7 @@ message ModificationRequest {
     optional string after = 3;
     optional string name = 4;
     optional bool playlist = 5;
-    
+
     optional Attributes attributes = 6;
     message Attributes {
         optional bool published = 1;
@@ -23,15 +23,48 @@ message ModificationRequest {
         optional string description = 4;
         optional string imageUri = 5;
         optional string picture = 6;
+        optional string ai_curation_reference_id = 7;
+        optional PublishedState published_state = 8;
     }
-    
+
     repeated string uris = 7;
     repeated string rows = 8;
     optional bool contents = 9;
     optional string item_id = 10;
+    repeated ListAttributeKind attributes_to_clear = 11;
+    optional CreateItemKind create_item_kind = 12;
 }
 
 message ModificationResponse {
     optional bool success = 1;
     optional string uri = 2;
 }
+
+enum ListAttributeKind {
+    LIST_UNKNOWN = 0;
+    LIST_NAME = 1;
+    LIST_DESCRIPTION = 2;
+    LIST_PICTURE = 3;
+    LIST_COLLABORATIVE = 4;
+    LIST_PL3_VERSION = 5;
+    LIST_DELETED_BY_OWNER = 6;
+    LIST_CLIENT_ID = 10;
+    LIST_FORMAT = 11;
+    LIST_FORMAT_ATTRIBUTES = 12;
+    LIST_PICTURE_SIZE = 13;
+    LIST_SEQUENCE_CONTEXT_TEMPLATE = 14;
+    LIST_AI_CURATION_REFERENCE_ID = 15;
+}
+
+enum PublishedState {
+    PUBLISHED_STATE_UNSPECIFIED = 0;
+    PUBLISHED_STATE_NOT_PUBLISHED = 1;
+    PUBLISHED_STATE_PUBLISHED = 2;
+}
+
+enum CreateItemKind {
+    CREATE_ITEM_KIND_UNSPECIFIED = 0;
+    CREATE_ITEM_KIND_PLAYLIST = 1;
+    CREATE_ITEM_KIND_FOLDER = 2;
+}
+

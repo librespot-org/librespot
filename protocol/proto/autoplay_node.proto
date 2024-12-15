@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -12,4 +12,5 @@ message AutoplayNode {
     map<string, bytes> filler_node = 1;
     required bool is_playing_filler = 2;
     required LoggingParams logging_params = 3;
+    optional bool called_play_on_filler = 4;
 }

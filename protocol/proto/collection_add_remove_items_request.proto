@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -6,12 +6,15 @@ package spotify.collection_cosmos.proto;
 
 import "status.proto";
 
+option java_package = "spotify.collection.esperanto.proto";
+option java_multiple_files = true;
+option objc_class_prefix = "ESP";
 option optimize_for = CODE_SIZE;
 
 message CollectionAddRemoveItemsRequest {
-    repeated string item = 1;
+  repeated string uri = 1;
 }
 
 message CollectionAddRemoveItemsResponse {
-    Status status = 1;
+  Status status = 1;
 }

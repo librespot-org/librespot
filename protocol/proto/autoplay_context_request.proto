@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -9,4 +9,5 @@ option optimize_for = CODE_SIZE;
 message AutoplayContextRequest {
     required string context_uri = 1;
     repeated string recent_track_uri = 2;
+    optional bool is_video = 3;
 }

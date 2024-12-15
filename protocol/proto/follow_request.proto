@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -13,6 +13,11 @@ option java_package = "spotify.socialgraph.esperanto.proto";
 
 message FollowRequest {
     repeated string username = 1;
+    bool follow = 2;
+}
+
+message FollowRequestV4 {
+    string username = 1;
     bool follow = 2;
 }
 

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -18,4 +18,6 @@ message SetOptionsRequest {
     OptionalBoolean shuffling_context = 3;
     CommandOptions options = 4;
     LoggingParams logging_params = 5;
+    map<string, string> modes = 7;
+    optional float playback_speed = 6;
 }

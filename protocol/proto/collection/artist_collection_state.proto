@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -15,4 +15,5 @@ message ArtistCollectionState {
     optional uint32 num_albums_in_collection = 4;
     optional bool is_banned = 5;
     optional bool can_ban = 6;
+    optional uint32 num_explicitly_liked_tracks = 7;
 }

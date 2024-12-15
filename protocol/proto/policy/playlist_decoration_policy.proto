@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -60,4 +60,11 @@ message PlaylistDecorationPolicy {
     bool base_permission = 41;
     bool user_capabilities = 42;
     repeated extendedmetadata.ExtensionKind extension = 43;
+    bool lenses = 44;
+    bool length_ignoring_text_filter = 45;
+    bool number_of_items_per_link_type = 46;
+    bool available_signals = 47;
+    bool ai_curation_reference_id = 48;
+    bool unranged_length = 49;
+    bool unfiltered_length = 50;
 }

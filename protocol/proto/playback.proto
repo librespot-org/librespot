@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -14,4 +14,6 @@ message Playback {
     optional double playback_speed = 3;
     optional bool is_paused = 4;
     optional ContextTrack current_track = 5;
+    optional ContextTrack associated_current_track = 6;
+    optional int32 associated_position_as_of_timestamp = 7;
 }

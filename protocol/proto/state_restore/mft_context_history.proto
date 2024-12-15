@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -17,3 +17,4 @@ message MftContextHistoryEntry {
 message MftContextHistory {
     map<string, MftContextHistoryEntry> lookup = 1;
 }
+
