@@ -28,9 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on Android platform.
 - [core] Fix "Invalid Credentials" when using a Keymaster access token and
   client ID on Android platform.
-= [connect] Fix "play" command not handled if missing "offset" property
+- [connect] Fix "play" command not handled if missing "offset" property
 
 ### Removed
+
+- [core] Removed `get_canvases` from SpClient (breaking)
+- [metadata] Removed `genres` from Album (breaking)
+- [metadata] Removed `genre` from Artists (breaking)
 
 ## [0.6.0] - 2024-10-30
 
