@@ -1,0 +1,20 @@
+// Extracted from: Spotify 1.2.52.442 (windows)
+
+syntax = "proto2";
+
+package spotify.player.proto.transfer;
+
+option optimize_for = CODE_SIZE;
+
+message PlayHistory {
+  message Item {
+    optional string context_id = 1;
+    optional string uid = 2;
+    optional bool disliked = 3;
+    repeated transfer.PlayHistory.Item children = 4;
+  }
+
+  repeated transfer.PlayHistory.Item backward_items = 1;
+  repeated transfer.PlayHistory.Item forward_items = 2;
+}
+
