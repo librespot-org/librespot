@@ -134,9 +134,7 @@ impl ResolveContext {
 
     /// the actual context uri
     pub fn context_uri(&self) -> &str {
-        self.context
-            .uri.as_deref()
-            .unwrap_or_default()
+        self.context.uri.as_deref().unwrap_or_default()
     }
 
     pub fn autoplay(&self) -> bool {

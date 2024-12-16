@@ -29,7 +29,8 @@ pub const SPOTIFY_PROPERTY_SET_ID: &str = "b4c7e4b5835079ed94391b2e65fca0fdba65e
 pub const SPOTIFY_MOBILE_VERSION: &str = "8.9.82.620";
 
 /// `property_set_id` related to mobile version 8.9.82.620
-pub const SPOTIFY_MOBILE_PROPERTY_SET_ID: &str = "5ec87c2cc32e7c509703582cfaaa3c7ad253129d5701127c1f5eab5c9531736c";
+pub const SPOTIFY_MOBILE_PROPERTY_SET_ID: &str =
+    "5ec87c2cc32e7c509703582cfaaa3c7ad253129d5701127c1f5eab5c9531736c";
 
 /// The general spirc version
 pub const SPOTIFY_SPIRC_VERSION: &str = "3.2.6";
