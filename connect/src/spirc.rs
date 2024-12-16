@@ -139,7 +139,7 @@ const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
 // delay to update volume after a certain amount of time, instead on each update request
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_secs(2);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
-const UPDATE_STATE_DELAY: Duration = Duration::from_millis(300);
+const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
@@ -452,7 +452,12 @@ impl SpircTask {
                         self.connect_state.prev_autoplay_track_uris()
                     }).await
                 }, if allow_context_resolving && self.context_resolver.has_next() => {
-                    self.handle_next_context(next_context)
+                    let update_state = self.handle_next_context(next_context);
+                    if update_state {
+                        if let Err(why) = self.notify().await {
+                            error!("update after context resolving failed: {why}")
+                        }
+                    }
                 },
                 else => break
             }
@@ -471,20 +476,22 @@ impl SpircTask {
         self.session.dealer().close().await;
     }
 
-    fn handle_next_context(&mut self, next_context: Result<Context, Error>) {
+    fn handle_next_context(&mut self, next_context: Result<Context, Error>) -> bool {
         let next_context = match next_context {
             Err(why) => {
                 self.context_resolver.mark_next_unavailable();
                 self.context_resolver.remove_used_and_invalid();
                 error!("{why}");
-                return;
+                return false;
             }
             Ok(ctx) => ctx,
         };
 
+        debug!("handling next context {}", next_context.uri);
+
         match self
             .context_resolver
-            .handle_next_context(&mut self.connect_state, next_context)
+            .apply_next_context(&mut self.connect_state, next_context)
         {
             Ok(remaining) => {
                 if let Some(remaining) = remaining {
@@ -496,15 +503,18 @@ impl SpircTask {
             }
         }
 
-        if self
+        let update_state = if self
             .context_resolver
             .try_finish(&mut self.connect_state, &mut self.transfer_state)
         {
             self.add_autoplay_resolving_when_required();
-            self.update_state = true;
-        }
+            true
+        } else {
+            false
+        };
 
         self.context_resolver.remove_used_and_invalid();
+        update_state
     }
 
     // todo: is the time_delta still necessary?
@@ -561,6 +571,7 @@ impl SpircTask {
     fn handle_player_event(&mut self, event: PlayerEvent) -> Result<(), Error> {
         if let PlayerEvent::TrackChanged { audio_item } = event {
             self.connect_state.update_duration(audio_item.duration_ms);
+            self.update_state = true;
             return Ok(());
         }
 
@@ -574,6 +585,7 @@ impl SpircTask {
             (event.get_play_request_id(), self.play_request_id),
             (Some(event_id), Some(current_id)) if event_id == current_id
         };
+
         // we only process events if the play_request_id matches. If it doesn't, it is
         // an event that belongs to a previous track and only arrives now due to a race
         // condition. In this case we have updated the state already and don't want to
@@ -878,7 +890,8 @@ impl SpircTask {
             }
             // modification and update of the connect_state
             Transfer(transfer) => {
-                self.handle_transfer(transfer.data.expect("by condition checked"))?
+                self.handle_transfer(transfer.data.expect("by condition checked"))?;
+                return self.notify().await;
             }
             Play(play) => {
                 let shuffle = play

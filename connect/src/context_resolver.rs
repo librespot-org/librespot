@@ -180,6 +180,11 @@ impl ContextResolver {
         } else if self.queue.contains(&resolve) {
             debug!("update for {resolve} is already added");
             return;
+        } else {
+            trace!(
+                "added {} to resolver queue",
+                resolve.resolve_uri().unwrap_or(resolve.context_uri())
+            )
         }
 
         self.queue.push_back(resolve)
@@ -265,7 +270,7 @@ impl ContextResolver {
         }
     }
 
-    pub fn handle_next_context(
+    pub fn apply_next_context(
         &self,
         state: &mut ConnectState,
         mut context: Context,
@@ -319,40 +324,23 @@ impl ContextResolver {
             return false;
         }
 
-        debug!("last item of type <{:?}>, finishing state", next.update);
-
         match (next.update, state.active_context) {
-            (UpdateContext::Default, ContextType::Default) => {}
+            (UpdateContext::Default, ContextType::Default) | (UpdateContext::Autoplay, _) => {
+                debug!(
+                    "last item of type <{:?}>, finishing state setup",
+                    next.update
+                );
+            }
             (UpdateContext::Default, _) => {
                 debug!("skipped finishing default, because it isn't the active context");
                 return false;
             }
-            (UpdateContext::Autoplay, _) => {}
         }
 
         if let Some(transfer_state) = transfer_state.take() {
             if let Err(why) = state.finish_transfer(transfer_state) {
                 error!("finishing setup of transfer failed: {why}")
             }
-        }
-
-        let res = if state.shuffling_context() {
-            state.shuffle()
-        } else if let Ok(ctx) = state.get_context(state.active_context) {
-            let idx = ConnectState::find_index_in_context(ctx, |t| {
-                state.current_track(|c| t.uri == c.uri)
-            })
-            .ok();
-
-            state
-                .reset_playback_to_position(idx)
-                .and_then(|_| state.fill_up_next_tracks())
-        } else {
-            state.fill_up_next_tracks()
-        };
-
-        if let Err(why) = res {
-            error!("setting up state failed after updating contexts: {why}")
         }
 
         state.update_restrictions();

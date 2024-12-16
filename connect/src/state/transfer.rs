@@ -68,6 +68,7 @@ impl ConnectState {
 
         self.clear_prev_track();
         self.clear_next_tracks(false);
+        self.update_queue_revision()
     }
 
     /// completes the transfer, loading the queue and updating metadata

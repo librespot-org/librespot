@@ -104,9 +104,6 @@ impl ConnectState {
     }
 
     pub fn reset_context(&mut self, mut reset_as: ResetContext) {
-        self.set_active_context(ContextType::Default);
-        self.fill_up_context = ContextType::Default;
-
         if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.different_context_uri(ctx)) {
             reset_as = ResetContext::Completely
         }
@@ -129,6 +126,8 @@ impl ConnectState {
             }
         }
 
+        self.fill_up_context = ContextType::Default;
+        self.set_active_context(ContextType::Default);
         self.update_restrictions()
     }
 
@@ -149,6 +148,10 @@ impl ConnectState {
     pub fn set_active_context(&mut self, new_context: ContextType) {
         self.active_context = new_context;
 
+        let player = self.player_mut();
+        player.context_metadata.clear();
+        player.restrictions.clear();
+
         let ctx = match self.get_context(new_context) {
             Err(why) => {
                 warn!("couldn't load context info because: {why}");
@@ -161,9 +164,6 @@ impl ConnectState {
         let metadata = ctx.metadata.clone();
 
         let player = self.player_mut();
-
-        player.context_metadata.clear();
-        player.restrictions.clear();
 
         if let Some(restrictions) = restrictions.take() {
             player.restrictions = MessageField::some(restrictions);
