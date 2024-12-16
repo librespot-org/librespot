@@ -1554,7 +1554,7 @@ impl SpircTask {
             );
 
             if self.session.session_id() != session.session_id {
-                self.session.set_session_id(session.session_id.clone());
+                self.session.set_session_id(&session.session_id);
                 self.connect_state.set_session_id(session.session_id);
             }
         } else {
