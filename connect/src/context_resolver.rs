@@ -341,6 +341,25 @@ impl ContextResolver {
             if let Err(why) = state.finish_transfer(transfer_state) {
                 error!("finishing setup of transfer failed: {why}")
             }
+        } else {
+            let res = if state.shuffling_context() {
+                state.shuffle()
+            } else if let Ok(ctx) = state.get_context(state.active_context) {
+                let idx = ConnectState::find_index_in_context(ctx, |t| {
+                    state.current_track(|c| t.uri == c.uri)
+                })
+                .ok();
+
+                state
+                    .reset_playback_to_position(idx)
+                    .and_then(|_| state.fill_up_next_tracks())
+            } else {
+                state.fill_up_next_tracks()
+            };
+
+            if let Err(why) = res {
+                error!("setting up state failed after updating contexts: {why}")
+            }
         }
 
         state.update_restrictions();
