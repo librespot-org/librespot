@@ -438,12 +438,14 @@ impl SpircTask {
                         error!("error updating connect state for volume update: {why}")
                     }
                 },
-                else => {
-                    if let Err(why) = self.handle_disconnect().await {
-                        error!("error during disconnect: {why}")
-                    }
-                    break
-                }
+                else => break,
+            }
+        }
+
+        if !self.shutdown && self.connect_state.is_active() {
+            warn!("unexpected shutdown");
+            if let Err(why) = self.handle_disconnect().await {
+                error!("error during disconnecting: {why}")
             }
         }
 
