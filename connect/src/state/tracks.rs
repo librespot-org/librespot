@@ -260,12 +260,7 @@ impl<'ct> ConnectState {
         self.prev_tracks_mut().clear()
     }
 
-    pub fn clear_next_tracks(&mut self, keep_queued: bool) {
-        if !keep_queued {
-            self.next_tracks_mut().clear();
-            return;
-        }
-
+    pub fn clear_next_tracks(&mut self) {
         // respect queued track and don't throw them out of our next played tracks
         let first_non_queued_track = self
             .next_tracks()

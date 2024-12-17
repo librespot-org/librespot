@@ -1057,7 +1057,7 @@ impl SpircTask {
     fn handle_stop(&mut self) {
         self.player.stop();
         self.connect_state.update_position(0, self.now_ms());
-        self.connect_state.clear_next_tracks(true);
+        self.connect_state.clear_next_tracks();
 
         if let Err(why) = self.connect_state.reset_playback_to_position(None) {
             warn!("failed filling up next_track during stopping: {why}")
@@ -1136,7 +1136,7 @@ impl SpircTask {
         self.connect_state.merge_context(context);
 
         // load here, so that we clear the queue only after we definitely retrieved a new context
-        self.connect_state.clear_next_tracks(false);
+        self.connect_state.clear_next_tracks();
         self.connect_state.clear_restrictions();
 
         debug!("play track <{:?}>", cmd.playing_track);

@@ -237,7 +237,7 @@ impl ConnectState {
                         Err(_) => {}
                     }
                     // enforce reloading the context
-                    self.clear_next_tracks(true);
+                    self.clear_next_tracks();
                 }
 
                 self.context = Some(new_context);

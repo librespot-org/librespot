@@ -47,7 +47,7 @@ impl ConnectState {
         }
 
         self.clear_prev_track();
-        self.clear_next_tracks(true);
+        self.clear_next_tracks();
 
         let current_uri = self.current_track(|t| &t.uri);
 

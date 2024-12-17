@@ -67,7 +67,7 @@ impl ConnectState {
         }
 
         self.clear_prev_track();
-        self.clear_next_tracks(false);
+        self.clear_next_tracks();
         self.update_queue_revision()
     }
 

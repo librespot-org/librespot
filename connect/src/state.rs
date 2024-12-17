@@ -380,7 +380,7 @@ impl ConnectState {
             debug!("has {} prev tracks", self.prev_tracks().len())
         }
 
-        self.clear_next_tracks(true);
+        self.clear_next_tracks();
         self.fill_up_next_tracks()?;
         self.update_restrictions();
 
