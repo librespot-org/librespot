@@ -9,7 +9,11 @@ pub struct SpircLoadCommand {
     pub shuffle: bool,
     pub repeat: bool,
     pub repeat_track: bool,
-    pub playing_track: PlayingTrack,
+    /// Decides the starting position in the given context
+    ///
+    /// ## Remarks:
+    /// If none is provided and shuffle true, a random track is played, otherwise the first  
+    pub playing_track: Option<PlayingTrack>,
 }
 
 #[derive(Debug)]
@@ -19,19 +23,20 @@ pub enum PlayingTrack {
     Uid(String),
 }
 
-impl From<SkipTo> for PlayingTrack {
-    fn from(value: SkipTo) -> Self {
+impl TryFrom<SkipTo> for PlayingTrack {
+    type Error = ();
+
+    fn try_from(value: SkipTo) -> Result<Self, ()> {
         // order of checks is important, as the index can be 0, but still has an uid or uri provided,
         // so we only use the index as last resort
         if let Some(uri) = value.track_uri {
-            PlayingTrack::Uri(uri)
+            Ok(PlayingTrack::Uri(uri))
         } else if let Some(uid) = value.track_uid {
-            PlayingTrack::Uid(uid)
+            Ok(PlayingTrack::Uid(uid))
+        } else if let Some(index) = value.track_index {
+            Ok(PlayingTrack::Index(index))
         } else {
-            PlayingTrack::Index(value.track_index.unwrap_or_else(|| {
-                warn!("SkipTo didn't provided any point to skip to, falling back to index 0");
-                0
-            }))
+            Err(())
         }
     }
 }

@@ -918,7 +918,7 @@ impl SpircTask {
                         context_uri: play.context.uri.clone(),
                         start_playing: true,
                         seek_to: play.options.seek_to.unwrap_or_default(),
-                        playing_track: play.options.skip_to.into(),
+                        playing_track: play.options.skip_to.try_into().ok(),
                         shuffle,
                         repeat,
                         repeat_track,
@@ -1141,16 +1141,21 @@ impl SpircTask {
 
         debug!("play track <{:?}>", cmd.playing_track);
 
-        let index = match cmd.playing_track {
-            PlayingTrack::Index(i) => i as usize,
+        let index = cmd.playing_track.map(|p| match p {
+            PlayingTrack::Index(i) => Ok(i as usize),
             PlayingTrack::Uri(uri) => {
                 let ctx = self.connect_state.get_context(ContextType::Default)?;
-                ConnectState::find_index_in_context(ctx, |t| t.uri == uri)?
+                ConnectState::find_index_in_context(ctx, |t| t.uri == uri)
             }
             PlayingTrack::Uid(uid) => {
                 let ctx = self.connect_state.get_context(ContextType::Default)?;
-                ConnectState::find_index_in_context(ctx, |t| t.uid == uid)?
+                ConnectState::find_index_in_context(ctx, |t| t.uid == uid)
             }
+        });
+
+        let index = match index {
+            Some(value) => Some(value?),
+            None => None,
         };
 
         debug!(
@@ -1163,7 +1168,9 @@ impl SpircTask {
         self.connect_state.set_repeat_track(cmd.repeat_track);
 
         if cmd.shuffle {
-            self.connect_state.set_current_track_random()?;
+            if index.is_none() {
+                self.connect_state.set_current_track_random()?;
+            }
 
             if self.context_resolver.has_next() {
                 self.connect_state.update_queue_revision()
@@ -1172,8 +1179,9 @@ impl SpircTask {
                 self.add_autoplay_resolving_when_required();
             }
         } else {
-            self.connect_state.set_current_track(index)?;
-            self.connect_state.reset_playback_to_position(Some(index))?;
+            self.connect_state
+                .set_current_track(index.unwrap_or_default())?;
+            self.connect_state.reset_playback_to_position(index)?;
             self.add_autoplay_resolving_when_required();
         }
 
