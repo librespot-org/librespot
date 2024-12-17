@@ -44,14 +44,15 @@ const SPOTIFY_MAX_NEXT_TRACKS_SIZE: usize = 80;
 pub enum StateError {
     #[error("the current track couldn't be resolved from the transfer state")]
     CouldNotResolveTrackFromTransfer,
-    #[error("message field {0} was not available")]
-    MessageFieldNone(String),
     #[error("context is not available. type: {0:?}")]
     NoContext(ContextType),
     #[error("could not find track {0:?} in context of {1}")]
     CanNotFindTrackInContext(Option<usize>, usize),
     #[error("currently {action} is not allowed because {reason}")]
-    CurrentlyDisallowed { action: String, reason: String },
+    CurrentlyDisallowed {
+        action: &'static str,
+        reason: String,
+    },
     #[error("the provided context has no tracks")]
     ContextHasNoTracks,
     #[error("playback of local files is not supported")]
@@ -65,7 +66,6 @@ impl From<StateError> for Error {
         use StateError::*;
         match err {
             CouldNotResolveTrackFromTransfer
-            | MessageFieldNone(_)
             | NoContext(_)
             | CanNotFindTrackInContext(_, _)
             | ContextHasNoTracks

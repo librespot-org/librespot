@@ -196,7 +196,7 @@ impl ConnectState {
                 let mut new_context = self.state_context_from_page(
                     page,
                     context.restrictions.take(),
-                    context.uri.as_ref(),
+                    context.uri.as_deref(),
                     None,
                 );
 
@@ -236,7 +236,7 @@ impl ConnectState {
                 self.autoplay_context = Some(self.state_context_from_page(
                     page,
                     context.restrictions.take(),
-                    context.uri.as_ref(),
+                    context.uri.as_deref(),
                     Some(Provider::Autoplay),
                 ))
             }
@@ -249,7 +249,7 @@ impl ConnectState {
         &mut self,
         page: ContextPage,
         restrictions: Option<Restrictions>,
-        new_context_uri: Option<&String>,
+        new_context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> StateContext {
         let new_context_uri = new_context_uri.unwrap_or(self.context_uri());

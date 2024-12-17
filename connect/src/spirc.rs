@@ -50,6 +50,8 @@ use tokio::{sync::mpsc, time::sleep};
 pub enum SpircError {
     #[error("response payload empty")]
     NoData,
+    #[error("{0} had no uri")]
+    NoUri(&'static str),
     #[error("message pushed for another URI")]
     InvalidUri(String),
     #[error("tried resolving not allowed context: {0:?}")]
@@ -64,7 +66,7 @@ impl From<SpircError> for Error {
     fn from(err: SpircError) -> Self {
         use SpircError::*;
         match err {
-            NoData | NotAllowedContext(_) => Error::unavailable(err),
+            NoData | NoUri(_) | NotAllowedContext(_) => Error::unavailable(err),
             InvalidUri(_) | FailedDealerSetup => Error::aborted(err),
             UnknownEndpoint(_) => Error::unimplemented(err),
         }
@@ -1037,7 +1039,11 @@ impl SpircTask {
                     .map(|o| o.repeating_track.unwrap_or_default())
                     .unwrap_or_else(|| self.connect_state.repeat_track());
 
-                let context_uri = play.context.uri.as_ref().ok_or(SpircError::NoData)?.clone();
+                let context_uri = play
+                    .context
+                    .uri
+                    .clone()
+                    .ok_or(SpircError::NoUri("context"))?;
 
                 self.handle_load(
                     SpircLoadCommand {
@@ -1093,7 +1099,7 @@ impl SpircTask {
 
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         let mut ctx_uri = match transfer.current_session.context.uri {
-            None => Err(SpircError::NoData)?,
+            None => Err(SpircError::NoUri("transfer context"))?,
             Some(ref uri) => uri.clone(),
         };
 
@@ -1517,7 +1523,9 @@ impl SpircTask {
         &mut self,
         playlist_modification_info: PlaylistModificationInfo,
     ) -> Result<(), Error> {
-        let uri = playlist_modification_info.uri.ok_or(SpircError::NoData)?;
+        let uri = playlist_modification_info
+            .uri
+            .ok_or(SpircError::NoUri("playlist modification"))?;
         let uri = String::from_utf8(uri)?;
 
         if self.connect_state.context_uri() != &uri {
