@@ -1,0 +1,59 @@
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "context_index.proto";
+import "restrictions.proto";
+import "play_origin.proto";
+import "state_restore/provided_track.proto";
+import "context_player_options.proto";
+import "prepare_play_options.proto";
+import "state_restore/playback_quality.proto";
+
+message ContextPlayerState {
+  message ContextMetadataEntry {
+    optional string key = 1;
+    optional string value = 2;
+  }
+
+  message PageMetadataEntry {
+    optional string key = 1;
+    optional string value = 2;
+  }
+
+  message ModesEntry {
+    optional string key = 1;
+    optional string value = 2;
+  }
+
+  optional uint64 timestamp = 1;
+  optional string context_uri = 2;
+  optional string context_url = 3;
+  optional Restrictions context_restrictions = 4;
+  optional PlayOrigin play_origin = 5;
+  optional ContextIndex index = 6;
+  optional ProvidedTrack track = 7;
+  optional bytes playback_id = 8;
+  optional PlaybackQuality playback_quality = 9;
+  optional double playback_speed = 10;
+  optional uint64 position_as_of_timestamp = 11;
+  optional uint64 duration = 12;
+  optional bool is_playing = 13;
+  optional bool is_paused = 14;
+  optional bool is_buffering = 15;
+  optional bool is_system_initiated = 16;
+  optional ContextPlayerOptions options = 17;
+  optional Restrictions restrictions = 18;
+  repeated string suppressions = 19;
+  repeated ProvidedTrack prev_tracks = 20;
+  repeated ProvidedTrack next_tracks = 21;
+  repeated ContextPlayerState.ContextMetadataEntry context_metadata = 22;
+  repeated ContextPlayerState.PageMetadataEntry page_metadata = 23;
+  optional string session_id = 24;
+  optional uint64 queue_revision = 25;
+  optional AudioStream audio_stream = 26;
+  repeated string signals = 27;
+  repeated ContextPlayerState.ModesEntry modes = 28;
+  optional string session_command_id = 29;
+}
+

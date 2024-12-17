@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -9,6 +9,7 @@ import "play_origin.proto";
 import "prepare_play_options.proto";
 import "track_instance.proto";
 import "track_instantiator.proto";
+import "context_track.proto";
 
 option optimize_for = CODE_SIZE;
 
@@ -21,4 +22,5 @@ message ContextNode {
     optional string session_id = 7;
     optional sint32 iteration = 8;
     optional bool pending_pause = 9;
+    optional ContextTrack injected_connect_transfer_track = 10;
 }

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -7,14 +7,24 @@ package spotify.collection_cosmos.proto;
 import "metadata/album_metadata.proto";
 import "metadata/artist_metadata.proto";
 import "metadata/track_metadata.proto";
+import "metadata/show_metadata.proto";
+import "metadata/episode_metadata.proto";
 import "collection/artist_collection_state.proto";
 import "collection/album_collection_state.proto";
 import "collection/track_collection_state.proto";
+import "collection/show_collection_state.proto";
+import "collection/episode_collection_state.proto";
 import "sync/artist_sync_state.proto";
 import "sync/album_sync_state.proto";
 import "sync/track_sync_state.proto";
+import "sync/episode_sync_state.proto";
 import "played_state/track_played_state.proto";
+import "played_state/show_played_state.proto";
+import "played_state/episode_played_state.proto";
 
+option java_package = "spotify.collection.esperanto.proto";
+option java_multiple_files = true;
+option objc_class_prefix = "ESP";
 option optimize_for = CODE_SIZE;
 
 message CollectionTrack {
@@ -27,6 +37,8 @@ message CollectionTrack {
     bool decorated = 7;
     CollectionAlbum album = 8;
     string cover = 9;
+    string link = 10;
+    repeated cosmos_util.proto.ArtistCollectionState artist_collection_state = 11;
 }
 
 message CollectionAlbum {
@@ -37,6 +49,7 @@ message CollectionAlbum {
     bool decorated = 5;
     string album_type = 6;
     repeated CollectionTrack track = 7;
+    string link = 11;
 }
 
 message CollectionArtist {
@@ -45,4 +58,23 @@ message CollectionArtist {
     cosmos_util.proto.ArtistSyncState artist_sync_state = 3;
     bool decorated = 4;
     repeated CollectionAlbum album = 5;
+    string link = 6;
 }
+
+message CollectionShow {
+    cosmos_util.proto.ShowMetadata show_metadata = 1;
+    cosmos_util.proto.ShowCollectionState show_collection_state = 2;
+    cosmos_util.proto.ShowPlayState show_play_state = 3;
+    uint32 add_time = 4;
+    string link = 5;
+}
+
+message CollectionEpisode {
+    cosmos_util.proto.EpisodeMetadata episode_metadata = 1;
+    cosmos_util.proto.EpisodeCollectionState episode_collection_state = 2;
+    cosmos_util.proto.EpisodeSyncState episode_offline_state = 3;
+    cosmos_util.proto.EpisodePlayState episode_play_state = 4;
+    CollectionShow show = 5;
+    string link = 6;
+}
+

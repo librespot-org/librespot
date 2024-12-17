@@ -1,0 +1,39 @@
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "context_track.proto";
+import "context_player_options.proto";
+import "logging_params.proto";
+import "play_origin.proto";
+import "player_license.proto";
+import "prepare_play_options.proto";
+import "state_restore/context_loader.proto";
+import "state_restore/context_player_rules.proto";
+import "state_restore/playback_state.proto";
+import "state_restore/player_session_fake.proto";
+import "state_restore/provided_track.proto";
+
+message PlayerSession {
+  required PreparePlayOptions prepare_play_options = 1;
+  optional PlaybackState playback_state = 2;
+  optional ProvidedTrack track = 3;
+  optional ContextTrack track_to_skip_to = 4;
+  optional bytes given_playback_id = 5;
+  required LoggingParams next_command_logging_params = 6;
+  required LoggingParams curr_command_logging_params = 7;
+  required PlayOrigin play_origin = 8;
+  required bool is_playing = 9;
+  required bool is_paused = 10;
+  required bool is_system_initiated = 11;
+  required bool is_finished = 12;
+  required ContextPlayerOptions options = 13;
+  required uint64 playback_seed = 14;
+  required int32 num_advances = 15;
+  required bool did_skip_prev = 16;
+  required PlayerLicense license = 17;
+  required ContextPlayerRules rules = 18;
+  required ContextLoader loader = 19;
+  optional PlayerSessionFake fake = 100;
+}
+

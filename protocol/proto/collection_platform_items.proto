@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package spotify.collection_platform.proto;
+
+option java_package = "com.spotify.collection_platform.esperanto.proto";
+option java_multiple_files = true;
+option objc_class_prefix = "ESP";
+
+message CollectionPlatformItem {
+  string uri = 1;
+  int64 add_time = 2;
+}
+
+message CollectionPlatformContextItem {
+  string uri = 1;
+  int64 add_time = 2;
+  string context_uri = 3;
+}
+

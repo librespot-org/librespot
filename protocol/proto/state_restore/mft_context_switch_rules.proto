@@ -1,3 +1,5 @@
+// Extracted from: Spotify 1.2.52.442 (windows)
+
 syntax = "proto2";
 
 package spotify.player.proto.state_restore;

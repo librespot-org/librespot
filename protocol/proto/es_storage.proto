@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -6,8 +6,8 @@ package spotify.storage.esperanto.proto;
 
 import "google/protobuf/empty.proto";
 
-option objc_class_prefix = "ESP";
 option java_package = "com.spotify.storage.esperanto.proto";
+option objc_class_prefix = "ESP";
 
 service Storage {
     rpc GetCacheSizeLimit(GetCacheSizeLimitParams) returns (CacheSizeLimit);
@@ -23,7 +23,6 @@ message CacheSizeLimit {
 }
 
 message GetCacheSizeLimitParams {
-    
 }
 
 message SetCacheSizeLimitParams {
@@ -31,11 +30,9 @@ message SetCacheSizeLimitParams {
 }
 
 message DeleteExpiredItemsParams {
-    
 }
 
 message DeleteUnlockedItemsParams {
-    
 }
 
 message RealmStats {
@@ -58,18 +55,17 @@ message Stats {
 }
 
 message GetStatsParams {
-    
 }
 
 message FileRanges {
-    bool byte_size_known = 1;
-    uint64 byte_size = 2;
-    
-    repeated Range ranges = 3;
     message Range {
         uint64 from_byte = 1;
         uint64 to_byte = 2;
     }
+
+    bool byte_size_known = 1;
+    uint64 byte_size = 2;
+    repeated Range ranges = 3;
 }
 
 message GetFileRangesParams {

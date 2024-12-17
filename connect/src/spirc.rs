@@ -17,10 +17,11 @@ use crate::{
     protocol::{
         autoplay_context_request::AutoplayContextRequest,
         connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
+        context::Context,
         explicit_content_pubsub::UserAttributesUpdate,
-        player::{Context, TransferState},
         playlist4_external::PlaylistModificationInfo,
-        social_connect_v2::{session::_host_active_device_id, SessionUpdate},
+        social_connect_v2::SessionUpdate,
+        transfer_state::TransferState,
         user_attributes::UserAttributesMutation,
     },
 };
@@ -49,6 +50,8 @@ use tokio::{sync::mpsc, time::sleep};
 pub enum SpircError {
     #[error("response payload empty")]
     NoData,
+    #[error("{0} had no uri")]
+    NoUri(&'static str),
     #[error("message pushed for another URI")]
     InvalidUri(String),
     #[error("tried resolving not allowed context: {0:?}")]
@@ -63,7 +66,7 @@ impl From<SpircError> for Error {
     fn from(err: SpircError) -> Self {
         use SpircError::*;
         match err {
-            NoData | NotAllowedContext(_) => Error::unavailable(err),
+            NoData | NoUri(_) | NotAllowedContext(_) => Error::unavailable(err),
             InvalidUri(_) | FailedDealerSetup => Error::aborted(err),
             UnknownEndpoint(_) => Error::unimplemented(err),
         }
@@ -522,14 +525,14 @@ impl SpircTask {
             let mut ctx = self.session.spclient().get_context(resolve_uri).await?;
 
             if update {
-                ctx.uri = context_uri.to_string();
-                ctx.url = format!("context://{context_uri}");
+                ctx.uri = Some(context_uri.to_string());
+                ctx.url = Some(format!("context://{context_uri}"));
 
                 self.connect_state
                     .update_context(ctx, UpdateContext::Default)?
             } else if matches!(ctx.pages.first(), Some(p) if !p.tracks.is_empty()) {
                 debug!(
-                    "update context from single page, context {} had {} pages",
+                    "update context from single page, context {:?} had {} pages",
                     ctx.uri,
                     ctx.pages.len()
                 );
@@ -883,7 +886,7 @@ impl SpircTask {
         let attributes: UserAttributes = update
             .pairs
             .iter()
-            .map(|pair| (pair.key().to_owned(), pair.value().to_owned()))
+            .map(|(key, value)| (key.to_owned(), value.to_owned()))
             .collect();
         self.session.set_user_attributes(attributes)
     }
@@ -998,9 +1001,10 @@ impl SpircTask {
             Unknown(unknown) => Err(SpircError::UnknownEndpoint(unknown))?,
             // implicit update of the connect_state
             UpdateContext(update_context) => {
-                if &update_context.context.uri != self.connect_state.context_uri() {
+                if matches!(update_context.context.uri, Some(ref uri) if uri != self.connect_state.context_uri())
+                {
                     debug!(
-                        "ignoring context update for <{}>, because it isn't the current context <{}>",
+                        "ignoring context update for <{:?}>, because it isn't the current context <{}>",
                         update_context.context.uri, self.connect_state.context_uri()
                     )
                 } else {
@@ -1020,24 +1024,30 @@ impl SpircTask {
                     .options
                     .player_options_override
                     .as_ref()
-                    .map(|o| o.shuffling_context)
+                    .map(|o| o.shuffling_context.unwrap_or_default())
                     .unwrap_or_else(|| self.connect_state.shuffling_context());
                 let repeat = play
                     .options
                     .player_options_override
                     .as_ref()
-                    .map(|o| o.repeating_context)
+                    .map(|o| o.repeating_context.unwrap_or_default())
                     .unwrap_or_else(|| self.connect_state.repeat_context());
                 let repeat_track = play
                     .options
                     .player_options_override
                     .as_ref()
-                    .map(|o| o.repeating_track)
+                    .map(|o| o.repeating_track.unwrap_or_default())
                     .unwrap_or_else(|| self.connect_state.repeat_track());
+
+                let context_uri = play
+                    .context
+                    .uri
+                    .clone()
+                    .ok_or(SpircError::NoUri("context"))?;
 
                 self.handle_load(
                     SpircLoadCommand {
-                        context_uri: play.context.uri.clone(),
+                        context_uri,
                         start_playing: true,
                         seek_to: play.options.seek_to.unwrap_or_default(),
                         playing_track: play.options.skip_to.unwrap_or_default().into(),
@@ -1088,12 +1098,13 @@ impl SpircTask {
     }
 
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
-        self.connect_state
-            .reset_context(ResetContext::WhenDifferent(
-                &transfer.current_session.context.uri,
-            ));
+        let mut ctx_uri = match transfer.current_session.context.uri {
+            None => Err(SpircError::NoUri("transfer context"))?,
+            Some(ref uri) => uri.clone(),
+        };
 
-        let mut ctx_uri = transfer.current_session.context.uri.clone();
+        self.connect_state
+            .reset_context(ResetContext::WhenDifferent(&ctx_uri));
 
         match self.connect_state.current_track_from_transfer(&transfer) {
             Err(why) => warn!("didn't find initial track: {why}"),
@@ -1118,17 +1129,18 @@ impl SpircTask {
         state.set_active(true);
         state.handle_initial_transfer(&mut transfer);
 
-        // update position if the track continued playing
-        let position = if transfer.playback.is_paused {
-            transfer.playback.position_as_of_timestamp.into()
-        } else if transfer.playback.position_as_of_timestamp > 0 {
-            let time_since_position_update = timestamp - transfer.playback.timestamp;
-            i64::from(transfer.playback.position_as_of_timestamp) + time_since_position_update
-        } else {
-            0
+        let transfer_timestamp = transfer.playback.timestamp.unwrap_or_default();
+        let position = match transfer.playback.position_as_of_timestamp {
+            Some(position) if transfer.playback.is_paused.unwrap_or_default() => position.into(),
+            // update position if the track continued playing
+            Some(position) if position > 0 => {
+                let time_since_position_update = timestamp - transfer_timestamp;
+                i64::from(position) + time_since_position_update
+            }
+            _ => 0,
         };
 
-        let is_playing = !transfer.playback.is_paused;
+        let is_playing = matches!(transfer.playback.is_paused, Some(is_playing) if is_playing);
 
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
             debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
@@ -1514,7 +1526,9 @@ impl SpircTask {
         &mut self,
         playlist_modification_info: PlaylistModificationInfo,
     ) -> Result<(), Error> {
-        let uri = playlist_modification_info.uri.ok_or(SpircError::NoData)?;
+        let uri = playlist_modification_info
+            .uri
+            .ok_or(SpircError::NoUri("playlist modification"))?;
         let uri = String::from_utf8(uri)?;
 
         if self.connect_state.context_uri() != &uri {
@@ -1540,14 +1554,7 @@ impl SpircTask {
             Some(session) => session,
         };
 
-        let active_device = session._host_active_device_id.take().map(|id| match id {
-            _host_active_device_id::HostActiveDeviceId(id) => id,
-            other => {
-                warn!("unexpected active device id {other:?}");
-                String::new()
-            }
-        });
-
+        let active_device = session.host_active_device_id.take();
         if matches!(active_device, Some(ref device) if device == self.session.device_id()) {
             info!(
                 "session update: <{:?}> for self, current session_id {}, new session_id {}",

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -6,6 +6,7 @@ package spotify.player.esperanto.proto;
 
 import "es_command_options.proto";
 import "es_logging_params.proto";
+import "es_pauseresume_origin.proto";
 
 option objc_class_prefix = "ESP";
 option optimize_for = CODE_SIZE;
@@ -14,4 +15,5 @@ option java_package = "com.spotify.player.esperanto.proto";
 message PauseRequest {
     CommandOptions options = 1;
     LoggingParams logging_params = 2;
+    PauseResumeOrigin pause_origin = 3;
 }

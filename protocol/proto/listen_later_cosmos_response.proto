@@ -1,14 +1,17 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
 package spotify.listen_later_cosmos.proto;
+
 
 import "collection/episode_collection_state.proto";
 import "metadata/episode_metadata.proto";
 import "played_state/episode_played_state.proto";
 import "sync/episode_sync_state.proto";
 
+option java_package = "spotify.listen_later_cosmos.proto";
+option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
 
 message Episode {
@@ -25,4 +28,6 @@ message EpisodesResponse {
     repeated Episode episode = 3;
     optional string offline_availability = 5;
     optional uint32 offline_progress = 6;
+    optional uint32 status_code = 98;
+    optional string error = 99;
 }

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package spotify.playlist.cosmos.proto;
+
+option java_package = "com.spotify.playlist.policy.proto";
+option java_multiple_files = true;
+
+enum LinkType {
+  EMPTY = 0;
+  ARTIST = 1;
+  ALBUM = 2;
+  TRACK = 4;
+  LOCAL_TRACK = 9;
+  SHOW = 62;
+  EPISODE = 63;
+}
+

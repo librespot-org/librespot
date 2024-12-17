@@ -1,4 +1,4 @@
-// No longer present in Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -19,7 +19,7 @@ message ListDevicesResponse {
 
 message PutDeviceRequest {
     string user_id = 1;
-    
+
     Body body = 2;
     message Body {
         Device device = 1;
@@ -39,8 +39,27 @@ message RemoveDeviceRequest {
     bool is_force_remove = 2;
 }
 
+message OfflineEnableDeviceRequest {
+    message Body {
+      bool auto_opc = 1;
+    }
+
+    DeviceKey key = 1;
+    Body body = 2;
+    string name = 9;
+    int32 platform = 7;
+    string client_id = 8;
+}
+
 message OfflineEnableDeviceResponse {
+    enum StatusCode {
+      UNKNOWN = 0;
+      OK = 1;
+      DEVICE_LIMIT_REACHED = 2;
+    }
+
     Restrictions restrictions = 1;
+    StatusCode status_code = 2;
 }
 
 message ListResourcesResponse {
@@ -50,7 +69,7 @@ message ListResourcesResponse {
 
 message WriteResourcesRequest {
     DeviceKey key = 1;
-    
+
     Body body = 2;
     message Body {
         repeated ResourceOperation operations = 1;
@@ -66,7 +85,7 @@ message ResourcesUpdate {
 
 message DeltaResourcesRequest {
     DeviceKey key = 1;
-    
+
     Body body = 2;
     message Body {
         google.protobuf.Timestamp last_known_server_time = 1;
@@ -90,7 +109,7 @@ message GetResourceResponse {
 
 message WriteResourcesDetailsRequest {
     DeviceKey key = 1;
-    
+
     Body body = 2;
     message Body {
         repeated Resource resources = 1;
@@ -106,3 +125,39 @@ message GetResourceForDevicesResponse {
     repeated Device devices = 1;
     repeated ResourceForDevice resources = 2;
 }
+
+message ListDevicesWithResourceRequest {
+    message Body {
+        string uri = 1;
+    }
+
+    string user_id = 1;
+    string username = 2;
+    Body body = 3;
+}
+
+message ListDevicesWithResourceResponse {
+    message DeviceWithResource {
+        Device device = 1;
+        bool is_supported = 2;
+        optional Resource resource = 3;
+    }
+
+    repeated DeviceWithResource deviceWithResource = 1;
+    FetchStrategy fetch_strategy = 2;
+}
+
+message FetchStrategy {
+    oneof fetch_strategy {
+        PollStrategy poll_strategy = 1;
+        SubStrategy sub_strategy = 2;
+    }
+}
+
+message PollStrategy {
+    int32 interval_ms = 1;
+}
+
+message SubStrategy {
+}
+

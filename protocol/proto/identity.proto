@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -29,9 +29,25 @@ message UserProfile {
     google.protobuf.BoolValue has_spotify_name = 9;
     google.protobuf.BoolValue has_spotify_image = 10;
     google.protobuf.Int32Value color = 11;
+    google.protobuf.BoolValue is_private = 12;
+    google.protobuf.StringValue pronouns = 13;
+    google.protobuf.StringValue location = 14;
+    google.protobuf.StringValue bio = 15;
+    google.protobuf.BoolValue abuse_reported_bio = 17;
+    google.protobuf.BoolValue edit_name_disabled = 18;
+    google.protobuf.BoolValue edit_image_disabled = 19;
+    google.protobuf.BoolValue edit_bio_disabled = 20;
+    google.protobuf.BoolValue is_kid = 21;
 }
 
 message UserProfileUpdateRequest {
     google.protobuf.FieldMask mask = 1;
     UserProfile user_profile = 2;
+    bool skip_emit_events = 3;
 }
+
+message UserProfileChangedEvent {
+    string userid = 1;
+    UserProfile user_profile = 2;
+}
+

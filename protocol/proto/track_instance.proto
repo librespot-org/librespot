@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -11,12 +11,11 @@ import "seek_to_position.proto";
 option optimize_for = CODE_SIZE;
 
 message TrackInstance {
+    reserved 3;
     optional ContextTrack track = 1;
     optional uint64 id = 2;
     optional SeekToPosition seek_to_position = 7;
     optional bool initially_paused = 4;
     optional ContextIndex index = 5;
     optional string provider = 6;
-    
-    reserved 3;
 }

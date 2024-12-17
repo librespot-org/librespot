@@ -1,10 +1,13 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.stream_reporting_esperanto.proto;
 
+import "google/protobuf/timestamp.proto";
+import "audio_format.proto";
 import "stream_handle.proto";
+import "playback_state.proto";
 
 option objc_class_prefix = "ESP";
 option java_package = "com.spotify.stream_reporting_esperanto.proto";
@@ -19,4 +22,12 @@ message StreamProgressRequest {
     bool is_fullscreen = 7;
     bool is_external = 8;
     double playback_speed = 9;
+    google.protobuf.Timestamp client_timestamp = 14;
+    PlaybackState playback_state = 15;
+    optional string media_id = 10;
+    optional bool content_is_downloaded = 11;
+    optional AudioFormat audio_format = 12;
+    optional string content_uri = 13;
+    optional bool is_audio_on = 16;
+    optional string video_surface = 17;
 }

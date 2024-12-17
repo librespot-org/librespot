@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -19,15 +19,12 @@ message SetAccessTokenRequest {
 }
 
 message SetAccessTokenResponse {
-    
 }
 
 message SubscribeToEventsRequest {
-    
 }
 
 message SubscribeToEventsResponse {
-    Error status = 1;
     enum Error {
         NONE = 0;
         FAILED_TO_CONNECT = 1;
@@ -36,12 +33,12 @@ message SubscribeToEventsResponse {
         SERVICE_CONNECT_NOT_PERMITTED = 4;
         USER_UNAUTHORIZED = 5;
     }
-    
+
+    Error status = 1;
     string description = 2;
 }
 
 message SubscribeToStateRequest {
-    
 }
 
 message SubscribeToStateResponse {
@@ -50,3 +47,4 @@ message SubscribeToStateResponse {
     repeated string missingPermissions = 3;
     string accessToken = 4;
 }
+

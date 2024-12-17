@@ -1,10 +1,11 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
 package spotify.player.proto;
 
 import "context_player_options.proto";
+import "pause_resume_origin.proto";
 import "player_license.proto";
 
 option optimize_for = CODE_SIZE;
@@ -13,4 +14,6 @@ message GlobalNode {
     optional ContextPlayerOptions options = 1;
     optional PlayerLicense license = 2;
     map<string, string> configuration = 3;
+    optional PauseResumeOrigin pause_resume_origin = 4;
+    optional bool is_paused = 5;
 }

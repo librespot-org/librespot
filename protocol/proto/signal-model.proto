@@ -1,0 +1,16 @@
+// Extracted from: Spotify 1.2.52.442 (windows)
+
+syntax = "proto3";
+
+package spotify.playlist.signal.proto;
+
+option java_package = "com.spotify.playlist_signal.model.proto";
+option java_outer_classname = "SignalModelProto";
+option optimize_for = CODE_SIZE;
+
+message Signal {
+  string identifier = 1;
+  bytes data = 2;
+  bytes client_payload = 3;
+}
+

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -14,4 +14,5 @@ message PlayOrigin {
     optional string referrer_identifier = 5;
     optional string device_identifier = 6;
     repeated string feature_classes = 7;
+    optional string restriction_identifier = 8;
 }

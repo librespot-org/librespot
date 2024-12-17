@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package spotify.show_cosmos.proto;
+
+message ShowOfflineState {
+  optional string offline_state = 1;
+  optional uint32 sync_progress = 2;
+}
+

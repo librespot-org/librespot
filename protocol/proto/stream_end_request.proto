@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -15,5 +15,6 @@ message StreamEndRequest {
     StreamHandle stream_handle = 1;
     string source_end = 2;
     PlayReason reason_end = 3;
-    MediaFormat format = 4;
+    google.protobuf.Timestamp client_timestamp = 5;
+    optional AudioFormat format = 4;
 }

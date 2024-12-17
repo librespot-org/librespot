@@ -1,8 +1,8 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
-package spotify.narration_injection.proto;
+package spotify.narration.proto;
 
 import "tts-resolve.proto";
 
@@ -18,7 +18,6 @@ message TtsRequest {
     ResolveRequest.TtsVoice tts_voice = 5;
     ResolveRequest.TtsProvider tts_provider = 6;
     int32 sample_rate_hz = 7;
-    
     oneof prompt {
         string text = 1;
         string ssml = 2;

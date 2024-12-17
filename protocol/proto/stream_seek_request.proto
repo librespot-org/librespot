@@ -1,16 +1,20 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.stream_reporting_esperanto.proto;
 
+import "google/protobuf/timestamp.proto";
 import "stream_handle.proto";
 
 option objc_class_prefix = "ESP";
 option java_package = "com.spotify.stream_reporting_esperanto.proto";
 
 message StreamSeekRequest {
+    reserved 2;
     StreamHandle stream_handle = 1;
     uint64 from_position = 3;
     uint64 to_position = 4;
+    google.protobuf.Timestamp client_timestamp = 5;
+    optional bool is_system_initiated = 6;
 }

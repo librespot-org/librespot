@@ -1,26 +1,29 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.your_library.proto;
 
+import "policy/supported_link_types_in_playlists.proto";
+
 option optimize_for = CODE_SIZE;
 
 message YourLibraryEntityInfo {
-    string key = 1;
+    enum Pinnable {
+        YES = 0;
+        NO_IN_FOLDER = 1;
+    }
+
     string name = 2;
     string uri = 3;
     string group_label = 5;
     string image_uri = 6;
     bool pinned = 7;
-    
     Pinnable pinnable = 8;
-    enum Pinnable {
-        YES = 0;
-        NO_IN_FOLDER = 1;
-    }
-    
     Offline.Availability offline_availability = 9;
+    int64 add_time = 11;
+    int64 last_played = 12;
+    bool has_curated_items = 13;
 }
 
 message Offline {
@@ -31,20 +34,51 @@ message Offline {
         DOWNLOADING = 3;
         WAITING = 4;
     }
+
 }
 
 message YourLibraryAlbumExtraInfo {
+    enum Type {
+        ALBUM = 0;
+        SINGLE = 1;
+        COMPILATION = 2;
+        EP = 3;
+    }
+
     string artist_name = 1;
+    string artist_uri = 2;
+    Type type = 3;
+    bool is_premium_only = 4;
+    bool new_release = 5;
 }
 
 message YourLibraryArtistExtraInfo {
-    
+    bool has_liked_tracks_or_albums = 1;
+}
+
+message NumberOfItemsForLinkType {
+    playlist.cosmos.proto.LinkType link_type = 1;
+    int32 num_items = 2;
+}
+
+message YourLibraryPlaylistFolderInfo {
+    string uri = 1;
+    string name = 2;
 }
 
 message YourLibraryPlaylistExtraInfo {
     string creator_name = 1;
+    string creator_uri = 8;
     bool is_loading = 5;
     bool can_view = 6;
+    bool can_add = 9;
+    string row_id = 7;
+    string made_for_name = 10;
+    string made_for_uri = 11;
+    repeated NumberOfItemsForLinkType number_of_items_per_link_type = 12;
+    bool owned_by_self = 13;
+    YourLibraryPlaylistFolderInfo from_folder = 14;
+    string name_prefix = 15;
 }
 
 message YourLibraryShowExtraInfo {
@@ -57,6 +91,8 @@ message YourLibraryShowExtraInfo {
 message YourLibraryFolderExtraInfo {
     int32 number_of_playlists = 2;
     int32 number_of_folders = 3;
+    string row_id = 4;
+    repeated YourLibraryDecoratedEntity entity = 5;
 }
 
 message YourLibraryLikedSongsExtraInfo {
@@ -76,12 +112,53 @@ message YourLibraryLocalFilesExtraInfo {
 }
 
 message YourLibraryBookExtraInfo {
+    enum Access {
+        OPEN = 0;
+        LOCKED = 1;
+        CAPPED = 2;
+    }
+
+    enum State {
+        NOT_STARTED = 0;
+        IN_PROGRESS = 1;
+        FINISHED = 2;
+    }
+
     string author_name = 1;
+    Access access = 2;
+    int64 milliseconds_left = 3;
+    int32 percent_done = 4;
+    State state = 5;
+}
+
+message YourLibraryCachedFilesExtraInfo {
+    int32 number_of_items = 1;
+    int32 duration_in_seconds = 2;
+}
+
+message YourLibraryPreReleaseExtraInfo {
+    enum Type {
+        ALBUM = 0;
+        BOOK = 1;
+    }
+
+    string artist_name = 1;
+    string artist_uri = 2;
+    Type type = 3;
+    YourLibraryAlbumExtraInfo.Type album_type = 4;
+}
+
+message YourLibraryEventExtraInfo {
+    string location_name = 1;
+    int64 start_time = 2;
+    string city_name = 3;
+}
+
+message YourLibraryAuthorExtraInfo {
 }
 
 message YourLibraryDecoratedEntity {
     YourLibraryEntityInfo entity_info = 1;
-    
     oneof entity {
         YourLibraryAlbumExtraInfo album = 2;
         YourLibraryArtistExtraInfo artist = 3;
@@ -93,13 +170,10 @@ message YourLibraryDecoratedEntity {
         YourLibraryNewEpisodesExtraInfo new_episodes = 10;
         YourLibraryLocalFilesExtraInfo local_files = 11;
         YourLibraryBookExtraInfo book = 12;
+        YourLibraryCachedFilesExtraInfo cached_files = 13;
+        YourLibraryPreReleaseExtraInfo prerelease = 15;
+        YourLibraryEventExtraInfo event = 16;
+        YourLibraryAuthorExtraInfo author = 17;
     }
 }
 
-message YourLibraryAvailableEntityTypes {
-    bool albums = 1;
-    bool artists = 2;
-    bool playlists = 3;
-    bool shows = 4;
-    bool books = 5;
-}

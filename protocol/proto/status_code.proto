@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -8,7 +8,10 @@ option objc_class_prefix = "ESP";
 option java_package = "com.spotify.stream_reporting_esperanto.proto";
 
 enum StatusCode {
-    SUCCESS = 0;
-    NO_PLAYBACK_ID = 1;
+    INVALID_STATUS_CODE = 0;
+    SUCCESS = 1;
     EVENT_SENDER_ERROR = 2;
+    INVALID_STREAM_HANDLE = 3;
+    PENDING_EVENTS_ERROR = 4;
+    IGNORED = 5;
 }

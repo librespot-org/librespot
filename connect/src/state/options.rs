@@ -41,7 +41,7 @@ impl ConnectState {
             .first()
         {
             Err(StateError::CurrentlyDisallowed {
-                action: "shuffle".to_string(),
+                action: "shuffle",
                 reason: reason.clone(),
             })?
         }

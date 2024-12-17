@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -11,6 +11,7 @@ option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.cosmos.util.policy.proto";
 
 message ShowDecorationPolicy {
+    reserved 15;
     bool link = 1;
     bool name = 2;
     bool description = 3;
@@ -25,11 +26,26 @@ message ShowDecorationPolicy {
     bool copyrights = 12;
     bool trailer_uri = 13;
     bool is_music_and_talk = 14;
-    bool access_info = 15;
     repeated extendedmetadata.ExtensionKind extension = 16;
     bool is_book = 17;
+    bool is_creator_channel = 18;
 }
 
 message ShowPlayedStateDecorationPolicy {
     bool latest_played_episode_link = 1;
+    bool played_time = 2;
+    bool is_playable = 3;
+    bool playability_restriction = 4;
+    bool label = 5;
+    bool resume_episode_link = 7;
 }
+
+message ShowCollectionDecorationPolicy {
+    bool is_in_collection = 1;
+}
+
+message ShowOfflineStateDecorationPolicy {
+    bool offline = 1;
+    bool sync_progress = 2;
+}
+

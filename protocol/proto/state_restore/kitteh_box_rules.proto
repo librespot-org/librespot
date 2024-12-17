@@ -1,0 +1,30 @@
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+message KittehBoxRules {
+  message NodeAspectsEntry {
+    optional string key = 1;
+    optional bytes value = 2;
+  }
+
+  enum Transition {
+    ADVANCE = 0;
+    SKIP_NEXT = 1;
+    SKIP_PREV = 2;
+  }
+
+  enum Position {
+    BETWEEN_TRACKS = 0;
+    ON_DELIMITER = 1;
+    ON_NODE_TRACK = 2;
+  }
+
+  repeated KittehBoxRules.NodeAspectsEntry node_aspects = 1;
+  required KittehBoxRules.Position pos = 2;
+  required KittehBoxRules.Transition last_transition = 3;
+  required int32 context_iteration = 4;
+  required bool pending_skip_to = 5;
+  optional int64 page_index = 6;
+}
+

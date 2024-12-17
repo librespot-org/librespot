@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -8,9 +8,19 @@ option objc_class_prefix = "ESP";
 option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.playback_esperanto.proto";
 
+message ConnectLoggingParams {
+    repeated string interaction_ids = 1;
+    repeated string page_instance_ids = 2;
+}
+
 message GetVolumeResponse {
     Status status = 1;
     double volume = 2;
+}
+
+message GetRawVolumeResponse {
+    Status status = 1;
+    int32 volume = 2;
 }
 
 message SubVolumeResponse {
@@ -19,19 +29,34 @@ message SubVolumeResponse {
     VolumeChangeSource source = 3;
 }
 
+message SubRawVolumeResponse {
+    Status status = 1;
+    int32 volume = 2;
+    VolumeChangeSource source = 3;
+}
+
 message SetVolumeRequest {
     VolumeChangeSource source = 1;
     double volume = 2;
+    ConnectLoggingParams connect_logging_params = 3;
+}
+
+message SetRawVolumeRequest {
+    VolumeChangeSource source = 1;
+    int32 volume = 2;
+    ConnectLoggingParams connect_logging_params = 3;
 }
 
 message NudgeVolumeRequest {
     VolumeChangeSource source = 1;
+    ConnectLoggingParams connect_logging_params = 2;
 }
 
 message PlaybackInfoResponse {
+    reserved 3;
+    reserved 16;
     Status status = 1;
     uint64 length_ms = 2;
-    uint64 position_ms = 3;
     bool playing = 4;
     bool buffering = 5;
     int32 error = 6;
@@ -48,12 +73,10 @@ message PlaybackInfoResponse {
     int32 target_bitrate = 18;
     int32 advised_bitrate = 19;
     bool target_file_available = 20;
-    
-    reserved 16;
+    string audio_id = 21;
 }
 
 message GetFormatsResponse {
-    repeated Format formats = 1;
     message Format {
         string enum_key = 1;
         uint32 enum_value = 2;
@@ -61,6 +84,8 @@ message GetFormatsResponse {
         uint32 bitrate = 4;
         string mime_type = 5;
     }
+
+    repeated GetFormatsResponse.Format formats = 1;
 }
 
 message SubPositionRequest {
@@ -77,24 +102,24 @@ message GetFilesRequest {
 }
 
 message GetFilesResponse {
-    GetFilesStatus status = 1;
-    
-    repeated File files = 2;
     message File {
         string file_id = 1;
         string format = 2;
         uint32 bitrate = 3;
         uint32 format_enum = 4;
     }
+
+    GetFilesStatus status = 1;
+    repeated File files = 2;
 }
 
 message DuckRequest {
-    Action action = 2;
     enum Action {
         START = 0;
         STOP = 1;
     }
-    
+
+    Action action = 2;
     double volume = 3;
     uint32 fade_duration_ms = 4;
 }
@@ -119,4 +144,5 @@ enum GetFilesStatus {
 enum VolumeChangeSource {
     USER = 0;
     SYSTEM = 1;
+    CONNECT = 2;
 }

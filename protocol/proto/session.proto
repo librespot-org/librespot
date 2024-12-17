@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -19,4 +19,7 @@ message Session {
     optional ContextPlayerOptionOverrides option_overrides = 4;
     optional Suppressions suppressions = 5;
     optional InstrumentationParams instrumentation_params = 6;
+    optional string shuffle_seed = 7;
+    optional Context main_context = 8;
+    optional string original_session_id = 9;
 }

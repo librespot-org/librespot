@@ -1,14 +1,10 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
-package spotify.narration_injection.proto;
+package spotify.narration.proto;
 
 option optimize_for = CODE_SIZE;
-
-service TtsResolveService {
-    rpc Resolve(ResolveRequest) returns (ResolveResponse);
-}
 
 message ResolveRequest {
     AudioFormat audio_format = 3;
@@ -20,17 +16,54 @@ message ResolveRequest {
         VORBIS = 4;
         MP3 = 5;
     }
-    
+
     string language = 4;
-    
+
     TtsVoice tts_voice = 5;
     enum TtsVoice {
         UNSET_TTS_VOICE = 0;
         VOICE1 = 1;
         VOICE2 = 2;
         VOICE3 = 3;
+        VOICE4 = 4;
+        VOICE5 = 5;
+        VOICE6 = 6;
+        VOICE7 = 7;
+        VOICE8 = 8;
+        VOICE9 = 9;
+        VOICE10 = 10;
+        VOICE11 = 11;
+        VOICE12 = 12;
+        VOICE13 = 13;
+        VOICE14 = 14;
+        VOICE15 = 15;
+        VOICE16 = 16;
+        VOICE17 = 17;
+        VOICE18 = 18;
+        VOICE19 = 19;
+        VOICE20 = 20;
+        VOICE21 = 21;
+        VOICE22 = 22;
+        VOICE23 = 23;
+        VOICE24 = 24;
+        VOICE25 = 25;
+        VOICE26 = 26;
+        VOICE27 = 27;
+        VOICE28 = 28;
+        VOICE29 = 29;
+        VOICE30 = 30;
+        VOICE31 = 31;
+        VOICE32 = 32;
+        VOICE33 = 33;
+        VOICE34 = 34;
+        VOICE35 = 35;
+        VOICE36 = 36;
+        VOICE37 = 37;
+        VOICE38 = 38;
+        VOICE39 = 39;
+        VOICE40 = 40;
     }
-    
+
     TtsProvider tts_provider = 6;
     enum TtsProvider {
         UNSET_TTS_PROVIDER = 0;
@@ -38,10 +71,11 @@ message ResolveRequest {
         READSPEAKER = 2;
         POLLY = 3;
         WELL_SAID = 4;
+        SONANTIC_DEPRECATED = 5;
+        SONANTIC_FAST = 6;
     }
-    
+
     int32 sample_rate_hz = 7;
-    
     oneof prompt {
         string text = 1;
         string ssml = 2;
@@ -50,4 +84,5 @@ message ResolveRequest {
 
 message ResolveResponse {
     string url = 1;
+    int64 expiry = 2;
 }

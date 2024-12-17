@@ -1,0 +1,19 @@
+// Extracted from: Spotify 1.2.52.442 (windows)
+
+syntax = "proto3";
+
+package spotify.common.media;
+
+option java_package = "com.spotify.common.proto";
+option optimize_for = CODE_SIZE;
+
+enum AudioQuality {
+  DEFAULT = 0;
+  LOW = 1;
+  NORMAL = 2;
+  HIGH = 3;
+  VERY_HIGH = 4;
+  HIFI = 5;
+  HIFI_24 = 6;
+}
+

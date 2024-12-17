@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -10,6 +10,12 @@ import "state_restore/provided_track.proto";
 option optimize_for = CODE_SIZE;
 
 message ModRulesInterruptions {
+    enum InterruptionSource {
+        CONTEXT = 1;
+        SAS = 2;
+        NO_INTERRUPTIONS = 3;
+    }
+
     optional ProvidedTrack seek_repeat_track = 1;
     required uint32 prng_seed = 2;
     required bool support_video = 3;
@@ -20,8 +26,3 @@ message ModRulesInterruptions {
     required PlayerLicense license = 8;
 }
 
-enum InterruptionSource {
-    Context_IS = 1;
-    SAS = 2;
-    NoInterruptions = 3;
-}

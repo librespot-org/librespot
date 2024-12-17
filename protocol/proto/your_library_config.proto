@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package spotify.your_library.proto;
+
+message YourLibraryLabelAndImage {
+  string label = 1;
+  string image = 2;
+  bool include_empty = 3;
+}
+
+message YourLibraryPseudoPlaylistConfig {
+  .spotify.your_library.proto.YourLibraryLabelAndImage liked_songs = 1;
+  .spotify.your_library.proto.YourLibraryLabelAndImage your_episodes = 2;
+  .spotify.your_library.proto.YourLibraryLabelAndImage new_episodes = 3;
+  .spotify.your_library.proto.YourLibraryLabelAndImage local_files = 4;
+  .spotify.your_library.proto.YourLibraryLabelAndImage cached_files = 5;
+  bool your_highlights = 6;
+  bool all_available_configs_provided = 99;
+}
+
+message YourLibraryFilters {
+  enum Filter {
+    ALBUM = 0;
+    ARTIST = 1;
+    PLAYLIST = 2;
+    SHOW = 3;
+    BOOK = 4;
+    EVENT = 5;
+    AUTHOR = 7;
+    DOWNLOADED = 100;
+    WRITABLE = 101;
+    BY_YOU = 102;
+    BY_SPOTIFY = 103;
+    UNPLAYED = 104;
+    IN_PROGRESS = 105;
+    FINISHED = 106;
+  }
+
+  repeated .spotify.your_library.proto.YourLibraryFilters.Filter filter = 1;
+}
+
+message YourLibrarySortOrder {
+  enum SortOrder {
+    NAME = 0;
+    RECENTLY_ADDED = 1;
+    CREATOR = 2;
+    CUSTOM = 4;
+    RECENTLY_UPDATED = 5;
+    RECENTLY_PLAYED_OR_ADDED = 6;
+    RELEVANCE = 7;
+    EVENT_START_TIME = 8;
+    RELEASE_DATE = 9;
+  }
+
+  .spotify.your_library.proto.YourLibrarySortOrder.SortOrder sort_order = 1;
+}
+

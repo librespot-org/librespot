@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -6,7 +6,9 @@ package spotify.your_library.proto;
 
 import "your_library_decorated_entity.proto";
 
+option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
+option java_package = "spotify.your_library.esperanto.proto";
 
 message YourLibraryDecorateResponseHeader {
     bool is_loading = 2;
@@ -15,5 +17,6 @@ message YourLibraryDecorateResponseHeader {
 message YourLibraryDecorateResponse {
     YourLibraryDecorateResponseHeader header = 1;
     repeated YourLibraryDecoratedEntity entity = 2;
+    uint32 status_code = 98;
     string error = 99;
 }

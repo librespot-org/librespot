@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -24,4 +24,6 @@ message RequestInfo {
     int64 event_first_byte_received = 11;
     int64 event_last_byte_received = 12;
     int64 event_ended = 13;
+    string protocol = 14;
+    int64 event_redirects_done = 15;
 }

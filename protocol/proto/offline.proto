@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -17,6 +17,10 @@ message Capacity {
     uint64 episode_count = 5;
 }
 
+message Capabilities {
+    bool remote_downloads_enabled = 1;
+}
+
 message Device {
     string device_id = 1;
     string cache_id = 2;
@@ -25,9 +29,11 @@ message Device {
     int32 platform = 5;
     bool offline_enabled = 6;
     Capacity capacity = 7;
+    Capabilities capabilities = 8;
     google.protobuf.Timestamp updated_at = 9;
     google.protobuf.Timestamp last_seen_at = 10;
     bool removal_pending = 11;
+    string client_id = 12;
 }
 
 message Restrictions {
@@ -35,6 +41,7 @@ message Restrictions {
     uint64 max_tracks = 2;
     google.protobuf.Duration allowed_duration_episodes = 3;
     uint64 max_episodes = 4;
+    google.protobuf.Duration allowed_duration_abp_chapters = 5;
 }
 
 message Resource {
@@ -58,13 +65,13 @@ message ResourceForDevice {
 }
 
 message ResourceOperation {
-    Operation operation = 2;
     enum Operation {
         INVALID = 0;
         ADD = 1;
         REMOVE = 2;
     }
-    
+
+    Operation operation = 2;
     string uri = 3;
 }
 

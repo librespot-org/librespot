@@ -1,21 +1,21 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.collection_cosmos.proto;
 
-import "policy/track_decoration_policy.proto";
-import "policy/artist_decoration_policy.proto";
-import "metadata/track_metadata.proto";
-import "metadata/artist_metadata.proto";
+import "collection_decoration_policy.proto";
+import "collection_item.proto";
 import "status.proto";
 
+option java_multiple_files = true;
+option java_package = "spotify.collection.esperanto.proto";
 option objc_class_prefix = "SPTCollectionCosmos";
 option optimize_for = CODE_SIZE;
 
 message CollectionGetBansRequest {
-    cosmos_util.proto.TrackDecorationPolicy track_policy = 1;
-    cosmos_util.proto.ArtistDecorationPolicy artist_policy = 2;
+  CollectionTrackDecorationPolicy track_policy = 1;
+  CollectionArtistDecorationPolicy artist_policy = 2;
     string sort = 3;
     bool timestamp = 4;
     uint32 update_throttling = 5;
@@ -23,8 +23,8 @@ message CollectionGetBansRequest {
 
 message Item {
     uint32 add_time = 1;
-    cosmos_util.proto.TrackMetadata track_metadata = 2;
-    cosmos_util.proto.ArtistMetadata artist_metadata = 3;
+  CollectionTrack track_metadata = 2;
+  CollectionArtist artist_metadata = 3;
 }
 
 message CollectionGetBansResponse {

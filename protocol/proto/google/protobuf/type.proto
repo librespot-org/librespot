@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -22,10 +22,10 @@ message Type {
     repeated Option options = 4;
     SourceContext source_context = 5;
     Syntax syntax = 6;
+    string edition = 7;
 }
 
 message Field {
-    Kind kind = 1;
     enum Kind {
         TYPE_UNKNOWN = 0;
         TYPE_DOUBLE = 1;
@@ -47,15 +47,16 @@ message Field {
         TYPE_SINT32 = 17;
         TYPE_SINT64 = 18;
     }
-    
-    Cardinality cardinality = 2;
+
     enum Cardinality {
         CARDINALITY_UNKNOWN = 0;
         CARDINALITY_OPTIONAL = 1;
         CARDINALITY_REQUIRED = 2;
         CARDINALITY_REPEATED = 3;
     }
-    
+
+    Kind kind = 1;
+    Cardinality cardinality = 2;
     int32 number = 3;
     string name = 4;
     string type_url = 6;
@@ -72,6 +73,7 @@ message Enum {
     repeated Option options = 3;
     SourceContext source_context = 4;
     Syntax syntax = 5;
+    string edition = 6;
 }
 
 message EnumValue {
@@ -88,4 +90,5 @@ message Option {
 enum Syntax {
     SYNTAX_PROTO2 = 0;
     SYNTAX_PROTO3 = 1;
+    SYNTAX_EDITIONS = 2;
 }

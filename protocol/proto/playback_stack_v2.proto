@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+option objc_class_prefix = "ESP";
+
+enum PlaybackStackV2 {
+  PLAYBACK_STACK_UNKNOWN = 0;
+  PLAYBACK_STACK_BOOMBOX = 1;
+  PLAYBACK_STACK_BETAMAX = 2;
+  PLAYBACK_STACK_KUBRICK = 3;
+}
+

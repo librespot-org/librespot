@@ -1,27 +1,26 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
+
+import "state_restore/player_session.proto";
 
 package spotify.player.proto.state_restore;
 
 option optimize_for = CODE_SIZE;
 
-message SessionJson {
-    optional string json = 1;
-}
-
 message QueuedSession {
-    optional Trigger trigger = 1;
-    optional SessionJson session = 2;
+    enum Trigger {
+        DID_GO_PAST_TRACK = 1;
+        DID_GO_PAST_CONTEXT = 2;
+    }
+
+    optional QueuedSession.Trigger trigger = 1;
+    optional PlayerSession session = 2;
 }
 
 message PlayerSessionQueue {
-    optional SessionJson active = 1;
-    repeated SessionJson pushed = 2;
+    optional PlayerSession active = 1;
+    repeated PlayerSession pushed = 2;
     repeated QueuedSession queued = 3;
 }
 
-enum Trigger {
-    DID_GO_PAST_TRACK = 1;
-    DID_GO_PAST_CONTEXT = 2;
-}

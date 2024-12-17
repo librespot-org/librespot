@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -22,4 +22,6 @@ message PlaylistEpisodeDecorationPolicy {
     cosmos_util.proto.EpisodePlayedStateDecorationPolicy played_state = 7;
     UserDecorationPolicy added_by = 8;
     cosmos_util.proto.ShowDecorationPolicy show = 9;
+    bool signals = 10;
+    bool is_recommendation = 11;
 }

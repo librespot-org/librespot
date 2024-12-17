@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -20,12 +20,6 @@ message LocalBatchedEntityRequest {
 }
 
 message LocalBatchedExtensionResponse {
-    repeated Extension extension = 1;
-    message Extension {
-        extendedmetadata.ExtensionKind extension_kind = 1;
-        repeated EntityExtension entity_extension = 2;
-    }
-    
     message ExtensionHeader {
         bool cache_valid = 1;
         bool offline_valid = 2;
@@ -33,11 +27,20 @@ message LocalBatchedExtensionResponse {
         bool is_empty = 4;
         int64 cache_expiry_timestamp = 5;
         int64 offline_expiry_timestamp = 6;
+        string etag = 7;
     }
-    
+
     message EntityExtension {
         string entity_uri = 1;
         ExtensionHeader header = 2;
         google.protobuf.Any extension_data = 3;
     }
+
+    message Extension {
+        extendedmetadata.ExtensionKind extension_kind = 1;
+        repeated EntityExtension entity_extension = 2;
+    }
+
+    repeated Extension extension = 1;
 }
+

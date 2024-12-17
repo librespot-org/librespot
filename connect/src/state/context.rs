@@ -1,7 +1,13 @@
-use crate::state::{metadata::Metadata, provider::Provider, ConnectState, StateError};
-use librespot_core::{Error, SpotifyId};
-use librespot_protocol::player::{
-    Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack, Restrictions,
+use crate::{
+    core::{Error, SpotifyId},
+    protocol::{
+        context::Context,
+        context_page::ContextPage,
+        context_track::ContextTrack,
+        player::{ContextIndex, ProvidedTrack},
+        restrictions::Restrictions,
+    },
+    state::{metadata::Metadata, provider::Provider, ConnectState, StateError},
 };
 use protobuf::MessageField;
 use std::collections::HashMap;
@@ -104,14 +110,16 @@ impl ConnectState {
     }
 
     pub fn get_context_uri_from_context(context: &Context) -> Option<&String> {
-        if !context.uri.starts_with(SEARCH_IDENTIFIER) {
-            return Some(&context.uri);
+        let context_uri = context.uri.as_ref()?;
+
+        if !context_uri.starts_with(SEARCH_IDENTIFIER) {
+            return Some(context_uri);
         }
 
         context
             .pages
             .first()
-            .and_then(|p| p.tracks.first().map(|t| &t.uri))
+            .and_then(|p| p.tracks.first().and_then(|t| t.uri.as_ref()))
     }
 
     pub fn set_active_context(&mut self, new_context: ContextType) {
@@ -134,7 +142,7 @@ impl ConnectState {
         player.restrictions.clear();
 
         if let Some(restrictions) = restrictions.take() {
-            player.restrictions = MessageField::some(restrictions);
+            player.restrictions = MessageField::some(restrictions.into());
         }
 
         for (key, value) in metadata {
@@ -146,7 +154,7 @@ impl ConnectState {
         if context.pages.iter().all(|p| p.tracks.is_empty()) {
             error!("context didn't have any tracks: {context:#?}");
             return Err(StateError::ContextHasNoTracks.into());
-        } else if context.uri.starts_with(LOCAL_FILES_IDENTIFIER) {
+        } else if matches!(context.uri, Some(ref uri) if uri.starts_with(LOCAL_FILES_IDENTIFIER)) {
             return Err(StateError::UnsupportedLocalPlayBack.into());
         }
 
@@ -174,7 +182,7 @@ impl ConnectState {
         };
 
         debug!(
-            "updated context {ty:?} from <{}> ({} tracks) to <{}> ({} tracks)",
+            "updated context {ty:?} from <{:?}> ({} tracks) to <{:?}> ({} tracks)",
             self.context_uri(),
             prev_context
                 .map(|c| c.tracks.len().to_string())
@@ -188,14 +196,14 @@ impl ConnectState {
                 let mut new_context = self.state_context_from_page(
                     page,
                     context.restrictions.take(),
-                    Some(&context.uri),
+                    context.uri.as_deref(),
                     None,
                 );
 
                 // when we update the same context, we should try to preserve the previous position
                 // otherwise we might load the entire context twice
                 if !self.context_uri().contains(SEARCH_IDENTIFIER)
-                    && self.context_uri() == &context.uri
+                    && matches!(context.uri, Some(ref uri) if uri == self.context_uri())
                 {
                     match Self::find_index_in_context(Some(&new_context), |t| {
                         self.current_track(|t| &t.uri) == &t.uri
@@ -217,18 +225,18 @@ impl ConnectState {
 
                 self.context = Some(new_context);
 
-                if !context.url.contains(SEARCH_IDENTIFIER) {
-                    self.player_mut().context_url = context.url;
+                if !matches!(context.url, Some(ref url) if url.contains(SEARCH_IDENTIFIER)) {
+                    self.player_mut().context_url = context.url.take().unwrap_or_default();
                 } else {
                     self.player_mut().context_url.clear()
                 }
-                self.player_mut().context_uri = context.uri;
+                self.player_mut().context_uri = context.uri.take().unwrap_or_default();
             }
             UpdateContext::Autoplay => {
                 self.autoplay_context = Some(self.state_context_from_page(
                     page,
                     context.restrictions.take(),
-                    Some(&context.uri),
+                    context.uri.as_deref(),
                     Some(Provider::Autoplay),
                 ))
             }
@@ -271,7 +279,7 @@ impl ConnectState {
 
     pub fn merge_context(&mut self, context: Option<Context>) -> Option<()> {
         let mut context = context?;
-        if self.context_uri() != &context.uri {
+        if matches!(context.uri, Some(ref uri) if uri != self.context_uri()) {
             return None;
         }
 
@@ -279,12 +287,13 @@ impl ConnectState {
         let new_page = context.pages.pop()?;
 
         for new_track in new_page.tracks {
-            if new_track.uri.is_empty() {
+            if new_track.uri.is_none() || matches!(new_track.uri, Some(ref uri) if uri.is_empty()) {
                 continue;
             }
 
+            let new_track_uri = new_track.uri.unwrap_or_default();
             if let Ok(position) =
-                Self::find_index_in_context(Some(current_context), |t| t.uri == new_track.uri)
+                Self::find_index_in_context(Some(current_context), |t| t.uri == new_track_uri)
             {
                 let context_track = current_context.tracks.get_mut(position)?;
 
@@ -294,8 +303,10 @@ impl ConnectState {
                 }
 
                 // the uid provided from another context might be actual uid of an item
-                if !new_track.uid.is_empty() {
-                    context_track.uid = new_track.uid;
+                if new_track.uid.is_some()
+                    || matches!(new_track.uid, Some(ref uid) if uid.is_empty())
+                {
+                    context_track.uid = new_track.uid.unwrap_or_default();
                 }
             }
         }
@@ -325,19 +336,19 @@ impl ConnectState {
         context_uri: Option<&str>,
         provider: Option<Provider>,
     ) -> Result<ProvidedTrack, Error> {
-        let id = if !ctx_track.uri.is_empty() {
-            if ctx_track.uri.contains(['?', '%']) {
-                Err(StateError::InvalidTrackUri(ctx_track.uri.clone()))?
+        let id = match (ctx_track.uri.as_ref(), ctx_track.gid.as_ref()) {
+            (None, None) => Err(StateError::InvalidTrackUri(None))?,
+            (Some(uri), _) if uri.contains(['?', '%']) => {
+                Err(StateError::InvalidTrackUri(Some(uri.clone())))?
             }
-
-            SpotifyId::from_uri(&ctx_track.uri)?
-        } else if !ctx_track.gid.is_empty() {
-            SpotifyId::from_raw(&ctx_track.gid)?
-        } else {
-            Err(StateError::InvalidTrackUri(String::new()))?
+            (Some(uri), _) if !uri.is_empty() => SpotifyId::from_uri(uri)?,
+            (None, Some(gid)) if !gid.is_empty() => SpotifyId::from_raw(gid)?,
+            _ => Err(StateError::InvalidTrackUri(None))?,
         };
 
-        let provider = if self.unavailable_uri.contains(&ctx_track.uri) {
+        let uri = id.to_uri()?.replace("unknown", "track");
+
+        let provider = if self.unavailable_uri.contains(&uri) {
             Provider::Unavailable
         } else {
             provider.unwrap_or(Provider::Context)
@@ -346,11 +357,10 @@ impl ConnectState {
         // assumption: the uid is used as unique-id of any item
         //  - queue resorting is done by each client and orients itself by the given uid
         //  - if no uid is present, resorting doesn't work or behaves not as intended
-        let uid = if ctx_track.uid.is_empty() {
-            // so setting providing a unique id should allow to resort the queue
-            Uuid::new_v4().as_simple().to_string()
-        } else {
-            ctx_track.uid.to_string()
+        let uid = match ctx_track.uid.as_ref() {
+            Some(uid) if !uid.is_empty() => uid.to_string(),
+            // so providing a unique id should allow to resort the queue
+            _ => Uuid::new_v4().as_simple().to_string(),
         };
 
         let mut metadata = HashMap::new();
@@ -359,7 +369,7 @@ impl ConnectState {
         }
 
         let mut track = ProvidedTrack {
-            uri: id.to_uri()?.replace("unknown", "track"),
+            uri,
             uid,
             metadata,
             provider: provider.to_string(),
@@ -399,12 +409,13 @@ impl ConnectState {
         };
 
         if next.tracks.is_empty() {
-            if next.page_url.is_empty() {
-                Err(StateError::NoContext(ContextType::Default))?
-            }
+            let next_page_url = match next.page_url {
+                Some(page_url) if !page_url.is_empty() => page_url,
+                _ => Err(StateError::NoContext(ContextType::Default))?,
+            };
 
             self.update_current_index(|i| i.page += 1);
-            return Ok(LoadNext::PageUrl(next.page_url));
+            return Ok(LoadNext::PageUrl(next_page_url));
         }
 
         self.fill_context_from_page(next)?;

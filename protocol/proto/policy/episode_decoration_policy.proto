@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -11,6 +11,8 @@ option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.cosmos.util.policy.proto";
 
 message EpisodeDecorationPolicy {
+    reserved 19;
+    reserved 20;
     bool link = 1;
     bool length = 2;
     bool name = 3;
@@ -29,11 +31,11 @@ message EpisodeDecorationPolicy {
     bool is_explicit = 16;
     bool type = 17;
     bool is_music_and_talk = 18;
-    PodcastSegmentsPolicy podcast_segments = 19;
-    bool podcast_subscription = 20;
     repeated extendedmetadata.ExtensionKind extension = 21;
     bool is_19_plus_only = 22;
     bool is_book_chapter = 23;
+    bool is_podcast_short = 24;
+    bool is_curated = 25;
 }
 
 message EpisodeCollectionDecorationPolicy {
@@ -55,10 +57,3 @@ message EpisodePlayedStateDecorationPolicy {
     bool last_played_at = 5;
 }
 
-message PodcastSegmentsPolicy {
-    bool playback_segments = 1;
-    bool embedded_segments = 2;
-    bool can_upsell = 3;
-    bool album_mosaic_uri = 4;
-    bool artists = 5;
-}

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package spotify.player.esperanto.proto;
+
+option java_package = "com.spotify.player.esperanto.proto";
+option objc_class_prefix = "ESP";
+
+message PauseResumeOrigin {
+  string feature_identifier = 1;
+}
+

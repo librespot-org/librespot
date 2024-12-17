@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -15,11 +15,39 @@ import "playlist_permission.proto";
 import "playlist_playlist_state.proto";
 import "playlist_track_state.proto";
 import "playlist_user_state.proto";
+import "policy/supported_link_types_in_playlists.proto";
 import "metadata/track_metadata.proto";
+import "metadata/extension.proto";
 
 option objc_class_prefix = "SPTPlaylistCosmosPlaylist";
 option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.playlist.proto";
+
+message AvailableSignal {
+    optional string name = 1;
+    optional .spotify.playlist.cosmos.playlist_request.proto.SignalState state = 2;
+}
+
+message ItemOfflineState {
+    optional string offline = 1;
+    optional uint32 sync_progress = 2;
+    optional bool locally_playable = 3;
+}
+
+message ItemCollectionState {
+    optional bool is_in_collection = 1;
+    optional bool is_banned = 2;
+}
+
+message ItemMetadata {
+    optional string name = 1;
+    optional string image = 2;
+    optional bool is_explicit = 3;
+}
+
+message ItemCurationState {
+    optional bool is_curated = 1;
+}
 
 message Item {
     optional string header_field = 1;
@@ -36,11 +64,30 @@ message Item {
     optional cosmos_util.proto.EpisodeCollectionState episode_collection_state = 12;
     optional cosmos_util.proto.EpisodePlayState episode_play_state = 13;
     optional cosmos_util.proto.ImageGroup display_covers = 14;
+    repeated AvailableSignal available_signals = 15;
+    optional bool is_recommendation = 16;
+    repeated cosmos_util.proto.Extension extension = 17;
+    optional string uri = 18;
+    optional ItemOfflineState offline_state = 19;
+    optional ItemCollectionState collection_state = 20;
+    optional ItemMetadata metadata = 21;
+    optional ItemCurationState curation_state = 22;
+    optional bool should_be_obfuscated = 23;
+}
+
+message Lens {
+    optional string name = 1;
+}
+
+message LensState {
+    repeated Lens requested_lenses = 1;
+    repeated Lens applied_lenses = 2;
 }
 
 message Playlist {
     optional cosmos.proto.PlaylistMetadata playlist_metadata = 1;
     optional cosmos.proto.PlaylistOfflineState playlist_offline_state = 2;
+    optional LensState lenses = 3;
 }
 
 message RecommendationItem {
@@ -61,6 +108,11 @@ message Collaborator {
 message Collaborators {
     optional uint32 count = 1;
     repeated Collaborator collaborator = 2;
+}
+
+message NumberOfItemsForLinkType {
+    optional cosmos.proto.LinkType link_type = 1;
+    optional int32 num_items = 2;
 }
 
 message Response {
@@ -88,4 +140,12 @@ message Response {
     optional Collaborators collaborators = 22;
     optional playlist_permission.proto.Permission base_permission = 23;
     optional playlist_permission.proto.Capabilities user_capabilities = 24;
+    repeated NumberOfItemsForLinkType number_of_items_per_link_type = 25;
+    repeated AvailableSignal available_signals = 26;
 }
+
+enum SignalState {
+    READY = 0;
+    PENDING = 1;
+}
+

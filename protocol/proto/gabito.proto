@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -8,16 +8,16 @@ option optimize_for = CODE_SIZE;
 
 message EventEnvelope {
     string event_name = 2;
-    
+
     repeated EventFragment event_fragment = 3;
     message EventFragment {
         string name = 1;
         bytes data = 2;
     }
-    
+
     bytes sequence_id = 4;
     int64 sequence_number = 5;
-    
+
     reserved 1;
 }
 
@@ -27,10 +27,11 @@ message PublishEventsRequest {
 }
 
 message PublishEventsResponse {
-    repeated EventError error = 1;
     message EventError {
         int32 index = 1;
         bool transient = 2;
         int32 reason = 3;
     }
+
+    repeated EventError error = 1;
 }

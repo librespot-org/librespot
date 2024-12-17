@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -21,7 +21,6 @@ message ContextIndex {
 }
 
 message PlaybackQuality {
-    BitrateLevel bitrate_level = 1;
     enum BitrateLevel {
         UNKNOWN = 0;
         LOW = 1;
@@ -29,9 +28,9 @@ message PlaybackQuality {
         HIGH = 3;
         VERY_HIGH = 4;
         HIFI = 5;
+        HIFI24 = 6;
     }
-    
-    BitrateStrategy strategy = 2;
+
     enum BitrateStrategy {
         UNKNOWN_STRATEGY = 0;
         BEST_MATCHING = 1;
@@ -40,16 +39,18 @@ message PlaybackQuality {
         CACHED_FILE = 4;
         LOCAL_FILE = 5;
     }
-    
-    BitrateLevel target_bitrate_level = 3;
-    bool target_bitrate_available = 4;
-    
-    HiFiStatus hifi_status = 5;
+
     enum HiFiStatus {
         NONE = 0;
         OFF = 1;
         ON = 2;
     }
+
+    BitrateLevel bitrate_level = 1;
+    BitrateStrategy strategy = 2;
+    BitrateLevel target_bitrate_level = 3;
+    bool target_bitrate_available = 4;
+    HiFiStatus hifi_status = 5;
 }
 
 message ContextPlayerState {
@@ -79,4 +80,6 @@ message ContextPlayerState {
     string session_id = 24;
     uint64 queue_revision = 25;
     PreparePlayOptions.AudioStream audio_stream = 26;
+    repeated string signals = 27;
+    string session_command_id = 28;
 }

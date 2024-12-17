@@ -1,18 +1,18 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.collection_platform.proto;
 
+import "collection_platform_items.proto";
+
+option java_package = "com.spotify.collection_platform.esperanto.proto";
+option java_multiple_files = true;
+option objc_class_prefix = "ESP";
 option optimize_for = CODE_SIZE;
 
 message CollectionPlatformSimpleResponse {
     string error_msg = 1;
-}
-
-message CollectionPlatformItem {
-    string uri = 1;
-    int64 add_time = 2;
 }
 
 message CollectionPlatformItemsResponse {
@@ -22,3 +22,29 @@ message CollectionPlatformItemsResponse {
 message CollectionPlatformContainsResponse {
     repeated bool found = 1;
 }
+
+message Status {
+    int32 code = 1;
+    string reason = 2;
+}
+
+message CollectionPlatformEsperantoContainsResponse {
+    Status status = 1;
+    CollectionPlatformContainsResponse contains = 2;
+}
+
+message CollectionPlatformEsperantoItemsResponse {
+    Status status = 1;
+    repeated CollectionPlatformItem items = 2;
+}
+
+message CollectionPlatformContextItemsResponse {
+    Status status = 1;
+    repeated CollectionPlatformContextItem items = 2;
+}
+
+message CollectionPlatformContainsContextItemsResponse {
+    Status status = 1;
+    repeated bool found = 2;
+}
+
