@@ -174,6 +174,10 @@ jobs:
       - name: Install NASM
         uses: ilammy/setup-nasm@v1.5.1
 
+      - name: Install stable toolchain for cargo-hack
+        run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain stable -y
+        if: ${{ matrix.toolchain != 'stable' }}
+
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
 
@@ -196,7 +200,7 @@ jobs:
       - run: cargo build --frozen --workspace --examples
       - run: cargo test --workspace
 
-      - run: cargo install cargo-hack
+      - run: cargo +stable install cargo-hack
       - run: cargo hack --workspace --remove-dev-deps
       - run: cargo check --no-default-features
       - run: cargo check
