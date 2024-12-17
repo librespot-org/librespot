@@ -21,6 +21,7 @@ impl ConnectState {
         self.context_to_provided_track(
             track,
             Some(&transfer.current_session.context.uri),
+            None,
             transfer.queue.is_playing_queue.then_some(Provider::Queue),
         )
     }
@@ -66,7 +67,8 @@ impl ConnectState {
         }
 
         self.clear_prev_track();
-        self.clear_next_tracks(false);
+        self.clear_next_tracks();
+        self.update_queue_revision()
     }
 
     /// completes the transfer, loading the queue and updating metadata
@@ -85,7 +87,7 @@ impl ConnectState {
         self.set_active_context(context_ty);
         self.fill_up_context = context_ty;
 
-        let ctx = self.get_context(&self.active_context).ok();
+        let ctx = self.get_context(self.active_context)?;
 
         let current_index = if track.is_queue() {
             Self::find_index_in_context(ctx, |c| c.uid == transfer.current_session.current_uid)
@@ -98,7 +100,7 @@ impl ConnectState {
             "active track is <{}> with index {current_index:?} in {:?} context, has {} tracks",
             track.uri,
             self.active_context,
-            ctx.map(|c| c.tracks.len()).unwrap_or_default()
+            ctx.tracks.len()
         );
 
         if self.player().track.is_none() {
@@ -125,6 +127,7 @@ impl ConnectState {
             if let Ok(queued_track) = self.context_to_provided_track(
                 track,
                 Some(self.context_uri()),
+                None,
                 Some(Provider::Queue),
             ) {
                 self.add_to_queue(queued_track, false);
