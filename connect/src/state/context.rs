@@ -3,7 +3,11 @@ use crate::{
     protocol::player::{
         Context, ContextIndex, ContextPage, ContextTrack, ProvidedTrack, Restrictions,
     },
-    state::{metadata::Metadata, provider::Provider, ConnectState, StateError},
+    state::{
+        metadata::Metadata,
+        provider::{IsProvider, Provider},
+        ConnectState, StateError, SPOTIFY_MAX_NEXT_TRACKS_SIZE,
+    },
 };
 use protobuf::MessageField;
 use std::collections::HashMap;
@@ -222,22 +226,21 @@ impl ConnectState {
                 if !self.context_uri().starts_with(SEARCH_IDENTIFIER)
                     && self.context_uri() == &context.uri
                 {
-                    match Self::find_index_in_context(&new_context, |t| {
-                        self.current_track(|t| &t.uri) == &t.uri
-                    }) {
-                        Ok(new_pos) => {
-                            debug!("found new index of current track, updating new_context index to {new_pos}");
-                            new_context.index.track = (new_pos + 1) as u32;
+                    if let Some(new_index) = self.find_last_index_in_new_context(&new_context) {
+                        new_context.index.track = match new_index {
+                            Ok(i) => i,
+                            Err(i) => {
+                                self.player_mut().index = MessageField::none();
+                                i
+                            }
+                        };
+
+                        // enforce reloading the context
+                        if let Some(autoplay_ctx) = self.autoplay_context.as_mut() {
+                            autoplay_ctx.index.track = 0
                         }
-                        // the track isn't anymore in the context
-                        Err(_) if matches!(self.active_context, ContextType::Default) => {
-                            warn!("current track was removed, setting pos to last known index");
-                            new_context.index.track = self.player().index.track
-                        }
-                        Err(_) => {}
+                        self.clear_next_tracks();
                     }
-                    // enforce reloading the context
-                    self.clear_next_tracks();
                 }
 
                 self.context = Some(new_context);
@@ -281,6 +284,52 @@ impl ConnectState {
             .collect();
 
         Ok(Some(next_contexts))
+    }
+
+    fn find_first_prev_track_index(&self, ctx: &StateContext) -> Option<usize> {
+        let prev_tracks = self.prev_tracks();
+        for i in (0..prev_tracks.len()).rev() {
+            let prev_track = prev_tracks.get(i)?;
+            if let Ok(idx) = Self::find_index_in_context(ctx, |t| prev_track.uri == t.uri) {
+                return Some(idx);
+            }
+        }
+        None
+    }
+
+    fn find_last_index_in_new_context(
+        &self,
+        new_context: &StateContext,
+    ) -> Option<Result<u32, u32>> {
+        let ctx = self.context.as_ref()?;
+
+        let is_queued_item = self.current_track(|t| t.is_queue() || t.is_from_queue());
+
+        let new_index = if ctx.index.track as usize >= SPOTIFY_MAX_NEXT_TRACKS_SIZE {
+            Some(ctx.index.track as usize - SPOTIFY_MAX_NEXT_TRACKS_SIZE)
+        } else if is_queued_item {
+            self.find_first_prev_track_index(new_context)
+        } else {
+            Self::find_index_in_context(new_context, |current| {
+                self.current_track(|t| t.uri == current.uri)
+            })
+            .ok()
+        }
+        .map(|i| i as u32 + 1);
+
+        Some(new_index.ok_or_else(|| {
+            info!(
+                "couldn't distinguish index from current or previous tracks in the updated context"
+            );
+            let fallback_index = self
+                .player()
+                .index
+                .as_ref()
+                .map(|i| i.track)
+                .unwrap_or_default();
+            info!("falling back to index {fallback_index}");
+            fallback_index
+        }))
     }
 
     fn state_context_from_page(

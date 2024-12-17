@@ -337,29 +337,27 @@ impl ContextResolver {
             }
         }
 
-        if let Some(transfer_state) = transfer_state.take() {
-            if let Err(why) = state.finish_transfer(transfer_state) {
-                error!("finishing setup of transfer failed: {why}")
-            }
+        let active_ctx = state.get_context(state.active_context);
+        let res = if let Some(transfer_state) = transfer_state.take() {
+            state.finish_transfer(transfer_state)
+        } else if state.shuffling_context() {
+            state.shuffle()
+        } else if matches!(active_ctx, Ok(ctx) if ctx.index.track == 0) {
+            // has context, and context is not touched
+            // when the index is not zero, the next index was already evaluated elsewhere
+            let ctx = active_ctx.expect("checked by precondition");
+            let idx = ConnectState::find_index_in_context(ctx, |t| {
+                state.current_track(|c| t.uri == c.uri)
+            })
+            .ok();
+
+            state.reset_playback_to_position(idx)
         } else {
-            let res = if state.shuffling_context() {
-                state.shuffle()
-            } else if let Ok(ctx) = state.get_context(state.active_context) {
-                let idx = ConnectState::find_index_in_context(ctx, |t| {
-                    state.current_track(|c| t.uri == c.uri)
-                })
-                .ok();
+            state.fill_up_next_tracks()
+        };
 
-                state
-                    .reset_playback_to_position(idx)
-                    .and_then(|_| state.fill_up_next_tracks())
-            } else {
-                state.fill_up_next_tracks()
-            };
-
-            if let Err(why) = res {
-                error!("setting up state failed after updating contexts: {why}")
-            }
+        if let Err(why) = res {
+            error!("setup of state failed: {why}, last used resolve {next:#?}")
         }
 
         state.update_restrictions();
