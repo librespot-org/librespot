@@ -389,8 +389,8 @@ impl Session {
         self.0.data.read().session_id.clone()
     }
 
-    pub fn set_session_id(&self, session_id: String) {
-        self.0.data.write().session_id = session_id.to_owned();
+    pub fn set_session_id(&self, session_id: &str) {
+        session_id.clone_into(&mut self.0.data.write().session_id);
     }
 
     pub fn device_id(&self) -> &str {
@@ -450,7 +450,7 @@ impl Session {
     }
 
     pub fn set_auth_data(&self, auth_data: &[u8]) {
-        self.0.data.write().auth_data = auth_data.to_owned();
+        auth_data.clone_into(&mut self.0.data.write().auth_data);
     }
 
     pub fn country(&self) -> String {

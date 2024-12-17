@@ -2,6 +2,16 @@
 
 set -e
 
+clean() {
+    # some shells will call EXIT after the INT signal
+    # causing EXIT trap to be executed, so we trap EXIT after INT
+    trap '' EXIT
+    
+    cargo clean
+}
+
+trap clean INT QUIT TERM EXIT
+
 # this script runs the tests and checks that also run as part of the`test.yml` github action workflow
 cargo clean
 cargo fmt --all -- --check

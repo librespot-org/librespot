@@ -125,7 +125,7 @@ enum SpircCommand {
     Shuffle(bool),
     Repeat(bool),
     RepeatTrack(bool),
-    Disconnect,
+    Disconnect { pause: bool },
     SetPosition(u32),
     SetVolume(u16),
     Activate,
@@ -306,8 +306,8 @@ impl Spirc {
     pub fn set_position_ms(&self, position_ms: u32) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetPosition(position_ms))?)
     }
-    pub fn disconnect(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::Disconnect)?)
+    pub fn disconnect(&self, pause: bool) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Disconnect { pause })?)
     }
     pub fn activate(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Activate)?)
@@ -464,15 +464,12 @@ impl SpircTask {
         }
 
         if !self.shutdown && self.connect_state.is_active() {
-            if let Err(why) = self.notify().await {
-                warn!("notify before unexpected shutdown couldn't be send: {why}")
+            warn!("unexpected shutdown");
+            if let Err(why) = self.handle_disconnect().await {
+                error!("error during disconnecting: {why}")
             }
         }
 
-        // clears the session id, leaving an empty state
-        if let Err(why) = self.session.spclient().delete_connect_state_request().await {
-            warn!("deleting connect_state failed before unexpected shutdown: {why}")
-        }
         self.session.dealer().close().await;
     }
 
@@ -549,6 +546,12 @@ impl SpircTask {
             _ if !self.connect_state.is_active() => {
                 warn!("SpircCommand::{:?} will be ignored while Not Active", cmd)
             }
+            SpircCommand::Disconnect { pause } => {
+                if pause {
+                    self.handle_pause()
+                }
+                return self.handle_disconnect().await;
+            }
             SpircCommand::Play => self.handle_play(),
             SpircCommand::PlayPause => self.handle_play_pause(),
             SpircCommand::Pause => self.handle_pause(),
@@ -556,7 +559,6 @@ impl SpircTask {
             SpircCommand::Next => self.handle_next(None)?,
             SpircCommand::VolumeUp => self.handle_volume_up(),
             SpircCommand::VolumeDown => self.handle_volume_down(),
-            SpircCommand::Disconnect => self.handle_disconnect().await?,
             SpircCommand::Shuffle(shuffle) => self.connect_state.handle_shuffle(shuffle)?,
             SpircCommand::Repeat(repeat) => self.connect_state.set_repeat_context(repeat),
             SpircCommand::RepeatTrack(repeat) => self.connect_state.set_repeat_track(repeat),
@@ -918,7 +920,7 @@ impl SpircTask {
                         context_uri: play.context.uri.clone(),
                         start_playing: true,
                         seek_to: play.options.seek_to.unwrap_or_default(),
-                        playing_track: play.options.skip_to.try_into().ok(),
+                        playing_track: play.options.skip_to.and_then(|s| s.try_into().ok()),
                         shuffle,
                         repeat,
                         repeat_track,
@@ -1039,7 +1041,6 @@ impl SpircTask {
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
         self.context_resolver.clear();
-        self.handle_pause();
 
         self.play_status = SpircPlayStatus::Stopped {};
         self.connect_state
@@ -1047,6 +1048,12 @@ impl SpircTask {
         self.notify().await?;
 
         self.connect_state.became_inactive(&self.session).await?;
+
+        // this should clear the active session id, leaving an empty state
+        self.session
+            .spclient()
+            .delete_connect_state_request()
+            .await?;
 
         self.player
             .emit_session_disconnected_event(self.session.connection_id(), self.session.username());
@@ -1454,7 +1461,7 @@ impl SpircTask {
             );
 
             if self.session.session_id() != session.session_id {
-                self.session.set_session_id(session.session_id.clone());
+                self.session.set_session_id(&session.session_id);
                 self.connect_state.set_session_id(session.session_id);
             }
         } else {

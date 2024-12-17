@@ -28,9 +28,9 @@ serde = { version = "1", default-features = false, features = ["derive"], option
 serde_repr = "0.1"
 serde_json = "1.0"
 sha1 = "0.10"
-thiserror = "1.0"
+thiserror = "2.0"
 tokio = { version = "1", features = ["parking_lot", "sync", "rt"] }
-zbus = { version = "4", default-features = false, features = ["tokio"], optional = true }
+zbus = { version = "4", default-features = false, features = ["tokio"], optional = true } # zbus > 4 requires a MSRV of 1.80
 
 [dependencies.librespot-core]
 path = "../core"

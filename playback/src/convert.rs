@@ -1,7 +1,7 @@
 use crate::dither::{Ditherer, DithererBuilder};
-use zerocopy::AsBytes;
+use zerocopy::{Immutable, IntoBytes};
 
-#[derive(AsBytes, Copy, Clone, Debug)]
+#[derive(Immutable, IntoBytes, Copy, Clone, Debug)]
 #[allow(non_camel_case_types)]
 #[repr(transparent)]
 pub struct i24([u8; 3]);
