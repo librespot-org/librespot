@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on Android platform.
 - [core] Fix "Invalid Credentials" when using a Keymaster access token and
   client ID on Android platform.
-= [connect] Fix "play" command not handled if missing "offset" property
+- [connect] Fix "play" command not handled if missing "offset" property
+- [discovery] Fix libmdns zerconf setup errors not propagating to the main task.
 
 ### Removed
 
