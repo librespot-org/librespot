@@ -1148,21 +1148,19 @@ impl SpircTask {
 
         debug!("play track <{:?}>", cmd.playing_track);
 
-        let index = cmd.playing_track.map(|p| match p {
-            PlayingTrack::Index(i) => Ok(i as usize),
-            PlayingTrack::Uri(uri) => {
-                let ctx = self.connect_state.get_context(ContextType::Default)?;
-                ConnectState::find_index_in_context(ctx, |t| t.uri == uri)
-            }
-            PlayingTrack::Uid(uid) => {
-                let ctx = self.connect_state.get_context(ContextType::Default)?;
-                ConnectState::find_index_in_context(ctx, |t| t.uid == uid)
-            }
-        });
-
-        let index = match index {
-            Some(value) => Some(value?),
+        let index = match cmd.playing_track {
             None => None,
+            Some(playing_track) => Some(match playing_track {
+                PlayingTrack::Index(i) => i as usize,
+                PlayingTrack::Uri(uri) => {
+                    let ctx = self.connect_state.get_context(ContextType::Default)?;
+                    ConnectState::find_index_in_context(ctx, |t| t.uri == uri)?
+                }
+                PlayingTrack::Uid(uid) => {
+                    let ctx = self.connect_state.get_context(ContextType::Default)?;
+                    ConnectState::find_index_in_context(ctx, |t| t.uid == uid)?
+                }
+            }),
         };
 
         debug!(
@@ -1175,7 +1173,9 @@ impl SpircTask {
         self.connect_state.set_repeat_track(cmd.repeat_track);
 
         if cmd.shuffle {
-            if index.is_none() {
+            if let Some(index) = index {
+                self.connect_state.set_current_track(index)?;
+            } else {
                 self.connect_state.set_current_track_random()?;
             }
 
