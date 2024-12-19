@@ -359,17 +359,14 @@ impl<'ct> ConnectState {
         }
     }
 
-    pub fn prev_autoplay_track_uris(&self) -> Vec<String> {
+    pub fn recent_track_uris(&self) -> Vec<String> {
         let mut prev = self
             .prev_tracks()
             .iter()
-            .flat_map(|t| t.is_autoplay().then_some(t.uri.clone()))
+            .map(|t| t.uri.clone())
             .collect::<Vec<_>>();
 
-        if self.current_track(|t| t.is_autoplay()) {
-            prev.push(self.current_track(|t| t.uri.clone()));
-        }
-
+        prev.push(self.current_track(|t| t.uri.clone()));
         prev
     }
 

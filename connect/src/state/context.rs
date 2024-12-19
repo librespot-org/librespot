@@ -200,7 +200,7 @@ impl ConnectState {
             }
         }
 
-        let mut page = match first_page {
+        let page = match first_page {
             None => Err(StateError::ContextHasNoTracks)?,
             Some(p) => p,
         };
@@ -253,17 +253,6 @@ impl ConnectState {
                 self.player_mut().context_uri = context.uri;
             }
             UpdateContext::Autoplay => {
-                if matches!(self.context.as_ref(), Some(ctx) if ctx.tracks.len() == 1) {
-                    if let Some(position) = page
-                        .tracks
-                        .iter()
-                        .position(|p| self.current_track(|t| t.uri == p.uri))
-                    {
-                        debug!("removing track (of single track context) from autoplay context");
-                        page.tracks.remove(position);
-                    }
-                }
-
                 self.autoplay_context = Some(self.state_context_from_page(
                     page,
                     context.metadata,

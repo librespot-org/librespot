@@ -449,7 +449,7 @@ impl SpircTask {
                 // finish after we received our last item of a type
                 next_context = async {
                     self.context_resolver.get_next_context(|| {
-                        self.connect_state.prev_autoplay_track_uris()
+                        self.connect_state.recent_track_uris()
                     }).await
                 }, if allow_context_resolving && self.context_resolver.has_next() => {
                     let update_state = self.handle_next_context(next_context);
@@ -1105,8 +1105,6 @@ impl SpircTask {
         cmd: SpircLoadCommand,
         context: Option<Context>,
     ) -> Result<(), Error> {
-        self.context_resolver.clear();
-
         self.connect_state
             .reset_context(ResetContext::WhenDifferent(&cmd.context_uri));
 
@@ -1128,6 +1126,7 @@ impl SpircTask {
             debug!("context <{current_context_uri}> didn't change, no resolving required")
         } else {
             debug!("resolving context for load command");
+            self.context_resolver.clear();
             self.context_resolver.add(ResolveContext::from_uri(
                 &cmd.context_uri,
                 fallback,
