@@ -185,9 +185,9 @@ impl ConnectState {
     ) -> Result<Option<Vec<String>>, Error> {
         if context.pages.iter().all(|p| p.tracks.is_empty()) {
             error!("context didn't have any tracks: {context:#?}");
-            return Err(StateError::ContextHasNoTracks.into());
+            Err(StateError::ContextHasNoTracks)?;
         } else if context.uri.starts_with(LOCAL_FILES_IDENTIFIER) {
-            return Err(StateError::UnsupportedLocalPlayBack.into());
+            Err(StateError::UnsupportedLocalPlayBack)?;
         }
 
         let mut next_contexts = Vec::new();
@@ -200,7 +200,7 @@ impl ConnectState {
             }
         }
 
-        let page = match first_page {
+        let mut page = match first_page {
             None => Err(StateError::ContextHasNoTracks)?,
             Some(p) => p,
         };
@@ -245,7 +245,7 @@ impl ConnectState {
 
                 self.context = Some(new_context);
 
-                if !context.url.starts_with(SEARCH_IDENTIFIER) {
+                if !context.url.contains(SEARCH_IDENTIFIER) {
                     self.player_mut().context_url = context.url;
                 } else {
                     self.player_mut().context_url.clear()
@@ -253,6 +253,17 @@ impl ConnectState {
                 self.player_mut().context_uri = context.uri;
             }
             UpdateContext::Autoplay => {
+                if matches!(self.context.as_ref(), Some(ctx) if ctx.tracks.len() == 1) {
+                    if let Some(position) = page
+                        .tracks
+                        .iter()
+                        .position(|p| self.current_track(|t| t.uri == p.uri))
+                    {
+                        debug!("removing track (of single track context) from autoplay context");
+                        page.tracks.remove(position);
+                    }
+                }
+
                 self.autoplay_context = Some(self.state_context_from_page(
                     page,
                     context.metadata,
