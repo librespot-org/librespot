@@ -47,16 +47,12 @@ impl ConnectState {
         }
 
         self.clear_prev_track();
-        self.clear_next_tracks(true);
+        self.clear_next_tracks();
 
         let current_uri = self.current_track(|t| &t.uri);
 
-        let ctx = self
-            .context
-            .as_ref()
-            .ok_or(StateError::NoContext(ContextType::Default))?;
-
-        let current_track = Self::find_index_in_context(Some(ctx), |t| &t.uri == current_uri)?;
+        let ctx = self.get_context(ContextType::Default)?;
+        let current_track = Self::find_index_in_context(ctx, |t| &t.uri == current_uri)?;
 
         let mut shuffle_context = ctx.clone();
         // we don't need to include the current track, because it is already being played

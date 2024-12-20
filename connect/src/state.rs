@@ -20,8 +20,7 @@ use librespot_protocol::connect::{
     Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest,
 };
 use librespot_protocol::player::{
-    ContextIndex, ContextPage, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack,
-    Suppressions,
+    ContextIndex, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack, Suppressions,
 };
 use log::LevelFilter;
 use protobuf::{EnumOrUnknown, MessageField};
@@ -101,19 +100,17 @@ pub struct ConnectState {
 
     unavailable_uri: Vec<String>,
 
-    pub active_since: Option<SystemTime>,
+    active_since: Option<SystemTime>,
     queue_count: u64,
 
     // separation is necessary because we could have already loaded
     // the autoplay context but are still playing from the default context
     /// to update the active context use [switch_active_context](ConnectState::set_active_context)
     pub active_context: ContextType,
-    pub fill_up_context: ContextType,
+    fill_up_context: ContextType,
 
     /// the context from which we play, is used to top up prev and next tracks
-    pub context: Option<StateContext>,
-    /// upcoming contexts, directly provided by the context-resolver
-    next_contexts: Vec<ContextPage>,
+    context: Option<StateContext>,
 
     /// a context to keep track of our shuffled context,
     /// should be only available when `player.option.shuffling_context` is true
@@ -293,6 +290,12 @@ impl ConnectState {
                 | SpircPlayStatus::Stopped
         );
 
+        if player.is_paused {
+            player.playback_speed = 0.;
+        } else {
+            player.playback_speed = 1.;
+        }
+
         // desktop and mobile require all 'states' set to true, when we are paused,
         // otherwise the play button (desktop) is grayed out or the preview (mobile) can't be opened
         player.is_buffering = player.is_paused
@@ -345,9 +348,15 @@ impl ConnectState {
     }
 
     pub fn reset_playback_to_position(&mut self, new_index: Option<usize>) -> Result<(), Error> {
+        debug!(
+            "reset_playback with active ctx <{:?}> fill_up ctx <{:?}>",
+            self.active_context, self.fill_up_context
+        );
+
         let new_index = new_index.unwrap_or(0);
         self.update_current_index(|i| i.track = new_index as u32);
         self.update_context_index(self.active_context, new_index + 1)?;
+        self.fill_up_context = self.active_context;
 
         if !self.current_track(|t| t.is_queue()) {
             self.set_current_track(new_index)?;
@@ -356,7 +365,7 @@ impl ConnectState {
         self.clear_prev_track();
 
         if new_index > 0 {
-            let context = self.get_context(&self.active_context)?;
+            let context = self.get_context(self.active_context)?;
 
             let before_new_track = context.tracks.len() - new_index;
             self.player_mut().prev_tracks = context
@@ -371,7 +380,7 @@ impl ConnectState {
             debug!("has {} prev tracks", self.prev_tracks().len())
         }
 
-        self.clear_next_tracks(true);
+        self.clear_next_tracks();
         self.fill_up_next_tracks()?;
         self.update_restrictions();
 

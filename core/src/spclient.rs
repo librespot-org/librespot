@@ -820,7 +820,7 @@ impl SpClient {
     ///     **will** contain the query
     /// - artists
     ///   - returns 2 pages with tracks: 10 most popular tracks and latest/popular album
-    ///   - remaining pages are albums of the artists and are only provided as page_url
+    ///   - remaining pages are artist albums sorted by popularity (only provided as page_url)
     /// - search
     ///   - is massively influenced by the provided query
     ///   - the query result shown by the search expects no query at all
