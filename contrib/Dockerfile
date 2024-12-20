@@ -8,38 +8,49 @@
 # The compiled binaries will be located in /tmp/librespot-build
 #
 # If only one architecture is desired, cargo can be invoked directly with the appropriate options :
-# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --no-default-features --features "alsa-backend"
+# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --no-default-features --features alsa-backend
 # $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features alsa-backend
 # $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabi --no-default-features --features alsa-backend
 # $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target aarch64-unknown-linux-gnu --no-default-features --features alsa-backend
 
 FROM debian:bookworm
 
-RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list
-RUN echo "deb http://deb.debian.org/debian bookworm-updates main" >> /etc/apt/sources.list
-RUN echo "deb http://deb.debian.org/debian-security bookworm-security main" >> /etc/apt/sources.list
+RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list && \
+	echo "deb http://deb.debian.org/debian bookworm-updates main" >> /etc/apt/sources.list && \
+	echo "deb http://deb.debian.org/debian-security bookworm-security main" >> /etc/apt/sources.list
 
-RUN dpkg --add-architecture arm64
-RUN dpkg --add-architecture armhf
-RUN dpkg --add-architecture armel
-RUN apt-get update
+RUN dpkg --add-architecture arm64 && \
+	dpkg --add-architecture armhf && \
+	dpkg --add-architecture armel && \
+	apt-get update && \
+	apt-get install -y \
+	build-essential \
+	cmake \
+	crossbuild-essential-arm64 \
+	crossbuild-essential-armel \
+	crossbuild-essential-armhf \
+	curl \
+	libasound2-dev \
+	libasound2-dev:arm64 \
+	libasound2-dev:armel \
+	libasound2-dev:armhf \
+	libclang-dev \
+	libpulse0 \
+	libpulse0:arm64 \
+	libpulse0:armel \
+	libpulse0:armhf \
+	pkg-config 
 
-RUN apt-get install -y cmake libclang-dev
-RUN apt-get install -y curl git build-essential crossbuild-essential-arm64 crossbuild-essential-armel crossbuild-essential-armhf pkg-config
-RUN apt-get install -y libasound2-dev libasound2-dev:arm64 libasound2-dev:armel libasound2-dev:armhf
-RUN apt-get install -y libpulse0 libpulse0:arm64 libpulse0:armel libpulse0:armhf
-
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.81 -y
 ENV PATH="/root/.cargo/bin/:${PATH}"
-RUN rustup target add aarch64-unknown-linux-gnu
-RUN rustup target add arm-unknown-linux-gnueabi
-RUN rustup target add arm-unknown-linux-gnueabihf
-RUN cargo install bindgen-cli
-
-RUN mkdir /.cargo && \
-    echo '[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"' > /.cargo/config && \
-    echo '[target.arm-unknown-linux-gnueabihf]\nlinker = "arm-linux-gnueabihf-gcc"' >> /.cargo/config && \
-    echo '[target.arm-unknown-linux-gnueabi]\nlinker = "arm-linux-gnueabi-gcc"' >> /.cargo/config
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.81 -y && \
+	rustup target add aarch64-unknown-linux-gnu && \
+	rustup target add arm-unknown-linux-gnueabi && \
+	rustup target add arm-unknown-linux-gnueabihf && \
+	cargo install bindgen-cli && \
+	mkdir /.cargo && \
+	echo '[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"' > /.cargo/config && \
+	echo '[target.arm-unknown-linux-gnueabihf]\nlinker = "arm-linux-gnueabihf-gcc"' >> /.cargo/config && \
+	echo '[target.arm-unknown-linux-gnueabi]\nlinker = "arm-linux-gnueabi-gcc"' >> /.cargo/config
 
 ENV CARGO_TARGET_DIR=/build
 ENV CARGO_HOME=/build/cache
