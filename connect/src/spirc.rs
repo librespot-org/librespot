@@ -1350,7 +1350,7 @@ impl SpircTask {
     }
 
     fn handle_next(&mut self, track_uri: Option<String>) -> Result<(), Error> {
-        let continue_playing = self.connect_state.player().is_playing;
+        let continue_playing = self.connect_state.is_playing();
 
         let current_uri = self.connect_state.current_track(|t| &t.uri);
         let mut has_next_track =
@@ -1391,7 +1391,7 @@ impl SpircTask {
                     self.connect_state.reset_playback_to_position(None)?;
                     self.handle_stop()
                 }
-                Some(_) => self.load_track(self.connect_state.player().is_playing, 0)?,
+                Some(_) => self.load_track(self.connect_state.is_playing(), 0)?,
             }
         } else {
             self.handle_seek(0);
@@ -1515,7 +1515,7 @@ impl SpircTask {
     async fn notify(&mut self) -> Result<(), Error> {
         self.connect_state.set_status(&self.play_status);
 
-        if self.connect_state.player().is_playing {
+        if self.connect_state.is_playing() {
             self.connect_state
                 .update_position_in_relation(self.now_ms());
         }

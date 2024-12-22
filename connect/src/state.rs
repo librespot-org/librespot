@@ -233,6 +233,22 @@ impl ConnectState {
         self.request.is_active
     }
 
+    /// Returns the `is_playing` value as perceived by other connect devices
+    ///
+    /// see [ConnectState::set_status]
+    pub fn is_playing(&self) -> bool {
+        let player = self.player();
+        player.is_playing && !player.is_paused
+    }
+
+    /// Returns the `is_paused` state value as perceived by other connect devices
+    ///
+    /// see [ConnectState::set_status]
+    pub fn is_pause(&self) -> bool {
+        let player = self.player();
+        player.is_playing && player.is_paused && player.is_buffering
+    }
+
     pub fn set_volume(&mut self, volume: u32) {
         self.device_mut()
             .device_info
