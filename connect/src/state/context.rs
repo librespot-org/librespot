@@ -7,6 +7,7 @@ use crate::{
         player::{ContextIndex, ProvidedTrack},
         restrictions::Restrictions,
     },
+    shuffle_vec::ShuffleVec,
     state::{
         metadata::Metadata,
         provider::{IsProvider, Provider},
@@ -15,44 +16,26 @@ use crate::{
 };
 use protobuf::MessageField;
 use std::collections::HashMap;
-use std::ops::Deref;
 use uuid::Uuid;
 
 const LOCAL_FILES_IDENTIFIER: &str = "spotify:local-files";
 const SEARCH_IDENTIFIER: &str = "spotify:search";
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct StateContext {
-    pub tracks: Vec<ProvidedTrack>,
+    pub tracks: ShuffleVec<ProvidedTrack>,
+    pub skip_track: Option<ProvidedTrack>,
     pub metadata: HashMap<String, String>,
     pub restrictions: Option<Restrictions>,
     /// is used to keep track which tracks are already loaded into the next_tracks
     pub index: ContextIndex,
 }
 
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub enum ContextType {
     #[default]
     Default,
-    Shuffle,
     Autoplay,
-}
-
-#[derive(Debug, Hash, Copy, Clone, PartialEq, Eq)]
-pub enum UpdateContext {
-    Default,
-    Autoplay,
-}
-
-impl Deref for UpdateContext {
-    type Target = ContextType;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            UpdateContext::Default => &ContextType::Default,
-            UpdateContext::Autoplay => &ContextType::Autoplay,
-        }
-    }
 }
 
 pub enum ResetContext<'s> {
@@ -96,8 +79,15 @@ impl ConnectState {
     pub fn get_context(&self, ty: ContextType) -> Result<&StateContext, StateError> {
         match ty {
             ContextType::Default => self.context.as_ref(),
-            ContextType::Shuffle => self.shuffle_context.as_ref(),
             ContextType::Autoplay => self.autoplay_context.as_ref(),
+        }
+        .ok_or(StateError::NoContext(ty))
+    }
+
+    pub fn get_context_mut(&mut self, ty: ContextType) -> Result<&mut StateContext, StateError> {
+        match ty {
+            ContextType::Default => self.context.as_mut(),
+            ContextType::Autoplay => self.autoplay_context.as_mut(),
         }
         .ok_or(StateError::NoContext(ty))
     }
@@ -115,14 +105,17 @@ impl ConnectState {
         if matches!(reset_as, ResetContext::WhenDifferent(ctx) if self.different_context_uri(ctx)) {
             reset_as = ResetContext::Completely
         }
-        self.shuffle_context = None;
+
+        if let Ok(ctx) = self.get_context_mut(ContextType::Default) {
+            ctx.tracks.unshuffle()
+        }
 
         match reset_as {
+            ResetContext::WhenDifferent(_) => debug!("context didn't change, no reset"),
             ResetContext::Completely => {
                 self.context = None;
                 self.autoplay_context = None;
             }
-            ResetContext::WhenDifferent(_) => debug!("context didn't change, no reset"),
             ResetContext::DefaultIndex => {
                 for ctx in [self.context.as_mut(), self.autoplay_context.as_mut()]
                     .into_iter()
@@ -190,7 +183,7 @@ impl ConnectState {
     pub fn update_context(
         &mut self,
         mut context: Context,
-        ty: UpdateContext,
+        ty: ContextType,
     ) -> Result<Option<Vec<String>>, Error> {
         if context.pages.iter().all(|p| p.tracks.is_empty()) {
             error!("context didn't have any tracks: {context:#?}");
@@ -221,7 +214,7 @@ impl ConnectState {
         );
 
         match ty {
-            UpdateContext::Default => {
+            ContextType::Default => {
                 let mut new_context = self.state_context_from_page(
                     page,
                     context.metadata,
@@ -245,7 +238,7 @@ impl ConnectState {
                         };
 
                         // enforce reloading the context
-                        if let Some(autoplay_ctx) = self.autoplay_context.as_mut() {
+                        if let Ok(autoplay_ctx) = self.get_context_mut(ContextType::Autoplay) {
                             autoplay_ctx.index.track = 0
                         }
                         self.clear_next_tracks();
@@ -261,7 +254,7 @@ impl ConnectState {
                 }
                 self.player_mut().context_uri = context.uri.take().unwrap_or_default();
             }
-            UpdateContext::Autoplay => {
+            ContextType::Autoplay => {
                 self.autoplay_context = Some(self.state_context_from_page(
                     page,
                     context.metadata,
@@ -373,11 +366,19 @@ impl ConnectState {
             .collect::<Vec<_>>();
 
         StateContext {
-            tracks,
+            tracks: ShuffleVec::new(tracks),
+            skip_track: None,
             restrictions,
             metadata,
             index: ContextIndex::new(),
         }
+    }
+
+    pub fn is_skip_track(&self, track: &ProvidedTrack) -> bool {
+        self.get_context(self.active_context)
+            .ok()
+            .and_then(|t| t.skip_track.as_ref().map(|t| t.uri == track.uri))
+            .unwrap_or(false)
     }
 
     pub fn merge_context(&mut self, context: Option<Context>) -> Option<()> {
@@ -386,7 +387,7 @@ impl ConnectState {
             return None;
         }
 
-        let current_context = self.context.as_mut()?;
+        let current_context = self.get_context_mut(ContextType::Default).ok()?;
         let new_page = context.pages.pop()?;
 
         for new_track in new_page.tracks {
@@ -421,12 +422,7 @@ impl ConnectState {
         ty: ContextType,
         new_index: usize,
     ) -> Result<(), StateError> {
-        let context = match ty {
-            ContextType::Default => self.context.as_mut(),
-            ContextType::Shuffle => self.shuffle_context.as_mut(),
-            ContextType::Autoplay => self.autoplay_context.as_mut(),
-        }
-        .ok_or(StateError::NoContext(ty))?;
+        let context = self.get_context_mut(ty)?;
 
         context.index.track = new_index as u32;
         Ok(())

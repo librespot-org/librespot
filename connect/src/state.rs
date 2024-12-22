@@ -7,12 +7,12 @@ mod restrictions;
 mod tracks;
 mod transfer;
 
-use crate::model::SpircPlayStatus;
 use crate::{
     core::{
         config::DeviceType, date::Date, dealer::protocol::Request, spclient::SpClientResult,
         version, Error, Session,
     },
+    model::SpircPlayStatus,
     protocol::{
         connect::{Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest},
         media::AudioQuality,
@@ -26,7 +26,6 @@ use crate::{
         provider::{IsProvider, Provider},
     },
 };
-
 use log::LevelFilter;
 use protobuf::{EnumOrUnknown, MessageField};
 use std::{
@@ -119,9 +118,6 @@ pub struct ConnectState {
     /// the context from which we play, is used to top up prev and next tracks
     context: Option<StateContext>,
 
-    /// a context to keep track of our shuffled context,
-    /// should be only available when `player.option.shuffling_context` is true
-    shuffle_context: Option<StateContext>,
     /// a context to keep track of the autoplay context
     autoplay_context: Option<StateContext>,
 }

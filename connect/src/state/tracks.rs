@@ -124,6 +124,7 @@ impl<'ct> ConnectState {
                     continue;
                 }
                 Some(next) if next.is_unavailable() => continue,
+                Some(next) if self.is_skip_track(&next) => continue,
                 other => break other,
             };
         };
@@ -323,7 +324,7 @@ impl<'ct> ConnectState {
                     }
                 }
                 None => break,
-                Some(ct) if ct.is_unavailable() => {
+                Some(ct) if ct.is_unavailable() || self.is_skip_track(ct) => {
                     new_index += 1;
                     continue;
                 }

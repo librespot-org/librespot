@@ -1,9 +1,10 @@
-use crate::state::context::ContextType;
-use crate::state::{ConnectState, StateError};
-use librespot_core::Error;
-use librespot_protocol::player::{ContextIndex, ContextPlayerOptions};
+use crate::state::context::ResetContext;
+use crate::{
+    core::Error,
+    protocol::player::ContextPlayerOptions,
+    state::{context::ContextType, ConnectState, StateError},
+};
 use protobuf::MessageField;
-use rand::prelude::SliceRandom;
 
 impl ConnectState {
     fn add_options_if_empty(&mut self) {
@@ -55,22 +56,17 @@ impl ConnectState {
         self.clear_prev_track();
         self.clear_next_tracks();
 
-        let current_uri = self.current_track(|t| &t.uri);
+        let current_track = self.current_track(|t| t.clone().take());
 
-        let ctx = self.get_context(ContextType::Default)?;
-        let current_track = Self::find_index_in_context(ctx, |t| &t.uri == current_uri)?;
+        self.reset_context(ResetContext::DefaultIndex);
+        let ctx = self.get_context_mut(ContextType::Default)?;
 
-        let mut shuffle_context = ctx.clone();
         // we don't need to include the current track, because it is already being played
-        shuffle_context.tracks.remove(current_track);
+        ctx.skip_track = current_track;
+        ctx.tracks.shuffle();
 
-        let mut rng = rand::thread_rng();
-        shuffle_context.tracks.shuffle(&mut rng);
-        shuffle_context.index = ContextIndex::new();
-
-        self.shuffle_context = Some(shuffle_context);
-        self.set_active_context(ContextType::Shuffle);
-        self.fill_up_context = ContextType::Shuffle;
+        self.set_active_context(ContextType::Default);
+        self.fill_up_context = ContextType::Default;
         self.fill_up_next_tracks()?;
 
         Ok(())

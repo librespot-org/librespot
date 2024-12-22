@@ -4,13 +4,10 @@ use crate::{
         autoplay_context_request::AutoplayContextRequest, context::Context,
         transfer_state::TransferState,
     },
-    state::{
-        context::{ContextType, UpdateContext},
-        ConnectState,
-    },
+    state::{context::ContextType, ConnectState},
 };
-use std::cmp::PartialEq;
 use std::{
+    cmp::PartialEq,
     collections::{HashMap, VecDeque},
     fmt::{Display, Formatter},
     hash::Hash,
@@ -35,7 +32,7 @@ pub(super) enum ContextAction {
 pub(super) struct ResolveContext {
     resolve: Resolve,
     fallback: Option<String>,
-    update: UpdateContext,
+    update: ContextType,
     action: ContextAction,
 }
 
@@ -44,7 +41,7 @@ impl ResolveContext {
         Self {
             resolve: Resolve::Uri(uri.into()),
             fallback: None,
-            update: UpdateContext::Default,
+            update: ContextType::Default,
             action: ContextAction::Append,
         }
     }
@@ -52,7 +49,7 @@ impl ResolveContext {
     pub fn from_uri(
         uri: impl Into<String>,
         fallback: impl Into<String>,
-        update: UpdateContext,
+        update: ContextType,
         action: ContextAction,
     ) -> Self {
         let fallback_uri = fallback.into();
@@ -64,7 +61,7 @@ impl ResolveContext {
         }
     }
 
-    pub fn from_context(context: Context, update: UpdateContext, action: ContextAction) -> Self {
+    pub fn from_context(context: Context, update: ContextType, action: ContextAction) -> Self {
         Self {
             resolve: Resolve::Context(context),
             fallback: None,
@@ -214,7 +211,7 @@ impl ContextResolver {
         let (next, resolve_uri, _) = self.find_next().ok_or(ContextResolverError::NoNext)?;
 
         match next.update {
-            UpdateContext::Default => {
+            ContextType::Default => {
                 let mut ctx = self.session.spclient().get_context(resolve_uri).await;
                 if let Ok(ctx) = ctx.as_mut() {
                     ctx.uri = Some(next.context_uri().to_string());
@@ -223,7 +220,7 @@ impl ContextResolver {
 
                 ctx
             }
-            UpdateContext::Autoplay => {
+            ContextType::Autoplay => {
                 if resolve_uri.contains("spotify:show:") || resolve_uri.contains("spotify:episode:")
                 {
                     // autoplay is not supported for podcasts
@@ -304,13 +301,13 @@ impl ContextResolver {
         }
 
         match (next.update, state.active_context) {
-            (UpdateContext::Default, ContextType::Default) | (UpdateContext::Autoplay, _) => {
+            (ContextType::Default, ContextType::Default) | (ContextType::Autoplay, _) => {
                 debug!(
                     "last item of type <{:?}>, finishing state setup",
                     next.update
                 );
             }
-            (UpdateContext::Default, _) => {
+            (ContextType::Default, _) => {
                 debug!("skipped finishing default, because it isn't the active context");
                 return false;
             }
