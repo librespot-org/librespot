@@ -901,19 +901,19 @@ impl SpircTask {
                     .player_options_override
                     .as_ref()
                     .map(|o| o.shuffling_context)
-                    .unwrap_or_else(|| self.connect_state.shuffling_context());
+                    .unwrap_or_default();
                 let repeat = play
                     .options
                     .player_options_override
                     .as_ref()
                     .map(|o| o.repeating_context)
-                    .unwrap_or_else(|| self.connect_state.repeat_context());
+                    .unwrap_or_default();
                 let repeat_track = play
                     .options
                     .player_options_override
                     .as_ref()
                     .map(|o| o.repeating_track)
-                    .unwrap_or_else(|| self.connect_state.repeat_track());
+                    .unwrap_or_default();
 
                 self.handle_load(
                     SpircLoadCommand {
@@ -1107,6 +1107,8 @@ impl SpircTask {
     ) -> Result<(), Error> {
         self.connect_state
             .reset_context(ResetContext::WhenDifferent(&cmd.context_uri));
+
+        self.connect_state.reset_options();
 
         if !self.connect_state.is_active() {
             self.handle_activate();

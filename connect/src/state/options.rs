@@ -33,6 +33,12 @@ impl ConnectState {
         }
     }
 
+    pub fn reset_options(&mut self) {
+        self.set_shuffle(false);
+        self.set_repeat_track(false);
+        self.set_repeat_context(false);
+    }
+
     pub fn shuffle(&mut self) -> Result<(), Error> {
         if let Some(reason) = self
             .player()
