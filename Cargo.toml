@@ -1,7 +1,7 @@
 [package]
 name = "librespot"
 version = "0.6.0-dev"
-rust-version = "1.75"
+rust-version = "1.81"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
@@ -103,4 +103,4 @@ assets = [
 ]
 
 [workspace.package]
-rust-version = "1.75"
+rust-version = "1.81"

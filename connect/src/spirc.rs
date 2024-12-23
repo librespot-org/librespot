@@ -132,7 +132,7 @@ enum SpircCommand {
     Shuffle(bool),
     Repeat(bool),
     RepeatTrack(bool),
-    Disconnect,
+    Disconnect { pause: bool },
     SetPosition(u32),
     SetVolume(u16),
     Activate,
@@ -314,8 +314,8 @@ impl Spirc {
     pub fn set_position_ms(&self, position_ms: u32) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetPosition(position_ms))?)
     }
-    pub fn disconnect(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::Disconnect)?)
+    pub fn disconnect(&self, pause: bool) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Disconnect { pause })?)
     }
     pub fn activate(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Activate)?)
@@ -441,20 +441,17 @@ impl SpircTask {
                         error!("error updating connect state for volume update: {why}")
                     }
                 },
-                else => break
+                else => break,
             }
         }
 
         if !self.shutdown && self.connect_state.is_active() {
-            if let Err(why) = self.notify().await {
-                warn!("notify before unexpected shutdown couldn't be send: {why}")
+            warn!("unexpected shutdown");
+            if let Err(why) = self.handle_disconnect().await {
+                error!("error during disconnecting: {why}")
             }
         }
 
-        // clears the session id, leaving an empty state
-        if let Err(why) = self.session.spclient().delete_connect_state_request().await {
-            warn!("deleting connect_state failed before unexpected shutdown: {why}")
-        }
         self.session.dealer().close().await;
     }
 
@@ -654,7 +651,10 @@ impl SpircTask {
                     self.handle_volume_down();
                     self.notify().await
                 }
-                SpircCommand::Disconnect => {
+                SpircCommand::Disconnect { pause } => {
+                    if pause {
+                        self.handle_pause()
+                    }
                     self.handle_disconnect().await?;
                     self.notify().await
                 }
@@ -1154,14 +1154,17 @@ impl SpircTask {
     }
 
     async fn handle_disconnect(&mut self) -> Result<(), Error> {
-        self.handle_stop();
-
-        self.play_status = SpircPlayStatus::Stopped {};
         self.connect_state
             .update_position_in_relation(self.now_ms());
         self.notify().await?;
 
         self.connect_state.became_inactive(&self.session).await?;
+
+        // this should clear the active session id, leaving an empty state
+        self.session
+            .spclient()
+            .delete_connect_state_request()
+            .await?;
 
         self.player
             .emit_session_disconnected_event(self.session.connection_id(), self.session.username());
@@ -1561,7 +1564,7 @@ impl SpircTask {
             );
 
             if self.session.session_id() != session.session_id {
-                self.session.set_session_id(session.session_id.clone());
+                self.session.set_session_id(&session.session_id);
                 self.connect_state.set_session_id(session.session_id);
             }
         } else {

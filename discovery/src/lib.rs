@@ -396,7 +396,7 @@ fn launch_libmdns(
 
     let task_handle = tokio::task::spawn_blocking(move || {
         let inner = move || -> Result<(), DiscoveryError> {
-            let svc = if !zeroconf_ip.is_empty() {
+            let responder = if !zeroconf_ip.is_empty() {
                 libmdns::Responder::spawn_with_ip_list(
                     &tokio::runtime::Handle::current(),
                     zeroconf_ip,
@@ -404,9 +404,9 @@ fn launch_libmdns(
             } else {
                 libmdns::Responder::spawn(&tokio::runtime::Handle::current())
             }
-            .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))
-            .unwrap()
-            .register(
+            .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?;
+
+            let svc = responder.register(
                 DNS_SD_SERVICE_NAME.to_owned(),
                 name.into_owned(),
                 port,

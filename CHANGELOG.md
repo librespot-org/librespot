@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- [core] MSRV is now 1.81 (breaking)
 - [connect] Replaced `ConnectConfig` with `ConnectStateConfig` (breaking)
 - [connect] Replaced `playing_track_index` field of `SpircLoadCommand` with `playing_track` (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [connect] Add `seek_to` field to `SpircLoadCommand` (breaking)
 - [connect] Add `repeat_track` field to `SpircLoadCommand` (breaking)
+- [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
 
@@ -29,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Fix "Invalid Credentials" when using a Keymaster access token and
   client ID on Android platform.
 - [connect] Fix "play" command not handled if missing "offset" property
+- [discovery] Fix libmdns zerconf setup errors not propagating to the main task.
 
 ### Removed
 

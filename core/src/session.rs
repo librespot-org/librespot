@@ -389,7 +389,7 @@ impl Session {
         self.0.data.read().session_id.clone()
     }
 
-    pub fn set_session_id(&self, session_id: String) {
+    pub fn set_session_id(&self, session_id: &str) {
         session_id.clone_into(&mut self.0.data.write().session_id);
     }
 
