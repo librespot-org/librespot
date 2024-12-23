@@ -19,7 +19,7 @@ mod server {
         default_path = "/",
         gen_blocking = false
     )]
-    trait Server {
+    pub trait Server {
         /// EntryGroupNew method
         #[zbus(object = "super::entry_group::EntryGroup")]
         fn entry_group_new(&self);
@@ -53,9 +53,7 @@ mod entry_group {
     }
 
     impl zvariant::Type for EntryGroupState {
-        fn signature() -> zvariant::Signature<'static> {
-            zvariant::Signature::try_from("i").unwrap()
-        }
+        const SIGNATURE: &'static zvariant::Signature = &zvariant::Signature::I32;
     }
 
     #[zbus::proxy(
@@ -63,7 +61,7 @@ mod entry_group {
         default_service = "org.freedesktop.Avahi",
         gen_blocking = false
     )]
-    trait EntryGroup {
+    pub trait EntryGroup {
         /// AddAddress method
         fn add_address(
             &self,
