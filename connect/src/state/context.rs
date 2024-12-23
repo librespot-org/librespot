@@ -34,7 +34,7 @@ pub enum ContextType {
     Autoplay,
 }
 
-#[derive(Debug, PartialEq, Hash, Copy, Clone)]
+#[derive(Debug, Hash, Copy, Clone, PartialEq, Eq)]
 pub enum UpdateContext {
     Default,
     Autoplay,

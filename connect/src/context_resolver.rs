@@ -1,35 +1,37 @@
-use crate::state::context::ContextType;
 use crate::{
     core::{Error, Session},
     protocol::{
         autoplay_context_request::AutoplayContextRequest,
         player::{Context, TransferState},
     },
-    state::{context::UpdateContext, ConnectState},
+    state::{
+        context::{ContextType, UpdateContext},
+        ConnectState,
+    },
 };
 use std::cmp::PartialEq;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::{Display, Formatter},
-    hash::{Hash, Hasher},
+    hash::Hash,
     time::Duration,
 };
 use thiserror::Error as ThisError;
 use tokio::time::Instant;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum Resolve {
     Uri(String),
     Context(Context),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(super) enum ContextAction {
     Append,
     Replace,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub(super) struct ResolveContext {
     resolve: Resolve,
     fallback: Option<String>,
@@ -100,26 +102,6 @@ impl Display for ResolveContext {
             self.context_uri(),
             self.update,
         )
-    }
-}
-
-impl PartialEq for ResolveContext {
-    fn eq(&self, other: &Self) -> bool {
-        let eq_context = self.context_uri() == other.context_uri();
-        let eq_resolve = self.resolve_uri() == other.resolve_uri();
-        let eq_autoplay = self.update == other.update;
-
-        eq_context && eq_resolve && eq_autoplay
-    }
-}
-
-impl Eq for ResolveContext {}
-
-impl Hash for ResolveContext {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.context_uri().hash(state);
-        self.resolve_uri().hash(state);
-        self.update.hash(state);
     }
 }
 
