@@ -140,21 +140,21 @@ impl ConnectState {
     }
 
     pub fn get_context_uri_from_context(context: &Context) -> Option<&str> {
-        match Self::valid_resolve_uri(&context.uri) {
-            Some(uri) => Some(uri),
-            None => context
+        Self::valid_resolve_uri(&context.uri).or_else(|| {
+            context
                 .pages
                 .first()
-                .and_then(|p| p.tracks.first().map(|t| t.uri.as_ref())),
-        }
+                .and_then(|p| p.tracks.first().map(|t| t.uri.as_ref()))
+        })
     }
 
     pub fn set_active_context(&mut self, new_context: ContextType) {
         self.active_context = new_context;
 
         let player = self.player_mut();
-        player.context_metadata.clear();
-        player.restrictions.clear();
+
+        player.context_metadata = Default::default();
+        player.restrictions = Some(Default::default()).into();
 
         let ctx = match self.get_context(new_context) {
             Err(why) => {

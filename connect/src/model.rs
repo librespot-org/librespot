@@ -26,7 +26,7 @@ pub enum PlayingTrack {
 impl TryFrom<SkipTo> for PlayingTrack {
     type Error = ();
 
-    fn try_from(value: SkipTo) -> Result<Self, ()> {
+    fn try_from(value: SkipTo) -> Result<Self, Self::Error> {
         // order of checks is important, as the index can be 0, but still has an uid or uri provided,
         // so we only use the index as last resort
         if let Some(uri) = value.track_uri {

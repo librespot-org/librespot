@@ -198,11 +198,9 @@ impl ContextResolver {
 
     pub fn remove_used_and_invalid(&mut self) {
         if let Some((_, _, remove)) = self.find_next() {
-            for _ in 0..remove {
-                let _ = self.queue.pop_front();
-            }
+            let _ = self.queue.drain(0..remove); // remove invalid
         }
-        self.queue.pop_front();
+        self.queue.pop_front(); // remove used
     }
 
     pub fn clear(&mut self) {
@@ -210,18 +208,17 @@ impl ContextResolver {
     }
 
     fn find_next(&self) -> Option<(&ResolveContext, &str, usize)> {
-        let mut idx = 0;
-        loop {
+        for idx in 0..self.queue.len() {
             let next = self.queue.get(idx)?;
             match next.resolve_uri() {
-                None if idx < self.queue.len() => {
-                    warn!("skipped {idx} because of no valid resolve_uri: {next}");
-                    idx += 1;
+                None => {
+                    warn!("skipped {idx} because of invalid resolve_uri: {next}");
                     continue;
                 }
-                value => break value.map(|uri| (next, uri, idx)),
+                Some(uri) => return Some((next, uri, idx)),
             }
         }
+        None
     }
 
     pub fn has_next(&self) -> bool {
