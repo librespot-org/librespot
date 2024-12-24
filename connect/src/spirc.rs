@@ -37,6 +37,7 @@ use futures_util::StreamExt;
 use protobuf::MessageField;
 use std::{
     future::Future,
+    ops::Deref,
     sync::atomic::{AtomicUsize, Ordering},
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -934,6 +935,7 @@ impl SpircTask {
                         shuffle,
                         repeat,
                         repeat_track,
+                        autoplay: false,
                     },
                     Some(play.context),
                 )
@@ -1127,7 +1129,6 @@ impl SpircTask {
             self.handle_activate();
         }
 
-        let current_context_uri = self.connect_state.context_uri();
         let fallback = if let Some(ref ctx) = context {
             match ConnectState::get_context_uri_from_context(ctx) {
                 Some(ctx_uri) => ctx_uri,
@@ -1137,6 +1138,16 @@ impl SpircTask {
             &cmd.context_uri
         };
 
+        let update_context = if cmd.autoplay {
+            UpdateContext::Autoplay
+        } else {
+            UpdateContext::Default
+        };
+
+        self.connect_state
+            .set_active_context(*update_context.deref());
+
+        let current_context_uri = self.connect_state.context_uri();
         if current_context_uri == &cmd.context_uri && fallback == cmd.context_uri {
             debug!("context <{current_context_uri}> didn't change, no resolving required")
         } else {
@@ -1145,7 +1156,7 @@ impl SpircTask {
             self.context_resolver.add(ResolveContext::from_uri(
                 &cmd.context_uri,
                 fallback,
-                UpdateContext::Default,
+                update_context,
                 ContextAction::Replace,
             ));
             let context = self.context_resolver.get_next_context(Vec::new).await;

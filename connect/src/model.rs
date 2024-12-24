@@ -9,10 +9,15 @@ pub struct SpircLoadCommand {
     pub shuffle: bool,
     pub repeat: bool,
     pub repeat_track: bool,
+    /// Decides if the context or the autoplay of the context is played
+    ///
+    /// ## Remarks:
+    /// If `true` is provided, the option values (`shuffle`, `repeat` and `repeat_track`) are ignored
+    pub autoplay: bool,
     /// Decides the starting position in the given context
     ///
     /// ## Remarks:
-    /// If none is provided and shuffle true, a random track is played, otherwise the first
+    /// If `None` is provided and `shuffle` is `true`, a random track is played, otherwise the first
     pub playing_track: Option<PlayingTrack>,
 }
 
