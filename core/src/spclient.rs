@@ -10,12 +10,13 @@ use crate::{
     config::SessionConfig,
     error::ErrorKind,
     protocol::{
-        canvaz::EntityCanvazRequest,
+        autoplay_context_request::AutoplayContextRequest,
         clienttoken_http::{
             ChallengeAnswer, ChallengeType, ClientTokenRequest, ClientTokenRequestType,
             ClientTokenResponse, ClientTokenResponseType,
         },
         connect::PutStateRequest,
+        context::Context,
         extended_metadata::BatchedEntityRequest,
     },
     token::Token,
@@ -32,7 +33,6 @@ use hyper::{
     HeaderMap, Method, Request,
 };
 use hyper_util::client::legacy::ResponseFuture;
-use librespot_protocol::{autoplay_context_request::AutoplayContextRequest, player::Context};
 use protobuf::{Enum, Message, MessageFull};
 use rand::RngCore;
 use sysinfo::System;
@@ -715,13 +715,6 @@ impl SpClient {
 
     // TODO: Seen-in-the-wild but unimplemented endpoints
     // - /presence-view/v1/buddylist
-
-    // TODO: Find endpoint for newer canvas.proto and upgrade to that.
-    pub async fn get_canvases(&self, request: EntityCanvazRequest) -> SpClientResult {
-        let endpoint = "/canvaz-cache/v0/canvases";
-        self.request_with_protobuf(&Method::POST, endpoint, None, &request)
-            .await
-    }
 
     pub async fn get_extended_metadata(&self, request: BatchedEntityRequest) -> SpClientResult {
         let endpoint = "/extended-metadata/v0/extended-metadata";

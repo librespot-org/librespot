@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -27,11 +27,11 @@ message PreparePlayOptions {
 }
 
 enum PrefetchLevel {
-    kNone = 0;
-    kMedia = 1;
+    NONE = 0;
+    MEDIA = 1;
 }
 
 enum AudioStream {
-    kDefault = 0;
-    kAlarm = 1;
+    DEFAULT = 0;
+    ALARM = 1;
 }

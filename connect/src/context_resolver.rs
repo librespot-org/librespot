@@ -1,8 +1,8 @@
 use crate::{
     core::{Error, Session},
     protocol::{
-        autoplay_context_request::AutoplayContextRequest,
-        player::{Context, TransferState},
+        autoplay_context_request::AutoplayContextRequest, context::Context,
+        transfer_state::TransferState,
     },
     state::{
         context::{ContextType, UpdateContext},
@@ -88,7 +88,7 @@ impl ResolveContext {
     fn context_uri(&self) -> &str {
         match self.resolve {
             Resolve::Uri(ref uri) => uri,
-            Resolve::Context(ref ctx) => &ctx.uri,
+            Resolve::Context(ref ctx) => ctx.uri.as_deref().unwrap_or_default(),
         }
     }
 }
@@ -217,8 +217,8 @@ impl ContextResolver {
             UpdateContext::Default => {
                 let mut ctx = self.session.spclient().get_context(resolve_uri).await;
                 if let Ok(ctx) = ctx.as_mut() {
-                    ctx.uri = next.context_uri().to_string();
-                    ctx.url = format!("context://{}", ctx.uri);
+                    ctx.uri = Some(next.context_uri().to_string());
+                    ctx.url = ctx.uri.as_ref().map(|s| format!("context://{s}"));
                 }
 
                 ctx

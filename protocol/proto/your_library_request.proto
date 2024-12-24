@@ -1,18 +1,59 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.your_library.proto;
 
-import "your_library_pseudo_playlist_config.proto";
+import "your_library_config.proto";
 
+option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
+option java_package = "spotify.your_library.esperanto.proto";
+
+message YourLibraryTagFilter {
+    string tag_uri = 1;
+}
+
+message CuratedItems {
+    enum CuratedItemsFilter {
+        NONE = 0;
+        GROUP_BY = 1;
+        ONLY_CURATED = 2;
+        ONLY_NOT_CURATED = 3;
+    }
+
+    repeated string items = 1;
+    CuratedItemsFilter filter = 2;
+}
 
 message YourLibraryRequestHeader {
     bool remaining_entities = 9;
+    bool total_count = 18;
+    string lower_bound = 10;
+    int32 skip = 11;
+    int32 length = 12;
+    string text_filter = 13;
+    YourLibraryFilters filters = 14;
+    YourLibrarySortOrder sort_order = 15;
+    bool all_playlists = 17;
+    repeated int64 fill_folders = 34;
+    bool separate_pinned_items = 22;
+    bool num_link_types_in_playlists = 25;
+    bool ignore_pinning = 26;
+    CuratedItems curated_items = 29;
+    bool include_events = 30;
+    bool include_prereleases = 31;
+    bool include_authors = 33;
+    oneof maybe_folder_id {
+        int64 folder_id = 16;
+    }
+    oneof maybe_tag_filter {
+        .spotify.your_library.proto.YourLibraryTagFilter tag_filter = 24;
+    }
 }
 
 message YourLibraryRequest {
     YourLibraryRequestHeader header = 1;
     YourLibraryPseudoPlaylistConfig pseudo_playlist_config = 4;
+    int32 update_throttling = 5;
 }

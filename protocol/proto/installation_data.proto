@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -12,7 +12,7 @@ message InstallationEntity {
 }
 
 message InstallationData {
-    string installation_id = 1;
-    string last_seen_device_id = 2;
+    bytes installation_id = 1;
+    bytes last_seen_device_id = 2;
     int64 monotonic_clock_id = 3;
 }

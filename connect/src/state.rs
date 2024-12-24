@@ -8,20 +8,24 @@ mod tracks;
 mod transfer;
 
 use crate::model::SpircPlayStatus;
-use crate::state::{
-    context::{ContextType, ResetContext, StateContext},
-    provider::{IsProvider, Provider},
+use crate::{
+    core::{
+        config::DeviceType, date::Date, dealer::protocol::Request, spclient::SpClientResult,
+        version, Error, Session,
+    },
+    protocol::{
+        connect::{Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest},
+        player::{
+            ContextIndex, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack,
+            Suppressions,
+        },
+    },
+    state::{
+        context::{ContextType, ResetContext, StateContext},
+        provider::{IsProvider, Provider},
+    },
 };
-use librespot_core::{
-    config::DeviceType, date::Date, dealer::protocol::Request, spclient::SpClientResult, version,
-    Error, Session,
-};
-use librespot_protocol::connect::{
-    Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest,
-};
-use librespot_protocol::player::{
-    ContextIndex, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack, Suppressions,
-};
+
 use log::LevelFilter;
 use protobuf::{EnumOrUnknown, MessageField};
 use std::{
@@ -39,20 +43,21 @@ const SPOTIFY_MAX_NEXT_TRACKS_SIZE: usize = 80;
 pub enum StateError {
     #[error("the current track couldn't be resolved from the transfer state")]
     CouldNotResolveTrackFromTransfer,
-    #[error("message field {0} was not available")]
-    MessageFieldNone(String),
     #[error("context is not available. type: {0:?}")]
     NoContext(ContextType),
     #[error("could not find track {0:?} in context of {1}")]
     CanNotFindTrackInContext(Option<usize>, usize),
     #[error("currently {action} is not allowed because {reason}")]
-    CurrentlyDisallowed { action: String, reason: String },
+    CurrentlyDisallowed {
+        action: &'static str,
+        reason: String,
+    },
     #[error("the provided context has no tracks")]
     ContextHasNoTracks,
     #[error("playback of local files is not supported")]
     UnsupportedLocalPlayBack,
-    #[error("track uri <{0}> contains invalid characters")]
-    InvalidTrackUri(String),
+    #[error("track uri <{0:?}> contains invalid characters")]
+    InvalidTrackUri(Option<String>),
 }
 
 impl From<StateError> for Error {
@@ -60,7 +65,6 @@ impl From<StateError> for Error {
         use StateError::*;
         match err {
             CouldNotResolveTrackFromTransfer
-            | MessageFieldNone(_)
             | NoContext(_)
             | CanNotFindTrackInContext(_, _)
             | ContextHasNoTracks

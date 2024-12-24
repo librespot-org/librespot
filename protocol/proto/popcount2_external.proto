@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -7,24 +7,29 @@ package spotify.popcount2.proto;
 option optimize_for = CODE_SIZE;
 
 message PopcountRequest {
-    
 }
 
 message PopcountResult {
     optional sint64 count = 1;
     optional bool truncated = 2;
     repeated string user = 3;
+    repeated string userid = 6;
+    optional int64 raw_count = 7;
+    optional bool count_hidden_from_users = 8;
 }
 
 message PopcountUserUpdate {
     optional string user = 1;
     optional sint64 timestamp = 2;
     optional bool added = 3;
+    optional string userid = 4;
 }
 
-message PopcountUpdate {
-    repeated PopcountUserUpdate updates = 1;
-    optional sint64 common_timestamp = 2;
-    optional sint64 remove_older_than_timestamp = 3;
-    optional bool verify_counter = 4;
+message PopcountFollowerResult {
+    optional bool is_truncated = 1;
+    repeated bytes user_id = 2;
+}
+
+message PopcountSetFollowerCounterValueRequest {
+    optional int64 count = 1;
 }

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -9,24 +9,15 @@ import "collection_index.proto";
 
 option optimize_for = CODE_SIZE;
 
-message YourLibraryShowWrapper {
-    collection.proto.CollectionAlbumLikeEntry show = 1;
-    string uri = 2;
-}
-
-message YourLibraryBookWrapper {
-    collection.proto.CollectionAlbumLikeEntry book = 1;
-    string uri = 2;
-}
-
 message YourLibraryEntity {
-    bool pinned = 1;
-    
     oneof entity {
-        collection.proto.CollectionAlbumLikeEntry album = 2;
-        collection.proto.CollectionArtistEntry artist = 3;
-        YourLibraryRootlistEntity rootlist_entity = 4;
-        YourLibraryShowWrapper show = 7;
-        YourLibraryBookWrapper book = 8;
+        collection.proto.CollectionAlbumEntry album = 1;
+        collection.proto.CollectionArtistEntry artist = 2;
+        YourLibraryRootlistEntity rootlist_entity = 3;
+        collection.proto.CollectionShowEntry show = 4;
+        collection.proto.CollectionBookEntry book = 5;
+        YourLibraryPreReleaseEntity prerelease = 6;
+        YourLibraryEventEntity event = 7;
+        collection.proto.CollectionAuthorEntry author = 9;
     }
 }

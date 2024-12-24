@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -34,5 +34,4 @@ message Response {
     optional bool loading_contents = 4;
     optional string offline = 5;
     optional uint32 sync_progress = 6;
-    repeated GroupHeader group_index = 7;
 }

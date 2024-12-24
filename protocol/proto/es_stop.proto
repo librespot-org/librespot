@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -13,13 +13,13 @@ option java_package = "com.spotify.player.esperanto.proto";
 
 message StopRequest {
     CommandOptions options = 1;
-    
-    Reason reason = 2;
+
+    StopRequest.Reason reason = 2;
     enum Reason {
         INTERACTIVE = 0;
         REMOTE_TRANSFER = 1;
         SHUTDOWN = 2;
     }
-    
+
     LoggingParams logging_params = 3;
 }

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -15,4 +15,5 @@ enum PlayabilityRestriction {
     AGE_RESTRICTED = 3;
     NOT_IN_CATALOGUE = 4;
     NOT_AVAILABLE_OFFLINE = 5;
+    PREMIUM_ONLY = 6;
 }

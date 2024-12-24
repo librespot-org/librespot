@@ -3,4 +3,6 @@
 
 mod impl_trait;
 
+mod conversion;
+
 include!(concat!(env!("OUT_DIR"), "/mod.rs"));

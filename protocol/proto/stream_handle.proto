@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -8,5 +8,6 @@ option objc_class_prefix = "ESP";
 option java_package = "com.spotify.stream_reporting_esperanto.proto";
 
 message StreamHandle {
-    string playback_id = 1;
+    reserved 1;
+    uint32 raw_handle = 2;
 }

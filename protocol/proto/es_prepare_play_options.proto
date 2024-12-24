@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -21,19 +21,19 @@ message PreparePlayOptions {
     bool system_initiated = 6;
     ContextPlayerOptionOverrides player_options_override = 7;
     repeated string suppressions = 8;
-    
+
     PrefetchLevel prefetch_level = 9;
     enum PrefetchLevel {
         NONE = 0;
         MEDIA = 1;
     }
-    
+
     AudioStream audio_stream = 10;
     enum AudioStream {
         DEFAULT = 0;
         ALARM = 1;
     }
-    
+
     string session_id = 11;
     string license = 12;
     map<string, string> configuration_override = 13;

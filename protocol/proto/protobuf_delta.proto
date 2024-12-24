@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -14,7 +14,7 @@ message Delta {
         DELETE = 0;
         INSERT = 1;
     }
-    
+
     required uint32 index = 2;
     required uint32 length = 3;
 }

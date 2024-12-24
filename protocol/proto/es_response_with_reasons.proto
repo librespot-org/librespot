@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -9,13 +9,13 @@ option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.player.esperanto.proto";
 
 message ResponseWithReasons {
-    Error error = 1;
     enum Error {
         OK = 0;
         FORBIDDEN = 1;
         NOT_FOUND = 2;
         CONFLICT = 3;
     }
-    
+
+    Error error = 1;
     string reasons = 2;
 }

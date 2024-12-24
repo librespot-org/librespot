@@ -1,9 +1,10 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.playlist_esperanto.proto;
 
+import "google/protobuf/duration.proto";
 import "policy/playlist_request_decoration_policy.proto";
 import "playlist_query.proto";
 import "playlist_request.proto";
@@ -20,7 +21,30 @@ message PlaylistGetRequest {
     playlist.cosmos.proto.PlaylistRequestDecorationPolicy policy = 3;
 }
 
+message PlaylistMultiGetSingleRequest {
+    string id = 1;
+    PlaylistGetRequest request = 2;
+}
+
+message PlaylistMultiGetRequest {
+    repeated PlaylistMultiGetSingleRequest requests = 1;
+    google.protobuf.Duration timeout = 2;
+}
+
 message PlaylistGetResponse {
     ResponseStatus status = 1;
     playlist.cosmos.playlist_request.proto.Response data = 2;
+    PlaylistQuery query = 3;
 }
+
+message PlaylistMultiGetSingleResponse {
+    string id = 1;
+    string uri = 2;
+    PlaylistGetResponse response = 3;
+}
+
+message PlaylistMultiGetResponse {
+    ResponseStatus status = 1;
+    repeated PlaylistMultiGetSingleResponse responses = 2;
+}
+

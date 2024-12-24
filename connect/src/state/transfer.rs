@@ -1,9 +1,13 @@
-use crate::state::context::ContextType;
-use crate::state::metadata::Metadata;
-use crate::state::provider::{IsProvider, Provider};
-use crate::state::{ConnectState, StateError};
-use librespot_core::Error;
-use librespot_protocol::player::{ProvidedTrack, TransferState};
+use crate::{
+    core::Error,
+    protocol::{player::ProvidedTrack, transfer_state::TransferState},
+    state::{
+        context::ContextType,
+        metadata::Metadata,
+        provider::{IsProvider, Provider},
+        {ConnectState, StateError},
+    },
+};
 use protobuf::MessageField;
 
 impl ConnectState {
@@ -11,7 +15,7 @@ impl ConnectState {
         &self,
         transfer: &TransferState,
     ) -> Result<ProvidedTrack, Error> {
-        let track = if transfer.queue.is_playing_queue {
+        let track = if transfer.queue.is_playing_queue.unwrap_or_default() {
             transfer.queue.tracks.first()
         } else {
             transfer.playback.current_track.as_ref()
@@ -20,9 +24,13 @@ impl ConnectState {
 
         self.context_to_provided_track(
             track,
-            Some(&transfer.current_session.context.uri),
+            transfer.current_session.context.uri.as_deref(),
             None,
-            transfer.queue.is_playing_queue.then_some(Provider::Queue),
+            transfer
+                .queue
+                .is_playing_queue
+                .unwrap_or_default()
+                .then_some(Provider::Queue),
         )
     }
 
@@ -34,23 +42,22 @@ impl ConnectState {
         player.is_buffering = false;
 
         if let Some(options) = transfer.options.take() {
-            player.options = MessageField::some(options);
+            player.options = MessageField::some(options.into());
         }
-        player.is_paused = transfer.playback.is_paused;
-        player.is_playing = !transfer.playback.is_paused;
+        player.is_paused = transfer.playback.is_paused.unwrap_or_default();
+        player.is_playing = !player.is_paused;
 
-        if transfer.playback.playback_speed != 0. {
-            player.playback_speed = transfer.playback.playback_speed
-        } else {
-            player.playback_speed = 1.;
+        match transfer.playback.playback_speed {
+            Some(speed) if speed != 0. => player.playback_speed = speed,
+            _ => player.playback_speed = 1.,
         }
 
         if let Some(session) = transfer.current_session.as_mut() {
-            player.play_origin = session.play_origin.take().into();
-            player.suppressions = session.suppressions.take().into();
+            player.play_origin = session.play_origin.take().map(Into::into).into();
+            player.suppressions = session.suppressions.take().map(Into::into).into();
 
             if let Some(mut ctx) = session.context.take() {
-                player.restrictions = ctx.restrictions.take().into();
+                player.restrictions = ctx.restrictions.take().map(Into::into).into();
                 for (key, value) in ctx.metadata {
                     player.context_metadata.insert(key, value);
                 }
@@ -89,11 +96,10 @@ impl ConnectState {
 
         let ctx = self.get_context(self.active_context)?;
 
-        let current_index = if track.is_queue() {
-            Self::find_index_in_context(ctx, |c| c.uid == transfer.current_session.current_uid)
-                .map(|i| if i > 0 { i - 1 } else { i })
-        } else {
-            Self::find_index_in_context(ctx, |c| c.uri == track.uri || c.uid == track.uid)
+        let current_index = match transfer.current_session.current_uid.as_ref() {
+            Some(uid) if track.is_queue() => Self::find_index_in_context(ctx, |c| &c.uid == uid)
+                .map(|i| if i > 0 { i - 1 } else { i }),
+            _ => Self::find_index_in_context(ctx, |c| c.uri == track.uri || c.uid == track.uid),
         };
 
         debug!(
@@ -118,7 +124,7 @@ impl ConnectState {
         );
 
         for (i, track) in transfer.queue.tracks.iter().enumerate() {
-            if transfer.queue.is_playing_queue && i == 0 {
+            if transfer.queue.is_playing_queue.unwrap_or_default() && i == 0 {
                 // if we are currently playing from the queue,
                 // don't add the first queued item, because we are currently playing that item
                 continue;

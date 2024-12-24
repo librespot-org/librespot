@@ -1,0 +1,23 @@
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "state_restore/play_history.proto";
+import "state_restore/player_model.proto";
+import "state_restore/mft_state.proto";
+import "state_restore/mft_context_history.proto";
+import "state_restore/mft_fallback_page_history.proto";
+import "state_restore/pns_capper.proto";
+
+message ContextPlayerRestorable {
+  reserved 8;
+  required int32 version = 1;
+  optional string version_suffix = 2;
+  required PlayerModel player_model = 3;
+  required PlayHistory play_history = 4;
+  required MftState mft_can_play_checker = 5;
+  required MftContextHistory mft_context_history = 6;
+  required MftFallbackPageHistory mft_fallback_page_history = 7;
+  optional PnsCapper pns_capper = 9;
+}
+

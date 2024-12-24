@@ -12,7 +12,7 @@ pub struct SpircLoadCommand {
     /// Decides the starting position in the given context
     ///
     /// ## Remarks:
-    /// If none is provided and shuffle true, a random track is played, otherwise the first  
+    /// If none is provided and shuffle true, a random track is played, otherwise the first
     pub playing_track: Option<PlayingTrack>,
 }
 

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -14,6 +14,7 @@ message PodcastAds {
     repeated string file_ids = 1;
     repeated string manifest_ids = 2;
     repeated Segment segments = 3;
+    string request_id = 4;
 }
 
 message Segment {

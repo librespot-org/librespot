@@ -1,9 +1,10 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
 package spotify.cosmos_util.proto;
 
+import "metadata/extension.proto";
 import "metadata/image_group.proto";
 
 option java_multiple_files = true;
@@ -30,6 +31,7 @@ message TrackArtistMetadata {
 
 message TrackDescriptor {
     optional string name = 1;
+    optional float weight = 2;
 }
 
 message TrackMetadata {
@@ -52,4 +54,7 @@ message TrackMetadata {
     optional uint32 popularity = 17;
     optional bool is_19_plus_only = 18;
     repeated TrackDescriptor track_descriptors = 19;
+    repeated Extension extension = 20;
+    optional bool is_curated = 21;
+    optional bool to_be_obfuscated = 22;
 }
