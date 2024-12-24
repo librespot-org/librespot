@@ -17,14 +17,18 @@ impl ConnectState {
         const ENDLESS_CONTEXT: &str = "endless_context";
 
         let prev_tracks_is_empty = self.prev_tracks().is_empty();
+
+        let is_paused = self.is_pause();
+        let is_playing = self.is_playing();
+
         let player = self.player_mut();
         if let Some(restrictions) = player.restrictions.as_mut() {
-            if player.is_playing {
+            if is_playing {
                 restrictions.disallow_pausing_reasons.clear();
                 restrictions.disallow_resuming_reasons = vec!["not_paused".to_string()]
             }
 
-            if player.is_paused {
+            if is_paused {
                 restrictions.disallow_resuming_reasons.clear();
                 restrictions.disallow_pausing_reasons = vec!["not_playing".to_string()]
             }
