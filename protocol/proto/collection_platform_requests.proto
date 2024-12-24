@@ -1,9 +1,14 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.collection_platform.proto;
 
+import "collection_platform_items.proto";
+
+option java_package = "com.spotify.collection_platform.esperanto.proto";
+option java_multiple_files = true;
+option objc_class_prefix = "ESP";
 option optimize_for = CODE_SIZE;
 
 message CollectionPlatformItemsRequest {
@@ -11,11 +16,21 @@ message CollectionPlatformItemsRequest {
     repeated string items = 2;
 }
 
+message CollectionPlatformContextItemsRequest {
+    CollectionSet set = 1;
+    repeated CollectionPlatformContextItem items = 2;
+}
+
 enum CollectionSet {
     UNKNOWN = 0;
-    SHOW = 1;
-    BAN = 2;
-    LISTENLATER = 3;
     IGNOREINRECS = 4;
     ENHANCED = 5;
+    BANNED_ARTISTS = 8;
+    CONCERTS = 10;
+    TAGS = 11;
+    PRERELEASE = 12;
+    MARKED_AS_FINISHED = 13;
+    NOT_INTERESTED = 14;
+    LOCAL_BANS = 15;
 }
+

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package spotify.stream_reporting_esperanto.proto;
+
+option java_package = "com.spotify.stream_reporting_esperanto.proto";
+option objc_class_prefix = "ESP";
+
+enum PlaybackState {
+  ACTIVE = 0;
+  PAUSED = 1;
+  SUSPENDED = 2;
+  INVALID_PLAYBACK_STATE = 3;
+}
+

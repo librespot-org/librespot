@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -6,8 +6,6 @@ package spotify.cosmos_util.proto;
 
 import "metadata/extension.proto";
 import "metadata/image_group.proto";
-import "podcast_segments.proto";
-import "podcast_subscription.proto";
 
 option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
@@ -21,6 +19,9 @@ message EpisodeShowMetadata {
 }
 
 message EpisodeMetadata {
+    reserved 20;
+    reserved 21;
+
     optional EpisodeShowMetadata show = 1;
     optional string link = 2;
     optional string name = 3;
@@ -32,20 +33,20 @@ message EpisodeMetadata {
     optional ImageGroup freeze_frames = 9;
     optional string language = 10;
     optional bool available = 11;
-    
+
     optional MediaType media_type_enum = 12;
     enum MediaType {
         VODCAST = 0;
         AUDIO = 1;
         VIDEO = 2;
     }
-    
+
     optional int32 number = 13;
     optional bool backgroundable = 14;
     optional string preview_manifest_id = 15;
     optional bool is_explicit = 16;
     optional string preview_id = 17;
-    
+
     optional EpisodeType episode_type = 18;
     enum EpisodeType {
         UNKNOWN = 0;
@@ -53,11 +54,12 @@ message EpisodeMetadata {
         TRAILER = 2;
         BONUS = 3;
     }
-    
+
     optional bool is_music_and_talk = 19;
-    optional podcast_segments.PodcastSegments podcast_segments = 20;
-    optional podcast_paywalls.PodcastSubscription podcast_subscription = 21;
     repeated Extension extension = 22;
     optional bool is_19_plus_only = 23;
     optional bool is_book_chapter = 24;
+    optional bool is_podcast_short = 25;
+    optional bool is_curated = 26;
 }
+

@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -7,35 +7,35 @@ package spotify.remote_config.proto;
 option optimize_for = CODE_SIZE;
 
 message GranularConfiguration {
-    repeated AssignedPropertyValue properties = 1;
     message AssignedPropertyValue {
         Platform platform = 7;
         string client_id = 4;
         string component_id = 5;
         int64 groupId = 8;
         string name = 6;
-        
         oneof structured_value {
             BoolValue bool_value = 1;
             IntValue int_value = 2;
             EnumValue enum_value = 3;
         }
-        
+
         message BoolValue {
             bool value = 1;
         }
-        
+
         message IntValue {
             int32 value = 1;
         }
-        
+
         message EnumValue {
             string value = 1;
         }
     }
-    
+
+    repeated AssignedPropertyValue properties = 1;
     int64 rcs_fetch_time = 2;
     string configuration_assignment_id = 3;
+    string etag = 10;
 }
 
 message PolicyGroupId {
@@ -44,57 +44,55 @@ message PolicyGroupId {
 }
 
 message ClientPropertySet {
-    string client_id = 1;
-    string version = 2;
-    repeated PropertyDefinition properties = 5;
-    
-    repeated ComponentInfo component_infos = 6;
     message ComponentInfo {
+        reserved "owner";
+        reserved "tags";
+        reserved 1;
+        reserved 2;
         string name = 3;
-        
-        //reserved 1, 2, "owner", "tags";
     }
-    
-    string property_set_key = 7;
-    
-    PublisherInfo publisherInfo = 8;
+
     message PublisherInfo {
         string published_for_client_version = 1;
         int64 published_at = 2;
     }
+
+    string client_id = 1;
+    string version = 2;
+    repeated PropertyDefinition properties = 5;
+    repeated ComponentInfo component_infos = 6;
+    string property_set_key = 7;
+    PublisherInfo publisherInfo = 8;
 }
 
 message PropertyDefinition {
-    string description = 2;
-    string component_id = 3;
-    Platform platform = 8;
-    
-    oneof identifier {
-        string id = 9;
-        string name = 7;
-    }
-    
-    oneof spec {
-        BoolSpec bool_spec = 4;
-        IntSpec int_spec = 5;
-        EnumSpec enum_spec = 6;
-    }
-    
     reserved 1;
-    
     message BoolSpec {
         bool default = 1;
     }
-    
+
     message IntSpec {
         int32 default = 1;
         int32 lower = 2;
         int32 upper = 3;
     }
-    
+
     message EnumSpec {
         string default = 1;
         repeated string values = 2;
+    }
+
+    string description = 2;
+    string component_id = 3;
+    Platform platform = 8;
+    oneof identifier {
+        string id = 9;
+        string name = 7;
+    }
+    oneof spec {
+        BoolSpec bool_spec = 4;
+        IntSpec int_spec = 5;
+        EnumSpec enum_spec = 6;
     }
 }
 

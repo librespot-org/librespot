@@ -1,6 +1,11 @@
-use crate::deserialize_with::*;
-use librespot_protocol::player::{
-    Context, ContextPlayerOptionOverrides, PlayOrigin, ProvidedTrack, TransferState,
+use crate::{
+    deserialize_with::*,
+    protocol::{
+        context::Context,
+        context_player_options::ContextPlayerOptionOverrides,
+        player::{PlayOrigin, ProvidedTrack},
+        transfer_state::TransferState,
+    },
 };
 use serde::Deserialize;
 use serde_json::Value;

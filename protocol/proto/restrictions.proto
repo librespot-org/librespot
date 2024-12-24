@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -6,7 +6,17 @@ package spotify.player.proto;
 
 option optimize_for = CODE_SIZE;
 
+message ModeRestrictions {
+    map<string, RestrictionReasons> values = 1;
+}
+
+message RestrictionReasons {
+    repeated string reasons = 1;
+}
+
 message Restrictions {
+    reserved 24;
+
     repeated string disallow_pausing_reasons = 1;
     repeated string disallow_resuming_reasons = 2;
     repeated string disallow_seeking_reasons = 3;
@@ -28,4 +38,9 @@ message Restrictions {
     repeated string disallow_removing_from_next_tracks_reasons = 19;
     repeated string disallow_removing_from_context_tracks_reasons = 20;
     repeated string disallow_updating_context_reasons = 21;
+    repeated string disallow_add_to_queue_reasons = 22;
+    repeated string disallow_setting_playback_speed = 23;
+    map<string, ModeRestrictions> disallow_setting_modes = 25;
+    map<string, RestrictionReasons> disallow_signals = 26;
 }
+

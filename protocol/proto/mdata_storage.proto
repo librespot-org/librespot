@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -23,6 +23,7 @@ message CacheInfo {
     string etag = 5;
     fixed64 cache_checksum_lo = 6;
     fixed64 cache_checksum_hi = 7;
+    uint64 last_modified = 8;
 }
 
 message OfflineLock {

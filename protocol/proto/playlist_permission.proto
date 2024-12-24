@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -13,6 +13,24 @@ message Permission {
     optional PermissionLevel permission_level = 2;
 }
 
+message GrantableLevels {
+    repeated PermissionLevel base = 1;
+    repeated PermissionLevel member = 2;
+}
+
+message AttributeCapabilities {
+    optional bool can_edit = 1;
+}
+
+message ListAttributeCapabilities {
+    optional AttributeCapabilities name = 1;
+    optional AttributeCapabilities description = 2;
+    optional AttributeCapabilities picture = 3;
+    optional AttributeCapabilities collaborative = 4;
+    optional AttributeCapabilities deleted_by_owner = 6;
+    optional AttributeCapabilities ai_curation_reference_id = 15;
+}
+
 message Capabilities {
     optional bool can_view = 1;
     optional bool can_administrate_permissions = 2;
@@ -20,6 +38,8 @@ message Capabilities {
     optional bool can_edit_metadata = 4;
     optional bool can_edit_items = 5;
     optional bool can_cancel_membership = 6;
+    optional GrantableLevels grantable_levels = 7;
+    optional ListAttributeCapabilities list_attribute_capabilities = 8;
 }
 
 message CapabilitiesMultiRequest {
@@ -29,11 +49,17 @@ message CapabilitiesMultiRequest {
     optional string fallback_uri = 4;
 }
 
+message CapabilitiesRequestOptions {
+    optional bool can_view_only = 1;
+}
+
 message CapabilitiesRequest {
     optional string username = 1;
     optional string user_id = 2;
     optional string uri = 3;
     optional bool user_is_owner = 4;
+    optional string permission_grant_token = 5;
+    optional CapabilitiesRequestOptions request_options = 6;
 }
 
 message CapabilitiesMultiResponse {
@@ -82,9 +108,29 @@ message PermissionGrant {
     optional PermissionGrantOptions permission_grant_options = 2;
 }
 
+message PermissionGrantDetails {
+    optional bool permission_level_downgraded = 1;
+}
+
+message PermissionGrantDescription {
+    enum ClaimFailReason {
+        CLAIM_FAIL_REASON_UNSPECIFIED = 0;
+        CLAIM_FAIL_REASON_ANONYMOUS = 1;
+        CLAIM_FAIL_REASON_NO_GRANT_FOUND = 2;
+        CLAIM_FAIL_REASON_GRANT_EXPIRED = 3;
+    }
+
+    optional PermissionGrantOptions permission_grant_options = 1;
+    optional ClaimFailReason claim_fail_reason = 2;
+    optional bool is_effective = 3;
+    optional Capabilities capabilities = 4;
+    repeated PermissionGrantDetails details = 5;
+}
+
 message ClaimPermissionGrantResponse {
     optional Permission user_permission = 1;
     optional Capabilities capabilities = 2;
+    repeated PermissionGrantDetails details = 3;
 }
 
 message ResponseStatus {
@@ -92,9 +138,42 @@ message ResponseStatus {
     optional string status_message = 2;
 }
 
+message PermissionIdentifier {
+    required PermissionIdentifierKind kind = 1;
+    optional string user_id = 2;
+}
+
+message PermissionEntry {
+    optional PermissionIdentifier identifier = 1;
+    optional Permission permission = 2;
+}
+
+message CreateInitialPermissions {
+    repeated PermissionEntry permission_entry = 1;
+}
+
+message CreateInitialPermissionsResponse {
+    repeated PermissionEntry permission_entry = 1;
+}
+
+message DefaultOwnerCapabilitiesResponse {
+    optional Capabilities capabilities = 1;
+}
+
 enum PermissionLevel {
     UNKNOWN = 0;
     BLOCKED = 1;
     VIEWER = 2;
     CONTRIBUTOR = 3;
+    MADE_FOR = 4;
 }
+
+enum PermissionIdentifierKind {
+    PERMISSION_IDENTIFIER_KIND_UNSPECIFIED = 0;
+    PERMISSION_IDENTIFIER_KIND_BASE = 1;
+    PERMISSION_IDENTIFIER_KIND_MEMBER = 2;
+    PERMISSION_IDENTIFIER_KIND_ABUSE = 3;
+    PERMISSION_IDENTIFIER_KIND_PROFILE = 4;
+    PERMISSION_IDENTIFIER_KIND_AUTHORIZED = 5;
+}
+

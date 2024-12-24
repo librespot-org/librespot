@@ -1,0 +1,9 @@
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+message AutomixRules {
+  required bool automix = 1;
+  required string current_track_uri = 2;
+}
+

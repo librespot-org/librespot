@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- [core] Removed `get_canvases` from SpClient (breaking)
+- [metadata] Removed `genres` from Album (breaking)
+- [metadata] Removed `genre` from Artists (breaking)
+
 ## [0.6.0] - 2024-10-30
 
 This version takes another step into the direction of the HTTP API, fixes a

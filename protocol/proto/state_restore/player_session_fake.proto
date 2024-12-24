@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package spotify.player.proto.state_restore;
+
+import "context.proto";
+import "state_restore/context_player_state.proto";
+
+message PlayerSessionFake {
+  required ContextPlayerState player_state = 1;
+  required Context player_context = 2;
+  required bool is_finished = 3;
+}
+

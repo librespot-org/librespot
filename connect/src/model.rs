@@ -1,6 +1,6 @@
 use crate::state::ConnectState;
 use librespot_core::dealer::protocol::SkipTo;
-use librespot_protocol::player::Context;
+use librespot_protocol::context::Context;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
@@ -77,7 +77,7 @@ impl ResolveContext {
         let fallback_uri = fallback.into();
         Self {
             context: Context {
-                uri: uri.into(),
+                uri: Some(uri.into()),
                 ..Default::default()
             },
             fallback: (!fallback_uri.is_empty()).then_some(fallback_uri),
@@ -114,7 +114,7 @@ impl ResolveContext {
 
         Self {
             context: Context {
-                uri,
+                uri: Some(uri),
                 ..Default::default()
             },
             fallback: None,
@@ -134,7 +134,7 @@ impl ResolveContext {
 
     /// the actual context uri
     pub fn context_uri(&self) -> &str {
-        &self.context.uri
+        self.context.uri.as_deref().unwrap_or_default()
     }
 
     pub fn autoplay(&self) -> bool {
@@ -150,7 +150,7 @@ impl Display for ResolveContext {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "resolve_uri: <{:?}>, context_uri: <{}>, autoplay: <{}>, update: <{}>",
+            "resolve_uri: <{:?}>, context_uri: <{:?}>, autoplay: <{}>, update: <{}>",
             self.resolve_uri(),
             self.context.uri,
             self.autoplay,

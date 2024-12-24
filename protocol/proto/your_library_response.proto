@@ -1,23 +1,48 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.your_library.proto;
 
 import "your_library_decorated_entity.proto";
+import "your_library_config.proto";
 
+option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
+option java_package = "spotify.your_library.esperanto.proto";
+
+message YourLibraryTagPlaylist {
+    string name = 1;
+    string uri = 2;
+    string description = 3;
+    string image_uri = 4;
+    proto.Offline.Availability offline_availability = 5;
+    bool is_curated = 6;
+    bool is_loading = 7;
+}
+
+message YourLibraryTagInfo {
+    string tag_name = 1;
+    bool is_added = 5;
+    YourLibraryTagPlaylist tag_playlist_info = 7;
+}
 
 message YourLibraryResponseHeader {
     int32 remaining_entities = 9;
+    int32 total_count = 17;
+    int32 pin_count = 18;
+    int32 maximum_pinned_items = 19;
     bool is_loading = 12;
-    YourLibraryAvailableEntityTypes has = 13;
-    YourLibraryAvailableEntityTypes has_downloaded = 14;
     string folder_name = 15;
+    string parent_folder_uri = 20;
+    YourLibraryFilters available_filters = 16;
+    YourLibraryTagInfo tag_info = 21;
 }
 
 message YourLibraryResponse {
     YourLibraryResponseHeader header = 1;
     repeated YourLibraryDecoratedEntity entity = 2;
+    repeated YourLibraryDecoratedEntity pinned_entity = 3;
+    int32 status_code = 98;
     string error = 99;
 }

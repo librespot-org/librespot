@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.61.583 (Windows)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -7,13 +7,47 @@ package spotify.playlist.cosmos.proto;
 import "policy/playlist_decoration_policy.proto";
 import "policy/playlist_episode_decoration_policy.proto";
 import "policy/playlist_track_decoration_policy.proto";
+import "policy/supported_link_types_in_playlists.proto";
+import "extension_kind.proto";
 
 option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
 option java_package = "com.spotify.playlist.policy.proto";
 
+message ItemExtensionPolicy {
+    LinkType link_type = 1;
+    extendedmetadata.ExtensionKind extension = 2;
+}
+
+message ItemOfflineStateDecorationPolicy {
+    bool offline_state = 1;
+    bool sync_progress = 2;
+    bool locally_playable = 3;
+}
+
+message ItemMetadataPolicy {
+    bool name = 1;
+    bool image = 2;
+    bool is_explicit = 3;
+}
+
+message ItemCurationStatePolicy {
+    bool is_curated = 1;
+}
+
+message PlaylistItemDecorationPolicy {
+    bool uri = 1;
+    repeated ItemExtensionPolicy extension_policy = 2;
+    ItemOfflineStateDecorationPolicy offline_state = 3;
+    bool collection_state = 4;
+    ItemMetadataPolicy metadata = 5;
+    ItemCurationStatePolicy curation_state = 6;
+    bool obfuscation_state = 7;
+}
+
 message PlaylistRequestDecorationPolicy {
     PlaylistDecorationPolicy playlist = 1;
     PlaylistTrackDecorationPolicy track = 2;
     PlaylistEpisodeDecorationPolicy episode = 3;
+    PlaylistItemDecorationPolicy item = 4;
 }

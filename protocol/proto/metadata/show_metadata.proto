@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
@@ -28,4 +28,5 @@ message ShowMetadata {
     optional bool is_music_and_talk = 14;
     repeated Extension extension = 15;
     optional bool is_book = 16;
+    optional bool is_creator_channel = 17;
 }

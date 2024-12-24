@@ -1,25 +1,42 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
 package spotify.your_library.proto;
 
+option java_package = "spotify.your_library.esperanto.proto";
+option java_multiple_files = true;
 option optimize_for = CODE_SIZE;
 
 message PinRequest {
     string uri = 1;
+    oneof position {
+        string after_uri = 2;
+        string before_uri = 3;
+        bool first = 4;
+    }
+}
+
+message MovePinRequest {
+    string move_uri = 1;
+    oneof position {
+        string after_uri = 2;
+        string before_uri = 3;
+        bool first = 4;
+    }
 }
 
 message PinResponse {
-    PinStatus status = 1;
     enum PinStatus {
         UNKNOWN = 0;
         PINNED = 1;
         NOT_PINNED = 2;
     }
-    
+
+    PinStatus status = 1;
     bool has_maximum_pinned_items = 2;
     int32 maximum_pinned_items = 3;
+    uint32 status_code = 98;
     string error = 99;
 }
 
@@ -28,7 +45,3 @@ message PinItem {
     bool in_library = 2;
 }
 
-message PinList {
-    repeated PinItem item = 1;
-    string error = 99;
-}

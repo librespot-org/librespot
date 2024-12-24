@@ -1,4 +1,4 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto3";
 
@@ -22,6 +22,7 @@ message ArtistCollectionDecorationPolicy {
     bool num_albums_in_collection = 4;
     bool is_banned = 5;
     bool can_ban = 6;
+    bool num_explicitly_liked_tracks = 8;
 }
 
 message ArtistSyncDecorationPolicy {

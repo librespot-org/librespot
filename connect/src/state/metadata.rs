@@ -1,4 +1,4 @@
-use librespot_protocol::player::{ContextTrack, ProvidedTrack};
+use librespot_protocol::{context_track::ContextTrack, player::ProvidedTrack};
 use std::collections::HashMap;
 
 const CONTEXT_URI: &str = "context_uri";

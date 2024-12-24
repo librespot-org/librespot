@@ -1,16 +1,72 @@
-// Extracted from: Spotify 1.1.73.517 (macOS)
+// Extracted from: Spotify 1.2.52.442 (windows)
 
 syntax = "proto2";
 
 package spotify.player.proto.state_restore;
 
-import "state_restore/context_player_rules_base.proto";
-import "state_restore/mft_rules.proto";
+import "state_restore/ads_rules_inject_tracks.proto";
+import "state_restore/automix_rules.proto";
+import "state_restore/automix_talk_rules.proto";
+import "state_restore/behavior_metadata_rules.proto";
+import "state_restore/circuit_breaker_rules.proto";
+import "state_restore/explicit_content_rules.proto";
+import "state_restore/kitteh_box_rules.proto";
+import "state_restore/mft_rules_core.proto";
+import "state_restore/mod_rules_interruptions.proto";
+import "state_restore/music_injection_rules.proto";
+import "state_restore/remove_banned_tracks_rules.proto";
+import "state_restore/resume_points_rules.proto";
+import "state_restore/track_error_rules.proto";
 
 option optimize_for = CODE_SIZE;
 
-message ContextPlayerRules {
-    optional ContextPlayerRulesBase base = 1;
-    optional MftRules mft_rules = 2;
-    map<string, ContextPlayerRulesBase> sub_rules = 3;
+message PlayEvents {
+    required uint64 max_consecutive = 1;
+    required uint64 max_occurrences_in_period = 2;
+    required int64 period = 3;
 }
+
+message SkipEvents {
+    required uint64 max_occurrences_in_period = 1;
+    required int64 period = 2;
+}
+
+message Context {
+    required uint64 min_tracks = 1;
+}
+
+message MftConfiguration {
+    optional PlayEvents track = 1;
+    optional PlayEvents album = 2;
+    optional PlayEvents artist = 3;
+    optional SkipEvents skip = 4;
+    optional Context context = 5;
+    optional PlayEvents social_track = 6;
+}
+
+message MftRules {
+    required bool locked = 1;
+    optional MftConfiguration config = 2;
+    map<string, ContextPlayerRules> old_forward_rules = 3;
+    optional ContextPlayerRules forward_rules = 4;
+}
+
+message ContextPlayerRules {
+    optional BehaviorMetadataRules behavior_metadata_rules = 1;
+    optional CircuitBreakerRules circuit_breaker_rules = 2;
+    optional ExplicitContentRules explicit_content_rules = 3;
+    optional MusicInjectionRules music_injection_rules = 5;
+    optional RemoveBannedTracksRules remove_banned_tracks_rules = 6;
+    optional ResumePointsRules resume_points_rules = 7;
+    optional TrackErrorRules track_error_rules = 8;
+    optional AdsRulesInjectTracks ads_rules_inject_tracks = 9;
+    optional MftRulesCore mft_rules_core = 10;
+    optional ModRulesInterruptions mod_rules_interruptions = 11;
+    optional KittehBoxRules kitteh_box_rules = 12;
+    optional AutomixRules automix_rules = 13;
+    optional AutomixTalkRules automix_talk_rules = 14;
+    optional MftRules mft_rules = 15;
+    map<string, ContextPlayerRules> sub_rules = 16;
+    optional bool is_adaptor_only = 17;
+}
+
