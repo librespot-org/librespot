@@ -27,7 +27,7 @@ pub struct Show {
     pub media_type: ShowMediaType,
     pub consumption_order: ShowConsumptionOrder,
     pub availability: Availabilities,
-    pub trailer_uri: SpotifyId,
+    pub trailer_uri: Option<SpotifyId>,
     pub has_music_and_talk: bool,
     pub is_audiobook: bool,
 }
@@ -63,7 +63,12 @@ impl TryFrom<&<Self as Metadata>::Message> for Show {
             media_type: show.media_type(),
             consumption_order: show.consumption_order(),
             availability: show.availability.as_slice().try_into()?,
-            trailer_uri: SpotifyId::from_uri(show.trailer_uri())?,
+            trailer_uri: show
+                .trailer_uri
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .map(SpotifyId::from_uri)
+                .transpose()?,
             has_music_and_talk: show.music_and_talk(),
             is_audiobook: show.is_audiobook(),
         })
