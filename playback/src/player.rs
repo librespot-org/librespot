@@ -922,6 +922,10 @@ impl PlayerTrackLoader {
             AudioFileFormat::XHE_AAC_16 => 2.,
             AudioFileFormat::XHE_AAC_24 => 3.,
             AudioFileFormat::FLAC_FLAC_24BIT => 3.,
+            AudioFileFormat::UNKNOWN_FORMAT => {
+                error!("Unknown stream data rate");
+                return None;
+            }
         };
         let data_rate: f32 = kbps * 1024.;
         Some(data_rate.ceil() as usize)

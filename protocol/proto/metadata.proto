@@ -311,10 +311,11 @@ message AudioFile {
         XHE_AAC_16 = 19;
         XHE_AAC_12 = 20;
         FLAC_FLAC_24BIT = 22;
+        UNKNOWN_FORMAT = 255;
     }
 
     optional bytes file_id = 1;
-    optional Format format = 2;
+    optional Format format = 2 [default = UNKNOWN_FORMAT];
 }
 
 message Video {
