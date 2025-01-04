@@ -1,0 +1,36 @@
+name: build librespot debian package for stable
+
+on:
+  pull_request:
+  push:
+    paths-ignore:
+      - '*.md'
+
+jobs:
+  build-librespot-debs:
+    strategy:
+      matrix:
+        architecture: [amd64, armhf, arm64]
+
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: build-rust-deb-action
+      - uses: actions/checkout@v4
+        with:
+          repository: librespot-org/librespot
+          path: librespot
+      - uses: catango/build-rust-deb-action@master
+        id: build
+        with:
+          host-build-deps: libclang-14-dev cmake
+          target-build-deps: libasound2-dev
+          target-arch: ${{ matrix.architecture }}
+          # bindget-cli 0.71 breaks build
+          rust-buildtools: bindgen-cli@0.70.1
+          source-dir: librespot
+      - uses: actions/upload-artifact@v4
+        with:
+          name: librespot-${{ matrix.architecture }}
+          path: ${{ steps.build.outputs.artifact-dir }}

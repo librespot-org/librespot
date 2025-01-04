@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [build] Add Github workflow to build multiarch debian package
 - [connect] Add `seek_to` field to `SpircLoadCommand` (breaking)
 - [connect] Add `repeat_track` field to `SpircLoadCommand` (breaking)
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
