@@ -21,7 +21,6 @@ rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 librespot-core = { version = "0.8.0", path = "../core", default-features = false }
 librespot-protocol = { version = "0.8.0", path = "../protocol", default-features = false }
 
-async-trait = "0.1"
 bytes = "1"
 log = "0.4"
 protobuf = "3.7"
