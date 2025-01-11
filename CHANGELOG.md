@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [discovery] Fix libmdns zerconf setup errors not propagating to the main task.
 - [metadata] `Show::trailer_uri` is now optional since it isn't always present (breaking)
 - [connect] Handle transfer of playback with empty "uri" field
+- [connect] Correctly apply playing/paused state when transferring playback
 
 ### Removed
 
