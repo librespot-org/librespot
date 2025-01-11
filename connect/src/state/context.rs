@@ -342,7 +342,7 @@ impl ConnectState {
                 Err(StateError::InvalidTrackUri(Some(uri.clone())))?
             }
             (Some(uri), _) if !uri.is_empty() => SpotifyId::from_uri(uri)?,
-            (None, Some(gid)) if !gid.is_empty() => SpotifyId::from_raw(gid)?,
+            (_, Some(gid)) if !gid.is_empty() => SpotifyId::from_raw(gid)?,
             _ => Err(StateError::InvalidTrackUri(None))?,
         };
 
