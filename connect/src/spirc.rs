@@ -1140,7 +1140,7 @@ impl SpircTask {
             _ => 0,
         };
 
-        let is_playing = matches!(transfer.playback.is_paused, Some(is_playing) if is_playing);
+        let is_playing = !transfer.playback.is_paused();
 
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
             debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
