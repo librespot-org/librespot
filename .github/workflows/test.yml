@@ -241,7 +241,13 @@ jobs:
 
       - name: Install the cross compiler rust targets
         run: rustup target add ${{ matrix.target }}
-      
+
+      - name: Update and Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libclang1
+
+      - name: Install bindgen-cli
+        run: cargo install --force --locked bindgen-cli
+
       - name: Install cross compiler
         run: |
             if [ ${{ matrix.target }} = "armv7-unknown-linux-gnueabihf" ]; then
