@@ -273,7 +273,9 @@ jobs:
       - name: Fetch
         run: cargo fetch --locked
       - name: Build
-        run: cargo build --frozen --verbose --target ${{ matrix.target }} --no-default-features
+        run: |
+          cargo install bindgen-cli@0.70.1
+          cargo build --frozen --verbose --target ${{ matrix.target }} --no-default-features
       
       - name: Check binary
         run: file target/${{ matrix.target }}/debug/librespot
