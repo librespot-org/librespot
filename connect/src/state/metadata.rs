@@ -1,5 +1,6 @@
 use librespot_protocol::{context_track::ContextTrack, player::ProvidedTrack};
 use std::collections::HashMap;
+use std::fmt::Display;
 
 const CONTEXT_URI: &str = "context_uri";
 const ENTITY_URI: &str = "entity_uri";
@@ -9,58 +10,41 @@ const IS_AUTOPLAY: &str = "autoplay.is_autoplay";
 const HIDDEN: &str = "hidden";
 const ITERATION: &str = "iteration";
 
+macro_rules! metadata_entry {
+    ( $get:ident, $set:ident ($key:ident: $entry:ident)) => {
+        metadata_entry!( $get use get, $set ($key: $entry) -> Option<&String> );
+    };
+    ( $get_key:ident use $get:ident, $set:ident ($key:ident: $entry:ident) -> $ty:ty ) => {
+        fn $get_key (&self) -> $ty {
+            self.$get($entry)
+        }
+
+        fn $set (&mut self, $key: impl Display) {
+            self.metadata_mut().insert($entry.to_string(), $key.to_string());
+        }
+    };
+}
+
 #[allow(dead_code)]
 pub trait Metadata {
     fn metadata(&self) -> &HashMap<String, String>;
     fn metadata_mut(&mut self) -> &mut HashMap<String, String>;
 
-    fn is_from_queue(&self) -> bool {
-        matches!(self.metadata().get(IS_QUEUED), Some(is_queued) if is_queued.eq("true"))
+    fn get_bool(&self, entry: &str) -> bool {
+        matches!(self.metadata().get(entry), Some(entry) if entry.eq("true"))
     }
 
-    fn is_from_autoplay(&self) -> bool {
-        matches!(self.metadata().get(IS_AUTOPLAY), Some(is_autoplay) if is_autoplay.eq("true"))
+    fn get(&self, entry: &str) -> Option<&String> {
+        self.metadata().get(entry)
     }
 
-    fn is_hidden(&self) -> bool {
-        matches!(self.metadata().get(HIDDEN), Some(is_hidden) if is_hidden.eq("true"))
-    }
+    metadata_entry!(is_from_queue use get_bool, set_from_queue (is_queued: IS_QUEUED) -> bool);
+    metadata_entry!(is_from_autoplay use get_bool, set_from_autoplay (is_autoplay: IS_AUTOPLAY) -> bool);
+    metadata_entry!(is_hidden use get_bool, set_hidden (is_hidden: HIDDEN) -> bool);
 
-    fn get_context_uri(&self) -> Option<&String> {
-        self.metadata().get(CONTEXT_URI)
-    }
-
-    fn get_iteration(&self) -> Option<&String> {
-        self.metadata().get(ITERATION)
-    }
-
-    fn set_queued(&mut self, queued: bool) {
-        self.metadata_mut()
-            .insert(IS_QUEUED.to_string(), queued.to_string());
-    }
-
-    fn set_autoplay(&mut self, autoplay: bool) {
-        self.metadata_mut()
-            .insert(IS_AUTOPLAY.to_string(), autoplay.to_string());
-    }
-
-    fn set_hidden(&mut self, hidden: bool) {
-        self.metadata_mut()
-            .insert(HIDDEN.to_string(), hidden.to_string());
-    }
-
-    fn set_context_uri(&mut self, uri: String) {
-        self.metadata_mut().insert(CONTEXT_URI.to_string(), uri);
-    }
-
-    fn set_entity_uri(&mut self, uri: String) {
-        self.metadata_mut().insert(ENTITY_URI.to_string(), uri);
-    }
-
-    fn add_iteration(&mut self, iter: i64) {
-        self.metadata_mut()
-            .insert(ITERATION.to_string(), iter.to_string());
-    }
+    metadata_entry!(get_context_uri, set_context_uri (context_uri: CONTEXT_URI));
+    metadata_entry!(get_entity_uri, set_entity_uri (entity_uri: ENTITY_URI));
+    metadata_entry!(get_iteration, set_iteration (iteration: ITERATION));
 }
 
 impl Metadata for ContextTrack {

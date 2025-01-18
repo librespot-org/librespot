@@ -23,7 +23,7 @@ impl<'ct> ConnectState {
             ..Default::default()
         };
         delimiter.set_hidden(true);
-        delimiter.add_iteration(iteration);
+        delimiter.set_iteration(iteration);
 
         delimiter
     }
@@ -415,7 +415,7 @@ impl<'ct> ConnectState {
 
         track.set_provider(Provider::Queue);
         if !track.is_from_queue() {
-            track.set_queued(true);
+            track.set_from_queue(true);
         }
 
         let next_tracks = self.next_tracks_mut();

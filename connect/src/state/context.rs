@@ -480,7 +480,7 @@ impl ConnectState {
         }
 
         if matches!(provider, Provider::Autoplay) {
-            track.set_autoplay(true)
+            track.set_from_autoplay(true)
         }
 
         Ok(track)
