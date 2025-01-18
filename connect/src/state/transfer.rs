@@ -26,6 +26,7 @@ impl ConnectState {
             track,
             transfer.current_session.context.uri.as_deref(),
             None,
+            None,
             transfer
                 .queue
                 .is_playing_queue
@@ -133,6 +134,7 @@ impl ConnectState {
             if let Ok(queued_track) = self.context_to_provided_track(
                 track,
                 Some(self.context_uri()),
+                None,
                 None,
                 Some(Provider::Queue),
             ) {

@@ -220,6 +220,7 @@ impl ConnectState {
                     context.metadata,
                     context.restrictions.take(),
                     context.uri.as_deref(),
+                    Some(0),
                     None,
                 );
 
@@ -260,6 +261,7 @@ impl ConnectState {
                     context.metadata,
                     context.restrictions.take(),
                     context.uri.as_deref(),
+                    None,
                     Some(Provider::Autoplay),
                 ))
             }
@@ -342,6 +344,7 @@ impl ConnectState {
         metadata: HashMap<String, String>,
         restrictions: Option<Restrictions>,
         new_context_uri: Option<&str>,
+        context_length: Option<usize>,
         provider: Option<Provider>,
     ) -> StateContext {
         let new_context_uri = new_context_uri.unwrap_or(self.context_uri());
@@ -349,10 +352,12 @@ impl ConnectState {
         let tracks = page
             .tracks
             .iter()
-            .flat_map(|track| {
+            .enumerate()
+            .flat_map(|(i, track)| {
                 match self.context_to_provided_track(
                     track,
                     Some(new_context_uri),
+                    context_length.map(|l| l + i),
                     Some(&page.metadata),
                     provider.clone(),
                 ) {
@@ -432,6 +437,7 @@ impl ConnectState {
         &self,
         ctx_track: &ContextTrack,
         context_uri: Option<&str>,
+        context_index: Option<usize>,
         page_metadata: Option<&HashMap<String, String>>,
         provider: Option<Provider>,
     ) -> Result<ProvidedTrack, Error> {
@@ -475,8 +481,12 @@ impl ConnectState {
         };
 
         if let Some(context_uri) = context_uri {
-            track.set_context_uri(context_uri.to_string());
-            track.set_entity_uri(context_uri.to_string());
+            track.set_entity_uri(context_uri);
+            track.set_context_uri(context_uri);
+        }
+
+        if let Some(index) = context_index {
+            track.set_context_index(index);
         }
 
         if matches!(provider, Provider::Autoplay) {
@@ -487,7 +497,9 @@ impl ConnectState {
     }
 
     pub fn fill_context_from_page(&mut self, page: ContextPage) -> Result<(), Error> {
-        let context = self.state_context_from_page(page, HashMap::new(), None, None, None);
+        let ctx_len = self.context.as_ref().map(|c| c.tracks.len());
+        let context = self.state_context_from_page(page, HashMap::new(), None, None, ctx_len, None);
+
         let ctx = self
             .context
             .as_mut()

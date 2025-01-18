@@ -142,12 +142,10 @@ impl<'ct> ConnectState {
             self.set_active_context(ContextType::Autoplay);
             None
         } else {
-            let ctx = self.get_context(ContextType::Default)?;
-            let new_index = Self::find_index_in_context(ctx, |c| c.uri == new_track.uri);
-            match new_index {
-                Ok(new_index) => Some(new_index as u32),
-                Err(why) => {
-                    error!("didn't find the track in the current context: {why}");
+            match new_track.get_context_index() {
+                Some(new_index) => Some(new_index as u32),
+                None => {
+                    error!("the given context track had no set context_index");
                     None
                 }
             }
