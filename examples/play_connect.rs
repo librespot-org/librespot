@@ -84,7 +84,7 @@ async fn main() {
                 repeat: false,
                 repeat_track: false,
                 // the index specifies which track in the context starts playing, in this case the first in the album
-                playing_track: PlayingTrack::Index(0),
+                playing_track: PlayingTrack::Index(0).into(),
             })
             .unwrap();
     });
