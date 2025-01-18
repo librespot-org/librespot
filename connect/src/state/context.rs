@@ -366,7 +366,7 @@ impl ConnectState {
             .collect::<Vec<_>>();
 
         StateContext {
-            tracks: ShuffleVec::new(tracks),
+            tracks: tracks.into(),
             skip_track: None,
             restrictions,
             metadata,

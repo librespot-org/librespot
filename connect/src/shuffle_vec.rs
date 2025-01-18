@@ -1,13 +1,19 @@
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use std::{
     ops::{Deref, DerefMut},
     vec::IntoIter,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ShuffleVec<T> {
     vec: Vec<T>,
     indices: Option<Vec<usize>>,
+}
+
+impl<T: PartialEq> PartialEq for ShuffleVec<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.vec == other.vec
+    }
 }
 
 impl<T> Deref for ShuffleVec<T> {
@@ -33,18 +39,36 @@ impl<T> IntoIterator for ShuffleVec<T> {
     }
 }
 
-impl<T> ShuffleVec<T> {
-    pub fn new(vec: Vec<T>) -> Self {
+impl<T> From<Vec<T>> for ShuffleVec<T> {
+    fn from(vec: Vec<T>) -> Self {
         Self { vec, indices: None }
     }
+}
 
-    pub fn shuffle(&mut self) {
+impl<T> Default for ShuffleVec<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> ShuffleVec<T> {
+    pub fn new() -> Self {
+        Self {
+            vec: Vec::new(),
+            indices: None,
+        }
+    }
+
+    pub fn shuffle_with_seed(&mut self, seed: u64) {
+        self.shuffle_with_rng(rand::rngs::StdRng::seed_from_u64(seed))
+    }
+
+    pub fn shuffle_with_rng(&mut self, mut rng: impl Rng) {
         if self.indices.is_some() {
             self.unshuffle()
         }
 
         let indices = {
-            let mut rng = rand::thread_rng();
             (1..self.vec.len())
                 .rev()
                 .map(|i| rng.gen_range(0..i + 1))
@@ -68,5 +92,32 @@ impl<T> ShuffleVec<T> {
             let n = indices[self.vec.len() - i - 1];
             self.vec.swap(n, i);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::shuffle_vec::ShuffleVec;
+    use rand::Rng;
+
+    #[test]
+    fn test_shuffle_with_seed() {
+        let seed = rand::thread_rng().gen_range(0..10000000000000);
+
+        let vec = (0..100).collect::<Vec<_>>();
+        let base_vec: ShuffleVec<i32> = vec.into();
+
+        let mut shuffled_vec = base_vec.clone();
+        shuffled_vec.shuffle_with_seed(seed);
+
+        let mut different_shuffled_vec = base_vec.clone();
+        different_shuffled_vec.shuffle_with_seed(seed);
+
+        assert_eq!(shuffled_vec, different_shuffled_vec);
+
+        let mut unshuffled_vec = shuffled_vec.clone();
+        unshuffled_vec.unshuffle();
+
+        assert_eq!(base_vec, unshuffled_vec);
     }
 }

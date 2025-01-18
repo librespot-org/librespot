@@ -63,7 +63,7 @@ impl ConnectState {
 
         // we don't need to include the current track, because it is already being played
         ctx.skip_track = current_track;
-        ctx.tracks.shuffle();
+        ctx.tracks.shuffle_with_rng(rand::thread_rng());
 
         self.set_active_context(ContextType::Default);
         self.fill_up_context = ContextType::Default;
