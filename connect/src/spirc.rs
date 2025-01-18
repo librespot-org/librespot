@@ -1193,9 +1193,11 @@ impl SpircTask {
             cmd.shuffle, cmd.repeat, cmd.repeat_track
         );
 
-        self.connect_state.set_shuffle(cmd.shuffle);
-        self.connect_state.set_repeat_context(cmd.repeat);
-        self.connect_state.set_repeat_track(cmd.repeat_track);
+        self.connect_state.set_shuffle(!cmd.autoplay && cmd.shuffle);
+        self.connect_state
+            .set_repeat_context(!cmd.autoplay && cmd.repeat);
+        self.connect_state
+            .set_repeat_track(!cmd.autoplay && cmd.repeat_track);
 
         if cmd.shuffle {
             if let Some(index) = index {
