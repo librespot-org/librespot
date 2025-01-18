@@ -249,6 +249,14 @@ impl<'ct> ConnectState {
                 self.queue_count += 1;
             });
 
+        // when you drag 'n drop the current track in the queue view into the "Next from: ..."
+        // section, it is only send as an empty item with just the provider and metadata, so we have
+        // to provide set the uri from the current track manually
+        tracks
+            .iter_mut()
+            .filter(|t| t.uri.is_empty())
+            .for_each(|t| t.uri = self.current_track(|ct| ct.uri.clone()));
+
         self.player_mut().next_tracks = tracks;
     }
 
