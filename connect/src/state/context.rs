@@ -107,6 +107,7 @@ impl ConnectState {
         }
 
         if let Ok(ctx) = self.get_context_mut(ContextType::Default) {
+            ctx.remove_shuffle_seed();
             ctx.tracks.unshuffle()
         }
 

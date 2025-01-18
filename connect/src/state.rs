@@ -117,6 +117,8 @@ pub struct ConnectState {
 
     /// the context from which we play, is used to top up prev and next tracks
     context: Option<StateContext>,
+    /// seed extracted in [ConnectState::handle_initial_transfer] and used in [ConnectState::finish_transfer]
+    transfer_shuffle_seed: Option<String>,
 
     /// a context to keep track of the autoplay context
     autoplay_context: Option<StateContext>,

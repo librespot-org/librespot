@@ -746,9 +746,6 @@ impl SpircTask {
 
         use protobuf::Message;
 
-        // todo: handle received pages from transfer, important to not always shuffle the first 10 tracks
-        //  also important when the dealer is restarted, currently we just shuffle again, but at least
-        //  the 10 tracks provided should be used and after that the new shuffle context
         match TransferState::parse_from_bytes(&cluster.transfer_data) {
             Ok(transfer_state) => self.handle_transfer(transfer_state)?,
             Err(why) => error!("failed to take over control: {why}"),
@@ -1205,7 +1202,7 @@ impl SpircTask {
             if self.context_resolver.has_next() {
                 self.connect_state.update_queue_revision()
             } else {
-                self.connect_state.shuffle()?;
+                self.connect_state.shuffle(None)?;
                 self.add_autoplay_resolving_when_required();
             }
         } else {

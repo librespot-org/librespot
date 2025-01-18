@@ -53,11 +53,16 @@ impl ConnectState {
             _ => player.playback_speed = 1.,
         }
 
+        let mut shuffle_seed = None;
         if let Some(session) = transfer.current_session.as_mut() {
             player.play_origin = session.play_origin.take().map(Into::into).into();
             player.suppressions = session.suppressions.take().map(Into::into).into();
 
             if let Some(mut ctx) = session.context.take() {
+                if let Some(seed) = ctx.get_shuffle_seed() {
+                    let _ = shuffle_seed.insert(seed.clone());
+                }
+
                 player.restrictions = ctx.restrictions.take().map(Into::into).into();
                 for (key, value) in ctx.metadata {
                     player.context_metadata.insert(key, value);
@@ -73,6 +78,8 @@ impl ConnectState {
                 player.context_metadata.insert(key, value);
             }
         }
+
+        self.transfer_shuffle_seed = shuffle_seed;
 
         self.clear_prev_track();
         self.clear_next_tracks();
@@ -143,9 +150,14 @@ impl ConnectState {
         }
 
         if self.shuffling_context() {
+            let previous_seed = self
+                .transfer_shuffle_seed
+                .take()
+                .and_then(|s| s.parse().ok());
+
             self.set_current_track(current_index.unwrap_or_default())?;
             self.set_shuffle(true);
-            self.shuffle()?;
+            self.shuffle(previous_seed)?;
         } else {
             self.reset_playback_to_position(current_index)?;
         }

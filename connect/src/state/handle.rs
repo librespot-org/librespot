@@ -13,7 +13,7 @@ impl ConnectState {
         self.set_shuffle(shuffle);
 
         if shuffle {
-            return self.shuffle();
+            return self.shuffle(None);
         }
 
         self.reset_context(ResetContext::DefaultIndex);

@@ -1,10 +1,14 @@
-use crate::state::context::ResetContext;
 use crate::{
     core::Error,
     protocol::player::ContextPlayerOptions,
-    state::{context::ContextType, ConnectState, StateError},
+    state::{
+        context::{ContextType, ResetContext},
+        metadata::Metadata,
+        ConnectState, StateError,
+    },
 };
 use protobuf::MessageField;
+use rand::Rng;
 
 impl ConnectState {
     fn add_options_if_empty(&mut self) {
@@ -40,7 +44,7 @@ impl ConnectState {
         self.set_repeat_context(false);
     }
 
-    pub fn shuffle(&mut self) -> Result<(), Error> {
+    pub fn shuffle(&mut self, seed: Option<u64>) -> Result<(), Error> {
         if let Some(reason) = self
             .player()
             .restrictions
@@ -63,7 +67,12 @@ impl ConnectState {
 
         // we don't need to include the current track, because it is already being played
         ctx.skip_track = current_track;
-        ctx.tracks.shuffle_with_rng(rand::thread_rng());
+
+        let seed = seed
+            .unwrap_or_else(|| rand::thread_rng().gen_range(100_000_000_000..1_000_000_000_000));
+
+        ctx.tracks.shuffle_with_seed(seed);
+        ctx.set_shuffle_seed(seed);
 
         self.set_active_context(ContextType::Default);
         self.fill_up_context = ContextType::Default;

@@ -317,7 +317,7 @@ impl ContextResolver {
         let res = if let Some(transfer_state) = transfer_state.take() {
             state.finish_transfer(transfer_state)
         } else if state.shuffling_context() {
-            state.shuffle()
+            state.shuffle(None)
         } else if matches!(active_ctx, Ok(ctx) if ctx.index.track == 0) {
             // has context, and context is not touched
             // when the index is not zero, the next index was already evaluated elsewhere
