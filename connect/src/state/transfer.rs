@@ -58,11 +58,21 @@ impl ConnectState {
             player.play_origin = session.play_origin.take().map(Into::into).into();
             player.suppressions = session.suppressions.take().map(Into::into).into();
 
-            if let Some(mut ctx) = session.context.take() {
-                if let Some(seed) = ctx.get_shuffle_seed() {
-                    let _ = shuffle_seed.insert(seed.clone());
-                }
+            // maybe at some point we can use the shuffle seed provided by spotify,
+            // but I doubt it, as spotify doesn't use true randomness but rather an algorithm
+            // based shuffle
+            trace!(
+                "shuffle_seed: <{:?}> (spotify), <{:?}> (own)",
+                session.shuffle_seed,
+                session.context.get_shuffle_seed()
+            );
 
+            shuffle_seed = session
+                .context
+                .get_shuffle_seed()
+                .and_then(|seed| seed.parse().ok());
+
+            if let Some(mut ctx) = session.context.take() {
                 player.restrictions = ctx.restrictions.take().map(Into::into).into();
                 for (key, value) in ctx.metadata {
                     player.context_metadata.insert(key, value);
@@ -150,13 +160,10 @@ impl ConnectState {
         }
 
         if self.shuffling_context() {
-            let previous_seed = self
-                .transfer_shuffle_seed
-                .take()
-                .and_then(|s| s.parse().ok());
-
             self.set_current_track(current_index.unwrap_or_default())?;
             self.set_shuffle(true);
+
+            let previous_seed = self.transfer_shuffle_seed.take();
             self.shuffle(previous_seed)?;
         } else {
             self.reset_playback_to_position(current_index)?;
