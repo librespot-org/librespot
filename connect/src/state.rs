@@ -15,6 +15,7 @@ use crate::{
     },
     protocol::{
         connect::{Capabilities, Device, DeviceInfo, MemberType, PutStateReason, PutStateRequest},
+        media::AudioQuality,
         player::{
             ContextIndex, ContextPlayerOptions, PlayOrigin, PlayerState, ProvidedTrack,
             Suppressions,
@@ -82,6 +83,7 @@ pub struct ConnectStateConfig {
     pub device_type: DeviceType,
     pub volume_steps: i32,
     pub is_group: bool,
+    pub disable_volume: bool,
 }
 
 impl Default for ConnectStateConfig {
@@ -93,6 +95,7 @@ impl Default for ConnectStateConfig {
             device_type: DeviceType::Speaker,
             volume_steps: 64,
             is_group: false,
+            disable_volume: false,
         }
     }
 }
@@ -137,14 +140,14 @@ impl ConnectState {
             is_group: cfg.is_group,
             capabilities: MessageField::some(Capabilities {
                 volume_steps: cfg.volume_steps,
-                hidden: false, // could be exposed later to only observe the playback
+                disable_volume: cfg.disable_volume,
+
                 gaia_eq_connect_id: true,
                 can_be_player: true,
-
                 needs_full_player_state: true,
-
                 is_observable: true,
                 is_controllable: true,
+                hidden: false,
 
                 supports_gzip_pushes: true,
                 // todo: enable after logout handling is implemented, see spirc logout_request
@@ -157,14 +160,19 @@ impl ConnectState {
 
                 is_voice_enabled: false,
                 restrict_to_local: false,
-                disable_volume: false,
                 connect_disabled: false,
                 supports_rename: false,
                 supports_external_episodes: false,
                 supports_set_backend_metadata: false,
                 supports_hifi: MessageField::none(),
+                // that "AI" dj thingy only available to specific regions/users
+                supports_dj: false,
+                supports_rooms: false,
+                // AudioQuality::HIFI is available, further investigation necessary
+                supported_audio_quality: EnumOrUnknown::new(AudioQuality::VERY_HIGH),
 
                 command_acks: true,
+
                 ..Default::default()
             }),
             ..Default::default()
