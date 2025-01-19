@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Replaced `ConnectConfig` with `ConnectStateConfig` (breaking)
 - [connect] Replaced `playing_track_index` field of `SpircLoadCommand` with `playing_track` (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
+- [player] Expose `PlayerTrackLoader` as a public interface.
 
 ### Added
 
