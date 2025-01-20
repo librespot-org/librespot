@@ -11,16 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [core] MSRV is now 1.81 (breaking)
 - [core] AP connect and handshake have a combined 5 second timeout.
-- [connect] Replaced `ConnectConfig` with `ConnectStateConfig` (breaking)
-- [connect] Replaced `playing_track_index` field of `SpircLoadCommand` with `playing_track` (breaking)
+- [connect] Replaced `has_volume_ctrl` with `disable_volume` in `ConnectConfig` (breaking)
+- [connect] Changed `initial_volume` from `Option<u16>` to `u16` in `ConnectConfig` (breaking)
+- [connect] Replaced `SpircLoadCommand` with `LoadRequest` and `LoadRequestOptions` (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
 
 ### Added
 
-- [connect] Add `seek_to` field to `SpircLoadCommand` (breaking)
-- [connect] Add `repeat_track` field to `SpircLoadCommand` (breaking)
-- [connect] Add `autoplay` field to `SpircLoadCommand` (breaking)
+- [connect] Add support for `seek_to`, `repeat_track` and `autoplay` for `Spirc` loading
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
+- [connect] Add `volume_steps` to `ConnectConfig` (breaking)
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
 - [oauth] Add `OAuthClient` and `OAuthClientBuilder` structs to achieve a more customizable login process

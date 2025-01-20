@@ -14,7 +14,7 @@ use futures_util::StreamExt;
 #[cfg(feature = "alsa-backend")]
 use librespot::playback::mixer::alsamixer::AlsaMixer;
 use librespot::{
-    connect::{spirc::Spirc, state::ConnectStateConfig},
+    connect::{ConnectConfig, Spirc},
     core::{
         authentication::Credentials, cache::Cache, config::DeviceType, version, Session,
         SessionConfig,
@@ -208,7 +208,7 @@ struct Setup {
     cache: Option<Cache>,
     player_config: PlayerConfig,
     session_config: SessionConfig,
-    connect_config: ConnectStateConfig,
+    connect_config: ConnectConfig,
     mixer_config: MixerConfig,
     credentials: Option<Credentials>,
     enable_oauth: bool,
@@ -1371,7 +1371,7 @@ fn get_setup() -> Setup {
     });
 
     let connect_config = {
-        let connect_default_config = ConnectStateConfig::default();
+        let connect_default_config = ConnectConfig::default();
 
         let name = opt_str(NAME).unwrap_or_else(|| connect_default_config.name.clone());
 
@@ -1483,7 +1483,7 @@ fn get_setup() -> Setup {
         let is_group = opt_present(DEVICE_IS_GROUP);
 
         if let Some(initial_volume) = initial_volume {
-            ConnectStateConfig {
+            ConnectConfig {
                 name,
                 device_type,
                 is_group,
@@ -1491,7 +1491,7 @@ fn get_setup() -> Setup {
                 ..Default::default()
             }
         } else {
-            ConnectStateConfig {
+            ConnectConfig {
                 name,
                 device_type,
                 is_group,

@@ -1,7 +1,10 @@
 use librespot::{
+    connect::{ConnectConfig, LoadRequest, LoadRequestOptions, PlayingTrack, Spirc},
     core::{
         authentication::Credentials, config::SessionConfig, session::Session, spotify_id::SpotifyId,
     },
+    metadata::{Album, Metadata},
+    playback::mixer::{softmixer::SoftMixer, Mixer, MixerConfig},
     playback::{
         audio_backend,
         config::{AudioFormat, PlayerConfig},
@@ -9,15 +12,8 @@ use librespot::{
         player::Player,
     },
 };
-use librespot_connect::spirc::PlayingTrack;
-use librespot_connect::{
-    spirc::{Spirc, SpircLoadCommand},
-    state::ConnectStateConfig,
-};
-use librespot_metadata::{Album, Metadata};
-use librespot_playback::mixer::{softmixer::SoftMixer, Mixer, MixerConfig};
-use std::env;
-use std::sync::Arc;
+
+use std::{env, sync::Arc};
 use tokio::join;
 
 #[tokio::main]
@@ -25,7 +21,7 @@ async fn main() {
     let session_config = SessionConfig::default();
     let player_config = PlayerConfig::default();
     let audio_format = AudioFormat::default();
-    let connect_config = ConnectStateConfig::default();
+    let connect_config = ConnectConfig::default();
 
     let mut args: Vec<_> = env::args().collect();
     let context_uri = if args.len() == 3 {
@@ -76,17 +72,19 @@ async fn main() {
 
         spirc.activate().unwrap();
         spirc
-            .load(SpircLoadCommand {
+            .load(LoadRequest::from_context_uri(
                 context_uri,
-                start_playing: true,
-                seek_to: 0,
-                shuffle: false,
-                repeat: false,
-                repeat_track: false,
-                autoplay: false,
-                // the index specifies which track in the context starts playing, in this case the first in the album
-                playing_track: PlayingTrack::Index(0).into(),
-            })
+                LoadRequestOptions {
+                    start_playing: true,
+                    seek_to: 0,
+                    shuffle: false,
+                    repeat: false,
+                    repeat_track: false,
+                    autoplay: false,
+                    // the index specifies which track in the context starts playing, in this case the first in the album
+                    playing_track: PlayingTrack::Index(0).into(),
+                },
+            ))
             .unwrap();
     });
 }
