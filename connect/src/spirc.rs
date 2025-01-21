@@ -26,7 +26,7 @@ use crate::{
     state::{
         context::{ContextType, ResetContext},
         provider::IsProvider,
-        Metadata, {ConnectConfig, ConnectState},
+        {ConnectConfig, ConnectState},
     },
     LoadRequestOptions,
 };
@@ -1083,7 +1083,7 @@ impl SpircTask {
             }
         };
 
-        let autoplay = self.connect_state.current_track(|t| t.is_from_autoplay());
+        let autoplay = self.connect_state.current_track(|t| t.is_autoplay());
         if autoplay {
             ctx_uri = ctx_uri.replace("station:", "");
         }

@@ -37,11 +37,9 @@ macro_rules! metadata_entry {
 
 /// Allows easy access of known metadata fields
 #[allow(dead_code)]
-pub trait Metadata {
-    /// Borrowed access to the map of metadata fields
+pub(super) trait Metadata {
     fn metadata(&self) -> &HashMap<String, String>;
 
-    /// Mutably borrowed access to the map of metadata fields
     fn metadata_mut(&mut self) -> &mut HashMap<String, String>;
 
     fn get_bool(&self, entry: &str) -> bool {

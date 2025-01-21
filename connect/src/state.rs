@@ -7,8 +7,6 @@ mod restrictions;
 mod tracks;
 mod transfer;
 
-pub use metadata::Metadata;
-
 use crate::model::SpircPlayStatus;
 use crate::{
     core::{
