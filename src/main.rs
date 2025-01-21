@@ -1487,7 +1487,7 @@ fn get_setup() -> Setup {
                 name,
                 device_type,
                 is_group,
-                initial_volume: initial_volume.into(),
+                initial_volume,
                 ..Default::default()
             }
         } else {
