@@ -85,9 +85,6 @@ pub struct ConnectConfig {
     /// Displays the [DeviceType] twice in the ui to show up as a group (default: false)
     pub is_group: bool,
     /// The volume with which the connect device will be initialized (default: 50%)
-    ///
-    /// ## Remarks
-    /// Max volume is `u16::MAX`
     pub initial_volume: u16,
     /// Disables the option to control the volume remotely (default: false)
     pub disable_volume: bool,

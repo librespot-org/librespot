@@ -28,7 +28,7 @@ use crate::{
         provider::IsProvider,
         {ConnectConfig, ConnectState},
     },
-    LoadRequestOptions,
+    LoadContextOptions, LoadRequestOptions,
 };
 use futures_util::StreamExt;
 use protobuf::MessageField;
@@ -985,30 +985,17 @@ impl SpircTask {
                 return self.notify().await;
             }
             Play(play) => {
-                let shuffle = play
-                    .options
-                    .player_options_override
-                    .as_ref()
-                    .map(|o| o.shuffling_context.unwrap_or_default())
-                    .unwrap_or_default();
-                let repeat = play
-                    .options
-                    .player_options_override
-                    .as_ref()
-                    .map(|o| o.repeating_context.unwrap_or_default())
-                    .unwrap_or_default();
-                let repeat_track = play
-                    .options
-                    .player_options_override
-                    .as_ref()
-                    .map(|o| o.repeating_track.unwrap_or_default())
-                    .unwrap_or_default();
-
                 let context_uri = play
                     .context
                     .uri
                     .clone()
                     .ok_or(SpircError::NoUri("context"))?;
+
+                let context_options = play
+                    .options
+                    .player_options_override
+                    .map(Into::into)
+                    .map(LoadContextOptions::Options);
 
                 self.handle_load(
                     LoadRequest::from_context_uri(
@@ -1017,10 +1004,7 @@ impl SpircTask {
                             start_playing: true,
                             seek_to: play.options.seek_to.unwrap_or_default(),
                             playing_track: play.options.skip_to.and_then(|s| s.try_into().ok()),
-                            shuffle,
-                            repeat,
-                            repeat_track,
-                            autoplay: false,
+                            context_options,
                         },
                     ),
                     Some(play.context),
@@ -1224,7 +1208,7 @@ impl SpircTask {
             &cmd.context_uri
         };
 
-        let update_context = if cmd.autoplay {
+        let update_context = if matches!(cmd.context_options, Some(LoadContextOptions::Autoplay)) {
             ContextType::Autoplay
         } else {
             ContextType::Default
@@ -1273,18 +1257,18 @@ impl SpircTask {
             }),
         };
 
-        debug!(
-            "loading with shuffle: <{}>, repeat track: <{}> context: <{}>",
-            cmd.shuffle, cmd.repeat, cmd.repeat_track
-        );
+        if let Some(LoadContextOptions::Options(ref options)) = cmd.context_options {
+            debug!(
+                "loading with shuffle: <{}>, repeat track: <{}> context: <{}>",
+                options.shuffle, options.repeat, options.repeat_track
+            );
 
-        self.connect_state.set_shuffle(!cmd.autoplay && cmd.shuffle);
-        self.connect_state
-            .set_repeat_context(!cmd.autoplay && cmd.repeat);
-        self.connect_state
-            .set_repeat_track(!cmd.autoplay && cmd.repeat_track);
+            self.connect_state.set_shuffle(options.shuffle);
+            self.connect_state.set_repeat_context(options.repeat);
+            self.connect_state.set_repeat_track(options.repeat_track);
+        }
 
-        if cmd.shuffle {
+        if matches!(cmd.context_options, Some(LoadContextOptions::Options(ref o)) if o.shuffle) {
             if let Some(index) = index {
                 self.connect_state.set_current_track(index)?;
             } else {

@@ -1,5 +1,5 @@
 use librespot::{
-    connect::{ConnectConfig, LoadRequest, LoadRequestOptions, PlayingTrack, Spirc},
+    connect::{ConnectConfig, LoadRequest, LoadRequestOptions, Spirc},
     core::{
         authentication::Credentials, config::SessionConfig, session::Session, spotify_id::SpotifyId,
     },
@@ -76,13 +76,7 @@ async fn main() {
                 context_uri,
                 LoadRequestOptions {
                     start_playing: true,
-                    seek_to: 0,
-                    shuffle: false,
-                    repeat: false,
-                    repeat_track: false,
-                    autoplay: false,
-                    // the index specifies which track in the context starts playing, in this case the first in the album
-                    playing_track: PlayingTrack::Index(0).into(),
+                    ..Default::default()
                 },
             ))
             .unwrap();

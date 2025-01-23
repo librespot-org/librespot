@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] AP connect and handshake have a combined 5 second timeout.
 - [connect] Replaced `has_volume_ctrl` with `disable_volume` in `ConnectConfig` (breaking)
 - [connect] Changed `initial_volume` from `Option<u16>` to `u16` in `ConnectConfig` (breaking)
-- [connect] Replaced `SpircLoadCommand` with `LoadRequest` and `LoadRequestOptions` (breaking)
+- [connect] Replaced `SpircLoadCommand` with `LoadRequest`, `LoadRequestOptions` and `LoadContextOptions` (breaking)
 - [connect] Moved all public items to the highest level (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
 

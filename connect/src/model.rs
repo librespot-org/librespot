@@ -1,4 +1,7 @@
-use librespot_core::dealer::protocol::SkipTo;
+use crate::{
+    core::dealer::protocol::SkipTo, protocol::context_player_options::ContextPlayerOptionOverrides,
+};
+
 use std::ops::Deref;
 
 /// Request for loading playback
@@ -21,27 +24,56 @@ impl Deref for LoadRequest {
 pub struct LoadRequestOptions {
     /// Whether the given tracks should immediately start playing, or just be initially loaded.
     pub start_playing: bool,
-    /// Start the playback after a specified amount of time (milliseconds).
-    pub seek_to: u32,
-    /// Start the playback in shuffle mode.
-    pub shuffle: bool,
-    /// Start the playback in repeat mode.
-    pub repeat: bool,
-    /// Start the playback by repeating the first track.
-    pub repeat_track: bool,
-    /// Decides if the context or the autoplay of the context is played
+    /// Start the playback at a specific point of the track.
     ///
-    /// ## Remarks:
-    /// If `true` is provided, the option values (`shuffle`, `repeat` and `repeat_track`) are ignored
-    pub autoplay: bool,
+    /// The provided value is used as milliseconds. Providing a value greater
+    /// than the track duration will start the track at the beginning.
+    pub seek_to: u32,
+    /// Options that decide how the context starts playing
+    pub context_options: Option<LoadContextOptions>,
     /// Decides the starting position in the given context.
     ///
     /// If the provided item doesn't exist or is out of range,
     /// the playback starts at the beginning of the context.
     ///
-    /// ## Remarks:
     /// If `None` is provided and `shuffle` is `true`, a random track is played, otherwise the first
     pub playing_track: Option<PlayingTrack>,
+}
+
+/// The options which decide how the playback is started
+///
+/// Separated into an `enum` to exclude the other variants from being used
+/// simultaneously, as they are not compatible.
+#[derive(Debug)]
+pub enum LoadContextOptions {
+    /// Starts the context with options
+    Options(Options),
+    /// Starts the playback as the autoplay variant of the context
+    ///
+    /// This is the same as finishing a context and
+    /// automatically continuing playback of similar tracks
+    Autoplay,
+}
+
+/// The available options that indicate how to start the context
+#[derive(Debug, Default)]
+pub struct Options {
+    /// Start the context in shuffle mode
+    pub shuffle: bool,
+    /// Start the context in repeat mode
+    pub repeat: bool,
+    /// Start the context, repeating the first track until skipped or manually disabled
+    pub repeat_track: bool,
+}
+
+impl From<ContextPlayerOptionOverrides> for Options {
+    fn from(value: ContextPlayerOptionOverrides) -> Self {
+        Self {
+            shuffle: value.shuffling_context.unwrap_or_default(),
+            repeat: value.repeating_context.unwrap_or_default(),
+            repeat_track: value.repeating_track.unwrap_or_default(),
+        }
+    }
 }
 
 impl LoadRequest {
