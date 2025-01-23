@@ -95,10 +95,17 @@ pub enum PlayingTrack {
     Index(u32),
     /// Represent the uri of a track.
     Uri(String),
+    #[doc(hidden)]
     /// Represent an internal identifier from spotify.
     ///
-    /// ## Remarks:
-    /// Is not intended for usage, but required for parsing of some connect messages.
+    /// The internal identifier is not the id contained in the uri. And rather
+    /// an unrelated id probably unique in spotify's internal database. But that's
+    /// just speculation.
+    ///
+    /// This identifier is not available by any public api. It's used for varies in
+    /// any spotify client, like sorting, displaying which track is currently played
+    /// and skipping to a track. Mobile uses it pretty intensively but also web and
+    /// desktop seem to make use of it.
     Uid(String),
 }
 
