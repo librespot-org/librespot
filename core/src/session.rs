@@ -43,6 +43,7 @@ use tokio::{
     time::{sleep, Duration as TokioDuration, Instant as TokioInstant, Sleep},
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use uuid::Uuid;
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -130,7 +131,8 @@ impl Session {
 
         let session_data = SessionData {
             client_id: config.client_id.clone(),
-            session_id: String::new(),
+            // can be any guid, doesn't need to be simple
+            session_id: Uuid::new_v4().as_simple().to_string(),
             ..SessionData::default()
         };
 
