@@ -280,24 +280,21 @@ impl Spirc {
 
     /// Resumes the playback
     ///
-    /// ## Remarks:
-    /// Does nothing if not active, or it isn't paused.
+    /// Does nothing if we are not the active device, or it isn't paused.
     pub fn play(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Play)?)
     }
 
     /// Resumes or pauses the playback
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn play_pause(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::PlayPause)?)
     }
 
     /// Pauses the playback
     ///
-    /// ## Remarks:
-    /// Does nothing if not active, or if it isn't playing.
+    /// Does nothing if we are not the active device, or if it isn't playing.
     pub fn pause(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Pause)?)
     }
@@ -307,32 +304,28 @@ impl Spirc {
     /// Seeks to the beginning when the current track position
     /// is greater than 3 seconds.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn prev(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Prev)?)
     }
 
     /// Skips to the next track.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn next(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Next)?)
     }
 
     /// Increases the volume by configured steps of [ConnectConfig].
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn volume_up(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::VolumeUp)?)
     }
 
     /// Decreases the volume by configured steps of [ConnectConfig].
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn volume_down(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::VolumeDown)?)
     }
@@ -343,40 +336,39 @@ impl Spirc {
     /// nothing (if not shuffled) or unshuffles the playback while
     /// resuming at the position of the current track.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn shuffle(&self, shuffle: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Shuffle(shuffle))?)
     }
 
     /// Repeats the playback context according to the value.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn repeat(&self, repeat: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Repeat(repeat))?)
     }
 
     /// Repeats the current track if true.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active. Skipping to the next track disables the repeating.
+    /// Does nothing if we are not the active device.
+    ///
+    /// Skipping to the next track disables the repeating.
     pub fn repeat_track(&self, repeat: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::RepeatTrack(repeat))?)
     }
 
     /// Update the volume to the given value.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn set_volume(&self, volume: u16) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetVolume(volume))?)
     }
 
     /// Updates the position to the given value.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active. If value is greater than the track duration,
+    /// Does nothing if we are not the active device.
+    ///
+    /// If value is greater than the track duration,
     /// the update is ignored.
     pub fn set_position_ms(&self, position_ms: u32) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetPosition(position_ms))?)
@@ -384,24 +376,23 @@ impl Spirc {
 
     /// Load a new context and replace the current.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active. Does not overwrite the queue.
+    /// Does nothing if we are not the active device.
+    ///
+    /// Does not overwrite the queue.
     pub fn load(&self, command: LoadRequest) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Load(command))?)
     }
 
     /// Disconnects the current device and pauses the playback according the value.
     ///
-    /// ## Remarks:
-    /// Does nothing if not active.
+    /// Does nothing if we are not the active device.
     pub fn disconnect(&self, pause: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Disconnect { pause })?)
     }
 
     /// Acquires the control as active connect device.
     ///
-    /// ## Remarks:
-    /// Does nothing if active.
+    /// Does nothing if we are not the active device.
     pub fn activate(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Activate)?)
     }

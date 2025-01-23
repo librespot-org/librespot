@@ -813,7 +813,7 @@ impl SpClient {
     /// ## Query params found in the wild:
     /// - include_video=true
     ///
-    /// ## Remarks:
+    /// ## Known results of uri types:
     /// - uris of type `track`
     ///   - returns a single page with a single track
     ///   - when requesting a single track with a query in the request, the returned track uri
