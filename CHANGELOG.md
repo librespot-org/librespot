@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [connect] Add `seek_to` field to `SpircLoadCommand` (breaking)
 - [connect] Add `repeat_track` field to `SpircLoadCommand` (breaking)
+- [connect] Add `autoplay` field to `SpircLoadCommand` (breaking)
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
