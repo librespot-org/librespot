@@ -1,10 +1,10 @@
-use rand::{Rng, SeedableRng};
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::{
     ops::{Deref, DerefMut},
     vec::IntoIter,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ShuffleVec<T> {
     vec: Vec<T>,
     indices: Option<Vec<usize>>,
@@ -45,12 +45,6 @@ impl<T> From<Vec<T>> for ShuffleVec<T> {
     }
 }
 
-impl<T> Default for ShuffleVec<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<T> ShuffleVec<T> {
     pub fn new() -> Self {
         Self {
@@ -60,7 +54,7 @@ impl<T> ShuffleVec<T> {
     }
 
     pub fn shuffle_with_seed(&mut self, seed: u64) {
-        self.shuffle_with_rng(rand::rngs::StdRng::seed_from_u64(seed))
+        self.shuffle_with_rng(SmallRng::seed_from_u64(seed))
     }
 
     pub fn shuffle_with_rng(&mut self, mut rng: impl Rng) {
@@ -97,7 +91,7 @@ impl<T> ShuffleVec<T> {
 
 #[cfg(test)]
 mod test {
-    use crate::shuffle_vec::ShuffleVec;
+    use super::*;
     use rand::Rng;
 
     #[test]
