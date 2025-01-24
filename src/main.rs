@@ -1899,6 +1899,7 @@ async fn main() {
             &setup.session_config.client_id,
             &format!("http://127.0.0.1{port_str}/login"),
             OAUTH_SCOPES.to_vec(),
+            false,
         ) {
             Ok(token) => token.access_token,
             Err(e) => {

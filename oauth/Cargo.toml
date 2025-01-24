@@ -11,6 +11,7 @@ edition = "2021"
 [dependencies]
 log = "0.4"
 oauth2 = "4.4"
+open = "5.3.2"
 thiserror = "2.0"
 url = "2.2"
 

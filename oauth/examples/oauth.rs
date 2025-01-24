@@ -25,7 +25,7 @@ fn main() {
         return;
     };
 
-    match get_access_token(client_id, redirect_uri, scopes) {
+    match get_access_token(client_id, redirect_uri, scopes, false) {
         Ok(token) => println!("Success: {token:#?}"),
         Err(e) => println!("Failed: {e}"),
     };

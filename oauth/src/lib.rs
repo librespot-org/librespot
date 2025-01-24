@@ -12,6 +12,7 @@
 
 use log::{error, info, trace};
 use oauth2::reqwest::http_client;
+use oauth2::RefreshToken;
 use oauth2::{
     basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, CsrfToken, PkceCodeChallenge,
     RedirectUrl, Scope, TokenResponse, TokenUrl,
@@ -163,11 +164,14 @@ fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
 }
 
 /// Obtain a Spotify access token using the authorization code with PKCE OAuth flow.
-/// The redirect_uri must match what is registered to the client ID.
+/// The `redirect_uri` must match what is registered to the client ID.
+/// Set `open_auth_url` to true if you want your default browser to open the auth url automatically,
+/// instead of printing it to standard output.
 pub fn get_access_token(
     client_id: &str,
     redirect_uri: &str,
     scopes: Vec<&str>,
+    open_auth_url: bool,
 ) -> Result<OAuthToken, OAuthError> {
     let auth_url = AuthUrl::new("https://accounts.spotify.com/authorize".to_string())
         .map_err(|_| OAuthError::InvalidSpotifyUri)?;
@@ -201,7 +205,11 @@ pub fn get_access_token(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    println!("Browse to: {}", auth_url);
+    if open_auth_url {
+        open::that_in_background(auth_url.as_str());
+    } else {
+        println!("{}", auth_url);
+    }
 
     let code = match get_socket_address(redirect_uri) {
         Some(addr) => get_authcode_listener(addr),
@@ -240,6 +248,56 @@ pub fn get_access_token(
                 .expires_in()
                 .unwrap_or_else(|| Duration::from_secs(3600)),
         token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
+        scopes: token_scopes,
+    })
+}
+
+pub fn get_refresh_token(
+    client_id: &str,
+    refresh_token: &str,
+    redirect_uri: &str,
+) -> Result<OAuthToken, OAuthError> {
+    let auth_url = AuthUrl::new("https://accounts.spotify.com/authorize".to_string())
+        .map_err(|_| OAuthError::InvalidSpotifyUri)?;
+    let token_url = TokenUrl::new("https://accounts.spotify.com/api/token".to_string())
+        .map_err(|_| OAuthError::InvalidSpotifyUri)?;
+    let redirect_url =
+        RedirectUrl::new(redirect_uri.to_string()).map_err(|e| OAuthError::InvalidRedirectUri {
+            uri: redirect_uri.to_string(),
+            e,
+        })?;
+    let client = BasicClient::new(
+        ClientId::new(client_id.to_string()),
+        None,
+        auth_url,
+        Some(token_url),
+    )
+    .set_redirect_uri(redirect_url);
+
+    let refresh_token = RefreshToken::new(refresh_token.to_string());
+    let resp = client
+        .exchange_refresh_token(&refresh_token)
+        .request(http_client);
+    let token = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
+    trace!("Obtained new access token: {token:?}");
+
+    let token_scopes: Vec<String> = token
+        .scopes()
+        .map(|s| s.iter().map(|s| s.to_string()).collect())
+        .unwrap_or_default();
+
+    let refresh_token = token
+        .refresh_token()
+        .map_or(String::new(), |t| t.secret().to_string());
+
+    Ok(OAuthToken {
+        access_token: token.access_token().secret().to_string(),
+        refresh_token,
+        expires_at: Instant::now()
+            + token
+                .expires_in()
+                .unwrap_or_else(|| Duration::from_secs(3600)),
+        token_type: format!("{:?}", token.token_type()).to_string(),
         scopes: token_scopes,
     })
 }
