@@ -75,6 +75,27 @@ pub struct OAuthToken {
     pub scopes: Vec<String>,
 }
 
+#[derive(Default)]
+pub enum OpenUrl {
+    Yes,
+    #[default]
+    No,
+}
+
+pub struct OAuthCallbackParams {
+    pub open_url: OpenUrl,
+    pub response: String,
+}
+
+impl Default for OAuthCallbackParams {
+    fn default() -> Self {
+        Self {
+            open_url: OpenUrl::default(),
+            response: String::from("Go back to your terminal :)"),
+        }
+    }
+}
+
 /// Return code query-string parameter from the redirect URI.
 fn get_code(redirect_url: &str) -> Result<AuthorizationCode, OAuthError> {
     let url = Url::parse(redirect_url).map_err(|e| OAuthError::AuthCodeBadUri {
@@ -105,7 +126,10 @@ fn get_authcode_stdin() -> Result<AuthorizationCode, OAuthError> {
 }
 
 /// Spawn HTTP server at provided socket address to accept OAuth callback and return auth code.
-fn get_authcode_listener(socket_address: SocketAddr) -> Result<AuthorizationCode, OAuthError> {
+fn get_authcode_listener(
+    socket_address: SocketAddr,
+    message: String,
+) -> Result<AuthorizationCode, OAuthError> {
     let listener =
         TcpListener::bind(socket_address).map_err(|e| OAuthError::AuthCodeListenerBind {
             addr: socket_address,
@@ -131,7 +155,6 @@ fn get_authcode_listener(socket_address: SocketAddr) -> Result<AuthorizationCode
         .ok_or(OAuthError::AuthCodeListenerParse)?;
     let code = get_code(&("http://localhost".to_string() + redirect_url));
 
-    let message = "Go back to your terminal :)";
     let response = format!(
         "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
         message.len(),
@@ -171,7 +194,7 @@ pub fn get_access_token(
     client_id: &str,
     redirect_uri: &str,
     scopes: Vec<&str>,
-    open_auth_url: bool,
+    oauth_callback_params: Option<OAuthCallbackParams>,
 ) -> Result<OAuthToken, OAuthError> {
     let auth_url = AuthUrl::new("https://accounts.spotify.com/authorize".to_string())
         .map_err(|_| OAuthError::InvalidSpotifyUri)?;
@@ -205,14 +228,16 @@ pub fn get_access_token(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    if open_auth_url {
-        open::that_in_background(auth_url.as_str());
-    } else {
-        println!("{}", auth_url);
+    let oauth_callback_params = oauth_callback_params.unwrap_or_default();
+    match oauth_callback_params.open_url {
+        OpenUrl::Yes => {
+            open::that_in_background(auth_url.as_str());
+        }
+        OpenUrl::No => println!("{}", auth_url),
     }
 
     let code = match get_socket_address(redirect_uri) {
-        Some(addr) => get_authcode_listener(addr),
+        Some(addr) => get_authcode_listener(addr, oauth_callback_params.response),
         _ => get_authcode_stdin(),
     }?;
     trace!("Exchange {code:?} for access token");
@@ -252,7 +277,7 @@ pub fn get_access_token(
     })
 }
 
-pub fn get_refresh_token(
+pub fn refresh_token(
     client_id: &str,
     refresh_token: &str,
     redirect_uri: &str,
