@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
-- [oauth] Add `open_auth_url` parameter to `get_access_token` (breaking)
+- [oauth] Add `oauth_callback_params` parameter to `get_access_token` (breaking)
 - [oauth] Add `refresh_token()` to obtain a new access token from an existing refresh token
 
 ### Fixed

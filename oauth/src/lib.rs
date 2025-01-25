@@ -75,23 +75,19 @@ pub struct OAuthToken {
     pub scopes: Vec<String>,
 }
 
-#[derive(Default)]
-pub enum OpenUrl {
-    Yes,
-    #[default]
-    No,
-}
-
+/// Params to customize `get_access_token()` action.
+/// `open_url` set to true opens a new tab in the default browser with the auth url
+/// `message` is a custom callback response. Can be an html
 pub struct OAuthCallbackParams {
-    pub open_url: OpenUrl,
-    pub response: String,
+    pub open_url: bool,
+    pub message: String,
 }
 
 impl Default for OAuthCallbackParams {
     fn default() -> Self {
         Self {
-            open_url: OpenUrl::default(),
-            response: String::from("Go back to your terminal :)"),
+            open_url: false,
+            message: String::from("Go back to your terminal :)"),
         }
     }
 }
@@ -188,8 +184,8 @@ fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
 
 /// Obtain a Spotify access token using the authorization code with PKCE OAuth flow.
 /// The `redirect_uri` must match what is registered to the client ID.
-/// Set `open_auth_url` to true if you want your default browser to open the auth url automatically,
-/// instead of printing it to standard output.
+/// Optionally, an instance of `OAuthCallbackParams` can be used to automate the auth url opening
+/// and to customize the callback response
 pub fn get_access_token(
     client_id: &str,
     redirect_uri: &str,
@@ -229,15 +225,14 @@ pub fn get_access_token(
         .url();
 
     let oauth_callback_params = oauth_callback_params.unwrap_or_default();
-    match oauth_callback_params.open_url {
-        OpenUrl::Yes => {
-            open::that_in_background(auth_url.as_str());
-        }
-        OpenUrl::No => println!("{}", auth_url),
+    if oauth_callback_params.open_url {
+        open::that_in_background(auth_url.as_str());
+    } else {
+        println!("{}", auth_url);
     }
 
     let code = match get_socket_address(redirect_uri) {
-        Some(addr) => get_authcode_listener(addr, oauth_callback_params.response),
+        Some(addr) => get_authcode_listener(addr, oauth_callback_params.message),
         _ => get_authcode_stdin(),
     }?;
     trace!("Exchange {code:?} for access token");
