@@ -11,7 +11,7 @@ FROM --platform=linux/amd64 ubuntu:18.04
 
 # Install common packages.
 RUN apt-get update
-RUN apt-get install -y -qq git curl build-essential libasound2-dev libpulse-dev
+RUN apt-get install -y -qq git curl build-essential cmake clang libclang-dev libasound2-dev libpulse-dev
 
 # Install armhf packages.
 RUN echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic main" | tee -a /etc/apt/sources.list
