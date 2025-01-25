@@ -67,12 +67,12 @@ protobuf-json-mapping = "3.5"
 # but currently, hyper-proxy2 and tokio-tungstenite do not support it.
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 hyper-proxy2 = { version = "0.1", default-features = false, features = ["rustls"] }
-hyper-rustls = { version = "0.27.2", default-features = false, features = ["http1", "logging", "tls12", "native-tokio", "http2"] }
+hyper-rustls = { version = "0.27.2", default-features = false, features = ["aws-lc-rs", "http1", "logging", "tls12", "native-tokio", "http2"] }
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["rustls-tls-native-roots"] }
 
 [target.'cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))'.dependencies]
 hyper-proxy2 = { version = "0.1", default-features = false, features = ["rustls-webpki"] }
-hyper-rustls = { version = "0.27.2", default-features = false, features = ["http1", "logging", "tls12", "webpki-tokio", "http2"] }
+hyper-rustls = { version = "0.27.2", default-features = false, features = ["aws-lc-rs", "http1", "logging", "tls12", "webpki-tokio", "http2"] }
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["rustls-tls-webpki-roots"] }
 
 [build-dependencies]
@@ -81,8 +81,3 @@ vergen-gitcl = { version = "1.0.0", default-features = false, features = ["build
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "parking_lot"] }
-
-[features]
-with-aws-lc-rs = ["hyper-rustls/aws-lc-rs"]
-with-ring = ["hyper-rustls/ring"]
-default = ["with-ring"]
