@@ -30,6 +30,7 @@ RUN dpkg --add-architecture arm64 && \
 	crossbuild-essential-armel \
 	crossbuild-essential-armhf \
 	curl \
+	git \
 	libasound2-dev \
 	libasound2-dev:arm64 \
 	libasound2-dev:armel \
