@@ -76,14 +76,14 @@ pub struct OAuthToken {
 }
 
 /// Params to customize `get_access_token()` action.
-/// `open_url` set to true opens a new tab in the default browser with the auth url
-/// `message` is a custom callback response. Can be an html
-pub struct OAuthCallbackParams {
+/// `open_url` set to true opens a new tab in the default browser with the auth url.
+/// `message` is a custom callback response.
+pub struct OAuthCustomParams {
     pub open_url: bool,
     pub message: String,
 }
 
-impl Default for OAuthCallbackParams {
+impl Default for OAuthCustomParams {
     fn default() -> Self {
         Self {
             open_url: false,
@@ -184,13 +184,13 @@ fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
 
 /// Obtain a Spotify access token using the authorization code with PKCE OAuth flow.
 /// The `redirect_uri` must match what is registered to the client ID.
-/// Optionally, an instance of `OAuthCallbackParams` can be used to automate the auth url opening
-/// and to customize the callback response
+/// Optionally, an instance of `OAuthCustomParams` can be used to automate the auth url opening
+/// and to customize the callback response.
 pub fn get_access_token(
     client_id: &str,
     redirect_uri: &str,
     scopes: Vec<&str>,
-    oauth_callback_params: Option<OAuthCallbackParams>,
+    oauth_callback_params: Option<OAuthCustomParams>,
 ) -> Result<OAuthToken, OAuthError> {
     let auth_url = AuthUrl::new("https://accounts.spotify.com/authorize".to_string())
         .map_err(|_| OAuthError::InvalidSpotifyUri)?;
