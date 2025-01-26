@@ -66,7 +66,7 @@ pub enum OAuthError {
     ExchangeCode { e: String },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OAuthToken {
     pub access_token: String,
     pub refresh_token: String,
