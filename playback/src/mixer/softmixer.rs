@@ -1,4 +1,5 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use atomic_shim::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use super::VolumeGetter;
