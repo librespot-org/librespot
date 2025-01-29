@@ -7,17 +7,15 @@ and stream to it like any other official spotify client.
 
 The [`Spirc`] is the entrypoint to creating your own connect device. It can be
 configured with the given [`ConnectConfig`] options and requires some additional data
-to start up the device. 
+to start up the device.
 
-When creating a new [`Spirc`] it returns two items. The [`Spirc`] itself, which is can 
-be used as to control the local connect device. And a [`Future`](std::future::Future), 
-lets name it `SpircTask`, that starts and executes the event loop of the connect device 
+When creating a new [`Spirc`] it returns two items. The [`Spirc`] itself, which is can
+be used as to control the local connect device. And a [`Future`](std::future::Future),
+lets name it `SpircTask`, that starts and executes the event loop of the connect device
 when awaited.
 
-To get an understanding how to handle the `SpircTask`, it is recommended to take look 
-at the code of the `librespot` binary. As the [`src/main.rs`](https://github.com/librespot-org/librespot/blob/dev/src/main.rs#L1943) 
-file is quite overwhelming to just understand how to handle the `SpircTask` it is 
-recommended to ignore all setup code and skip to the main-loop (around line 1940).
+A basic example in which the `Spirc` and `SpircTask` is used can be found here:
+[`examples/play_connect.rs`](../examples/play_connect.rs).
 
 # Example
 
@@ -33,8 +31,7 @@ use librespot_playback::{
     player::Player
 };
 
-async fn create_basic_spirc() -> Result<(Spirc, impl Future<Output=()>), Error> {
-    // when using a cache you can acquire the credentials from there
+async fn create_basic_spirc() -> Result<(), Error> {
     let credentials = Credentials::with_access_token("access-token-here");
     let session = Session::new(SessionConfig::default(), None);
 
@@ -53,12 +50,14 @@ async fn create_basic_spirc() -> Result<(Spirc, impl Future<Output=()>), Error> 
 
     let mixer = mixer::find(None).expect("will default to SoftMixer");
 
-    Spirc::new(
+    let (spirc, spirc_task): (Spirc, _) = Spirc::new(
         ConnectConfig::default(),
         session,
         credentials,
         player,
         mixer(MixerConfig::default())
-    ).await
+    ).await?;
+
+    Ok(())
 }
 ```
