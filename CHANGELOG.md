@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Replaced `ConnectConfig` with `ConnectStateConfig` (breaking)
 - [connect] Replaced `playing_track_index` field of `SpircLoadCommand` with `playing_track` (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
+- [oauth] `get_access_token()` function marked for deprecation and removal of thread overhead
 
 ### Added
 
@@ -22,8 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
-- [oauth] Add `oauth_callback_params` parameter to `get_access_token` (breaking)
-- [oauth] Add `refresh_token()` to obtain a new access token from an existing refresh token
+- [oauth] Add `OAuthClient` and `OAuthClientBuilder` structs to achieve a more customizable login process
 
 ### Fixed
 
