@@ -63,10 +63,13 @@ impl From<APLoginFailed> for AuthenticationError {
 }
 
 pub async fn connect(host: &str, port: u16, proxy: Option<&Url>) -> io::Result<Transport> {
-    const TIMEOUT: Duration = Duration::from_secs(3);
-    let socket = tokio::time::timeout(TIMEOUT, crate::socket::connect(host, port, proxy)).await??;
-
-    handshake(socket).await
+    const TIMEOUT: Duration = Duration::from_secs(5);
+    tokio::time::timeout(TIMEOUT, {
+        let socket = crate::socket::connect(host, port, proxy).await?;
+        debug!("Connection to AP established.");
+        handshake(socket)
+    })
+    .await?
 }
 
 pub async fn connect_with_retry(
@@ -80,7 +83,7 @@ pub async fn connect_with_retry(
         match connect(host, port, proxy).await {
             Ok(f) => return Ok(f),
             Err(e) => {
-                debug!("Connection failed: {e}");
+                debug!("Connection to \"{host}:{port}\" failed: {e}");
                 if num_retries < max_retries {
                     num_retries += 1;
                     debug!("Retry access point...");
