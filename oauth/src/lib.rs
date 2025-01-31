@@ -164,6 +164,8 @@ fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
     None
 }
 
+/// Struct that handle obtaining and refreshing of access tokens
+/// Should not be instantiate by itself, use OAuthClientBuilder instead.
 pub struct OAuthClient {
     scopes: Vec<String>,
     redirect_uri: String,
@@ -231,6 +233,7 @@ impl OAuthClient {
         })
     }
 
+    /// Creates a new valid OAuth token by a given refresh_token
     pub async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
         let refresh_token = RefreshToken::new(refresh_token.to_string());
         let resp = self
@@ -262,6 +265,8 @@ impl OAuthClient {
         })
     }
 }
+
+/// Builder struct through which structures of type OAuthClient are instantiated.
 pub struct OAuthClientBuilder {
     client_id: String,
     redirect_uri: String,
@@ -281,16 +286,21 @@ impl OAuthClientBuilder {
         }
     }
 
+    /// When this function is added to the building process pipeline, the auth url will be
+    /// displayed on a default web browser. Otherwise, it will be printed through standard output
     pub fn open_in_browser(mut self) -> Self {
         self.should_open_url = true;
         self
     }
 
+    /// When this function is added to the building process pipeline, the body of the response to
+    /// the callback request will be `message`. This is useful to load custom HTMLs to that &str.
     pub fn with_custom_message(mut self, message: &str) -> Self {
         self.message = message.to_string();
         self
     }
 
+    /// End of the building process pipeline. If Ok, a OAuthClient instance will be returned.
     pub fn build(self) -> Result<OAuthClient, OAuthError> {
         let auth_url = AuthUrl::new("https://accounts.spotify.com/authorize".to_string())
             .map_err(|_| OAuthError::InvalidSpotifyUri)?;

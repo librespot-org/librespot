@@ -17,3 +17,4 @@ url = "2.2"
 
 [dev-dependencies]
 env_logger =  { version = "0.11.2", default-features = false, features = ["color", "humantime", "auto-color"] }
+tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }

@@ -1,11 +1,12 @@
 use std::env;
 
-use librespot_oauth::get_access_token;
+use librespot_oauth::OAuthClientBuilder;
 
 const SPOTIFY_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 const SPOTIFY_REDIRECT_URI: &str = "http://127.0.0.1:8898/login";
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let mut builder = env_logger::Builder::new();
     builder.parse_filters("librespot=trace");
     builder.init();
@@ -25,8 +26,31 @@ fn main() {
         return;
     };
 
-    match get_access_token(client_id, redirect_uri, scopes, None) {
-        Ok(token) => println!("Success: {token:#?}"),
-        Err(e) => println!("Failed: {e}"),
+    let client = match OAuthClientBuilder::new(client_id, redirect_uri, scopes)
+        .open_in_browser()
+        .with_custom_message(include_str!("response.html"))
+        .build()
+    {
+        Ok(client) => client,
+        Err(err) => {
+            eprintln!("Unable to build an OAuth client: {}", err);
+            return;
+        }
     };
+
+    let refresh_token = match client.get_access_token().await {
+        Ok(token) => {
+            println!("OAuth Token: {token:#?}");
+            token.refresh_token
+        }
+        Err(err) => {
+            println!("Unable to get OAuth Token: {err}");
+            return;
+        }
+    };
+
+    match client.refresh_token(&refresh_token).await {
+        Ok(token) => println!("New refreshed OAuth Token: {token:#?}"),
+        Err(err) => println!("Unable to get refreshed OAuth Token: {err}"),
+    }
 }
