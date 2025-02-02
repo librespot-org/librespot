@@ -1,9 +1,14 @@
-use crate::state::context::ContextType;
-use crate::state::{ConnectState, StateError};
-use librespot_core::Error;
-use librespot_protocol::player::{ContextIndex, ContextPlayerOptions};
+use crate::{
+    core::Error,
+    protocol::player::ContextPlayerOptions,
+    state::{
+        context::{ContextType, ResetContext},
+        metadata::Metadata,
+        ConnectState, StateError,
+    },
+};
 use protobuf::MessageField;
-use rand::prelude::SliceRandom;
+use rand::Rng;
 
 impl ConnectState {
     fn add_options_if_empty(&mut self) {
@@ -39,7 +44,7 @@ impl ConnectState {
         self.set_repeat_context(false);
     }
 
-    pub fn shuffle(&mut self) -> Result<(), Error> {
+    pub fn shuffle(&mut self, seed: Option<u64>) -> Result<(), Error> {
         if let Some(reason) = self
             .player()
             .restrictions
@@ -55,22 +60,22 @@ impl ConnectState {
         self.clear_prev_track();
         self.clear_next_tracks();
 
-        let current_uri = self.current_track(|t| &t.uri);
+        let current_track = self.current_track(|t| t.clone().take());
 
-        let ctx = self.get_context(ContextType::Default)?;
-        let current_track = Self::find_index_in_context(ctx, |t| &t.uri == current_uri)?;
+        self.reset_context(ResetContext::DefaultIndex);
+        let ctx = self.get_context_mut(ContextType::Default)?;
 
-        let mut shuffle_context = ctx.clone();
         // we don't need to include the current track, because it is already being played
-        shuffle_context.tracks.remove(current_track);
+        ctx.skip_track = current_track;
 
-        let mut rng = rand::thread_rng();
-        shuffle_context.tracks.shuffle(&mut rng);
-        shuffle_context.index = ContextIndex::new();
+        let seed = seed
+            .unwrap_or_else(|| rand::thread_rng().gen_range(100_000_000_000..1_000_000_000_000));
 
-        self.shuffle_context = Some(shuffle_context);
-        self.set_active_context(ContextType::Shuffle);
-        self.fill_up_context = ContextType::Shuffle;
+        ctx.tracks.shuffle_with_seed(seed);
+        ctx.set_shuffle_seed(seed);
+
+        self.set_active_context(ContextType::Default);
+        self.fill_up_context = ContextType::Default;
         self.fill_up_next_tracks()?;
 
         Ok(())

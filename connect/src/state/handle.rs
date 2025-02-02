@@ -2,6 +2,7 @@ use crate::{
     core::{dealer::protocol::SetQueueCommand, Error},
     state::{
         context::{ContextType, ResetContext},
+        metadata::Metadata,
         ConnectState,
     },
 };
@@ -12,7 +13,7 @@ impl ConnectState {
         self.set_shuffle(shuffle);
 
         if shuffle {
-            return self.shuffle();
+            return self.shuffle(None);
         }
 
         self.reset_context(ResetContext::DefaultIndex);
@@ -21,11 +22,16 @@ impl ConnectState {
             return Ok(());
         }
 
-        let ctx = self.get_context(ContextType::Default)?;
-        let current_index =
-            ConnectState::find_index_in_context(ctx, |c| self.current_track(|t| c.uri == t.uri))?;
-
-        self.reset_playback_to_position(Some(current_index))
+        match self.current_track(|t| t.get_context_index()) {
+            Some(current_index) => self.reset_playback_to_position(Some(current_index)),
+            None => {
+                let ctx = self.get_context(ContextType::Default)?;
+                let current_index = ConnectState::find_index_in_context(ctx, |c| {
+                    self.current_track(|t| c.uri == t.uri)
+                })?;
+                self.reset_playback_to_position(Some(current_index))
+            }
+        }
     }
 
     pub fn handle_set_queue(&mut self, set_queue: SetQueueCommand) {

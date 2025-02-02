@@ -25,9 +25,7 @@ use crate::{
         user_attributes::UserAttributesMutation,
     },
     state::{
-        context::{
-            ResetContext, {ContextType, UpdateContext},
-        },
+        context::{ContextType, ResetContext},
         metadata::Metadata,
         provider::IsProvider,
         {ConnectState, ConnectStateConfig},
@@ -37,7 +35,6 @@ use futures_util::StreamExt;
 use protobuf::MessageField;
 use std::{
     future::Future,
-    ops::Deref,
     sync::atomic::{AtomicUsize, Ordering},
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -749,9 +746,6 @@ impl SpircTask {
 
         use protobuf::Message;
 
-        // todo: handle received pages from transfer, important to not always shuffle the first 10 tracks
-        //  also important when the dealer is restarted, currently we just shuffle again, but at least
-        //  the 10 tracks provided should be used and after that the new shuffle context
         match TransferState::parse_from_bytes(&cluster.transfer_data) {
             Ok(transfer_state) => self.handle_transfer(transfer_state)?,
             Err(why) => error!("failed to take over control: {why}"),
@@ -889,7 +883,7 @@ impl SpircTask {
                 } else {
                     self.context_resolver.add(ResolveContext::from_context(
                         update_context.context,
-                        super::state::context::UpdateContext::Default,
+                        ContextType::Default,
                         ContextAction::Replace,
                     ))
                 }
@@ -1007,7 +1001,7 @@ impl SpircTask {
         self.context_resolver.add(ResolveContext::from_uri(
             ctx_uri.clone(),
             &fallback,
-            UpdateContext::Default,
+            ContextType::Default,
             ContextAction::Replace,
         ));
 
@@ -1044,7 +1038,7 @@ impl SpircTask {
             self.context_resolver.add(ResolveContext::from_uri(
                 ctx_uri,
                 fallback,
-                UpdateContext::Autoplay,
+                ContextType::Autoplay,
                 ContextAction::Replace,
             ))
         }
@@ -1139,13 +1133,12 @@ impl SpircTask {
         };
 
         let update_context = if cmd.autoplay {
-            UpdateContext::Autoplay
+            ContextType::Autoplay
         } else {
-            UpdateContext::Default
+            ContextType::Default
         };
 
-        self.connect_state
-            .set_active_context(*update_context.deref());
+        self.connect_state.set_active_context(update_context);
 
         let current_context_uri = self.connect_state.context_uri();
         if current_context_uri == &cmd.context_uri && fallback == cmd.context_uri {
@@ -1209,7 +1202,7 @@ impl SpircTask {
             if self.context_resolver.has_next() {
                 self.connect_state.update_queue_revision()
             } else {
-                self.connect_state.shuffle()?;
+                self.connect_state.shuffle(None)?;
                 self.add_autoplay_resolving_when_required();
             }
         } else {
@@ -1366,7 +1359,7 @@ impl SpircTask {
         let resolve = ResolveContext::from_uri(
             current_context,
             fallback,
-            UpdateContext::Autoplay,
+            ContextType::Autoplay,
             if has_tracks {
                 ContextAction::Append
             } else {
@@ -1458,7 +1451,7 @@ impl SpircTask {
         self.context_resolver.add(ResolveContext::from_uri(
             uri,
             self.connect_state.current_track(|t| &t.uri),
-            UpdateContext::Default,
+            ContextType::Default,
             ContextAction::Replace,
         ));
 

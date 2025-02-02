@@ -23,7 +23,7 @@ impl<'ct> ConnectState {
             ..Default::default()
         };
         delimiter.set_hidden(true);
-        delimiter.add_iteration(iteration);
+        delimiter.set_iteration(iteration);
 
         delimiter
     }
@@ -124,6 +124,7 @@ impl<'ct> ConnectState {
                     continue;
                 }
                 Some(next) if next.is_unavailable() => continue,
+                Some(next) if self.is_skip_track(&next) => continue,
                 other => break other,
             };
         };
@@ -141,12 +142,10 @@ impl<'ct> ConnectState {
             self.set_active_context(ContextType::Autoplay);
             None
         } else {
-            let ctx = self.get_context(ContextType::Default)?;
-            let new_index = Self::find_index_in_context(ctx, |c| c.uri == new_track.uri);
-            match new_index {
-                Ok(new_index) => Some(new_index as u32),
-                Err(why) => {
-                    error!("didn't find the track in the current context: {why}");
+            match new_track.get_context_index() {
+                Some(new_index) => Some(new_index as u32),
+                None => {
+                    error!("the given context track had no set context_index");
                     None
                 }
             }
@@ -323,7 +322,7 @@ impl<'ct> ConnectState {
                     }
                 }
                 None => break,
-                Some(ct) if ct.is_unavailable() => {
+                Some(ct) if ct.is_unavailable() || self.is_skip_track(ct) => {
                     new_index += 1;
                     continue;
                 }
@@ -414,7 +413,7 @@ impl<'ct> ConnectState {
 
         track.set_provider(Provider::Queue);
         if !track.is_from_queue() {
-            track.set_queued(true);
+            track.set_from_queue(true);
         }
 
         let next_tracks = self.next_tracks_mut();

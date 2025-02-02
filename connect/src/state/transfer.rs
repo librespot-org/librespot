@@ -26,6 +26,7 @@ impl ConnectState {
             track,
             transfer.current_session.context.uri.as_deref(),
             None,
+            None,
             transfer
                 .queue
                 .is_playing_queue
@@ -52,9 +53,24 @@ impl ConnectState {
             _ => player.playback_speed = 1.,
         }
 
+        let mut shuffle_seed = None;
         if let Some(session) = transfer.current_session.as_mut() {
             player.play_origin = session.play_origin.take().map(Into::into).into();
             player.suppressions = session.suppressions.take().map(Into::into).into();
+
+            // maybe at some point we can use the shuffle seed provided by spotify,
+            // but I doubt it, as spotify doesn't use true randomness but rather an algorithm
+            // based shuffle
+            trace!(
+                "shuffle_seed: <{:?}> (spotify), <{:?}> (own)",
+                session.shuffle_seed,
+                session.context.get_shuffle_seed()
+            );
+
+            shuffle_seed = session
+                .context
+                .get_shuffle_seed()
+                .and_then(|seed| seed.parse().ok());
 
             if let Some(mut ctx) = session.context.take() {
                 player.restrictions = ctx.restrictions.take().map(Into::into).into();
@@ -72,6 +88,8 @@ impl ConnectState {
                 player.context_metadata.insert(key, value);
             }
         }
+
+        self.transfer_shuffle_seed = shuffle_seed;
 
         self.clear_prev_track();
         self.clear_next_tracks();
@@ -134,6 +152,7 @@ impl ConnectState {
                 track,
                 Some(self.context_uri()),
                 None,
+                None,
                 Some(Provider::Queue),
             ) {
                 self.add_to_queue(queued_track, false);
@@ -143,7 +162,9 @@ impl ConnectState {
         if self.shuffling_context() {
             self.set_current_track(current_index.unwrap_or_default())?;
             self.set_shuffle(true);
-            self.shuffle()?;
+
+            let previous_seed = self.transfer_shuffle_seed.take();
+            self.shuffle(previous_seed)?;
         } else {
             self.reset_playback_to_position(current_index)?;
         }
