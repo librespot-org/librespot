@@ -55,12 +55,11 @@ pub trait Metadata {
     metadata_entry!(is_from_autoplay use get_bool, set_from_autoplay, remove_from_autoplay (is_autoplay: IS_AUTOPLAY) -> bool);
     metadata_entry!(is_hidden use get_bool, set_hidden, remove_hidden (is_hidden: HIDDEN) -> bool);
 
-    metadata_entry!(get_context_index use get_usize, set_context_index, remove_context_index (iteration: CUSTOM_CONTEXT_INDEX) -> Option<usize>);
-
+    metadata_entry!(get_context_index use get_usize, set_context_index, remove_context_index (context_index: CUSTOM_CONTEXT_INDEX) -> Option<usize>);
     metadata_entry!(get_context_uri, set_context_uri, remove_context_uri (context_uri: CONTEXT_URI));
     metadata_entry!(get_entity_uri, set_entity_uri, remove_entity_uri (entity_uri: ENTITY_URI));
     metadata_entry!(get_iteration, set_iteration, remove_iteration (iteration: ITERATION));
-    metadata_entry!(get_shuffle_seed, set_shuffle_seed, remove_shuffle_seed (iteration: CUSTOM_SHUFFLE_SEED));
+    metadata_entry!(get_shuffle_seed, set_shuffle_seed, remove_shuffle_seed (shuffle_seed: CUSTOM_SHUFFLE_SEED));
 }
 
 macro_rules! impl_metadata {
