@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Provides a Spotify access token using the OAuth authorization code flow
 //! with PKCE.
 //!
@@ -11,12 +12,13 @@
 //! is appropriate for headless systems.
 
 use log::{error, info, trace};
+use oauth2::basic::BasicTokenType;
 use oauth2::reqwest::{async_http_client, http_client};
-use oauth2::RefreshToken;
 use oauth2::{
     basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, CsrfToken, PkceCodeChallenge,
     RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
+use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, RefreshToken, StandardTokenResponse};
 use std::io;
 use std::time::{Duration, Instant};
 use std::{
@@ -25,52 +27,97 @@ use std::{
 };
 use thiserror::Error;
 use url::Url;
+use veil::Redact;
 
+/// Enumerates possible errors encountered during the OAuth authentication flow.
 #[derive(Debug, Error)]
 pub enum OAuthError {
+    /// The redirect URI cannot be parsed as a valid URL.
     #[error("Unable to parse redirect URI {uri} ({e})")]
-    AuthCodeBadUri { uri: String, e: url::ParseError },
+    AuthCodeBadUri {
+        /// Auth URI.
+        uri: String,
+        /// Inner error code.
+        e: url::ParseError,
+    },
 
+    /// The authorization code parameter is missing in the redirect URI.
     #[error("Auth code param not found in URI {uri}")]
-    AuthCodeNotFound { uri: String },
+    AuthCodeNotFound {
+        /// Auth URI.
+        uri: String,
+    },
 
+    /// Failed to read input from standard input when manually collecting auth code.
     #[error("Failed to read redirect URI from stdin")]
     AuthCodeStdinRead,
 
+    /// Could not bind TCP listener to the specified socket address for OAuth callback.
     #[error("Failed to bind server to {addr} ({e})")]
-    AuthCodeListenerBind { addr: SocketAddr, e: io::Error },
+    AuthCodeListenerBind {
+        /// Callback address.
+        addr: SocketAddr,
+        /// Inner error code.
+        e: io::Error,
+    },
 
+    /// Listener terminated before receiving an OAuth callback connection.
     #[error("Listener terminated without accepting a connection")]
     AuthCodeListenerTerminated,
 
+    /// Failed to read incoming HTTP request containing OAuth callback.
     #[error("Failed to read redirect URI from HTTP request")]
     AuthCodeListenerRead,
 
+    /// Received malformed HTTP request for OAuth callback.
     #[error("Failed to parse redirect URI from HTTP request")]
     AuthCodeListenerParse,
 
+    /// Could not send HTTP response after handling OAuth callback.
     #[error("Failed to write HTTP response")]
     AuthCodeListenerWrite,
 
+    /// Invalid Spotify authorization endpoint URL.
     #[error("Invalid Spotify OAuth URI")]
     InvalidSpotifyUri,
 
+    /// Redirect URI failed validation.
     #[error("Invalid Redirect URI {uri} ({e})")]
-    InvalidRedirectUri { uri: String, e: url::ParseError },
+    InvalidRedirectUri {
+        /// Auth URI.
+        uri: String,
+        /// Inner error code
+        e: url::ParseError,
+    },
 
+    /// Channel communication failure.
     #[error("Failed to receive code")]
     Recv,
 
+    /// Token exchange failure with Spotify's authorization server.
     #[error("Failed to exchange code for access token ({e})")]
-    ExchangeCode { e: String },
+    ExchangeCode {
+        /// Inner error description
+        e: String,
+    },
 }
 
-#[derive(Debug, Clone)]
+/// Represents an OAuth token used for accessing Spotify's Web API and sessions.
+///
+/// All sensitive fields are redacted when printed or logged for security purposes using
+/// [`veil`]'s redaction functionality.
+#[derive(Redact, Clone)]
+#[redact(all, partial, with = '*')]
 pub struct OAuthToken {
+    /// Bearer token used for authenticated Spotify API requests
     pub access_token: String,
+    /// Long-lived token used to obtain new access tokens
     pub refresh_token: String,
+    /// Instant when the access token becomes invalid
     pub expires_at: Instant,
+    /// Type of token
     pub token_type: String,
+    /// Permission scopes granted by this token
     pub scopes: Vec<String>,
 }
 
@@ -148,6 +195,7 @@ fn get_authcode_listener(
 // If the specified `redirect_uri` is HTTP, loopback, and contains a port,
 // then the corresponding socket address is returned.
 fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
+    #![warn(missing_docs)]
     let url = match Url::parse(redirect_uri) {
         Ok(u) if u.scheme() == "http" && u.port().is_some() => u,
         _ => return None,
@@ -164,8 +212,9 @@ fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
     None
 }
 
-/// Struct that handle obtaining and refreshing of access tokens
-/// Should not be instantiate by itself, use OAuthClientBuilder instead.
+/// Struct that handle obtaining and refreshing access tokens.
+///
+/// Should not be instantiate by itself, use [`OAuthClientBuilder`] instead.
 pub struct OAuthClient {
     scopes: Vec<String>,
     redirect_uri: String,
@@ -175,11 +224,11 @@ pub struct OAuthClient {
 }
 
 impl OAuthClient {
-    /// Obtain a Spotify access token using the authorization code with PKCE OAuth flow.
-    /// The `redirect_uri` must match what is registered to the client ID.
-    pub async fn get_access_token(&self) -> Result<OAuthToken, OAuthError> {
+    /// Generates and opens/shows the authentication URL to obtain an access token.
+    ///
+    /// Returns a verifier that must be included in the final request for validation.
+    fn set_auth_url(&self) -> PkceCodeVerifier {
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-
         // Generate the full authorization URL.
         // Some of these scopes are unavailable for custom client IDs. Which?
         let request_scopes: Vec<oauth2::Scope> =
@@ -194,8 +243,77 @@ impl OAuthClient {
         if self.should_open_url {
             open::that_in_background(auth_url.as_str());
         } else {
-            println!("{}", auth_url);
+            println!("Browse to: {}", auth_url);
         }
+
+        pkce_verifier
+    }
+
+    fn build_token(
+        &self,
+        resp: StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>,
+    ) -> Result<OAuthToken, OAuthError> {
+        trace!("Obtained new access token: {resp:?}");
+
+        let token_scopes: Vec<String> = match resp.scopes() {
+            Some(s) => s.iter().map(|s| s.to_string()).collect(),
+            _ => self.scopes.clone(),
+        };
+        let refresh_token = match resp.refresh_token() {
+            Some(t) => t.secret().to_string(),
+            _ => "".to_string(), // Spotify always provides a refresh token.
+        };
+        Ok(OAuthToken {
+            access_token: resp.access_token().secret().to_string(),
+            refresh_token,
+            expires_at: Instant::now()
+                + resp
+                    .expires_in()
+                    .unwrap_or_else(|| Duration::from_secs(3600)),
+            token_type: format!("{:?}", resp.token_type()),
+            scopes: token_scopes,
+        })
+    }
+
+    /// Syncronously obtain a Spotify access token using the authorization code with PKCE OAuth flow.
+    ///
+    /// `redirect_uri` must match what is registered to the client ID.
+    pub async fn get_access_token(&self) -> Result<OAuthToken, OAuthError> {
+        let pkce_verifier = self.set_auth_url();
+
+        let code = match get_socket_address(&self.redirect_uri) {
+            Some(addr) => get_authcode_listener(addr, self.message.clone()),
+            _ => get_authcode_stdin(),
+        }?;
+        trace!("Exchange {code:?} for access token");
+
+        let resp = self
+            .client
+            .exchange_code(code)
+            .set_pkce_verifier(pkce_verifier)
+            .request(http_client);
+
+        let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
+        self.build_token(resp)
+    }
+
+    /// Asynchronously creates a new valid OAuth token by a given refresh_token
+    pub async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
+        let refresh_token = RefreshToken::new(refresh_token.to_string());
+        let resp = self
+            .client
+            .exchange_refresh_token(&refresh_token)
+            .request(http_client);
+
+        let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
+        self.build_token(resp)
+    }
+
+    /// Asyncronously obtain a Spotify access token using the authorization code with PKCE OAuth flow.
+    ///
+    /// `redirect_uri` must match what is registered to the client ID.
+    pub async fn get_access_token_async(&self) -> Result<OAuthToken, OAuthError> {
+        let pkce_verifier = self.set_auth_url();
 
         let code = match get_socket_address(&self.redirect_uri) {
             Some(addr) => get_authcode_listener(addr, self.message.clone()),
@@ -210,59 +328,21 @@ impl OAuthClient {
             .request_async(async_http_client)
             .await;
 
-        let token = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
-        trace!("Obtained new access token: {token:?}");
-
-        let token_scopes: Vec<String> = match token.scopes() {
-            Some(s) => s.iter().map(|s| s.to_string()).collect(),
-            _ => self.scopes.clone(),
-        };
-        let refresh_token = match token.refresh_token() {
-            Some(t) => t.secret().to_string(),
-            _ => "".to_string(),
-        };
-        Ok(OAuthToken {
-            access_token: token.access_token().secret().to_string(),
-            refresh_token,
-            expires_at: Instant::now()
-                + token
-                    .expires_in()
-                    .unwrap_or_else(|| Duration::from_secs(3600)),
-            token_type: format!("{:?}", token.token_type()).to_string(),
-            scopes: token_scopes,
-        })
+        let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
+        self.build_token(resp)
     }
 
-    /// Creates a new valid OAuth token by a given refresh_token
-    pub async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
+    /// Asynchronously creates a new valid OAuth token by a given refresh_token
+    pub async fn refresh_token_async(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
         let refresh_token = RefreshToken::new(refresh_token.to_string());
         let resp = self
             .client
             .exchange_refresh_token(&refresh_token)
             .request_async(async_http_client)
             .await;
-        let token = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
-        trace!("Obtained new access token: {token:?}");
 
-        let token_scopes: Vec<String> = token
-            .scopes()
-            .map(|s| s.iter().map(|s| s.to_string()).collect())
-            .unwrap_or_default();
-
-        let refresh_token = token
-            .refresh_token()
-            .map_or(String::new(), |t| t.secret().to_string());
-
-        Ok(OAuthToken {
-            access_token: token.access_token().secret().to_string(),
-            refresh_token,
-            expires_at: Instant::now()
-                + token
-                    .expires_in()
-                    .unwrap_or_else(|| Duration::from_secs(3600)),
-            token_type: format!("{:?}", token.token_type()).to_string(),
-            scopes: token_scopes,
-        })
+        let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
+        self.build_token(resp)
     }
 }
 
@@ -276,11 +356,12 @@ pub struct OAuthClientBuilder {
 }
 
 impl OAuthClientBuilder {
+    /// Create a new OAuthClientBuilder with provided params and default config.
     pub fn new(client_id: &str, redirect_uri: &str, scopes: Vec<&str>) -> Self {
         Self {
             client_id: client_id.to_string(),
             redirect_uri: redirect_uri.to_string(),
-            scopes: scopes.iter().map(|s| s.to_string()).collect(),
+            scopes: scopes.into_iter().map(Into::into).collect(),
             should_open_url: false,
             message: String::from("Go back to your terminal :)"),
         }
@@ -330,6 +411,7 @@ impl OAuthClientBuilder {
         })
     }
 }
+
 /// Obtain a Spotify access token using the authorization code with PKCE OAuth flow.
 /// The `redirect_uri` must match what is registered to the client ID.
 #[deprecated(
@@ -373,10 +455,10 @@ pub fn get_access_token(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    println!("{}", auth_url);
+    println!("Browse to: {}", auth_url);
 
     let code = match get_socket_address(redirect_uri) {
-        Some(addr) => get_authcode_listener(addr, String::from("ayaya")),
+        Some(addr) => get_authcode_listener(addr, String::from("Go back to your terminal :)")),
         _ => get_authcode_stdin(),
     }?;
     trace!("Exchange {code:?} for access token");
@@ -403,7 +485,7 @@ pub fn get_access_token(
             + token
                 .expires_in()
                 .unwrap_or_else(|| Duration::from_secs(3600)),
-        token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
+        token_type: format!("{:?}", token.token_type()),
         scopes: token_scopes,
     })
 }

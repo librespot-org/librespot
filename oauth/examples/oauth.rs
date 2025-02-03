@@ -5,6 +5,15 @@ use librespot_oauth::OAuthClientBuilder;
 const SPOTIFY_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 const SPOTIFY_REDIRECT_URI: &str = "http://127.0.0.1:8898/login";
 
+const RESPONSE: &str = r#"
+<!doctype html>
+<html>
+    <body>
+        <h1>Return to your app!</h1>
+    </body>
+</html>
+"#;
+
 #[tokio::main]
 async fn main() {
     let mut builder = env_logger::Builder::new();
@@ -28,7 +37,7 @@ async fn main() {
 
     let client = match OAuthClientBuilder::new(client_id, redirect_uri, scopes)
         .open_in_browser()
-        .with_custom_message(include_str!("response.html"))
+        .with_custom_message(RESPONSE)
         .build()
     {
         Ok(client) => client,
