@@ -14,7 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Replaced `ConnectConfig` with `ConnectStateConfig` (breaking)
 - [connect] Replaced `playing_track_index` field of `SpircLoadCommand` with `playing_track` (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
-- [oauth] `get_access_token()` function marked for deprecation and removal of thread overhead
 
 ### Added
 
@@ -40,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [metadata] `Show::trailer_uri` is now optional since it isn't always present (breaking)
 - [connect] Handle transfer of playback with empty "uri" field
 - [connect] Correctly apply playing/paused state when transferring playback
+
+### Deprecated
+
+- [oauth] `get_access_token()` function marked for deprecation and removal of thread overhead
 
 ### Removed
 

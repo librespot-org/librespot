@@ -297,7 +297,7 @@ impl OAuthClient {
         self.build_token(resp)
     }
 
-    /// Asynchronously creates a new valid OAuth token by a given refresh_token
+    /// Synchronously creates a new valid OAuth token by a given refresh_token
     pub fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
         let refresh_token = RefreshToken::new(refresh_token.to_string());
         let resp = self
