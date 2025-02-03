@@ -278,7 +278,7 @@ impl OAuthClient {
     /// Syncronously obtain a Spotify access token using the authorization code with PKCE OAuth flow.
     ///
     /// `redirect_uri` must match what is registered to the client ID.
-    pub async fn get_access_token(&self) -> Result<OAuthToken, OAuthError> {
+    pub fn get_access_token(&self) -> Result<OAuthToken, OAuthError> {
         let pkce_verifier = self.set_auth_url();
 
         let code = match get_socket_address(&self.redirect_uri) {
@@ -298,7 +298,7 @@ impl OAuthClient {
     }
 
     /// Asynchronously creates a new valid OAuth token by a given refresh_token
-    pub async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
+    pub fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
         let refresh_token = RefreshToken::new(refresh_token.to_string());
         let resp = self
             .client

@@ -1906,7 +1906,7 @@ async fn main() {
             error!("Failed to create OAuth client: {e}");
             exit(1);
         });
-        let oauth_token = client.get_access_token().await.unwrap_or_else(|e| {
+        let oauth_token = client.get_access_token().unwrap_or_else(|e| {
             error!("Failed to get Spotify access token: {e}");
             exit(1);
         });

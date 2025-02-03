@@ -47,7 +47,7 @@ async fn main() {
         }
     };
 
-    let refresh_token = match client.get_access_token().await {
+    let refresh_token = match client.get_access_token_async().await {
         Ok(token) => {
             println!("OAuth Token: {token:#?}");
             token.refresh_token
@@ -58,7 +58,7 @@ async fn main() {
         }
     };
 
-    match client.refresh_token(&refresh_token).await {
+    match client.refresh_token_async(&refresh_token).await {
         Ok(token) => println!("New refreshed OAuth Token: {token:#?}"),
         Err(err) => println!("Unable to get refreshed OAuth Token: {err}"),
     }
