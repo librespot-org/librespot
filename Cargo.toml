@@ -60,7 +60,6 @@ env_logger =  { version = "0.11.2", default-features = false, features = ["color
 futures-util = { version = "0.3", default-features = false }
 getopts = "0.2"
 log = "0.4"
-reqwest = "0.12.12"
 sha1 = "0.10"
 sysinfo = { version = "0.33.0", default-features = false, features = ["system"] }
 thiserror = "2.0"
