@@ -20,6 +20,7 @@ use oauth2::{
 };
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, RefreshToken, StandardTokenResponse};
 use std::io;
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::{
     io::{BufRead, BufReader, Write},
@@ -224,7 +225,7 @@ pub struct OAuthClient {
 }
 
 impl OAuthClient {
-    /// Generates and opens/shows the authentication URL to obtain an access token.
+    /// Generates and opens/shows the authorization URL to obtain an access token.
     ///
     /// Returns a verifier that must be included in the final request for validation.
     fn set_auth_url(&self) -> PkceCodeVerifier {
@@ -276,8 +277,6 @@ impl OAuthClient {
     }
 
     /// Syncronously obtain a Spotify access token using the authorization code with PKCE OAuth flow.
-    ///
-    /// `redirect_uri` must match what is registered to the client ID.
     pub fn get_access_token(&self) -> Result<OAuthToken, OAuthError> {
         let pkce_verifier = self.set_auth_url();
 
@@ -297,7 +296,7 @@ impl OAuthClient {
         self.build_token(resp)
     }
 
-    /// Synchronously creates a new valid OAuth token by a given refresh_token
+    /// Synchronously obtain a new valid OAuth token from `refresh_token`
     pub fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
         let refresh_token = RefreshToken::new(refresh_token.to_string());
         let resp = self
@@ -310,8 +309,6 @@ impl OAuthClient {
     }
 
     /// Asyncronously obtain a Spotify access token using the authorization code with PKCE OAuth flow.
-    ///
-    /// `redirect_uri` must match what is registered to the client ID.
     pub async fn get_access_token_async(&self) -> Result<OAuthToken, OAuthError> {
         let pkce_verifier = self.set_auth_url();
 
@@ -332,7 +329,7 @@ impl OAuthClient {
         self.build_token(resp)
     }
 
-    /// Asynchronously creates a new valid OAuth token by a given refresh_token
+    /// Asynchronously obtain a new valid OAuth token from `refresh_token`
     pub async fn refresh_token_async(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
         let refresh_token = RefreshToken::new(refresh_token.to_string());
         let resp = self
@@ -349,7 +346,7 @@ impl OAuthClient {
 /// Builder struct through which structures of type OAuthClient are instantiated.
 pub struct OAuthClientBuilder {
     client_id: String,
-    redirect_uri: String,
+    redirect_uri: String, // must match what is registered to the client ID
     scopes: Vec<String>,
     should_open_url: bool,
     message: String,
@@ -418,6 +415,8 @@ impl OAuthClientBuilder {
     since = "0.7.0",
     note = "please use builder pattern with `OAuthClientBuilder` instead"
 )]
+/// Obtain a Spotify access token using the authorization code with PKCE OAuth flow.
+/// The redirect_uri must match what is registered to the client ID.
 pub fn get_access_token(
     client_id: &str,
     redirect_uri: &str,
@@ -463,11 +462,19 @@ pub fn get_access_token(
     }?;
     trace!("Exchange {code:?} for access token");
 
-    let resp = client
-        .exchange_code(code)
-        .set_pkce_verifier(pkce_verifier)
-        .request(http_client);
-    let token = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
+    // Do this sync in another thread because I am too stupid to make the async version work.
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let resp = client
+            .exchange_code(code)
+            .set_pkce_verifier(pkce_verifier)
+            .request(http_client);
+        if let Err(e) = tx.send(resp) {
+            error!("OAuth channel send error: {e}");
+        }
+    });
+    let token_response = rx.recv().map_err(|_| OAuthError::Recv)?;
+    let token = token_response.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
     trace!("Obtained new access token: {token:?}");
 
     let token_scopes: Vec<String> = match token.scopes() {
@@ -485,7 +492,7 @@ pub fn get_access_token(
             + token
                 .expires_in()
                 .unwrap_or_else(|| Duration::from_secs(3600)),
-        token_type: format!("{:?}", token.token_type()),
+        token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
         scopes: token_scopes,
     })
 }
