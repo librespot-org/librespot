@@ -11,20 +11,18 @@ FROM --platform=linux/amd64 ubuntu:18.04
 
 # Install common packages.
 RUN apt-get update
-RUN apt-get install -y -qq git curl build-essential libasound2-dev libssl-dev libpulse-dev libdbus-1-dev
+RUN apt-get install -y -qq git curl build-essential cmake clang libclang-dev libasound2-dev libpulse-dev
 
 # Install armhf packages.
 RUN echo "deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports/ bionic main" | tee -a /etc/apt/sources.list
 RUN apt-get update
-RUN apt-get download libasound2:armhf libasound2-dev:armhf libssl-dev:armhf libssl1.1:armhf
+RUN apt-get download libasound2:armhf libasound2-dev:armhf
 RUN mkdir /sysroot && \
     dpkg -x libasound2_*.deb /sysroot/ && \
-    dpkg -x libssl-dev*.deb /sysroot/ && \
-    dpkg -x libssl1.1*.deb /sysroot/ && \
     dpkg -x libasound2-dev*.deb /sysroot/
 
 # Install rust.
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.81 -y
 ENV PATH="/root/.cargo/bin/:${PATH}"
 RUN rustup target add arm-unknown-linux-gnueabihf
 RUN mkdir /.cargo && \
@@ -35,14 +33,11 @@ RUN mkdir /pi && \
     git -C /pi clone --depth=1 https://github.com/raspberrypi/tools.git
 
 # Build env variables.
-ENV CARGO_TARGET_DIR /build
-ENV CARGO_HOME /build/cache
+ENV CARGO_TARGET_DIR=/build
+ENV CARGO_HOME=/build/cache
 ENV PATH="/pi/tools/arm-bcm2708/arm-linux-gnueabihf/bin:${PATH}"
 ENV PKG_CONFIG_ALLOW_CROSS=1
 ENV PKG_CONFIG_PATH_arm-unknown-linux-gnueabihf=/usr/lib/arm-linux-gnueabihf/pkgconfig/
-ENV C_INCLUDE_PATH=/sysroot/usr/include
-ENV OPENSSL_LIB_DIR=/sysroot/usr/lib/arm-linux-gnueabihf
-ENV OPENSSL_INCLUDE_DIR=/sysroot/usr/include/arm-linux-gnueabihf
 
 ADD . /src
 WORKDIR /src
