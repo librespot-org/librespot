@@ -346,7 +346,7 @@ impl OAuthClient {
 /// Builder struct through which structures of type OAuthClient are instantiated.
 pub struct OAuthClientBuilder {
     client_id: String,
-    redirect_uri: String, // must match what is registered to the client ID
+    redirect_uri: String,
     scopes: Vec<String>,
     should_open_url: bool,
     message: String,
