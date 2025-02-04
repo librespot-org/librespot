@@ -30,7 +30,7 @@ use thiserror::Error;
 use url::Url;
 use veil::Redact;
 
-/// Enumerates possible errors encountered during the OAuth authentication flow.
+/// Possible errors encountered during the OAuth authentication flow.
 #[derive(Debug, Error)]
 pub enum OAuthError {
     /// The redirect URI cannot be parsed as a valid URL.
