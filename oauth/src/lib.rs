@@ -354,6 +354,8 @@ pub struct OAuthClientBuilder {
 
 impl OAuthClientBuilder {
     /// Create a new OAuthClientBuilder with provided params and default config.
+    ///
+    /// `redirect_uri` must match to the registered Uris of `client_id`
     pub fn new(client_id: &str, redirect_uri: &str, scopes: Vec<&str>) -> Self {
         Self {
             client_id: client_id.to_string(),
