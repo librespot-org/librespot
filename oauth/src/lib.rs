@@ -214,8 +214,6 @@ fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
 }
 
 /// Struct that handle obtaining and refreshing access tokens.
-///
-/// Should not be instantiate by itself, use [`OAuthClientBuilder`] instead.
 pub struct OAuthClient {
     scopes: Vec<String>,
     redirect_uri: String,
