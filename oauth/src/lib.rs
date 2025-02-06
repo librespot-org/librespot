@@ -365,7 +365,7 @@ impl OAuthClientBuilder {
     }
 
     /// When this function is added to the building process pipeline, the auth url will be
-    /// displayed on a default web browser. Otherwise, it will be printed through standard output
+    /// opened with the default web browser. Otherwise, it will be printed to standard output.
     pub fn open_in_browser(mut self) -> Self {
         self.should_open_url = true;
         self
