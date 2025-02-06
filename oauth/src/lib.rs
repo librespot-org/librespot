@@ -241,9 +241,8 @@ impl OAuthClient {
 
         if self.should_open_url {
             open::that_in_background(auth_url.as_str());
-        } else {
-            println!("Browse to: {}", auth_url);
         }
+        println!("Browse to: {}", auth_url);
 
         pkce_verifier
     }
