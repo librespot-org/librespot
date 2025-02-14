@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
-- [oauth] `get_access_token()` function marked for deprecation and removal of thread overhead
+- [oauth] `get_access_token()` function marked for deprecation
 
 ### Removed
 

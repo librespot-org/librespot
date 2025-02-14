@@ -29,7 +29,7 @@ use std::{
 use thiserror::Error;
 use url::Url;
 
-/// Enumerates possible errors encountered during the OAuth authentication flow.
+/// Possible errors encountered during the OAuth authentication flow.
 #[derive(Debug, Error)]
 pub enum OAuthError {
     /// The redirect URI cannot be parsed as a valid URL.
@@ -209,8 +209,6 @@ fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
 }
 
 /// Struct that handle obtaining and refreshing access tokens.
-///
-/// Should not be instantiate by itself, use [`OAuthClientBuilder`] instead.
 pub struct OAuthClient {
     scopes: Vec<String>,
     redirect_uri: String,
@@ -348,7 +346,7 @@ impl OAuthClient {
 /// Builder struct through which structures of type OAuthClient are instantiated.
 pub struct OAuthClientBuilder {
     client_id: String,
-    redirect_uri: String, // must match what is registered to the client ID
+    redirect_uri: String,
     scopes: Vec<String>,
     should_open_url: bool,
     message: String,
@@ -356,6 +354,8 @@ pub struct OAuthClientBuilder {
 
 impl OAuthClientBuilder {
     /// Create a new OAuthClientBuilder with provided params and default config.
+    ///
+    /// `redirect_uri` must match to the registered Uris of `client_id`
     pub fn new(client_id: &str, redirect_uri: &str, scopes: Vec<&str>) -> Self {
         Self {
             client_id: client_id.to_string(),
@@ -367,7 +367,7 @@ impl OAuthClientBuilder {
     }
 
     /// When this function is added to the building process pipeline, the auth url will be
-    /// displayed on a default web browser. Otherwise, it will be printed through standard output
+    /// opened with the default web browser. Otherwise, it will be printed to standard output.
     pub fn open_in_browser(mut self) -> Self {
         self.should_open_url = true;
         self
