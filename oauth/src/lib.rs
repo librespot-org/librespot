@@ -103,7 +103,7 @@ pub enum OAuthError {
 }
 
 /// Represents an OAuth token used for accessing Spotify's Web API and sessions.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct OAuthToken {
     /// Bearer token used for authenticated Spotify API requests
     pub access_token: String,
