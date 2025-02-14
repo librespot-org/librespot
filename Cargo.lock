@@ -170,15 +170,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "atomic-shim"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67cd4b51d303cf3501c301e8125df442128d3c6d7c69f71b27833d253de47e77"
-dependencies = [
- "crossbeam-utils",
-]
-
-[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2142,7 +2133,6 @@ name = "librespot-playback"
 version = "0.6.0-dev"
 dependencies = [
  "alsa",
- "atomic-shim",
  "cpal",
  "futures-util",
  "glib",
@@ -2158,6 +2148,7 @@ dependencies = [
  "log",
  "ogg",
  "parking_lot",
+ "portable-atomic",
  "portaudio-rs",
  "rand",
  "rand_distr",
