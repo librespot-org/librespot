@@ -14,7 +14,6 @@ oauth2 = "4.4"
 open = "5.3"
 thiserror = "2.0"
 url = "2.2"
-veil = "0.2"
 
 [dev-dependencies]
 env_logger =  { version = "0.11.2", default-features = false, features = ["color", "humantime", "auto-color"] }

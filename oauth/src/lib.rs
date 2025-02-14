@@ -28,7 +28,6 @@ use std::{
 };
 use thiserror::Error;
 use url::Url;
-use veil::Redact;
 
 /// Enumerates possible errors encountered during the OAuth authentication flow.
 #[derive(Debug, Error)]
@@ -104,11 +103,7 @@ pub enum OAuthError {
 }
 
 /// Represents an OAuth token used for accessing Spotify's Web API and sessions.
-///
-/// All sensitive fields are redacted when printed or logged for security purposes using
-/// [`veil`]'s redaction functionality.
-#[derive(Redact, Clone)]
-#[redact(all, partial, with = '*')]
+#[derive(Clone)]
 pub struct OAuthToken {
     /// Bearer token used for authenticated Spotify API requests
     pub access_token: String,
@@ -243,9 +238,8 @@ impl OAuthClient {
 
         if self.should_open_url {
             open::that_in_background(auth_url.as_str());
-        } else {
-            println!("Browse to: {}", auth_url);
         }
+        println!("Browse to: {}", auth_url);
 
         pkce_verifier
     }
@@ -286,14 +280,22 @@ impl OAuthClient {
         }?;
         trace!("Exchange {code:?} for access token");
 
-        let resp = self
-            .client
-            .exchange_code(code)
-            .set_pkce_verifier(pkce_verifier)
-            .request(http_client);
+        let (tx, rx) = mpsc::channel();
+        let client = self.client.clone();
+        std::thread::spawn(move || {
+            let resp = client
+                .exchange_code(code)
+                .set_pkce_verifier(pkce_verifier)
+                .request(http_client);
+            if let Err(e) = tx.send(resp) {
+                error!("OAuth channel send error: {e}");
+            }
+        });
+        let channel_response = rx.recv().map_err(|_| OAuthError::Recv)?;
+        let token_response =
+            channel_response.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
 
-        let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
-        self.build_token(resp)
+        self.build_token(token_response)
     }
 
     /// Synchronously obtain a new valid OAuth token from `refresh_token`

@@ -2147,7 +2147,6 @@ dependencies = [
  "thiserror 2.0.11",
  "tokio",
  "url",
- "veil",
 ]
 
 [[package]]
@@ -4047,27 +4046,6 @@ checksum = "b913a3b5fe84142e269d63cc62b64319ccaf89b748fc31fe025177f767a756c4"
 dependencies = [
  "getrandom",
  "rand",
-]
-
-[[package]]
-name = "veil"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f00796f9c5969da55497f5c8802c2e69eaf21c0166fe28b6006c7c4699f4d0e"
-dependencies = [
- "once_cell",
- "veil-macros",
-]
-
-[[package]]
-name = "veil-macros"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b2d5567b6fbd34e8f0488d56b648e67c0d999535f4af2060d14f9074b43e833"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
 ]
 
 [[package]]
