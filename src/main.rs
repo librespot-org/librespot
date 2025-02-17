@@ -1901,6 +1901,7 @@ async fn main() {
             &format!("http://127.0.0.1{port_str}/login"),
             OAUTH_SCOPES.to_vec(),
         )
+        .open_in_browser()
         .build()
         .unwrap_or_else(|e| {
             error!("Failed to create OAuth client: {e}");
