@@ -30,6 +30,7 @@ use librespot::{
         player::{coefficient_to_duration, duration_to_coefficient, Player},
     },
 };
+use librespot_oauth::OAuthClientBuilder;
 use log::{debug, error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use sysinfo::{ProcessesToUpdate, System};
@@ -1895,18 +1896,22 @@ async fn main() {
             Some(port) => format!(":{port}"),
             _ => String::new(),
         };
-        let access_token = match librespot::oauth::get_access_token(
+        let client = OAuthClientBuilder::new(
             &setup.session_config.client_id,
             &format!("http://127.0.0.1{port_str}/login"),
             OAUTH_SCOPES.to_vec(),
-        ) {
-            Ok(token) => token.access_token,
-            Err(e) => {
-                error!("Failed to get Spotify access token: {e}");
-                exit(1);
-            }
-        };
-        last_credentials = Some(Credentials::with_access_token(access_token));
+        )
+        .open_in_browser()
+        .build()
+        .unwrap_or_else(|e| {
+            error!("Failed to create OAuth client: {e}");
+            exit(1);
+        });
+        let oauth_token = client.get_access_token().unwrap_or_else(|e| {
+            error!("Failed to get Spotify access token: {e}");
+            exit(1);
+        });
+        last_credentials = Some(Credentials::with_access_token(oauth_token.access_token));
         connecting = true;
     } else if discovery.is_none() {
         error!(

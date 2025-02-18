@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
+- [oauth] Add `OAuthClient` and `OAuthClientBuilder` structs to achieve a more customizable login process
 
 ### Fixed
 
@@ -38,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [metadata] `Show::trailer_uri` is now optional since it isn't always present (breaking)
 - [connect] Handle transfer of playback with empty "uri" field
 - [connect] Correctly apply playing/paused state when transferring playback
+
+### Deprecated
+
+- [oauth] `get_access_token()` function marked for deprecation
 
 ### Removed
 
@@ -76,7 +81,7 @@ backend for Spotify Connect discovery.
 ## [0.5.0] - 2024-10-15
 
 This version is be a major departure from the architecture up until now. It
-focuses on implementing the "new Spotify API". This  means moving large parts
+focuses on implementing the "new Spotify API". This means moving large parts
 of the Spotify protocol from Mercury to HTTP. A lot of this was reverse
 engineered before by @devgianlu of librespot-java. It was long overdue that we
 started implementing it too, not in the least because new features like the
@@ -219,14 +224,17 @@ to offer. But, unless anything big comes up, it is also intended as the last
 release to be based on the old API. Happy listening.
 
 ### Changed
+
 - [playback] `pipe`: Better error handling
 - [playback] `subprocess`: Better error handling
 
 ### Added
+
 - [core] `apresolve`: Blacklist ap-gew4 and ap-gue1 access points that cause channel errors
 - [playback] `pipe`: Implement stop
 
 ### Fixed
+
 - [main] fix `--opt=value` line argument logging
 - [playback] `alsamixer`: make `--volume-ctrl fixed` work as expected when combined with `--mixer alsa`
 
@@ -235,9 +243,11 @@ release to be based on the old API. Happy listening.
 This release fixes dependency issues when installing from crates.
 
 ### Changed
+
 - [chore] The MSRV is now 1.56
 
 ### Fixed
+
 - [playback] Fixed dependency issues when installing from crate
 
 ## [0.4.0] - 2022-05-21
@@ -253,6 +263,7 @@ Targeting that major effort for a v0.5 release sometime, we intend to maintain
 v0.4.x as a stable branch until then.
 
 ### Changed
+
 - [chore] The MSRV is now 1.53
 - [contrib] Hardened security of the `systemd` service units
 - [core] `Session`: `connect()` now returns the long-term credentials
@@ -265,6 +276,7 @@ v0.4.x as a stable branch until then.
 - [playback] `Sink`: `write()` now receives ownership of the packet (breaking)
 
 ### Added
+
 - [main] Enforce reasonable ranges for option values (breaking)
 - [main] Add the ability to parse environment variables
 - [main] Log now emits warning when trying to use options that would otherwise have no effect
@@ -277,6 +289,7 @@ v0.4.x as a stable branch until then.
 - [playback] `pulseaudio`: set values to: `PULSE_PROP_application.version`, `PULSE_PROP_application.process.binary`, `PULSE_PROP_stream.description`, `PULSE_PROP_media.software` and `PULSE_PROP_media.role` environment variables (user set env var values take precedence) (breaking)
 
 ### Fixed
+
 - [connect] Don't panic when activating shuffle without previous interaction
 - [core] Removed unsafe code (breaking)
 - [main] Fix crash when built with Avahi support but Avahi is locally unavailable
@@ -287,20 +300,24 @@ v0.4.x as a stable branch until then.
 - [playback] `alsa`: make `--volume-range` overrides apply to Alsa softvol controls
 
 ### Removed
+
 - [playback] `alsamixer`: previously deprecated options `mixer-card`, `mixer-name` and `mixer-index` have been removed
 
 ## [0.3.1] - 2021-10-24
 
 ### Changed
+
 - Include build profile in the displayed version information
 - [playback] Improve dithering CPU usage by about 33%
 
 ### Fixed
+
 - [connect] Partly fix behavior after last track of an album/playlist
 
 ## [0.3.0] - 2021-10-13
 
 ### Added
+
 - [discovery] The crate `librespot-discovery` for discovery in LAN was created. Its functionality was previously part of `librespot-connect`.
 - [playback] Add support for dithering with `--dither` for lower requantization error (breaking)
 - [playback] Add `--volume-range` option to set dB range and control `log` and `cubic` volume control curves
@@ -309,6 +326,7 @@ v0.4.x as a stable branch until then.
 - [playback] Add `--normalisation-gain-type auto` that switches between album and track automatically
 
 ### Changed
+
 - [audio, playback] Moved `VorbisDecoder`, `VorbisError`, `AudioPacket`, `PassthroughDecoder`, `PassthroughError`, `DecoderError`, `AudioDecoder` and the `convert` module from `librespot-audio` to `librespot-playback`. The underlying crates `vorbis`, `librespot-tremor`, `lewton` and `ogg` should be used directly. (breaking)
 - [audio, playback] Use `Duration` for time constants and functions (breaking)
 - [connect, playback] Moved volume controls from `librespot-connect` to `librespot-playback` crate
@@ -325,17 +343,20 @@ v0.4.x as a stable branch until then.
 - [playback] `player`: default normalisation type is now `auto`
 
 ### Deprecated
+
 - [connect] The `discovery` module was deprecated in favor of the `librespot-discovery` crate
 - [playback] `alsamixer`: renamed `mixer-card` to `alsa-mixer-device`
 - [playback] `alsamixer`: renamed `mixer-name` to `alsa-mixer-control`
 - [playback] `alsamixer`: renamed `mixer-index` to `alsa-mixer-index`
 
 ### Removed
+
 - [connect] Removed no-op mixer started/stopped logic (breaking)
 - [playback] Removed `with-vorbis` and `with-tremor` features
 - [playback] `alsamixer`: removed `--mixer-linear-volume` option, now that `--volume-ctrl {linear|log}` work as expected on Alsa
 
 ### Fixed
+
 - [connect] Fix step size on volume up/down events
 - [connect] Fix looping back to the first track after the last track of an album or playlist
 - [playback] Incorrect `PlayerConfig::default().normalisation_threshold` caused distortion when using dynamic volume normalisation downstream
