@@ -49,12 +49,17 @@ impl From<&[AudioFileMessage]> for AudioFiles {
             .iter()
             .filter_map(|file| {
                 let file_id = FileId::from(file.file_id());
-                if file.has_format() {
-                    Some((file.format(), file_id))
+                if let Some(format) = file.format {
+                    match format.enum_value() {
+                        Ok(f) => return Some((f, file_id)),
+                        Err(unknown) => {
+                            trace!("Ignoring file <{}> with unknown format {unknown}", file_id);
+                        }
+                    }
                 } else {
                     trace!("Ignoring file <{}> with unspecified format", file_id);
-                    None
                 }
+                None
             })
             .collect();
 
