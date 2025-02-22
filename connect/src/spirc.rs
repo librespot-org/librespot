@@ -28,9 +28,10 @@ use crate::{
         provider::IsProvider,
         {ConnectConfig, ConnectState},
     },
-    LoadContextOptions, LoadRequestOptions,
+    LoadContextOptions, LoadRequestOptions, PlayContext,
 };
 use futures_util::StreamExt;
+use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
     future::Future,
@@ -976,11 +977,19 @@ impl SpircTask {
                 return self.notify().await;
             }
             Play(play) => {
-                let context_uri = play
-                    .context
-                    .uri
-                    .clone()
-                    .ok_or(SpircError::NoUri("context"))?;
+                let context = match play.context.uri {
+                    Some(ref s) => PlayContext::Uri(s.clone()),
+                    None if !play.context.pages.is_empty() => PlayContext::Tracks(
+                        play.context
+                            .pages
+                            .iter()
+                            .cloned()
+                            .flat_map(|p| p.tracks)
+                            .flat_map(|t| t.uri)
+                            .collect(),
+                    ),
+                    None => Err(SpircError::NoUri("context"))?,
+                };
 
                 let context_options = play
                     .options
@@ -989,15 +998,15 @@ impl SpircTask {
                     .map(LoadContextOptions::Options);
 
                 self.handle_load(
-                    LoadRequest::from_context_uri(
-                        context_uri,
-                        LoadRequestOptions {
+                    LoadRequest {
+                        context,
+                        options: LoadRequestOptions {
                             start_playing: true,
                             seek_to: play.options.seek_to.unwrap_or_default(),
                             playing_track: play.options.skip_to.and_then(|s| s.try_into().ok()),
                             context_options,
                         },
-                    ),
+                    },
                     Some(play.context),
                 )
                 .await?;
@@ -1044,6 +1053,8 @@ impl SpircTask {
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         let mut ctx_uri = match transfer.current_session.context.uri {
             None => Err(SpircError::NoUri("transfer context"))?,
+            // can apparently happen when a state is transferred stared with "uris" via the api
+            Some(ref uri) if uri == "-" => String::new(),
             Some(ref uri) => uri.clone(),
         };
 
@@ -1064,6 +1075,27 @@ impl SpircTask {
         }
 
         let fallback = self.connect_state.current_track(|t| &t.uri).clone();
+        let load_from_context_uri = !ctx_uri.is_empty();
+
+        if load_from_context_uri {
+            self.context_resolver.add(ResolveContext::from_uri(
+                ctx_uri.clone(),
+                &fallback,
+                ContextType::Default,
+                ContextAction::Replace,
+            ));
+        } else {
+            self.load_context_from_tracks(
+                transfer
+                    .current_session
+                    .context
+                    .pages
+                    .iter()
+                    .cloned()
+                    .flat_map(|p| p.tracks)
+                    .collect::<Vec<_>>(),
+            )?
+        }
 
         self.context_resolver.add(ResolveContext::from_uri(
             ctx_uri.clone(),
@@ -1110,7 +1142,15 @@ impl SpircTask {
             ))
         }
 
-        self.transfer_state = Some(transfer);
+        if load_from_context_uri {
+            self.transfer_state = Some(transfer);
+        } else {
+            let ctx = self.connect_state.get_context(ContextType::Default)?;
+            let idx = ConnectState::find_index_in_context(ctx, |pt| {
+                self.connect_state.current_track(|t| pt.uri == t.uri)
+            })?;
+            self.connect_state.reset_playback_to_position(Some(idx))?;
+        }
 
         self.load_track(is_playing, position.try_into()?)
     }
@@ -1182,46 +1222,23 @@ impl SpircTask {
         context: Option<Context>,
     ) -> Result<(), Error> {
         self.connect_state
-            .reset_context(ResetContext::WhenDifferent(&cmd.context_uri));
+            .reset_context(if let PlayContext::Uri(ref uri) = cmd.context {
+                ResetContext::WhenDifferent(uri)
+            } else {
+                ResetContext::Completely
+            });
 
         self.connect_state.reset_options();
 
-        if !self.connect_state.is_active() {
-            self.handle_activate();
+        let autoplay = matches!(cmd.context_options, Some(LoadContextOptions::Autoplay));
+        match cmd.context {
+            PlayContext::Uri(uri) => self.load_context_from_uri(&context, &uri, autoplay).await?,
+            PlayContext::Tracks(tracks) => self.load_context_from_tracks(tracks)?,
         }
 
-        let fallback = if let Some(ref ctx) = context {
-            match ConnectState::get_context_uri_from_context(ctx) {
-                Some(ctx_uri) => ctx_uri,
-                None => Err(SpircError::InvalidUri(cmd.context_uri.clone()))?,
-            }
-        } else {
-            &cmd.context_uri
-        };
+        let cmd_options = cmd.options;
 
-        let update_context = if matches!(cmd.context_options, Some(LoadContextOptions::Autoplay)) {
-            ContextType::Autoplay
-        } else {
-            ContextType::Default
-        };
-
-        self.connect_state.set_active_context(update_context);
-
-        let current_context_uri = self.connect_state.context_uri();
-        if current_context_uri == &cmd.context_uri && fallback == cmd.context_uri {
-            debug!("context <{current_context_uri}> didn't change, no resolving required")
-        } else {
-            debug!("resolving context for load command");
-            self.context_resolver.clear();
-            self.context_resolver.add(ResolveContext::from_uri(
-                &cmd.context_uri,
-                fallback,
-                update_context,
-                ContextAction::Replace,
-            ));
-            let context = self.context_resolver.get_next_context(Vec::new).await;
-            self.handle_next_context(context);
-        }
+        self.connect_state.set_active_context(ContextType::Default);
 
         // for play commands with skip by uid, the context of the command contains
         // tracks with uri and uid, so we merge the new context with the resolved/existing context
@@ -1231,9 +1248,9 @@ impl SpircTask {
         self.connect_state.clear_next_tracks();
         self.connect_state.clear_restrictions();
 
-        debug!("play track <{:?}>", cmd.playing_track);
+        debug!("play track <{:?}>", cmd_options.playing_track);
 
-        let index = match cmd.playing_track {
+        let index = match cmd_options.playing_track {
             None => None,
             Some(ref playing_track) => Some(match playing_track {
                 PlayingTrack::Index(i) => *i as usize,
@@ -1248,7 +1265,7 @@ impl SpircTask {
             }),
         };
 
-        if let Some(LoadContextOptions::Options(ref options)) = cmd.context_options {
+        if let Some(LoadContextOptions::Options(ref options)) = cmd_options.context_options {
             debug!(
                 "loading with shuffle: <{}>, repeat track: <{}> context: <{}>",
                 options.shuffle, options.repeat, options.repeat_track
@@ -1259,7 +1276,8 @@ impl SpircTask {
             self.connect_state.set_repeat_track(options.repeat_track);
         }
 
-        if matches!(cmd.context_options, Some(LoadContextOptions::Options(ref o)) if o.shuffle) {
+        if matches!(cmd_options.context_options, Some(LoadContextOptions::Options(ref o)) if o.shuffle)
+        {
             if let Some(index) = index {
                 self.connect_state.set_current_track(index)?;
             } else {
@@ -1280,11 +1298,70 @@ impl SpircTask {
         }
 
         if self.connect_state.current_track(MessageField::is_some) {
-            self.load_track(cmd.start_playing, cmd.seek_to)?;
+            self.load_track(cmd_options.start_playing, cmd_options.seek_to)?;
         } else {
             info!("No active track, stopping");
             self.handle_stop()
         }
+
+        Ok(())
+    }
+
+    async fn load_context_from_uri(
+        &mut self,
+        context: &Option<Context>,
+        context_uri: &str,
+        autoplay: bool,
+    ) -> Result<(), Error> {
+        if !self.connect_state.is_active() {
+            self.handle_activate();
+        }
+
+        let fallback = if let Some(ref ctx) = context {
+            match ConnectState::get_context_uri_from_context(ctx) {
+                Some(ctx_uri) => ctx_uri,
+                None => Err(SpircError::InvalidUri(context_uri.into()))?,
+            }
+        } else {
+            context_uri
+        };
+
+        let update_context = if autoplay {
+            ContextType::Autoplay
+        } else {
+            ContextType::Default
+        };
+
+        self.connect_state.set_active_context(update_context);
+
+        let current_context_uri = self.connect_state.context_uri();
+        if current_context_uri == context_uri && fallback == context_uri {
+            debug!("context <{current_context_uri}> didn't change, no resolving required")
+        } else {
+            debug!("resolving context for load command");
+            self.context_resolver.clear();
+            self.context_resolver.add(ResolveContext::from_uri(
+                context_uri,
+                fallback,
+                update_context,
+                ContextAction::Replace,
+            ));
+            let context = self.context_resolver.get_next_context(Vec::new).await;
+            self.handle_next_context(context);
+        }
+
+        Ok(())
+    }
+
+    fn load_context_from_tracks(&mut self, tracks: impl Into<ContextPage>) -> Result<(), Error> {
+        let ctx = Context {
+            pages: vec![tracks.into()],
+            ..Default::default()
+        };
+
+        let _ = self
+            .connect_state
+            .update_context(ctx, ContextType::Default)?;
 
         Ok(())
     }
@@ -1414,7 +1491,8 @@ impl SpircTask {
         let require_load_new = !self
             .connect_state
             .has_next_tracks(Some(CONTEXT_FETCH_THRESHOLD))
-            && self.session.autoplay();
+            && self.session.autoplay()
+            && !self.connect_state.context_uri().is_empty();
 
         if !require_load_new {
             return;

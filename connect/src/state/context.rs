@@ -116,6 +116,10 @@ impl ConnectState {
             ResetContext::Completely => {
                 self.context = None;
                 self.autoplay_context = None;
+
+                let player = self.player_mut();
+                player.context_uri.clear();
+                player.context_url.clear();
             }
             ResetContext::DefaultIndex => {
                 for ctx in [self.context.as_mut(), self.autoplay_context.as_mut()]
@@ -157,7 +161,8 @@ impl ConnectState {
         let player = self.player_mut();
 
         player.context_metadata = Default::default();
-        player.restrictions = Some(Default::default()).into();
+        player.context_restrictions = MessageField::some(Default::default());
+        player.restrictions = MessageField::some(Default::default());
 
         let ctx = match self.get_context(new_context) {
             Err(why) => {

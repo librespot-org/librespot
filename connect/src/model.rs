@@ -7,7 +7,7 @@ use std::ops::Deref;
 /// Request for loading playback
 #[derive(Debug)]
 pub struct LoadRequest {
-    pub(super) context_uri: String,
+    pub(super) context: PlayContext,
     pub(super) options: LoadRequestOptions,
 }
 
@@ -17,6 +17,12 @@ impl Deref for LoadRequest {
     fn deref(&self) -> &Self::Target {
         &self.options
     }
+}
+
+#[derive(Debug)]
+pub(super) enum PlayContext {
+    Uri(String),
+    Tracks(Vec<String>),
 }
 
 /// The parameters for creating a load request
@@ -80,9 +86,23 @@ impl LoadRequest {
     /// Create a load request from a `context_uri`
     ///
     /// For supported `context_uri` see [`SpClient::get_context`](librespot_core::spclient::SpClient::get_context)
+    ///
+    /// Equivalent to using [`/me/player/play`](https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback)
+    /// and providing `context_uri`
     pub fn from_context_uri(context_uri: String, options: LoadRequestOptions) -> Self {
         Self {
-            context_uri,
+            context: PlayContext::Uri(context_uri),
+            options,
+        }
+    }
+
+    /// Create a load request from a set of `tracks`
+    ///
+    /// Equivalent to using [`/me/player/play`](https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback)
+    /// and providing `uris`
+    pub fn from_tracks(tracks: Vec<String>, options: LoadRequestOptions) -> Self {
+        Self {
+            context: PlayContext::Tracks(tracks),
             options,
         }
     }
