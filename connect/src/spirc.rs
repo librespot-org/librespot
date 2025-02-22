@@ -1,4 +1,3 @@
-pub use crate::model::{PlayingTrack, SpircLoadCommand};
 use crate::{
     context_resolver::{ContextAction, ContextResolver, ResolveContext},
     core::{
@@ -10,7 +9,7 @@ use crate::{
         session::UserAttributes,
         Error, Session, SpotifyId,
     },
-    model::SpircPlayStatus,
+    model::{LoadRequest, PlayingTrack, SpircPlayStatus},
     playback::{
         mixer::Mixer,
         player::{Player, PlayerEvent, PlayerEventChannel},
@@ -26,10 +25,10 @@ use crate::{
     },
     state::{
         context::{ContextType, ResetContext},
-        metadata::Metadata,
         provider::IsProvider,
-        {ConnectState, ConnectStateConfig},
+        {ConnectConfig, ConnectState},
     },
+    LoadContextOptions, LoadRequestOptions,
 };
 use futures_util::StreamExt;
 use protobuf::MessageField;
@@ -43,15 +42,13 @@ use thiserror::Error;
 use tokio::{sync::mpsc, time::sleep};
 
 #[derive(Debug, Error)]
-pub enum SpircError {
+enum SpircError {
     #[error("response payload empty")]
     NoData,
     #[error("{0} had no uri")]
     NoUri(&'static str),
     #[error("message pushed for another URI")]
     InvalidUri(String),
-    #[error("tried resolving not allowed context: {0:?}")]
-    NotAllowedContext(String),
     #[error("failed to put connect state for new device")]
     FailedDealerSetup,
     #[error("unknown endpoint: {0:#?}")]
@@ -62,7 +59,7 @@ impl From<SpircError> for Error {
     fn from(err: SpircError) -> Self {
         use SpircError::*;
         match err {
-            NoData | NoUri(_) | NotAllowedContext(_) => Error::unavailable(err),
+            NoData | NoUri(_) => Error::unavailable(err),
             InvalidUri(_) | FailedDealerSetup => Error::aborted(err),
             UnknownEndpoint(_) => Error::unimplemented(err),
         }
@@ -130,25 +127,30 @@ enum SpircCommand {
     SetPosition(u32),
     SetVolume(u16),
     Activate,
-    Load(SpircLoadCommand),
+    Load(LoadRequest),
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
-
-const VOLUME_STEP_SIZE: u16 = 1024; // (u16::MAX + 1) / VOLUME_STEPS
 
 // delay to update volume after a certain amount of time, instead on each update request
 const VOLUME_UPDATE_DELAY: Duration = Duration::from_secs(2);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 
+/// The spotify connect handle
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
 }
 
 impl Spirc {
+    /// Initializes a new spotify connect device
+    ///
+    /// The returned tuple consists out of a handle to the [`Spirc`] that
+    /// can control the local connect device when active. And a [`Future`]
+    /// which represents the [`Spirc`] event loop that processes the whole
+    /// connect device logic.
     pub async fn new(
-        config: ConnectStateConfig,
+        config: ConnectConfig,
         session: Session,
         credentials: Credentials,
         player: Arc<Player>,
@@ -268,53 +270,131 @@ impl Spirc {
         Ok((spirc, task.run()))
     }
 
-    pub fn play(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::Play)?)
-    }
-    pub fn play_pause(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::PlayPause)?)
-    }
-    pub fn pause(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::Pause)?)
-    }
-    pub fn prev(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::Prev)?)
-    }
-    pub fn next(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::Next)?)
-    }
-    pub fn volume_up(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::VolumeUp)?)
-    }
-    pub fn volume_down(&self) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::VolumeDown)?)
-    }
+    /// Safely shutdowns the spirc.
+    ///
+    /// This pauses the playback, disconnects the connect device and
+    /// bring the future initially returned to an end.
     pub fn shutdown(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Shutdown)?)
     }
+
+    /// Resumes the playback
+    ///
+    /// Does nothing if we are not the active device, or it isn't paused.
+    pub fn play(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Play)?)
+    }
+
+    /// Resumes or pauses the playback
+    ///
+    /// Does nothing if we are not the active device.
+    pub fn play_pause(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::PlayPause)?)
+    }
+
+    /// Pauses the playback
+    ///
+    /// Does nothing if we are not the active device, or if it isn't playing.
+    pub fn pause(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Pause)?)
+    }
+
+    /// Seeks to the beginning or skips to the previous track.
+    ///
+    /// Seeks to the beginning when the current track position
+    /// is greater than 3 seconds.
+    ///
+    /// Does nothing if we are not the active device.
+    pub fn prev(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Prev)?)
+    }
+
+    /// Skips to the next track.
+    ///
+    /// Does nothing if we are not the active device.
+    pub fn next(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Next)?)
+    }
+
+    /// Increases the volume by configured steps of [ConnectConfig].
+    ///
+    /// Does nothing if we are not the active device.
+    pub fn volume_up(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::VolumeUp)?)
+    }
+
+    /// Decreases the volume by configured steps of [ConnectConfig].
+    ///
+    /// Does nothing if we are not the active device.
+    pub fn volume_down(&self) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::VolumeDown)?)
+    }
+
+    /// Shuffles the playback according to the value.
+    ///
+    /// If true shuffles/reshuffles the playback. Otherwise, does
+    /// nothing (if not shuffled) or unshuffles the playback while
+    /// resuming at the position of the current track.
+    ///
+    /// Does nothing if we are not the active device.
     pub fn shuffle(&self, shuffle: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Shuffle(shuffle))?)
     }
+
+    /// Repeats the playback context according to the value.
+    ///
+    /// Does nothing if we are not the active device.
     pub fn repeat(&self, repeat: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Repeat(repeat))?)
     }
+
+    /// Repeats the current track if true.
+    ///
+    /// Does nothing if we are not the active device.
+    ///
+    /// Skipping to the next track disables the repeating.
     pub fn repeat_track(&self, repeat: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::RepeatTrack(repeat))?)
     }
+
+    /// Update the volume to the given value.
+    ///
+    /// Does nothing if we are not the active device.
     pub fn set_volume(&self, volume: u16) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetVolume(volume))?)
     }
+
+    /// Updates the position to the given value.
+    ///
+    /// Does nothing if we are not the active device.
+    ///
+    /// If value is greater than the track duration,
+    /// the update is ignored.
     pub fn set_position_ms(&self, position_ms: u32) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::SetPosition(position_ms))?)
     }
+
+    /// Load a new context and replace the current.
+    ///
+    /// Does nothing if we are not the active device.
+    ///
+    /// Does not overwrite the queue.
+    pub fn load(&self, command: LoadRequest) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::Load(command))?)
+    }
+
+    /// Disconnects the current device and pauses the playback according the value.
+    ///
+    /// Does nothing if we are not the active device.
     pub fn disconnect(&self, pause: bool) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Disconnect { pause })?)
     }
+
+    /// Acquires the control as active connect device.
+    ///
+    /// Does nothing if we are not the active device.
     pub fn activate(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Activate)?)
-    }
-    pub fn load(&self, command: SpircLoadCommand) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::Load(command))?)
     }
 }
 
@@ -529,6 +609,7 @@ impl SpircTask {
         match cmd {
             SpircCommand::Shutdown => {
                 trace!("Received SpircCommand::Shutdown");
+                self.handle_pause();
                 self.handle_disconnect().await?;
                 self.shutdown = true;
                 if let Some(rx) = self.commands.as_mut() {
@@ -895,42 +976,28 @@ impl SpircTask {
                 return self.notify().await;
             }
             Play(play) => {
-                let shuffle = play
-                    .options
-                    .player_options_override
-                    .as_ref()
-                    .map(|o| o.shuffling_context.unwrap_or_default())
-                    .unwrap_or_default();
-                let repeat = play
-                    .options
-                    .player_options_override
-                    .as_ref()
-                    .map(|o| o.repeating_context.unwrap_or_default())
-                    .unwrap_or_default();
-                let repeat_track = play
-                    .options
-                    .player_options_override
-                    .as_ref()
-                    .map(|o| o.repeating_track.unwrap_or_default())
-                    .unwrap_or_default();
-
                 let context_uri = play
                     .context
                     .uri
                     .clone()
                     .ok_or(SpircError::NoUri("context"))?;
 
+                let context_options = play
+                    .options
+                    .player_options_override
+                    .map(Into::into)
+                    .map(LoadContextOptions::Options);
+
                 self.handle_load(
-                    SpircLoadCommand {
+                    LoadRequest::from_context_uri(
                         context_uri,
-                        start_playing: true,
-                        seek_to: play.options.seek_to.unwrap_or_default(),
-                        playing_track: play.options.skip_to.and_then(|s| s.try_into().ok()),
-                        shuffle,
-                        repeat,
-                        repeat_track,
-                        autoplay: false,
-                    },
+                        LoadRequestOptions {
+                            start_playing: true,
+                            seek_to: play.options.seek_to.unwrap_or_default(),
+                            playing_track: play.options.skip_to.and_then(|s| s.try_into().ok()),
+                            context_options,
+                        },
+                    ),
                     Some(play.context),
                 )
                 .await?;
@@ -991,7 +1058,7 @@ impl SpircTask {
             }
         };
 
-        let autoplay = self.connect_state.current_track(|t| t.is_from_autoplay());
+        let autoplay = self.connect_state.current_track(|t| t.is_autoplay());
         if autoplay {
             ctx_uri = ctx_uri.replace("station:", "");
         }
@@ -1111,7 +1178,7 @@ impl SpircTask {
 
     async fn handle_load(
         &mut self,
-        cmd: SpircLoadCommand,
+        cmd: LoadRequest,
         context: Option<Context>,
     ) -> Result<(), Error> {
         self.connect_state
@@ -1132,7 +1199,7 @@ impl SpircTask {
             &cmd.context_uri
         };
 
-        let update_context = if cmd.autoplay {
+        let update_context = if matches!(cmd.context_options, Some(LoadContextOptions::Autoplay)) {
             ContextType::Autoplay
         } else {
             ContextType::Default
@@ -1168,31 +1235,31 @@ impl SpircTask {
 
         let index = match cmd.playing_track {
             None => None,
-            Some(playing_track) => Some(match playing_track {
-                PlayingTrack::Index(i) => i as usize,
+            Some(ref playing_track) => Some(match playing_track {
+                PlayingTrack::Index(i) => *i as usize,
                 PlayingTrack::Uri(uri) => {
                     let ctx = self.connect_state.get_context(ContextType::Default)?;
-                    ConnectState::find_index_in_context(ctx, |t| t.uri == uri)?
+                    ConnectState::find_index_in_context(ctx, |t| &t.uri == uri)?
                 }
                 PlayingTrack::Uid(uid) => {
                     let ctx = self.connect_state.get_context(ContextType::Default)?;
-                    ConnectState::find_index_in_context(ctx, |t| t.uid == uid)?
+                    ConnectState::find_index_in_context(ctx, |t| &t.uid == uid)?
                 }
             }),
         };
 
-        debug!(
-            "loading with shuffle: <{}>, repeat track: <{}> context: <{}>",
-            cmd.shuffle, cmd.repeat, cmd.repeat_track
-        );
+        if let Some(LoadContextOptions::Options(ref options)) = cmd.context_options {
+            debug!(
+                "loading with shuffle: <{}>, repeat track: <{}> context: <{}>",
+                options.shuffle, options.repeat, options.repeat_track
+            );
 
-        self.connect_state.set_shuffle(!cmd.autoplay && cmd.shuffle);
-        self.connect_state
-            .set_repeat_context(!cmd.autoplay && cmd.repeat);
-        self.connect_state
-            .set_repeat_track(!cmd.autoplay && cmd.repeat_track);
+            self.connect_state.set_shuffle(options.shuffle);
+            self.connect_state.set_repeat_context(options.repeat);
+            self.connect_state.set_repeat_track(options.repeat_track);
+        }
 
-        if cmd.shuffle {
+        if matches!(cmd.context_options, Some(LoadContextOptions::Options(ref o)) if o.shuffle) {
             if let Some(index) = index {
                 self.connect_state.set_current_track(index)?;
             } else {
@@ -1285,6 +1352,12 @@ impl SpircTask {
     }
 
     fn handle_seek(&mut self, position_ms: u32) {
+        let duration = self.connect_state.player().duration;
+        if i64::from(position_ms) > duration {
+            warn!("tried to seek to {position_ms}ms of {duration}ms");
+            return;
+        }
+
         self.connect_state
             .update_position(position_ms, self.now_ms());
         self.player.seek(position_ms);
@@ -1422,14 +1495,16 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let volume =
-            (self.connect_state.device_info().volume as u16).saturating_add(VOLUME_STEP_SIZE);
+        let volume_steps = self.connect_state.device_info().capabilities.volume_steps as u16;
+
+        let volume = (self.connect_state.device_info().volume as u16).saturating_add(volume_steps);
         self.set_volume(volume);
     }
 
     fn handle_volume_down(&mut self) {
-        let volume =
-            (self.connect_state.device_info().volume as u16).saturating_sub(VOLUME_STEP_SIZE);
+        let volume_steps = self.connect_state.device_info().capabilities.volume_steps as u16;
+
+        let volume = (self.connect_state.device_info().volume as u16).saturating_sub(volume_steps);
         self.set_volume(volume);
     }
 

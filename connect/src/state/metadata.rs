@@ -24,6 +24,7 @@ macro_rules! metadata_entry {
             self.$get($entry)
         }
 
+
         fn $set (&mut self, $key: impl Display) {
             self.metadata_mut().insert($entry.to_string(), $key.to_string());
         }
@@ -34,9 +35,11 @@ macro_rules! metadata_entry {
     };
 }
 
+/// Allows easy access of known metadata fields
 #[allow(dead_code)]
-pub trait Metadata {
+pub(super) trait Metadata {
     fn metadata(&self) -> &HashMap<String, String>;
+
     fn metadata_mut(&mut self) -> &mut HashMap<String, String>;
 
     fn get_bool(&self, entry: &str) -> bool {

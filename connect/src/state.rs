@@ -1,6 +1,6 @@
 pub(super) mod context;
 mod handle;
-pub mod metadata;
+mod metadata;
 mod options;
 pub(super) mod provider;
 mod restrictions;
@@ -40,7 +40,7 @@ const SPOTIFY_MAX_PREV_TRACKS_SIZE: usize = 10;
 const SPOTIFY_MAX_NEXT_TRACKS_SIZE: usize = 80;
 
 #[derive(Debug, Error)]
-pub enum StateError {
+pub(super) enum StateError {
     #[error("the current track couldn't be resolved from the transfer state")]
     CouldNotResolveTrackFromTransfer,
     #[error("context is not available. type: {0:?}")]
@@ -74,33 +74,38 @@ impl From<StateError> for Error {
     }
 }
 
+/// Configuration of the connect device
 #[derive(Debug, Clone)]
-pub struct ConnectStateConfig {
-    pub session_id: String,
-    pub initial_volume: u32,
+pub struct ConnectConfig {
+    /// The name of the connect device (default: librespot)
     pub name: String,
+    /// The icon type of the connect device (default: [DeviceType::Speaker])
     pub device_type: DeviceType,
-    pub volume_steps: i32,
+    /// Displays the [DeviceType] twice in the ui to show up as a group (default: false)
     pub is_group: bool,
+    /// The volume with which the connect device will be initialized (default: 50%)
+    pub initial_volume: u16,
+    /// Disables the option to control the volume remotely (default: false)
     pub disable_volume: bool,
+    /// The steps in which the volume is incremented (default: 1024)
+    pub volume_steps: u16,
 }
 
-impl Default for ConnectStateConfig {
+impl Default for ConnectConfig {
     fn default() -> Self {
         Self {
-            session_id: String::new(),
-            initial_volume: u32::from(u16::MAX) / 2,
             name: "librespot".to_string(),
             device_type: DeviceType::Speaker,
-            volume_steps: 64,
             is_group: false,
+            initial_volume: u16::MAX / 2,
             disable_volume: false,
+            volume_steps: 1024,
         }
     }
 }
 
 #[derive(Default, Debug)]
-pub struct ConnectState {
+pub(super) struct ConnectState {
     /// the entire state that is updated to the remote server
     request: PutStateRequest,
 
@@ -125,10 +130,10 @@ pub struct ConnectState {
 }
 
 impl ConnectState {
-    pub fn new(cfg: ConnectStateConfig, session: &Session) -> Self {
+    pub fn new(cfg: ConnectConfig, session: &Session) -> Self {
         let device_info = DeviceInfo {
             can_play: true,
-            volume: cfg.initial_volume,
+            volume: cfg.initial_volume.into(),
             name: cfg.name,
             device_id: session.device_id().to_string(),
             device_type: EnumOrUnknown::new(cfg.device_type.into()),
@@ -137,7 +142,7 @@ impl ConnectState {
             client_id: session.client_id(),
             is_group: cfg.is_group,
             capabilities: MessageField::some(Capabilities {
-                volume_steps: cfg.volume_steps,
+                volume_steps: cfg.volume_steps.into(),
                 disable_volume: cfg.disable_volume,
 
                 gaia_eq_connect_id: true,
@@ -183,7 +188,7 @@ impl ConnectState {
                 device: MessageField::some(Device {
                     device_info: MessageField::some(device_info),
                     player_state: MessageField::some(PlayerState {
-                        session_id: cfg.session_id,
+                        session_id: session.session_id(),
                         ..Default::default()
                     }),
                     ..Default::default()

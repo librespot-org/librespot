@@ -1,92 +1,77 @@
 use librespot::{
+    connect::{ConnectConfig, LoadRequest, LoadRequestOptions, Spirc},
     core::{
-        authentication::Credentials, config::SessionConfig, session::Session, spotify_id::SpotifyId,
+        authentication::Credentials, cache::Cache, config::SessionConfig, session::Session, Error,
     },
+    playback::mixer::MixerConfig,
     playback::{
         audio_backend,
         config::{AudioFormat, PlayerConfig},
-        mixer::NoOpVolume,
+        mixer,
         player::Player,
     },
 };
-use librespot_connect::spirc::PlayingTrack;
-use librespot_connect::{
-    spirc::{Spirc, SpircLoadCommand},
-    state::ConnectStateConfig,
-};
-use librespot_metadata::{Album, Metadata};
-use librespot_playback::mixer::{softmixer::SoftMixer, Mixer, MixerConfig};
-use std::env;
-use std::sync::Arc;
-use tokio::join;
+
+use log::LevelFilter;
+
+const CACHE: &str = ".cache";
+const CACHE_FILES: &str = ".cache/files";
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
+    env_logger::builder()
+        .filter_module("librespot", LevelFilter::Debug)
+        .init();
+
     let session_config = SessionConfig::default();
     let player_config = PlayerConfig::default();
     let audio_format = AudioFormat::default();
-    let connect_config = ConnectStateConfig::default();
+    let connect_config = ConnectConfig::default();
+    let mixer_config = MixerConfig::default();
+    let request_options = LoadRequestOptions::default();
 
-    let mut args: Vec<_> = env::args().collect();
-    let context_uri = if args.len() == 3 {
-        args.pop().unwrap()
-    } else if args.len() == 2 {
-        String::from("spotify:album:79dL7FLiJFOO0EoehUHQBv")
-    } else {
-        eprintln!("Usage: {} ACCESS_TOKEN (ALBUM URI)", args[0]);
-        return;
-    };
+    let sink_builder = audio_backend::find(None).unwrap();
+    let mixer_builder = mixer::find(None).unwrap();
 
-    let credentials = Credentials::with_access_token(&args[1]);
-    let backend = audio_backend::find(None).unwrap();
+    let cache = Cache::new(Some(CACHE), Some(CACHE), Some(CACHE_FILES), None)?;
+    let credentials = cache
+        .credentials()
+        .ok_or(Error::unavailable("credentials not cached"))
+        .or_else(|_| {
+            librespot_oauth::OAuthClientBuilder::new(
+                &session_config.client_id,
+                "http://127.0.0.1:8898/login",
+                vec!["streaming"],
+            )
+            .open_in_browser()
+            .build()?
+            .get_access_token()
+            .map(|t| Credentials::with_access_token(t.access_token))
+        })?;
 
-    println!("Connecting...");
-    let session = Session::new(session_config, None);
+    let session = Session::new(session_config, Some(cache));
+    let mixer = mixer_builder(mixer_config);
 
     let player = Player::new(
         player_config,
         session.clone(),
-        Box::new(NoOpVolume),
-        move || backend(None, audio_format),
+        mixer.get_soft_volume(),
+        move || sink_builder(None, audio_format),
     );
 
-    let (spirc, spirc_task) = Spirc::new(
-        connect_config,
-        session.clone(),
-        credentials,
-        player,
-        Arc::new(SoftMixer::open(MixerConfig::default())),
-    )
-    .await
-    .unwrap();
+    let (spirc, spirc_task) =
+        Spirc::new(connect_config, session.clone(), credentials, player, mixer).await?;
 
-    join!(spirc_task, async {
-        let album = Album::get(&session, &SpotifyId::from_uri(&context_uri).unwrap())
-            .await
-            .unwrap();
+    // these calls can be seen as "queued"
+    spirc.activate()?;
+    spirc.load(LoadRequest::from_context_uri(
+        format!("spotify:user:{}:collection", session.username()),
+        request_options,
+    ))?;
+    spirc.play()?;
 
-        println!(
-            "Playing album: {} by {}",
-            &album.name,
-            album
-                .artists
-                .first()
-                .map_or("unknown", |artist| &artist.name)
-        );
+    // starting the connect device and processing the previously "queued" calls
+    spirc_task.await;
 
-        spirc.activate().unwrap();
-        spirc
-            .load(SpircLoadCommand {
-                context_uri,
-                start_playing: true,
-                seek_to: 0,
-                shuffle: false,
-                repeat: false,
-                repeat_track: false,
-                autoplay: false,
-                // the index specifies which track in the context starts playing, in this case the first in the album
-                playing_track: PlayingTrack::Index(0).into(),
-            })
-            .unwrap();
-    });
+    Ok(())
 }

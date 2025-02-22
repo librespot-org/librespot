@@ -84,7 +84,7 @@ impl Credentials {
             }
 
             let hi = read_u8(stream)? as u32;
-            Ok(lo & 0x7f | hi << 7)
+            Ok(lo & 0x7f | (hi << 7))
         }
 
         fn read_bytes<R: Read>(stream: &mut R) -> io::Result<Vec<u8>> {

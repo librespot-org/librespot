@@ -46,13 +46,6 @@ impl<T> From<Vec<T>> for ShuffleVec<T> {
 }
 
 impl<T> ShuffleVec<T> {
-    pub fn new() -> Self {
-        Self {
-            vec: Vec::new(),
-            indices: None,
-        }
-    }
-
     pub fn shuffle_with_seed(&mut self, seed: u64) {
         self.shuffle_with_rng(SmallRng::seed_from_u64(seed))
     }
