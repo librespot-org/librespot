@@ -2238,9 +2238,7 @@ impl PlayerInternal {
             let wait_for_data_length =
                 (read_ahead_during_playback.as_secs_f32() * bytes_per_second as f32) as usize;
 
-            stream_loader_controller
-                .fetch_next_and_wait(request_data_length, wait_for_data_length)
-                .map_err(Into::into)
+            stream_loader_controller.fetch_next_and_wait(request_data_length, wait_for_data_length)
         } else {
             Ok(())
         }

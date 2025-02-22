@@ -7,7 +7,6 @@ mod restrictions;
 mod tracks;
 mod transfer;
 
-use crate::model::SpircPlayStatus;
 use crate::{
     core::{
         config::DeviceType, date::Date, dealer::protocol::Request, spclient::SpClientResult,
