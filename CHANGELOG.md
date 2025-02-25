@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - [core] Removed `get_canvases` from SpClient (breaking)
+- [core] DeviceType `homething` removed due to crashes on Android (breaking)
 - [metadata] Removed `genres` from Album (breaking)
 - [metadata] Removed `genre` from Artists (breaking)
 
