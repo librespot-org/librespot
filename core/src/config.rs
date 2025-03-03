@@ -79,7 +79,6 @@ pub enum DeviceType {
     UnknownSpotify = 100,
     CarThing = 101,
     Observer = 102,
-    HomeThing = 103,
 }
 
 impl FromStr for DeviceType {
@@ -102,7 +101,6 @@ impl FromStr for DeviceType {
             "smartwatch" => Ok(Smartwatch),
             "chromebook" => Ok(Chromebook),
             "carthing" => Ok(CarThing),
-            "homething" => Ok(HomeThing),
             _ => Err(()),
         }
     }
@@ -130,7 +128,6 @@ impl From<&DeviceType> for &str {
             UnknownSpotify => "UnknownSpotify",
             CarThing => "CarThing",
             Observer => "Observer",
-            HomeThing => "HomeThing",
         }
     }
 }
@@ -169,7 +166,6 @@ impl From<DeviceType> for ProtoDeviceType {
             DeviceType::UnknownSpotify => ProtoDeviceType::UNKNOWN_SPOTIFY,
             DeviceType::CarThing => ProtoDeviceType::CAR_THING,
             DeviceType::Observer => ProtoDeviceType::OBSERVER,
-            DeviceType::HomeThing => ProtoDeviceType::HOME_THING,
         }
     }
 }

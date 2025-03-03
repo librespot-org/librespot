@@ -1471,7 +1471,7 @@ fn get_setup() -> Setup {
                         speaker, tv, avr, stb, audiodongle, \
                         gameconsole, castaudio, castvideo, \
                         automobile, smartwatch, chromebook, \
-                        carthing, homething",
+                        carthing",
                         DeviceType::default().into(),
                     );
 
