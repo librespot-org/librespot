@@ -98,7 +98,11 @@ impl AudioKeyManager {
                 error!("Audio key response timeout");
                 Err(AudioKeyError::Timeout.into())
             }
-            Ok(k) => k?,
+            Ok(key) => {
+                info!("Got key for track: {:?}", track);
+                info!("Key: {:?}", key);
+                key?
+            },
         }
     }
 

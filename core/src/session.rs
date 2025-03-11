@@ -3,7 +3,6 @@ use std::{
     future::Future,
     io,
     pin::Pin,
-    process::exit,
     sync::{Arc, Weak},
     task::{Context, Poll},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -354,11 +353,8 @@ impl Session {
     fn check_catalogue(attributes: &UserAttributes) {
         if let Some(account_type) = attributes.get("type") {
             if account_type != "premium" {
-                error!("librespot does not support {:?} accounts.", account_type);
-                info!("Please support Spotify and your artists and sign up for a premium account.");
-
-                // TODO: logout instead of exiting
-                exit(1);
+                info!("librespot does not support {:?} accounts.", account_type);
+                info!("Overriding premium account requirement for account type: {:?}", account_type);
             }
         }
     }

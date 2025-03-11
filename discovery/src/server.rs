@@ -108,7 +108,6 @@ impl RequestHandler {
             // TODO: bitmask but what are the flags?
             "supported_capabilities": 1,
             // undocumented but should still work
-            "accountReq": "PREMIUM",
             "activeUser": active_user,
             // others seen-in-the-wild:
             // - "deviceAPI_isGroup": False
