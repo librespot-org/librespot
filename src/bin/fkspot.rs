@@ -72,10 +72,14 @@ impl Connection {
             .await
             .unwrap()
             .json::<SpotRes>()
-            .await;
-
-        // TODO: PANIC IF res.isAnonymous is true
-        res.unwrap().accessToken
+            .await
+            .unwrap();
+        
+        if res.isAnonymous {
+            panic!("Invalid credentials")
+        }
+        
+        res.accessToken
     }
 
     pub async fn get_audio_key(&self, track_id: &str, file_id: &str) -> AudioKey {
