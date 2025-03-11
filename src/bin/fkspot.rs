@@ -74,6 +74,7 @@ impl Connection {
             .json::<SpotRes>()
             .await;
 
+        // TODO: PANIC IF res.isAnonymous is true
         res.unwrap().accessToken
     }
 
