@@ -1,8 +1,13 @@
 use crate::util;
-use std::time::{SystemTime, UNIX_EPOCH};
 use librespot::core::{
-    audio_key::AudioKey, authentication::Credentials, session::Session, FileId, SpotifyId, SessionConfig
+    audio_key::AudioKey, authentication::Credentials, session::Session, FileId, SessionConfig,
+    SpotifyId,
 };
+use log::{debug, info};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+const ACCESS_TOKEN_ENDPOINT: &str =
+    "https://open.spotify.com/get_access_token?reason=transport&productType=web_player";
 
 pub struct Connection {
     pub session: Session,
@@ -10,24 +15,23 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub async fn init(&mut self) {
+    pub async fn init(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let access_token = self.get_token().await;
-        println!("access_token: {}", access_token);
+        debug!("access_token: {}", access_token);
+
         let credentials = Credentials::with_access_token(access_token);
-        println!("Connecting with token..");
-        self.session
-            .connect(credentials, false)
-            .await
-            .expect("failed to connect with credentials");
+        match self.session.connect(credentials, false).await {
+            Ok(()) => Ok(()),
+            Err(e) => return Err(Box::new(e)),
+        }
     }
 
     async fn get_token(&mut self) -> String {
         let (sp_t, sp_dc, sp_key) = util::read_config();
-        let client = reqwest::Client::new();
-        let res = client
-            .get(
-                "https://open.spotify.com/get_access_token?reason=transport&productType=web_player",
-            )
+        let client: reqwest::Client = reqwest::Client::new();
+
+        let res: util::SpotTokenRes = client
+            .get(ACCESS_TOKEN_ENDPOINT)
             .header(
                 "Cookie",
                 format!("sp_t={}; sp_dc={}; sp_key={}", sp_t, sp_dc, sp_key),
@@ -60,15 +64,17 @@ impl Connection {
             .as_millis() as i64;
 
         if current_time >= self.access_token_expiration_timestamp_ms {
+            info!("Session expired, renewing..");
             self.session.shutdown();
-            self.session =  Session::new(SessionConfig::default(), None);
-            self.init().await;
+            self.session = Session::new(SessionConfig::default(), None);
+            self.init().await.expect("Failed to renew session");
         }
 
-        println!(
-            "{}, {}",
+        debug!(
+            "current time: {}, expiration time: {}",
             current_time, self.access_token_expiration_timestamp_ms
         );
+
         let spot_id: SpotifyId =
             match SpotifyId::from_uri(format!("spotify:track:{}", track_id).as_str()) {
                 Ok(id) => id,
