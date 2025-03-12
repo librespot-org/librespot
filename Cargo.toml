@@ -21,6 +21,11 @@ name = "librespot"
 path = "src/main.rs"
 doc = false
 
+[[bin]]
+name = "fkspot"
+path = "fkspot/src/main.rs"
+doc = false
+
 [dependencies.librespot-audio]
 path = "audio"
 version = "0.6.0-dev"
