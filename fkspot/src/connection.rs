@@ -1,7 +1,7 @@
 use crate::util;
 use std::time::{SystemTime, UNIX_EPOCH};
 use librespot::core::{
-    audio_key::AudioKey, authentication::Credentials, session::Session, FileId, SpotifyId,
+    audio_key::AudioKey, authentication::Credentials, session::Session, FileId, SpotifyId, SessionConfig
 };
 
 pub struct Connection {
@@ -61,6 +61,7 @@ impl Connection {
 
         if current_time >= self.access_token_expiration_timestamp_ms {
             self.session.shutdown();
+            self.session =  Session::new(SessionConfig::default(), None);
             self.init().await;
         }
 
