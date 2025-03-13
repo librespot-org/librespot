@@ -33,7 +33,7 @@ async fn audio_key(
     // use the global connecton to get the audio key
     let key: AudioKey = match GLOBAL_CONN
         .lock()
-        .unwrap()
+        .expect("Couldn't lock Mutex")
         .get_audio_key(collection[0], collection[1])
         .await
     {
@@ -51,7 +51,12 @@ async fn main() -> std::io::Result<()> {
 
     // intialize on start (not necessary considering we will be intializing
     // even when we don't have a timestamp set and you request a key)
-    match GLOBAL_CONN.lock().unwrap().init().await {
+    match GLOBAL_CONN
+        .lock()
+        .expect("Couldn't lock Mutex")
+        .init()
+        .await
+    {
         Ok(()) => println!("Successfully initialized session"),
         Err(e) => eprintln!("Failed to initialize session: {:?}", e),
     };
