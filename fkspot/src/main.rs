@@ -1,3 +1,4 @@
+// TODO: Make this PORT constant configurable via fkspot.cfg
 const PORT: u16 = 3745;
 
 // Imports
