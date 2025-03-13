@@ -8,6 +8,7 @@ use actix_web::error::ErrorBadRequest;
 use actix_web::{get, web, App, HttpServer};
 use connection::Connection;
 use librespot::core::{audio_key::AudioKey, config::SessionConfig, session::Session};
+use log::info;
 use std::sync::{LazyLock, Mutex};
 
 // Initialize Connection
@@ -58,7 +59,7 @@ async fn main() -> std::io::Result<()> {
         .init()
         .await
     {
-        Ok(()) => println!("Successfully initialized session"),
+        Ok(()) => info!("Successfully initialized session"),
         Err(e) => eprintln!("Failed to initialize session: {:?}", e),
     };
 
@@ -68,7 +69,7 @@ async fn main() -> std::io::Result<()> {
     // let key: AudioKey = GLOBAL_CONN.get_audio_key(track_id, file_id).await;
     // println!("key: {:?}", key);
 
-    println!("Starting web server on http://localhost:{}", PORT);
+    info!("Starting web server on http://localhost:{}", PORT);
     HttpServer::new(|| App::new().service(audio_key))
         .bind(("127.0.0.1", PORT))?
         .run()
