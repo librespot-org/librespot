@@ -1,5 +1,7 @@
 use std::fs;
 
+use librespot_core::FileId;
+
 // Spotify's access token response format
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[allow(non_snake_case)] // this is for json parsing, ignore naming conventions therefore
@@ -8,6 +10,16 @@ pub struct SpotTokenRes {
     pub accessToken: String,
     pub accessTokenExpirationTimestampMs: i64,
     pub isAnonymous: bool,
+}
+
+pub fn file_id_from_string(file_id: &str) -> FileId {
+    let mut bytes = [0u8; 20];
+    for i in 0..20 {
+        let byte_str = &file_id[i * 2..i * 2 + 2];
+        bytes[i] = u8::from_str_radix(byte_str, 16).unwrap();
+    }
+
+    FileId::from(&bytes[..])
 }
 
 pub fn read_config() -> (String, String, String) {

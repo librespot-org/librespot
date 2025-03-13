@@ -1,7 +1,6 @@
-use crate::util;
+use crate::util::{self, file_id_from_string};
 use librespot::core::{
-    audio_key::AudioKey, authentication::Credentials, session::Session, FileId, SessionConfig,
-    SpotifyId,
+    audio_key::AudioKey, authentication::Credentials, session::Session, SessionConfig, SpotifyId,
 };
 use log::{debug, info};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -84,8 +83,11 @@ impl Connection {
         let aud_key: AudioKey = self
             .session
             .audio_key()
-            .request(spot_id, FileId::from_raw(file_id.as_bytes()))
+            .request(spot_id, file_id_from_string(file_id))
             .await?;
+        debug!("{:?}", spot_id);
+        debug!("{:?}", file_id_from_string(file_id));
+        debug!("{:?}", aud_key);
 
         Ok(aud_key)
     }
