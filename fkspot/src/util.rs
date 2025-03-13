@@ -12,7 +12,7 @@ pub struct SpotTokenRes {
     pub isAnonymous: bool,
 }
 
-pub fn file_id_from_string(file_id: &str) -> FileId {
+pub fn file_id_from_string(file_id: &str) -> Result<FileId, Box<dyn std::error::Error>> {
     // Create an array of 20 bytes initialized to 0
     let mut bytes = [0u8; 20];
 
@@ -21,11 +21,16 @@ pub fn file_id_from_string(file_id: &str) -> FileId {
         // Extract a substring of 2 characters
         let byte_str = &file_id[i * 2..i * 2 + 2];
         // Convert the substring from a hexadecimal string to a byte and store it in the array
-        bytes[i] = u8::from_str_radix(byte_str, 16).unwrap();
+        bytes[i] = match u8::from_str_radix(byte_str, 16) {
+            Ok(byte) => byte,
+            Err(_) => {
+                return Err("Invalid file ID".into());
+            }
+        };
     }
 
     // Create a FileId from the byte array and return it
-    FileId::from(&bytes[..])
+    Ok(FileId::from(&bytes[..]))
 }
 
 pub fn read_config() -> (String, String, String) {

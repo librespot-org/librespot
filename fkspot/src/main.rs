@@ -38,7 +38,7 @@ async fn audio_key(
         .await
     {
         Ok(key) => key,
-        Err(_e) => return Err(ErrorBadRequest("Bad Request")),
+        Err(e) => return Err(ErrorBadRequest(format!("Bad Request: {}", e.to_string()))),
     };
 
     // pass the audio key that was retrieved as raw bytes

@@ -1,6 +1,6 @@
 use crate::util::{self, file_id_from_string};
 use librespot::core::{
-    audio_key::AudioKey, authentication::Credentials, session::Session, SessionConfig, SpotifyId,
+    audio_key::AudioKey, authentication::Credentials, session::Session, SessionConfig, SpotifyId, FileId
 };
 use log::{debug, info};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -77,16 +77,22 @@ impl Connection {
         let spot_id: SpotifyId =
             match SpotifyId::from_uri(format!("spotify:track:{}", track_id).as_str()) {
                 Ok(id) => id,
-                Err(e) => return Err(Box::new(e)),
+                Err(_) => return Err("Invalid Track ID".into()),
+            };
+
+        let file_id: FileId =
+            match file_id_from_string(file_id) {
+                Ok(id) => id,
+                Err(_) => return Err("Invalid file ID".into()),
             };
 
         let aud_key: AudioKey = self
             .session
             .audio_key()
-            .request(spot_id, file_id_from_string(file_id))
+            .request(spot_id, file_id)
             .await?;
         debug!("{:?}", spot_id);
-        debug!("{:?}", file_id_from_string(file_id));
+        debug!("{:?}", file_id);
         debug!("{:?}", aud_key);
 
         Ok(aud_key)
