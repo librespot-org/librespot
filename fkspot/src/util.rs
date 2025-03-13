@@ -13,12 +13,18 @@ pub struct SpotTokenRes {
 }
 
 pub fn file_id_from_string(file_id: &str) -> FileId {
+    // Create an array of 20 bytes initialized to 0
     let mut bytes = [0u8; 20];
+
+    // Loop through each pair of characters in the input string
     for i in 0..20 {
+        // Extract a substring of 2 characters
         let byte_str = &file_id[i * 2..i * 2 + 2];
+        // Convert the substring from a hexadecimal string to a byte and store it in the array
         bytes[i] = u8::from_str_radix(byte_str, 16).unwrap();
     }
 
+    // Create a FileId from the byte array and return it
     FileId::from(&bytes[..])
 }
 
