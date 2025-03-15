@@ -10,6 +10,8 @@ pub struct SpotTokenRes {
     pub accessToken: String,
     pub accessTokenExpirationTimestampMs: i64,
     pub isAnonymous: bool,
+    pub totpValidity: i64,
+    pub _notes: String,
 }
 
 pub fn file_id_from_string(file_id: &str) -> Result<FileId, Box<dyn std::error::Error>> {
