@@ -87,6 +87,7 @@ tokio = { version = "1.40", features = [
     "process",
 ] }
 url = "2.2"
+totp-rs = "5.6.0"
 
 [features]
 alsa-backend = ["librespot-playback/alsa-backend"]

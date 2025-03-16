@@ -2,6 +2,13 @@ use std::fs;
 
 use librespot_core::FileId;
 
+// Response format of https://open.spotify.com/server-time
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[allow(non_snake_case)] // this is for json parsing, ignore naming conventions therefore
+pub struct SpotServerTs {
+    pub serverTime: i64,
+}
+
 // Spotify's access token response format
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[allow(non_snake_case)] // this is for json parsing, ignore naming conventions therefore
@@ -10,7 +17,7 @@ pub struct SpotTokenRes {
     pub accessToken: String,
     pub accessTokenExpirationTimestampMs: i64,
     pub isAnonymous: bool,
-    pub totpValidity: i64,
+    pub totpValidity: bool,
     pub _notes: String,
 }
 

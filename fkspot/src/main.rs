@@ -4,6 +4,7 @@ const PORT: u16 = 3745;
 // Imports
 mod connection;
 mod util;
+mod totp;
 use actix_web::error::ErrorBadRequest;
 use actix_web::{get, web, App, HttpServer};
 use connection::Connection;
