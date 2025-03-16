@@ -34,13 +34,8 @@ pub async fn get() -> (String, u64, String, u64) {
     ).unwrap();
 
     let totp_client: String = totp.generate_current().unwrap();
-    println!("{}", totp_client);
     let server_time: u64 = get_server_time().await;
     let totp_server: String = totp.generate(server_time * 1000);
 
-    println!(
-        "{} {} {} {}",
-        totp_client, client_time * 1000, totp_client, server_time
-    );
     (totp_client, client_time * 1000, totp_server, server_time)
 }

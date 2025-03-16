@@ -10,7 +10,7 @@ use log::{debug, info};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const ACCESS_TOKEN_ENDPOINT: &str =
-    "https://open.spotify.com/get_access_token?reason=init&productType=web_player";
+    "https://open.spotify.com/get_access_token?reason=init&productType=web-player";
 
 pub struct Connection {
     pub session: Session,
@@ -35,12 +35,14 @@ impl Connection {
 
         let client: reqwest::Client = reqwest::Client::new();
         let final_endpoint: String = format!("{}&totp={totp_client}&totpServer={totp_server}&totpVer=5&cTime={client_time}&sTime={server_time}", ACCESS_TOKEN_ENDPOINT);
-        println!("{}", final_endpoint);
+
+        debug!("final_endpoint: {}", final_endpoint);
+
         let res: reqwest::Response = client
             .get(final_endpoint)
             .header(
                 "Cookie",
-                format!("sp_t={}; sp_dc={}; sp_key={}; sp_gaid=0088fcc4d9614c1285a279219845c6cf638b31d8b6f99ab0c8a8a7", sp_t, sp_dc, sp_key),
+                format!("sp_t={}; sp_dc={}; sp_key={};", sp_t, sp_dc, sp_key),
             )
             .send()
             .await
@@ -60,7 +62,6 @@ impl Connection {
 
         self.access_token_expiration_timestamp_ms = res.accessTokenExpirationTimestampMs;
 
-        println!("{:?}", res);
         res.accessToken
     }
 
