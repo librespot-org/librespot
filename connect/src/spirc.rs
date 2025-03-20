@@ -642,8 +642,8 @@ impl SpircTask {
             SpircCommand::VolumeUp => self.handle_volume_up(),
             SpircCommand::VolumeDown => self.handle_volume_down(),
             SpircCommand::Shuffle(shuffle) => self.handle_shuffle(shuffle)?,
-            SpircCommand::Repeat(repeat) => self.handle_repeat(Some(repeat), None)?,
-            SpircCommand::RepeatTrack(repeat) => self.handle_repeat(None, Some(repeat))?,
+            SpircCommand::Repeat(repeat) => self.handle_repeat_context(repeat)?,
+            SpircCommand::RepeatTrack(repeat) => self.handle_repeat_track(repeat),
             SpircCommand::SetPosition(position) => self.handle_seek(position),
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
             SpircCommand::Load(command) => self.handle_load(command, None).await?,
@@ -1012,17 +1012,19 @@ impl SpircTask {
             }
             SetShufflingContext(shuffle) => self.handle_shuffle(shuffle.value)?,
             SetRepeatingContext(repeat_context) => {
-                self.handle_repeat(Some(repeat_context.value), None)?
+                self.handle_repeat_context(repeat_context.value)?
             }
-            SetRepeatingTrack(repeat_track) => {
-                self.handle_repeat(None, Some(repeat_track.value))?
-            }
+            SetRepeatingTrack(repeat_track) => self.handle_repeat_track(repeat_track.value),
             AddToQueue(add_to_queue) => self.connect_state.add_to_queue(add_to_queue.track, true),
             SetQueue(set_queue) => self.connect_state.handle_set_queue(set_queue),
             SetOptions(set_options) => {
-                let context = set_options.repeating_context;
-                let track = set_options.repeating_track;
-                self.handle_repeat(context, track)?;
+                if let Some(repeat_context) = set_options.repeating_context {
+                    self.handle_repeat_context(repeat_context)?
+                }
+
+                if let Some(repeat_track) = set_options.repeating_track {
+                    self.handle_repeat_track(repeat_track)
+                }
 
                 let shuffle = set_options.shuffling_context;
                 if let Some(shuffle) = shuffle {
@@ -1386,13 +1388,16 @@ impl SpircTask {
         self.connect_state.handle_shuffle(shuffle)
     }
 
-    fn handle_repeat(&mut self, context: Option<bool>, track: Option<bool>) -> Result<(), Error> {
-        let context_repeat = context.unwrap_or_else(|| self.connect_state.repeat_context());
-        let context_track = track.unwrap_or_else(|| self.connect_state.repeat_track());
-
+    fn handle_repeat_context(&mut self, repeat: bool) -> Result<(), Error> {
         self.player
-            .emit_repeat_changed_event(context_repeat, context_track);
-        self.connect_state.handle_set_repeat(context, track)
+            .emit_repeat_changed_event(repeat, self.connect_state.repeat_track());
+        self.connect_state.handle_set_repeat_context(repeat)
+    }
+
+    fn handle_repeat_track(&mut self, repeat: bool) {
+        self.player
+            .emit_repeat_changed_event(self.connect_state.repeat_context(), repeat);
+        self.connect_state.set_repeat_track(repeat);
     }
 
     fn handle_preload_next_track(&mut self) {

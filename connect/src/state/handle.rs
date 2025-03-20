@@ -40,26 +40,10 @@ impl ConnectState {
         self.update_queue_revision();
     }
 
-    pub fn handle_set_repeat(
-        &mut self,
-        context: Option<bool>,
-        track: Option<bool>,
-    ) -> Result<(), Error> {
-        // doesn't need any state updates, because it should only change how the current song is played
-        if let Some(track) = track {
-            self.set_repeat_track(track);
-        }
+    pub fn handle_set_repeat_context(&mut self, repeat: bool) -> Result<(), Error> {
+        self.set_repeat_context(repeat);
 
-        if matches!(context, Some(context) if self.repeat_context() == context) || context.is_none()
-        {
-            return Ok(());
-        }
-
-        if let Some(context) = context {
-            self.set_repeat_context(context);
-        }
-
-        if self.repeat_context() {
+        if repeat {
             self.set_shuffle(false);
             self.reset_context(ResetContext::DefaultIndex);
 
