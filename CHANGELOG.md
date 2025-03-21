@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [metadata] `Show::trailer_uri` is now optional since it isn't always present (breaking)
 - [connect] Handle transfer of playback with empty "uri" field
 - [connect] Correctly apply playing/paused state when transferring playback
+- [player] Saturate invalid seek positions to track duration
 
 ### Deprecated
 
