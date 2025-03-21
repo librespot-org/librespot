@@ -1592,12 +1592,6 @@ impl PlayerInternal {
                                     *sample *= volume;
                                 }
                             }
-                        } else if self.config.normalisation_method == NormalisationMethod::Basic
-                            && (normalisation_factor < 1.0 || volume < 1.0)
-                        {
-                            for sample in data.iter_mut() {
-                                *sample *= normalisation_factor * volume;
-                            }
                         } else if self.config.normalisation_method == NormalisationMethod::Dynamic {
                             // zero-cost shorthands
                             let threshold_db = self.config.normalisation_threshold_dbfs;
@@ -1655,6 +1649,12 @@ impl PlayerInternal {
                                     self.normalisation_peaks[1],
                                 );
                                 *sample *= db_to_ratio(-max_peak) * volume;
+                            }
+                        } else if self.config.normalisation_method == NormalisationMethod::Basic
+                            && (normalisation_factor < 1.0 || volume < 1.0)
+                        {
+                            for sample in data.iter_mut() {
+                                *sample *= normalisation_factor * volume;
                             }
                         }
                     }
