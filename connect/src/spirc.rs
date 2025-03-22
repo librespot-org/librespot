@@ -976,9 +976,10 @@ impl SpircTask {
                 self.handle_transfer(transfer.data.expect("by condition checked"))?;
                 return self.notify().await;
             }
-            Play(play) => {
+            Play(mut play) => {
+                let first_page = play.context.pages.pop();
                 let context = match play.context.uri {
-                    Some(ref s) => PlayContext::Uri(s.clone()),
+                    Some(s) => PlayContext::Uri(s),
                     None if !play.context.pages.is_empty() => PlayContext::Tracks(
                         play.context
                             .pages
@@ -1007,7 +1008,7 @@ impl SpircTask {
                             context_options,
                         },
                     },
-                    Some(play.context),
+                    first_page,
                 )
                 .await?;
 
@@ -1219,7 +1220,7 @@ impl SpircTask {
     async fn handle_load(
         &mut self,
         cmd: LoadRequest,
-        context: Option<Context>,
+        page: Option<ContextPage>,
     ) -> Result<(), Error> {
         self.connect_state
             .reset_context(if let PlayContext::Uri(ref uri) = cmd.context {
@@ -1232,7 +1233,10 @@ impl SpircTask {
 
         let autoplay = matches!(cmd.context_options, Some(LoadContextOptions::Autoplay));
         match cmd.context {
-            PlayContext::Uri(uri) => self.load_context_from_uri(&context, &uri, autoplay).await?,
+            PlayContext::Uri(uri) => {
+                self.load_context_from_uri(&uri, page.as_ref(), autoplay)
+                    .await?
+            }
             PlayContext::Tracks(tracks) => self.load_context_from_tracks(tracks)?,
         }
 
@@ -1242,7 +1246,7 @@ impl SpircTask {
 
         // for play commands with skip by uid, the context of the command contains
         // tracks with uri and uid, so we merge the new context with the resolved/existing context
-        self.connect_state.merge_context(context);
+        self.connect_state.merge_context(page);
 
         // load here, so that we clear the queue only after we definitely retrieved a new context
         self.connect_state.clear_next_tracks();
@@ -1309,22 +1313,13 @@ impl SpircTask {
 
     async fn load_context_from_uri(
         &mut self,
-        context: &Option<Context>,
         context_uri: &str,
+        page: Option<&ContextPage>,
         autoplay: bool,
     ) -> Result<(), Error> {
         if !self.connect_state.is_active() {
             self.handle_activate();
         }
-
-        let fallback = if let Some(ref ctx) = context {
-            match ConnectState::get_context_uri_from_context(ctx) {
-                Some(ctx_uri) => ctx_uri,
-                None => Err(SpircError::InvalidUri(context_uri.into()))?,
-            }
-        } else {
-            context_uri
-        };
 
         let update_context = if autoplay {
             ContextType::Autoplay
@@ -1334,7 +1329,10 @@ impl SpircTask {
 
         self.connect_state.set_active_context(update_context);
 
+        let fallback = ConnectState::get_context_uri_from_context(Some(context_uri), page)
+            .unwrap_or(context_uri);
         let current_context_uri = self.connect_state.context_uri();
+
         if current_context_uri == context_uri && fallback == context_uri {
             debug!("context <{current_context_uri}> didn't change, no resolving required")
         } else {
