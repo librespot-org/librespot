@@ -111,17 +111,21 @@ impl From<&[AudioFileMessage]> for AudioFiles {
             .iter()
             .filter_map(|file| {
                 let file_id = FileId::from(file.file_id());
-                if let Some(format) = file.format {
-                    match format.enum_value() {
-                        Ok(f) => return Some((f.into(), file_id)),
-                        Err(unknown) => {
-                            trace!("Ignoring file <{}> with unknown format {unknown}", file_id);
-                        }
-                    }
-                } else {
-                    trace!("Ignoring file <{}> with unspecified format", file_id);
+                let format = file
+                    .format
+                    .ok_or(format!("Ignoring file <{file_id}> with unspecified format",))
+                    .and_then(|format| match format.enum_value() {
+                        Ok(f) => Ok((f.into(), file_id)),
+                        Err(unknown) => Err(format!(
+                            "Ignoring file <{file_id}> with unknown format {unknown}",
+                        )),
+                    });
+
+                if let Err(ref why) = format {
+                    trace!("{why}");
                 }
-                None
+
+                format.ok()
             })
             .collect();
 
