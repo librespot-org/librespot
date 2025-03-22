@@ -5,7 +5,7 @@ use crate::{
 use std::ops::Deref;
 
 /// Request for loading playback
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoadRequest {
     pub(super) context: PlayContext,
     pub(super) options: LoadRequestOptions,
@@ -19,14 +19,14 @@ impl Deref for LoadRequest {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) enum PlayContext {
     Uri(String),
     Tracks(Vec<String>),
 }
 
 /// The parameters for creating a load request
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct LoadRequestOptions {
     /// Whether the given tracks should immediately start playing, or just be initially loaded.
     pub start_playing: bool,
@@ -50,7 +50,7 @@ pub struct LoadRequestOptions {
 ///
 /// Separated into an `enum` to exclude the other variants from being used
 /// simultaneously, as they are not compatible.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LoadContextOptions {
     /// Starts the context with options
     Options(Options),
@@ -62,7 +62,7 @@ pub enum LoadContextOptions {
 }
 
 /// The available options that indicate how to start the context
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Options {
     /// Start the context in shuffle mode
     pub shuffle: bool,
@@ -109,7 +109,7 @@ impl LoadRequest {
 }
 
 /// An item that represent a track to play
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PlayingTrack {
     /// Represent the track at a given index.
     Index(u32),
