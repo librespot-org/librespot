@@ -1,14 +1,3 @@
-use std::{
-    env,
-    fs::create_dir_all,
-    ops::RangeInclusive,
-    path::{Path, PathBuf},
-    pin::Pin,
-    process::exit,
-    str::FromStr,
-    time::{Duration, Instant},
-};
-
 use data_encoding::HEXLOWER;
 use futures_util::StreamExt;
 #[cfg(feature = "alsa-backend")]
@@ -33,6 +22,16 @@ use librespot::{
 use librespot_oauth::OAuthClientBuilder;
 use log::{debug, error, info, trace, warn};
 use sha1::{Digest, Sha1};
+use std::{
+    env,
+    fs::create_dir_all,
+    ops::RangeInclusive,
+    path::{Path, PathBuf},
+    pin::Pin,
+    process::exit,
+    str::FromStr,
+    time::{Duration, Instant},
+};
 use sysinfo::{ProcessesToUpdate, System};
 use thiserror::Error;
 use url::Url;
@@ -1921,7 +1920,13 @@ async fn main() {
     }
 
     let mixer_config = setup.mixer_config.clone();
-    let mixer = (setup.mixer)(mixer_config);
+    let mixer = match (setup.mixer)(mixer_config) {
+        Ok(mixer) => mixer,
+        Err(why) => {
+            error!("{why}");
+            exit(1)
+        }
+    };
     let player_config = setup.player_config.clone();
 
     let soft_volume = mixer.get_soft_volume();
