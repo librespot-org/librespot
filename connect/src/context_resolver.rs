@@ -77,7 +77,7 @@ impl ResolveContext {
         match self.resolve {
             Resolve::Uri(ref uri) => ConnectState::valid_resolve_uri(uri),
             Resolve::Context(ref ctx) => {
-                ConnectState::get_context_uri_from_context(ctx.uri.as_deref(), ctx.pages.first())
+                ConnectState::find_valid_uri(ctx.uri.as_deref(), ctx.pages.first())
             }
         }
         .or(self.fallback.as_deref())

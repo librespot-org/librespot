@@ -145,7 +145,7 @@ impl ConnectState {
         }
     }
 
-    pub fn get_context_uri_from_context<'s>(
+    pub fn find_valid_uri<'s>(
         context_uri: Option<&'s str>,
         first_page: Option<&'s ContextPage>,
     ) -> Option<&'s str> {

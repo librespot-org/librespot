@@ -1234,7 +1234,7 @@ impl SpircTask {
         let autoplay = matches!(cmd.context_options, Some(LoadContextOptions::Autoplay));
         match cmd.context {
             PlayContext::Uri(uri) => {
-                self.load_context_from_uri(&uri, page.as_ref(), autoplay)
+                self.load_context_from_uri(uri, page.as_ref(), autoplay)
                     .await?
             }
             PlayContext::Tracks(tracks) => self.load_context_from_tracks(tracks)?,
@@ -1313,7 +1313,7 @@ impl SpircTask {
 
     async fn load_context_from_uri(
         &mut self,
-        context_uri: &str,
+        context_uri: String,
         page: Option<&ContextPage>,
         autoplay: bool,
     ) -> Result<(), Error> {
@@ -1329,17 +1329,25 @@ impl SpircTask {
 
         self.connect_state.set_active_context(update_context);
 
-        let fallback = ConnectState::get_context_uri_from_context(Some(context_uri), page)
-            .unwrap_or(context_uri);
+        let fallback = match page {
+            // check that the uri is valid or the page has a valid uri that can be used
+            Some(page) => match ConnectState::find_valid_uri(Some(&context_uri), Some(page)) {
+                Some(ctx_uri) => ctx_uri,
+                None => return Err(SpircError::InvalidUri(context_uri).into()),
+            },
+            // when there is no page, the uri should be valid
+            None => &context_uri,
+        };
+
         let current_context_uri = self.connect_state.context_uri();
 
-        if current_context_uri == context_uri && fallback == context_uri {
+        if current_context_uri == &context_uri && fallback == context_uri {
             debug!("context <{current_context_uri}> didn't change, no resolving required")
         } else {
             debug!("resolving context for load command");
             self.context_resolver.clear();
             self.context_resolver.add(ResolveContext::from_uri(
-                context_uri,
+                &context_uri,
                 fallback,
                 update_context,
                 ContextAction::Replace,
