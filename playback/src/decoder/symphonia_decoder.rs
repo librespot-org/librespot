@@ -146,7 +146,7 @@ impl SymphoniaDecoder {
 impl AudioDecoder for SymphoniaDecoder {
     fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError> {
         // "Saturate" the position_ms to the duration of the track if it exceeds it.
-        let mut target = Duration::from_millis(position_ms as u64);
+        let mut target = Duration::from_millis(position_ms.into());
         let codec_params = self.decoder.codec_params();
         if let (Some(time_base), Some(n_frames)) = (codec_params.time_base, codec_params.n_frames) {
             let duration = Duration::from(time_base.calc_time(n_frames));
