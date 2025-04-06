@@ -1780,7 +1780,7 @@ impl PlayerInternal {
             self.ensure_sink_stopped(play);
         }
 
-        if matches!(self.state, PlayerState::Invalid { .. }) {
+        if matches!(self.state, PlayerState::Invalid) {
             return Err(Error::internal(format!(
                 "Player::handle_command_load called from invalid state: {:?}",
                 self.state

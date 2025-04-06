@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, time::Duration};
 
 use symphonia::{
     core::{
@@ -8,7 +8,6 @@ use symphonia::{
         formats::{FormatOptions, FormatReader, SeekMode, SeekTo},
         io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
         meta::{StandardTagKey, Value},
-        units::Time,
     },
     default::{
         codecs::{MpaDecoder, VorbisDecoder},
@@ -133,30 +132,34 @@ impl SymphoniaDecoder {
     }
 
     fn ts_to_ms(&self, ts: u64) -> u32 {
-        let time_base = self.decoder.codec_params().time_base;
-        let seeked_to_ms = match time_base {
+        match self.decoder.codec_params().time_base {
             Some(time_base) => {
-                let time = time_base.calc_time(ts);
-                (time.seconds as f64 + time.frac) * 1000.
+                let time = Duration::from(time_base.calc_time(ts));
+                time.as_millis() as u32
             }
             // Fallback in the unexpected case that the format has no base time set.
-            None => ts as f64 * PAGES_PER_MS,
-        };
-        seeked_to_ms as u32
+            None => (ts as f64 * PAGES_PER_MS) as u32,
+        }
     }
 }
 
 impl AudioDecoder for SymphoniaDecoder {
     fn seek(&mut self, position_ms: u32) -> Result<u32, DecoderError> {
-        let seconds = position_ms as u64 / 1000;
-        let frac = (position_ms as f64 % 1000.) / 1000.;
-        let time = Time::new(seconds, frac);
+        // "Saturate" the position_ms to the duration of the track if it exceeds it.
+        let mut target = Duration::from_millis(position_ms.into());
+        let codec_params = self.decoder.codec_params();
+        if let (Some(time_base), Some(n_frames)) = (codec_params.time_base, codec_params.n_frames) {
+            let duration = Duration::from(time_base.calc_time(n_frames));
+            if target > duration {
+                target = duration;
+            }
+        }
 
         // `track_id: None` implies the default track ID (of the container, not of Spotify).
         let seeked_to_ts = self.format.seek(
             SeekMode::Accurate,
             SeekTo::Time {
-                time,
+                time: target.into(),
                 track_id: None,
             },
         )?;
