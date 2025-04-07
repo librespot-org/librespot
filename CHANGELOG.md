@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Replaced `SpircLoadCommand` with `LoadRequest`, `LoadRequestOptions` and `LoadContextOptions` (breaking)
 - [connect] Moved all public items to the highest level (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
+- [player] Expose `PlayerTrackLoader` as a public interface.
 
 ### Added
 
