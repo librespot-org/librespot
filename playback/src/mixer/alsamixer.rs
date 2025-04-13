@@ -33,7 +33,7 @@ const SND_CTL_TLV_DB_GAIN_MUTE: MilliBel = MilliBel(-9999999);
 const ZERO_DB: MilliBel = MilliBel(0);
 
 #[derive(Debug, Error)]
-enum AslaMixerError {
+enum AlsaMixerError {
     #[error("Could not open Alsa mixer. {0}")]
     CouldNotOpen(AlsaError),
     #[error("Could not find Alsa mixer control")]
@@ -48,8 +48,8 @@ enum AslaMixerError {
     CouldNotConvertRaw(AlsaError),
 }
 
-impl From<AslaMixerError> for Error {
-    fn from(value: AslaMixerError) -> Self {
+impl From<AlsaMixerError> for Error {
+    fn from(value: AlsaMixerError) -> Self {
         Error::failed_precondition(value)
     }
 }
@@ -64,10 +64,10 @@ impl Mixer for AlsaMixer {
         let mut config = config; // clone
 
         let mixer =
-            alsa::mixer::Mixer::new(&config.device, false).map_err(AslaMixerError::CouldNotOpen)?;
+            alsa::mixer::Mixer::new(&config.device, false).map_err(AlsaMixerError::CouldNotOpen)?;
         let simple_element = mixer
             .find_selem(&SelemId::new(&config.control, config.index))
-            .ok_or(AslaMixerError::CouldNotFindController)?;
+            .ok_or(AlsaMixerError::CouldNotFindController)?;
 
         // Query capabilities
         let has_switch = simple_element.has_playback_switch();
@@ -83,16 +83,16 @@ impl Mixer for AlsaMixer {
         // API for hardware and software mixers
         let (min_millibel, max_millibel) = if is_softvol {
             let control =
-                Ctl::new(&config.device, false).map_err(AslaMixerError::CouldNotOpenWithDevice)?;
+                Ctl::new(&config.device, false).map_err(AlsaMixerError::CouldNotOpenWithDevice)?;
             let mut element_id = ElemId::new(ElemIface::Mixer);
             element_id.set_name(
                 &CString::new(config.control.as_str())
-                    .map_err(AslaMixerError::CouldNotOpenWithName)?,
+                    .map_err(AlsaMixerError::CouldNotOpenWithName)?,
             );
             element_id.set_index(config.index);
             let (min_millibel, mut max_millibel) = control
                 .get_db_range(&element_id)
-                .map_err(AslaMixerError::NoDbRange)?;
+                .map_err(AlsaMixerError::NoDbRange)?;
 
             // Alsa can report incorrect maximum volumes due to rounding
             // errors. e.g. Alsa rounds [-60.0..0.0] in range [0..255] to
@@ -122,7 +122,7 @@ impl Mixer for AlsaMixer {
                 debug!("Alsa mixer reported minimum dB as mute, trying workaround");
                 min_millibel = simple_element
                     .ask_playback_vol_db(min + 1)
-                    .map_err(AslaMixerError::CouldNotConvertRaw)?;
+                    .map_err(AlsaMixerError::CouldNotConvertRaw)?;
             }
             (min_millibel, max_millibel)
         };

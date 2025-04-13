@@ -55,7 +55,7 @@ async fn create_basic_spirc() -> Result<(), Error> {
         session,
         credentials,
         player,
-        mixer(MixerConfig::default())
+        mixer(MixerConfig::default())?
     ).await?;
 
     Ok(())
