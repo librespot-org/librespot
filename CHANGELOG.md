@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Moved all public items to the highest level (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
 - [metadata] Replaced `AudioFileFormat` with own enum. (breaking)
+- [playback] Changed trait `Mixer::open` to return `Result<Self, Error>` instead of `Self` (breaking)
+- [playback] Changed type alias `MixerFn` to return `Result<Arc<dyn Mixer>, Error>` instead of `Arc<dyn Mixer>` (breaking)
 
 ### Added
 
