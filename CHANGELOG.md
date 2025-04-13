@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Replaced `SpircLoadCommand` with `LoadRequest`, `LoadRequestOptions` and `LoadContextOptions` (breaking)
 - [connect] Moved all public items to the highest level (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
+- [metadata] Replaced `AudioFileFormat` with own enum. (breaking)
 
 ### Added
 
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Fix "play" command not handled if missing "offset" property
 - [discovery] Fix libmdns zerconf setup errors not propagating to the main task.
 - [metadata] `Show::trailer_uri` is now optional since it isn't always present (breaking)
+- [metadata] Fix incorrect parsing of audio format
 - [connect] Handle transfer of playback with empty "uri" field
 - [connect] Correctly apply playing/paused state when transferring playback
 - [player] Saturate invalid seek positions to track duration
