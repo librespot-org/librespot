@@ -419,7 +419,7 @@ impl SpircTask {
             };
 
             ( $next:expr, match |$ok:ident| $use_ok:expr ) => {
-                unwrap! { $next, error!(""), match |$ok| $use_ok }
+                unwrap! { $next, error!("Unexpected:"), match |$ok| $use_ok }
             };
         }
 
