@@ -411,11 +411,15 @@ impl SpircTask {
                     }
                 }
             };
-            ( $next:expr, match |$ok:ident| $use_ok:expr ) => {
+            ( $next:expr, $log:ident!($msg:expr), match |$ok:ident| $use_ok:expr ) => {
                 unwrap!($next, |$ok| match $ok {
                     Ok($ok) => $use_ok,
-                    Err(why) => error!("could not parse {}: {}", stringify!($ok), why),
+                    Err(why) => $log!("{} could not parse {}: {}", $msg, stringify!($ok), why),
                 })
+            };
+
+            ( $next:expr, match |$ok:ident| $use_ok:expr ) => {
+                unwrap! { $next, error!(""), match |$ok| $use_ok }
             };
         }
 
@@ -486,6 +490,7 @@ impl SpircTask {
                 },
                 session_update = self.session_update.next() => unwrap! {
                     session_update,
+                    warn!("Known parsing error for WIFI_BROADCAST_CHANGED."),
                     match |session_update| self.handle_session_update(session_update)
                 },
                 cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
