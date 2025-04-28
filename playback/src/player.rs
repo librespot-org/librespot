@@ -85,6 +85,7 @@ struct PlayerInternal {
 
     player_id: usize,
     play_request_id_generator: SeqGenerator<u64>,
+    last_progress_update: Instant,
 }
 
 static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -191,6 +192,12 @@ pub enum PlayerEvent {
         volume: u16,
     },
     PositionCorrection {
+        play_request_id: u64,
+        track_id: SpotifyId,
+        position_ms: u32,
+    },
+    // Will be sent periodically while playing the track to inform about the current playback position
+    PositionChanged {
         play_request_id: u64,
         track_id: SpotifyId,
         position_ms: u32,
@@ -481,6 +488,7 @@ impl Player {
 
                 player_id,
                 play_request_id_generator: SeqGenerator::new(0),
+                last_progress_update: Instant::now(),
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -1335,6 +1343,18 @@ impl Future for PlayerInternal {
                                                 *reported_nominal_start_time =
                                                     now.checked_sub(new_stream_position);
                                                 self.send_event(PlayerEvent::PositionCorrection {
+                                                    play_request_id,
+                                                    track_id,
+                                                    position_ms: new_stream_position_ms,
+                                                });
+                                            }
+
+                                            let last_progress_update_since_ms = now
+                                                .duration_since(self.last_progress_update)
+                                                .as_millis();
+                                            if last_progress_update_since_ms > 250 {
+                                                self.last_progress_update = now;
+                                                self.send_event(PlayerEvent::PositionChanged {
                                                     play_request_id,
                                                     track_id,
                                                     position_ms: new_stream_position_ms,
