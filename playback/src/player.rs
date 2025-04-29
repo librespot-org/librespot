@@ -85,13 +85,7 @@ struct PlayerInternal {
 
     player_id: usize,
     play_request_id_generator: SeqGenerator<u64>,
-    progress_callback: Option<ProgressCallback>,
-}
-
-pub struct ProgressCallback {
-    pub update_interval: Duration,
-    pub last_update: Instant,
-    pub callback: Box<dyn Fn(u32) + Send>,
+    last_progress_update: Instant,
 }
 
 static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -112,7 +106,6 @@ enum PlayerCommand {
     SetSession(Session),
     AddEventSender(mpsc::UnboundedSender<PlayerEvent>),
     SetSinkEventCallback(Option<SinkEventCallback>),
-    SetProgressCallback(ProgressCallback),
     EmitVolumeChangedEvent(u16),
     SetAutoNormaliseAsAlbum(bool),
     EmitSessionDisconnectedEvent {
@@ -199,6 +192,12 @@ pub enum PlayerEvent {
         volume: u16,
     },
     PositionCorrection {
+        play_request_id: u64,
+        track_id: SpotifyId,
+        position_ms: u32,
+    },
+    // Will be sent periodically while playing the track to inform about the current playback position
+    PositionChanged {
         play_request_id: u64,
         track_id: SpotifyId,
         position_ms: u32,
@@ -489,7 +488,7 @@ impl Player {
 
                 player_id,
                 play_request_id_generator: SeqGenerator::new(0),
-                progress_callback: None,
+                last_progress_update: Instant::now(),
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -573,18 +572,6 @@ impl Player {
 
     pub fn set_sink_event_callback(&self, callback: Option<SinkEventCallback>) {
         self.command(PlayerCommand::SetSinkEventCallback(callback));
-    }
-
-    pub fn set_progress_callback(
-        &self,
-        callback: Box<dyn Fn(u32) + Send>,
-        update_interval: Duration,
-    ) {
-        self.command(PlayerCommand::SetProgressCallback(ProgressCallback {
-            update_interval,
-            last_update: Instant::now(),
-            callback,
-        }));
     }
 
     pub fn emit_volume_changed_event(&self, volume: u16) {
@@ -1362,18 +1349,16 @@ impl Future for PlayerInternal {
                                                 });
                                             }
 
-                                            if let Some(progress_callback) =
-                                                self.progress_callback.as_mut()
-                                            {
-                                                let last_progress_update_since_ms = now
-                                                    .duration_since(progress_callback.last_update);
-                                                if last_progress_update_since_ms
-                                                    > progress_callback.update_interval
-                                                {
-                                                    progress_callback.last_update = now;
-                                                    let callback = &progress_callback.callback;
-                                                    callback(new_stream_position_ms);
-                                                }
+                                            let last_progress_update_since_ms = now
+                                                .duration_since(self.last_progress_update)
+                                                .as_millis();
+                                            if last_progress_update_since_ms > 250 {
+                                                self.last_progress_update = now;
+                                                self.send_event(PlayerEvent::PositionChanged {
+                                                    play_request_id,
+                                                    track_id,
+                                                    position_ms: new_stream_position_ms,
+                                                });
                                             }
                                         }
                                         Err(e) => {
@@ -2140,8 +2125,6 @@ impl PlayerInternal {
 
             PlayerCommand::SetSinkEventCallback(callback) => self.sink_event_callback = callback,
 
-            PlayerCommand::SetProgressCallback(callback) => self.progress_callback = Some(callback),
-
             PlayerCommand::EmitVolumeChangedEvent(volume) => {
                 self.send_event(PlayerEvent::VolumeChanged { volume })
             }
@@ -2332,7 +2315,6 @@ impl fmt::Debug for PlayerCommand {
             PlayerCommand::SetSinkEventCallback(_) => {
                 f.debug_tuple("SetSinkEventCallback").finish()
             }
-            PlayerCommand::SetProgressCallback(_) => f.debug_tuple("SetProgressCallback").finish(),
             PlayerCommand::EmitVolumeChangedEvent(volume) => f
                 .debug_tuple("EmitVolumeChangedEvent")
                 .field(&volume)
