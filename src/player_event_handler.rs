@@ -194,20 +194,6 @@ impl EventHandler {
                                 env_vars.insert("POSITION_MS", position_ms.to_string());
                             }
                         },
-                        PlayerEvent::PositionChanged {
-                            track_id,
-                            position_ms,
-                            ..
-                        } => match track_id.to_base62() {
-                            Err(e) => {
-                                warn!("PlayerEvent::PositionChanged: Invalid track id: {}", e)
-                            }
-                            Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "position_changed".to_string());
-                                env_vars.insert("TRACK_ID", id);
-                                env_vars.insert("POSITION_MS", position_ms.to_string());
-                            }
-                        },
                         PlayerEvent::SessionConnected {
                             connection_id,
                             user_name,
