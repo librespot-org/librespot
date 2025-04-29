@@ -1349,16 +1349,20 @@ impl Future for PlayerInternal {
                                                 });
                                             }
 
-                                            let last_progress_update_since_ms = now
-                                                .duration_since(self.last_progress_update)
-                                                .as_millis();
-                                            if last_progress_update_since_ms > 250 {
-                                                self.last_progress_update = now;
-                                                self.send_event(PlayerEvent::PositionChanged {
-                                                    play_request_id,
-                                                    track_id,
-                                                    position_ms: new_stream_position_ms,
-                                                });
+                                            if let Some(interval) =
+                                                self.config.position_update_interval
+                                            {
+                                                let last_progress_update_since_ms =
+                                                    now.duration_since(self.last_progress_update);
+
+                                                if last_progress_update_since_ms > interval {
+                                                    self.last_progress_update = now;
+                                                    self.send_event(PlayerEvent::PositionChanged {
+                                                        play_request_id,
+                                                        track_id,
+                                                        position_ms: new_stream_position_ms,
+                                                    });
+                                                }
                                             }
                                         }
                                         Err(e) => {
