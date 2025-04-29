@@ -133,7 +133,7 @@ enum SpircCommand {
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
 
 // delay to update volume after a certain amount of time, instead on each update request
-const VOLUME_UPDATE_DELAY: Duration = Duration::from_secs(2);
+const VOLUME_UPDATE_DELAY: Duration = Duration::from_millis(500);
 // to reduce updates to remote, we group some request by waiting for a set amount of time
 const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 

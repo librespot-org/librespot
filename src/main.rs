@@ -276,6 +276,7 @@ fn get_setup() -> Setup {
     const VERSION: &str = "version";
     const VOLUME_CTRL: &str = "volume-ctrl";
     const VOLUME_RANGE: &str = "volume-range";
+    const VOLUME_STEPS: &str = "volume-steps";
     const ZEROCONF_PORT: &str = "zeroconf-port";
     const ZEROCONF_INTERFACE: &str = "zeroconf-interface";
     const ZEROCONF_BACKEND: &str = "zeroconf-backend";
@@ -291,6 +292,7 @@ fn get_setup() -> Setup {
     const DEVICE_SHORT: &str = "d";
     const VOLUME_CTRL_SHORT: &str = "E";
     const VOLUME_RANGE_SHORT: &str = "e";
+    const VOLUME_STEPS_SHORT: &str = ""; // no short flag
     const DEVICE_TYPE_SHORT: &str = "F";
     const FORMAT_SHORT: &str = "f";
     const DISABLE_AUDIO_CACHE_SHORT: &str = "G";
@@ -371,6 +373,9 @@ fn get_setup() -> Setup {
     #[cfg(not(feature = "alsa-backend"))]
     const VOLUME_RANGE_DESC: &str =
         "Range of the volume control (dB) from 0.0 to 100.0. Defaults to 60.0.";
+
+    const VOLUME_STEPS_DESC: &str =
+        "Number of incremental steps when responding to volume control. Default: 1024.";
 
     let mut opts = getopts::Options::new();
     opts.optflag(
@@ -569,6 +574,12 @@ fn get_setup() -> Setup {
         VOLUME_RANGE,
         VOLUME_RANGE_DESC,
         "RANGE",
+    )
+    .optopt(
+        VOLUME_STEPS_SHORT,
+        VOLUME_STEPS,
+        VOLUME_STEPS_DESC,
+        "STEPS",
     )
     .optopt(
         NORMALISATION_METHOD_SHORT,
@@ -1457,7 +1468,8 @@ fn get_setup() -> Setup {
                 } else {
                     cache.as_ref().and_then(Cache::volume)
                 }
-            });
+            })
+            .unwrap_or_default();
 
         let device_type = opt_str(DEVICE_TYPE)
             .as_deref()
@@ -1480,23 +1492,32 @@ fn get_setup() -> Setup {
             })
             .unwrap_or_default();
 
+        let volume_steps = opt_str(VOLUME_STEPS)
+            .map(|steps| match steps.parse::<u16>() {
+                Ok(value) => value,
+                _ => {
+                    invalid_error_msg(
+                        VOLUME_STEPS,
+                        VOLUME_STEPS_SHORT,
+                        &steps,
+                        "a positive whole number <= 65535",
+                        "1024",
+                    );
+
+                    exit(1);
+                }
+            })
+            .unwrap_or_else(|| connect_default_config.volume_steps);
+
         let is_group = opt_present(DEVICE_IS_GROUP);
 
-        if let Some(initial_volume) = initial_volume {
-            ConnectConfig {
-                name,
-                device_type,
-                is_group,
-                initial_volume,
-                ..Default::default()
-            }
-        } else {
-            ConnectConfig {
-                name,
-                device_type,
-                is_group,
-                ..Default::default()
-            }
+        ConnectConfig {
+            name,
+            device_type,
+            is_group,
+            initial_volume,
+            volume_steps,
+            ..connect_default_config
         }
     };
 
