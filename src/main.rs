@@ -373,9 +373,8 @@ fn get_setup() -> Setup {
     #[cfg(not(feature = "alsa-backend"))]
     const VOLUME_RANGE_DESC: &str =
         "Range of the volume control (dB) from 0.0 to 100.0. Defaults to 60.0.";
-
     const VOLUME_STEPS_DESC: &str =
-        "Number of incremental steps when responding to volume control. Default: 1024.";
+        "Number of incremental steps when responding to volume control. Defaults to 64.";
 
     let mut opts = getopts::Options::new();
     opts.optflag(
@@ -1496,12 +1495,14 @@ fn get_setup() -> Setup {
             .map(|steps| match steps.parse::<u16>() {
                 Ok(value) => value,
                 _ => {
+                    let default_value = &connect_default_config.volume_steps.to_string();
+
                     invalid_error_msg(
                         VOLUME_STEPS,
                         VOLUME_STEPS_SHORT,
                         &steps,
                         "a positive whole number <= 65535",
-                        "1024",
+                        default_value,
                     );
 
                     exit(1);

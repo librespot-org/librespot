@@ -87,7 +87,7 @@ pub struct ConnectConfig {
     pub initial_volume: u16,
     /// Disables the option to control the volume remotely (default: false)
     pub disable_volume: bool,
-    /// The steps in which the volume is incremented (default: 1024)
+    /// The steps in which the volume is incremented (default: 64)
     pub volume_steps: u16,
 }
 
@@ -99,7 +99,7 @@ impl Default for ConnectConfig {
             is_group: false,
             initial_volume: u16::MAX / 2,
             disable_volume: false,
-            volume_steps: 1024,
+            volume_steps: 64,
         }
     }
 }
