@@ -127,10 +127,15 @@ pub(super) struct ConnectState {
 
     /// a context to keep track of the autoplay context
     autoplay_context: Option<StateContext>,
+
+    // The volume adjustment per step when handling individual volume adjustments.
+    pub volume_step_size: u16,
 }
 
 impl ConnectState {
     pub fn new(cfg: ConnectConfig, session: &Session) -> Self {
+        let volume_step_size = u16::MAX.checked_div(cfg.volume_steps).unwrap_or(1024);
+
         let device_info = DeviceInfo {
             can_play: true,
             volume: cfg.initial_volume.into(),
@@ -195,6 +200,7 @@ impl ConnectState {
                 }),
                 ..Default::default()
             },
+            volume_step_size,
             ..Default::default()
         };
         state.reset();

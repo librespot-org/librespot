@@ -1514,16 +1514,18 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let volume_steps = self.connect_state.device_info().capabilities.volume_steps as u16;
+        let volume = (self.connect_state.device_info().volume as u16).saturating_add(
+            self.connect_state.volume_step_size
+            );
 
-        let volume = (self.connect_state.device_info().volume as u16).saturating_add(volume_steps);
         self.set_volume(volume);
     }
 
     fn handle_volume_down(&mut self) {
-        let volume_steps = self.connect_state.device_info().capabilities.volume_steps as u16;
+        let volume = (self.connect_state.device_info().volume as u16).saturating_sub(
+            self.connect_state.volume_step_size
+            );
 
-        let volume = (self.connect_state.device_info().volume as u16).saturating_sub(volume_steps);
         self.set_volume(volume);
     }
 
@@ -1639,6 +1641,8 @@ impl SpircTask {
     }
 
     fn set_volume(&mut self, volume: u16) {
+        debug!("SpircTask::set_volume({})", volume);
+
         let old_volume = self.connect_state.device_info().volume;
         let new_volume = volume as u32;
         if old_volume != new_volume || self.mixer.volume() != volume {
