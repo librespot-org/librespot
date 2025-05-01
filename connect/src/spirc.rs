@@ -1514,17 +1514,15 @@ impl SpircTask {
     }
 
     fn handle_volume_up(&mut self) {
-        let volume = (self.connect_state.device_info().volume as u16).saturating_add(
-            self.connect_state.volume_step_size
-            );
+        let volume = (self.connect_state.device_info().volume as u16)
+            .saturating_add(self.connect_state.volume_step_size);
 
         self.set_volume(volume);
     }
 
     fn handle_volume_down(&mut self) {
-        let volume = (self.connect_state.device_info().volume as u16).saturating_sub(
-            self.connect_state.volume_step_size
-            );
+        let volume = (self.connect_state.device_info().volume as u16)
+            .saturating_sub(self.connect_state.volume_step_size);
 
         self.set_volume(volume);
     }
