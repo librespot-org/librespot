@@ -5,9 +5,8 @@ pub use request::*;
 use std::collections::HashMap;
 use std::io::{Error as IoError, Read};
 
-use crate::Error;
-use base64::prelude::BASE64_STANDARD;
-use base64::{DecodeError, Engine};
+use crate::{deserialize_with::json_proto, Error};
+use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
 use flate2::read::GzDecoder;
 use log::LevelFilter;
 use serde::Deserialize;
@@ -99,17 +98,19 @@ pub struct Message {
     pub uri: String,
 }
 
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum FallbackWrapper<T: protobuf::MessageFull> {
+    Inner(#[serde(deserialize_with = "json_proto")] T),
+    Fallback(JsonValue),
+}
+
 impl Message {
-    pub fn from_json<M: protobuf::MessageFull>(value: Self) -> Result<M, Error> {
-        use protobuf_json_mapping::*;
+    pub fn try_from_json<M: protobuf::MessageFull>(
+        value: Self,
+    ) -> Result<FallbackWrapper<M>, Error> {
         match value.payload {
-            PayloadValue::Json(json) => match parse_from_str::<M>(&json) {
-                Ok(message) => Ok(message),
-                Err(_) => match parse_from_str_with_options(&json, &IGNORE_UNKNOWN) {
-                    Ok(message) => Ok(message),
-                    Err(why) => Err(Error::failed_precondition(why)),
-                },
-            },
+            PayloadValue::Json(json) => Ok(serde_json::from_str(&json)?),
             other => Err(ProtocolError::UnexpectedData(other).into()),
         }
     }
