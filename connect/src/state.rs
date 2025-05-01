@@ -128,7 +128,7 @@ pub(super) struct ConnectState {
     /// a context to keep track of the autoplay context
     autoplay_context: Option<StateContext>,
 
-    // The volume adjustment per step when handling individual volume adjustments.
+    /// The volume adjustment per step when handling individual volume adjustments.
     pub volume_step_size: u16,
 }
 

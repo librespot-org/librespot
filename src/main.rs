@@ -374,7 +374,7 @@ fn get_setup() -> Setup {
     const VOLUME_RANGE_DESC: &str =
         "Range of the volume control (dB) from 0.0 to 100.0. Defaults to 60.0.";
     const VOLUME_STEPS_DESC: &str =
-        "Number of incremental steps when responding to volume control. Defaults to 64.";
+        "Number of incremental steps when responding to volume control updates. Defaults to 64.";
 
     let mut opts = getopts::Options::new();
     opts.optflag(
