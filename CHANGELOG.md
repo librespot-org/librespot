@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [connect] Add command line parameter for setting volume steps.
 - [connect] Add support for `seek_to`, `repeat_track` and `autoplay` for `Spirc` loading
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [connect] Add `volume_steps` to `ConnectConfig` (breaking)
