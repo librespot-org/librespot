@@ -196,7 +196,9 @@ pub enum PlayerEvent {
         track_id: SpotifyId,
         position_ms: u32,
     },
-    // Will be sent periodically while playing the track to inform about the current playback position
+    /// Requires `PlayerConfig::position_update_interval` to be set to Some.
+    /// Once set this event will be sent periodically while playing the track to inform about the
+    /// current playback position
     PositionChanged {
         play_request_id: u64,
         track_id: SpotifyId,
