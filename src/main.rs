@@ -1818,6 +1818,7 @@ fn get_setup() -> Setup {
             normalisation_release_cf,
             normalisation_knee_db,
             ditherer,
+            position_update_interval: None,
         }
     };
 

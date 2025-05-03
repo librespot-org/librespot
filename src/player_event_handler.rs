@@ -243,6 +243,8 @@ impl EventHandler {
                             );
                             env_vars.insert("FILTER", filter.to_string());
                         }
+                        // Ignore event irrelevant for standalone binary like PositionChanged
+                        _ => {}
                     }
 
                     if !env_vars.is_empty() {
