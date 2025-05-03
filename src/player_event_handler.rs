@@ -180,16 +180,16 @@ impl EventHandler {
                                 env_vars.insert("POSITION_MS", position_ms.to_string());
                             }
                         },
-                        PlayerEvent::PositionChanged {
+                        PlayerEvent::PositionCorrection {
                             track_id,
                             position_ms,
                             ..
                         } => match track_id.to_base62() {
                             Err(e) => {
-                                warn!("PlayerEvent::PositionChanged: Invalid track id: {}", e)
+                                warn!("PlayerEvent::PositionCorrection: Invalid track id: {}", e)
                             }
                             Ok(id) => {
-                                env_vars.insert("PLAYER_EVENT", "position_changed".to_string());
+                                env_vars.insert("PLAYER_EVENT", "position_correction".to_string());
                                 env_vars.insert("TRACK_ID", id);
                                 env_vars.insert("POSITION_MS", position_ms.to_string());
                             }
@@ -244,9 +244,7 @@ impl EventHandler {
                             env_vars.insert("FILTER", filter.to_string());
                         }
                         // Ignore event irrelevant for standalone binary like PositionChanged
-                        _ => {
-                            continue;
-                        }
+                        _ => {}
                     }
 
                     if !env_vars.is_empty() {
