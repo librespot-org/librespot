@@ -1783,8 +1783,6 @@ fn get_setup() -> Setup {
         #[cfg(not(feature = "passthrough-decoder"))]
         let passthrough = false;
 
-        let position_update_interval = Some(Duration::from_secs(1));
-
         PlayerConfig {
             bitrate,
             gapless,
@@ -1798,7 +1796,7 @@ fn get_setup() -> Setup {
             normalisation_release_cf,
             normalisation_knee_db,
             ditherer,
-            position_update_interval,
+            position_update_interval: None,
         }
     };
 
