@@ -357,7 +357,7 @@ impl DealerShared {
             }
         }
 
-        warn!("No subscriber for msg.uri: {}", msg.uri);
+        debug!("No subscriber for msg.uri: {}", msg.uri);
     }
 
     fn dispatch_request(

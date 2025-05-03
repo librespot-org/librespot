@@ -4,7 +4,7 @@ use crate::{
         authentication::Credentials,
         dealer::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
-            protocol::{Command, Message, Request},
+            protocol::{Command, FallbackWrapper, Message, Request},
         },
         session::UserAttributes,
         Error, Session, SpotifyId,
@@ -81,7 +81,7 @@ struct SpircTask {
     connect_state_volume_update: BoxedStreamResult<SetVolumeCommand>,
     connect_state_logout_request: BoxedStreamResult<LogoutCommand>,
     playlist_update: BoxedStreamResult<PlaylistModificationInfo>,
-    session_update: BoxedStreamResult<SessionUpdate>,
+    session_update: BoxedStreamResult<FallbackWrapper<SessionUpdate>>,
     connect_state_command: BoxedStream<RequestReply>,
     user_attributes_update: BoxedStreamResult<UserAttributesUpdate>,
     user_attributes_mutation: BoxedStreamResult<UserAttributesMutation>,
@@ -191,7 +191,7 @@ impl Spirc {
 
         let session_update = session
             .dealer()
-            .listen_for("social-connect/v2/session_update", Message::from_json)?;
+            .listen_for("social-connect/v2/session_update", Message::try_from_json)?;
 
         let user_attributes_update = session
             .dealer()
@@ -1552,7 +1552,24 @@ impl SpircTask {
         Ok(())
     }
 
-    fn handle_session_update(&mut self, mut session_update: SessionUpdate) {
+    fn handle_session_update(&mut self, session_update: FallbackWrapper<SessionUpdate>) {
+        // we know that this enum value isn't present in our current proto definitions, by that
+        // the json parsing fails because the enum isn't known as proto representation
+        const WBC: &str = "WIFI_BROADCAST_CHANGED";
+
+        let mut session_update = match session_update {
+            FallbackWrapper::Inner(update) => update,
+            FallbackWrapper::Fallback(value) => {
+                let fallback_inner = value.to_string();
+                if fallback_inner.contains(WBC) {
+                    log::debug!("Received SessionUpdate::{WBC}");
+                } else {
+                    log::warn!("SessionUpdate couldn't be parse correctly: {value:?}");
+                }
+                return;
+            }
+        };
+
         let reason = session_update.reason.enum_value();
 
         let mut session = match session_update.session.take() {
