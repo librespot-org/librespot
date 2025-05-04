@@ -116,6 +116,10 @@ impl ConnectState {
             ResetContext::Completely => {
                 self.context = None;
                 self.autoplay_context = None;
+
+                let player = self.player_mut();
+                player.context_uri.clear();
+                player.context_url.clear();
             }
             ResetContext::DefaultIndex => {
                 for ctx in [self.context.as_mut(), self.autoplay_context.as_mut()]
@@ -141,14 +145,13 @@ impl ConnectState {
         }
     }
 
-    pub fn get_context_uri_from_context(context: &Context) -> Option<&str> {
-        let uri = context.uri.as_deref().unwrap_or_default();
-        Self::valid_resolve_uri(uri).or_else(|| {
-            context
-                .pages
-                .first()
-                .and_then(|p| p.tracks.first().and_then(|t| t.uri.as_deref()))
-        })
+    pub fn find_valid_uri<'s>(
+        context_uri: Option<&'s str>,
+        first_page: Option<&'s ContextPage>,
+    ) -> Option<&'s str> {
+        context_uri
+            .and_then(Self::valid_resolve_uri)
+            .or_else(|| first_page.and_then(|p| p.tracks.first().and_then(|t| t.uri.as_deref())))
     }
 
     pub fn set_active_context(&mut self, new_context: ContextType) {
@@ -157,7 +160,8 @@ impl ConnectState {
         let player = self.player_mut();
 
         player.context_metadata = Default::default();
-        player.restrictions = Some(Default::default()).into();
+        player.context_restrictions = MessageField::some(Default::default());
+        player.restrictions = MessageField::some(Default::default());
 
         let ctx = match self.get_context(new_context) {
             Err(why) => {
@@ -387,16 +391,10 @@ impl ConnectState {
             .unwrap_or(false)
     }
 
-    pub fn merge_context(&mut self, context: Option<Context>) -> Option<()> {
-        let mut context = context?;
-        if matches!(context.uri, Some(ref uri) if uri != self.context_uri()) {
-            return None;
-        }
-
+    pub fn merge_context(&mut self, new_page: Option<ContextPage>) -> Option<()> {
         let current_context = self.get_context_mut(ContextType::Default).ok()?;
-        let new_page = context.pages.pop()?;
 
-        for new_track in new_page.tracks {
+        for new_track in new_page?.tracks {
             if new_track.uri.is_none() || matches!(new_track.uri, Some(ref uri) if uri.is_empty()) {
                 continue;
             }

@@ -76,7 +76,9 @@ impl ResolveContext {
         // otherwise we might not even check if we need to fallback and just use the fallback uri
         match self.resolve {
             Resolve::Uri(ref uri) => ConnectState::valid_resolve_uri(uri),
-            Resolve::Context(ref ctx) => ConnectState::get_context_uri_from_context(ctx),
+            Resolve::Context(ref ctx) => {
+                ConnectState::find_valid_uri(ctx.uri.as_deref(), ctx.pages.first())
+            }
         }
         .or(self.fallback.as_deref())
     }
@@ -260,7 +262,7 @@ impl ContextResolver {
             ContextAction::Replace => {
                 let remaining = state.update_context(context, next.update);
                 if let Resolve::Context(ref ctx) = next.resolve {
-                    state.merge_context(Some(ctx.clone()));
+                    state.merge_context(ctx.pages.clone().pop());
                 }
 
                 remaining

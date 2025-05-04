@@ -7,8 +7,8 @@ impl ConnectState {
     pub fn clear_restrictions(&mut self) {
         let player = self.player_mut();
 
-        player.restrictions.clear();
-        player.context_restrictions.clear();
+        player.context_restrictions = Some(Default::default()).into();
+        player.restrictions = Some(Default::default()).into();
     }
 
     pub fn update_restrictions(&mut self) {
