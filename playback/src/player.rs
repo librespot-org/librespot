@@ -23,6 +23,9 @@ use parking_lot::Mutex;
 use symphonia::core::io::MediaSource;
 use tokio::sync::{mpsc, oneshot};
 
+#[cfg(feature = "passthrough-decoder")]
+use crate::decoder::PassthroughDecoder;
+use crate::SAMPLES_PER_SECOND;
 use crate::{
     audio::{AudioDecrypt, AudioFetchParams, AudioFile, StreamLoaderController},
     audio_backend::Sink,
@@ -33,11 +36,6 @@ use crate::{
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::VolumeGetter,
 };
-
-#[cfg(feature = "passthrough-decoder")]
-use crate::decoder::PassthroughDecoder;
-
-use crate::SAMPLES_PER_SECOND;
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
@@ -71,7 +69,8 @@ struct PlayerInternal {
 
     state: PlayerState,
     preload: PlayerPreload,
-    sink: Box<dyn Sink>,
+    sink: Option<Box<dyn Sink>>,
+    sink_builder: Box<dyn Fn() -> Box<dyn Sink> + Send + 'static>,
     sink_status: SinkStatus,
     sink_event_callback: Option<SinkEventCallback>,
     volume_getter: Box<dyn VolumeGetter + Send>,
@@ -425,15 +424,12 @@ impl NormalisationData {
 }
 
 impl Player {
-    pub fn new<F>(
+    pub fn new(
         config: PlayerConfig,
         session: Session,
         volume_getter: Box<dyn VolumeGetter + Send>,
-        sink_builder: F,
-    ) -> Arc<Self>
-    where
-        F: FnOnce() -> Box<dyn Sink> + Send + 'static,
-    {
+        sink_builder: impl Fn() -> Box<dyn Sink> + Send + 'static,
+    ) -> Arc<Self> {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         if config.normalisation {
@@ -476,7 +472,8 @@ impl Player {
 
                 state: PlayerState::Stopped,
                 preload: PlayerPreload::None,
-                sink: sink_builder(),
+                sink: None,
+                sink_builder: Box::new(sink_builder),
                 sink_status: SinkStatus::Closed,
                 sink_event_callback: None,
                 volume_getter,
@@ -1440,7 +1437,9 @@ impl PlayerInternal {
             if let Some(callback) = &mut self.sink_event_callback {
                 callback(SinkStatus::Running);
             }
-            match self.sink.start() {
+
+            let sink = self.sink.get_or_insert_with(|| (*self.sink_builder)());
+            match sink.start() {
                 Ok(()) => self.sink_status = SinkStatus::Running,
                 Err(e) => {
                     error!("{}", e);
@@ -1454,11 +1453,25 @@ impl PlayerInternal {
         match self.sink_status {
             SinkStatus::Running => {
                 trace!("== Stopping sink ==");
-                match self.sink.stop() {
+
+                let sink = match self.sink.as_mut() {
+                    Some(sink) => sink,
+                    None => {
+                        self.sink_status = if temporarily {
+                            SinkStatus::TemporarilyClosed
+                        } else {
+                            SinkStatus::Closed
+                        };
+                        return;
+                    }
+                };
+
+                match sink.stop() {
                     Ok(()) => {
                         self.sink_status = if temporarily {
                             SinkStatus::TemporarilyClosed
                         } else {
+                            self.sink = None;
                             SinkStatus::Closed
                         };
                         if let Some(callback) = &mut self.sink_event_callback {
@@ -1693,10 +1706,22 @@ impl PlayerInternal {
                         }
                     }
 
-                    if let Err(e) = self.sink.write(packet, &mut self.converter) {
-                        error!("{}", e);
-                        self.handle_pause();
-                    }
+                    let write_res = self
+                        .sink
+                        .as_mut()
+                        .ok_or(Error::failed_precondition("sink not available"))
+                        .map(|sink| {
+                            sink.write(packet, &mut self.converter)
+                                .map_err(Error::internal)
+                        });
+
+                    match write_res {
+                        Ok(Ok(())) => {}
+                        Ok(Err(why)) | Err(why) => {
+                            error!("{why}");
+                            self.handle_pause()
+                        }
+                    };
                 }
             }
 

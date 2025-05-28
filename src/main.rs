@@ -1949,9 +1949,10 @@ async fn main() {
     let soft_volume = mixer.get_soft_volume();
     let format = setup.format;
     let backend = setup.backend;
-    let device = setup.device.clone();
+    let device = setup.device;
+
     let player = Player::new(player_config, session.clone(), soft_volume, move || {
-        (backend)(device, format)
+        backend(device.clone(), format)
     });
 
     if let Some(player_event_program) = setup.player_event_program.clone() {
