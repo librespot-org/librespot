@@ -1227,8 +1227,7 @@ fn get_setup() -> Setup {
         Some("librespot compiled without zeroconf backend".to_owned())
     } else if opt_present(DISABLE_DISCOVERY) {
         Some(format!(
-            "the `--{}` / `-{}` flag set",
-            DISABLE_DISCOVERY, DISABLE_DISCOVERY_SHORT,
+            "the `--{DISABLE_DISCOVERY}` / `-{DISABLE_DISCOVERY_SHORT}` flag set",
         ))
     } else {
         None

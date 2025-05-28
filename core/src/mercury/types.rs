@@ -57,7 +57,7 @@ impl std::fmt::Display for MercuryMethod {
             MercuryMethod::Unsub => "UNSUB",
             MercuryMethod::Send => "SEND",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

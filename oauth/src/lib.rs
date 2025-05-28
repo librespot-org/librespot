@@ -237,7 +237,7 @@ impl OAuthClient {
         if self.should_open_url {
             open::that_in_background(auth_url.as_str());
         }
-        println!("Browse to: {}", auth_url);
+        println!("Browse to: {auth_url}");
 
         pkce_verifier
     }
@@ -456,7 +456,7 @@ pub fn get_access_token(
         .set_pkce_challenge(pkce_challenge)
         .url();
 
-    println!("Browse to: {}", auth_url);
+    println!("Browse to: {auth_url}");
 
     let code = match get_socket_address(redirect_uri) {
         Some(addr) => get_authcode_listener(addr, String::from("Go back to your terminal :)")),
