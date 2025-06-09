@@ -55,7 +55,7 @@ impl<T> ShuffleVec<T> {
             self.unshuffle()
         }
 
-        let indices = {
+        let indices: Vec<_> = {
             (1..self.vec.len())
                 .rev()
                 .map(|i| rng.gen_range(0..i + 1))
