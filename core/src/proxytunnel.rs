@@ -22,7 +22,7 @@ pub async fn proxy_connect<T: AsyncRead + AsyncWrite + Unpin>(
     loop {
         let bytes_read = proxy_connection.read(&mut buffer[offset..]).await?;
         if bytes_read == 0 {
-            return Err(io::Error::new(io::ErrorKind::Other, "Early EOF from proxy"));
+            return Err(io::Error::other("Early EOF from proxy"));
         }
         offset += bytes_read;
 
@@ -31,7 +31,7 @@ pub async fn proxy_connect<T: AsyncRead + AsyncWrite + Unpin>(
 
         let status = response
             .parse(&buffer[..offset])
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+            .map_err(io::Error::other)?;
 
         if status.is_complete() {
             return match response.code {
@@ -39,12 +39,9 @@ pub async fn proxy_connect<T: AsyncRead + AsyncWrite + Unpin>(
                 Some(code) => {
                     let reason = response.reason.unwrap_or("no reason");
                     let msg = format!("Proxy responded with {code}: {reason}");
-                    Err(io::Error::new(io::ErrorKind::Other, msg))
+                    Err(io::Error::other(msg))
                 }
-                None => Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Malformed response from proxy",
-                )),
+                None => Err(io::Error::other("Malformed response from proxy")),
             };
         }
 
