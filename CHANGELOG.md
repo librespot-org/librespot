@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Moved all public items to the highest level (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
 - [metadata] Replaced `AudioFileFormat` with own enum. (breaking)
+- [player] Changed `sink_builder` parameter from `FnOnce()` to `Fn()` of `Player::new` (breaking)
 
 ### Added
 
