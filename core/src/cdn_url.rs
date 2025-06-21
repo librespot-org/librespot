@@ -121,6 +121,15 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
                     if let Some(token) = url
                         .query_pairs()
                         .into_iter()
+                        .find(|(key, _value)| key == "verify")
+                    {
+                        // https://audio-cf.spotifycdn.com/audio/844ecdb297a87ebfee4399f28892ef85d9ba725f?verify=1750549951-4R3I2w2q7OfNkR%2FGH8qH7xtIKUPlDxywBuADY%2BsvMeU%3D
+                        if let Some((expiry_str_candidate, _)) = token.1.split_once('-') {
+                            expiry_str = Some(expiry_str_candidate.to_string());
+                        }
+                    } else if let Some(token) = url
+                        .query_pairs()
+                        .into_iter()
                         .find(|(key, _value)| key == "__token__")
                     {
                         //"https://audio-ak-spotify-com.akamaized.net/audio/4712bc9e47f7feb4ee3450ef2bb545e1d83c3d54?__token__=exp=1688165560~hmac=4e661527574fab5793adb99cf04e1c2ce12294c71fe1d39ffbfabdcfe8ce3b41",
@@ -187,6 +196,7 @@ mod test {
         let mut msg = CdnUrlMessage::new();
         msg.result = StorageResolveResponse_Result::CDN.into();
         msg.cdnurl = vec![
+            format!("https://audio-cf.spotifycdn.com/audio/844ecdb297a87ebfee4399f28892ef85d9ba725f?verify={timestamp}-4R3I2w2q7OfNkR%2FGH8qH7xtIKUPlDxywBuADY%2BsvMeU%3D"),
             format!("https://audio-ak-spotify-com.akamaized.net/audio/foo?__token__=exp={timestamp}~hmac=4e661527574fab5793adb99cf04e1c2ce12294c71fe1d39ffbfabdcfe8ce3b41"),
             format!("https://audio-gm-off.spotifycdn.com/audio/foo?Expires={timestamp}~FullPath~hmac=IIZA28qptl8cuGLq15-SjHKHtLoxzpy_6r_JpAU4MfM="),
             format!("https://audio4-fa.scdn.co/audio/foo?{timestamp}_0GKSyXjLaTW1BksFOyI4J7Tf9tZDbBUNNPu9Mt4mhH4="),
@@ -195,11 +205,12 @@ mod test {
         msg.fileid = vec![0];
 
         let urls = MaybeExpiringUrls::try_from(msg).expect("valid urls");
-        assert_eq!(urls.len(), 4);
+        assert_eq!(urls.len(), 5);
         assert!(urls[0].1.is_some());
         assert!(urls[1].1.is_some());
         assert!(urls[2].1.is_some());
-        assert!(urls[3].1.is_none());
+        assert!(urls[3].1.is_some());
+        assert!(urls[4].1.is_none());
         let timestamp_margin = Duration::seconds(timestamp) - CDN_URL_EXPIRY_MARGIN;
         assert_eq!(
             urls[0].1.unwrap().as_timestamp_ms() as i128,
