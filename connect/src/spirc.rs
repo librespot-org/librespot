@@ -977,7 +977,10 @@ impl SpircTask {
                 return self.notify().await;
             }
             Play(mut play) => {
-                let first_page = play.context.pages.pop();
+                if !self.connect_state.is_active() {
+                    self.handle_activate()
+                }
+
                 let context = match play.context.uri {
                     Some(s) => PlayContext::Uri(s),
                     None if !play.context.pages.is_empty() => PlayContext::Tracks(
@@ -1008,7 +1011,7 @@ impl SpircTask {
                             context_options,
                         },
                     },
-                    first_page,
+                    play.context.pages.pop(),
                 )
                 .await?;
 
