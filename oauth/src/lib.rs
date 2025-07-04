@@ -188,7 +188,7 @@ fn get_authcode_listener(
     code
 }
 
-// If the specified `redirect_uri` is HTTP, loopback, and contains a port,
+// If the specified `redirect_uri` is HTTP and contains a port,
 // then the corresponding socket address is returned.
 fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
     #![warn(missing_docs)]
@@ -196,16 +196,10 @@ fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
         Ok(u) if u.scheme() == "http" && u.port().is_some() => u,
         _ => return None,
     };
-    let socket_addr = match url.socket_addrs(|| None) {
+    match url.socket_addrs(|| None) {
         Ok(mut addrs) => addrs.pop(),
         _ => None,
-    };
-    if let Some(s) = socket_addr {
-        if s.ip().is_loopback() {
-            return socket_addr;
-        }
     }
-    None
 }
 
 /// Struct that handle obtaining and refreshing access tokens.
@@ -511,21 +505,21 @@ mod test {
         assert_eq!(get_socket_address("http://127.0.0.1/foo"), None);
         assert_eq!(get_socket_address("http://127.0.0.1:/foo"), None);
         assert_eq!(get_socket_address("http://[::1]/foo"), None);
-        // Not localhost
-        assert_eq!(get_socket_address("http://56.0.0.1:1234/foo"), None);
-        assert_eq!(
-            get_socket_address("http://[3ffe:2a00:100:7031::1]:1234/foo"),
-            None
-        );
         // Not http
         assert_eq!(get_socket_address("https://127.0.0.1/foo"), None);
     }
 
     #[test]
-    fn get_socket_address_localhost() {
+    fn get_socket_address_some() {
         let localhost_v4 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
         let localhost_v6 = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8888);
+        let addr_v4 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 1234);
+        let addr_v6 = SocketAddr::new(
+            IpAddr::V6(Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888)),
+            8888,
+        );
 
+        // Loopback addresses
         assert_eq!(
             get_socket_address("http://127.0.0.1:1234/foo"),
             Some(localhost_v4)
@@ -537,6 +531,13 @@ mod test {
         assert_eq!(
             get_socket_address("http://[::1]:8888/foo"),
             Some(localhost_v6)
+        );
+
+        // Non-loopback addresses
+        assert_eq!(get_socket_address("http://8.8.8.8:1234/foo"), Some(addr_v4));
+        assert_eq!(
+            get_socket_address("http://[2001:4860:4860::8888]:8888/foo"),
+            Some(addr_v6)
         );
     }
 }
