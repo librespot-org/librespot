@@ -191,7 +191,6 @@ fn get_authcode_listener(
 // If the specified `redirect_uri` is HTTP and contains a port,
 // then the corresponding socket address is returned.
 fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
-    #![warn(missing_docs)]
     let url = match Url::parse(redirect_uri) {
         Ok(u) if u.scheme() == "http" && u.port().is_some() => u,
         _ => return None,
