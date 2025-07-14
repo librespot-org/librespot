@@ -1,10 +1,10 @@
-use portable_atomic::AtomicU64;
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-
 use super::VolumeGetter;
 use super::{MappedCtrl, VolumeCtrl};
 use super::{Mixer, MixerConfig};
+use librespot_core::Error;
+use portable_atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct SoftMixer {
@@ -15,14 +15,14 @@ pub struct SoftMixer {
 }
 
 impl Mixer for SoftMixer {
-    fn open(config: MixerConfig) -> Self {
+    fn open(config: MixerConfig) -> Result<Self, Error> {
         let volume_ctrl = config.volume_ctrl;
         info!("Mixing with softvol and volume control: {:?}", volume_ctrl);
 
-        Self {
+        Ok(Self {
             volume: Arc::new(AtomicU64::new(f64::to_bits(0.5))),
             volume_ctrl,
-        }
+        })
     }
 
     fn volume(&self) -> u16 {
