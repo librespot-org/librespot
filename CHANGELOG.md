@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Moved all public items to the highest level (breaking)
 - [connect] Replaced Mercury usage in `Spirc` with Dealer
 - [metadata] Replaced `AudioFileFormat` with own enum. (breaking)
-- [oauth] Allow `get_socket_address` to accept non-localhost IP addresses.
+- [oauth] `get_access_token` spawns OAuth listener instead of prompting for stdin, even for non-loopback IP
 
 ### Added
 
