@@ -1,6 +1,6 @@
-use std::sync::Arc;
-
 use crate::config::VolumeCtrl;
+use librespot_core::Error;
+use std::sync::Arc;
 
 pub mod mappings;
 use self::mappings::MappedCtrl;
@@ -8,12 +8,12 @@ use self::mappings::MappedCtrl;
 pub struct NoOpVolume;
 
 pub trait Mixer: Send + Sync {
-    fn open(config: MixerConfig) -> Self
+    fn open(config: MixerConfig) -> Result<Self, Error>
     where
         Self: Sized;
 
-    fn set_volume(&self, volume: u16);
     fn volume(&self) -> u16;
+    fn set_volume(&self, volume: u16);
 
     fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
         Box::new(NoOpVolume)
@@ -57,10 +57,10 @@ impl Default for MixerConfig {
     }
 }
 
-pub type MixerFn = fn(MixerConfig) -> Arc<dyn Mixer>;
+pub type MixerFn = fn(MixerConfig) -> Result<Arc<dyn Mixer>, Error>;
 
-fn mk_sink<M: Mixer + 'static>(config: MixerConfig) -> Arc<dyn Mixer> {
-    Arc::new(M::open(config))
+fn mk_sink<M: Mixer + 'static>(config: MixerConfig) -> Result<Arc<dyn Mixer>, Error> {
+    Ok(Arc::new(M::open(config)?))
 }
 
 pub const MIXERS: &[(&str, MixerFn)] = &[
