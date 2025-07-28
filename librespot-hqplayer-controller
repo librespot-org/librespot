@@ -1,0 +1,76 @@
+#!/usr/bin/env /opt/homebrew/bin/node
+import fs from "fs";
+import path from "path";
+import { promisify } from "node:util";
+import { execFile as execFileCb } from "node:child_process";
+
+const execFile = promisify(execFileCb);
+
+const HQP_CTL = "/Applications/hqp5-control.app/Contents/MacOS/hqp5-control";
+const HQP_HOST = "127.0.0.1";
+const LOGFILE = path.resolve(process.env.HOME, "librespot-hqp.log");
+
+async function log(message) {
+  const ts = new Date().toISOString();
+  fs.appendFileSync(LOGFILE, `${ts} ${message}\n`);
+  console.log(LOGFILE, `${ts} ${message}\n`);
+}
+
+async function runHQPCommand(arg, value) {
+  if (!HQP_CTL || !fs.existsSync(HQP_CTL)) {
+    log(`ERROR: HQPlayer CLI not found at ${HQP_CTL}`);
+    return;
+  }
+  const args = value ? [HQP_HOST, arg, value.toString()] : [HQP_HOST, arg];
+  return await execFile(HQP_CTL, args, (err, stdout, stderr) => {
+    if (err) {
+      log(`ERROR: HQPlayer command failed [${args.join(" ")}] - ${err.message}`);
+      if (stderr) log(`STDERR: ${stderr}`);
+    } else if (stdout) {
+      log(`HQPlayer: ${stdout.trim()}`);
+    }
+  });
+}
+
+const EVENT = process.env.PLAYER_EVENT;
+const TRACK_ID = process.env.TRACK_ID;
+const POSITION = process.env.POSITION_MS;
+const TRACK_NAME = process.env.TRACK_NAME || "Unknown";
+const ARTIST_NAME = process.env.ARTIST_NAME || "Unknown";
+const ALBUM_NAME = process.env.ALBUM_NAME || "Unknown";
+const VOLUME = parseInt(process.env.VOLUME || "0", 10);
+
+const volumePercent = Math.round((VOLUME / 65535) * 100);
+
+const volumeMapped = () => {
+  let out = Math.round((100 - volumePercent) / 5);
+  if (out < 2) out = 2;
+  return `-${out}.0`;
+};
+
+log(
+  `EVENT=${EVENT} TRACK="${TRACK_NAME}" ARTIST="${ARTIST_NAME}" ALBUM="${ALBUM_NAME}" TRACK_ID=${TRACK_ID} POS=${POSITION}ms VOL=${volumePercent}%`
+);
+
+(async () => {
+  switch (EVENT) {
+    case "playing":
+      await runHQPCommand("--play");
+      break;
+    case "paused":
+    case "stopped":
+      await runHQPCommand("--pause");
+      break;
+    case "volume_changed":
+      console.log('Volume: ', volumeMapped(), 'dbfs');
+      await runHQPCommand("--volume", volumeMapped());
+      break;
+    case "preloading":
+    case "end_of_track":
+      log("INFO: Preloading/End of track event (no HQP action)");
+      break;
+    default:
+      log(`WARN: Unknown event '${EVENT}'`);
+      break;
+  }
+})();
