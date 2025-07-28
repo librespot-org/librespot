@@ -13,7 +13,7 @@ ${LOCATION}/target/release/librespot \
   --cache "$HOME/.librespot" \
   --bitrate 320 \
   --name "HQPL" \
-  --onevent ${LOCATION}/controller \
+  --onevent ${LOCATION}/librespot-hqplayer-controller \
   --mixer null \
   --initial-volume 70 \
   --device-type stb \
