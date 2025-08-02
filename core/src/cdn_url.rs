@@ -84,9 +84,20 @@ impl CdnUrl {
         }
 
         let now = Date::now_utc();
-        let url = self.urls.iter().find(|url| match url.1 {
-            Some(expiry) => now < expiry,
-            None => true,
+
+        let url = self.urls.iter().find(|url| {
+            match is_resolvable(&url.0) {
+                true => {},
+                false => {
+                    warn!("Found unreachable CDN URL: {}", url.0);
+                    return false;
+                }
+            };
+
+            match url.1 {
+                Some(expiry) => now < expiry,
+                None => true,
+            }
         });
 
         if let Some(url) = url {
@@ -183,6 +194,21 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
             .collect::<Result<Vec<MaybeExpiringUrl>, Error>>()?;
 
         Ok(Self(result))
+    }
+}
+
+/// returns wether a given URL's host could be resolved by DNS lookup or not
+fn is_resolvable(address: &String) -> bool {
+    let host = address.replace("https://", "");
+    let parts: Vec<&str> = host.split('/').collect();
+
+    match dns_lookup::lookup_host(parts[0]) {
+        Ok(addresses) => {
+            !addresses.is_empty()
+        },
+        Err(_) => {
+            false
+        }
     }
 }
 
