@@ -71,7 +71,16 @@ impl CdnUrl {
         let msg = CdnUrlMessage::parse_from_bytes(&response)?;
         let urls = MaybeExpiringUrls::try_from(msg)?;
 
-        let cdn_url = Self { file_id, urls };
+        let mut resolvable_urls = Vec::with_capacity(urls.len());
+
+        for url in urls.iter() {
+            match is_resolvable(&url.0) {
+                true => resolvable_urls.push(url.clone()),
+                false => warn!("Found unreachable CDN URL: {}", url.0),
+            };
+        }
+
+        let cdn_url = Self { file_id, urls: MaybeExpiringUrls(resolvable_urls) };
 
         trace!("Resolved CDN storage: {:#?}", cdn_url);
 
@@ -86,14 +95,6 @@ impl CdnUrl {
         let now = Date::now_utc();
 
         let url = self.urls.iter().find(|url| {
-            match is_resolvable(&url.0) {
-                true => {},
-                false => {
-                    warn!("Found unreachable CDN URL: {}", url.0);
-                    return false;
-                }
-            };
-
             match url.1 {
                 Some(expiry) => now < expiry,
                 None => true,
