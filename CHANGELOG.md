@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Handle transfer of playback with empty "uri" field
 - [connect] Correctly apply playing/paused state when transferring playback
 - [player] Saturate invalid seek positions to track duration
+- [core] Fix unresolvable CDN URLs by adding DNS lookup
 
 ### Deprecated
 

@@ -74,13 +74,16 @@ impl CdnUrl {
         let mut resolvable_urls = Vec::with_capacity(urls.len());
 
         for url in urls.iter() {
-            match is_resolvable(&url.0) {
+            match is_resolvable(url.0.as_str()) {
                 true => resolvable_urls.push(url.clone()),
                 false => warn!("Found unreachable CDN URL: {}", url.0),
             };
         }
 
-        let cdn_url = Self { file_id, urls: MaybeExpiringUrls(resolvable_urls) };
+        let cdn_url = Self {
+            file_id,
+            urls: MaybeExpiringUrls(resolvable_urls),
+        };
 
         trace!("Resolved CDN storage: {:#?}", cdn_url);
 
@@ -94,11 +97,9 @@ impl CdnUrl {
 
         let now = Date::now_utc();
 
-        let url = self.urls.iter().find(|url| {
-            match url.1 {
-                Some(expiry) => now < expiry,
-                None => true,
-            }
+        let url = self.urls.iter().find(|url| match url.1 {
+            Some(expiry) => now < expiry,
+            None => true,
         });
 
         if let Some(url) = url {
@@ -199,17 +200,13 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
 }
 
 /// returns wether a given URL's host could be resolved by DNS lookup or not
-fn is_resolvable(address: &String) -> bool {
+fn is_resolvable(address: &str) -> bool {
     let host = address.replace("https://", "");
     let parts: Vec<&str> = host.split('/').collect();
 
     match dns_lookup::lookup_host(parts[0]) {
-        Ok(addresses) => {
-            !addresses.is_empty()
-        },
-        Err(_) => {
-            false
-        }
+        Ok(addresses) => !addresses.is_empty(),
+        Err(_) => false,
     }
 }
 
