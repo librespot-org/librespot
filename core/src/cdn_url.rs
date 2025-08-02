@@ -96,7 +96,6 @@ impl CdnUrl {
         }
 
         let now = Date::now_utc();
-
         let url = self.urls.iter().find(|url| match url.1 {
             Some(expiry) => now < expiry,
             None => true,
@@ -199,7 +198,6 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
     }
 }
 
-/// returns wether a given URL's host could be resolved by DNS lookup or not
 fn is_resolvable(address: &str) -> bool {
     let host = address.replace("https://", "");
     let parts: Vec<&str> = host.split('/').collect();
