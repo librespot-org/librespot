@@ -306,7 +306,7 @@ struct AudioFileDownloadStatus {
 }
 
 struct AudioFileShared {
-    cdn_url: CdnUrl,
+    cdn_url: String,
     file_size: usize,
     bytes_per_second: usize,
     cond: Condvar,
@@ -426,25 +426,41 @@ impl AudioFileStreaming {
     ) -> Result<AudioFileStreaming, Error> {
         let cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
 
-        if let Ok(url) = cdn_url.try_get_url() {
-            trace!("Streaming from {}", url);
-        }
-
         let minimum_download_size = AudioFetchParams::get().minimum_download_size;
 
-        // When the audio file is really small, this `download_size` may turn out to be
-        // larger than the audio file we're going to stream later on. This is OK; requesting
-        // `Content-Range` > `Content-Length` will return the complete file with status code
-        // 206 Partial Content.
-        let mut streamer =
-            session
-                .spclient()
-                .stream_from_cdn(&cdn_url, 0, minimum_download_size)?;
+        let mut response_streamer_url = None;
 
-        // Get the first chunk with the headers to get the file size.
-        // The remainder of that chunk with possibly also a response body is then
-        // further processed in `audio_file_fetch`.
-        let response = streamer.next().await.ok_or(AudioFileError::NoData)??;
+        for url in cdn_url.try_get_urls()? {
+            // When the audio file is really small, this `download_size` may turn out to be
+            // larger than the audio file we're going to stream later on. This is OK; requesting
+            // `Content-Range` > `Content-Length` will return the complete file with status code
+            // 206 Partial Content.
+            let mut streamer = session
+                .spclient()
+                .stream_from_cdn(url, 0, minimum_download_size)?;
+
+            // Get the first chunk with the headers to get the file size.
+            // The remainder of that chunk with possibly also a response body is then
+            // further processed in `audio_file_fetch`.
+            let resp: Result<Response<Incoming>, Error> = streamer
+                .next()
+                .await
+                .map_or(Err(AudioFileError::NoData.into()), |x| Ok(x?));
+
+            match resp {
+                Ok(r) => {
+                    response_streamer_url = Some((r, streamer, url));
+                    break;
+                }
+                Err(e) => warn!("Fetching {url} failed with error {e:?}, trying next"),
+            }
+        }
+
+        let Some((response, streamer, url)) = response_streamer_url else {
+            return Err(Error::unavailable("all URLs failed, none left to try"));
+        };
+
+        trace!("Streaming from {}", url);
 
         let code = response.status();
         if code != StatusCode::PARTIAL_CONTENT {
@@ -473,7 +489,7 @@ impl AudioFileStreaming {
         };
 
         let shared = Arc::new(AudioFileShared {
-            cdn_url,
+            cdn_url: url.to_string(),
             file_size,
             bytes_per_second,
             cond: Condvar::new(),

@@ -6,7 +6,6 @@ use std::{
 use crate::config::{os_version, OS};
 use crate::{
     apresolve::SocketAddress,
-    cdn_url::CdnUrl,
     config::SessionConfig,
     error::ErrorKind,
     protocol::{
@@ -732,14 +731,13 @@ impl SpClient {
 
     pub fn stream_from_cdn(
         &self,
-        cdn_url: &CdnUrl,
+        cdn_url: &str,
         offset: usize,
         length: usize,
     ) -> Result<IntoStream<ResponseFuture>, Error> {
-        let url = cdn_url.try_get_url()?;
         let req = Request::builder()
             .method(&Method::GET)
-            .uri(url)
+            .uri(cdn_url)
             .header(
                 RANGE,
                 HeaderValue::from_str(&format!("bytes={}-{}", offset, offset + length - 1))?,

@@ -78,6 +78,7 @@ impl CdnUrl {
         Ok(cdn_url)
     }
 
+    #[deprecated = "This function only returns the first valid URL. Use try_get_urls instead, which allows for fallback logic."]
     pub fn try_get_url(&self) -> Result<&str, Error> {
         if self.urls.is_empty() {
             return Err(CdnUrlError::Unresolved.into());
@@ -93,6 +94,34 @@ impl CdnUrl {
             Ok(&url.0)
         } else {
             Err(CdnUrlError::Expired.into())
+        }
+    }
+
+    pub fn try_get_urls(&self) -> Result<Vec<&str>, Error> {
+        if self.urls.is_empty() {
+            return Err(CdnUrlError::Unresolved.into());
+        }
+
+        let now = Date::now_utc();
+        let urls: Vec<&str> = self
+            .urls
+            .iter()
+            .filter_map(|MaybeExpiringUrl(url, expiry)| match *expiry {
+                Some(expiry) => {
+                    if now < expiry {
+                        Some(url.as_str())
+                    } else {
+                        None
+                    }
+                }
+                None => Some(url.as_str()),
+            })
+            .collect();
+
+        if urls.is_empty() {
+            Err(CdnUrlError::Expired.into())
+        } else {
+            Ok(urls)
         }
     }
 }
