@@ -429,8 +429,8 @@ impl AudioFileStreaming {
         let minimum_download_size = AudioFetchParams::get().minimum_download_size;
 
         let mut response_streamer_url = None;
-
-        for url in cdn_url.try_get_urls()? {
+        let urls = cdn_url.try_get_urls()?;
+        for url in &urls {
             // When the audio file is really small, this `download_size` may turn out to be
             // larger than the audio file we're going to stream later on. This is OK; requesting
             // `Content-Range` > `Content-Length` will return the complete file with status code
@@ -442,10 +442,10 @@ impl AudioFileStreaming {
             // Get the first chunk with the headers to get the file size.
             // The remainder of that chunk with possibly also a response body is then
             // further processed in `audio_file_fetch`.
-            let resp: Result<Response<Incoming>, Error> = streamer
-                .next()
-                .await
-                .map_or(Err(AudioFileError::NoData.into()), |x| Ok(x?));
+            let resp = streamer.next().await.map_or_else(
+                || Err(AudioFileError::NoData.into()),
+                |x| x.map_err(Error::from),
+            );
 
             match resp {
                 Ok(r) => {
@@ -457,7 +457,10 @@ impl AudioFileStreaming {
         }
 
         let Some((response, streamer, url)) = response_streamer_url else {
-            return Err(Error::unavailable("all URLs failed, none left to try"));
+            return Err(Error::unavailable(format!(
+                "{} URLs failed, none left to try",
+                urls.len()
+            )));
         };
 
         trace!("Streaming from {}", url);
