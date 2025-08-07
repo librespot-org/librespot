@@ -87,7 +87,7 @@ impl Default for RequestStrategy {
 pub struct RequestOptions {
     metrics: bool,
     salt: bool,
-    base_url: Option<String>,
+    base_url: Option<&'static str>,
 }
 
 impl Default for RequestOptions {
@@ -453,7 +453,7 @@ impl SpClient {
             // Reconnection logic: retrieve the endpoint every iteration, so we can try
             // another access point when we are experiencing network issues (see below).
             let mut url = match &options.base_url {
-                Some(base_url) => base_url.clone(),
+                Some(base_url) => base_url.to_owned().to_string(),
                 None => self.base_url().await?,
             };
             url.push_str(endpoint);
@@ -572,8 +572,11 @@ impl SpClient {
 
     pub async fn get_metadata(&self, scope: &str, id: &SpotifyId) -> SpClientResult {
         let endpoint = format!("/metadata/4/{}/{}", scope, id.to_base16()?);
+        // For unknown reasons, metadata requests must now be sent through spclient.wg.spotify.com.
+        // Otherwise, the API will respond with 500 Internal Server Error responses.
+        // Context: https://github.com/librespot-org/librespot/issues/1527
         let options = RequestOptions {
-            base_url: Some(String::from("https://spclient.wg.spotify.com")),
+            base_url: Some("https://spclient.wg.spotify.com"),
             ..Default::default()
         };
         self.request_with_options(&Method::GET, &endpoint, None, None, &options)
