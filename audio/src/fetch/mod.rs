@@ -442,12 +442,13 @@ impl AudioFileStreaming {
             // Get the first chunk with the headers to get the file size.
             // The remainder of that chunk with possibly also a response body is then
             // further processed in `audio_file_fetch`.
-            let resp = streamer.next().await.map_or_else(
-                || Err(AudioFileError::NoData.into()),
-                |x| x.map_err(Error::from),
-            );
+            let streamer_result = tokio::time::timeout(Duration::from_secs(10), streamer.next())
+                .await
+                .map_err(|_| AudioFileError::WaitTimeout.into())
+                .and_then(|x| x.ok_or_else(|| AudioFileError::NoData.into()))
+                .and_then(|x| x.map_err(Error::from));
 
-            match resp {
+            match streamer_result {
                 Ok(r) => {
                     response_streamer_url = Some((r, streamer, url));
                     break;
