@@ -6,7 +6,6 @@ use std::{
 use crate::config::{os_version, OS};
 use crate::{
     apresolve::SocketAddress,
-    cdn_url::CdnUrl,
     config::SessionConfig,
     error::ErrorKind,
     protocol::{
@@ -27,7 +26,7 @@ use crate::{
 use bytes::Bytes;
 use data_encoding::HEXUPPER_PERMISSIVE;
 use futures_util::future::IntoStream;
-use http::header::HeaderValue;
+use http::{header::HeaderValue, Uri};
 use hyper::{
     header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
     HeaderMap, Method, Request,
@@ -730,16 +729,19 @@ impl SpClient {
         self.request(&Method::GET, &endpoint, None, None).await
     }
 
-    pub fn stream_from_cdn(
+    pub fn stream_from_cdn<U>(
         &self,
-        cdn_url: &CdnUrl,
+        cdn_url: U,
         offset: usize,
         length: usize,
-    ) -> Result<IntoStream<ResponseFuture>, Error> {
-        let url = cdn_url.try_get_url()?;
+    ) -> Result<IntoStream<ResponseFuture>, Error>
+    where
+        U: TryInto<Uri>,
+        <U as TryInto<Uri>>::Error: Into<http::Error>,
+    {
         let req = Request::builder()
             .method(&Method::GET)
-            .uri(url)
+            .uri(cdn_url)
             .header(
                 RANGE,
                 HeaderValue::from_str(&format!("bytes={}-{}", offset, offset + length - 1))?,
