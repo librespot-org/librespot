@@ -26,7 +26,7 @@ use crate::{
 use bytes::Bytes;
 use data_encoding::HEXUPPER_PERMISSIVE;
 use futures_util::future::IntoStream;
-use http::header::HeaderValue;
+use http::{header::HeaderValue, Uri};
 use hyper::{
     header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
     HeaderMap, Method, Request,
@@ -729,12 +729,16 @@ impl SpClient {
         self.request(&Method::GET, &endpoint, None, None).await
     }
 
-    pub fn stream_from_cdn(
+    pub fn stream_from_cdn<U>(
         &self,
-        cdn_url: &str,
+        cdn_url: U,
         offset: usize,
         length: usize,
-    ) -> Result<IntoStream<ResponseFuture>, Error> {
+    ) -> Result<IntoStream<ResponseFuture>, Error>
+    where
+        U: TryInto<Uri>,
+        <U as TryInto<Uri>>::Error: Into<http::Error>,
+    {
         let req = Request::builder()
             .method(&Method::GET)
             .uri(cdn_url)

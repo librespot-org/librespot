@@ -435,9 +435,10 @@ impl AudioFileStreaming {
             // larger than the audio file we're going to stream later on. This is OK; requesting
             // `Content-Range` > `Content-Length` will return the complete file with status code
             // 206 Partial Content.
-            let mut streamer = session
-                .spclient()
-                .stream_from_cdn(url, 0, minimum_download_size)?;
+            let mut streamer =
+                session
+                    .spclient()
+                    .stream_from_cdn(*url, 0, minimum_download_size)?;
 
             // Get the first chunk with the headers to get the file size.
             // The remainder of that chunk with possibly also a response body is then
