@@ -458,8 +458,8 @@ impl SpClient {
 
             // Reconnection logic: retrieve the endpoint every iteration, so we can try
             // another access point when we are experiencing network issues (see below).
-            let mut url = match &options.base_url {
-                Some(base_url) => base_url.to_owned().to_string(),
+            let mut url = match options.base_url {
+                Some(base_url) => base_url.to_string(),
                 None => self.base_url().await?,
             };
             url.push_str(endpoint);
