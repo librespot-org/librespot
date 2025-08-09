@@ -7,6 +7,7 @@ use crate::config::{os_version, OS};
 use crate::{
     apresolve::SocketAddress,
     config::SessionConfig,
+    dealer::protocol::TransferOptions,
     error::ErrorKind,
     protocol::{
         autoplay_context_request::AutoplayContextRequest,
@@ -881,5 +882,36 @@ impl SpClient {
         let endpoint = format!("/playlist/v2/user/{user}/rootlist?decorate=revision,attributes,length,owner,capabilities,status_code&from={from}&length={length}");
 
         self.request(&Method::GET, &endpoint, None, None).await
+    }
+
+    /// Triggers the transfers of the playback from one device to another
+    ///
+    /// Using the same `device_id` for `from_device_id` and `to_device_id`, initiates the transfer
+    /// from the currently active device.
+    pub async fn transfer(
+        &self,
+        from_device_id: &str,
+        to_device_id: &str,
+        transfer_options: &Option<TransferOptions>,
+    ) -> SpClientResult {
+        let endpoint =
+            format!("/connect-state/v1/connect/transfer/from/{from_device_id}/to/{to_device_id}");
+
+        let transfer_options = transfer_options
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?;
+        let body = transfer_options.map(|op| format!(r#"{{ "transfer_options": {op} }}"#));
+
+        debug!("{body:?}");
+
+        self.request_with_options(
+            &Method::POST,
+            &endpoint,
+            None,
+            body.as_deref().map(|s| s.as_bytes()),
+            &NO_METRICS_AND_SALT,
+        )
+        .await
     }
 }

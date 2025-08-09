@@ -4,7 +4,7 @@ use crate::{
         authentication::Credentials,
         dealer::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
-            protocol::{Command, FallbackWrapper, Message, Request},
+            protocol::{Command, FallbackWrapper, Message, Request, TransferOptions},
         },
         session::UserAttributes,
         Error, Session, SpotifyId,
@@ -128,6 +128,7 @@ enum SpircCommand {
     SetPosition(u32),
     SetVolume(u16),
     Activate,
+    Transfer(Option<TransferOptions>),
     Load(LoadRequest),
 }
 
@@ -393,9 +394,18 @@ impl Spirc {
 
     /// Acquires the control as active connect device.
     ///
-    /// Does nothing if we are not the active device.
+    /// Does not [Spirc::transfer] the playback. Does nothing if we are not the active device.
     pub fn activate(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Activate)?)
+    }
+
+    /// Acquires the control as active connect device over the transfer flow.
+    ///
+    /// Does nothing if we are not the active device.
+    pub fn transfer(&self, transfer_options: Option<TransferOptions>) -> Result<(), Error> {
+        Ok(self
+            .commands
+            .send(SpircCommand::Transfer(transfer_options))?)
     }
 }
 
@@ -617,12 +627,19 @@ impl SpircTask {
                     rx.close()
                 }
             }
+            SpircCommand::Transfer(options) if !self.connect_state.is_active() => {
+                self.session
+                    .spclient()
+                    .transfer(self.session.device_id(), self.session.device_id(), &options)
+                    .await?;
+                return Ok(());
+            }
             SpircCommand::Activate if !self.connect_state.is_active() => {
                 trace!("Received SpircCommand::{:?}", cmd);
                 self.handle_activate();
                 return self.notify().await;
             }
-            SpircCommand::Activate => warn!(
+            SpircCommand::Transfer(..) | SpircCommand::Activate => warn!(
                 "SpircCommand::{:?} will be ignored while already active",
                 cmd
             ),
