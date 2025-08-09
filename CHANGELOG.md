@@ -17,8 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
 - [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
 - [player] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
-- [spclient] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [core] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [core] Changed return type of `get_extended_metadata` to return `BatchedExtensionResponse` (breaking)
+- [core] Changed parameter of `get_<item>_metadata` from `SpotifyId` to `SpotifyUri` (breaking)
 
+### Fixed
+
+- [core] Fixed a problem where the metadata didn't include the audio file by switching to `get_extended_metadata`
 
 ### Removed
 
