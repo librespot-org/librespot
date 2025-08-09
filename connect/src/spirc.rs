@@ -501,7 +501,7 @@ impl SpircTask {
                     session_update,
                     match |session_update| self.handle_session_update(session_update)
                 },
-                cmd = async { commands?.recv().await }, if self.connect_established && commands.is_some() => if let Some(cmd) = cmd {
+                cmd = async { commands?.recv().await }, if commands.is_some() && self.connect_established => if let Some(cmd) = cmd {
                     if let Err(e) = self.handle_command(cmd).await {
                         debug!("could not dispatch command: {}", e);
                     }
@@ -630,9 +630,10 @@ impl SpircTask {
                 }
             }
             SpircCommand::Transfer(options) if !self.connect_state.is_active() => {
+                let device_id = self.session.device_id();
                 self.session
                     .spclient()
-                    .transfer(self.session.device_id(), self.session.device_id(), &options)
+                    .transfer(device_id, device_id, options.as_ref())
                     .await?;
                 return Ok(());
             }

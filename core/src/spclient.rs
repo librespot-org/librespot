@@ -892,19 +892,16 @@ impl SpClient {
         &self,
         from_device_id: &str,
         to_device_id: &str,
-        transfer_options: &Option<TransferOptions>,
+        transfer_options: Option<&TransferOptions>,
     ) -> SpClientResult {
-        let endpoint =
-            format!("/connect-state/v1/connect/transfer/from/{from_device_id}/to/{to_device_id}");
-
         let transfer_options = transfer_options
             .as_ref()
             .map(serde_json::to_string)
             .transpose()?;
         let body = transfer_options.map(|op| format!(r#"{{ "transfer_options": {op} }}"#));
 
-        debug!("{body:?}");
-
+        let endpoint =
+            format!("/connect-state/v1/connect/transfer/from/{from_device_id}/to/{to_device_id}");
         self.request_with_options(
             &Method::POST,
             &endpoint,
