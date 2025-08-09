@@ -58,11 +58,11 @@ impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 
     async fn request(session: &Session, episode_uri: &SpotifyUri) -> RequestResult {
-        let SpotifyUri::Episode { id: episode_id } = episode_uri else {
+        let SpotifyUri::Episode { .. } = episode_uri else {
             return Err(Error::invalid_argument("episode_uri"));
         };
 
-        session.spclient().get_episode_metadata(episode_id).await
+        session.spclient().get_episode_metadata(episode_uri).await
     }
 
     fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {

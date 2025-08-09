@@ -59,11 +59,11 @@ impl Metadata for Track {
     type Message = protocol::metadata::Track;
 
     async fn request(session: &Session, track_uri: &SpotifyUri) -> RequestResult {
-        let SpotifyUri::Track { id: track_id } = track_uri else {
+        let SpotifyUri::Track { .. } = track_uri else {
             return Err(Error::invalid_argument("track_uri"));
         };
 
-        session.spclient().get_track_metadata(track_id).await
+        session.spclient().get_track_metadata(track_uri).await
     }
 
     fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {
