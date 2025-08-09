@@ -58,6 +58,12 @@ const NO_METRICS_AND_SALT: RequestOptions = RequestOptions {
     base_url: None,
 };
 
+const SPCLIENT_FALLBACK_ENDPOINT: RequestOptions = RequestOptions {
+    metrics: true,
+    salt: true,
+    base_url: Some("https://spclient.wg.spotify.com"),
+};
+
 #[derive(Debug, Error)]
 pub enum SpClientError {
     #[error("missing attribute {0}")]
@@ -575,12 +581,14 @@ impl SpClient {
         // For unknown reasons, metadata requests must now be sent through spclient.wg.spotify.com.
         // Otherwise, the API will respond with 500 Internal Server Error responses.
         // Context: https://github.com/librespot-org/librespot/issues/1527
-        let options = RequestOptions {
-            base_url: Some("https://spclient.wg.spotify.com"),
-            ..Default::default()
-        };
-        self.request_with_options(&Method::GET, &endpoint, None, None, &options)
-            .await
+        self.request_with_options(
+            &Method::GET,
+            &endpoint,
+            None,
+            None,
+            &SPCLIENT_FALLBACK_ENDPOINT,
+        )
+        .await
     }
 
     pub async fn get_track_metadata(&self, track_id: &SpotifyId) -> SpClientResult {
