@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Correctly apply playing/paused state when transferring playback
 - [player] Saturate invalid seek positions to track duration
 - [audio] Fall back to other URLs in case of a failure when downloading from CDN
+- [core] Metadata requests failing with 500 Internal Server Error
 
 ### Deprecated
 
