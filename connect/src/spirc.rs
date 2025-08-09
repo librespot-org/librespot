@@ -73,6 +73,7 @@ struct SpircTask {
 
     /// the state management object
     connect_state: ConnectState,
+    connect_established: bool,
 
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
@@ -226,6 +227,7 @@ impl Spirc {
             mixer,
 
             connect_state,
+            connect_established: false,
 
             play_request_id: None,
             play_status: SpircPlayStatus::Stopped,
@@ -499,7 +501,7 @@ impl SpircTask {
                     session_update,
                     match |session_update| self.handle_session_update(session_update)
                 },
-                cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
+                cmd = async { commands?.recv().await }, if self.connect_established && commands.is_some() => if let Some(cmd) = cmd {
                     if let Err(e) = self.handle_command(cmd).await {
                         debug!("could not dispatch command: {}", e);
                     }
@@ -824,6 +826,8 @@ impl SpircTask {
             "successfully put connect state for {} with connection-id {connection_id}",
             self.session.device_id()
         );
+
+        self.connect_established = true;
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
