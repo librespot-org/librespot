@@ -70,11 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [connect] Add `volume_steps` to `ConnectConfig` (breaking)
 - [connect] Add and enforce rustdoc
+- [connect] Add `audio/local` to the `supported_types` field of the device capabilities.
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [playback] Add `PlayerEvent::PositionChanged` event to notify about the current playback position
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
 - [core] Add `try_get_urls` to `CdnUrl`
 - [oauth] Add `OAuthClient` and `OAuthClientBuilder` structs to achieve a more customizable login process
+
 
 ### Fixed
 
