@@ -55,6 +55,13 @@ const CONNECTION_ID: HeaderName = HeaderName::from_static("x-spotify-connection-
 const NO_METRICS_AND_SALT: RequestOptions = RequestOptions {
     metrics: false,
     salt: false,
+    base_url: None,
+};
+
+const SPCLIENT_FALLBACK_ENDPOINT: RequestOptions = RequestOptions {
+    metrics: true,
+    salt: true,
+    base_url: Some("https://spclient.wg.spotify.com"),
 };
 
 #[derive(Debug, Error)]
@@ -86,6 +93,7 @@ impl Default for RequestStrategy {
 pub struct RequestOptions {
     metrics: bool,
     salt: bool,
+    base_url: Option<&'static str>,
 }
 
 impl Default for RequestOptions {
@@ -93,6 +101,7 @@ impl Default for RequestOptions {
         Self {
             metrics: true,
             salt: true,
+            base_url: None,
         }
     }
 }
@@ -449,7 +458,10 @@ impl SpClient {
 
             // Reconnection logic: retrieve the endpoint every iteration, so we can try
             // another access point when we are experiencing network issues (see below).
-            let mut url = self.base_url().await?;
+            let mut url = match options.base_url {
+                Some(base_url) => base_url.to_string(),
+                None => self.base_url().await?,
+            };
             url.push_str(endpoint);
 
             // Add metrics. There is also an optional `partner` key with a value like
@@ -566,7 +578,17 @@ impl SpClient {
 
     pub async fn get_metadata(&self, scope: &str, id: &SpotifyId) -> SpClientResult {
         let endpoint = format!("/metadata/4/{}/{}", scope, id.to_base16()?);
-        self.request(&Method::GET, &endpoint, None, None).await
+        // For unknown reasons, metadata requests must now be sent through spclient.wg.spotify.com.
+        // Otherwise, the API will respond with 500 Internal Server Error responses.
+        // Context: https://github.com/librespot-org/librespot/issues/1527
+        self.request_with_options(
+            &Method::GET,
+            &endpoint,
+            None,
+            None,
+            &SPCLIENT_FALLBACK_ENDPOINT,
+        )
+        .await
     }
 
     pub async fn get_track_metadata(&self, track_id: &SpotifyId) -> SpClientResult {
