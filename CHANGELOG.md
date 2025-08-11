@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [core] MSRV is now 1.81 (breaking)
 - [core] AP connect and handshake have a combined 5 second timeout.
+- [core] `stream_from_cdn` now accepts the URL as a `&str` instead of `CdnUrl` (breaking)
 - [connect] Replaced `has_volume_ctrl` with `disable_volume` in `ConnectConfig` (breaking)
 - [connect] Changed `initial_volume` from `Option<u16>` to `u16` in `ConnectConfig` (breaking)
 - [connect] Replaced `SpircLoadCommand` with `LoadRequest`, `LoadRequestOptions` and `LoadContextOptions` (breaking)
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [playback] Add `PlayerEvent::PositionChanged` event to notify about the current playback position
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
+- [core] Add `try_get_urls` to `CdnUrl`
 - [oauth] Add `OAuthClient` and `OAuthClientBuilder` structs to achieve a more customizable login process
 
 ### Fixed
@@ -48,10 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Handle transfer of playback with empty "uri" field
 - [connect] Correctly apply playing/paused state when transferring playback
 - [player] Saturate invalid seek positions to track duration
+- [audio] Fall back to other URLs in case of a failure when downloading from CDN
+- [core] Metadata requests failing with 500 Internal Server Error
 
 ### Deprecated
 
 - [oauth] `get_access_token()` function marked for deprecation
+- [core] `try_get_url()` function marked for deprecation
 
 ### Removed
 
