@@ -5,13 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) since v0.2.0.
 
-## [Unreleased] - YYYY-MM-DD
+## [0.7.0] - Unreleased
 
 ### Changed
 
 - [core] MSRV is now 1.81 (breaking)
 - [core] AP connect and handshake have a combined 5 second timeout.
-- [core] `stream_from_cdn` now accepts the URL as a `&str` instead of `CdnUrl` (breaking)
+- [core] `stream_from_cdn` now accepts the URL as `TryInto<Uri>` instead of `CdnUrl` (breaking)
 - [connect] Replaced `has_volume_ctrl` with `disable_volume` in `ConnectConfig` (breaking)
 - [connect] Changed `initial_volume` from `Option<u16>` to `u16` in `ConnectConfig` (breaking)
 - [connect] Replaced `SpircLoadCommand` with `LoadRequest`, `LoadRequestOptions` and `LoadContextOptions` (breaking)
@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [player] Saturate invalid seek positions to track duration
 - [audio] Fall back to other URLs in case of a failure when downloading from CDN
 - [core] Metadata requests failing with 500 Internal Server Error
+- [player] Rodio backend did not honor audio output format request
 
 ### Deprecated
 
@@ -398,7 +399,8 @@ v0.4.x as a stable branch until then.
 
 ## [0.1.0] - 2019-11-06
 
-[unreleased]: https://github.com/librespot-org/librespot/compare/v0.6.0...HEAD
+[unreleased]: https://github.com/librespot-org/librespot/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/librespot-org/librespot/compare/v0.5.0...v0.7.0
 [0.6.0]: https://github.com/librespot-org/librespot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/librespot-org/librespot/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/librespot-org/librespot/compare/v0.4.1...v0.4.2
