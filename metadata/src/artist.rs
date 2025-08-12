@@ -16,7 +16,7 @@ use crate::{
     util::{impl_deref_wrapped, impl_from_repeated, impl_try_from_repeated},
 };
 
-use librespot_core::{Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyUri};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::artist_with_role::ArtistRole;
@@ -29,7 +29,7 @@ use protocol::metadata::TopTracks as TopTracksMessage;
 
 #[derive(Debug, Clone)]
 pub struct Artist {
-    pub id: SpotifyId,
+    pub id: SpotifyUri,
     pub name: String,
     pub popularity: i32,
     pub top_tracks: CountryTopTracks,
@@ -56,7 +56,7 @@ impl_deref_wrapped!(Artists, Vec<Artist>);
 
 #[derive(Debug, Clone)]
 pub struct ArtistWithRole {
-    pub id: SpotifyId,
+    pub id: SpotifyUri,
     pub name: String,
     pub role: ArtistRole,
 }
@@ -140,14 +140,14 @@ impl Artist {
     /// Get the full list of albums, not containing duplicate variants of the same albums.
     ///
     /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
-    pub fn albums_current(&self) -> impl Iterator<Item = &SpotifyId> {
+    pub fn albums_current(&self) -> impl Iterator<Item = &SpotifyUri> {
         self.albums.current_releases()
     }
 
     /// Get the full list of singles, not containing duplicate variants of the same singles.
     ///
     /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
-    pub fn singles_current(&self) -> impl Iterator<Item = &SpotifyId> {
+    pub fn singles_current(&self) -> impl Iterator<Item = &SpotifyUri> {
         self.singles.current_releases()
     }
 
@@ -155,14 +155,14 @@ impl Artist {
     /// compilations.
     ///
     /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
-    pub fn compilations_current(&self) -> impl Iterator<Item = &SpotifyId> {
+    pub fn compilations_current(&self) -> impl Iterator<Item = &SpotifyUri> {
         self.compilations.current_releases()
     }
 
     /// Get the full list of albums, not containing duplicate variants of the same albums.
     ///
     /// See also [`AlbumGroups`](struct@AlbumGroups) and [`AlbumGroups::current_releases`]
-    pub fn appears_on_albums_current(&self) -> impl Iterator<Item = &SpotifyId> {
+    pub fn appears_on_albums_current(&self) -> impl Iterator<Item = &SpotifyUri> {
         self.appears_on_albums.current_releases()
     }
 }
@@ -171,11 +171,15 @@ impl Artist {
 impl Metadata for Artist {
     type Message = protocol::metadata::Artist;
 
-    async fn request(session: &Session, artist_id: &SpotifyId) -> RequestResult {
+    async fn request(session: &Session, artist_uri: &SpotifyUri) -> RequestResult {
+        let SpotifyUri::Artist { id: artist_id } = artist_uri else {
+            return Err(Error::invalid_argument("artist_uri"));
+        };
+
         session.spclient().get_artist_metadata(artist_id).await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }
@@ -249,7 +253,7 @@ impl AlbumGroups {
     /// Get the contained albums. This will only use the latest release / variant of an album if
     /// multiple variants are available. This should be used if multiple variants of the same album
     /// are not explicitely desired.
-    pub fn current_releases(&self) -> impl Iterator<Item = &SpotifyId> {
+    pub fn current_releases(&self) -> impl Iterator<Item = &SpotifyUri> {
         self.iter().filter_map(|agrp| agrp.first())
     }
 }

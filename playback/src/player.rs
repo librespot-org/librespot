@@ -15,27 +15,26 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures_util::{
-    StreamExt, TryFutureExt, future, future::FusedFuture,
-    stream::futures_unordered::FuturesUnordered,
-};
-use parking_lot::Mutex;
-use symphonia::core::io::MediaSource;
-use tokio::sync::{mpsc, oneshot};
-
+#[cfg(feature = "passthrough-decoder")]
+use crate::decoder::PassthroughDecoder;
 use crate::{
     audio::{AudioDecrypt, AudioFetchParams, AudioFile, StreamLoaderController},
     audio_backend::Sink,
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
     convert::Converter,
-    core::{Error, Session, SpotifyId, util::SeqGenerator},
+    core::{Error, Session, SpotifyId, SpotifyUri, util::SeqGenerator},
     decoder::{AudioDecoder, AudioPacket, AudioPacketPosition, SymphoniaDecoder},
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::VolumeGetter,
 };
-
-#[cfg(feature = "passthrough-decoder")]
-use crate::decoder::PassthroughDecoder;
+use futures_util::{
+    StreamExt, TryFutureExt, future, future::FusedFuture,
+    stream::futures_unordered::FuturesUnordered,
+};
+use librespot_metadata::track::Tracks;
+use parking_lot::Mutex;
+use symphonia::core::io::MediaSource;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::SAMPLES_PER_SECOND;
 
@@ -94,12 +93,12 @@ static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 enum PlayerCommand {
     Load {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         play: bool,
         position_ms: u32,
     },
     Preload {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
     },
     Play,
     Pause,
@@ -142,17 +141,17 @@ pub enum PlayerEvent {
     // Fired when the player is stopped (e.g. by issuing a "stop" command to the player).
     Stopped {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
     },
     // The player is delayed by loading a track.
     Loading {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         position_ms: u32,
     },
     // The player is preloading a track.
     Preloading {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
     },
     // The player is playing a track.
     // This event is issued at the start of playback of whenever the position must be communicated
@@ -163,31 +162,31 @@ pub enum PlayerEvent {
     // after a buffer-underrun
     Playing {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         position_ms: u32,
     },
     // The player entered a paused state.
     Paused {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         position_ms: u32,
     },
     // The player thinks it's a good idea to issue a preload command for the next track now.
     // This event is intended for use within spirc.
     TimeToPreloadNextTrack {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
     },
     // The player reached the end of a track.
     // This event is intended for use within spirc. Spirc will respond by issuing another command.
     EndOfTrack {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
     },
     // The player was unable to load the requested track.
     Unavailable {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
     },
     // The mixer volume was set to a new level.
     VolumeChanged {
@@ -195,7 +194,7 @@ pub enum PlayerEvent {
     },
     PositionCorrection {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         position_ms: u32,
     },
     /// Requires `PlayerConfig::position_update_interval` to be set to Some.
@@ -203,12 +202,12 @@ pub enum PlayerEvent {
     /// current playback position
     PositionChanged {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         position_ms: u32,
     },
     Seeked {
         play_request_id: u64,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         position_ms: u32,
     },
     TrackChanged {
@@ -526,7 +525,16 @@ impl Player {
         }
     }
 
+    #[deprecated(since = "0.8.0", note = "use load_uri instead")]
     pub fn load(&self, track_id: SpotifyId, start_playing: bool, position_ms: u32) {
+        self.command(PlayerCommand::Load {
+            track_id: track_id.into(),
+            play: start_playing,
+            position_ms,
+        });
+    }
+
+    pub fn load_uri(&self, track_id: SpotifyUri, start_playing: bool, position_ms: u32) {
         self.command(PlayerCommand::Load {
             track_id,
             play: start_playing,
@@ -534,7 +542,14 @@ impl Player {
         });
     }
 
+    #[deprecated(since = "0.8.0", note = "use preload_uri instead")]
     pub fn preload(&self, track_id: SpotifyId) {
+        self.command(PlayerCommand::Preload {
+            track_id: track_id.into(),
+        });
+    }
+
+    pub fn preload_uri(&self, track_id: SpotifyUri) {
         self.command(PlayerCommand::Preload { track_id });
     }
 
@@ -660,11 +675,11 @@ struct PlayerLoadedTrackData {
 enum PlayerPreload {
     None,
     Loading {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
     },
     Ready {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         loaded_track: Box<PlayerLoadedTrackData>,
     },
 }
@@ -674,13 +689,13 @@ type Decoder = Box<dyn AudioDecoder + Send>;
 enum PlayerState {
     Stopped,
     Loading {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         play_request_id: u64,
         start_playback: bool,
         loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
     },
     Paused {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         play_request_id: u64,
         decoder: Decoder,
         audio_item: AudioItem,
@@ -694,7 +709,7 @@ enum PlayerState {
         is_explicit: bool,
     },
     Playing {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         play_request_id: u64,
         decoder: Decoder,
         normalisation_data: NormalisationData,
@@ -709,7 +724,7 @@ enum PlayerState {
         is_explicit: bool,
     },
     EndOfTrack {
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         play_request_id: u64,
         loaded_track: PlayerLoadedTrackData,
     },
@@ -893,10 +908,12 @@ impl PlayerTrackLoader {
             None
         } else if !audio_item.files.is_empty() {
             Some(audio_item)
-        } else if let Some(alternatives) = &audio_item.alternatives {
-            let alternatives: FuturesUnordered<_> = alternatives
-                .iter()
-                .map(|alt_id| AudioItem::get_file(&self.session, *alt_id))
+        } else if let Some(alternatives) = audio_item.alternatives {
+            let Tracks(alternatives_vec) = alternatives; // required to make `into_iter` able to move
+
+            let alternatives: FuturesUnordered<_> = alternatives_vec
+                .into_iter()
+                .map(|alt_id| AudioItem::get_file(&self.session, alt_id))
                 .collect();
 
             alternatives
@@ -938,16 +955,34 @@ impl PlayerTrackLoader {
 
     async fn load_track(
         &self,
-        spotify_id: SpotifyId,
+        track_uri: SpotifyUri,
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
-        let audio_item = match AudioItem::get_file(&self.session, spotify_id).await {
+        match track_uri {
+            SpotifyUri::Track { id: track_id } => {
+                self.load_remote_track(track_uri, track_id, position_ms)
+                    .await
+            }
+            _ => {
+                error!("Cannot handle load of track with URI: <{track_uri:?}>",);
+                None
+            }
+        }
+    }
+
+    async fn load_remote_track(
+        &self,
+        track_uri: SpotifyUri,
+        track_id: SpotifyId,
+        position_ms: u32,
+    ) -> Option<PlayerLoadedTrackData> {
+        let audio_item = match AudioItem::get_file(&self.session, track_uri).await {
             Ok(audio) => match self.find_available_alternative(audio).await {
                 Some(audio) => audio,
                 None => {
                     warn!(
-                        "<{}> is not available",
-                        spotify_id.to_uri().unwrap_or_default()
+                        "spotify:track:<{}> is not available",
+                        track_id.to_base62().unwrap_or_default()
                     );
                     return None;
                 }
@@ -1033,13 +1068,14 @@ impl PlayerTrackLoader {
             // Not all audio files are encrypted. If we can't get a key, try loading the track
             // without decryption. If the file was encrypted after all, the decoder will fail
             // parsing and bail out, so we should be safe from outputting ear-piercing noise.
-            let key = match self.session.audio_key().request(spotify_id, file_id).await {
+            let key = match self.session.audio_key().request(track_id, file_id).await {
                 Ok(key) => Some(key),
                 Err(e) => {
                     warn!("Unable to load key, continuing without decryption: {e}");
                     None
                 }
             };
+
             let mut decrypted_file = AudioDecrypt::new(key, encrypted_file);
 
             let is_ogg_vorbis = AudioFiles::is_ogg_vorbis(format);
@@ -1195,13 +1231,15 @@ impl Future for PlayerInternal {
             // Handle loading of a new track to play
             if let PlayerState::Loading {
                 ref mut loader,
-                track_id,
+                ref track_id,
                 start_playback,
                 play_request_id,
             } = self.state
             {
                 // The loader may be terminated if we are trying to load the same track
                 // as before, and that track failed to open before.
+                let track_id = track_id.clone();
+
                 if !loader.as_mut().is_terminated() {
                     match loader.as_mut().poll(cx) {
                         Poll::Ready(Ok(loaded_track)) => {
@@ -1233,12 +1271,15 @@ impl Future for PlayerInternal {
             // handle pending preload requests.
             if let PlayerPreload::Loading {
                 ref mut loader,
-                track_id,
+                ref track_id,
             } = self.preload
             {
+                let track_id = track_id.clone();
                 match loader.as_mut().poll(cx) {
                     Poll::Ready(Ok(loaded_track)) => {
-                        self.send_event(PlayerEvent::Preloading { track_id });
+                        self.send_event(PlayerEvent::Preloading {
+                            track_id: track_id.clone(),
+                        });
                         self.preload = PlayerPreload::Ready {
                             track_id,
                             loaded_track: Box::new(loaded_track),
@@ -1269,7 +1310,7 @@ impl Future for PlayerInternal {
                 self.ensure_sink_running();
 
                 if let PlayerState::Playing {
-                    track_id,
+                    ref track_id,
                     play_request_id,
                     ref mut decoder,
                     normalisation_factor,
@@ -1278,6 +1319,7 @@ impl Future for PlayerInternal {
                     ..
                 } = self.state
                 {
+                    let track_id = track_id.clone();
                     match decoder.next_packet() {
                         Ok(result) => {
                             if let Some((ref packet_position, ref packet)) = result {
@@ -1338,7 +1380,7 @@ impl Future for PlayerInternal {
                                                     now.checked_sub(new_stream_position);
                                                 self.send_event(PlayerEvent::PositionCorrection {
                                                     play_request_id,
-                                                    track_id,
+                                                    track_id: track_id.clone(),
                                                     position_ms: new_stream_position_ms,
                                                 });
                                             }
@@ -1391,7 +1433,7 @@ impl Future for PlayerInternal {
             }
 
             if let PlayerState::Playing {
-                track_id,
+                ref track_id,
                 play_request_id,
                 duration_ms,
                 stream_position_ms,
@@ -1400,7 +1442,7 @@ impl Future for PlayerInternal {
                 ..
             }
             | PlayerState::Paused {
-                track_id,
+                ref track_id,
                 play_request_id,
                 duration_ms,
                 stream_position_ms,
@@ -1409,6 +1451,8 @@ impl Future for PlayerInternal {
                 ..
             } = self.state
             {
+                let track_id = track_id.clone();
+
                 if (!*suggested_to_preload_next_track)
                     && ((duration_ms as i64 - stream_position_ms as i64)
                         < PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS as i64)
@@ -1482,25 +1526,27 @@ impl PlayerInternal {
     fn handle_player_stop(&mut self) {
         match self.state {
             PlayerState::Playing {
-                track_id,
+                ref track_id,
                 play_request_id,
                 ..
             }
             | PlayerState::Paused {
-                track_id,
+                ref track_id,
                 play_request_id,
                 ..
             }
             | PlayerState::EndOfTrack {
-                track_id,
+                ref track_id,
                 play_request_id,
                 ..
             }
             | PlayerState::Loading {
-                track_id,
+                ref track_id,
                 play_request_id,
                 ..
             } => {
+                let track_id = track_id.clone();
+
                 self.ensure_sink_stopped(false);
                 self.send_event(PlayerEvent::Stopped {
                     track_id,
@@ -1519,11 +1565,13 @@ impl PlayerInternal {
     fn handle_play(&mut self) {
         match self.state {
             PlayerState::Paused {
-                track_id,
+                ref track_id,
                 play_request_id,
                 stream_position_ms,
                 ..
             } => {
+                let track_id = track_id.clone();
+
                 self.state.paused_to_playing();
                 self.send_event(PlayerEvent::Playing {
                     track_id,
@@ -1546,11 +1594,13 @@ impl PlayerInternal {
         match self.state {
             PlayerState::Paused { .. } => self.ensure_sink_stopped(false),
             PlayerState::Playing {
-                track_id,
+                ref track_id,
                 play_request_id,
                 stream_position_ms,
                 ..
             } => {
+                let track_id = track_id.clone();
+
                 self.state.playing_to_paused();
 
                 self.ensure_sink_stopped(false);
@@ -1681,13 +1731,13 @@ impl PlayerInternal {
             None => {
                 self.state.playing_to_end_of_track();
                 if let PlayerState::EndOfTrack {
-                    track_id,
+                    ref track_id,
                     play_request_id,
                     ..
                 } = self.state
                 {
                     self.send_event(PlayerEvent::EndOfTrack {
-                        track_id,
+                        track_id: track_id.clone(),
                         play_request_id,
                     })
                 } else {
@@ -1700,7 +1750,7 @@ impl PlayerInternal {
 
     fn start_playback(
         &mut self,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         play_request_id: u64,
         loaded_track: PlayerLoadedTrackData,
         start_playback: bool,
@@ -1725,7 +1775,7 @@ impl PlayerInternal {
         if start_playback {
             self.ensure_sink_running();
             self.send_event(PlayerEvent::Playing {
-                track_id,
+                track_id: track_id.clone(),
                 play_request_id,
                 position_ms,
             });
@@ -1750,7 +1800,7 @@ impl PlayerInternal {
             self.ensure_sink_stopped(false);
 
             self.state = PlayerState::Paused {
-                track_id,
+                track_id: track_id.clone(),
                 play_request_id,
                 decoder: loaded_track.decoder,
                 audio_item: loaded_track.audio_item,
@@ -1774,7 +1824,7 @@ impl PlayerInternal {
 
     fn handle_command_load(
         &mut self,
-        track_id: SpotifyId,
+        track_id: SpotifyUri,
         play_request_id_option: Option<u64>,
         play: bool,
         position_ms: u32,
@@ -1803,9 +1853,9 @@ impl PlayerInternal {
         if let PlayerState::EndOfTrack {
             track_id: previous_track_id,
             ..
-        } = self.state
+        } = &self.state
         {
-            if previous_track_id == track_id {
+            if *previous_track_id == track_id {
                 let mut loaded_track = match mem::replace(&mut self.state, PlayerState::Invalid) {
                     PlayerState::EndOfTrack { loaded_track, .. } => loaded_track,
                     _ => {
@@ -1834,19 +1884,19 @@ impl PlayerInternal {
 
         // Check if we are already playing the track. If so, just do a seek and update our info.
         if let PlayerState::Playing {
-            track_id: current_track_id,
+            track_id: ref current_track_id,
             ref mut stream_position_ms,
             ref mut decoder,
             ..
         }
         | PlayerState::Paused {
-            track_id: current_track_id,
+            track_id: ref current_track_id,
             ref mut stream_position_ms,
             ref mut decoder,
             ..
         } = self.state
         {
-            if current_track_id == track_id {
+            if *current_track_id == track_id {
                 // we can use the current decoder. Ensure it's at the correct position.
                 if position_ms != *stream_position_ms {
                     // This may be blocking.
@@ -1915,9 +1965,9 @@ impl PlayerInternal {
         if let PlayerPreload::Ready {
             track_id: loaded_track_id,
             ..
-        } = self.preload
+        } = &self.preload
         {
-            if track_id == loaded_track_id {
+            if track_id == *loaded_track_id {
                 let preload = std::mem::replace(&mut self.preload, PlayerPreload::None);
                 if let PlayerPreload::Ready {
                     track_id,
@@ -1940,7 +1990,7 @@ impl PlayerInternal {
         }
 
         self.send_event(PlayerEvent::Loading {
-            track_id,
+            track_id: track_id.clone(),
             play_request_id,
             position_ms,
         });
@@ -1949,9 +1999,9 @@ impl PlayerInternal {
         let loader = if let PlayerPreload::Loading {
             track_id: loaded_track_id,
             ..
-        } = self.preload
+        } = &self.preload
         {
-            if (track_id == loaded_track_id) && (position_ms == 0) {
+            if (track_id == *loaded_track_id) && (position_ms == 0) {
                 let mut preload = PlayerPreload::None;
                 std::mem::swap(&mut preload, &mut self.preload);
                 if let PlayerPreload::Loading { loader, .. } = preload {
@@ -1969,7 +2019,8 @@ impl PlayerInternal {
         self.preload = PlayerPreload::None;
 
         // If we don't have a loader yet, create one from scratch.
-        let loader = loader.unwrap_or_else(|| Box::pin(self.load_track(track_id, position_ms)));
+        let loader =
+            loader.unwrap_or_else(|| Box::pin(self.load_track(track_id.clone(), position_ms)));
 
         // Set ourselves to a loading state.
         self.state = PlayerState::Loading {
@@ -1982,7 +2033,7 @@ impl PlayerInternal {
         Ok(())
     }
 
-    fn handle_command_preload(&mut self, track_id: SpotifyId) {
+    fn handle_command_preload(&mut self, track_id: SpotifyUri) {
         debug!("Preloading track");
         let mut preload_track = true;
         // check whether the track is already loaded somewhere or being loaded.
@@ -1993,9 +2044,9 @@ impl PlayerInternal {
         | PlayerPreload::Ready {
             track_id: currently_loading,
             ..
-        } = self.preload
+        } = &self.preload
         {
-            if currently_loading == track_id {
+            if *currently_loading == track_id {
                 // we're already preloading the requested track.
                 preload_track = false;
             } else {
@@ -2015,9 +2066,9 @@ impl PlayerInternal {
         | PlayerState::EndOfTrack {
             track_id: current_track_id,
             ..
-        } = self.state
+        } = &self.state
         {
-            if current_track_id == track_id {
+            if *current_track_id == track_id {
                 // we already have the requested track loaded.
                 preload_track = false;
             }
@@ -2025,7 +2076,7 @@ impl PlayerInternal {
 
         // schedule the preload of the current track if desired.
         if preload_track {
-            let loader = self.load_track(track_id, 0);
+            let loader = self.load_track(track_id.clone(), 0);
             self.preload = PlayerPreload::Loading {
                 track_id,
                 loader: Box::pin(loader),
@@ -2039,14 +2090,14 @@ impl PlayerInternal {
         // that. In this case just restart the loading process but
         // with the requested position.
         if let PlayerState::Loading {
-            track_id,
+            ref track_id,
             play_request_id,
             start_playback,
             ..
         } = self.state
         {
             return self.handle_command_load(
-                track_id,
+                track_id.clone(),
                 Some(play_request_id),
                 start_playback,
                 position_ms,
@@ -2058,13 +2109,13 @@ impl PlayerInternal {
                 Ok(new_position_ms) => {
                     if let PlayerState::Playing {
                         ref mut stream_position_ms,
-                        track_id,
+                        ref track_id,
                         play_request_id,
                         ..
                     }
                     | PlayerState::Paused {
                         ref mut stream_position_ms,
-                        track_id,
+                        ref track_id,
                         play_request_id,
                         ..
                     } = self.state
@@ -2073,7 +2124,7 @@ impl PlayerInternal {
 
                         self.send_event(PlayerEvent::Seeked {
                             play_request_id,
-                            track_id,
+                            track_id: track_id.clone(),
                             position_ms: new_position_ms,
                         });
                     }
@@ -2177,18 +2228,20 @@ impl PlayerInternal {
 
                 if filter {
                     if let PlayerState::Playing {
-                        track_id,
+                        ref track_id,
                         play_request_id,
                         is_explicit,
                         ..
                     }
                     | PlayerState::Paused {
-                        track_id,
+                        ref track_id,
                         play_request_id,
                         is_explicit,
                         ..
                     } = self.state
                     {
+                        let track_id = track_id.clone();
+
                         if is_explicit {
                             warn!(
                                 "Currently loaded track is explicit, which client setting forbids -- skipping to next track."
@@ -2213,7 +2266,7 @@ impl PlayerInternal {
 
     fn load_track(
         &mut self,
-        spotify_id: SpotifyId,
+        spotify_uri: SpotifyUri,
         position_ms: u32,
     ) -> impl FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send + 'static {
         // This method creates a future that returns the loaded stream and associated info.
@@ -2231,8 +2284,9 @@ impl PlayerInternal {
 
         let load_handles_clone = self.load_handles.clone();
         let handle = tokio::runtime::Handle::current();
+
         let load_handle = thread::spawn(move || {
-            let data = handle.block_on(loader.load_track(spotify_id, position_ms));
+            let data = handle.block_on(loader.load_track(spotify_uri, position_ms));
             if let Some(data) = data {
                 let _ = result_tx.send(data);
             }
@@ -2376,7 +2430,7 @@ impl fmt::Debug for PlayerCommand {
 impl fmt::Debug for PlayerState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use PlayerState::*;
-        match *self {
+        match self {
             Stopped => f.debug_struct("Stopped").finish(),
             Loading {
                 track_id,

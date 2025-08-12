@@ -5,7 +5,7 @@ use std::{
 
 use crate::config::{OS, os_version};
 use crate::{
-    Error, FileId, SpotifyId,
+    Error, FileId, SpotifyId, SpotifyUri,
     apresolve::SocketAddress,
     config::SessionConfig,
     error::ErrorKind,
@@ -676,10 +676,10 @@ impl SpClient {
             .await
     }
 
-    pub async fn get_radio_for_track(&self, track_id: &SpotifyId) -> SpClientResult {
+    pub async fn get_radio_for_track(&self, track_uri: &SpotifyUri) -> SpClientResult {
         let endpoint = format!(
             "/inspiredby-mix/v2/seed_to_playlist/{}?response-format=json",
-            track_id.to_uri()?
+            track_uri.to_uri()?
         );
 
         self.request_as_json(&Method::GET, &endpoint, None, None)
