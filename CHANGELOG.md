@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) since v0.2.0.
 
+## [Unreleased]
+
+### Added
+
+- [playback] Add `load_uri()` function to load a `SpotifyUri`
+- [playback] Add `preload_uri()` function to load a `SpotifyUri`
+- [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
+
+### Changed
+
+- [connect] Changed `track_id` parameter in `SpircTask::handle_unavailable` from `SpotifyId` to `&SpotifyUri` (breaking)
+- [connect] Changed return type of `ConnectState::preview_next_track` from `Option<SpotifyId>` to
+  `Option<SpotifyUri>` (breaking)
+- [connect] Changed type of `id` parameter `ConnectState::mark_unavailable` from `SpotifyId` to `&SpotifyUri` (breaking)
+- [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
+- [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
+
+### Deprecated
+
+- [player] `load()` function marked for deprecation
+- [player] `preload()` function marked for deprecation
+
+### Removed
+
+### Fixed
+
+### Security
+
 ## [v0.7.1] - 2025-08-31
 
 ### Changed

@@ -2,7 +2,7 @@ use crate::{
     LoadContextOptions, LoadRequestOptions, PlayContext,
     context_resolver::{ContextAction, ContextResolver, ResolveContext},
     core::{
-        Error, Session, SpotifyId,
+        Error, Session, SpotifyUri,
         authentication::Credentials,
         dealer::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
@@ -778,7 +778,7 @@ impl SpircTask {
                 return Ok(());
             }
             PlayerEvent::Unavailable { track_id, .. } => {
-                self.handle_unavailable(track_id)?;
+                self.handle_unavailable(&track_id)?;
                 if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri()? {
                     self.handle_next(None)?
                 }
@@ -1494,12 +1494,12 @@ impl SpircTask {
         }
 
         if let Some(track_id) = self.connect_state.preview_next_track() {
-            self.player.preload(track_id);
+            self.player.preload_uri(track_id);
         }
     }
 
     // Mark unavailable tracks so we can skip them later
-    fn handle_unavailable(&mut self, track_id: SpotifyId) -> Result<(), Error> {
+    fn handle_unavailable(&mut self, track_id: &SpotifyUri) -> Result<(), Error> {
         self.connect_state.mark_unavailable(track_id)?;
         self.handle_preload_next_track();
 
@@ -1704,8 +1704,8 @@ impl SpircTask {
         }
 
         let current_uri = self.connect_state.current_track(|t| &t.uri);
-        let id = SpotifyId::from_uri(current_uri)?;
-        self.player.load(id, start_playing, position_ms);
+        let id = SpotifyUri::from_uri(current_uri)?;
+        self.player.load_uri(id, start_playing, position_ms);
 
         self.connect_state
             .update_position(position_ms, self.now_ms());

@@ -2,7 +2,8 @@ use std::{env, process::exit};
 
 use librespot::{
     core::{
-        authentication::Credentials, config::SessionConfig, session::Session, spotify_id::SpotifyId,
+        authentication::Credentials, config::SessionConfig, session::Session,
+        spotify_uri::SpotifyUri,
     },
     metadata::{Metadata, Playlist, Track},
 };
@@ -19,7 +20,7 @@ async fn main() {
     }
     let credentials = Credentials::with_access_token(&args[1]);
 
-    let plist_uri = SpotifyId::from_uri(&args[2]).unwrap_or_else(|_| {
+    let plist_uri = SpotifyUri::from_uri(&args[2]).unwrap_or_else(|_| {
         eprintln!(
             "PLAYLIST should be a playlist URI such as: \
                 \"spotify:playlist:37i9dQZF1DXec50AjHrNTq\""

@@ -1,5 +1,5 @@
 use crate::{
-    core::{Error, SpotifyId},
+    core::{Error, SpotifyUri},
     protocol::{
         context::Context,
         context_page::ContextPage,
@@ -14,6 +14,7 @@ use crate::{
         provider::{IsProvider, Provider},
     },
 };
+use librespot_core::spotify_id::SpotifyItemType;
 use protobuf::MessageField;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -449,8 +450,8 @@ impl ConnectState {
             (Some(uri), _) if uri.contains(['?', '%']) => {
                 Err(StateError::InvalidTrackUri(Some(uri.clone())))?
             }
-            (Some(uri), _) if !uri.is_empty() => SpotifyId::from_uri(uri)?,
-            (_, Some(gid)) if !gid.is_empty() => SpotifyId::from_raw(gid)?,
+            (Some(uri), _) if !uri.is_empty() => SpotifyUri::from_uri(uri)?,
+            (_, Some(gid)) if !gid.is_empty() => SpotifyUri::from_raw(gid, SpotifyItemType::Track)?,
             _ => Err(StateError::InvalidTrackUri(None))?,
         };
 
