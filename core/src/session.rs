@@ -4,6 +4,7 @@ use std::{
     io,
     pin::Pin,
     process::exit,
+    sync::OnceLock,
     sync::{Arc, Weak},
     task::{Context, Poll},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -33,7 +34,6 @@ use futures_core::TryStream;
 use futures_util::StreamExt;
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
-use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use pin_project_lite::pin_project;
 use quick_xml::events::Event;
@@ -68,6 +68,12 @@ impl From<SessionError> for Error {
     }
 }
 
+impl From<quick_xml::encoding::EncodingError> for Error {
+    fn from(err: quick_xml::encoding::EncodingError) -> Self {
+        Error::invalid_argument(err)
+    }
+}
+
 pub type UserAttributes = HashMap<String, String>;
 
 #[derive(Debug, Clone, Default)]
@@ -96,16 +102,16 @@ struct SessionInternal {
     data: RwLock<SessionData>,
 
     http_client: HttpClient,
-    tx_connection: OnceCell<mpsc::UnboundedSender<(u8, Vec<u8>)>>,
+    tx_connection: OnceLock<mpsc::UnboundedSender<(u8, Vec<u8>)>>,
 
-    apresolver: OnceCell<ApResolver>,
-    audio_key: OnceCell<AudioKeyManager>,
-    channel: OnceCell<ChannelManager>,
-    mercury: OnceCell<MercuryManager>,
-    dealer: OnceCell<DealerManager>,
-    spclient: OnceCell<SpClient>,
-    token_provider: OnceCell<TokenProvider>,
-    login5: OnceCell<Login5Manager>,
+    apresolver: OnceLock<ApResolver>,
+    audio_key: OnceLock<AudioKeyManager>,
+    channel: OnceLock<ChannelManager>,
+    mercury: OnceLock<MercuryManager>,
+    dealer: OnceLock<DealerManager>,
+    spclient: OnceLock<SpClient>,
+    token_provider: OnceLock<TokenProvider>,
+    login5: OnceLock<Login5Manager>,
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
@@ -140,16 +146,16 @@ impl Session {
             config,
             data: RwLock::new(session_data),
             http_client,
-            tx_connection: OnceCell::new(),
+            tx_connection: OnceLock::new(),
             cache: cache.map(Arc::new),
-            apresolver: OnceCell::new(),
-            audio_key: OnceCell::new(),
-            channel: OnceCell::new(),
-            mercury: OnceCell::new(),
-            dealer: OnceCell::new(),
-            spclient: OnceCell::new(),
-            token_provider: OnceCell::new(),
-            login5: OnceCell::new(),
+            apresolver: OnceLock::new(),
+            audio_key: OnceLock::new(),
+            channel: OnceLock::new(),
+            mercury: OnceLock::new(),
+            dealer: OnceLock::new(),
+            spclient: OnceLock::new(),
+            token_provider: OnceLock::new(),
+            login5: OnceLock::new(),
             handle: tokio::runtime::Handle::current(),
         }))
     }
@@ -688,8 +694,10 @@ where
                         }
                         Ok(Event::Text(ref value)) => {
                             if !current_element.is_empty() {
-                                let _ = user_attributes
-                                    .insert(current_element.clone(), value.unescape()?.to_string());
+                                let _ = user_attributes.insert(
+                                    current_element.clone(),
+                                    value.xml_content()?.to_string(),
+                                );
                             }
                         }
                         Ok(Event::Eof) => break,

@@ -51,7 +51,7 @@ impl RequestHandler {
         Self {
             config,
             username: Mutex::new(None),
-            keys: DhLocalKeys::random(&mut rand::thread_rng()),
+            keys: DhLocalKeys::random(&mut rand::rng()),
             event_tx,
         }
     }

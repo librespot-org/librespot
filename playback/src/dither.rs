@@ -43,7 +43,7 @@ impl fmt::Display for dyn Ditherer {
 }
 
 fn create_rng() -> SmallRng {
-    SmallRng::from_entropy()
+    SmallRng::from_os_rng()
 }
 
 pub struct TriangularDitherer {
@@ -113,7 +113,9 @@ impl Ditherer for HighPassDitherer {
             active_channel: 0,
             previous_noises: [0.0; NUM_CHANNELS as usize],
             cached_rng: create_rng(),
-            distribution: Uniform::new_inclusive(-0.5, 0.5), // 1 LSB +/- 1 LSB (previous) = 2 LSB
+            // 1 LSB +/- 1 LSB (previous) = 2 LSB
+            distribution: Uniform::new_inclusive(-0.5, 0.5)
+                .expect("Failed to create uniform distribution"),
         }
     }
 

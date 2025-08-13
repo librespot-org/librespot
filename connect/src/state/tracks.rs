@@ -69,7 +69,7 @@ impl<'ct> ConnectState {
 
     pub fn set_current_track_random(&mut self) -> Result<(), Error> {
         let max_tracks = self.get_context(self.active_context)?.tracks.len();
-        let rng_track = rand::thread_rng().gen_range(0..max_tracks);
+        let rng_track = rand::rng().random_range(0..max_tracks);
         self.set_current_track(rng_track)
     }
 

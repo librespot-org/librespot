@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    sync::OnceLock,
     time::{Duration, Instant},
 };
 
@@ -18,7 +19,6 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 use nonzero_ext::nonzero;
-use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use thiserror::Error;
 use url::Url;
@@ -94,7 +94,7 @@ type HyperClient = Client<ProxyConnector<HttpsConnector<HttpConnector>>, Full<by
 pub struct HttpClient {
     user_agent: HeaderValue,
     proxy_url: Option<Url>,
-    hyper_client: OnceCell<HyperClient>,
+    hyper_client: OnceLock<HyperClient>,
 
     // while the DashMap variant is more performant, our level of concurrency
     // is pretty low so we can save pulling in that extra dependency
@@ -138,7 +138,7 @@ impl HttpClient {
         Self {
             user_agent,
             proxy_url: proxy_url.cloned(),
-            hyper_client: OnceCell::new(),
+            hyper_client: OnceLock::new(),
             rate_limiter,
         }
     }
@@ -170,9 +170,9 @@ impl HttpClient {
         Ok(client)
     }
 
-    fn hyper_client(&self) -> Result<&HyperClient, Error> {
+    fn hyper_client(&self) -> &HyperClient {
         self.hyper_client
-            .get_or_try_init(|| Self::try_create_hyper_client(self.proxy_url.as_ref()))
+            .get_or_init(|| Self::try_create_hyper_client(self.proxy_url.as_ref()).unwrap())
     }
 
     pub async fn request(&self, req: Request<Bytes>) -> Result<Response<Incoming>, Error> {
@@ -253,7 +253,7 @@ impl HttpClient {
             ))
         })?;
 
-        Ok(self.hyper_client()?.request(req.map(Full::new)))
+        Ok(self.hyper_client().request(req.map(Full::new)))
     }
 
     pub fn get_retry_after(headers: &HeaderMap<HeaderValue>) -> Option<Duration> {

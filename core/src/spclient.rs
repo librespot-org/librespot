@@ -483,7 +483,7 @@ impl SpClient {
                     url,
                     "{}salt={}",
                     util::get_next_query_separator(&url),
-                    rand::thread_rng().next_u32()
+                    rand::rng().next_u32()
                 );
             }
 

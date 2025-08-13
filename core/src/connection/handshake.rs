@@ -3,7 +3,7 @@ use std::{env::consts::ARCH, io};
 use byteorder::{BigEndian, ByteOrder, WriteBytesExt};
 use hmac::{Hmac, Mac};
 use protobuf::Message;
-use rand::{thread_rng, RngCore};
+use rand::RngCore;
 use rsa::{BigUint, Pkcs1v15Sign, RsaPublicKey};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
@@ -49,7 +49,7 @@ pub enum HandshakeError {
 pub async fn handshake<T: AsyncRead + AsyncWrite + Unpin>(
     mut connection: T,
 ) -> io::Result<Framed<T, ApCodec>> {
-    let local_keys = DhLocalKeys::random(&mut thread_rng());
+    let local_keys = DhLocalKeys::random(&mut rand::rng());
     let gc = local_keys.public_key();
     let mut accumulator = client_hello(&mut connection, gc).await?;
     let message: APResponseMessage = recv_packet(&mut connection, &mut accumulator).await?;
@@ -108,7 +108,7 @@ where
     T: AsyncWrite + Unpin,
 {
     let mut client_nonce = vec![0; 0x10];
-    thread_rng().fill_bytes(&mut client_nonce);
+    rand::rng().fill_bytes(&mut client_nonce);
 
     let platform = match crate::config::OS {
         "freebsd" | "netbsd" | "openbsd" => match ARCH {

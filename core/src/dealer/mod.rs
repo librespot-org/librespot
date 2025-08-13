@@ -88,7 +88,7 @@ impl Responder {
         })
         .to_string();
 
-        if let Err(e) = self.tx.send(WsMessage::Text(response)) {
+        if let Err(e) = self.tx.send(WsMessage::Text(response.into())) {
             warn!("Wasn't able to reply to dealer request: {}", e);
         }
     }
@@ -586,7 +586,10 @@ async fn connect(
                 timer.tick().await;
 
                 pong_received.store(false, atomic::Ordering::Relaxed);
-                if send_tx.send(WsMessage::Ping(vec![])).is_err() {
+                if send_tx
+                    .send(WsMessage::Ping(bytes::Bytes::default()))
+                    .is_err()
+                {
                     // The sender is closed.
                     break;
                 }

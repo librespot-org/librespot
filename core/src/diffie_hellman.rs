@@ -1,11 +1,12 @@
-use num_bigint::{BigUint, RandBigInt};
+use std::sync::LazyLock;
+
+use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{One, Zero};
-use once_cell::sync::Lazy;
 use rand::{CryptoRng, Rng};
 
-static DH_GENERATOR: Lazy<BigUint> = Lazy::new(|| BigUint::from_bytes_be(&[0x02]));
-static DH_PRIME: Lazy<BigUint> = Lazy::new(|| {
+static DH_GENERATOR: LazyLock<BigUint> = LazyLock::new(|| BigUint::from_bytes_be(&[0x02]));
+static DH_PRIME: LazyLock<BigUint> = LazyLock::new(|| {
     BigUint::from_bytes_be(&[
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc9, 0x0f, 0xda, 0xa2, 0x21, 0x68, 0xc2,
         0x34, 0xc4, 0xc6, 0x62, 0x8b, 0x80, 0xdc, 0x1c, 0xd1, 0x29, 0x02, 0x4e, 0x08, 0x8a, 0x67,
@@ -40,7 +41,9 @@ pub struct DhLocalKeys {
 
 impl DhLocalKeys {
     pub fn random<R: Rng + CryptoRng>(rng: &mut R) -> DhLocalKeys {
-        let private_key = rng.gen_biguint(95 * 8);
+        let mut bytes = [0u8; 95];
+        rng.fill_bytes(&mut bytes);
+        let private_key = BigUint::from_bytes_le(&bytes);
         let public_key = powm(&DH_GENERATOR, &private_key, &DH_PRIME);
 
         DhLocalKeys {

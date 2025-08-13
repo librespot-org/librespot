@@ -13,12 +13,12 @@
 
 use log::{error, info, trace};
 use oauth2::basic::BasicTokenType;
-use oauth2::reqwest::{async_http_client, http_client};
 use oauth2::{
-    basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, CsrfToken, PkceCodeChallenge,
-    RedirectUrl, Scope, TokenResponse, TokenUrl,
+    basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, CsrfToken, EndpointNotSet,
+    EndpointSet, PkceCodeChallenge, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, RefreshToken, StandardTokenResponse};
+use reqwest;
 use std::io;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -214,7 +214,7 @@ pub struct OAuthClient {
     redirect_uri: String,
     should_open_url: bool,
     message: String,
-    client: BasicClient,
+    client: BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>,
 }
 
 impl OAuthClient {
@@ -281,10 +281,11 @@ impl OAuthClient {
         let (tx, rx) = mpsc::channel();
         let client = self.client.clone();
         std::thread::spawn(move || {
+            let http_client = reqwest::blocking::Client::new();
             let resp = client
                 .exchange_code(code)
                 .set_pkce_verifier(pkce_verifier)
-                .request(http_client);
+                .request(&http_client);
             if let Err(e) = tx.send(resp) {
                 error!("OAuth channel send error: {e}");
             }
@@ -299,10 +300,11 @@ impl OAuthClient {
     /// Synchronously obtain a new valid OAuth token from `refresh_token`
     pub fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
         let refresh_token = RefreshToken::new(refresh_token.to_string());
+        let http_client = reqwest::blocking::Client::new();
         let resp = self
             .client
             .exchange_refresh_token(&refresh_token)
-            .request(http_client);
+            .request(&http_client);
 
         let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
         self.build_token(resp)
@@ -318,11 +320,12 @@ impl OAuthClient {
         }?;
         trace!("Exchange {code:?} for access token");
 
+        let http_client = reqwest::Client::new();
         let resp = self
             .client
             .exchange_code(code)
             .set_pkce_verifier(pkce_verifier)
-            .request_async(async_http_client)
+            .request_async(&http_client)
             .await;
 
         let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
@@ -332,10 +335,11 @@ impl OAuthClient {
     /// Asynchronously obtain a new valid OAuth token from `refresh_token`
     pub async fn refresh_token_async(&self, refresh_token: &str) -> Result<OAuthToken, OAuthError> {
         let refresh_token = RefreshToken::new(refresh_token.to_string());
+        let http_client = reqwest::Client::new();
         let resp = self
             .client
             .exchange_refresh_token(&refresh_token)
-            .request_async(async_http_client)
+            .request_async(&http_client)
             .await;
 
         let resp = resp.map_err(|e| OAuthError::ExchangeCode { e: e.to_string() })?;
@@ -393,13 +397,10 @@ impl OAuthClientBuilder {
             }
         })?;
 
-        let client = BasicClient::new(
-            ClientId::new(self.client_id.to_string()),
-            None,
-            auth_url,
-            Some(token_url),
-        )
-        .set_redirect_uri(redirect_url);
+        let client = BasicClient::new(ClientId::new(self.client_id.to_string()))
+            .set_auth_uri(auth_url)
+            .set_token_uri(token_url)
+            .set_redirect_uri(redirect_url);
 
         Ok(OAuthClient {
             scopes: self.scopes,
@@ -433,13 +434,10 @@ pub fn get_access_token(
             uri: redirect_uri.to_string(),
             e,
         })?;
-    let client = BasicClient::new(
-        ClientId::new(client_id.to_string()),
-        None,
-        auth_url,
-        Some(token_url),
-    )
-    .set_redirect_uri(redirect_url);
+    let client = BasicClient::new(ClientId::new(client_id.to_string()))
+        .set_auth_uri(auth_url)
+        .set_token_uri(token_url)
+        .set_redirect_uri(redirect_url);
 
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
@@ -467,10 +465,11 @@ pub fn get_access_token(
     // Do this sync in another thread because I am too stupid to make the async version work.
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
+        let http_client = reqwest::blocking::Client::new();
         let resp = client
             .exchange_code(code)
             .set_pkce_verifier(pkce_verifier)
-            .request(http_client);
+            .request(&http_client);
         if let Err(e) = tx.send(resp) {
             error!("OAuth channel send error: {e}");
         }

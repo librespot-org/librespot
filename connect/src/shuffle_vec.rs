@@ -58,7 +58,7 @@ impl<T> ShuffleVec<T> {
         let indices: Vec<_> = {
             (1..self.vec.len())
                 .rev()
-                .map(|i| rng.gen_range(0..i + 1))
+                .map(|i| rng.random_range(0..i + 1))
                 .collect()
         };
 
@@ -89,7 +89,7 @@ mod test {
 
     #[test]
     fn test_shuffle_with_seed() {
-        let seed = rand::thread_rng().gen_range(0..10000000000000);
+        let seed = rand::rng().random_range(0..10000000000000);
 
         let vec = (0..100).collect::<Vec<_>>();
         let base_vec: ShuffleVec<i32> = vec.into();
