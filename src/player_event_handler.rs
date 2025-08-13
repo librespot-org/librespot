@@ -28,7 +28,7 @@ impl EventHandler {
                         PlayerEvent::TrackChanged { audio_item } => {
                             match audio_item.track_id.to_base62() {
                                 Err(e) => {
-                                    warn!("PlayerEvent::TrackChanged: Invalid track id: {}", e)
+                                    warn!("PlayerEvent::TrackChanged: Invalid track id: {e}")
                                 }
                                 Ok(id) => {
                                     env_vars.insert("PLAYER_EVENT", "track_changed".to_string());
@@ -94,7 +94,7 @@ impl EventHandler {
                             }
                         }
                         PlayerEvent::Stopped { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Stopped: Invalid track id: {}", e),
+                            Err(e) => warn!("PlayerEvent::Stopped: Invalid track id: {e}"),
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "stopped".to_string());
                                 env_vars.insert("TRACK_ID", id);
@@ -105,7 +105,7 @@ impl EventHandler {
                             position_ms,
                             ..
                         } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Playing: Invalid track id: {}", e),
+                            Err(e) => warn!("PlayerEvent::Playing: Invalid track id: {e}"),
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "playing".to_string());
                                 env_vars.insert("TRACK_ID", id);
@@ -117,7 +117,7 @@ impl EventHandler {
                             position_ms,
                             ..
                         } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Paused: Invalid track id: {}", e),
+                            Err(e) => warn!("PlayerEvent::Paused: Invalid track id: {e}"),
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "paused".to_string());
                                 env_vars.insert("TRACK_ID", id);
@@ -125,14 +125,14 @@ impl EventHandler {
                             }
                         },
                         PlayerEvent::Loading { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Loading: Invalid track id: {}", e),
+                            Err(e) => warn!("PlayerEvent::Loading: Invalid track id: {e}"),
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "loading".to_string());
                                 env_vars.insert("TRACK_ID", id);
                             }
                         },
                         PlayerEvent::Preloading { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Preloading: Invalid track id: {}", e),
+                            Err(e) => warn!("PlayerEvent::Preloading: Invalid track id: {e}"),
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "preloading".to_string());
                                 env_vars.insert("TRACK_ID", id);
@@ -141,8 +141,7 @@ impl EventHandler {
                         PlayerEvent::TimeToPreloadNextTrack { track_id, .. } => {
                             match track_id.to_base62() {
                                 Err(e) => warn!(
-                                    "PlayerEvent::TimeToPreloadNextTrack: Invalid track id: {}",
-                                    e
+                                    "PlayerEvent::TimeToPreloadNextTrack: Invalid track id: {e}"
                                 ),
                                 Ok(id) => {
                                     env_vars.insert("PLAYER_EVENT", "preload_next".to_string());
@@ -151,14 +150,14 @@ impl EventHandler {
                             }
                         }
                         PlayerEvent::EndOfTrack { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::EndOfTrack: Invalid track id: {}", e),
+                            Err(e) => warn!("PlayerEvent::EndOfTrack: Invalid track id: {e}"),
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "end_of_track".to_string());
                                 env_vars.insert("TRACK_ID", id);
                             }
                         },
                         PlayerEvent::Unavailable { track_id, .. } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Unavailable: Invalid track id: {}", e),
+                            Err(e) => warn!("PlayerEvent::Unavailable: Invalid track id: {e}"),
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "unavailable".to_string());
                                 env_vars.insert("TRACK_ID", id);
@@ -173,7 +172,7 @@ impl EventHandler {
                             position_ms,
                             ..
                         } => match track_id.to_base62() {
-                            Err(e) => warn!("PlayerEvent::Seeked: Invalid track id: {}", e),
+                            Err(e) => warn!("PlayerEvent::Seeked: Invalid track id: {e}"),
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "seeked".to_string());
                                 env_vars.insert("TRACK_ID", id);
@@ -186,7 +185,7 @@ impl EventHandler {
                             ..
                         } => match track_id.to_base62() {
                             Err(e) => {
-                                warn!("PlayerEvent::PositionCorrection: Invalid track id: {}", e)
+                                warn!("PlayerEvent::PositionCorrection: Invalid track id: {e}")
                             }
                             Ok(id) => {
                                 env_vars.insert("PLAYER_EVENT", "position_correction".to_string());
@@ -263,7 +262,7 @@ impl Drop for EventHandler {
         debug!("Shutting down EventHandler thread ...");
         if let Some(handle) = self.thread_handle.take() {
             if let Err(e) = handle.join() {
-                error!("EventHandler thread Error: {:?}", e);
+                error!("EventHandler thread Error: {e:?}");
             }
         }
     }
@@ -289,8 +288,7 @@ fn run_program(env_vars: HashMap<&str, String>, onevent: &str) {
     let mut v: Vec<&str> = onevent.split_whitespace().collect();
 
     debug!(
-        "Running {} with environment variables:\n{:#?}",
-        onevent, env_vars
+        "Running {onevent} with environment variables:\n{env_vars:#?}"
     );
 
     match Command::new(v.remove(0))
@@ -298,15 +296,15 @@ fn run_program(env_vars: HashMap<&str, String>, onevent: &str) {
         .envs(env_vars.iter())
         .spawn()
     {
-        Err(e) => warn!("On event program {} failed to start: {}", onevent, e),
+        Err(e) => warn!("On event program {onevent} failed to start: {e}"),
         Ok(mut child) => match child.wait() {
-            Err(e) => warn!("On event program {} failed: {}", onevent, e),
+            Err(e) => warn!("On event program {onevent} failed: {e}"),
             Ok(e) if e.success() => (),
             Ok(e) => {
                 if let Some(code) = e.code() {
-                    warn!("On event program {} returned exit code {}", onevent, code);
+                    warn!("On event program {onevent} returned exit code {code}");
                 } else {
-                    warn!("On event program {} returned failure: {}", onevent, e);
+                    warn!("On event program {onevent} returned failure: {e}");
                 }
             }
         },

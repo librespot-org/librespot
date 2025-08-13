@@ -29,12 +29,12 @@ async fn main() {
 
     let session = Session::new(session_config, None);
     if let Err(e) = session.connect(credentials, false).await {
-        println!("Error connecting: {}", e);
+        println!("Error connecting: {e}");
         exit(1);
     }
 
     let plist = Playlist::get(&session, &plist_uri).await.unwrap();
-    println!("{:?}", plist);
+    println!("{plist:?}");
     for track_id in plist.tracks() {
         let plist_track = Track::get(&session, track_id).await.unwrap();
         println!("track: {} ", plist_track.name);

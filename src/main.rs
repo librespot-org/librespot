@@ -1114,7 +1114,7 @@ fn get_setup() -> Setup {
     let tmp_dir = opt_str(TEMP_DIR).map_or(SessionConfig::default().tmp_dir, |p| {
         let tmp_dir = PathBuf::from(p);
         if let Err(e) = create_dir_all(&tmp_dir) {
-            error!("could not create or access specified tmp directory: {}", e);
+            error!("could not create or access specified tmp directory: {e}");
             exit(1);
         }
         tmp_dir
@@ -1164,15 +1164,14 @@ fn get_setup() -> Setup {
 
         if audio_dir.is_none() && opt_present(CACHE_SIZE_LIMIT) {
             warn!(
-                "Without a `--{}` / `-{}` path, and/or if the `--{}` / `-{}` flag is set, `--{}` / `-{}` has no effect.",
-                CACHE, CACHE_SHORT, DISABLE_AUDIO_CACHE, DISABLE_AUDIO_CACHE_SHORT, CACHE_SIZE_LIMIT, CACHE_SIZE_LIMIT_SHORT
+                "Without a `--{CACHE}` / `-{CACHE_SHORT}` path, and/or if the `--{DISABLE_AUDIO_CACHE}` / `-{DISABLE_AUDIO_CACHE_SHORT}` flag is set, `--{CACHE_SIZE_LIMIT}` / `-{CACHE_SIZE_LIMIT_SHORT}` has no effect."
             );
         }
 
         let cache = match Cache::new(cred_dir.clone(), volume_dir, audio_dir, limit) {
             Ok(cache) => Some(cache),
             Err(e) => {
-                warn!("Cannot create cache: {}", e);
+                warn!("Cannot create cache: {e}");
                 None
             }
         };
@@ -1240,8 +1239,7 @@ fn get_setup() -> Setup {
     let oauth_port = if opt_present(OAUTH_PORT) {
         if !enable_oauth {
             warn!(
-                "Without the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
-                ENABLE_OAUTH, ENABLE_OAUTH_SHORT, OAUTH_PORT, OAUTH_PORT_SHORT
+                "Without the `--{ENABLE_OAUTH}` / `-{ENABLE_OAUTH_SHORT}` flag set `--{OAUTH_PORT}` / `-{OAUTH_PORT_SHORT}` has no effect."
             );
         }
         opt_str(OAUTH_PORT)
@@ -1268,8 +1266,7 @@ fn get_setup() -> Setup {
     if let Some(reason) = no_discovery_reason.as_deref() {
         if opt_present(ZEROCONF_PORT) {
             warn!(
-                "With {} `--{}` / `-{}` has no effect.",
-                reason, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
+                "With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect."
             );
         }
     }
@@ -1348,8 +1345,7 @@ fn get_setup() -> Setup {
     if let Some(reason) = no_discovery_reason.as_deref() {
         if opt_present(ZEROCONF_BACKEND) {
             warn!(
-                "With {} `--{}` / `-{}` has no effect.",
-                reason, ZEROCONF_BACKEND, ZEROCONF_BACKEND_SHORT
+                "With {reason} `--{ZEROCONF_BACKEND}` / `-{ZEROCONF_BACKEND_SHORT}` has no effect."
             );
         }
     }
@@ -1534,7 +1530,7 @@ fn get_setup() -> Setup {
                         url
                     },
                     Err(e) => {
-                        error!("Invalid proxy URL: \"{}\", only URLs in the format \"http(s)://host:port\" are allowed", e);
+                        error!("Invalid proxy URL: \"{e}\", only URLs in the format \"http(s)://host:port\" are allowed");
                         exit(1);
                     }
                 }
@@ -1591,8 +1587,7 @@ fn get_setup() -> Setup {
             ] {
                 if opt_present(a) {
                     warn!(
-                        "Without the `--{}` / `-{}` flag normalisation options have no effect.",
-                        ENABLE_VOLUME_NORMALISATION, ENABLE_VOLUME_NORMALISATION_SHORT,
+                        "Without the `--{ENABLE_VOLUME_NORMALISATION}` / `-{ENABLE_VOLUME_NORMALISATION_SHORT}` flag normalisation options have no effect.",
                     );
                     break;
                 }
@@ -1774,7 +1769,7 @@ fn get_setup() -> Setup {
                 "none" => None,
                 _ => match format {
                     AudioFormat::F64 | AudioFormat::F32 => {
-                        error!("Dithering is not available with format: {:?}.", format);
+                        error!("Dithering is not available with format: {format:?}.");
                         exit(1);
                     }
                     _ => Some(dither::find_ditherer(ditherer_name).unwrap_or_else(|| {
@@ -1987,7 +1982,7 @@ async fn main() {
 
                         if let Some(spirc) = spirc.take() {
                             if let Err(e) = spirc.shutdown() {
-                                error!("error sending spirc shutdown message: {}", e);
+                                error!("error sending spirc shutdown message: {e}");
                             }
                         }
                         if let Some(spirc_task) = spirc_task.take() {
@@ -2021,7 +2016,7 @@ async fn main() {
                                                                 mixer.clone()).await {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
                     Err(e) => {
-                        error!("could not initialize spirc: {}", e);
+                        error!("could not initialize spirc: {e}");
                         exit(1);
                     }
                 };
@@ -2073,7 +2068,7 @@ async fn main() {
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
         if let Err(e) = spirc.shutdown() {
-            error!("error sending spirc shutdown message: {}", e);
+            error!("error sending spirc shutdown message: {e}");
         }
 
         if let Some(spirc_task) = spirc_task {
