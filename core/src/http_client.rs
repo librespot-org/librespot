@@ -145,7 +145,7 @@ impl HttpClient {
 
     fn try_create_hyper_client(proxy_url: Option<&Url>) -> Result<HyperClient, Error> {
         // configuring TLS is expensive and should be done once per process
-        let _ = rustls::crypto::aws_lc_rs::default_provider()
+        let _ = rustls::crypto::ring::default_provider()
             .install_default()
             .map_err(|e| {
                 Error::internal(format!("unable to install default crypto provider: {e:?}"))
