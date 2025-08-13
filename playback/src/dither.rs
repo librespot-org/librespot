@@ -82,8 +82,15 @@ impl Ditherer for GaussianDitherer {
     fn new() -> Self {
         Self {
             cached_rng: create_rng(),
-            // 1/2 LSB RMS needed to linearize the response:
-            distribution: Normal::new(0.0, 0.5).unwrap(),
+            // For Gaussian to achieve equivalent decorrelation to triangular dithering, it needs
+            // 3-4 dB higher amplitude than TPDF's optimal 0.408 LSB. If optimizing:
+            // - minimum correlation: σ ≈ 0.58
+            // - perceptual equivalence: σ ≈ 0.65
+            // - worst-case performance: σ ≈ 0.70
+            //
+            // σ = 0.6 LSB is a reasonable compromise that balances mathematical theory with
+            // empirical performance across various signal types.
+            distribution: Normal::new(0.0, 0.6).unwrap(),
         }
     }
 
