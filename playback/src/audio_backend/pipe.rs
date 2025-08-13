@@ -96,6 +96,7 @@ impl Sink for StdoutSink {
 }
 
 impl SinkAsBytes for StdoutSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         self.output
             .as_deref_mut()

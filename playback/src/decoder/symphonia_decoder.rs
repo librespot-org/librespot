@@ -131,6 +131,7 @@ impl SymphoniaDecoder {
         }
     }
 
+    #[inline]
     fn ts_to_ms(&self, ts: u64) -> u32 {
         match self.decoder.codec_params().time_base {
             Some(time_base) => {

@@ -137,6 +137,7 @@ impl Sink for PulseAudioSink {
 }
 
 impl SinkAsBytes for PulseAudioSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         let sink = self.sink.as_mut().ok_or(PulseError::NotConnected)?;
 

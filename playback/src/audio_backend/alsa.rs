@@ -452,6 +452,7 @@ impl Sink for AlsaSink {
 }
 
 impl SinkAsBytes for AlsaSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         let mut start_index = 0;
         let data_len = data.len();

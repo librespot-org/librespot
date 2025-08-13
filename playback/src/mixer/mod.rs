@@ -25,6 +25,7 @@ pub trait VolumeGetter {
 }
 
 impl VolumeGetter for NoOpVolume {
+    #[inline]
     fn attenuation_factor(&self) -> f64 {
         1.0
     }

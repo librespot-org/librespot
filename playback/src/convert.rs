@@ -42,7 +42,6 @@ impl Converter {
     const SHIFT_S24: u8 = 23; // 24-bit: 2^23 = 8388608  
     const SHIFT_S32: u8 = 31; // 32-bit: 2^31 = 2147483648
 
-
     /// Additional bit shifts needed to scale from 16-bit to higher bit depths.
     /// These are the differences between the base shift amounts above.
     const SHIFT_16_TO_24: u8 = Self::SHIFT_S24 - Self::SHIFT_S16; // 23 - 15 = 8
@@ -52,12 +51,12 @@ impl Converter {
     const SCALE_S24: f64 = (1_u64 << Self::SHIFT_S24) as f64;
 
     /// Scale audio samples with optimal dithering strategy for Spotify's 16-bit source material.
-    /// 
+    ///
     /// Since Spotify audio is always 16-bit depth, this function:
     /// 1. When dithering: applies noise at 16-bit level, preserves fractional precision,
     ///    then scales to target format and rounds once at the end
     /// 2. When not dithering: scales directly from normalized float to target format
-    /// 
+    ///
     /// The `shift` parameter specifies how many extra bits to shift beyond
     /// the base 16-bit scaling (0 for 16-bit, 8 for 24-bit, 16 for 32-bit).
     #[inline]
@@ -85,11 +84,11 @@ impl Converter {
     #[inline]
     pub fn clamping_scale_s24(&mut self, sample: f64) -> f64 {
         let int_value = self.scale(sample, Self::SHIFT_16_TO_24);
-        
+
         // In two's complement, there are more negative than positive values.
         let min = -Self::SCALE_S24;
         let max = Self::SCALE_S24 - 1.0;
-        
+
         int_value.clamp(min, max)
     }
 

@@ -279,10 +279,12 @@ impl PlayerEvent {
 
 pub type PlayerEventChannel = mpsc::UnboundedReceiver<PlayerEvent>;
 
+#[inline]
 pub fn db_to_ratio(db: f64) -> f64 {
     f64::powf(10.0, db / DB_VOLTAGE_RATIO)
 }
 
+#[inline]
 pub fn ratio_to_db(ratio: f64) -> f64 {
     ratio.log10() * DB_VOLTAGE_RATIO
 }

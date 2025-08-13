@@ -171,6 +171,7 @@ impl Drop for GstreamerSink {
 }
 
 impl SinkAsBytes for GstreamerSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         if let Some(async_error) = &*self.async_error.lock() {
             return Err(SinkError::OnWrite(async_error.to_string()));

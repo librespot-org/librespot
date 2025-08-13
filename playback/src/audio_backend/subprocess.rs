@@ -139,6 +139,7 @@ impl Sink for SubprocessSink {
 }
 
 impl SinkAsBytes for SubprocessSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         // We get one attempted restart per write.
         // We don't want to get stuck in a restart loop.

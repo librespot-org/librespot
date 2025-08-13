@@ -48,6 +48,7 @@ impl SoftMixer {
 struct SoftVolume(Arc<AtomicU64>);
 
 impl VolumeGetter for SoftVolume {
+    #[inline]
     fn attenuation_factor(&self) -> f64 {
         f64::from_bits(self.0.load(Ordering::Relaxed))
     }

@@ -36,6 +36,7 @@ pub enum AudioPacket {
 }
 
 impl AudioPacket {
+    #[inline]
     pub fn samples(&self) -> AudioPacketResult<&[f64]> {
         match self {
             AudioPacket::Samples(s) => Ok(s),
@@ -43,6 +44,7 @@ impl AudioPacket {
         }
     }
 
+    #[inline]
     pub fn raw(&self) -> AudioPacketResult<&[u8]> {
         match self {
             AudioPacket::Raw(d) => Ok(d),
@@ -50,6 +52,7 @@ impl AudioPacket {
         }
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         match self {
             AudioPacket::Samples(s) => s.is_empty(),
