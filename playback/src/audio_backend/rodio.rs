@@ -209,8 +209,10 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
         host.id().name()
     );
 
+    let mut format = format;
     if format != AudioFormat::S16 && format != AudioFormat::F32 {
-        unimplemented!("Rodio currently only supports F32 and S16 formats");
+        error!("Rodio currently only supports F32 and S16 formats, falling back to S16");
+        format = AudioFormat::S16;
     }
 
     let (sink, stream) = create_sink(&host, device, format).unwrap();
