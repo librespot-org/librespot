@@ -22,7 +22,7 @@ RUN mkdir /sysroot && \
     dpkg -x libasound2-dev*.deb /sysroot/
 
 # Install rust.
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.81 -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.85 -y
 ENV PATH="/root/.cargo/bin/:${PATH}"
 RUN rustup target add arm-unknown-linux-gnueabihf
 RUN mkdir /.cargo && \
