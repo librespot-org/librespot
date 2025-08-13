@@ -77,6 +77,7 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 data-encoding = "2.9"
 flate2 = "1.1"
 protobuf-json-mapping = "3.7"
+rustls = { version = "0.23", features = ["aws-lc-rs"] }
 
 # Eventually, this should use rustls-platform-verifier to unify the platform-specific dependencies
 # but currently, hyper-proxy2 and tokio-tungstenite do not support it.
