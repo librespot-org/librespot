@@ -151,14 +151,7 @@ impl HttpClient {
                 Error::internal(format!("unable to install default crypto provider: {e:?}"))
             });
 
-        // On supported platforms, use native roots
-        #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
-        let tls = HttpsConnectorBuilder::new().with_native_roots()?;
-
-        // Otherwise, use webpki roots
-        #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
         let tls = HttpsConnectorBuilder::new().with_webpki_roots();
-
         let https_connector = tls.https_or_http().enable_http1().enable_http2().build();
 
         // When not using a proxy a dummy proxy is configured that will not intercept any traffic.

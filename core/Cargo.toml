@@ -77,29 +77,8 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 data-encoding = "2.9"
 flate2 = "1.1"
 protobuf-json-mapping = "3.7"
-rustls = { version = "0.23", default-features = false, features = [
-    "ring",
-] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
-# Eventually, this should use rustls-platform-verifier to unify the platform-specific dependencies
-# but currently, hyper-proxy2 and tokio-tungstenite do not support it.
-[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
-hyper-proxy2 = { version = "0.1", default-features = false, features = [
-    "rustls",
-] }
-hyper-rustls = { version = "0.27", default-features = false, features = [
-    "ring",
-    "http1",
-    "logging",
-    "tls12",
-    "native-tokio",
-    "http2",
-] }
-tokio-tungstenite = { version = "0.27", default-features = false, features = [
-    "rustls-tls-native-roots",
-] }
-
-[target.'cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))'.dependencies]
 hyper-proxy2 = { version = "0.1", default-features = false, features = [
     "rustls-webpki",
 ] }
