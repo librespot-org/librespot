@@ -1,5 +1,5 @@
-use crate::state::provider::IsProvider;
 use crate::state::ConnectState;
+use crate::state::provider::IsProvider;
 use librespot_protocol::player::Restrictions;
 use protobuf::MessageField;
 

@@ -5,21 +5,21 @@ use std::{
     fs,
     io::{self, Read, Seek, SeekFrom},
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, OnceLock,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
-use futures_util::{future::IntoStream, StreamExt, TryFutureExt};
-use hyper::{body::Incoming, header::CONTENT_RANGE, Response, StatusCode};
+use futures_util::{StreamExt, TryFutureExt, future::IntoStream};
+use hyper::{Response, StatusCode, body::Incoming, header::CONTENT_RANGE};
 use hyper_util::client::legacy::ResponseFuture;
 use parking_lot::{Condvar, Mutex};
 use tempfile::NamedTempFile;
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot, Semaphore};
+use tokio::sync::{Semaphore, mpsc, oneshot};
 
-use librespot_core::{cdn_url::CdnUrl, Error, FileId, Session};
+use librespot_core::{Error, FileId, Session, cdn_url::CdnUrl};
 
 use self::receive::audio_file_fetch;
 

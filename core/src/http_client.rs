@@ -5,17 +5,17 @@ use std::{
 };
 
 use bytes::Bytes;
-use futures_util::{future::IntoStream, FutureExt};
+use futures_util::{FutureExt, future::IntoStream};
 use governor::{
-    clock::MonotonicClock, middleware::NoOpMiddleware, state::InMemoryState, Quota, RateLimiter,
+    Quota, RateLimiter, clock::MonotonicClock, middleware::NoOpMiddleware, state::InMemoryState,
 };
-use http::{header::HeaderValue, Uri};
+use http::{Uri, header::HeaderValue};
 use http_body_util::{BodyExt, Full};
-use hyper::{body::Incoming, header::USER_AGENT, HeaderMap, Request, Response, StatusCode};
+use hyper::{HeaderMap, Request, Response, StatusCode, body::Incoming, header::USER_AGENT};
 use hyper_proxy2::{Intercept, Proxy, ProxyConnector};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::{
-    client::legacy::{connect::HttpConnector, Client, ResponseFuture},
+    client::legacy::{Client, ResponseFuture, connect::HttpConnector},
     rt::TokioExecutor,
 };
 use nonzero_ext::nonzero;
@@ -24,10 +24,10 @@ use thiserror::Error;
 use url::Url;
 
 use crate::{
-    config::{os_version, OS},
-    date::Date,
-    version::{spotify_version, FALLBACK_USER_AGENT, VERSION_STRING},
     Error,
+    config::{OS, os_version},
+    date::Date,
+    version::{FALLBACK_USER_AGENT, VERSION_STRING, spotify_version},
 };
 
 // The 30 seconds interval is documented by Spotify, but the calls per interval

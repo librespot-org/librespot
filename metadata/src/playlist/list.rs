@@ -4,9 +4,9 @@ use std::{
 };
 
 use crate::{
+    Metadata,
     request::RequestResult,
     util::{impl_deref_wrapped, impl_from_repeated_copy, impl_try_from_repeated},
-    Metadata,
 };
 
 use super::{
@@ -15,9 +15,9 @@ use super::{
 };
 
 use librespot_core::{
+    Error, Session,
     date::Date,
     spotify_id::{NamedSpotifyId, SpotifyId},
-    Error, Session,
 };
 
 use librespot_protocol as protocol;

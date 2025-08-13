@@ -2,10 +2,10 @@ use crate::{
     core::{Error, SpotifyId},
     protocol::player::ProvidedTrack,
     state::{
+        ConnectState, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE, StateError,
         context::ContextType,
         metadata::Metadata,
         provider::{IsProvider, Provider},
-        ConnectState, StateError, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE,
     },
 };
 use protobuf::MessageField;

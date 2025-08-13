@@ -3,9 +3,9 @@ use std::fmt::Debug;
 use protobuf::Message;
 
 use crate::{
+    Metadata,
     image::TranscodedPictures,
     request::{MercuryRequest, RequestResult},
-    Metadata,
 };
 
 use librespot_core::{Error, Session, SpotifyId};

@@ -10,7 +10,7 @@ use super::{
     permission::Capabilities,
 };
 
-use librespot_core::{date::Date, SpotifyId};
+use librespot_core::{SpotifyId, date::Date};
 
 use librespot_protocol as protocol;
 use protocol::playlist4_external::Item as PlaylistItemMessage;

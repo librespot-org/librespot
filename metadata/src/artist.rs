@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    Metadata,
     album::Albums,
     availability::Availabilities,
     external_id::ExternalIds,
@@ -13,7 +14,6 @@ use crate::{
     sale_period::SalePeriods,
     track::Tracks,
     util::{impl_deref_wrapped, impl_from_repeated, impl_try_from_repeated},
-    Metadata,
 };
 
 use librespot_core::{Error, Session, SpotifyId};
@@ -294,7 +294,7 @@ impl TryFrom<&ActivityPeriodMessage> for ActivityPeriod {
             _ => {
                 return Err(librespot_core::Error::failed_precondition(
                     "ActivityPeriod is expected to be either a decade or timespan",
-                ))
+                ));
             }
         };
         Ok(activity_period)

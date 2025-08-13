@@ -5,7 +5,7 @@ use crate::decoder::AudioPacket;
 use shell_words::split;
 
 use std::io::{ErrorKind, Write};
-use std::process::{exit, Child, Command, Stdio};
+use std::process::{Child, Command, Stdio, exit};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -68,7 +68,9 @@ pub struct SubprocessSink {
 impl Open for SubprocessSink {
     fn open(shell_command: Option<String>, format: AudioFormat) -> Self {
         if let Some("?") = shell_command.as_deref() {
-            println!("\nUsage:\n\nOutput to a Subprocess:\n\n\t--backend subprocess --device {{shell_command}}\n");
+            println!(
+                "\nUsage:\n\nOutput to a Subprocess:\n\n\t--backend subprocess --device {{shell_command}}\n"
+            );
             exit(0);
         }
 

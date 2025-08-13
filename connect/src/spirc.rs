@@ -1,13 +1,14 @@
 use crate::{
+    LoadContextOptions, LoadRequestOptions, PlayContext,
     context_resolver::{ContextAction, ContextResolver, ResolveContext},
     core::{
+        Error, Session, SpotifyId,
         authentication::Credentials,
         dealer::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
             protocol::{Command, FallbackWrapper, Message, Request},
         },
         session::UserAttributes,
-        Error, Session, SpotifyId,
     },
     model::{LoadRequest, PlayingTrack, SpircPlayStatus},
     playback::{
@@ -28,15 +29,14 @@ use crate::{
         provider::IsProvider,
         {ConnectConfig, ConnectState},
     },
-    LoadContextOptions, LoadRequestOptions, PlayContext,
 };
 use futures_util::StreamExt;
 use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
     future::Future,
-    sync::atomic::{AtomicUsize, Ordering},
     sync::Arc,
+    sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use thiserror::Error;
@@ -951,7 +951,8 @@ impl SpircTask {
                 {
                     debug!(
                         "ignoring context update for <{:?}>, because it isn't the current context <{}>",
-                        update_context.context.uri, self.connect_state.context_uri()
+                        update_context.context.uri,
+                        self.connect_state.context_uri()
                     )
                 } else {
                     self.context_resolver.add(ResolveContext::from_context(
@@ -1615,7 +1616,9 @@ impl SpircTask {
         let uri = String::from_utf8(uri)?;
 
         if self.connect_state.context_uri() != &uri {
-            debug!("ignoring playlist modification update for playlist <{uri}>, because it isn't the current context");
+            debug!(
+                "ignoring playlist modification update for playlist <{uri}>, because it isn't the current context"
+            );
             return Ok(());
         }
 

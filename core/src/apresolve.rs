@@ -139,7 +139,7 @@ impl ApResolver {
                 _ => {
                     return Err(Error::unimplemented(format!(
                         "No implementation to resolve access point {endpoint}"
-                    )))
+                    )));
                 }
             };
 

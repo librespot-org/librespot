@@ -2,9 +2,9 @@ use crate::{
     core::Error,
     protocol::player::ContextPlayerOptions,
     state::{
+        ConnectState, StateError,
         context::{ContextType, ResetContext},
         metadata::Metadata,
-        ConnectState, StateError,
     },
 };
 use protobuf::MessageField;

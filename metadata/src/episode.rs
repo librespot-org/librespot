@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    Metadata,
     audio::file::AudioFiles,
     availability::Availabilities,
     content_rating::ContentRatings,
@@ -12,10 +13,9 @@ use crate::{
     restriction::Restrictions,
     util::{impl_deref_wrapped, impl_try_from_repeated},
     video::VideoFiles,
-    Metadata,
 };
 
-use librespot_core::{date::Date, Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyId, date::Date};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::episode::EpisodeType;

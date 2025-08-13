@@ -13,7 +13,7 @@ use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use url::Url;
 
-use crate::{authentication::Credentials, packet::PacketType, version, Error};
+use crate::{Error, authentication::Credentials, packet::PacketType, version};
 
 use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 

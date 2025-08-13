@@ -1,5 +1,5 @@
-use rand::rngs::SmallRng;
 use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use rand_distr::{Distribution, Normal, Triangular, Uniform};
 use std::fmt;
 

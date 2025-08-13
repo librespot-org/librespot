@@ -6,22 +6,22 @@ use std::{
     iter,
     pin::Pin,
     sync::{
-        atomic::{self, AtomicBool},
         Arc,
+        atomic::{self, AtomicBool},
     },
     task::Poll,
     time::Duration,
 };
 
 use futures_core::{Future, Stream};
-use futures_util::{future::join_all, SinkExt, StreamExt};
+use futures_util::{SinkExt, StreamExt, future::join_all};
 use parking_lot::Mutex;
 use thiserror::Error;
 use tokio::{
     select,
     sync::{
-        mpsc::{self, UnboundedReceiver},
         Semaphore,
+        mpsc::{self, UnboundedReceiver},
     },
     task::JoinHandle,
 };
@@ -35,9 +35,8 @@ use self::{
 };
 
 use crate::{
-    socket,
-    util::{keep_flushing, CancelOnDrop, TimeoutOnDrop},
-    Error,
+    Error, socket,
+    util::{CancelOnDrop, TimeoutOnDrop, keep_flushing},
 };
 
 type WsMessage = tungstenite::Message;

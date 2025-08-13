@@ -11,7 +11,7 @@ use futures_util::FutureExt;
 use protobuf::Message;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{packet::PacketType, protocol, util::SeqGenerator, Error};
+use crate::{Error, packet::PacketType, protocol, util::SeqGenerator};
 
 mod types;
 pub use self::types::*;

@@ -3,9 +3,9 @@ use crate::player::{db_to_ratio, ratio_to_db};
 use super::mappings::{LogMapping, MappedCtrl, VolumeMapping};
 use super::{Mixer, MixerConfig, VolumeCtrl};
 
+use alsa::Error as AlsaError;
 use alsa::ctl::{ElemId, ElemIface};
 use alsa::mixer::{MilliBel, SelemChannelId, SelemId};
-use alsa::Error as AlsaError;
 use alsa::{Ctl, Round};
 
 use librespot_core::Error;
@@ -106,7 +106,11 @@ impl Mixer for AlsaMixer {
                 let reported_step_size = (max_millibel - min_millibel).0 / range;
                 let assumed_step_size = (ZERO_DB - min_millibel).0 / range;
                 if reported_step_size == assumed_step_size {
-                    warn!("Alsa rounding error detected, setting maximum dB to {:.2} instead of {:.2}", ZERO_DB.to_db(), max_millibel.to_db());
+                    warn!(
+                        "Alsa rounding error detected, setting maximum dB to {:.2} instead of {:.2}",
+                        ZERO_DB.to_db(),
+                        max_millibel.to_db()
+                    );
                     max_millibel = ZERO_DB;
                 } else {
                     warn!("Please manually set `--volume-range` if this is incorrect");

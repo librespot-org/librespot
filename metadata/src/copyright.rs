@@ -6,8 +6,8 @@ use std::{
 use crate::util::{impl_deref_wrapped, impl_from_repeated};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::copyright::Type as CopyrightType;
 use protocol::metadata::Copyright as CopyrightMessage;
+pub use protocol::metadata::copyright::Type as CopyrightType;
 
 #[derive(Debug, Clone)]
 pub struct Copyright {

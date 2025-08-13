@@ -12,11 +12,11 @@ use crate::{
 };
 
 use librespot_protocol as protocol;
-pub use protocol::playlist4_external::op::Kind as PlaylistOperationKind;
 use protocol::playlist4_external::Add as PlaylistAddMessage;
 use protocol::playlist4_external::Mov as PlaylistMoveMessage;
 use protocol::playlist4_external::Op as PlaylistOperationMessage;
 use protocol::playlist4_external::Rem as PlaylistRemoveMessage;
+pub use protocol::playlist4_external::op::Kind as PlaylistOperationKind;
 
 #[derive(Debug, Clone)]
 pub struct PlaylistOperation {

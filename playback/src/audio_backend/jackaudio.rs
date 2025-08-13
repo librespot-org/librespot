@@ -1,12 +1,12 @@
 use super::{Open, Sink, SinkError, SinkResult};
+use crate::NUM_CHANNELS;
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
-use crate::NUM_CHANNELS;
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 
 pub struct JackSink {
     send: SyncSender<f32>,

@@ -211,7 +211,9 @@ async fn avahi_task(
                     break 'wait_avahi;
                 }
             }
-            log::warn!("Failed to connect to Avahi, zeroconf discovery will not work until avahi-daemon is started. Check that it is installed and running");
+            log::warn!(
+                "Failed to connect to Avahi, zeroconf discovery will not work until avahi-daemon is started. Check that it is installed and running"
+            );
 
             // If it didn't, wait for the signal
             match stream.next().await {

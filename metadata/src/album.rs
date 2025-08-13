@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    Metadata,
     artist::Artists,
     availability::Availabilities,
     copyright::Copyrights,
@@ -14,14 +15,13 @@ use crate::{
     sale_period::SalePeriods,
     track::Tracks,
     util::{impl_deref_wrapped, impl_try_from_repeated},
-    Metadata,
 };
 
-use librespot_core::{date::Date, Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyId, date::Date};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::album::Type as AlbumType;
 use protocol::metadata::Disc as DiscMessage;
+pub use protocol::metadata::album::Type as AlbumType;
 
 #[derive(Debug, Clone)]
 pub struct Album {

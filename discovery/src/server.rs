@@ -6,13 +6,13 @@ use std::{
 };
 
 use aes::cipher::{KeyIvInit, StreamCipher};
-use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::engine::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use bytes::Bytes;
 use futures_util::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
 use http_body_util::{BodyExt, Full};
-use hyper::{body::Incoming, Method, Request, Response, StatusCode};
+use hyper::{Method, Request, Response, StatusCode, body::Incoming};
 
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
 use log::{debug, error, warn};
@@ -24,7 +24,7 @@ use super::{DiscoveryError, DiscoveryEvent};
 
 use crate::{
     core::config::DeviceType,
-    core::{authentication::Credentials, diffie_hellman::DhLocalKeys, Error},
+    core::{Error, authentication::Credentials, diffie_hellman::DhLocalKeys},
 };
 
 type Aes128Ctr = ctr::Ctr128BE<aes::Aes128>;

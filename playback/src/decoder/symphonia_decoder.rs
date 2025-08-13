@@ -18,9 +18,9 @@ use symphonia::{
 use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
 
 use crate::{
+    NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE,
     metadata::audio::{AudioFileFormat, AudioFiles},
     player::NormalisationData,
-    NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE,
 };
 
 pub struct SymphoniaDecoder {

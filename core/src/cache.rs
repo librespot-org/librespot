@@ -12,7 +12,7 @@ use parking_lot::Mutex;
 use priority_queue::PriorityQueue;
 use thiserror::Error;
 
-use crate::{authentication::Credentials, error::ErrorKind, Error, FileId};
+use crate::{Error, FileId, authentication::Credentials, error::ErrorKind};
 
 #[derive(Debug, Error)]
 pub enum CacheError {

@@ -5,7 +5,7 @@ use bytes::Bytes;
 use thiserror::Error;
 use tokio::sync::oneshot;
 
-use crate::{packet::PacketType, util::SeqGenerator, Error, FileId, SpotifyId};
+use crate::{Error, FileId, SpotifyId, packet::PacketType, util::SeqGenerator};
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct AudioKey(pub [u8; 16]);

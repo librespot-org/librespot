@@ -12,6 +12,7 @@ use std::{
 
 use crate::dealer::manager::DealerManager;
 use crate::{
+    Error,
     apresolve::{ApResolver, SocketAddress},
     audio_key::AudioKeyManager,
     authentication::Credentials,
@@ -26,7 +27,6 @@ use crate::{
     protocol::keyexchange::ErrorCode,
     spclient::SpClient,
     token::TokenProvider,
-    Error,
 };
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
@@ -40,7 +40,7 @@ use quick_xml::events::Event;
 use thiserror::Error;
 use tokio::{
     sync::mpsc,
-    time::{sleep, Duration as TokioDuration, Instant as TokioInstant, Sleep},
+    time::{Duration as TokioDuration, Instant as TokioInstant, Sleep, sleep},
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;

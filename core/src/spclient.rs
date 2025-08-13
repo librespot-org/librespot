@@ -3,8 +3,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::config::{os_version, OS};
+use crate::config::{OS, os_version};
 use crate::{
+    Error, FileId, SpotifyId,
     apresolve::SocketAddress,
     config::SessionConfig,
     error::ErrorKind,
@@ -21,15 +22,14 @@ use crate::{
     token::Token,
     util,
     version::spotify_semantic_version,
-    Error, FileId, SpotifyId,
 };
 use bytes::Bytes;
 use data_encoding::HEXUPPER_PERMISSIVE;
 use futures_util::future::IntoStream;
-use http::{header::HeaderValue, Uri};
+use http::{Uri, header::HeaderValue};
 use hyper::{
-    header::{HeaderName, ACCEPT, AUTHORIZATION, CONTENT_TYPE, RANGE},
     HeaderMap, Method, Request,
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderName, RANGE},
 };
 use hyper_util::client::legacy::ResponseFuture;
 use protobuf::{Enum, Message, MessageFull};
@@ -335,7 +335,7 @@ impl SpClient {
                 Some(unknown) => {
                     return Err(Error::unimplemented(format!(
                         "Unknown client token response type: {unknown:?}"
-                    )))
+                    )));
                 }
                 None => return Err(Error::failed_precondition("No client token response type")),
             }
@@ -892,7 +892,9 @@ impl SpClient {
     pub async fn get_rootlist(&self, from: usize, length: Option<usize>) -> SpClientResult {
         let length = length.unwrap_or(120);
         let user = self.session().username();
-        let endpoint = format!("/playlist/v2/user/{user}/rootlist?decorate=revision,attributes,length,owner,capabilities,status_code&from={from}&length={length}");
+        let endpoint = format!(
+            "/playlist/v2/user/{user}/rootlist?decorate=revision,attributes,length,owner,capabilities,status_code&from={from}&length={length}"
+        );
 
         self.request(&Method::GET, &endpoint, None, None).await
     }

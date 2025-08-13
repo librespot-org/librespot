@@ -7,8 +7,8 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use url::Url;
 
 use super::{
-    protocol::Message, Builder, Dealer, GetUrlResult, Request, RequestHandler, Responder, Response,
-    Subscription,
+    Builder, Dealer, GetUrlResult, Request, RequestHandler, Responder, Response, Subscription,
+    protocol::Message,
 };
 use crate::{Error, Session};
 

@@ -44,7 +44,9 @@ pub struct StdoutSink {
 impl Open for StdoutSink {
     fn open(file: Option<String>, format: AudioFormat) -> Self {
         if let Some("?") = file.as_deref() {
-            println!("\nUsage:\n\nOutput to stdout:\n\n\t--backend pipe\n\nOutput to file:\n\n\t--backend pipe --device {{filename}}\n");
+            println!(
+                "\nUsage:\n\nOutput to stdout:\n\n\t--backend pipe\n\nOutput to file:\n\n\t--backend pipe --device {{filename}}\n"
+            );
             exit(0);
         }
 

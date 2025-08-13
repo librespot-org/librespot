@@ -15,7 +15,7 @@ use http::{
 use protobuf::Error as ProtobufError;
 use thiserror::Error;
 use tokio::sync::{
-    mpsc::error::SendError, oneshot::error::RecvError, AcquireError, TryAcquireError,
+    AcquireError, TryAcquireError, mpsc::error::SendError, oneshot::error::RecvError,
 };
 use url::ParseError;
 

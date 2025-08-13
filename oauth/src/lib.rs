@@ -14,8 +14,8 @@
 use log::{error, info, trace};
 use oauth2::basic::BasicTokenType;
 use oauth2::{
-    basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, CsrfToken, EndpointNotSet,
-    EndpointSet, PkceCodeChallenge, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    AuthUrl, AuthorizationCode, ClientId, CsrfToken, EndpointNotSet, EndpointSet,
+    PkceCodeChallenge, RedirectUrl, Scope, TokenResponse, TokenUrl, basic::BasicClient,
 };
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, RefreshToken, StandardTokenResponse};
 use std::io;

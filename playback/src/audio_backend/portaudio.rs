@@ -3,7 +3,7 @@ use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
-use portaudio_rs::device::{get_default_output_index, DeviceIndex, DeviceInfo};
+use portaudio_rs::device::{DeviceIndex, DeviceInfo, get_default_output_index};
 use portaudio_rs::stream::*;
 use std::process::exit;
 use std::time::Duration;

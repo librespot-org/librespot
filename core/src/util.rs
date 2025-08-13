@@ -1,7 +1,7 @@
 use crate::Error;
 use byteorder::{BigEndian, ByteOrder};
 use futures_core::ready;
-use futures_util::{future, FutureExt, Sink, SinkExt};
+use futures_util::{FutureExt, Sink, SinkExt, future};
 use hmac::digest::Digest;
 use sha1::Sha1;
 use std::time::{Duration, Instant};
@@ -62,11 +62,12 @@ impl<T: Send + 'static> Future for TimeoutOnDrop<T> {
     type Output = <JoinHandle<T> as Future>::Output;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let r = ready!(self
-            .handle
-            .as_mut()
-            .expect("Polled after ready")
-            .poll_unpin(cx));
+        let r = ready!(
+            self.handle
+                .as_mut()
+                .expect("Polled after ready")
+                .poll_unpin(cx)
+        );
         self.handle = None;
         Poll::Ready(r)
     }

@@ -10,7 +10,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 enum PulseError {
-    #[error("<PulseAudioSink> Unsupported Pulseaudio Sample Spec, Format {pulse_format:?} ({format:?}), Channels {channels}, Rate {rate}")]
+    #[error(
+        "<PulseAudioSink> Unsupported Pulseaudio Sample Spec, Format {pulse_format:?} ({format:?}), Channels {channels}, Rate {rate}"
+    )]
     InvalidSampleSpec {
         pulse_format: pulse::sample::Format,
         format: AudioFormat,
