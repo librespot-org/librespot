@@ -70,11 +70,7 @@ impl AudioKeyManager {
                     .map_err(|_| AudioKeyError::Channel)?
             }
             _ => {
-                trace!(
-                    "Did not expect {:?} AES key packet with data {:#?}",
-                    cmd,
-                    data
-                );
+                trace!("Did not expect {cmd:?} AES key packet with data {data:#?}");
                 return Err(AudioKeyError::Packet(cmd as u8).into());
             }
         }

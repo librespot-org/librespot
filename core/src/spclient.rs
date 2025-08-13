@@ -311,20 +311,12 @@ impl SpClient {
                                         continue;
                                     }
                                     Err(e) => {
-                                        trace!(
-                                            "Answer not accepted {}/{}: {}",
-                                            count,
-                                            MAX_TRIES,
-                                            e
-                                        );
+                                        trace!("Answer not accepted {count}/{MAX_TRIES}: {e}");
                                     }
                                 }
                             }
                             Err(e) => trace!(
-                                "Unable to solve hash cash challenge {}/{}: {}",
-                                count,
-                                MAX_TRIES,
-                                e
+                                "Unable to solve hash cash challenge {count}/{MAX_TRIES}: {e}"
                             ),
                         }
 
@@ -373,7 +365,7 @@ impl SpClient {
             inner.client_token = Some(client_token);
         });
 
-        trace!("Got client token: {:?}", granted_token);
+        trace!("Got client token: {granted_token:?}");
 
         Ok(access_token)
     }
@@ -542,7 +534,7 @@ impl SpClient {
                 }
             }
 
-            debug!("Error was: {:?}", last_response);
+            debug!("Error was: {last_response:?}");
         }
 
         last_response

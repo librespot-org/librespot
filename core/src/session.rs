@@ -273,7 +273,7 @@ impl Session {
         let session_weak = self.weak();
         tokio::spawn(async move {
             if let Err(e) = sender_task.await {
-                error!("{}", e);
+                error!("{e}");
                 if let Some(session) = session_weak.try_upgrade() {
                     if !session.is_invalid() {
                         session.shutdown();
@@ -360,7 +360,7 @@ impl Session {
     fn check_catalogue(attributes: &UserAttributes) {
         if let Some(account_type) = attributes.get("type") {
             if account_type != "premium" {
-                error!("librespot does not support {:?} accounts.", account_type);
+                error!("librespot does not support {account_type:?} accounts.");
                 info!("Please support Spotify and your artists and sign up for a premium account.");
 
                 // TODO: logout instead of exiting
@@ -566,7 +566,7 @@ impl KeepAliveState {
             .map(|t| t.as_secs_f64())
             .unwrap_or(f64::INFINITY);
 
-        trace!("keep-alive state: {:?}, timeout in {:.1}", self, delay);
+        trace!("keep-alive state: {self:?}, timeout in {delay:.1}");
     }
 }
 
@@ -619,7 +619,7 @@ where
         let cmd = match packet_type {
             Some(cmd) => cmd,
             None => {
-                trace!("Ignoring unknown packet {:x}", cmd);
+                trace!("Ignoring unknown packet {cmd:x}");
                 return Err(SessionError::Packet(cmd).into());
             }
         };
@@ -667,7 +667,7 @@ where
             }
             Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned())?;
-                info!("Country: {:?}", country);
+                info!("Country: {country:?}");
                 session.0.data.write().user_data.country = country;
                 Ok(())
             }
@@ -710,7 +710,7 @@ where
                     }
                 }
 
-                trace!("Received product info: {:#?}", user_attributes);
+                trace!("Received product info: {user_attributes:#?}");
                 Session::check_catalogue(&user_attributes);
 
                 session.0.data.write().user_data.attributes = user_attributes;
@@ -721,7 +721,7 @@ where
             | Some(UnknownDataAllZeros)
             | Some(LicenseVersion) => Ok(()),
             _ => {
-                trace!("Ignoring {:?} packet with data {:#?}", cmd, data);
+                trace!("Ignoring {cmd:?} packet with data {data:#?}");
                 Err(SessionError::Packet(cmd as u8).into())
             }
         }
@@ -749,7 +749,7 @@ where
                 Poll::Ready(Some(Ok((cmd, data)))) => {
                     let result = self.as_mut().dispatch(&session, cmd, data);
                     if let Err(e) = result {
-                        debug!("could not dispatch command: {}", e);
+                        debug!("could not dispatch command: {e}");
                     }
                 }
                 Poll::Ready(None) => {

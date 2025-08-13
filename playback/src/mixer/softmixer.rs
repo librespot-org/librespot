@@ -17,7 +17,7 @@ pub struct SoftMixer {
 impl Mixer for SoftMixer {
     fn open(config: MixerConfig) -> Result<Self, Error> {
         let volume_ctrl = config.volume_ctrl;
-        info!("Mixing with softvol and volume control: {:?}", volume_ctrl);
+        info!("Mixing with softvol and volume control: {volume_ctrl:?}");
 
         Ok(Self {
             volume: Arc::new(AtomicU64::new(f64::to_bits(0.5))),

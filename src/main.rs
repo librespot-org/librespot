@@ -5,18 +5,18 @@ use librespot::playback::mixer::alsamixer::AlsaMixer;
 use librespot::{
     connect::{ConnectConfig, Spirc},
     core::{
-        authentication::Credentials, cache::Cache, config::DeviceType, version, Session,
-        SessionConfig,
+        Session, SessionConfig, authentication::Credentials, cache::Cache, config::DeviceType,
+        version,
     },
     discovery::DnsSdServiceBuilder,
     playback::{
-        audio_backend::{self, SinkBuilder, BACKENDS},
+        audio_backend::{self, BACKENDS, SinkBuilder},
         config::{
             AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
         },
         dither,
         mixer::{self, MixerConfig, MixerFn},
-        player::{coefficient_to_duration, duration_to_coefficient, Player},
+        player::{Player, coefficient_to_duration, duration_to_coefficient},
     },
 };
 use librespot_oauth::OAuthClientBuilder;
@@ -24,6 +24,7 @@ use log::{debug, error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use std::{
     env,
+    ffi::OsStr,
     fs::create_dir_all,
     ops::RangeInclusive,
     path::{Path, PathBuf},
@@ -34,10 +35,11 @@ use std::{
 };
 use sysinfo::{ProcessesToUpdate, System};
 use thiserror::Error;
+use tokio::sync::Semaphore;
 use url::Url;
 
 mod player_event_handler;
-use player_event_handler::{run_program_on_sink_events, EventHandler};
+use player_event_handler::{EventHandler, run_program_on_sink_events};
 
 fn device_id(name: &str) -> String {
     HEXLOWER.encode(&Sha1::digest(name.as_bytes()))
@@ -75,7 +77,9 @@ fn setup_logging(quiet: bool, verbose: bool) {
             builder.init();
 
             if verbose && quiet {
-                warn!("`--verbose` and `--quiet` are mutually exclusive. Logging can not be both verbose and quiet. Using verbose mode.");
+                warn!(
+                    "`--verbose` and `--quiet` are mutually exclusive. Logging can not be both verbose and quiet. Using verbose mode."
+                );
             }
         }
     }
@@ -219,7 +223,7 @@ struct Setup {
     zeroconf_backend: Option<DnsSdServiceBuilder>,
 }
 
-fn get_setup() -> Setup {
+async fn get_setup() -> Setup {
     const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
     const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
     const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=10.0;
@@ -810,7 +814,9 @@ fn get_setup() -> Setup {
         ALSA_MIXER_CONTROL,
     ] {
         if opt_present(a) {
-            warn!("Alsa specific options have no effect if the alsa backend is not enabled at build time.");
+            warn!(
+                "Alsa specific options have no effect if the alsa backend is not enabled at build time."
+            );
             break;
         }
     }
@@ -1196,7 +1202,9 @@ fn get_setup() -> Setup {
                 empty_string_error_msg(USERNAME, USERNAME_SHORT);
             }
             if opt_present(PASSWORD) {
-                error!("Invalid `--{PASSWORD}` / `-{PASSWORD_SHORT}`: Password authentication no longer supported, use OAuth");
+                error!(
+                    "Invalid `--{PASSWORD}` / `-{PASSWORD_SHORT}`: Password authentication no longer supported, use OAuth"
+                );
                 exit(1);
             }
             match cached_creds {
@@ -1265,9 +1273,7 @@ fn get_setup() -> Setup {
 
     if let Some(reason) = no_discovery_reason.as_deref() {
         if opt_present(ZEROCONF_PORT) {
-            warn!(
-                "With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect."
-            );
+            warn!("With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect.");
         }
     }
 
@@ -1393,31 +1399,31 @@ fn get_setup() -> Setup {
                     name.clone()
                 };
 
-                env::set_var("PULSE_PROP_application.name", pulseaudio_name);
+                set_env_var("PULSE_PROP_application.name", pulseaudio_name).await;
             }
 
             if env::var("PULSE_PROP_application.version").is_err() {
-                env::set_var("PULSE_PROP_application.version", version::SEMVER);
+                set_env_var("PULSE_PROP_application.version", version::SEMVER).await;
             }
 
             if env::var("PULSE_PROP_application.icon_name").is_err() {
-                env::set_var("PULSE_PROP_application.icon_name", "audio-x-generic");
+                set_env_var("PULSE_PROP_application.icon_name", "audio-x-generic").await;
             }
 
             if env::var("PULSE_PROP_application.process.binary").is_err() {
-                env::set_var("PULSE_PROP_application.process.binary", "librespot");
+                set_env_var("PULSE_PROP_application.process.binary", "librespot").await;
             }
 
             if env::var("PULSE_PROP_stream.description").is_err() {
-                env::set_var("PULSE_PROP_stream.description", "Spotify Connect endpoint");
+                set_env_var("PULSE_PROP_stream.description", "Spotify Connect endpoint").await;
             }
 
             if env::var("PULSE_PROP_media.software").is_err() {
-                env::set_var("PULSE_PROP_media.software", "Spotify");
+                set_env_var("PULSE_PROP_media.software", "Spotify").await;
             }
 
             if env::var("PULSE_PROP_media.role").is_err() {
-                env::set_var("PULSE_PROP_media.role", "music");
+                set_env_var("PULSE_PROP_media.role", "music").await;
             }
         }
 
@@ -1839,6 +1845,23 @@ fn get_setup() -> Setup {
     }
 }
 
+// Initialize a static semaphore with only one permit, which is used to
+// prevent setting environment variables from running in parallel.
+static PERMIT: Semaphore = Semaphore::const_new(1);
+async fn set_env_var<K: AsRef<OsStr>, V: AsRef<OsStr>>(key: K, value: V) {
+    let permit = PERMIT
+        .acquire()
+        .await
+        .expect("Failed to acquire semaphore permit");
+
+    // SAFETY: This is safe because setting the environment variable will wait if the permit is
+    // already acquired by other callers.
+    unsafe { env::set_var(key, value) }
+
+    // Drop the permit manually, so the compiler doesn't optimize it away as unused variable.
+    drop(permit);
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     const RUST_BACKTRACE: &str = "RUST_BACKTRACE";
@@ -1847,10 +1870,10 @@ async fn main() {
     const RECONNECT_RATE_LIMIT: usize = 5;
 
     if env::var(RUST_BACKTRACE).is_err() {
-        env::set_var(RUST_BACKTRACE, "full")
+        set_env_var(RUST_BACKTRACE, "full").await;
     }
 
-    let setup = get_setup();
+    let setup = get_setup().await;
 
     let mut last_credentials = None;
     let mut spirc: Option<Spirc> = None;

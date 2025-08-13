@@ -166,7 +166,7 @@ impl Spirc {
         }
 
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
-        debug!("new Spirc[{}]", spirc_id);
+        debug!("new Spirc[{spirc_id}]");
 
         let connect_state = ConnectState::new(config, &session);
 
@@ -446,14 +446,14 @@ impl SpircTask {
                 cluster_update = self.connect_state_update.next() => unwrap! {
                     cluster_update,
                     match |cluster_update| if let Err(e) = self.handle_cluster_update(cluster_update).await {
-                        error!("could not dispatch connect state update: {}", e);
+                        error!("could not dispatch connect state update: {e}");
                     }
                 },
                 // main dealer request handling (dealer expects an answer)
                 request = self.connect_state_command.next() => unwrap! {
                     request,
                     |request| if let Err(e) = self.handle_connect_state_request(request).await {
-                        error!("couldn't handle connect state command: {}", e);
+                        error!("couldn't handle connect state command: {e}");
                     }
                 },
                 // volume request handling is send separately (it's more like a fire forget)
@@ -491,12 +491,12 @@ impl SpircTask {
                 },
                 cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
                     if let Err(e) = self.handle_command(cmd).await {
-                        debug!("could not dispatch command: {}", e);
+                        debug!("could not dispatch command: {e}");
                     }
                 },
                 event = async { player_events?.recv().await }, if player_events.is_some() => if let Some(event) = event {
                     if let Err(e) = self.handle_player_event(event) {
-                        error!("could not dispatch player event: {}", e);
+                        error!("could not dispatch player event: {e}");
                     }
                 },
                 _ = async { sleep(UPDATE_STATE_DELAY).await }, if self.update_state => {
@@ -606,7 +606,7 @@ impl SpircTask {
     }
 
     async fn handle_command(&mut self, cmd: SpircCommand) -> Result<(), Error> {
-        trace!("Received SpircCommand::{:?}", cmd);
+        trace!("Received SpircCommand::{cmd:?}");
         match cmd {
             SpircCommand::Shutdown => {
                 trace!("Received SpircCommand::Shutdown");
@@ -618,16 +618,15 @@ impl SpircTask {
                 }
             }
             SpircCommand::Activate if !self.connect_state.is_active() => {
-                trace!("Received SpircCommand::{:?}", cmd);
+                trace!("Received SpircCommand::{cmd:?}");
                 self.handle_activate();
                 return self.notify().await;
             }
-            SpircCommand::Activate => warn!(
-                "SpircCommand::{:?} will be ignored while already active",
-                cmd
-            ),
+            SpircCommand::Activate => {
+                warn!("SpircCommand::{cmd:?} will be ignored while already active")
+            }
             _ if !self.connect_state.is_active() => {
-                warn!("SpircCommand::{:?} will be ignored while Not Active", cmd)
+                warn!("SpircCommand::{cmd:?} will be ignored while Not Active")
             }
             SpircCommand::Disconnect { pause } => {
                 if pause {
@@ -787,7 +786,7 @@ impl SpircTask {
     }
 
     async fn handle_connection_id_update(&mut self, connection_id: String) -> Result<(), Error> {
-        trace!("Received connection ID update: {:?}", connection_id);
+        trace!("Received connection ID update: {connection_id:?}");
         self.session.set_connection_id(&connection_id);
 
         let cluster = match self
@@ -837,7 +836,7 @@ impl SpircTask {
     }
 
     fn handle_user_attributes_update(&mut self, update: UserAttributesUpdate) {
-        trace!("Received attributes update: {:#?}", update);
+        trace!("Received attributes update: {update:#?}");
         let attributes: UserAttributes = update
             .pairs
             .iter()
@@ -863,12 +862,7 @@ impl SpircTask {
                 };
                 self.session.set_user_attribute(key, new_value);
 
-                trace!(
-                    "Received attribute mutation, {} was {} is now {}",
-                    key,
-                    old_value,
-                    new_value
-                );
+                trace!("Received attribute mutation, {key} was {old_value} is now {new_value}");
 
                 if key == "filter-explicit-content" && new_value == "1" {
                     self.player
@@ -882,10 +876,7 @@ impl SpircTask {
                     self.add_autoplay_resolving_when_required()
                 }
             } else {
-                trace!(
-                    "Received attribute mutation for {} but key was not found!",
-                    key
-                );
+                trace!("Received attribute mutation for {key} but key was not found!");
             }
         }
     }
@@ -1743,7 +1734,7 @@ impl SpircTask {
     }
 
     fn set_volume(&mut self, volume: u16) {
-        debug!("SpircTask::set_volume({})", volume);
+        debug!("SpircTask::set_volume({volume})");
 
         let old_volume = self.connect_state.device_info().volume;
         let new_volume = volume as u32;

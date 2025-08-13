@@ -141,7 +141,7 @@ impl FsSizeLimiter {
         let list_dir = match fs::read_dir(path) {
             Ok(list_dir) => list_dir,
             Err(e) => {
-                warn!("Could not read directory {:?} in cache dir: {}", path, e);
+                warn!("Could not read directory {path:?} in cache dir: {e}");
                 return;
             }
         };
@@ -150,7 +150,7 @@ impl FsSizeLimiter {
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(e) => {
-                    warn!("Could not directory {:?} in cache dir: {}", path, e);
+                    warn!("Could not directory {path:?} in cache dir: {e}");
                     return;
                 }
             };
@@ -166,7 +166,7 @@ impl FsSizeLimiter {
                             limiter.add(&path, size, access_time);
                         }
                         Err(e) => {
-                            warn!("Could not read file {:?} in cache dir: {}", path, e)
+                            warn!("Could not read file {path:?} in cache dir: {e}")
                         }
                     }
                 }
@@ -213,7 +213,7 @@ impl FsSizeLimiter {
 
             let res = fs::remove_file(&file);
             if let Err(e) = res {
-                warn!("Could not remove file {:?} from cache dir: {}", file, e);
+                warn!("Could not remove file {file:?} from cache dir: {e}");
                 last_error = Some(e);
             } else {
                 count += 1;
@@ -221,7 +221,7 @@ impl FsSizeLimiter {
         }
 
         if count > 0 {
-            info!("Removed {} cache files.", count);
+            info!("Removed {count} cache files.");
         }
 
         if let Some(err) = last_error {
@@ -317,7 +317,7 @@ impl Cache {
                 // If the file did not exist, the file was probably not written
                 // before. Otherwise, log the error.
                 if e.kind != ErrorKind::NotFound {
-                    warn!("Error reading credentials from cache: {}", e);
+                    warn!("Error reading credentials from cache: {e}");
                 }
                 None
             }
@@ -332,7 +332,7 @@ impl Cache {
             });
 
             if let Err(e) = result {
-                warn!("Cannot save credentials to cache: {}", e)
+                warn!("Cannot save credentials to cache: {e}")
             }
         }
     }
@@ -351,7 +351,7 @@ impl Cache {
             Ok(v) => Some(v),
             Err(e) => {
                 if e.kind != ErrorKind::NotFound {
-                    warn!("Error reading volume from cache: {}", e);
+                    warn!("Error reading volume from cache: {e}");
                 }
                 None
             }
@@ -362,7 +362,7 @@ impl Cache {
         if let Some(ref location) = self.volume_location {
             let result = File::create(location).and_then(|mut file| write!(file, "{volume}"));
             if let Err(e) = result {
-                warn!("Cannot save volume to cache: {}", e);
+                warn!("Cannot save volume to cache: {e}");
             }
         }
     }
@@ -375,7 +375,7 @@ impl Cache {
                 path
             }),
             Err(e) => {
-                warn!("Invalid FileId: {}", e);
+                warn!("Invalid FileId: {e}");
                 None
             }
         }
@@ -387,14 +387,14 @@ impl Cache {
             Ok(file) => {
                 if let Some(limiter) = self.size_limiter.as_deref() {
                     if !limiter.touch(&path) {
-                        error!("limiter could not touch {:?}", path);
+                        error!("limiter could not touch {path:?}");
                     }
                 }
                 Some(file)
             }
             Err(e) => {
                 if e.kind() != io::ErrorKind::NotFound {
-                    warn!("Error reading file from cache: {}", e)
+                    warn!("Error reading file from cache: {e}")
                 }
                 None
             }

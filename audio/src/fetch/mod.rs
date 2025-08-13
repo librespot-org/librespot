@@ -366,11 +366,11 @@ impl AudioFile {
         bytes_per_second: usize,
     ) -> Result<AudioFile, Error> {
         if let Some(file) = session.cache().and_then(|cache| cache.file(file_id)) {
-            debug!("File {} already in cache", file_id);
+            debug!("File {file_id} already in cache");
             return Ok(AudioFile::Cached(file));
         }
 
-        debug!("Downloading file {}", file_id);
+        debug!("Downloading file {file_id}");
 
         let (complete_tx, complete_rx) = oneshot::channel();
 
@@ -379,14 +379,14 @@ impl AudioFile {
 
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
-            debug!("Downloading file {} complete", file_id);
+            debug!("Downloading file {file_id} complete");
 
             if let Some(cache) = session_.cache() {
                 if let Some(cache_id) = cache.file_path(file_id) {
                     if let Err(e) = cache.save_file(file_id, &mut file) {
-                        error!("Error caching file {} to {:?}: {}", file_id, cache_id, e);
+                        error!("Error caching file {file_id} to {cache_id:?}: {e}");
                     } else {
-                        debug!("File {} cached to {:?}", file_id, cache_id);
+                        debug!("File {file_id} cached to {cache_id:?}");
                     }
                 }
             }
@@ -465,14 +465,11 @@ impl AudioFileStreaming {
             )));
         };
 
-        trace!("Streaming from {}", url);
+        trace!("Streaming from {url}");
 
         let code = response.status();
         if code != StatusCode::PARTIAL_CONTENT {
-            debug!(
-                "Opening audio file expected partial content but got: {}",
-                code
-            );
+            debug!("Opening audio file expected partial content but got: {code}");
             return Err(AudioFileError::StatusCode(code).into());
         }
 

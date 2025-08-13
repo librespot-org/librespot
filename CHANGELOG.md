@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- [core] MSRV is now 1.81 (breaking)
+- [core] MSRV is now 1.85 with Rust edition 2024 (breaking)
 - [core] AP connect and handshake have a combined 5 second timeout.
 - [core] `stream_from_cdn` now accepts the URL as `TryInto<Uri>` instead of `CdnUrl` (breaking)
 - [connect] Replaced `has_volume_ctrl` with `disable_volume` in `ConnectConfig` (breaking)

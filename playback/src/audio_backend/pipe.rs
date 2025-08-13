@@ -48,7 +48,7 @@ impl Open for StdoutSink {
             exit(0);
         }
 
-        info!("Using StdoutSink (pipe) with format: {:?}", format);
+        info!("Using StdoutSink (pipe) with format: {format:?}");
 
         Self {
             output: None,

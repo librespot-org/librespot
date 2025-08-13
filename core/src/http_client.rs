@@ -124,7 +124,7 @@ impl HttpClient {
         );
 
         let user_agent = HeaderValue::from_str(user_agent_str).unwrap_or_else(|err| {
-            error!("Invalid user agent <{}>: {}", user_agent_str, err);
+            error!("Invalid user agent <{user_agent_str}>: {err}");
             HeaderValue::from_static(FALLBACK_USER_AGENT)
         });
 
@@ -176,7 +176,7 @@ impl HttpClient {
     }
 
     pub async fn request(&self, req: Request<Bytes>) -> Result<Response<Incoming>, Error> {
-        debug!("Requesting {}", req.uri().to_string());
+        debug!("Requesting {}", req.uri());
 
         // `Request` does not implement `Clone` because its `Body` may be a single-shot stream.
         // As correct as that may be technically, we now need all this boilerplate to clone it

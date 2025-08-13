@@ -226,7 +226,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
         let buffer_size = {
             let max = match hwp.get_buffer_size_max() {
                 Err(e) => {
-                    trace!("Error getting the device's max Buffer size: {}", e);
+                    trace!("Error getting the device's max Buffer size: {e}");
                     ZERO_FRAMES
                 }
                 Ok(s) => s,
@@ -234,7 +234,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
 
             let min = match hwp.get_buffer_size_min() {
                 Err(e) => {
-                    trace!("Error getting the device's min Buffer size: {}", e);
+                    trace!("Error getting the device's min Buffer size: {e}");
                     ZERO_FRAMES
                 }
                 Ok(s) => s,
@@ -246,11 +246,11 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                     .find(|f| (min..=max).contains(f))
                 {
                     Some(size) => {
-                        trace!("Desired Frames per Buffer: {:?}", size);
+                        trace!("Desired Frames per Buffer: {size:?}");
 
                         match hwp.set_buffer_size_near(size) {
                             Err(e) => {
-                                trace!("Error setting the device's Buffer size: {}", e);
+                                trace!("Error setting the device's Buffer size: {e}");
                                 ZERO_FRAMES
                             }
                             Ok(s) => s,
@@ -267,17 +267,9 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
             };
 
             if buffer_size == ZERO_FRAMES {
-                trace!(
-                    "Desired Buffer Frame range: {:?} - {:?}",
-                    MIN_BUFFER,
-                    MAX_BUFFER
-                );
+                trace!("Desired Buffer Frame range: {MIN_BUFFER:?} - {MAX_BUFFER:?}",);
 
-                trace!(
-                    "Actual Buffer Frame range as reported by the device: {:?} - {:?}",
-                    min,
-                    max
-                );
+                trace!("Actual Buffer Frame range as reported by the device: {min:?} - {max:?}",);
             }
 
             buffer_size
@@ -289,7 +281,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
             } else {
                 let max = match hwp.get_period_size_max() {
                     Err(e) => {
-                        trace!("Error getting the device's max Period size: {}", e);
+                        trace!("Error getting the device's max Period size: {e}");
                         ZERO_FRAMES
                     }
                     Ok(s) => s,
@@ -297,7 +289,7 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
 
                 let min = match hwp.get_period_size_min() {
                     Err(e) => {
-                        trace!("Error getting the device's min Period size: {}", e);
+                        trace!("Error getting the device's min Period size: {e}");
                         ZERO_FRAMES
                     }
                     Ok(s) => s,
@@ -312,11 +304,11 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                         .find(|f| (min..=max).contains(f))
                     {
                         Some(size) => {
-                            trace!("Desired Frames per Period: {:?}", size);
+                            trace!("Desired Frames per Period: {size:?}");
 
                             match hwp.set_period_size_near(size, ValueOr::Nearest) {
                                 Err(e) => {
-                                    trace!("Error setting the device's Period size: {}", e);
+                                    trace!("Error setting the device's Period size: {e}");
                                     ZERO_FRAMES
                                 }
                                 Ok(s) => s,
@@ -334,20 +326,14 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
                 };
 
                 if period_size == ZERO_FRAMES {
-                    trace!("Buffer size: {:?}", buffer_size);
+                    trace!("Buffer size: {buffer_size:?}");
 
                     trace!(
-                        "Desired Period Frame range: {:?} (Buffer size / {:?}) - {:?} (Buffer size / {:?})",
-                        min_period,
-                        MIN_PERIOD_DIVISOR,
-                        max_period,
-                        MAX_PERIOD_DIVISOR,
+                        "Desired Period Frame range: {min_period:?} (Buffer size / {MIN_PERIOD_DIVISOR:?}) - {max_period:?} (Buffer size / {MAX_PERIOD_DIVISOR:?})",
                     );
 
                     trace!(
-                        "Actual Period Frame range as reported by the device: {:?} - {:?}",
-                        min,
-                        max
+                        "Actual Period Frame range as reported by the device: {min:?} - {max:?}",
                     );
                 }
 
@@ -381,14 +367,14 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
 
         pcm.sw_params(&swp).map_err(AlsaError::Pcm)?;
 
-        trace!("Actual Frames per Buffer: {:?}", frames_per_buffer);
-        trace!("Actual Frames per Period: {:?}", frames_per_period);
+        trace!("Actual Frames per Buffer: {frames_per_buffer:?}");
+        trace!("Actual Frames per Period: {frames_per_period:?}");
 
         // Let ALSA do the math for us.
         pcm.frames_to_bytes(frames_per_period) as usize
     };
 
-    trace!("Period Buffer size in bytes: {:?}", bytes_per_period);
+    trace!("Period Buffer size in bytes: {bytes_per_period:?}");
 
     Ok((pcm, bytes_per_period))
 }
@@ -401,7 +387,7 @@ impl Open for AlsaSink {
                     exit(0);
                 }
                 Err(e) => {
-                    error!("{}", e);
+                    error!("{e}");
                     exit(1);
                 }
             },
@@ -410,7 +396,7 @@ impl Open for AlsaSink {
         }
         .to_string();
 
-        info!("Using AlsaSink with format: {:?}", format);
+        info!("Using AlsaSink with format: {format:?}");
 
         Self {
             pcm: None,
@@ -500,10 +486,7 @@ impl AlsaSink {
                     Err(e) => {
                         // Capture and log the original error as a warning, and then try to recover.
                         // If recovery fails then forward that error back to player.
-                        warn!(
-                            "Error writing from AlsaSink buffer to PCM, trying to recover, {}",
-                            e
-                        );
+                        warn!("Error writing from AlsaSink buffer to PCM, trying to recover, {e}");
 
                         pcm.try_recover(e, false).map_err(AlsaError::OnWrite)
                     }

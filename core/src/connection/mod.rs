@@ -186,11 +186,7 @@ pub async fn authenticate(
             Err(error_data.into())
         }
         _ => {
-            trace!(
-                "Did not expect {:?} AES key packet with data {:#?}",
-                cmd,
-                data
-            );
+            trace!("Did not expect {cmd:?} AES key packet with data {data:#?}");
             Err(AuthenticationError::Packet(cmd))
         }
     };

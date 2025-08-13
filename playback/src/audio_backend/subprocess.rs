@@ -72,7 +72,7 @@ impl Open for SubprocessSink {
             exit(0);
         }
 
-        info!("Using SubprocessSink with format: {:?}", format);
+        info!("Using SubprocessSink with format: {format:?}");
 
         Self {
             shell_command,

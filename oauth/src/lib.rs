@@ -18,7 +18,6 @@ use oauth2::{
     EndpointSet, PkceCodeChallenge, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, RefreshToken, StandardTokenResponse};
-use reqwest;
 use std::io;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -156,7 +155,7 @@ fn get_authcode_listener(
             addr: socket_address,
             e,
         })?;
-    info!("OAuth server listening on {:?}", socket_address);
+    info!("OAuth server listening on {socket_address:?}");
 
     // The server will terminate itself after collecting the first code.
     let mut stream = listener

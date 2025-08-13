@@ -1,14 +1,14 @@
 [package]
 name = "librespot"
 version = "0.6.0-dev"
-rust-version = "1.81"
+rust-version = "1.85"
 authors = ["Librespot Org"]
 license = "MIT"
 description = "An open source client library for Spotify, with support for Spotify Connect"
 keywords = ["spotify"]
 repository = "https://github.com/librespot-org/librespot"
 readme = "README.md"
-edition = "2021"
+edition = "2024"
 
 [workspace]
 
@@ -126,4 +126,4 @@ assets = [
 ]
 
 [workspace.package]
-rust-version = "1.81"
+rust-version = "1.85"

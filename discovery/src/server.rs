@@ -170,7 +170,7 @@ impl RequestHandler {
             .map_err(|_| DiscoveryError::HmacError(base_key.to_vec()))?;
         h.update(encrypted);
         if h.verify_slice(cksum).is_err() {
-            warn!("Login error for user {:?}: MAC mismatch", username);
+            warn!("Login error for user {username:?}: MAC mismatch");
             let result = json!({
                 "status": 102,
                 "spotifyError": 1,
@@ -314,7 +314,7 @@ impl DiscoveryServer {
                             discovery
                                 .clone()
                                 .handle(request)
-                                .inspect_err(|e| error!("could not handle discovery request: {}", e))
+                                .inspect_err(|e| error!("could not handle discovery request: {e}"))
                                 .and_then(|x| async move { Ok(x) })
                                 .map(Result::unwrap) // guaranteed by `and_then` above
                         });

@@ -419,7 +419,7 @@ fn launch_libmdns(
         };
 
         if let Err(e) = inner() {
-            log::error!("libmdns error: {}", e);
+            log::error!("libmdns error: {e}");
             let _ = status_tx.send(DiscoveryEvent::ZeroconfError(e));
         }
     });

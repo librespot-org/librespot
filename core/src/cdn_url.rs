@@ -73,7 +73,7 @@ impl CdnUrl {
 
         let cdn_url = Self { file_id, urls };
 
-        trace!("Resolved CDN storage: {:#?}", cdn_url);
+        trace!("Resolved CDN storage: {cdn_url:#?}");
 
         Ok(cdn_url)
     }

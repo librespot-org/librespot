@@ -7,7 +7,7 @@ use crate::proxytunnel;
 
 pub async fn connect(host: &str, port: u16, proxy: Option<&Url>) -> io::Result<TcpStream> {
     let socket = if let Some(proxy_url) = proxy {
-        info!("Using proxy \"{}\"", proxy_url);
+        info!("Using proxy \"{proxy_url}\"");
 
         let socket_addr = proxy_url.socket_addrs(|| None).and_then(|addrs| {
             addrs.into_iter().next().ok_or_else(|| {
