@@ -64,6 +64,7 @@ impl Ditherer for TriangularDitherer {
         Self::NAME
     }
 
+    #[inline]
     fn noise(&mut self) -> f64 {
         self.distribution.sample(&mut self.cached_rng)
     }
@@ -98,6 +99,7 @@ impl Ditherer for GaussianDitherer {
         Self::NAME
     }
 
+    #[inline]
     fn noise(&mut self) -> f64 {
         self.distribution.sample(&mut self.cached_rng)
     }
@@ -130,6 +132,7 @@ impl Ditherer for HighPassDitherer {
         Self::NAME
     }
 
+    #[inline]
     fn noise(&mut self) -> f64 {
         let new_noise = self.distribution.sample(&mut self.cached_rng);
         let high_passed_noise = new_noise - self.previous_noises[self.active_channel];
