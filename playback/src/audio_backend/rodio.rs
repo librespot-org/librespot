@@ -193,11 +193,18 @@ fn create_sink(
         AudioFormat::S16 => cpal::SampleFormat::I16,
     };
 
-    let stream = rodio::OutputStreamBuilder::default()
-        .with_device(cpal_device)
+    let stream = match rodio::OutputStreamBuilder::default()
+        .with_device(cpal_device.clone())
         .with_config(&config.config())
         .with_sample_format(sample_format)
-        .open_stream_or_fallback()?;
+        .open_stream()
+    {
+        Ok(exact_stream) => exact_stream,
+        Err(e) => {
+            warn!("unable to create Rodio output, falling back to default: {e}");
+            rodio::OutputStreamBuilder::from_device(cpal_device)?.open_stream_or_fallback()?
+        }
+    };
 
     let sink = rodio::Sink::connect_new(stream.mixer());
     Ok((sink, stream))
@@ -208,12 +215,6 @@ pub fn open(host: cpal::Host, device: Option<String>, format: AudioFormat) -> Ro
         "Using Rodio sink with format {format:?} and cpal host: {}",
         host.id().name()
     );
-
-    let mut format = format;
-    if format != AudioFormat::S16 && format != AudioFormat::F32 {
-        error!("Rodio currently only supports F32 and S16 formats, falling back to S16");
-        format = AudioFormat::S16;
-    }
 
     let (sink, stream) = create_sink(&host, device, format).unwrap();
 
