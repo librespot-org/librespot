@@ -65,7 +65,7 @@ futures-util = { version = "0.3", default-features = false }
 getopts = "0.2"
 log = "0.4"
 sha1 = "0.10"
-sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+sysinfo = { version = "0.36", default-features = false, features = ["system"] }
 thiserror = "2"
 tokio = { version = "1", features = [
     "rt",
