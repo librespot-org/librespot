@@ -81,6 +81,7 @@ struct PlayerInternal {
     normalisation_integrators: [f64; 2],
     normalisation_peaks: [f64; 2],
     normalisation_channel: usize,
+    normalisation_knee_factor: f64,
 
     auto_normalise_as_album: bool,
 
@@ -467,6 +468,7 @@ impl Player {
             debug!("new Player [{player_id}]");
 
             let converter = Converter::new(config.ditherer);
+            let normalisation_knee_factor = 1.0 / (8.0 * config.normalisation_knee_db);
 
             let internal = PlayerInternal {
                 session,
@@ -486,6 +488,7 @@ impl Player {
                 normalisation_peaks: [0.0; 2],
                 normalisation_integrators: [0.0; 2],
                 normalisation_channel: 0,
+                normalisation_knee_factor,
 
                 auto_normalise_as_album: false,
 
@@ -1586,75 +1589,84 @@ impl PlayerInternal {
                         // want to shave off.
                         //
                         // No matter the case we apply volume attenuation last if there is any.
-                        if !self.config.normalisation {
-                            if volume < 1.0 {
-                                for sample in data.iter_mut() {
-                                    *sample *= volume;
+                        match (self.config.normalisation, self.config.normalisation_method) {
+                            (false, _) => {
+                                if volume < 1.0 {
+                                    for sample in data.iter_mut() {
+                                        *sample *= volume;
+                                    }
                                 }
                             }
-                        } else if self.config.normalisation_method == NormalisationMethod::Dynamic {
-                            // zero-cost shorthands
-                            let threshold_db = self.config.normalisation_threshold_dbfs;
-                            let knee_db = self.config.normalisation_knee_db;
-                            let attack_cf = self.config.normalisation_attack_cf;
-                            let release_cf = self.config.normalisation_release_cf;
+                            (true, NormalisationMethod::Dynamic) => {
+                                // zero-cost shorthands
+                                let threshold_db = self.config.normalisation_threshold_dbfs;
+                                let knee_db = self.config.normalisation_knee_db;
+                                let attack_cf = self.config.normalisation_attack_cf;
+                                let release_cf = self.config.normalisation_release_cf;
 
-                            for sample in data.iter_mut() {
-                                // Feedforward limiter in the log domain
-                                // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012).
-                                // Digital Dynamic Range Compressor Design—A Tutorial and Analysis.
-                                // Journal of The Audio Engineering Society, 60, 399-408.
+                                for sample in data.iter_mut() {
+                                    // Feedforward limiter in the log domain
+                                    // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012).
+                                    // Digital Dynamic Range Compressor Design—A Tutorial and
+                                    // Analysis. Journal of The Audio Engineering Society, 60,
+                                    // 399-408.
 
-                                // step 0: apply gain stage
-                                *sample *= normalisation_factor;
+                                    // This implementation assumes audio is stereo.
 
-                                // step 1-4: half-wave rectification and conversion into dB, and
-                                // gain computer with soft knee and subtractor
-                                let limiter_db = {
-                                    // Add slight DC offset. Some samples are silence, which is
-                                    // -inf dB and gets the limiter stuck. Adding a small positive
-                                    // offset prevents this.
-                                    *sample += f64::MIN_POSITIVE;
+                                    // step 0: apply gain stage
+                                    *sample *= normalisation_factor;
 
-                                    let bias_db = ratio_to_db(sample.abs()) - threshold_db;
-                                    let knee_boundary_db = bias_db * 2.0;
-                                    if knee_boundary_db < -knee_db {
-                                        0.0
-                                    } else if knee_boundary_db.abs() <= knee_db {
-                                        (knee_boundary_db + knee_db).powi(2) / (8.0 * knee_db)
-                                    } else {
-                                        bias_db
-                                    }
-                                };
+                                    // step 1-4: half-wave rectification and conversion into dB, and
+                                    // gain computer with soft knee and subtractor
+                                    let limiter_db = {
+                                        // Add slight DC offset. Some samples are silence, which is
+                                        // -inf dB and gets the limiter stuck. Adding a small
+                                        // positive offset prevents this.
+                                        *sample += f64::MIN_POSITIVE;
 
-                                // track left/right channel
-                                let channel = self.normalisation_channel;
-                                self.normalisation_channel ^= 1;
+                                        let bias_db = ratio_to_db(sample.abs()) - threshold_db;
+                                        let knee_boundary_db = bias_db * 2.0;
+                                        if knee_boundary_db < -knee_db {
+                                            0.0
+                                        } else if knee_boundary_db.abs() <= knee_db {
+                                            let term = knee_boundary_db + knee_db;
+                                            term * term * self.normalisation_knee_factor
+                                        } else {
+                                            bias_db
+                                        }
+                                    };
 
-                                // step 5: smooth, decoupled peak detector
-                                self.normalisation_integrators[channel] = f64::max(
-                                    limiter_db,
-                                    release_cf * self.normalisation_integrators[channel]
-                                        + (1.0 - release_cf) * limiter_db,
-                                );
-                                self.normalisation_peaks[channel] = attack_cf
-                                    * self.normalisation_peaks[channel]
-                                    + (1.0 - attack_cf) * self.normalisation_integrators[channel];
+                                    // track left/right channel
+                                    let channel = self.normalisation_channel;
+                                    self.normalisation_channel ^= 1;
 
-                                // steps 6-8: conversion into level and multiplication into gain
-                                // stage. Find maximum peak across both channels to couple the gain
-                                // and maintain stereo imaging.
-                                let max_peak = f64::max(
-                                    self.normalisation_peaks[0],
-                                    self.normalisation_peaks[1],
-                                );
-                                *sample *= db_to_ratio(-max_peak) * volume;
+                                    // step 5: smooth, decoupled peak detector for each channel
+                                    // Use direct references to reduce repeated array indexing
+                                    let integrator = &mut self.normalisation_integrators[channel];
+                                    let peak = &mut self.normalisation_peaks[channel];
+
+                                    *integrator = f64::max(
+                                        limiter_db,
+                                        release_cf * *integrator + (1.0 - release_cf) * limiter_db,
+                                    );
+                                    *peak = attack_cf * *peak + (1.0 - attack_cf) * *integrator;
+
+                                    // steps 6-8: conversion into level and multiplication into gain
+                                    // stage. Find maximum peak across both channels to couple the
+                                    // gain and maintain stereo imaging.
+                                    let max_peak = f64::max(
+                                        self.normalisation_peaks[0],
+                                        self.normalisation_peaks[1],
+                                    );
+                                    *sample *= db_to_ratio(-max_peak) * volume;
+                                }
                             }
-                        } else if self.config.normalisation_method == NormalisationMethod::Basic
-                            && (normalisation_factor < 1.0 || volume < 1.0)
-                        {
-                            for sample in data.iter_mut() {
-                                *sample *= normalisation_factor * volume;
+                            (true, NormalisationMethod::Basic) => {
+                                if normalisation_factor < 1.0 || volume < 1.0 {
+                                    for sample in data.iter_mut() {
+                                        *sample *= normalisation_factor * volume;
+                                    }
+                                }
                             }
                         }
                     }
