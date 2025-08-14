@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [metadata] Replaced `AudioFileFormat` with own enum. (breaking)
 - [playback] Changed trait `Mixer::open` to return `Result<Self, Error>` instead of `Self` (breaking)
 - [playback] Changed type alias `MixerFn` to return `Result<Arc<dyn Mixer>, Error>` instead of `Arc<dyn Mixer>` (breaking)
-- [playback] Optimize audio conversion to always dither at 16-bit level and use bit shifts for scaling
+- [playback] Optimize audio conversion to always dither at 16-bit level, and improve performance
+- [playback] Normalizer maintains better stereo imaging, while also being faster
 
 ### Added
 

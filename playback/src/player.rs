@@ -78,8 +78,10 @@ struct PlayerInternal {
     event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
     converter: Converter,
 
-    normalisation_integrator: f64,
-    normalisation_peak: f64,
+    normalisation_integrators: [f64; 2],
+    normalisation_peaks: [f64; 2],
+    normalisation_channel: usize,
+    normalisation_knee_factor: f64,
 
     auto_normalise_as_album: bool,
 
@@ -466,6 +468,7 @@ impl Player {
             debug!("new Player [{player_id}]");
 
             let converter = Converter::new(config.ditherer);
+            let normalisation_knee_factor = 1.0 / (8.0 * config.normalisation_knee_db);
 
             let internal = PlayerInternal {
                 session,
@@ -482,8 +485,10 @@ impl Player {
                 event_senders: vec![],
                 converter,
 
-                normalisation_peak: 0.0,
-                normalisation_integrator: 0.0,
+                normalisation_peaks: [0.0; 2],
+                normalisation_integrators: [0.0; 2],
+                normalisation_channel: 0,
+                normalisation_knee_factor,
 
                 auto_normalise_as_album: false,
 
@@ -1574,112 +1579,94 @@ impl PlayerInternal {
             Some((_, mut packet)) => {
                 if !packet.is_empty() {
                     if let AudioPacket::Samples(ref mut data) = packet {
-                        // Get the volume for the packet.
-                        // In the case of hardware volume control this will
-                        // always be 1.0 (no change).
+                        // Get the volume for the packet. In the case of hardware volume control
+                        // this will always be 1.0 (no change).
                         let volume = self.volume_getter.attenuation_factor();
 
-                        // For the basic normalisation method, a normalisation factor of 1.0 indicates that
-                        // there is nothing to normalise (all samples should pass unaltered). For the
-                        // dynamic method, there may still be peaks that we want to shave off.
-
+                        // For the basic normalisation method, a normalisation factor of 1.0
+                        // indicates that there is nothing to normalise (all samples should pass
+                        // unaltered). For the dynamic method, there may still be peaks that we
+                        // want to shave off.
+                        //
                         // No matter the case we apply volume attenuation last if there is any.
-                        if !self.config.normalisation {
-                            if volume < 1.0 {
-                                for sample in data.iter_mut() {
-                                    *sample *= volume;
-                                }
-                            }
-                        } else if self.config.normalisation_method == NormalisationMethod::Basic
-                            && (normalisation_factor < 1.0 || volume < 1.0)
-                        {
-                            for sample in data.iter_mut() {
-                                *sample *= normalisation_factor * volume;
-                            }
-                        } else if self.config.normalisation_method == NormalisationMethod::Dynamic {
-                            // zero-cost shorthands
-                            let threshold_db = self.config.normalisation_threshold_dbfs;
-                            let knee_db = self.config.normalisation_knee_db;
-                            let attack_cf = self.config.normalisation_attack_cf;
-                            let release_cf = self.config.normalisation_release_cf;
-
-                            for sample in data.iter_mut() {
-                                *sample *= normalisation_factor;
-
-                                // Feedforward limiter in the log domain
-                                // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012). Digital Dynamic
-                                // Range Compressor Design—A Tutorial and Analysis. Journal of The Audio
-                                // Engineering Society, 60, 399-408.
-
-                                // Some tracks have samples that are precisely 0.0. That's silence
-                                // and we know we don't need to limit that, in which we can spare
-                                // the CPU cycles.
-                                //
-                                // Also, calling `ratio_to_db(0.0)` returns `inf` and would get the
-                                // peak detector stuck. Also catch the unlikely case where a sample
-                                // is decoded as `NaN` or some other non-normal value.
-                                let limiter_db = if sample.is_normal() {
-                                    // step 1-4: half-wave rectification and conversion into dB
-                                    // and gain computer with soft knee and subtractor
-                                    let bias_db = ratio_to_db(sample.abs()) - threshold_db;
-                                    let knee_boundary_db = bias_db * 2.0;
-
-                                    if knee_boundary_db < -knee_db {
-                                        0.0
-                                    } else if knee_boundary_db.abs() <= knee_db {
-                                        // The textbook equation:
-                                        // ratio_to_db(sample.abs()) - (ratio_to_db(sample.abs()) - (bias_db + knee_db / 2.0).powi(2) / (2.0 * knee_db))
-                                        // Simplifies to:
-                                        // ((2.0 * bias_db) + knee_db).powi(2) / (8.0 * knee_db)
-                                        // Which in our case further simplifies to:
-                                        // (knee_boundary_db + knee_db).powi(2) / (8.0 * knee_db)
-                                        // because knee_boundary_db is 2.0 * bias_db.
-                                        (knee_boundary_db + knee_db).powi(2) / (8.0 * knee_db)
-                                    } else {
-                                        // Textbook:
-                                        // ratio_to_db(sample.abs()) - threshold_db, which is already our bias_db.
-                                        bias_db
+                        match (self.config.normalisation, self.config.normalisation_method) {
+                            (false, _) => {
+                                if volume < 1.0 {
+                                    for sample in data.iter_mut() {
+                                        *sample *= volume;
                                     }
-                                } else {
-                                    0.0
-                                };
-
-                                // Spare the CPU unless (1) the limiter is engaged, (2) we
-                                // were in attack or (3) we were in release, and that attack/
-                                // release wasn't finished yet.
-                                if limiter_db > 0.0
-                                    || self.normalisation_integrator > 0.0
-                                    || self.normalisation_peak > 0.0
-                                {
-                                    // step 5: smooth, decoupled peak detector
-                                    // Textbook:
-                                    // release_cf * self.normalisation_integrator + (1.0 - release_cf) * limiter_db
-                                    // Simplifies to:
-                                    // release_cf * self.normalisation_integrator - release_cf * limiter_db + limiter_db
-                                    self.normalisation_integrator = f64::max(
-                                        limiter_db,
-                                        release_cf * self.normalisation_integrator
-                                            - release_cf * limiter_db
-                                            + limiter_db,
-                                    );
-                                    // Textbook:
-                                    // attack_cf * self.normalisation_peak + (1.0 - attack_cf) * self.normalisation_integrator
-                                    // Simplifies to:
-                                    // attack_cf * self.normalisation_peak - attack_cf * self.normalisation_integrator + self.normalisation_integrator
-                                    self.normalisation_peak = attack_cf * self.normalisation_peak
-                                        - attack_cf * self.normalisation_integrator
-                                        + self.normalisation_integrator;
-
-                                    // step 6: make-up gain applied later (volume attenuation)
-                                    // Applying the standard normalisation factor here won't work,
-                                    // because there are tracks with peaks as high as 6 dB above
-                                    // the default threshold, so that would clip.
-
-                                    // steps 7-8: conversion into level and multiplication into gain stage
-                                    *sample *= db_to_ratio(-self.normalisation_peak);
                                 }
+                            }
+                            (true, NormalisationMethod::Dynamic) => {
+                                // zero-cost shorthands
+                                let threshold_db = self.config.normalisation_threshold_dbfs;
+                                let knee_db = self.config.normalisation_knee_db;
+                                let attack_cf = self.config.normalisation_attack_cf;
+                                let release_cf = self.config.normalisation_release_cf;
 
-                                *sample *= volume;
+                                for sample in data.iter_mut() {
+                                    // Feedforward limiter in the log domain
+                                    // After: Giannoulis, D., Massberg, M., & Reiss, J.D. (2012).
+                                    // Digital Dynamic Range Compressor Design—A Tutorial and
+                                    // Analysis. Journal of The Audio Engineering Society, 60,
+                                    // 399-408.
+
+                                    // This implementation assumes audio is stereo.
+
+                                    // step 0: apply gain stage
+                                    *sample *= normalisation_factor;
+
+                                    // step 1-4: half-wave rectification and conversion into dB, and
+                                    // gain computer with soft knee and subtractor
+                                    let limiter_db = {
+                                        // Add slight DC offset. Some samples are silence, which is
+                                        // -inf dB and gets the limiter stuck. Adding a small
+                                        // positive offset prevents this.
+                                        *sample += f64::MIN_POSITIVE;
+
+                                        let bias_db = ratio_to_db(sample.abs()) - threshold_db;
+                                        let knee_boundary_db = bias_db * 2.0;
+                                        if knee_boundary_db < -knee_db {
+                                            0.0
+                                        } else if knee_boundary_db.abs() <= knee_db {
+                                            let term = knee_boundary_db + knee_db;
+                                            term * term * self.normalisation_knee_factor
+                                        } else {
+                                            bias_db
+                                        }
+                                    };
+
+                                    // track left/right channel
+                                    let channel = self.normalisation_channel;
+                                    self.normalisation_channel ^= 1;
+
+                                    // step 5: smooth, decoupled peak detector for each channel
+                                    // Use direct references to reduce repeated array indexing
+                                    let integrator = &mut self.normalisation_integrators[channel];
+                                    let peak = &mut self.normalisation_peaks[channel];
+
+                                    *integrator = f64::max(
+                                        limiter_db,
+                                        release_cf * *integrator + (1.0 - release_cf) * limiter_db,
+                                    );
+                                    *peak = attack_cf * *peak + (1.0 - attack_cf) * *integrator;
+
+                                    // steps 6-8: conversion into level and multiplication into gain
+                                    // stage. Find maximum peak across both channels to couple the
+                                    // gain and maintain stereo imaging.
+                                    let max_peak = f64::max(
+                                        self.normalisation_peaks[0],
+                                        self.normalisation_peaks[1],
+                                    );
+                                    *sample *= db_to_ratio(-max_peak) * volume;
+                                }
+                            }
+                            (true, NormalisationMethod::Basic) => {
+                                if normalisation_factor < 1.0 || volume < 1.0 {
+                                    for sample in data.iter_mut() {
+                                        *sample *= normalisation_factor * volume;
+                                    }
+                                }
                             }
                         }
                     }
