@@ -1,0 +1,86 @@
+---
+# Note, this is used in the badge URL!
+name: build
+
+"on":
+  push:
+    branches: [dev, master]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "contrib/**"
+      - "LICENSE"
+      - "*.sh"
+      - "**/Dockerfile*"
+      - "publish.sh"
+      - "test.sh"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "contrib/**"
+      - "LICENSE"
+      - "*.sh"
+      - "**/Dockerfile*"
+      - "publish.sh"
+      - "test.sh"
+  schedule:
+    # Run CI every week
+    - cron: "00 01 * * 0"
+
+env:
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
+
+jobs:
+  test:
+    name: cargo +${{ matrix.toolchain }} test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        toolchain:
+          - "1.85"  # MSRV (Minimum supported rust version)
+          - stable
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install developer package dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: >
+          sudo apt-get update && sudo apt-get install -y
+          libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev
+          gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+          libavahi-compat-libdnssd-dev
+
+      - name: Fetch dependencies
+        run: cargo fetch --locked
+
+      - name: Build workspace with examples
+        run: cargo build --frozen --workspace --examples
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Check workspace (each feature combination)
+        run: cargo hack check --workspace --each-feature
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: librespot-${{ matrix.os }}-${{ matrix.toolchain }}
+          path: >
+            target/debug/librespot${{ runner.os == 'Windows' && '.exe' || '' }}
+          if-no-files-found: error

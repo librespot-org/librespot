@@ -1,0 +1,69 @@
+---
+name: code-quality
+
+"on":
+  push:
+    branches: [dev, master]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "contrib/**"
+      - "LICENSE"
+      - "*.sh"
+      - "**/Dockerfile*"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "contrib/**"
+      - "LICENSE"
+      - "*.sh"
+      - "**/Dockerfile*"
+  schedule:
+    # Run CI every week
+    - cron: "00 01 * * 0"
+
+env:
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  clippy:
+    needs: fmt
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install developer package dependencies
+        run: >
+          sudo apt-get update && sudo apt-get install -y
+          libpulse-dev portaudio19-dev libasound2-dev libsdl2-dev
+          gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+          libavahi-compat-libdnssd-dev
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Run clippy (each feature combination)
+        run: cargo hack clippy --workspace --each-feature
