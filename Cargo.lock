@@ -1949,6 +1949,7 @@ dependencies = [
  "log",
  "oauth2",
  "open",
+ "openssl",
  "reqwest",
  "thiserror 2.0.14",
  "tokio",

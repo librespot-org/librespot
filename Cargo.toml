@@ -93,7 +93,7 @@ with-libmdns = ["librespot-discovery/with-libmdns"]
 
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
-vendored-openssl = ["librespot-core/openssl"]
+vendored-openssl = ["librespot-core/openssl", "librespot-oauth/openssl"]
 
 default = ["rodio-backend", "with-libmdns"]
 
