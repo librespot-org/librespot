@@ -19,12 +19,12 @@ futures-core = "0.3"
 futures-util = "0.3"
 hmac = "0.12"
 hyper = { version = "1.6", features = ["http1"] }
+http-body-util = "0.1"
 hyper-util = { version = "0.1", features = [
     "server-auto",
     "server-graceful",
     "service",
 ] }
-http-body-util = "0.1"
 libmdns = { version = "0.9", optional = true }
 log = "0.4"
 rand = "0.9"

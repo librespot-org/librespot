@@ -17,8 +17,8 @@ aes = "0.8"
 bytes = "1"
 ctr = "0.9"
 futures-util = "0.3"
-hyper = "1.6"
-hyper-util = { version = "0.1", features = ["client"] }
+hyper = { version = "1.6", features = ["http1", "http2"] }
+hyper-util = { version = "0.1", features = ["client", "http2"] }
 http-body-util = "0.1"
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }

@@ -10,11 +10,14 @@ edition = "2021"
 
 [dependencies]
 log = "0.4"
-oauth2 = { version = "5.0", features = ["reqwest", "reqwest-blocking"] }
+oauth2 = { version = "5.0", default-features = false, features = [
+    "native-tls",
+    "reqwest",
+    "reqwest-blocking",
+] }
 reqwest = { version = "0.12", default-features = false, features = [
     "blocking",
-    "http2",
-    "rustls-tls",
+    "native-tls",
     "system-proxy",
 ] }
 open = "5.3"

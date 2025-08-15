@@ -13,7 +13,7 @@ use http::{Uri, header::HeaderValue};
 use http_body_util::{BodyExt, Full};
 use hyper::{HeaderMap, Request, Response, StatusCode, body::Incoming, header::USER_AGENT};
 use hyper_proxy2::{Intercept, Proxy, ProxyConnector};
-use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use hyper_tls::HttpsConnector;
 use hyper_util::{
     client::legacy::{Client, ResponseFuture, connect::HttpConnector},
     rt::TokioExecutor,
@@ -145,14 +145,7 @@ impl HttpClient {
 
     fn try_create_hyper_client(proxy_url: Option<&Url>) -> Result<HyperClient, Error> {
         // configuring TLS is expensive and should be done once per process
-        let _ = rustls::crypto::ring::default_provider()
-            .install_default()
-            .map_err(|e| {
-                Error::internal(format!("unable to install default crypto provider: {e:?}"))
-            });
-
-        let tls = HttpsConnectorBuilder::new().with_webpki_roots();
-        let https_connector = tls.https_or_http().enable_http1().enable_http2().build();
+        let https_connector = HttpsConnector::new();
 
         // When not using a proxy a dummy proxy is configured that will not intercept any traffic.
         // This prevents needing to carry the Client Connector generics through the whole project
