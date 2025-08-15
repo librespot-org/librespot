@@ -50,6 +50,7 @@ num-bigint = "0.4"
 num-derive = "0.4"
 num-integer = "0.1"
 num-traits = "0.2"
+openssl = { version = "0.10", optional = true, features = ["vendored"] }
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 pin-project-lite = "0.2"

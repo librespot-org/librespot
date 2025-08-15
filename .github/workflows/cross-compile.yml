@@ -32,20 +32,20 @@ jobs:
     strategy:
       matrix:
         platform:
-          - os-name: Linux-armv7
+          - os-name: linux-armv7
             runs-on: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
 
-          - os-name: Linux-aarch64
+          - os-name: linux-aarch64
             runs-on: ubuntu-latest
             target: aarch64-unknown-linux-gnu
 
-          - os-name: Linux-riscv64gc
+          - os-name: linux-riscv64gc
             runs-on: ubuntu-latest
             target: riscv64gc-unknown-linux-gnu
 
         toolchain:
-          - "1.85"  # MSRV (Minimum supported rust version)
+          - "1.85" # MSRV (Minimum supported rust version)
           - stable
 
     steps:
@@ -58,7 +58,11 @@ jobs:
           command: build
           target: ${{ matrix.platform.target }}
           toolchain: ${{ matrix.toolchain }}
-          args: "--locked --verbose"
+          args: >
+            --locked --verbose${{
+            matrix.platform.target == 'riscv64gc-unknown-linux-gnu' &&
+            ' --no-default-features --features vendored-openssl' || ''
+            }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

@@ -1,5 +1,15 @@
 [build]
 pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
-    "apt-get update && apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH libasound2-dev:$CROSS_DEB_ARCH",
+    "apt-get update",
+    "apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH libasound2-dev:$CROSS_DEB_ARCH",
+]
+
+[target.riscv64gc-unknown-linux-gnu]
+# RISC-V: Try system packages first, fall back to vendored OpenSSL via feature flag
+# Building with --no-default-features to avoid Rodio (which needs ALSA)
+pre-build = [
+    "dpkg --add-architecture $CROSS_DEB_ARCH",
+    "apt-get update",
+    "apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH || true",
 ]
