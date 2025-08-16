@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [metadata] Replaced `AudioFileFormat` with own enum. (breaking)
 - [playback] Changed trait `Mixer::open` to return `Result<Self, Error>` instead of `Self` (breaking)
 - [playback] Changed type alias `MixerFn` to return `Result<Arc<dyn Mixer>, Error>` instead of `Arc<dyn Mixer>` (breaking)
-- [oauth] `get_access_token` spawns OAuth listener instead of prompting for stdin, even for non-loopback IP
+- [oauth] Remove loopback address requirement from `redirect_uri` when spawning callback handling server versus using stdin.
 
 ### Added
 
