@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [playback] Changed type alias `MixerFn` to return `Result<Arc<dyn Mixer>, Error>` instead of `Arc<dyn Mixer>` (breaking)
 - [playback] Optimize audio conversion to always dither at 16-bit level, and improve performance
 - [playback] Normalizer maintains better stereo imaging, while also being faster
+- [oauth] Remove loopback address requirement from `redirect_uri` when spawning callback handling server versus using stdin.
 
 ### Added
 
