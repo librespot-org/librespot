@@ -5,11 +5,11 @@ use thiserror::Error;
 use time::Duration;
 use url::Url;
 
-use super::{date::Date, Error, FileId, Session};
+use super::{Error, FileId, Session, date::Date};
 
 use librespot_protocol as protocol;
-use protocol::storage_resolve::storage_resolve_response::Result as StorageResolveResponse_Result;
 use protocol::storage_resolve::StorageResolveResponse as CdnUrlMessage;
+use protocol::storage_resolve::storage_resolve_response::Result as StorageResolveResponse_Result;
 
 #[derive(Debug, Clone)]
 pub struct MaybeExpiringUrl(pub String, pub Option<Date>);
@@ -73,11 +73,12 @@ impl CdnUrl {
 
         let cdn_url = Self { file_id, urls };
 
-        trace!("Resolved CDN storage: {:#?}", cdn_url);
+        trace!("Resolved CDN storage: {cdn_url:#?}");
 
         Ok(cdn_url)
     }
 
+    #[deprecated = "This function only returns the first valid URL. Use try_get_urls instead, which allows for fallback logic."]
     pub fn try_get_url(&self) -> Result<&str, Error> {
         if self.urls.is_empty() {
             return Err(CdnUrlError::Unresolved.into());
@@ -93,6 +94,34 @@ impl CdnUrl {
             Ok(&url.0)
         } else {
             Err(CdnUrlError::Expired.into())
+        }
+    }
+
+    pub fn try_get_urls(&self) -> Result<Vec<&str>, Error> {
+        if self.urls.is_empty() {
+            return Err(CdnUrlError::Unresolved.into());
+        }
+
+        let now = Date::now_utc();
+        let urls: Vec<&str> = self
+            .urls
+            .iter()
+            .filter_map(|MaybeExpiringUrl(url, expiry)| match *expiry {
+                Some(expiry) => {
+                    if now < expiry {
+                        Some(url.as_str())
+                    } else {
+                        None
+                    }
+                }
+                None => Some(url.as_str()),
+            })
+            .collect();
+
+        if urls.is_empty() {
+            Err(CdnUrlError::Expired.into())
+        } else {
+            Ok(urls)
         }
     }
 }
@@ -172,7 +201,9 @@ impl TryFrom<CdnUrlMessage> for MaybeExpiringUrls {
                                 expiry = Some(Date::from(with_margin));
                             }
                         } else {
-                            warn!("Cannot parse CDN URL expiry timestamp '{exp_str}' from '{cdn_url}'");
+                            warn!(
+                                "Cannot parse CDN URL expiry timestamp '{exp_str}' from '{cdn_url}'"
+                            );
                         }
                     } else {
                         warn!("Unknown CDN URL format: {cdn_url}");
@@ -196,10 +227,18 @@ mod test {
         let mut msg = CdnUrlMessage::new();
         msg.result = StorageResolveResponse_Result::CDN.into();
         msg.cdnurl = vec![
-            format!("https://audio-cf.spotifycdn.com/audio/844ecdb297a87ebfee4399f28892ef85d9ba725f?verify={timestamp}-4R3I2w2q7OfNkR%2FGH8qH7xtIKUPlDxywBuADY%2BsvMeU%3D"),
-            format!("https://audio-ak-spotify-com.akamaized.net/audio/foo?__token__=exp={timestamp}~hmac=4e661527574fab5793adb99cf04e1c2ce12294c71fe1d39ffbfabdcfe8ce3b41"),
-            format!("https://audio-gm-off.spotifycdn.com/audio/foo?Expires={timestamp}~FullPath~hmac=IIZA28qptl8cuGLq15-SjHKHtLoxzpy_6r_JpAU4MfM="),
-            format!("https://audio4-fa.scdn.co/audio/foo?{timestamp}_0GKSyXjLaTW1BksFOyI4J7Tf9tZDbBUNNPu9Mt4mhH4="),
+            format!(
+                "https://audio-cf.spotifycdn.com/audio/844ecdb297a87ebfee4399f28892ef85d9ba725f?verify={timestamp}-4R3I2w2q7OfNkR%2FGH8qH7xtIKUPlDxywBuADY%2BsvMeU%3D"
+            ),
+            format!(
+                "https://audio-ak-spotify-com.akamaized.net/audio/foo?__token__=exp={timestamp}~hmac=4e661527574fab5793adb99cf04e1c2ce12294c71fe1d39ffbfabdcfe8ce3b41"
+            ),
+            format!(
+                "https://audio-gm-off.spotifycdn.com/audio/foo?Expires={timestamp}~FullPath~hmac=IIZA28qptl8cuGLq15-SjHKHtLoxzpy_6r_JpAU4MfM="
+            ),
+            format!(
+                "https://audio4-fa.scdn.co/audio/foo?{timestamp}_0GKSyXjLaTW1BksFOyI4J7Tf9tZDbBUNNPu9Mt4mhH4="
+            ),
             "https://audio4-fa.scdn.co/foo?baz".to_string(),
         ];
         msg.fileid = vec![0];

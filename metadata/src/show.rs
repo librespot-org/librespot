@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use crate::{
-    availability::Availabilities, copyright::Copyrights, episode::Episodes, image::Images,
-    restriction::Restrictions, Metadata, RequestResult,
+    Metadata, RequestResult, availability::Availabilities, copyright::Copyrights,
+    episode::Episodes, image::Images, restriction::Restrictions,
 };
 
 use librespot_core::{Error, Session, SpotifyId};

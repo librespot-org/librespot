@@ -108,7 +108,7 @@ impl ApResolver {
             if inner.data.is_any_empty() {
                 warn!("Failed to resolve all access points, using fallbacks");
                 if let Some(error) = error {
-                    warn!("Resolve access points error: {}", error);
+                    warn!("Resolve access points error: {error}");
                 }
 
                 let fallback = self.parse_resolve_to_access_points(ApResolveData::fallback());
@@ -139,7 +139,7 @@ impl ApResolver {
                 _ => {
                     return Err(Error::unimplemented(format!(
                         "No implementation to resolve access point {endpoint}"
-                    )))
+                    )));
                 }
             };
 

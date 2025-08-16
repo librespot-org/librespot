@@ -5,21 +5,21 @@ use std::{
     fs,
     io::{self, Read, Seek, SeekFrom},
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, OnceLock,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
-use futures_util::{future::IntoStream, StreamExt, TryFutureExt};
-use hyper::{body::Incoming, header::CONTENT_RANGE, Response, StatusCode};
+use futures_util::{StreamExt, TryFutureExt, future::IntoStream};
+use hyper::{Response, StatusCode, body::Incoming, header::CONTENT_RANGE};
 use hyper_util::client::legacy::ResponseFuture;
 use parking_lot::{Condvar, Mutex};
 use tempfile::NamedTempFile;
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot, Semaphore};
+use tokio::sync::{Semaphore, mpsc, oneshot};
 
-use librespot_core::{cdn_url::CdnUrl, Error, FileId, Session};
+use librespot_core::{Error, FileId, Session, cdn_url::CdnUrl};
 
 use self::receive::audio_file_fetch;
 
@@ -306,7 +306,7 @@ struct AudioFileDownloadStatus {
 }
 
 struct AudioFileShared {
-    cdn_url: CdnUrl,
+    cdn_url: String,
     file_size: usize,
     bytes_per_second: usize,
     cond: Condvar,
@@ -366,11 +366,11 @@ impl AudioFile {
         bytes_per_second: usize,
     ) -> Result<AudioFile, Error> {
         if let Some(file) = session.cache().and_then(|cache| cache.file(file_id)) {
-            debug!("File {} already in cache", file_id);
+            debug!("File {file_id} already in cache");
             return Ok(AudioFile::Cached(file));
         }
 
-        debug!("Downloading file {}", file_id);
+        debug!("Downloading file {file_id}");
 
         let (complete_tx, complete_rx) = oneshot::channel();
 
@@ -379,14 +379,14 @@ impl AudioFile {
 
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
-            debug!("Downloading file {} complete", file_id);
+            debug!("Downloading file {file_id} complete");
 
             if let Some(cache) = session_.cache() {
                 if let Some(cache_id) = cache.file_path(file_id) {
                     if let Err(e) = cache.save_file(file_id, &mut file) {
-                        error!("Error caching file {} to {:?}: {}", file_id, cache_id, e);
+                        error!("Error caching file {file_id} to {cache_id:?}: {e}");
                     } else {
-                        debug!("File {} cached to {:?}", file_id, cache_id);
+                        debug!("File {file_id} cached to {cache_id:?}");
                     }
                 }
             }
@@ -426,32 +426,50 @@ impl AudioFileStreaming {
     ) -> Result<AudioFileStreaming, Error> {
         let cdn_url = CdnUrl::new(file_id).resolve_audio(&session).await?;
 
-        if let Ok(url) = cdn_url.try_get_url() {
-            trace!("Streaming from {}", url);
-        }
-
         let minimum_download_size = AudioFetchParams::get().minimum_download_size;
 
-        // When the audio file is really small, this `download_size` may turn out to be
-        // larger than the audio file we're going to stream later on. This is OK; requesting
-        // `Content-Range` > `Content-Length` will return the complete file with status code
-        // 206 Partial Content.
-        let mut streamer =
-            session
-                .spclient()
-                .stream_from_cdn(&cdn_url, 0, minimum_download_size)?;
+        let mut response_streamer_url = None;
+        let urls = cdn_url.try_get_urls()?;
+        for url in &urls {
+            // When the audio file is really small, this `download_size` may turn out to be
+            // larger than the audio file we're going to stream later on. This is OK; requesting
+            // `Content-Range` > `Content-Length` will return the complete file with status code
+            // 206 Partial Content.
+            let mut streamer =
+                session
+                    .spclient()
+                    .stream_from_cdn(*url, 0, minimum_download_size)?;
 
-        // Get the first chunk with the headers to get the file size.
-        // The remainder of that chunk with possibly also a response body is then
-        // further processed in `audio_file_fetch`.
-        let response = streamer.next().await.ok_or(AudioFileError::NoData)??;
+            // Get the first chunk with the headers to get the file size.
+            // The remainder of that chunk with possibly also a response body is then
+            // further processed in `audio_file_fetch`.
+            let streamer_result = tokio::time::timeout(Duration::from_secs(10), streamer.next())
+                .await
+                .map_err(|_| AudioFileError::WaitTimeout.into())
+                .and_then(|x| x.ok_or_else(|| AudioFileError::NoData.into()))
+                .and_then(|x| x.map_err(Error::from));
+
+            match streamer_result {
+                Ok(r) => {
+                    response_streamer_url = Some((r, streamer, url));
+                    break;
+                }
+                Err(e) => warn!("Fetching {url} failed with error {e:?}, trying next"),
+            }
+        }
+
+        let Some((response, streamer, url)) = response_streamer_url else {
+            return Err(Error::unavailable(format!(
+                "{} URLs failed, none left to try",
+                urls.len()
+            )));
+        };
+
+        trace!("Streaming from {url}");
 
         let code = response.status();
         if code != StatusCode::PARTIAL_CONTENT {
-            debug!(
-                "Opening audio file expected partial content but got: {}",
-                code
-            );
+            debug!("Opening audio file expected partial content but got: {code}");
             return Err(AudioFileError::StatusCode(code).into());
         }
 
@@ -473,7 +491,7 @@ impl AudioFileStreaming {
         };
 
         let shared = Arc::new(AudioFileShared {
-            cdn_url,
+            cdn_url: url.to_string(),
             file_size,
             bytes_per_second,
             cond: Condvar::new(),

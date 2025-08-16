@@ -18,9 +18,9 @@ use symphonia::{
 use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
 
 use crate::{
+    NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE,
     metadata::audio::{AudioFileFormat, AudioFiles},
     player::NormalisationData,
-    NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE,
 };
 
 pub struct SymphoniaDecoder {
@@ -131,6 +131,7 @@ impl SymphoniaDecoder {
         }
     }
 
+    #[inline]
     fn ts_to_ms(&self, ts: u64) -> u32 {
         match self.decoder.codec_params().time_base {
             Some(time_base) => {

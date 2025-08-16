@@ -5,8 +5,8 @@ pub use request::*;
 use std::collections::HashMap;
 use std::io::{Error as IoError, Read};
 
-use crate::{deserialize_with::json_proto, Error};
-use base64::{prelude::BASE64_STANDARD, DecodeError, Engine};
+use crate::{Error, deserialize_with::json_proto};
+use base64::{DecodeError, Engine, prelude::BASE64_STANDARD};
 use flate2::read::GzDecoder;
 use log::LevelFilter;
 use serde::Deserialize;

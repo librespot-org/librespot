@@ -1,9 +1,9 @@
 use crate::{
-    core::{dealer::protocol::SetQueueCommand, Error},
+    core::{Error, dealer::protocol::SetQueueCommand},
     state::{
+        ConnectState,
         context::{ContextType, ResetContext},
         metadata::Metadata,
-        ConnectState,
     },
 };
 use protobuf::MessageField;

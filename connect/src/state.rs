@@ -9,8 +9,8 @@ mod transfer;
 
 use crate::{
     core::{
-        config::DeviceType, date::Date, dealer::protocol::Request, spclient::SpClientResult,
-        version, Error, Session,
+        Error, Session, config::DeviceType, date::Date, dealer::protocol::Request,
+        spclient::SpClientResult, version,
     },
     model::SpircPlayStatus,
     protocol::{

@@ -12,7 +12,7 @@ use hyper::StatusCode;
 use tempfile::NamedTempFile;
 use tokio::sync::{mpsc, oneshot};
 
-use librespot_core::{http_client::HttpClient, session::Session, Error};
+use librespot_core::{Error, http_client::HttpClient, session::Session};
 
 use crate::range_set::{Range, RangeSet};
 

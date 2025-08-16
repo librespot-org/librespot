@@ -9,9 +9,9 @@ use crate::{
     },
     shuffle_vec::ShuffleVec,
     state::{
+        ConnectState, SPOTIFY_MAX_NEXT_TRACKS_SIZE, StateError,
         metadata::Metadata,
         provider::{IsProvider, Provider},
-        ConnectState, StateError, SPOTIFY_MAX_NEXT_TRACKS_SIZE,
     },
 };
 use protobuf::MessageField;

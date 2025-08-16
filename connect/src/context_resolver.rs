@@ -4,7 +4,7 @@ use crate::{
         autoplay_context_request::AutoplayContextRequest, context::Context,
         transfer_state::TransferState,
     },
-    state::{context::ContextType, ConnectState},
+    state::{ConnectState, context::ContextType},
 };
 use std::{
     cmp::PartialEq,

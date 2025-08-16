@@ -6,6 +6,7 @@ use std::{
 use uuid::Uuid;
 
 use crate::{
+    Album, Metadata, RequestResult,
     artist::{Artists, ArtistsWithRole},
     audio::file::AudioFiles,
     availability::Availabilities,
@@ -14,10 +15,9 @@ use crate::{
     restriction::Restrictions,
     sale_period::SalePeriods,
     util::{impl_deref_wrapped, impl_try_from_repeated},
-    Album, Metadata, RequestResult,
 };
 
-use librespot_core::{date::Date, Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyId, date::Date};
 use librespot_protocol as protocol;
 
 #[derive(Debug, Clone)]

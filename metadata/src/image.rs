@@ -8,11 +8,11 @@ use crate::util::{impl_deref_wrapped, impl_from_repeated, impl_try_from_repeated
 use librespot_core::{FileId, SpotifyId};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::image::Size as ImageSize;
 use protocol::metadata::Image as ImageMessage;
 use protocol::metadata::ImageGroup;
-use protocol::playlist4_external::PictureSize as PictureSizeMessage;
+pub use protocol::metadata::image::Size as ImageSize;
 use protocol::playlist_annotate3::TranscodedPicture as TranscodedPictureMessage;
+use protocol::playlist4_external::PictureSize as PictureSizeMessage;
 
 #[derive(Debug, Clone)]
 pub struct Image {

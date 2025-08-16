@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain stable  -y
       - run: cargo fmt --all -- --check
@@ -68,7 +68,7 @@ jobs:
         toolchain: [stable]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile default --default-toolchain ${{ matrix.toolchain }}  -y
@@ -79,7 +79,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry/index
@@ -109,7 +109,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         toolchain:
-          - "1.81" # MSRV (Minimum supported rust version)
+          - "1.85" # MSRV (Minimum supported rust version)
           - stable
         experimental: [false]
         # Ignore failures in beta
@@ -119,7 +119,7 @@ jobs:
             experimental: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -130,7 +130,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry/index
@@ -164,15 +164,11 @@ jobs:
       matrix:
         os: [windows-latest]
         toolchain:
-          - "1.81" # MSRV (Minimum supported rust version)
+          - "1.85" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
-    
-      # hyper-rustls >=0.27 uses aws-lc as default backend which requires NASM to build
-      - name: Install NASM
-        uses: ilammy/setup-nasm@v1.5.1
+        uses: actions/checkout@v5
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -183,7 +179,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry/index
@@ -210,16 +206,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        target: 
+        target:
           - armv7-unknown-linux-gnueabihf
           - aarch64-unknown-linux-gnu
           - riscv64gc-unknown-linux-gnu
         toolchain:
-          - "1.81" # MSRV (Minimum supported rust version)
+          - "1.85" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5
 
       - name: Install toolchain
         run: curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.toolchain }}  -y
@@ -230,7 +226,7 @@ jobs:
         shell: bash
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry/index
@@ -250,36 +246,36 @@ jobs:
 
       - name: Install cross compiler
         run: |
-            if [ ${{ matrix.target }} = "armv7-unknown-linux-gnueabihf" ]; then
-              sudo apt-get install -y gcc-arm-linux-gnueabihf
-            fi
-            if [ ${{ matrix.target }} = "aarch64-unknown-linux-gnu" ]; then
-              sudo apt-get install -y gcc-aarch64-linux-gnu
-            fi
-            if [ ${{ matrix.target }} = "riscv64gc-unknown-linux-gnu" ]; then
-              sudo apt-get install -y gcc-riscv64-linux-gnu
-            fi
-      
+          if [ ${{ matrix.target }} = "armv7-unknown-linux-gnueabihf" ]; then
+            sudo apt-get install -y gcc-arm-linux-gnueabihf
+          fi
+          if [ ${{ matrix.target }} = "aarch64-unknown-linux-gnu" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+          fi
+          if [ ${{ matrix.target }} = "riscv64gc-unknown-linux-gnu" ]; then
+            sudo apt-get install -y gcc-riscv64-linux-gnu
+          fi
+
       - name: Set target link compiler
         run: |
-            # Convert target to uppercase and replace - with _
-            target=${{ matrix.target }}
-            target=${target^^}  
-            target=${target//-/_}
-            if [ ${{ matrix.target }} = "armv7-unknown-linux-gnueabihf" ]; then
-              echo "CARGO_TARGET_${target}_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
-            fi
-            if [ ${{ matrix.target }} = "aarch64-unknown-linux-gnu" ]; then
-              echo "CARGO_TARGET_${target}_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-            fi
-            if [ ${{ matrix.target }} = "riscv64gc-unknown-linux-gnu" ]; then
-              echo "CARGO_TARGET_${target}_LINKER=riscv64-linux-gnu-gcc" >> $GITHUB_ENV
-            fi
-            
+          # Convert target to uppercase and replace - with _
+          target=${{ matrix.target }}
+          target=${target^^}
+          target=${target//-/_}
+          if [ ${{ matrix.target }} = "armv7-unknown-linux-gnueabihf" ]; then
+            echo "CARGO_TARGET_${target}_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV
+          fi
+          if [ ${{ matrix.target }} = "aarch64-unknown-linux-gnu" ]; then
+            echo "CARGO_TARGET_${target}_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          fi
+          if [ ${{ matrix.target }} = "riscv64gc-unknown-linux-gnu" ]; then
+            echo "CARGO_TARGET_${target}_LINKER=riscv64-linux-gnu-gcc" >> $GITHUB_ENV
+          fi
+
       - name: Fetch
         run: cargo fetch --locked
       - name: Build
         run: cargo build --frozen --verbose --target ${{ matrix.target }} --no-default-features
-      
+
       - name: Check binary
         run: file target/${{ matrix.target }}/debug/librespot

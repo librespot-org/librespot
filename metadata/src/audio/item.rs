@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use crate::{
+    Metadata,
     artist::ArtistsWithRole,
     availability::{AudioItemAvailability, Availabilities, UnavailabilityReason},
     episode::Episode,
@@ -8,13 +9,12 @@ use crate::{
     image::{ImageSize, Images},
     restriction::Restrictions,
     track::{Track, Tracks},
-    Metadata,
 };
 
 use super::file::AudioFiles;
 
 use librespot_core::{
-    date::Date, session::UserData, spotify_id::SpotifyItemType, Error, Session, SpotifyId,
+    Error, Session, SpotifyId, date::Date, session::UserData, spotify_id::SpotifyItemType,
 };
 
 pub type AudioItemResult = Result<AudioItem, Error>;

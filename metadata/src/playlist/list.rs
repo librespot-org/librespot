@@ -4,9 +4,9 @@ use std::{
 };
 
 use crate::{
+    Metadata,
     request::RequestResult,
     util::{impl_deref_wrapped, impl_from_repeated_copy, impl_try_from_repeated},
-    Metadata,
 };
 
 use super::{
@@ -15,9 +15,9 @@ use super::{
 };
 
 use librespot_core::{
+    Error, Session,
     date::Date,
     spotify_id::{NamedSpotifyId, SpotifyId},
-    Error, Session,
 };
 
 use librespot_protocol as protocol;
@@ -78,10 +78,7 @@ impl Playlist {
         let length = tracks.len();
         let expected_length = self.length as usize;
         if length != expected_length {
-            warn!(
-                "Got {} tracks, but the list should contain {} tracks.",
-                length, expected_length,
-            );
+            warn!("Got {length} tracks, but the list should contain {expected_length} tracks.",);
         }
 
         tracks

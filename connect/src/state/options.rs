@@ -2,9 +2,9 @@ use crate::{
     core::Error,
     protocol::player::ContextPlayerOptions,
     state::{
+        ConnectState, StateError,
         context::{ContextType, ResetContext},
         metadata::Metadata,
-        ConnectState, StateError,
     },
 };
 use protobuf::MessageField;
@@ -68,8 +68,8 @@ impl ConnectState {
         // we don't need to include the current track, because it is already being played
         ctx.skip_track = current_track;
 
-        let seed = seed
-            .unwrap_or_else(|| rand::thread_rng().gen_range(100_000_000_000..1_000_000_000_000));
+        let seed =
+            seed.unwrap_or_else(|| rand::rng().random_range(100_000_000_000..1_000_000_000_000));
 
         ctx.tracks.shuffle_with_seed(seed);
         ctx.set_shuffle_seed(seed);

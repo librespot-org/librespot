@@ -5,7 +5,7 @@ use crate::decoder::AudioPacket;
 use shell_words::split;
 
 use std::io::{ErrorKind, Write};
-use std::process::{exit, Child, Command, Stdio};
+use std::process::{Child, Command, Stdio, exit};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -68,11 +68,13 @@ pub struct SubprocessSink {
 impl Open for SubprocessSink {
     fn open(shell_command: Option<String>, format: AudioFormat) -> Self {
         if let Some("?") = shell_command.as_deref() {
-            println!("\nUsage:\n\nOutput to a Subprocess:\n\n\t--backend subprocess --device {{shell_command}}\n");
+            println!(
+                "\nUsage:\n\nOutput to a Subprocess:\n\n\t--backend subprocess --device {{shell_command}}\n"
+            );
             exit(0);
         }
 
-        info!("Using SubprocessSink with format: {:?}", format);
+        info!("Using SubprocessSink with format: {format:?}");
 
         Self {
             shell_command,
@@ -137,6 +139,7 @@ impl Sink for SubprocessSink {
 }
 
 impl SinkAsBytes for SubprocessSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         // We get one attempted restart per write.
         // We don't want to get stuck in a restart loop.

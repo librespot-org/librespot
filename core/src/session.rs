@@ -4,6 +4,7 @@ use std::{
     io,
     pin::Pin,
     process::exit,
+    sync::OnceLock,
     sync::{Arc, Weak},
     task::{Context, Poll},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -11,6 +12,7 @@ use std::{
 
 use crate::dealer::manager::DealerManager;
 use crate::{
+    Error,
     apresolve::{ApResolver, SocketAddress},
     audio_key::AudioKeyManager,
     authentication::Credentials,
@@ -25,7 +27,6 @@ use crate::{
     protocol::keyexchange::ErrorCode,
     spclient::SpClient,
     token::TokenProvider,
-    Error,
 };
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
@@ -33,14 +34,13 @@ use futures_core::TryStream;
 use futures_util::StreamExt;
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
-use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use pin_project_lite::pin_project;
 use quick_xml::events::Event;
 use thiserror::Error;
 use tokio::{
     sync::mpsc,
-    time::{sleep, Duration as TokioDuration, Instant as TokioInstant, Sleep},
+    time::{Duration as TokioDuration, Instant as TokioInstant, Sleep, sleep},
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
@@ -65,6 +65,12 @@ impl From<SessionError> for Error {
             SessionError::NotConnected => Error::unavailable(err),
             SessionError::Packet(_) => Error::unimplemented(err),
         }
+    }
+}
+
+impl From<quick_xml::encoding::EncodingError> for Error {
+    fn from(err: quick_xml::encoding::EncodingError) -> Self {
+        Error::invalid_argument(err)
     }
 }
 
@@ -96,16 +102,16 @@ struct SessionInternal {
     data: RwLock<SessionData>,
 
     http_client: HttpClient,
-    tx_connection: OnceCell<mpsc::UnboundedSender<(u8, Vec<u8>)>>,
+    tx_connection: OnceLock<mpsc::UnboundedSender<(u8, Vec<u8>)>>,
 
-    apresolver: OnceCell<ApResolver>,
-    audio_key: OnceCell<AudioKeyManager>,
-    channel: OnceCell<ChannelManager>,
-    mercury: OnceCell<MercuryManager>,
-    dealer: OnceCell<DealerManager>,
-    spclient: OnceCell<SpClient>,
-    token_provider: OnceCell<TokenProvider>,
-    login5: OnceCell<Login5Manager>,
+    apresolver: OnceLock<ApResolver>,
+    audio_key: OnceLock<AudioKeyManager>,
+    channel: OnceLock<ChannelManager>,
+    mercury: OnceLock<MercuryManager>,
+    dealer: OnceLock<DealerManager>,
+    spclient: OnceLock<SpClient>,
+    token_provider: OnceLock<TokenProvider>,
+    login5: OnceLock<Login5Manager>,
     cache: Option<Arc<Cache>>,
 
     handle: tokio::runtime::Handle,
@@ -140,16 +146,16 @@ impl Session {
             config,
             data: RwLock::new(session_data),
             http_client,
-            tx_connection: OnceCell::new(),
+            tx_connection: OnceLock::new(),
             cache: cache.map(Arc::new),
-            apresolver: OnceCell::new(),
-            audio_key: OnceCell::new(),
-            channel: OnceCell::new(),
-            mercury: OnceCell::new(),
-            dealer: OnceCell::new(),
-            spclient: OnceCell::new(),
-            token_provider: OnceCell::new(),
-            login5: OnceCell::new(),
+            apresolver: OnceLock::new(),
+            audio_key: OnceLock::new(),
+            channel: OnceLock::new(),
+            mercury: OnceLock::new(),
+            dealer: OnceLock::new(),
+            spclient: OnceLock::new(),
+            token_provider: OnceLock::new(),
+            login5: OnceLock::new(),
             handle: tokio::runtime::Handle::current(),
         }))
     }
@@ -267,7 +273,7 @@ impl Session {
         let session_weak = self.weak();
         tokio::spawn(async move {
             if let Err(e) = sender_task.await {
-                error!("{}", e);
+                error!("{e}");
                 if let Some(session) = session_weak.try_upgrade() {
                     if !session.is_invalid() {
                         session.shutdown();
@@ -354,7 +360,7 @@ impl Session {
     fn check_catalogue(attributes: &UserAttributes) {
         if let Some(account_type) = attributes.get("type") {
             if account_type != "premium" {
-                error!("librespot does not support {:?} accounts.", account_type);
+                error!("librespot does not support {account_type:?} accounts.");
                 info!("Please support Spotify and your artists and sign up for a premium account.");
 
                 // TODO: logout instead of exiting
@@ -560,7 +566,7 @@ impl KeepAliveState {
             .map(|t| t.as_secs_f64())
             .unwrap_or(f64::INFINITY);
 
-        trace!("keep-alive state: {:?}, timeout in {:.1}", self, delay);
+        trace!("keep-alive state: {self:?}, timeout in {delay:.1}");
     }
 }
 
@@ -613,7 +619,7 @@ where
         let cmd = match packet_type {
             Some(cmd) => cmd,
             None => {
-                trace!("Ignoring unknown packet {:x}", cmd);
+                trace!("Ignoring unknown packet {cmd:x}");
                 return Err(SessionError::Packet(cmd).into());
             }
         };
@@ -661,7 +667,7 @@ where
             }
             Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned())?;
-                info!("Country: {:?}", country);
+                info!("Country: {country:?}");
                 session.0.data.write().user_data.country = country;
                 Ok(())
             }
@@ -688,8 +694,10 @@ where
                         }
                         Ok(Event::Text(ref value)) => {
                             if !current_element.is_empty() {
-                                let _ = user_attributes
-                                    .insert(current_element.clone(), value.unescape()?.to_string());
+                                let _ = user_attributes.insert(
+                                    current_element.clone(),
+                                    value.xml_content()?.to_string(),
+                                );
                             }
                         }
                         Ok(Event::Eof) => break,
@@ -702,7 +710,7 @@ where
                     }
                 }
 
-                trace!("Received product info: {:#?}", user_attributes);
+                trace!("Received product info: {user_attributes:#?}");
                 Session::check_catalogue(&user_attributes);
 
                 session.0.data.write().user_data.attributes = user_attributes;
@@ -713,7 +721,7 @@ where
             | Some(UnknownDataAllZeros)
             | Some(LicenseVersion) => Ok(()),
             _ => {
-                trace!("Ignoring {:?} packet with data {:#?}", cmd, data);
+                trace!("Ignoring {cmd:?} packet with data {data:#?}");
                 Err(SessionError::Packet(cmd as u8).into())
             }
         }
@@ -741,7 +749,7 @@ where
                 Poll::Ready(Some(Ok((cmd, data)))) => {
                     let result = self.as_mut().dispatch(&session, cmd, data);
                     if let Err(e) = result {
-                        debug!("could not dispatch command: {}", e);
+                        debug!("could not dispatch command: {e}");
                     }
                 }
                 Poll::Ready(None) => {

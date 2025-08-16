@@ -10,7 +10,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 enum PulseError {
-    #[error("<PulseAudioSink> Unsupported Pulseaudio Sample Spec, Format {pulse_format:?} ({format:?}), Channels {channels}, Rate {rate}")]
+    #[error(
+        "<PulseAudioSink> Unsupported Pulseaudio Sample Spec, Format {pulse_format:?} ({format:?}), Channels {channels}, Rate {rate}"
+    )]
     InvalidSampleSpec {
         pulse_format: pulse::sample::Format,
         format: AudioFormat,
@@ -135,6 +137,7 @@ impl Sink for PulseAudioSink {
 }
 
 impl SinkAsBytes for PulseAudioSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         let sink = self.sink.as_mut().ok_or(PulseError::NotConnected)?;
 

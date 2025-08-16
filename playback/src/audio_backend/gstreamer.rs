@@ -1,7 +1,7 @@
 use gstreamer::{
+    State,
     event::{FlushStart, FlushStop},
     prelude::*,
-    State,
 };
 
 use gstreamer as gst;
@@ -14,7 +14,7 @@ use std::sync::Arc;
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 
 use crate::{
-    config::AudioFormat, convert::Converter, decoder::AudioPacket, NUM_CHANNELS, SAMPLE_RATE,
+    NUM_CHANNELS, SAMPLE_RATE, config::AudioFormat, convert::Converter, decoder::AudioPacket,
 };
 
 pub struct GstreamerSink {
@@ -171,6 +171,7 @@ impl Drop for GstreamerSink {
 }
 
 impl SinkAsBytes for GstreamerSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         if let Some(async_error) = &*self.async_error.lock() {
             return Err(SinkError::OnWrite(async_error.to_string()));
