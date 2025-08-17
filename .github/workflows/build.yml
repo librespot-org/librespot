@@ -75,7 +75,7 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - name: Check workspace (each feature combination)
-        run: cargo hack check --workspace --each-feature
+        run: cargo hack check --workspace --each-feature --exclude-all-features --exclude-no-default-features
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

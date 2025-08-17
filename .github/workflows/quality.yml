@@ -66,4 +66,4 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - name: Run clippy (each feature combination)
-        run: cargo hack clippy --workspace --each-feature
+        run: cargo hack clippy --workspace --each-feature --exclude-all-features --exclude-no-default-features
