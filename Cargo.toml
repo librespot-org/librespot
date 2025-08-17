@@ -10,7 +10,8 @@ repository = "https://github.com/librespot-org/librespot"
 readme = "README.md"
 edition = "2024"
 
-[workspace]
+[workspace.package]
+rust-version = "1.85"
 
 [lib]
 name = "librespot"
@@ -42,16 +43,16 @@ default-features = false
 path = "metadata"
 version = "0.6.0-dev"
 
+[dependencies.librespot-oauth]
+path = "oauth"
+version = "0.6.0-dev"
+
 [dependencies.librespot-playback]
 path = "playback"
 version = "0.6.0-dev"
 
 [dependencies.librespot-protocol]
 path = "protocol"
-version = "0.6.0-dev"
-
-[dependencies.librespot-oauth]
-path = "oauth"
 version = "0.6.0-dev"
 
 [dependencies]
@@ -78,6 +79,8 @@ tokio = { version = "1", features = [
 url = "2.2"
 
 [features]
+default = ["native-tls", "rodio-backend", "with-libmdns"]
+
 alsa-backend = ["librespot-playback/alsa-backend"]
 portaudio-backend = ["librespot-playback/portaudio-backend"]
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
@@ -93,9 +96,8 @@ with-libmdns = ["librespot-discovery/with-libmdns"]
 
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
-vendored-openssl = ["librespot-core/openssl", "librespot-oauth/openssl"]
-
-default = ["rodio-backend", "with-libmdns"]
+native-tls = ["librespot-core/native-tls", "librespot-oauth/native-tls"]
+rustls-tls = ["librespot-core/rustls-tls", "librespot-oauth/rustls-tls"]
 
 [package.metadata.deb]
 maintainer = "librespot-org"
@@ -126,6 +128,3 @@ assets = [
         "644",
     ],
 ]
-
-[workspace.package]
-rust-version = "1.85"

@@ -50,6 +50,9 @@ hex = "0.4"
 tokio = { version = "1", features = ["macros", "parking_lot", "rt"] }
 
 [features]
+native-tls = ["librespot-core/native-tls"]
+rustls-tls = ["librespot-core/rustls-tls"]
+
 with-avahi = ["zbus", "serde"]
 with-dns-sd = ["dns-sd"]
 with-libmdns = ["libmdns"]

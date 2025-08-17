@@ -40,7 +40,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         toolchain:
-          - "1.85"  # MSRV (Minimum supported rust version)
+          - "1.85" # MSRV (Minimum supported rust version)
           - stable
     steps:
       - name: Checkout code

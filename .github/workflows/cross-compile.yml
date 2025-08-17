@@ -61,7 +61,7 @@ jobs:
           args: >
             --locked --verbose${{
             matrix.platform.target == 'riscv64gc-unknown-linux-gnu' &&
-            ' --no-default-features --features vendored-openssl' || ''
+            ' --no-default-features --features rustls-tls' || ''
             }}
 
       - name: Upload artifacts

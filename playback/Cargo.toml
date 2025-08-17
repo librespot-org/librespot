@@ -68,6 +68,9 @@ rand = { version = "0.9", features = ["small_rng"] }
 rand_distr = "0.5"
 
 [features]
+native-tls = ["librespot-core/native-tls", "librespot-audio/native-tls", "librespot-metadata/native-tls"]
+rustls-tls = ["librespot-core/rustls-tls", "librespot-audio/rustls-tls", "librespot-metadata/rustls-tls"]
+
 alsa-backend = ["alsa"]
 portaudio-backend = ["portaudio-rs"]
 pulseaudio-backend = ["libpulse-binding", "libpulse-simple-binding"]

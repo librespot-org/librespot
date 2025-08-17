@@ -9,9 +9,26 @@ license = "MIT"
 repository = "https://github.com/librespot-org/librespot"
 edition = "2021"
 
+[features]
+default = []
+
+rustls-tls = [
+    "dep:hyper-rustls",
+    "hyper-proxy2/rustls",
+    "librespot-oauth/rustls-tls",
+    "tokio-tungstenite/__rustls-tls",
+]
+native-tls = [
+    "dep:hyper-tls",
+    "hyper-proxy2/tls",
+    "librespot-oauth/native-tls",
+    "tokio-tungstenite/native-tls",
+]
+
 [dependencies.librespot-oauth]
 path = "../oauth"
 version = "0.6.0-dev"
+default-features = false
 
 [dependencies.librespot-protocol]
 path = "../protocol"
@@ -41,16 +58,27 @@ httparse = "1.10"
 http = "1.3"
 http-body-util = "0.1"
 hyper = { version = "1.6", features = ["http1", "http2"] }
-hyper-proxy2 = "0.1"
-hyper-tls = "0.6"
-hyper-util = { version = "0.1", features = ["client", "http2"] }
+hyper-proxy2 = { version = "0.1", default-features = false }
+hyper-tls = { version = "0.6", optional = true }
+hyper-rustls = { version = "0.27", default-features = false, features = [
+    "http1",
+    "http2", 
+    "ring",
+    "rustls-platform-verifier",
+    "tls12",
+    "webpki-tokio",
+], optional = true }
+hyper-util = { version = "0.1", default-features = false, features = [
+    "client",
+    "http1",
+    "http2",
+] }
 log = "0.4"
 nonzero_ext = "0.3"
 num-bigint = "0.4"
 num-derive = "0.4"
 num-integer = "0.1"
 num-traits = "0.2"
-openssl = { version = "0.10", optional = true, features = ["vendored"] }
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 pin-project-lite = "0.2"
@@ -77,9 +105,7 @@ tokio = { version = "1", features = [
     "time",
 ] }
 tokio-stream = "0.1"
-tokio-tungstenite = { version = "0.27", default-features = false, features = [
-    "native-tls",
-] }
+tokio-tungstenite = { version = "0.27", default-features = false }
 tokio-util = { version = "0.7", features = ["codec"] }
 url = "2"
 uuid = { version = "1", default-features = false, features = ["v4"] }

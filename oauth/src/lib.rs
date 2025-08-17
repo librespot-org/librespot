@@ -11,22 +11,25 @@
 //! a spawned http server (mimicking Spotify's client), or manually via stdin. The latter
 //! is appropriate for headless systems.
 
-use log::{error, info, trace};
-use oauth2::basic::BasicTokenType;
-use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, CsrfToken, EndpointNotSet, EndpointSet,
-    PkceCodeChallenge, RedirectUrl, Scope, TokenResponse, TokenUrl, basic::BasicClient,
-};
-use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, RefreshToken, StandardTokenResponse};
-use std::io;
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
 use std::{
-    io::{BufRead, BufReader, Write},
+    io::{self, BufRead, BufReader, Write},
     net::{SocketAddr, TcpListener},
+    sync::mpsc,
+    time::{Duration, Instant},
 };
+
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, CsrfToken, EmptyExtraTokenFields, EndpointNotSet,
+    EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
+    StandardTokenResponse, TokenResponse, TokenUrl, basic::BasicClient, basic::BasicTokenType,
+};
+
+use log::{error, info, trace};
 use thiserror::Error;
 use url::Url;
+
+#[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+compile_error!("Either feature \"native-tls\" or \"rustls-tls\" must be enabled for this crate.");
 
 /// Possible errors encountered during the OAuth authentication flow.
 #[derive(Debug, Error)]
