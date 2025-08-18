@@ -184,11 +184,10 @@ passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
 [package.metadata.deb]
 maintainer = "Librespot Organization <noreply@github.com>"
-copyright = "2018 Paul Liétar"
+copyright = "2015, Paul Liétar"
 license-file = ["LICENSE", "4"]
 depends = "$auto"
 recommends = "avahi-daemon"
-suggests = "pulseaudio | alsa-utils"
 extended-description = """\
 librespot is an open source client library for Spotify. It enables applications \
 to use Spotify's service to control and play music via various backends, and to \
@@ -197,19 +196,15 @@ deprecated closed-source libspotify. Additionally, it provides extra features \
 which are not available in the official library.
 .
 This package provides the librespot binary for headless Spotify Connect playback. \
-It supports various audio backends including ALSA, PulseAudio, and others.
 .
 Note: librespot only works with Spotify Premium accounts."""
 section = "sound"
 priority = "optional"
-changelog = "debian/changelog"
 assets = [
     # Main binary
     ["target/release/librespot", "usr/bin/", "755"],
     # Documentation
     ["README.md", "usr/share/doc/librespot/", "644"],
-    ["COMPILING.md", "usr/share/doc/librespot/", "644"],
-    ["CONTRIBUTING.md", "usr/share/doc/librespot/", "644"],
     # Systemd services
     ["contrib/librespot.service", "lib/systemd/system/", "644"],
     ["contrib/librespot.user.service", "lib/systemd/user/", "644"],
