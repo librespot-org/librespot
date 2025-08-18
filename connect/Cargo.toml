@@ -4,11 +4,23 @@ version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
 license.workspace = true
-description = "The discovery and Spotify Connect logic for librespot"
+description = "The Spotify Connect logic for librespot"
 repository.workspace = true
 edition.workspace = true
 
+[features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["native-tls"]
+
+# TLS backend propagation
+native-tls = ["librespot-core/native-tls", "librespot-playback/native-tls"]
+rustls-tls = ["librespot-core/rustls-tls", "librespot-playback/rustls-tls"]
+
 [dependencies]
+librespot-core.workspace = true
+librespot-playback.workspace = true
+librespot-protocol.workspace = true
+
 futures-util = "0.3"
 log = "0.4"
 protobuf = "3.7"
@@ -18,20 +30,3 @@ thiserror = "2"
 tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }
 tokio-stream = "0.1"
 uuid = { version = "1.18", features = ["v4"] }
-
-[dependencies.librespot-core]
-path = "../core"
-version = "0.6.0-dev"
-
-[dependencies.librespot-playback]
-path = "../playback"
-version = "0.6.0-dev"
-
-[dependencies.librespot-protocol]
-path = "../protocol"
-version = "0.6.0-dev"
-
-[features]
-# TLS backend propagation
-native-tls = ["librespot-core/native-tls", "librespot-playback/native-tls"]
-rustls-tls = ["librespot-core/rustls-tls", "librespot-playback/rustls-tls"]

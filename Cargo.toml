@@ -1,11 +1,3 @@
-[workspace.package]
-version = "0.6.0-dev"
-rust-version = "1.85"
-authors = ["Librespot Org"]
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2024"
-
 [package]
 name = "librespot"
 version.workspace = true
@@ -35,70 +27,13 @@ include = [
     "CONTRIBUTING.md",
 ]
 
-[lib]
-name = "librespot"
-path = "src/lib.rs"
-
-[[bin]]
-name = "librespot"
-path = "src/main.rs"
-doc = false
-
-[dependencies.librespot-audio]
-path = "audio"
+[workspace.package]
 version = "0.6.0-dev"
-
-[dependencies.librespot-connect]
-path = "connect"
-version = "0.6.0-dev"
-
-[dependencies.librespot-core]
-path = "core"
-version = "0.6.0-dev"
-
-[dependencies.librespot-discovery]
-path = "discovery"
-version = "0.6.0-dev"
-default-features = false
-
-[dependencies.librespot-metadata]
-path = "metadata"
-version = "0.6.0-dev"
-
-[dependencies.librespot-oauth]
-path = "oauth"
-version = "0.6.0-dev"
-
-[dependencies.librespot-playback]
-path = "playback"
-version = "0.6.0-dev"
-
-[dependencies.librespot-protocol]
-path = "protocol"
-version = "0.6.0-dev"
-
-[dependencies]
-data-encoding = "2.5"
-env_logger = { version = "0.11.2", default-features = false, features = [
-    "color",
-    "humantime",
-    "auto-color",
-] }
-futures-util = { version = "0.3", default-features = false }
-getopts = "0.2"
-log = "0.4"
-sha1 = "0.10"
-sysinfo = { version = "0.36", default-features = false, features = ["system"] }
-thiserror = "2"
-tokio = { version = "1", features = [
-    "rt",
-    "macros",
-    "signal",
-    "sync",
-    "parking_lot",
-    "process",
-] }
-url = "2.2"
+rust-version = "1.85"
+authors = ["Librespot Org"]
+license = "MIT"
+repository = "https://github.com/librespot-org/librespot"
+edition = "2024"
 
 [features]
 default = ["native-tls", "rodio-backend", "with-libmdns"]
@@ -109,16 +44,17 @@ default = ["native-tls", "rodio-backend", "with-libmdns"]
 
 # native-tls: Uses the system's native TLS stack (OpenSSL on Linux, Secure Transport on macOS,
 # SChannel on Windows). This is the default as it's well-tested, widely compatible, and integrates
-# with system certificate stores. Choose this for maximum compatibility and when you want to use system-managed certificates.
+# with system certificate stores. Choose this for maximum compatibility and when you want to use
+# system-managed certificates.
 native-tls = ["librespot-core/native-tls", "librespot-oauth/native-tls"]
 
 # rustls-tls: Uses the Rust-based rustls TLS implementation with platform certificate verification.
 # This provides a Rust TLS stack (with assembly optimizations) that uses rustls-platform-verifier to
-# automatically select the appropriate certificate authority (CA) certificates from your system's trust
-# store. Choose this for avoiding external OpenSSL dependencies, reproducible builds, or when targeting
-# platforms where native TLS dependencies are unavailable or problematic (musl, embedded, static linking).
-# On Linux it uses ca-certificates, on macOS it uses Security.framework, and on Windows it uses the
-# Windows certificate store.
+# automatically select the appropriate certificate authority (CA) certificates from your system's
+# trust store. Choose this for avoiding external OpenSSL dependencies, reproducible builds, or when
+# targeting platforms where native TLS dependencies are unavailable or problematic (musl, embedded,
+# static linking). On Linux it uses ca-certificates, on macOS it uses Security.framework, and on
+# Windows it uses the Windows certificate store.
 rustls-tls = ["librespot-core/rustls-tls", "librespot-oauth/rustls-tls"]
 
 # Audio backends - see README.md for audio backend selection guide
@@ -182,6 +118,57 @@ with-dns-sd = ["librespot-discovery/with-dns-sd"]
 # externally. When enabled, audio is not decoded by librespot but passed through as raw Ogg Vorbis
 # data.
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
+
+[lib]
+name = "librespot"
+path = "src/lib.rs"
+
+[[bin]]
+name = "librespot"
+path = "src/main.rs"
+doc = false
+
+[workspace.dependencies]
+librespot-audio = { path = "audio", default-features = false }
+librespot-connect = { path = "connect", default-features = false }
+librespot-core = { path = "core", default-features = false }
+librespot-discovery = { path = "discovery", default-features = false }
+librespot-metadata = { path = "metadata", default-features = false }
+librespot-oauth = { path = "oauth", default-features = false }
+librespot-playback = { path = "playback", default-features = false }
+librespot-protocol = { path = "protocol", default-features = false }
+
+[dependencies]
+librespot-audio.workspace = true
+librespot-connect.workspace = true
+librespot-core.workspace = true
+librespot-discovery.workspace = true
+librespot-metadata.workspace = true
+librespot-oauth.workspace = true
+librespot-playback.workspace = true
+librespot-protocol.workspace = true
+
+data-encoding = "2.5"
+env_logger = { version = "0.11.2", default-features = false, features = [
+    "color",
+    "humantime",
+    "auto-color",
+] }
+futures-util = { version = "0.3", default-features = false }
+getopts = "0.2"
+log = "0.4"
+sha1 = "0.10"
+sysinfo = { version = "0.36", default-features = false, features = ["system"] }
+thiserror = "2"
+tokio = { version = "1", features = [
+    "rt",
+    "macros",
+    "signal",
+    "sync",
+    "parking_lot",
+    "process",
+] }
+url = "2.2"
 
 [package.metadata.deb]
 maintainer = "Librespot Organization <noreply@github.com>"

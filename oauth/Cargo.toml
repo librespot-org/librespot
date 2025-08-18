@@ -9,6 +9,9 @@ repository.workspace = true
 edition.workspace = true
 
 [features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["native-tls"]
+
 # TLS backends (mutually exclusive - compile-time checks in src/lib.rs)
 native-tls = ["oauth2/native-tls", "reqwest/native-tls"]
 rustls-tls = ["oauth2/rustls-tls", "reqwest/rustls-tls"]

@@ -8,25 +8,26 @@ description = "The audio fetching logic for librespot"
 repository.workspace = true
 edition.workspace = true
 
-[dependencies.librespot-core]
-path = "../core"
-version = "0.6.0-dev"
+[features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["native-tls"]
+
+# TLS backend propagation
+native-tls = ["librespot-core/native-tls"]
+rustls-tls = ["librespot-core/rustls-tls"]
 
 [dependencies]
+librespot-core.workspace = true
+
 aes = "0.8"
 bytes = "1"
 ctr = "0.9"
 futures-util = "0.3"
+http-body-util = "0.1"
 hyper = { version = "1.6", features = ["http1", "http2"] }
 hyper-util = { version = "0.1", features = ["client", "http2"] }
-http-body-util = "0.1"
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 tempfile = "3"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }
-
-[features]
-# TLS backend propagation
-native-tls = ["librespot-core/native-tls"]
-rustls-tls = ["librespot-core/rustls-tls"]

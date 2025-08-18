@@ -2013,7 +2013,6 @@ dependencies = [
  "alsa",
  "cpal",
  "futures-util",
- "glib",
  "gstreamer",
  "gstreamer-app",
  "gstreamer-audio",
