@@ -162,7 +162,7 @@ impl StreamLoaderController {
     }
 
     pub fn range_available(&self, range: Range) -> bool {
-        let available = if let Some(ref shared) = self.stream_shared {
+        if let Some(ref shared) = self.stream_shared {
             let download_status = shared.download_status.lock();
 
             range.length
@@ -171,9 +171,7 @@ impl StreamLoaderController {
                     .contained_length_from_value(range.start)
         } else {
             range.length <= self.len() - range.start
-        };
-
-        available
+        }
     }
 
     pub fn range_to_end_available(&self) -> bool {
@@ -397,12 +395,12 @@ impl AudioFile {
 
     pub fn get_stream_loader_controller(&self) -> Result<StreamLoaderController, Error> {
         let controller = match self {
-            AudioFile::Streaming(ref stream) => StreamLoaderController {
+            AudioFile::Streaming(stream) => StreamLoaderController {
                 channel_tx: Some(stream.stream_loader_command_tx.clone()),
                 stream_shared: Some(stream.shared.clone()),
                 file_size: stream.shared.file_size,
             },
-            AudioFile::Cached(ref file) => StreamLoaderController {
+            AudioFile::Cached(file) => StreamLoaderController {
                 channel_tx: None,
                 stream_shared: None,
                 file_size: file.metadata()?.len() as usize,

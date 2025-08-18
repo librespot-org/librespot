@@ -81,7 +81,7 @@ impl MappedCtrl for VolumeCtrl {
 
     fn set_db_range(&mut self, new_db_range: f64) {
         match self {
-            Self::Cubic(ref mut db_range) | Self::Log(ref mut db_range) => *db_range = new_db_range,
+            Self::Cubic(db_range) | Self::Log(db_range) => *db_range = new_db_range,
             _ => error!("Invalid to set dB range for volume control type {self:?}"),
         }
 
