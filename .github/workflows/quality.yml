@@ -65,12 +65,15 @@ jobs:
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
-      - name: Run clippy (each feature combination)
-        run: |
-          # Test packages that don't require TLS
-          cargo hack clippy -p librespot-protocol --each-feature
-          # Test workspace root with each TLS option
-          cargo hack clippy -p librespot --each-feature --exclude-all-features \
-            --include-features native-tls --exclude-features rustls-tls
-          cargo hack clippy -p librespot --each-feature --exclude-all-features \
-            --include-features rustls-tls --exclude-features native-tls
+      - name: Run clippy on packages without TLS requirements
+        run: cargo hack clippy -p librespot-protocol --each-feature
+
+      - name: Run clippy with native-tls
+        run: >
+          cargo hack clippy -p librespot --each-feature --exclude-all-features
+          --include-features native-tls --exclude-features rustls-tls
+
+      - name: Run clippy with rustls-tls
+        run: >
+          cargo hack clippy -p librespot --each-feature --exclude-all-features
+          --include-features rustls-tls --exclude-features native-tls

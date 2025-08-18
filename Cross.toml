@@ -6,10 +6,7 @@ pre-build = [
 ]
 
 [target.riscv64gc-unknown-linux-gnu]
-# RISC-V: Try system packages first, fall back to vendored OpenSSL via feature flag
-# Building with --no-default-features to avoid Rodio (which needs ALSA)
-pre-build = [
-    "dpkg --add-architecture $CROSS_DEB_ARCH",
-    "apt-get update",
-    "apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH || true",
-]
+# RISC-V: Uses rustls-tls (no system dependencies needed)
+# Building with --no-default-features --features rustls-tls
+# No pre-build steps required - rustls is pure Rust
+pre-build = []

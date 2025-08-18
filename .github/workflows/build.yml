@@ -74,15 +74,18 @@ jobs:
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
-      - name: Check workspace (each feature combination)
-        run: |
-          # Test packages that don't require TLS
-          cargo hack check -p librespot-protocol --each-feature
-          # Test workspace root with each TLS option
-          cargo hack check -p librespot --each-feature --exclude-all-features \
-            --include-features native-tls --exclude-features rustls-tls
-          cargo hack check -p librespot --each-feature --exclude-all-features \
-            --include-features rustls-tls --exclude-features native-tls
+      - name: Check packages without TLS requirements
+        run: cargo hack check -p librespot-protocol --each-feature
+
+      - name: Check workspace with native-tls
+        run: >
+          cargo hack check -p librespot --each-feature --exclude-all-features
+          --include-features native-tls --exclude-features rustls-tls
+
+      - name: Check workspace with rustls-tls
+        run: >
+          cargo hack check -p librespot --each-feature --exclude-all-features
+          --include-features rustls-tls --exclude-features native-tls
 
       - name: Build binary with default features
         run: cargo build --frozen
