@@ -29,13 +29,13 @@ use thiserror::Error;
 use url::Url;
 
 // TLS Feature Validation
-// 
+//
 // These compile-time checks are placed in the oauth crate rather than core for a specific reason:
 // oauth is at the bottom of the dependency tree (even librespot-core depends on librespot-oauth),
 // which means it gets compiled first. This ensures TLS feature conflicts are detected early in
 // the build process, providing immediate feedback to users rather than failing later during
 // core compilation.
-// 
+//
 // The dependency chain is: workspace -> core -> oauth
 // So oauth's feature validation runs before core's, catching configuration errors quickly.
 
