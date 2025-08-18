@@ -82,7 +82,7 @@ This is the **default choice** and provides the best compatibility. It integrate
 - You want maximum compatibility
 - You're using system-managed certificates
 - You're on a standard Linux distribution with OpenSSL
-- You're deploying on servers where OpenSSL is already present
+- You're deploying on platforms where OpenSSL is already present
 
 **Dependencies:**
 On Debian/Ubuntu:
@@ -154,7 +154,7 @@ You will most likely want to build debug builds when developing, as they compile
 
 There are also a number of compiler feature flags that you can add, in the event that you want to have certain additional features also compiled. All available features and their descriptions are documented in the main [Cargo.toml](Cargo.toml) file. Additional platform-specific information is available on the [wiki](https://github.com/librespot-org/librespot/wiki/Compiling#addition-features).
 
-By default, librespot compiles with the ```native-tls```, ```rodio-backend```, and ```with-libmdns``` features. 
+By default, librespot compiles with the ```native-tls```, ```rodio-backend```, and ```with-libmdns``` features.
 
 **Note:** librespot requires at least one TLS backend to function. Building with `--no-default-features` alone will fail compilation. For custom feature selection, you must specify at least one TLS backend along with your desired audio and discovery backends.
 For example, to build with the ALSA audio, libmdns discovery, and native-tls backends:
