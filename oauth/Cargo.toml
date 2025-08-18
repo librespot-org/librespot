@@ -1,14 +1,15 @@
 [package]
 name = "librespot-oauth"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Nick Steel <nick@nsteel.co.uk>"]
+license.workspace = true
 description = "OAuth authorization code flow with PKCE for obtaining a Spotify access token"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
 
 [features]
+# TLS backends (mutually exclusive - compile-time checks in src/lib.rs)
 native-tls = ["oauth2/native-tls", "reqwest/native-tls"]
 rustls-tls = ["oauth2/rustls-tls", "reqwest/rustls-tls"]
 

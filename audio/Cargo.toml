@@ -1,12 +1,12 @@
 [package]
 name = "librespot-audio"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
+license.workspace = true
 description = "The audio fetching logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
 
 [dependencies.librespot-core]
 path = "../core"
@@ -27,5 +27,6 @@ thiserror = "2"
 tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }
 
 [features]
+# TLS backend propagation
 native-tls = ["librespot-core/native-tls"]
 rustls-tls = ["librespot-core/rustls-tls"]

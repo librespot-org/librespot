@@ -1,15 +1,16 @@
 [package]
 name = "librespot-core"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
-build = "build.rs"
+license.workspace = true
 description = "The core functionality provided by librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
+build = "build.rs"
 
 [features]
+# TLS backends (mutually exclusive - see oauth/src/lib.rs for compile-time checks)
 native-tls = [
     "dep:hyper-tls",
     "hyper-proxy2/tls",

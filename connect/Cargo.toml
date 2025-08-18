@@ -1,12 +1,12 @@
 [package]
 name = "librespot-connect"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
+license.workspace = true
 description = "The discovery and Spotify Connect logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
 
 [dependencies]
 futures-util = "0.3"
@@ -32,5 +32,6 @@ path = "../protocol"
 version = "0.6.0-dev"
 
 [features]
+# TLS backend propagation
 native-tls = ["librespot-core/native-tls", "librespot-playback/native-tls"]
 rustls-tls = ["librespot-core/rustls-tls", "librespot-playback/rustls-tls"]

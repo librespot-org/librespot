@@ -1,12 +1,12 @@
 [package]
 name = "librespot-discovery"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
+license.workspace = true
 description = "The discovery logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
 
 [dependencies]
 aes = "0.8"
@@ -50,11 +50,13 @@ hex = "0.4"
 tokio = { version = "1", features = ["macros", "parking_lot", "rt"] }
 
 [features]
+default = ["with-libmdns"]
+
+# TLS backend propagation
 native-tls = ["librespot-core/native-tls"]
 rustls-tls = ["librespot-core/rustls-tls"]
 
+# Discovery backends
 with-avahi = ["zbus", "serde"]
 with-dns-sd = ["dns-sd"]
 with-libmdns = ["libmdns"]
-
-default = ["with-libmdns"]

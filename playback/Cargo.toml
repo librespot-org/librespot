@@ -1,12 +1,12 @@
 [package]
 name = "librespot-playback"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
+license.workspace = true
 description = "The audio playback logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
 
 [dependencies.librespot-audio]
 path = "../audio"
@@ -68,9 +68,11 @@ rand = { version = "0.9", features = ["small_rng"] }
 rand_distr = "0.5"
 
 [features]
+# TLS backend propagation
 native-tls = ["librespot-core/native-tls", "librespot-audio/native-tls", "librespot-metadata/native-tls"]
 rustls-tls = ["librespot-core/rustls-tls", "librespot-audio/rustls-tls", "librespot-metadata/rustls-tls"]
 
+# Audio backends
 alsa-backend = ["alsa"]
 portaudio-backend = ["portaudio-rs"]
 pulseaudio-backend = ["libpulse-binding", "libpulse-simple-binding"]
@@ -80,4 +82,5 @@ rodiojack-backend = ["rodio", "cpal/jack"]
 sdl-backend = ["sdl2"]
 gstreamer-backend = ["gstreamer", "gstreamer-app", "gstreamer-audio"]
 
+# Audio decoder features
 passthrough-decoder = ["ogg"]

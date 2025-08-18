@@ -62,12 +62,14 @@ SDL
 Pipe
 Subprocess
 ```
-Please check the corresponding [Compiling](https://github.com/librespot-org/librespot/wiki/Compiling#general-dependencies) entry on the wiki for backend specific dependencies.
+Please check [COMPILING.md](COMPILING.md) for detailed information on TLS, audio, and discovery backend dependencies, or the [Compiling](https://github.com/librespot-org/librespot/wiki/Compiling#general-dependencies) entry on the wiki for additional backend specific dependencies.
 
-Once you've installed the dependencies and cloned this repository you can build *librespot* with the default backend using Cargo.
+Once you've installed the dependencies and cloned this repository you can build *librespot* with the default features using Cargo.
 ```shell
 cargo build --release
 ```
+
+By default, this builds with native-tls (system TLS), rodio audio backend, and libmdns discovery. See [COMPILING.md](COMPILING.md) for information on selecting different TLS, audio, and discovery backends.
 
 # Packages
 

@@ -1,12 +1,12 @@
 [package]
 name = "librespot-metadata"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
+license.workspace = true
 description = "The metadata logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
 
 [dependencies]
 async-trait = "0.1"
@@ -27,5 +27,6 @@ path = "../protocol"
 version = "0.6.0-dev"
 
 [features]
+# TLS backend propagation
 native-tls = ["librespot-core/native-tls"]
 rustls-tls = ["librespot-core/rustls-tls"]
