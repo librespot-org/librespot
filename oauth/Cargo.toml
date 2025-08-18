@@ -9,8 +9,6 @@ repository = "https://github.com/librespot-org/librespot"
 edition = "2021"
 
 [features]
-default = []
-
 native-tls = ["oauth2/native-tls", "reqwest/native-tls"]
 rustls-tls = ["oauth2/rustls-tls", "reqwest/rustls-tls"]
 

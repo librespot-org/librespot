@@ -3,12 +3,6 @@ extern crate log;
 
 use librespot_protocol as protocol;
 
-#[cfg(all(feature = "native-tls", feature = "rustls-tls"))]
-compile_error!("Features 'native-tls' and 'rustls-tls' are mutually exclusive. Enable only one.");
-
-#[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
-compile_error!("Either feature \"native-tls\" or \"rustls-tls\" must be enabled for this crate.");
-
 #[macro_use]
 mod component;
 

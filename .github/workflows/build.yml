@@ -78,11 +78,16 @@ jobs:
         run: |
           # Test packages that don't require TLS
           cargo hack check -p librespot-protocol --each-feature
-          # Test workspace root with each TLS option (covers all workspace dependencies)
-          cargo hack check -p librespot --each-feature --exclude-all-features --include-features native-tls --exclude-features rustls-tls
-          cargo hack check -p librespot --each-feature --exclude-all-features --include-features rustls-tls --exclude-features native-tls
+          # Test workspace root with each TLS option
+          cargo hack check -p librespot --each-feature --exclude-all-features \
+            --include-features native-tls --exclude-features rustls-tls
+          cargo hack check -p librespot --each-feature --exclude-all-features \
+            --include-features rustls-tls --exclude-features native-tls
 
-      - name: Upload artifacts
+      - name: Build binary with default features
+        run: cargo build --frozen
+
+      - name: Upload debug artifacts
         uses: actions/upload-artifact@v4
         with:
           name: librespot-${{ matrix.os }}-${{ matrix.toolchain }}

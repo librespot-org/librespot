@@ -28,8 +28,13 @@ use log::{error, info, trace};
 use thiserror::Error;
 use url::Url;
 
+#[cfg(all(feature = "native-tls", feature = "rustls-tls"))]
+compile_error!("Features 'native-tls' and 'rustls-tls' are mutually exclusive. Enable only one.");
+
 #[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
-compile_error!("Either feature \"native-tls\" or \"rustls-tls\" must be enabled for this crate.");
+compile_error!(
+    "Either feature \"native-tls\" (default) or \"rustls-tls\" must be enabled for this crate."
+);
 
 /// Possible errors encountered during the OAuth authentication flow.
 #[derive(Debug, Error)]

@@ -10,25 +10,22 @@ repository = "https://github.com/librespot-org/librespot"
 edition = "2021"
 
 [features]
-default = []
-
-rustls-tls = [
-    "dep:hyper-rustls",
-    "hyper-proxy2/rustls",
-    "librespot-oauth/rustls-tls",
-    "tokio-tungstenite/__rustls-tls",
-]
 native-tls = [
     "dep:hyper-tls",
     "hyper-proxy2/tls",
     "librespot-oauth/native-tls",
     "tokio-tungstenite/native-tls",
 ]
+rustls-tls = [
+    "dep:hyper-rustls",
+    "hyper-proxy2/rustls",
+    "librespot-oauth/rustls-tls",
+    "tokio-tungstenite/__rustls-tls",
+]
 
 [dependencies.librespot-oauth]
 path = "../oauth"
 version = "0.6.0-dev"
-default-features = false
 
 [dependencies.librespot-protocol]
 path = "../protocol"
@@ -62,7 +59,7 @@ hyper-proxy2 = { version = "0.1", default-features = false }
 hyper-tls = { version = "0.6", optional = true }
 hyper-rustls = { version = "0.27", default-features = false, features = [
     "http1",
-    "http2", 
+    "http2",
     "ring",
     "rustls-platform-verifier",
     "tls12",
