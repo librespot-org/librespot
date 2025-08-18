@@ -104,6 +104,7 @@ url = "2.2"
 default = ["native-tls", "rodio-backend", "with-libmdns"]
 
 # TLS backends (mutually exclusive - compile-time checks in oauth/src/lib.rs)
+# Note: Feature validation is in oauth crate since it's compiled first in the dependency tree.
 # See COMPILING.md for more details on TLS backend selection.
 
 # native-tls: Uses the system's native TLS stack (OpenSSL on Linux, Secure Transport on macOS,

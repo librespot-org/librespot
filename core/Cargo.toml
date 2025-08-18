@@ -11,6 +11,7 @@ build = "build.rs"
 
 [features]
 # TLS backends (mutually exclusive - see oauth/src/lib.rs for compile-time checks)
+# Note: Validation is in oauth since it's compiled first in the dependency tree.
 native-tls = [
     "dep:hyper-tls",
     "hyper-proxy2/tls",
