@@ -65,7 +65,6 @@ hyper-rustls = { version = "0.27", default-features = false, features = [
     "ring",
     "rustls-platform-verifier",
     "tls12",
-    "webpki-tokio",
 ], optional = true }
 hyper-util = { version = "0.1", default-features = false, features = [
     "client",
