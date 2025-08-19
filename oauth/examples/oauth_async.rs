@@ -42,7 +42,7 @@ async fn main() {
     {
         Ok(client) => client,
         Err(err) => {
-            eprintln!("Unable to build an OAuth client: {}", err);
+            eprintln!("Unable to build an OAuth client: {err}");
             return;
         }
     };

@@ -11,22 +11,41 @@
 //! a spawned http server (mimicking Spotify's client), or manually via stdin. The latter
 //! is appropriate for headless systems.
 
-use log::{error, info, trace};
-use oauth2::basic::BasicTokenType;
-use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, CsrfToken, EndpointNotSet, EndpointSet,
-    PkceCodeChallenge, RedirectUrl, Scope, TokenResponse, TokenUrl, basic::BasicClient,
-};
-use oauth2::{EmptyExtraTokenFields, PkceCodeVerifier, RefreshToken, StandardTokenResponse};
-use std::io;
-use std::sync::mpsc;
-use std::time::{Duration, Instant};
 use std::{
-    io::{BufRead, BufReader, Write},
+    io::{self, BufRead, BufReader, Write},
     net::{SocketAddr, TcpListener},
+    sync::mpsc,
+    time::{Duration, Instant},
 };
+
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, CsrfToken, EmptyExtraTokenFields, EndpointNotSet,
+    EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
+    StandardTokenResponse, TokenResponse, TokenUrl, basic::BasicClient, basic::BasicTokenType,
+};
+
+use log::{error, info, trace};
 use thiserror::Error;
 use url::Url;
+
+// TLS Feature Validation
+//
+// These compile-time checks are placed in the oauth crate rather than core for a specific reason:
+// oauth is at the bottom of the dependency tree (even librespot-core depends on librespot-oauth),
+// which means it gets compiled first. This ensures TLS feature conflicts are detected early in
+// the build process, providing immediate feedback to users rather than failing later during
+// core compilation.
+//
+// The dependency chain is: workspace -> core -> oauth
+// So oauth's feature validation runs before core's, catching configuration errors quickly.
+
+#[cfg(all(feature = "native-tls", feature = "rustls-tls"))]
+compile_error!("Features 'native-tls' and 'rustls-tls' are mutually exclusive. Enable only one.");
+
+#[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+compile_error!(
+    "Either feature \"native-tls\" (default) or \"rustls-tls\" must be enabled for this crate."
+);
 
 /// Possible errors encountered during the OAuth authentication flow.
 #[derive(Debug, Error)]

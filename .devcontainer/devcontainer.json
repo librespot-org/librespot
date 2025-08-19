@@ -1,24 +1,20 @@
 {
   "name": "Librespot Devcontainer",
   "dockerFile": "Dockerfile.alpine",
-	// Use 'postCreateCommand' to run commands after the container is created.
-	//"postCreateCommand": "",
-	"customizations": {
-		// Configure properties specific to VS Code.
-		"vscode": {
-			"settings": {
-				"dev.containers.copyGitConfig": true
-			},
-			"extensions": [
-				"eamodio.gitlens",
-        		"github.vscode-github-actions",
-				"rust-lang.rust-analyzer"
-			]
-		}
-	},
+  "_postCreateCommand_comment": "Uncomment 'postCreateCommand' to run commands after the container is created.",
+  "_postCreateCommand": "",
+  "customizations": {
+    "_comment": "Configure properties specific to VS Code.",
+    "vscode": {
+      "settings": {
+        "dev.containers.copyGitConfig": true
+      },
+      "extensions": ["eamodio.gitlens", "github.vscode-github-actions", "rust-lang.rust-analyzer"]
+    }
+  },
   "containerEnv": {
     "GIT_EDITOR": "nano"
-  }
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
- }
+  },
+  "_remoteUser_comment": "Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root",
+  "_remoteUser": "root"
+}

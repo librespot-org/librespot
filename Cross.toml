@@ -1,0 +1,12 @@
+[build]
+pre-build = [
+    "dpkg --add-architecture $CROSS_DEB_ARCH",
+    "apt-get update",
+    "apt-get --assume-yes install libssl-dev:$CROSS_DEB_ARCH libasound2-dev:$CROSS_DEB_ARCH",
+]
+
+[target.riscv64gc-unknown-linux-gnu]
+# RISC-V: Uses rustls-tls (no system dependencies needed)
+# Building with --no-default-features --features rustls-tls
+# No pre-build steps required - rustls is pure Rust
+pre-build = []

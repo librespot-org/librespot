@@ -1,13 +1,13 @@
 [package]
 name = "librespot-protocol"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Liétar <paul@lietar.net>"]
-build = "build.rs"
+license.workspace = true
 description = "The protobuf logic for communicating with Spotify servers"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
+build = "build.rs"
 
 [dependencies]
 protobuf = "3.7"

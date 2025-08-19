@@ -8,7 +8,6 @@ ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
 ENV RUST_BACKTRACE=1
 ENV RUSTFLAGS="-D warnings"
 
-
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git \

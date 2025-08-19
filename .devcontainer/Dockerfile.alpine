@@ -7,7 +7,6 @@ ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL="sparse"
 ENV RUST_BACKTRACE=1
 ENV RUSTFLAGS="-D warnings -C target-feature=-crt-static"
 
-
 RUN apk add --no-cache \
         git \
         nano\

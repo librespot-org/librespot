@@ -1,16 +1,123 @@
 [package]
 name = "librespot"
+version.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "An open source client library for Spotify, with support for Spotify Connect"
+keywords = ["audio", "spotify", "music", "streaming", "connect"]
+categories = ["multimedia::audio"]
+repository.workspace = true
+readme = "README.md"
+edition.workspace = true
+include = [
+    "src/**/*",
+    "audio/**/*",
+    "connect/**/*",
+    "core/**/*",
+    "discovery/**/*",
+    "metadata/**/*",
+    "oauth/**/*",
+    "playback/**/*",
+    "protocol/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "COMPILING.md",
+    "CONTRIBUTING.md",
+]
+
+[workspace.package]
 version = "0.6.0-dev"
 rust-version = "1.85"
 authors = ["Librespot Org"]
 license = "MIT"
-description = "An open source client library for Spotify, with support for Spotify Connect"
-keywords = ["spotify"]
 repository = "https://github.com/librespot-org/librespot"
-readme = "README.md"
 edition = "2024"
 
-[workspace]
+[features]
+default = ["native-tls", "rodio-backend", "with-libmdns"]
+
+# TLS backends (mutually exclusive - compile-time checks in oauth/src/lib.rs)
+# Note: Feature validation is in oauth crate since it's compiled first in the dependency tree.
+# See COMPILING.md for more details on TLS backend selection.
+
+# native-tls: Uses the system's native TLS stack (OpenSSL on Linux, Secure Transport on macOS,
+# SChannel on Windows). This is the default as it's well-tested, widely compatible, and integrates
+# with system certificate stores. Choose this for maximum compatibility and when you want to use
+# system-managed certificates.
+native-tls = ["librespot-core/native-tls", "librespot-oauth/native-tls"]
+
+# rustls-tls: Uses the Rust-based rustls TLS implementation with platform certificate verification.
+# This provides a Rust TLS stack (with assembly optimizations) that uses rustls-platform-verifier to
+# automatically select the appropriate certificate authority (CA) certificates from your system's
+# trust store. Choose this for avoiding external OpenSSL dependencies, reproducible builds, or when
+# targeting platforms where native TLS dependencies are unavailable or problematic (musl, embedded,
+# static linking). On Linux it uses ca-certificates, on macOS it uses Security.framework, and on
+# Windows it uses the Windows certificate store.
+rustls-tls = ["librespot-core/rustls-tls", "librespot-oauth/rustls-tls"]
+
+# Audio backends - see README.md for audio backend selection guide
+# Cross-platform backends:
+
+# rodio-backend: Cross-platform audio backend using Rodio (default). Provides good cross-platform
+# compatibility with automatic backend selection. Uses ALSA on Linux, WASAPI on Windows, CoreAudio
+# on macOS.
+rodio-backend = ["librespot-playback/rodio-backend"]
+
+# rodiojack-backend: Rodio backend with JACK support for professional audio setups.
+rodiojack-backend = ["librespot-playback/rodiojack-backend"]
+
+# gstreamer-backend: Uses GStreamer multimedia framework for audio output.
+# Provides extensive audio processing capabilities.
+gstreamer-backend = ["librespot-playback/gstreamer-backend"]
+
+# portaudio-backend: Cross-platform audio I/O library backend.
+portaudio-backend = ["librespot-playback/portaudio-backend"]
+
+# sdl-backend: Simple DirectMedia Layer audio backend.
+sdl-backend = ["librespot-playback/sdl-backend"]
+
+# Platform-specific backends:
+
+# alsa-backend: Advanced Linux Sound Architecture backend (Linux only).
+# Provides low-latency audio output on Linux systems.
+alsa-backend = ["librespot-playback/alsa-backend"]
+
+# pulseaudio-backend: PulseAudio backend (Linux only).
+# Integrates with the PulseAudio sound server for advanced audio routing.
+pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
+
+# jackaudio-backend: JACK Audio Connection Kit backend.
+# Professional audio backend for low-latency, high-quality audio routing.
+jackaudio-backend = ["librespot-playback/jackaudio-backend"]
+
+# Network discovery backends - choose one for Spotify Connect device discovery
+# See COMPILING.md for dependencies and platform support.
+
+# with-libmdns: Pure-Rust mDNS implementation (default).
+# No external dependencies, works on all platforms. Choose this for simple deployments or when
+# avoiding system dependencies.
+with-libmdns = ["librespot-discovery/with-libmdns"]
+
+# with-avahi: Uses Avahi daemon for mDNS (Linux only).
+# Integrates with system's Avahi service for network discovery. Choose this when you want to
+# integrate with existing Avahi infrastructure or need advanced mDNS features. Requires
+# libavahi-client-dev.
+with-avahi = ["librespot-discovery/with-avahi"]
+
+# with-dns-sd: Uses DNS Service Discovery (cross-platform).
+# On macOS uses Bonjour, on Linux uses Avahi compatibility layer. Choose this for tight system
+# integration on macOS or when using Avahi's dns-sd compatibility mode on Linux.
+with-dns-sd = ["librespot-discovery/with-dns-sd"]
+
+# Audio processing features:
+
+# passthrough-decoder: Enables direct passthrough of Ogg Vorbis streams without decoding.
+# Useful for custom audio processing pipelines or when you want to handle audio decoding
+# externally. When enabled, audio is not decoded by librespot but passed through as raw Ogg Vorbis
+# data.
+passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
 [lib]
 name = "librespot"
@@ -21,40 +128,26 @@ name = "librespot"
 path = "src/main.rs"
 doc = false
 
-[dependencies.librespot-audio]
-path = "audio"
-version = "0.6.0-dev"
-
-[dependencies.librespot-connect]
-path = "connect"
-version = "0.6.0-dev"
-
-[dependencies.librespot-core]
-path = "core"
-version = "0.6.0-dev"
-
-[dependencies.librespot-discovery]
-path = "discovery"
-version = "0.6.0-dev"
-default-features = false
-
-[dependencies.librespot-metadata]
-path = "metadata"
-version = "0.6.0-dev"
-
-[dependencies.librespot-playback]
-path = "playback"
-version = "0.6.0-dev"
-
-[dependencies.librespot-protocol]
-path = "protocol"
-version = "0.6.0-dev"
-
-[dependencies.librespot-oauth]
-path = "oauth"
-version = "0.6.0-dev"
+[workspace.dependencies]
+librespot-audio = { path = "audio", default-features = false }
+librespot-connect = { path = "connect", default-features = false }
+librespot-core = { path = "core", default-features = false }
+librespot-discovery = { path = "discovery", default-features = false }
+librespot-metadata = { path = "metadata", default-features = false }
+librespot-oauth = { path = "oauth", default-features = false }
+librespot-playback = { path = "playback", default-features = false }
+librespot-protocol = { path = "protocol", default-features = false }
 
 [dependencies]
+librespot-audio.workspace = true
+librespot-connect.workspace = true
+librespot-core.workspace = true
+librespot-discovery.workspace = true
+librespot-metadata.workspace = true
+librespot-oauth.workspace = true
+librespot-playback.workspace = true
+librespot-protocol.workspace = true
+
 data-encoding = "2.5"
 env_logger = { version = "0.11.2", default-features = false, features = [
     "color",
@@ -77,53 +170,30 @@ tokio = { version = "1", features = [
 ] }
 url = "2.2"
 
-[features]
-alsa-backend = ["librespot-playback/alsa-backend"]
-portaudio-backend = ["librespot-playback/portaudio-backend"]
-pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
-jackaudio-backend = ["librespot-playback/jackaudio-backend"]
-rodio-backend = ["librespot-playback/rodio-backend"]
-rodiojack-backend = ["librespot-playback/rodiojack-backend"]
-sdl-backend = ["librespot-playback/sdl-backend"]
-gstreamer-backend = ["librespot-playback/gstreamer-backend"]
-
-with-avahi = ["librespot-discovery/with-avahi"]
-with-dns-sd = ["librespot-discovery/with-dns-sd"]
-with-libmdns = ["librespot-discovery/with-libmdns"]
-
-passthrough-decoder = ["librespot-playback/passthrough-decoder"]
-
-default = ["rodio-backend", "with-libmdns"]
-
 [package.metadata.deb]
-maintainer = "librespot-org"
-copyright = "2018 Paul Liétar"
+maintainer = "Librespot Organization <noreply@github.com>"
+copyright = "2015, Paul Liétar"
 license-file = ["LICENSE", "4"]
 depends = "$auto"
+recommends = "avahi-daemon"
 extended-description = """\
 librespot is an open source client library for Spotify. It enables applications \
-to use Spotify's service, without using the official but closed-source \
-libspotify. Additionally, it will provide extra features which are not \
-available in the official library."""
+to use Spotify's service to control and play music via various backends, and to \
+act as a Spotify Connect receiver. It is an alternative to the official and now \
+deprecated closed-source libspotify. Additionally, it provides extra features \
+which are not available in the official library.
+.
+This package provides the librespot binary for headless Spotify Connect playback. \
+.
+Note: librespot only works with Spotify Premium accounts."""
 section = "sound"
 priority = "optional"
 assets = [
-    [
-        "target/release/librespot",
-        "usr/bin/",
-        "755",
-    ],
-    [
-        "contrib/librespot.service",
-        "lib/systemd/system/",
-        "644",
-    ],
-    [
-        "contrib/librespot.user.service",
-        "lib/systemd/user/",
-        "644",
-    ],
+    # Main binary
+    ["target/release/librespot", "usr/bin/", "755"],
+    # Documentation
+    ["README.md", "usr/share/doc/librespot/", "644"],
+    # Systemd services
+    ["contrib/librespot.service", "lib/systemd/system/", "644"],
+    ["contrib/librespot.user.service", "lib/systemd/user/", "644"],
 ]
-
-[workspace.package]
-rust-version = "1.85"

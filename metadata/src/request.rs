@@ -21,7 +21,7 @@ pub trait MercuryRequest {
             let _ = write!(metrics_uri, "&product={product}");
         }
 
-        trace!("Requesting {}", metrics_uri);
+        trace!("Requesting {metrics_uri}");
 
         let request = session.mercury().get(metrics_uri)?;
         let response = request.await?;

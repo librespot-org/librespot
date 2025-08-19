@@ -67,6 +67,63 @@ Depending on the chosen backend, specific development libraries are required.
 |dns_sd              | `libavahi-compat-libdnssd-dev pkg-config` | `avahi-compat-libdns_sd-devel` |   |
 |libmdns (default)   |                              |                                   |             |
 
+### TLS library dependencies
+librespot requires a TLS implementation for secure connections to Spotify's servers. You can choose between two mutually exclusive options:
+
+#### native-tls (default)
+Uses your system's native TLS implementation:
+- **Linux**: OpenSSL
+- **macOS**: Secure Transport (Security.framework)
+- **Windows**: SChannel (Windows TLS)
+
+This is the **default choice** and provides the best compatibility. It integrates with your system's certificate store and is well-tested across platforms.
+
+**When to choose native-tls:**
+- You want maximum compatibility
+- You're using system-managed certificates
+- You're on a standard Linux distribution with OpenSSL
+- You're deploying on platforms where OpenSSL is already present
+
+**Dependencies:**
+On Debian/Ubuntu:
+```shell
+sudo apt-get install libssl-dev pkg-config
+```
+
+On Fedora:
+```shell
+sudo dnf install openssl-devel pkg-config
+```
+
+#### rustls-tls
+Uses a Rust-based TLS implementation with `rustls-platform-verifier` for certificate authority (CA) verification:
+- **Linux**: Uses system ca-certificates package
+- **macOS**: Uses Security.framework for CA verification
+- **Windows**: Uses Windows certificate store
+
+**When to choose rustls-tls:**
+- You want to avoid external OpenSSL dependencies
+- You're building for reproducible/deterministic builds
+- You're targeting platforms where OpenSSL is unavailable or problematic (musl, embedded, static linking)
+- You're cross-compiling and want to avoid OpenSSL build complexity
+- You prefer having cryptographic operations implemented in Rust
+
+**No additional system dependencies required** - rustls is implemented in Rust (with some assembly for performance-critical cryptographic operations) and doesn't require external libraries like OpenSSL.
+
+#### Building with specific TLS backends
+```bash
+# Default (native-tls)
+cargo build
+
+# Explicitly use native-tls
+cargo build --no-default-features --features "native-tls rodio-backend with-libmdns"
+
+# Use rustls-tls instead
+cargo build --no-default-features --features "rustls-tls rodio-backend with-libmdns"
+```
+
+**Important:** The TLS backends are mutually exclusive. Attempting to enable both will result in a compile-time error.
+
 ### Getting the Source
 
 The recommended method is to first fork the repo, so that you have a copy that you have read/write access to. After that, it’s a simple case of cloning your fork.
@@ -95,19 +152,21 @@ cargo build --release
 
 You will most likely want to build debug builds when developing, as they compile faster, and more verbose, and as the name suggests, are for the purposes of debugging. When submitting a bug report, it is recommended to use a debug build to capture stack traces.
 
-There are also a number of compiler feature flags that you can add, in the event that you want to have certain additional features also compiled. The list of these is available on the [wiki](https://github.com/librespot-org/librespot/wiki/Compiling#addition-features).
+There are also a number of compiler feature flags that you can add, in the event that you want to have certain additional features also compiled. All available features and their descriptions are documented in the main [Cargo.toml](Cargo.toml) file. Additional platform-specific information is available on the [wiki](https://github.com/librespot-org/librespot/wiki/Compiling#addition-features).
 
-By default, librespot compiles with the ```rodio-backend``` and ```with-libmdns``` features. To compile without default features, you can run with:
+By default, librespot compiles with the ```native-tls```, ```rodio-backend```, and ```with-libmdns``` features.
+
+**Note:** librespot requires at least one TLS backend to function. Building with `--no-default-features` alone will fail compilation. For custom feature selection, you must specify at least one TLS backend along with your desired audio and discovery backends.
+For example, to build with the ALSA audio, libmdns discovery, and native-tls backends:
 
 ```bash
-cargo build --no-default-features
+cargo build --no-default-features --features "native-tls alsa-backend with-libmdns"
 ```
 
-Note that this will also disable zeroconf discovery backends for Spotify Connect. For normal use cases, select at least one audio and discovery backend.
-For example, to build with the ALSA audio and libmdns discovery backend:
+Or to use rustls-tls with ALSA:
 
 ```bash
-cargo build --no-default-features --features "alsa-backend with-libmdns"
+cargo build --no-default-features --features "rustls-tls alsa-backend with-libmdns"
 ```
 
 ### Running

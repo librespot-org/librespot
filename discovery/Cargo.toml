@@ -1,14 +1,29 @@
 [package]
 name = "librespot-discovery"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
+license.workspace = true
 description = "The discovery logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
+
+[features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["with-libmdns", "native-tls"]
+
+# Discovery backends
+with-avahi = ["dep:serde", "dep:zbus"]
+with-dns-sd = ["dep:dns-sd"]
+with-libmdns = ["dep:libmdns"]
+
+# TLS backend propagation
+native-tls = ["librespot-core/native-tls"]
+rustls-tls = ["librespot-core/rustls-tls"]
 
 [dependencies]
+librespot-core.workspace = true
+
 aes = "0.8"
 base64 = "0.22"
 bytes = "1"
@@ -18,13 +33,13 @@ form_urlencoded = "1.2"
 futures-core = "0.3"
 futures-util = "0.3"
 hmac = "0.12"
+http-body-util = "0.1"
 hyper = { version = "1.6", features = ["http1"] }
 hyper-util = { version = "0.1", features = [
     "server-auto",
     "server-graceful",
     "service",
 ] }
-http-body-util = "0.1"
 libmdns = { version = "0.9", optional = true }
 log = "0.4"
 rand = "0.9"
@@ -40,18 +55,7 @@ zbus = { version = "5", default-features = false, features = [
     "tokio",
 ], optional = true }
 
-[dependencies.librespot-core]
-path = "../core"
-version = "0.6.0-dev"
-
 [dev-dependencies]
 futures = "0.3"
 hex = "0.4"
 tokio = { version = "1", features = ["macros", "parking_lot", "rt"] }
-
-[features]
-with-avahi = ["zbus", "serde"]
-with-dns-sd = ["dns-sd"]
-with-libmdns = ["libmdns"]
-
-default = ["with-libmdns"]

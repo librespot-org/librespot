@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/librespot-org/librespot/workflows/test/badge.svg)](https://github.com/librespot-org/librespot/actions)
+[![Build Status](https://github.com/librespot-org/librespot/workflows/build/badge.svg)](https://github.com/librespot-org/librespot/actions)
 [![Gitter chat](https://badges.gitter.im/librespot-org/librespot.png)](https://gitter.im/librespot-org/spotify-connect-resources)
 [![Crates.io](https://img.shields.io/crates/v/librespot.svg)](https://crates.io/crates/librespot)
 
@@ -62,12 +62,14 @@ SDL
 Pipe
 Subprocess
 ```
-Please check the corresponding [Compiling](https://github.com/librespot-org/librespot/wiki/Compiling#general-dependencies) entry on the wiki for backend specific dependencies.
+Please check [COMPILING.md](COMPILING.md) for detailed information on TLS, audio, and discovery backend dependencies, or the [Compiling](https://github.com/librespot-org/librespot/wiki/Compiling#general-dependencies) entry on the wiki for additional backend specific dependencies.
 
-Once you've installed the dependencies and cloned this repository you can build *librespot* with the default backend using Cargo.
+Once you've installed the dependencies and cloned this repository you can build *librespot* with the default features using Cargo.
 ```shell
 cargo build --release
 ```
+
+By default, this builds with native-tls (system TLS), rodio audio backend, and libmdns discovery. See [COMPILING.md](COMPILING.md) for information on selecting different TLS, audio, and discovery backends.
 
 # Packages
 
@@ -115,6 +117,6 @@ This is a non exhaustive list of projects that either use or have modified libre
 - [librespot-java](https://github.com/devgianlu/librespot-java) - A Java port of librespot.
 - [ncspot](https://github.com/hrkfdn/ncspot) - Cross-platform ncurses Spotify client.
 - [ansible-role-librespot](https://github.com/xMordax/ansible-role-librespot/tree/master) - Ansible role that will build, install and configure Librespot.
-- [Spot](https://github.com/xou816/spot) - Gtk/Rust native Spotify client for the GNOME desktop. 
+- [Spot](https://github.com/xou816/spot) - Gtk/Rust native Spotify client for the GNOME desktop.
 - [Snapcast](https://github.com/badaix/snapcast) - synchronised multi-room audio player that uses librespot as its source for Spotify content
 - [MuPiBox](https://mupibox.de/) - Portable music box for Spotify and local media based on Raspberry Pi. Operated via touchscreen. Suitable for children and older people.
