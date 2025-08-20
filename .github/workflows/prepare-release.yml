@@ -1,0 +1,57 @@
+---
+# test with
+# act --job bump-crate-version --eventpath ./.github/example/prepare-release.event
+name: prepare release
+on:
+  workflow_dispatch:
+    inputs:
+      versionBump:
+        description: "Version bump for"
+        required: true
+        type: choice
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  prepare-release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-tags: true
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Bump versions
+        env:
+          FRAGMENT: ${{ github.event.inputs.versionBump }}
+        run: ./.github/scripts/bump-versions.sh
+
+      - name: Update Cargo.lock
+        run: cargo update --workspace
+
+      - name: Get binary version
+        id: get-version
+        run: |
+          VERSION=$(cat ./Cargo.toml | awk "/version/{print; exit}" | cut -d\" -f 2)
+          echo VERSION=$VERSION >> ${GITHUB_OUTPUT}
+
+      - name: Update Changelog
+        uses: thomaseizinger/keep-a-changelog-new-release@3.1.0
+        with:
+          tag: v${{ steps.get-version.outputs.VERSION }}
+          version: ${{ steps.get-version.outputs.VERSION }}
+
+      - name: Commit version prepare
+        uses: stefanzweifel/git-auto-commit-action@v6
+        if: ${{ !env.ACT }}
+        with:
+          commit_message: 'Prepare for v${{ steps.get-version.outputs.VERSION }} release'
+          file_pattern: '*.md *.toml *.lock'
