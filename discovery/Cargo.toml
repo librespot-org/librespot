@@ -32,7 +32,7 @@ ctr = "0.9"
 dns-sd = { version = "0.1", optional = true }
 form_urlencoded = "1.2"
 futures-core = "0.3"
-futures-util = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 hmac = "0.12"
 http-body-util = "0.1"
 hyper = { version = "1.6", features = ["http1"] }
@@ -43,7 +43,7 @@ hyper-util = { version = "0.1", features = [
 ] }
 libmdns = { version = "0.10", optional = true }
 log = "0.4"
-rand = "0.9"
+rand = { version = "0.9", default-features = false, features = ["thread_rng"] }
 serde = { version = "1", default-features = false, features = [
     "derive",
 ], optional = true }

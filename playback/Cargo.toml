@@ -51,18 +51,13 @@ librespot-audio = { version = "0.7.1", path = "../audio", default-features = fal
 librespot-core = { version = "0.7.1", path = "../core", default-features = false }
 librespot-metadata = { version = "0.7.1", path = "../metadata", default-features = false }
 
-portable-atomic = "1"
-futures-util = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
+portable-atomic = "1"
 shell-words = "1.1"
 thiserror = "2"
-tokio = { version = "1", features = [
-    "parking_lot",
-    "rt",
-    "rt-multi-thread",
-    "sync",
-] }
+tokio = { version = "1", features = ["parking_lot", "rt-multi-thread", "sync"] }
 zerocopy = { version = "0.8", features = ["derive"] }
 
 # Backends
@@ -97,5 +92,5 @@ symphonia = { version = "0.5", default-features = false, features = [
 ogg = { version = "0.9", optional = true }
 
 # Dithering
-rand = { version = "0.9", features = ["small_rng"] }
+rand = { version = "0.9", default-features = false, features = ["small_rng"] }
 rand_distr = "0.5"
