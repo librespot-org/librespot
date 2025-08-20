@@ -56,7 +56,7 @@ futures-util = { version = "0.3", default-features = false, features = [
     "bilock",
     "unstable",
 ] }
-governor = { version = "0.10", default-features = false, features = ["std", "dashmap"] }
+governor = { version = "0.10", default-features = false, features = ["std"] }
 hmac = "0.12"
 httparse = "1.10"
 http = "1.3"

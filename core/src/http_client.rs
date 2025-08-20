@@ -7,7 +7,7 @@ use bytes::Bytes;
 use futures_util::{FutureExt, future::IntoStream};
 use governor::{
     Quota, RateLimiter, clock::MonotonicClock, middleware::NoOpMiddleware,
-    state::keyed::DashMapStateStore,
+    state::keyed::DefaultKeyedStateStore,
 };
 use http::{Uri, header::HeaderValue};
 use http_body_util::{BodyExt, Full};
@@ -99,9 +99,8 @@ pub struct HttpClient {
     proxy_url: Option<Url>,
     hyper_client: OnceLock<HyperClient>,
 
-    // while the DashMap variant is more performant, our level of concurrency
-    // is pretty low so we can save pulling in that extra dependency
-    rate_limiter: RateLimiter<String, DashMapStateStore<String>, MonotonicClock, NoOpMiddleware>,
+    rate_limiter:
+        RateLimiter<String, DefaultKeyedStateStore<String>, MonotonicClock, NoOpMiddleware>,
 }
 
 impl HttpClient {
