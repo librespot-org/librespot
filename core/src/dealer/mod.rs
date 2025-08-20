@@ -6,7 +6,7 @@ use std::{
     iter,
     pin::Pin,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{self, AtomicBool},
     },
     task::Poll,
@@ -15,7 +15,6 @@ use std::{
 
 use futures_core::{Future, Stream};
 use futures_util::{SinkExt, StreamExt, future::join_all};
-use parking_lot::Mutex;
 use thiserror::Error;
 use tokio::{
     select,
@@ -56,6 +55,11 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(10);
+
+const DEALER_REQUEST_HANDLERS_POISON_MSG: &str =
+    "dealer request handlers mutex should not be poisoned";
+const DEALER_MESSAGE_HANDLERS_POISON_MSG: &str =
+    "dealer message handlers mutex should not be poisoned";
 
 struct Response {
     pub success: bool,
@@ -350,6 +354,7 @@ impl DealerShared {
             if self
                 .message_handlers
                 .lock()
+                .expect(DEALER_MESSAGE_HANDLERS_POISON_MSG)
                 .retain(split, &mut |tx| tx.send(msg.clone()).is_ok())
             {
                 return;
@@ -387,7 +392,10 @@ impl DealerShared {
             return;
         };
 
-        let handler_map = self.request_handlers.lock();
+        let handler_map = self
+            .request_handlers
+            .lock()
+            .expect(DEALER_REQUEST_HANDLERS_POISON_MSG);
 
         if let Some(handler) = handler_map.get(split) {
             handler.handle_request(payload_request, responder);
@@ -425,21 +433,51 @@ impl Dealer {
     where
         H: RequestHandler,
     {
-        add_handler(&mut self.shared.request_handlers.lock(), uri, handler)
+        add_handler(
+            &mut self
+                .shared
+                .request_handlers
+                .lock()
+                .expect(DEALER_REQUEST_HANDLERS_POISON_MSG),
+            uri,
+            handler,
+        )
     }
 
     pub fn remove_handler(&self, uri: &str) -> Option<Box<dyn RequestHandler>> {
-        remove_handler(&mut self.shared.request_handlers.lock(), uri)
+        remove_handler(
+            &mut self
+                .shared
+                .request_handlers
+                .lock()
+                .expect(DEALER_REQUEST_HANDLERS_POISON_MSG),
+            uri,
+        )
     }
 
     pub fn subscribe(&self, uris: &[&str]) -> Result<Subscription, Error> {
-        subscribe(&mut self.shared.message_handlers.lock(), uris)
+        subscribe(
+            &mut self
+                .shared
+                .message_handlers
+                .lock()
+                .expect(DEALER_MESSAGE_HANDLERS_POISON_MSG),
+            uris,
+        )
     }
 
     pub fn handles(&self, uri: &str) -> bool {
         handles(
-            &self.shared.request_handlers.lock(),
-            &self.shared.message_handlers.lock(),
+            &self
+                .shared
+                .request_handlers
+                .lock()
+                .expect(DEALER_REQUEST_HANDLERS_POISON_MSG),
+            &self
+                .shared
+                .message_handlers
+                .lock()
+                .expect(DEALER_MESSAGE_HANDLERS_POISON_MSG),
             uri,
         )
     }

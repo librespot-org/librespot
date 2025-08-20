@@ -6,6 +6,7 @@ use std::{
     mem,
     pin::Pin,
     process::exit,
+    sync::Mutex,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -19,9 +20,10 @@ use futures_util::{
     StreamExt, TryFutureExt, future, future::FusedFuture,
     stream::futures_unordered::FuturesUnordered,
 };
-use parking_lot::Mutex;
 use symphonia::core::io::MediaSource;
 use tokio::sync::{mpsc, oneshot};
+
+const LOAD_HANDLES_POISON_MSG: &str = "load handles mutex should not be poisoned";
 
 use crate::{
     audio::{AudioDecrypt, AudioFetchParams, AudioFile, StreamLoaderController},
@@ -2237,11 +2239,11 @@ impl PlayerInternal {
                 let _ = result_tx.send(data);
             }
 
-            let mut load_handles = load_handles_clone.lock();
+            let mut load_handles = load_handles_clone.lock().expect(LOAD_HANDLES_POISON_MSG);
             load_handles.remove(&thread::current().id());
         });
 
-        let mut load_handles = self.load_handles.lock();
+        let mut load_handles = self.load_handles.lock().expect(LOAD_HANDLES_POISON_MSG);
         load_handles.insert(load_handle.thread().id(), load_handle);
 
         result_rx.map_err(|_| ())
@@ -2276,7 +2278,7 @@ impl Drop for PlayerInternal {
 
         let handles: Vec<thread::JoinHandle<()>> = {
             // waiting for the thread while holding the mutex would result in a deadlock
-            let mut load_handles = self.load_handles.lock();
+            let mut load_handles = self.load_handles.lock().expect(LOAD_HANDLES_POISON_MSG);
 
             load_handles
                 .drain()

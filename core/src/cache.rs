@@ -4,15 +4,16 @@ use std::{
     fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::SystemTime,
 };
 
-use parking_lot::Mutex;
 use priority_queue::PriorityQueue;
 use thiserror::Error;
 
 use crate::{Error, FileId, authentication::Credentials, error::ErrorKind};
+
+const CACHE_LIMITER_POISON_MSG: &str = "cache limiter mutex should not be poisoned";
 
 #[derive(Debug, Error)]
 pub enum CacheError {
@@ -189,15 +190,24 @@ impl FsSizeLimiter {
     }
 
     fn add(&self, file: &Path, size: u64) {
-        self.limiter.lock().add(file, size, SystemTime::now())
+        self.limiter
+            .lock()
+            .expect(CACHE_LIMITER_POISON_MSG)
+            .add(file, size, SystemTime::now())
     }
 
     fn touch(&self, file: &Path) -> bool {
-        self.limiter.lock().update(file, SystemTime::now())
+        self.limiter
+            .lock()
+            .expect(CACHE_LIMITER_POISON_MSG)
+            .update(file, SystemTime::now())
     }
 
     fn remove(&self, file: &Path) -> bool {
-        self.limiter.lock().remove(file)
+        self.limiter
+            .lock()
+            .expect(CACHE_LIMITER_POISON_MSG)
+            .remove(file)
     }
 
     fn prune_internal<F: FnMut() -> Option<PathBuf>>(mut pop: F) -> Result<(), Error> {
@@ -232,7 +242,7 @@ impl FsSizeLimiter {
     }
 
     fn prune(&self) -> Result<(), Error> {
-        Self::prune_internal(|| self.limiter.lock().pop())
+        Self::prune_internal(|| self.limiter.lock().expect(CACHE_LIMITER_POISON_MSG).pop())
     }
 
     fn new(path: &Path, limit: u64) -> Result<Self, Error> {

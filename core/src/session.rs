@@ -4,8 +4,7 @@ use std::{
     io,
     pin::Pin,
     process::exit,
-    sync::OnceLock,
-    sync::{Arc, Weak},
+    sync::{Arc, OnceLock, RwLock, Weak},
     task::{Context, Poll},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -34,7 +33,6 @@ use futures_core::TryStream;
 use futures_util::StreamExt;
 use librespot_protocol::authentication::AuthenticationType;
 use num_traits::FromPrimitive;
-use parking_lot::RwLock;
 use pin_project_lite::pin_project;
 use quick_xml::events::Event;
 use thiserror::Error;
@@ -44,6 +42,8 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
+
+const SESSION_DATA_POISON_MSG: &str = "session data rwlock should not be poisoned";
 
 #[derive(Debug, Error)]
 pub enum SessionError {
@@ -338,7 +338,11 @@ impl Session {
     }
 
     pub fn time_delta(&self) -> i64 {
-        self.0.data.read().time_delta
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .time_delta
     }
 
     pub fn spawn<T>(&self, task: T)
@@ -388,15 +392,32 @@ impl Session {
     // you need more fields at once, in which case this can spare multiple `read`
     // locks.
     pub fn user_data(&self) -> UserData {
-        self.0.data.read().user_data.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .user_data
+            .clone()
     }
 
     pub fn session_id(&self) -> String {
-        self.0.data.read().session_id.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .session_id
+            .clone()
     }
 
     pub fn set_session_id(&self, session_id: &str) {
-        session_id.clone_into(&mut self.0.data.write().session_id);
+        session_id.clone_into(
+            &mut self
+                .0
+                .data
+                .write()
+                .expect(SESSION_DATA_POISON_MSG)
+                .session_id,
+        );
     }
 
     pub fn device_id(&self) -> &str {
@@ -404,63 +425,155 @@ impl Session {
     }
 
     pub fn client_id(&self) -> String {
-        self.0.data.read().client_id.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .client_id
+            .clone()
     }
 
     pub fn set_client_id(&self, client_id: &str) {
-        client_id.clone_into(&mut self.0.data.write().client_id);
+        client_id.clone_into(
+            &mut self
+                .0
+                .data
+                .write()
+                .expect(SESSION_DATA_POISON_MSG)
+                .client_id,
+        );
     }
 
     pub fn client_name(&self) -> String {
-        self.0.data.read().client_name.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .client_name
+            .clone()
     }
 
     pub fn set_client_name(&self, client_name: &str) {
-        client_name.clone_into(&mut self.0.data.write().client_name);
+        client_name.clone_into(
+            &mut self
+                .0
+                .data
+                .write()
+                .expect(SESSION_DATA_POISON_MSG)
+                .client_name,
+        );
     }
 
     pub fn client_brand_name(&self) -> String {
-        self.0.data.read().client_brand_name.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .client_brand_name
+            .clone()
     }
 
     pub fn set_client_brand_name(&self, client_brand_name: &str) {
-        client_brand_name.clone_into(&mut self.0.data.write().client_brand_name);
+        client_brand_name.clone_into(
+            &mut self
+                .0
+                .data
+                .write()
+                .expect(SESSION_DATA_POISON_MSG)
+                .client_brand_name,
+        );
     }
 
     pub fn client_model_name(&self) -> String {
-        self.0.data.read().client_model_name.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .client_model_name
+            .clone()
     }
 
     pub fn set_client_model_name(&self, client_model_name: &str) {
-        client_model_name.clone_into(&mut self.0.data.write().client_model_name);
+        client_model_name.clone_into(
+            &mut self
+                .0
+                .data
+                .write()
+                .expect(SESSION_DATA_POISON_MSG)
+                .client_model_name,
+        );
     }
 
     pub fn connection_id(&self) -> String {
-        self.0.data.read().connection_id.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .connection_id
+            .clone()
     }
 
     pub fn set_connection_id(&self, connection_id: &str) {
-        connection_id.clone_into(&mut self.0.data.write().connection_id);
+        connection_id.clone_into(
+            &mut self
+                .0
+                .data
+                .write()
+                .expect(SESSION_DATA_POISON_MSG)
+                .connection_id,
+        );
     }
 
     pub fn username(&self) -> String {
-        self.0.data.read().user_data.canonical_username.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .user_data
+            .canonical_username
+            .clone()
     }
 
     pub fn set_username(&self, username: &str) {
-        username.clone_into(&mut self.0.data.write().user_data.canonical_username);
+        username.clone_into(
+            &mut self
+                .0
+                .data
+                .write()
+                .expect(SESSION_DATA_POISON_MSG)
+                .user_data
+                .canonical_username,
+        );
     }
 
     pub fn auth_data(&self) -> Vec<u8> {
-        self.0.data.read().auth_data.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .auth_data
+            .clone()
     }
 
     pub fn set_auth_data(&self, auth_data: &[u8]) {
-        auth_data.clone_into(&mut self.0.data.write().auth_data);
+        auth_data.clone_into(
+            &mut self
+                .0
+                .data
+                .write()
+                .expect(SESSION_DATA_POISON_MSG)
+                .auth_data,
+        );
     }
 
     pub fn country(&self) -> String {
-        self.0.data.read().user_data.country.clone()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .user_data
+            .country
+            .clone()
     }
 
     pub fn filter_explicit_content(&self) -> bool {
@@ -489,6 +602,7 @@ impl Session {
         self.0
             .data
             .write()
+            .expect(SESSION_DATA_POISON_MSG)
             .user_data
             .attributes
             .insert(key.to_owned(), value.to_owned())
@@ -497,11 +611,24 @@ impl Session {
     pub fn set_user_attributes(&self, attributes: UserAttributes) {
         Self::check_catalogue(&attributes);
 
-        self.0.data.write().user_data.attributes.extend(attributes)
+        self.0
+            .data
+            .write()
+            .expect(SESSION_DATA_POISON_MSG)
+            .user_data
+            .attributes
+            .extend(attributes)
     }
 
     pub fn get_user_attribute(&self, key: &str) -> Option<String> {
-        self.0.data.read().user_data.attributes.get(key).cloned()
+        self.0
+            .data
+            .read()
+            .expect(SESSION_DATA_POISON_MSG)
+            .user_data
+            .attributes
+            .get(key)
+            .cloned()
     }
 
     fn weak(&self) -> SessionWeak {
@@ -510,13 +637,13 @@ impl Session {
 
     pub fn shutdown(&self) {
         debug!("Shutdown: Invalidating session");
-        self.0.data.write().invalid = true;
+        self.0.data.write().expect(SESSION_DATA_POISON_MSG).invalid = true;
         self.mercury().shutdown();
         self.channel().shutdown();
     }
 
     pub fn is_invalid(&self) -> bool {
-        self.0.data.read().invalid
+        self.0.data.read().expect(SESSION_DATA_POISON_MSG).invalid
     }
 }
 
@@ -643,7 +770,7 @@ where
                     .unwrap_or(Duration::ZERO)
                     .as_secs() as i64;
                 {
-                    let mut data = session.0.data.write();
+                    let mut data = session.0.data.write().expect(SESSION_DATA_POISON_MSG);
                     data.time_delta = server_timestamp.saturating_sub(timestamp);
                 }
 
@@ -668,7 +795,13 @@ where
             Some(CountryCode) => {
                 let country = String::from_utf8(data.as_ref().to_owned())?;
                 info!("Country: {country:?}");
-                session.0.data.write().user_data.country = country;
+                session
+                    .0
+                    .data
+                    .write()
+                    .expect(SESSION_DATA_POISON_MSG)
+                    .user_data
+                    .country = country;
                 Ok(())
             }
             Some(StreamChunkRes) | Some(ChannelError) => session.channel().dispatch(cmd, data),
@@ -713,7 +846,13 @@ where
                 trace!("Received product info: {user_attributes:#?}");
                 Session::check_catalogue(&user_attributes);
 
-                session.0.data.write().user_data.attributes = user_attributes;
+                session
+                    .0
+                    .data
+                    .write()
+                    .expect(SESSION_DATA_POISON_MSG)
+                    .user_data
+                    .attributes = user_attributes;
                 Ok(())
             }
             Some(SecretBlock)
