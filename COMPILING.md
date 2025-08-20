@@ -96,10 +96,18 @@ sudo dnf install openssl-devel pkg-config
 ```
 
 #### rustls-tls
-Uses a Rust-based TLS implementation with `rustls-platform-verifier` for certificate authority (CA) verification:
+Uses a Rust-based TLS implementation with certificate authority (CA) verification. Two certificate store options are available:
+
+**rustls-tls-native-roots**:
 - **Linux**: Uses system ca-certificates package
 - **macOS**: Uses Security.framework for CA verification
 - **Windows**: Uses Windows certificate store
+- Integrates with system certificate management and security updates
+
+**rustls-tls-webpki-roots**:
+- Uses Mozilla's compiled-in certificate store (webpki-roots)
+- Certificate trust is independent of host system
+- Best for reproducible builds, containers, or embedded systems
 
 **When to choose rustls-tls:**
 - You want to avoid external OpenSSL dependencies
@@ -118,8 +126,11 @@ cargo build
 # Explicitly use native-tls
 cargo build --no-default-features --features "native-tls rodio-backend with-libmdns"
 
-# Use rustls-tls instead
-cargo build --no-default-features --features "rustls-tls rodio-backend with-libmdns"
+# Use rustls-tls with native certificate stores
+cargo build --no-default-features --features "rustls-tls-native-roots rodio-backend with-libmdns"
+
+# Use rustls-tls with Mozilla's webpki certificate store
+cargo build --no-default-features --features "rustls-tls-webpki-roots rodio-backend with-libmdns"
 ```
 
 **Important:** The TLS backends are mutually exclusive. Attempting to enable both will result in a compile-time error.

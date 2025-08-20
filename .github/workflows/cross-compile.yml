@@ -61,14 +61,14 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           args: --locked --verbose
 
-      - name: Build binary with rustls-tls and no default features
+      - name: Build binary without system dependencies
         if: matrix.platform.target == 'riscv64gc-unknown-linux-gnu'
         uses: houseabsolute/actions-rust-cross@v1
         with:
           command: build
           target: ${{ matrix.platform.target }}
           toolchain: ${{ matrix.toolchain }}
-          args: --locked --verbose --no-default-features --features rustls-tls
+          args: --locked --verbose --no-default-features --features rustls-tls-webpki-roots
 
       - name: Upload debug artifacts
         uses: actions/upload-artifact@v4

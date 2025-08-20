@@ -39,12 +39,14 @@ use url::Url;
 // The dependency chain is: workspace -> core -> oauth
 // So oauth's feature validation runs before core's, catching configuration errors quickly.
 
-#[cfg(all(feature = "native-tls", feature = "rustls-tls"))]
-compile_error!("Features 'native-tls' and 'rustls-tls' are mutually exclusive. Enable only one.");
-
-#[cfg(not(any(feature = "native-tls", feature = "rustls-tls")))]
+#[cfg(all(feature = "native-tls", feature = "__rustls"))]
 compile_error!(
-    "Either feature \"native-tls\" (default) or \"rustls-tls\" must be enabled for this crate."
+    "Feature \"native-tls\" is mutually exclusive with \"rustls-tls-native-roots\" and \"rustls-tls-webpki-roots\". Enable only one."
+);
+
+#[cfg(not(any(feature = "native-tls", feature = "__rustls")))]
+compile_error!(
+    "Either feature \"native-tls\" (default), \"rustls-tls-native-roots\" or \"rustls-tls-webpki-roots\" must be enabled for this crate."
 );
 
 /// Possible errors encountered during the OAuth authentication flow.
