@@ -226,15 +226,11 @@ impl StreamLoaderController {
                 .expect(DOWNLOAD_STATUS_POISON_MSG);
             let download_timeout = AudioFetchParams::get().download_timeout;
 
-            loop {
-                if range.length
-                    <= download_status
-                        .downloaded
-                        .contained_length_from_value(range.start)
-                {
-                    break;
-                }
-
+            while range.length
+                > download_status
+                    .downloaded
+                    .contained_length_from_value(range.start)
+            {
                 let (new_download_status, wait_result) = shared
                     .cond
                     .wait_timeout(download_status, download_timeout)
