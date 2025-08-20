@@ -8,13 +8,14 @@ use std::{
         Arc, OnceLock,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
+    sync::{Condvar, Mutex},
     time::Duration,
 };
 
 use futures_util::{StreamExt, TryFutureExt, future::IntoStream};
 use hyper::{Response, StatusCode, body::Incoming, header::CONTENT_RANGE};
 use hyper_util::client::legacy::ResponseFuture;
-use parking_lot::{Condvar, Mutex};
+
 use tempfile::NamedTempFile;
 use thiserror::Error;
 use tokio::sync::{Semaphore, mpsc, oneshot};
@@ -26,6 +27,8 @@ use self::receive::audio_file_fetch;
 use crate::range_set::{Range, RangeSet};
 
 pub type AudioFileResult = Result<(), librespot_core::Error>;
+
+const DOWNLOAD_STATUS_POISON_MSG: &str = "audio download status mutex should not be poisoned";
 
 #[derive(Error, Debug)]
 pub enum AudioFileError {
@@ -163,7 +166,10 @@ impl StreamLoaderController {
 
     pub fn range_available(&self, range: Range) -> bool {
         if let Some(ref shared) = self.stream_shared {
-            let download_status = shared.download_status.lock();
+            let download_status = shared
+                .download_status
+                .lock()
+                .expect(DOWNLOAD_STATUS_POISON_MSG);
 
             range.length
                 <= download_status
@@ -214,19 +220,28 @@ impl StreamLoaderController {
         self.fetch(range);
 
         if let Some(ref shared) = self.stream_shared {
-            let mut download_status = shared.download_status.lock();
+            let mut download_status = shared
+                .download_status
+                .lock()
+                .expect(DOWNLOAD_STATUS_POISON_MSG);
             let download_timeout = AudioFetchParams::get().download_timeout;
 
-            while range.length
-                > download_status
-                    .downloaded
-                    .contained_length_from_value(range.start)
-            {
-                if shared
-                    .cond
-                    .wait_for(&mut download_status, download_timeout)
-                    .timed_out()
+            loop {
+                if range.length
+                    <= download_status
+                        .downloaded
+                        .contained_length_from_value(range.start)
                 {
+                    break;
+                }
+
+                let (new_download_status, wait_result) = shared
+                    .cond
+                    .wait_timeout(download_status, download_timeout)
+                    .expect(DOWNLOAD_STATUS_POISON_MSG);
+
+                download_status = new_download_status;
+                if wait_result.timed_out() {
                     return Err(AudioFileError::WaitTimeout.into());
                 }
 
@@ -558,7 +573,11 @@ impl Read for AudioFileStreaming {
         let mut ranges_to_request = RangeSet::new();
         ranges_to_request.add_range(&Range::new(offset, length_to_request));
 
-        let mut download_status = self.shared.download_status.lock();
+        let mut download_status = self
+            .shared
+            .download_status
+            .lock()
+            .expect(DOWNLOAD_STATUS_POISON_MSG);
 
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
@@ -571,12 +590,14 @@ impl Read for AudioFileStreaming {
 
         let download_timeout = AudioFetchParams::get().download_timeout;
         while !download_status.downloaded.contains(offset) {
-            if self
+            let (new_download_status, wait_result) = self
                 .shared
                 .cond
-                .wait_for(&mut download_status, download_timeout)
-                .timed_out()
-            {
+                .wait_timeout(download_status, download_timeout)
+                .expect(DOWNLOAD_STATUS_POISON_MSG);
+
+            download_status = new_download_status;
+            if wait_result.timed_out() {
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
                     Error::deadline_exceeded(AudioFileError::WaitTimeout),
@@ -619,6 +640,7 @@ impl Seek for AudioFileStreaming {
             .shared
             .download_status
             .lock()
+            .expect(DOWNLOAD_STATUS_POISON_MSG)
             .downloaded
             .contains(requested_pos as usize);
 

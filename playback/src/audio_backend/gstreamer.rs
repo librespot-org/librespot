@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use gstreamer::{
     State,
     event::{FlushStart, FlushStop},
@@ -8,8 +10,7 @@ use gstreamer as gst;
 use gstreamer_app as gst_app;
 use gstreamer_audio as gst_audio;
 
-use parking_lot::Mutex;
-use std::sync::Arc;
+const GSTREAMER_ASYNC_ERROR_POISON_MSG: &str = "gstreamer async error mutex should not be poisoned";
 
 use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
 
@@ -97,7 +98,9 @@ impl Open for GstreamerSink {
                 gst::MessageView::Eos(_) => {
                     println!("gst signaled end of stream");
 
-                    let mut async_error_storage = async_error_clone.lock();
+                    let mut async_error_storage = async_error_clone
+                        .lock()
+                        .expect(GSTREAMER_ASYNC_ERROR_POISON_MSG);
                     *async_error_storage = Some(String::from("gst signaled end of stream"));
                 }
                 gst::MessageView::Error(err) => {
@@ -108,7 +111,9 @@ impl Open for GstreamerSink {
                         err.debug()
                     );
 
-                    let mut async_error_storage = async_error_clone.lock();
+                    let mut async_error_storage = async_error_clone
+                        .lock()
+                        .expect(GSTREAMER_ASYNC_ERROR_POISON_MSG);
                     *async_error_storage = Some(format!(
                         "Error from {:?}: {} ({:?})",
                         err.src().map(|s| s.path_string()),
@@ -138,7 +143,10 @@ impl Open for GstreamerSink {
 
 impl Sink for GstreamerSink {
     fn start(&mut self) -> SinkResult<()> {
-        *self.async_error.lock() = None;
+        *self
+            .async_error
+            .lock()
+            .expect(GSTREAMER_ASYNC_ERROR_POISON_MSG) = None;
         self.appsrc.send_event(FlushStop::new(true));
         self.bufferpool
             .set_active(true)
@@ -150,7 +158,10 @@ impl Sink for GstreamerSink {
     }
 
     fn stop(&mut self) -> SinkResult<()> {
-        *self.async_error.lock() = None;
+        *self
+            .async_error
+            .lock()
+            .expect(GSTREAMER_ASYNC_ERROR_POISON_MSG) = None;
         self.appsrc.send_event(FlushStart::new());
         self.pipeline
             .set_state(State::Paused)
@@ -173,7 +184,11 @@ impl Drop for GstreamerSink {
 impl SinkAsBytes for GstreamerSink {
     #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
-        if let Some(async_error) = &*self.async_error.lock() {
+        if let Some(async_error) = &*self
+            .async_error
+            .lock()
+            .expect(GSTREAMER_ASYNC_ERROR_POISON_MSG)
+        {
             return Err(SinkError::OnWrite(async_error.to_string()));
         }
 

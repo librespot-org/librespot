@@ -511,6 +511,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "6.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
 name = "dasp_sample"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -728,12 +742,6 @@ name = "find-msvc-tools"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ced73b1dacfc750a6db6c0a0c3a3853c8b41997e2e2c563dc90804ae6867959"
-
-[[package]]
-name = "fixedbitset"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
@@ -1016,6 +1024,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "444405bbb1a762387aa22dd569429533b54a1d8759d35d3b64cb39b0293eaa19"
 dependencies = [
  "cfg-if",
+ "dashmap",
  "futures-sink",
  "futures-timer",
  "futures-util",
@@ -1168,6 +1177,12 @@ dependencies = [
  "tokio-util",
  "tracing",
 ]
+
+[[package]]
+name = "hashbrown"
+version = "0.14.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hashbrown"
@@ -1884,7 +1899,6 @@ dependencies = [
  "hyper-util",
  "librespot-core",
  "log",
- "parking_lot",
  "tempfile",
  "thiserror 2.0.16",
  "tokio",
@@ -1939,7 +1953,6 @@ dependencies = [
  "num-derive",
  "num-integer",
  "num-traits",
- "parking_lot",
  "pbkdf2",
  "pin-project-lite",
  "priority-queue",
@@ -2044,7 +2057,6 @@ dependencies = [
  "librespot-metadata",
  "log",
  "ogg",
- "parking_lot",
  "portable-atomic",
  "portaudio-rs",
  "rand 0.9.2",
@@ -2586,13 +2598,10 @@ version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc838d2a56b5b1a6c25f55575dfc605fabb63bb2365f6c2353ef9159aa69e4a5"
 dependencies = [
- "backtrace",
  "cfg-if",
  "libc",
- "petgraph",
  "redox_syscall",
  "smallvec",
- "thread-id",
  "windows-targets 0.52.6",
 ]
 
@@ -2632,16 +2641,6 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
-
-[[package]]
-name = "petgraph"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
-dependencies = [
- "fixedbitset",
- "indexmap",
-]
 
 [[package]]
 name = "pin-project-lite"
@@ -3777,16 +3776,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "thread-id"
-version = "4.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfe8f25bbdd100db7e1d34acf7fd2dc59c4bf8f7483f505eaa7d4f12f76cc0ea"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "time"
 version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3855,7 +3844,6 @@ dependencies = [
  "io-uring",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "slab",

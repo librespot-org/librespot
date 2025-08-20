@@ -53,11 +53,10 @@ librespot-metadata = { version = "0.7.1", path = "../metadata", default-features
 
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 log = "0.4"
-parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 portable-atomic = "1"
 shell-words = "1.1"
 thiserror = "2"
-tokio = { version = "1", features = ["parking_lot", "rt-multi-thread", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 zerocopy = { version = "0.8", features = ["derive"] }
 
 # Backends

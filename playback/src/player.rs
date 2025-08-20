@@ -6,6 +6,7 @@ use std::{
     mem,
     pin::Pin,
     process::exit,
+    sync::Mutex,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -32,7 +33,6 @@ use futures_util::{
     stream::futures_unordered::FuturesUnordered,
 };
 use librespot_metadata::track::Tracks;
-use parking_lot::Mutex;
 use symphonia::core::io::MediaSource;
 use tokio::sync::{mpsc, oneshot};
 
@@ -45,6 +45,8 @@ pub const PCM_AT_0DBFS: f64 = 1.0;
 // Spotify inserts a custom Ogg packet at the start with custom metadata values, that you would
 // otherwise expect in Vorbis comments. This packet isn't well-formed and players may balk at it.
 const SPOTIFY_OGG_HEADER_END: u64 = 0xa7;
+
+const LOAD_HANDLES_POISON_MSG: &str = "load handles mutex should not be poisoned";
 
 pub type PlayerResult = Result<(), Error>;
 
@@ -2281,11 +2283,11 @@ impl PlayerInternal {
                 let _ = result_tx.send(data);
             }
 
-            let mut load_handles = load_handles_clone.lock();
+            let mut load_handles = load_handles_clone.lock().expect(LOAD_HANDLES_POISON_MSG);
             load_handles.remove(&thread::current().id());
         });
 
-        let mut load_handles = self.load_handles.lock();
+        let mut load_handles = self.load_handles.lock().expect(LOAD_HANDLES_POISON_MSG);
         load_handles.insert(load_handle.thread().id(), load_handle);
 
         result_rx.map_err(|_| ())
@@ -2320,7 +2322,7 @@ impl Drop for PlayerInternal {
 
         let handles: Vec<thread::JoinHandle<()>> = {
             // waiting for the thread while holding the mutex would result in a deadlock
-            let mut load_handles = self.load_handles.lock();
+            let mut load_handles = self.load_handles.lock().expect(LOAD_HANDLES_POISON_MSG);
 
             load_handles
                 .drain()
