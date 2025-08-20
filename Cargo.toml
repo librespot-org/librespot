@@ -1,6 +1,6 @@
 [package]
 name = "librespot"
-version.workspace = true
+version = "0.7.0"
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -29,7 +29,6 @@ include = [
 ]
 
 [workspace.package]
-version = "0.7.0"
 rust-version = "1.85"
 authors = ["Librespot Org"]
 license = "MIT"
