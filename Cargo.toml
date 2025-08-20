@@ -48,14 +48,27 @@ default = ["native-tls", "rodio-backend", "with-libmdns"]
 # system-managed certificates.
 native-tls = ["librespot-core/native-tls", "librespot-oauth/native-tls"]
 
-# rustls-tls: Uses the Rust-based rustls TLS implementation with platform certificate verification.
-# This provides a Rust TLS stack (with assembly optimizations) that uses rustls-platform-verifier to
-# automatically select the appropriate certificate authority (CA) certificates from your system's
-# trust store. Choose this for avoiding external OpenSSL dependencies, reproducible builds, or when
-# targeting platforms where native TLS dependencies are unavailable or problematic (musl, embedded,
-# static linking). On Linux it uses ca-certificates, on macOS it uses Security.framework, and on
-# Windows it uses the Windows certificate store.
-rustls-tls = ["librespot-core/rustls-tls", "librespot-oauth/rustls-tls"]
+# rustls-tls: Uses the Rust-based rustls TLS implementation with certificate authority (CA)
+# verification. This provides a Rust TLS stack (with assembly optimizations). Choose this for
+# avoiding external  OpenSSL dependencies, reproducible builds, or when targeting platforms where
+# native TLS  dependencies are unavailable or problematic (musl, embedded, static linking).
+#
+# Two certificate store options are available:
+#
+# - rustls-tls-native-roots: Uses rustls with native system certificate stores (ca-certificates on
+# Linux, Security.framework on macOS, Windows certificate store on Windows). Best for most users as
+# it integrates with system-managed certificates and gets security updates through the OS.
+rustls-tls-native-roots = [
+    "librespot-core/rustls-tls-native-roots",
+    "librespot-oauth/rustls-tls-native-roots",
+]
+# rustls-tls-webpki-roots: Uses rustls with Mozilla's compiled-in certificate store (webpki-roots).
+# Best for reproducible builds, containerized environments, or when you want certificate handling
+# to be independent of the host system.
+rustls-tls-webpki-roots = [
+    "librespot-core/rustls-tls-webpki-roots",
+    "librespot-oauth/rustls-tls-webpki-roots",
+]
 
 # Audio backends - see README.md for audio backend selection guide
 # Cross-platform backends:

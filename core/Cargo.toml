@@ -21,12 +21,23 @@ native-tls = [
     "librespot-oauth/native-tls",
     "tokio-tungstenite/native-tls",
 ]
-rustls-tls = [
-    "dep:hyper-rustls",
+rustls-tls-native-roots = [
+    "__rustls",
     "hyper-proxy2/rustls",
-    "librespot-oauth/rustls-tls",
-    "tokio-tungstenite/__rustls-tls",
+    "hyper-rustls/native-tokio",
+    "librespot-oauth/rustls-tls-native-roots",
+    "tokio-tungstenite/rustls-tls-native-roots",
 ]
+rustls-tls-webpki-roots = [
+    "__rustls",
+    "hyper-proxy2/rustls-webpki",
+    "hyper-rustls/webpki-tokio",
+    "librespot-oauth/rustls-tls-webpki-roots",
+    "tokio-tungstenite/rustls-tls-webpki-roots",
+]
+
+# Internal features - these are not meant to be used by end users
+__rustls = []
 
 [dependencies]
 librespot-oauth.workspace = true
@@ -60,8 +71,6 @@ hyper-rustls = { version = "0.27", default-features = false, features = [
     "http1",
     "http2",
     "ring",
-    "rustls-platform-verifier",
-    "tls12",
 ], optional = true }
 hyper-tls = { version = "0.6", optional = true }
 hyper-util = { version = "0.1", default-features = false, features = [

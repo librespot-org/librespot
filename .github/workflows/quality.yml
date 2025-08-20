@@ -71,9 +71,17 @@ jobs:
       - name: Run clippy with native-tls
         run: >
           cargo hack clippy -p librespot --each-feature --exclude-all-features
-          --include-features native-tls --exclude-features rustls-tls
+          --include-features native-tls
+          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots
 
-      - name: Run clippy with rustls-tls
+      - name: Run clippy with rustls-tls-native-roots
         run: >
           cargo hack clippy -p librespot --each-feature --exclude-all-features
-          --include-features rustls-tls --exclude-features native-tls
+          --include-features rustls-tls-native-roots
+          --exclude-features native-tls,rustls-tls-webpki-roots
+
+      - name: Run clippy with rustls-tls-webpki-roots
+        run: >
+          cargo hack clippy -p librespot --each-feature --exclude-all-features
+          --include-features rustls-tls-webpki-roots
+          --exclude-features native-tls,rustls-tls-native-roots

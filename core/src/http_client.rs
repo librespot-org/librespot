@@ -22,9 +22,9 @@ use parking_lot::Mutex;
 use thiserror::Error;
 use url::Url;
 
-#[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+#[cfg(all(feature = "__rustls", not(feature = "native-tls")))]
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
-#[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
+#[cfg(all(feature = "native-tls", not(feature = "__rustls")))]
 use hyper_tls::HttpsConnector;
 
 use crate::{
@@ -150,13 +150,16 @@ impl HttpClient {
     fn try_create_hyper_client(proxy_url: Option<&Url>) -> Result<HyperClient, Error> {
         // configuring TLS is expensive and should be done once per process
 
-        #[cfg(all(feature = "rustls-tls", not(feature = "native-tls")))]
+        #[cfg(all(feature = "__rustls", not(feature = "native-tls")))]
         let https_connector = {
-            let tls = HttpsConnectorBuilder::new().with_platform_verifier();
+            #[cfg(feature = "rustls-tls-native-roots")]
+            let tls = HttpsConnectorBuilder::new().with_native_roots()?;
+            #[cfg(feature = "rustls-tls-webpki-roots")]
+            let tls = HttpsConnectorBuilder::new().with_webpki_roots();
             tls.https_or_http().enable_http1().enable_http2().build()
         };
 
-        #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
+        #[cfg(all(feature = "native-tls", not(feature = "__rustls")))]
         let https_connector = HttpsConnector::new();
 
         // When not using a proxy a dummy proxy is configured that will not intercept any traffic.

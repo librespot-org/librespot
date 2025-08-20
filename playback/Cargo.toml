@@ -35,10 +35,15 @@ native-tls = [
     "librespot-audio/native-tls",
     "librespot-metadata/native-tls",
 ]
-rustls-tls = [
-    "librespot-core/rustls-tls",
-    "librespot-audio/rustls-tls",
-    "librespot-metadata/rustls-tls",
+rustls-tls-native-roots = [
+    "librespot-core/rustls-tls-native-roots",
+    "librespot-audio/rustls-tls-native-roots",
+    "librespot-metadata/rustls-tls-native-roots",
+]
+rustls-tls-webpki-roots = [
+    "librespot-core/rustls-tls-webpki-roots",
+    "librespot-audio/rustls-tls-webpki-roots",
+    "librespot-metadata/rustls-tls-webpki-roots",
 ]
 
 [dependencies]

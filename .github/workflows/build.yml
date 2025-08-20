@@ -80,12 +80,14 @@ jobs:
       - name: Check workspace with native-tls
         run: >
           cargo hack check -p librespot --each-feature --exclude-all-features
-          --include-features native-tls --exclude-features rustls-tls
+          --include-features native-tls
+          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots
 
-      - name: Check workspace with rustls-tls
+      - name: Check workspace with rustls-tls-native-roots
         run: >
           cargo hack check -p librespot --each-feature --exclude-all-features
-          --include-features rustls-tls --exclude-features native-tls
+          --include-features rustls-tls-native-roots
+          --exclude-features native-tls,rustls-tls-webpki-roots
 
       - name: Build binary with default features
         run: cargo build --frozen

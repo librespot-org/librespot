@@ -19,7 +19,8 @@ with-libmdns = ["dep:libmdns"]
 
 # TLS backend propagation
 native-tls = ["librespot-core/native-tls"]
-rustls-tls = ["librespot-core/rustls-tls"]
+rustls-tls-native-roots = ["librespot-core/rustls-tls-native-roots"]
+rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 
 [dependencies]
 librespot-core.workspace = true
