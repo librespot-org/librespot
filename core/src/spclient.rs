@@ -29,7 +29,7 @@ use futures_util::future::IntoStream;
 use http::{Uri, header::HeaderValue};
 use hyper::{
     HeaderMap, Method, Request,
-    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderName, RANGE},
+    header::{ACCEPT, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, HeaderName, RANGE},
 };
 use hyper_util::client::legacy::ResponseFuture;
 use protobuf::{Enum, Message, MessageFull};
@@ -482,6 +482,7 @@ impl SpClient {
             let mut request = Request::builder()
                 .method(method)
                 .uri(url)
+                .header(CONTENT_LENGTH, body.len())
                 .body(Bytes::copy_from_slice(body))?;
 
             // Reconnection logic: keep getting (cached) tokens because they might have expired.

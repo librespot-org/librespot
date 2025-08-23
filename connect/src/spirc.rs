@@ -898,8 +898,8 @@ impl SpircTask {
                 && cluster.active_device_id != self.session.device_id();
             if became_inactive {
                 info!("device became inactive");
-                self.connect_state.became_inactive(&self.session).await?;
-                self.handle_stop()
+                self.handle_disconnect().await?;
+                self.handle_stop();
             } else if self.connect_state.is_active() {
                 // fixme: workaround fix, because of missing information why it behaves like it does
                 //  background: when another device sends a connect-state update, some player's position de-syncs
@@ -1102,10 +1102,10 @@ impl SpircTask {
             ContextAction::Replace,
         ));
 
+        self.handle_activate();
+
         let timestamp = self.now_ms();
         let state = &mut self.connect_state;
-
-        state.set_active(true);
         state.handle_initial_transfer(&mut transfer);
 
         // adjust active context, so resolve knows for which context it should set up the state
