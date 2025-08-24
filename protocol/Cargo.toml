@@ -10,7 +10,7 @@ edition.workspace = true
 build = "build.rs"
 
 [dependencies]
-protobuf = "3.7"
+protobuf = "3"
 
 [build-dependencies]
 protobuf-codegen = "3"

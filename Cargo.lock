@@ -1833,7 +1833,7 @@ dependencies = [
 
 [[package]]
 name = "librespot"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "data-encoding",
  "env_logger",
@@ -1857,7 +1857,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-audio"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "aes",
  "bytes",
@@ -1876,7 +1876,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-connect"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "futures-util",
  "librespot-core",
@@ -1894,7 +1894,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-core"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "aes",
  "base64",
@@ -1951,7 +1951,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-discovery"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "aes",
  "base64",
@@ -1982,7 +1982,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-metadata"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1998,7 +1998,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-oauth"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "env_logger",
  "log",
@@ -2012,7 +2012,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-playback"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "alsa",
  "cpal",
@@ -2044,7 +2044,7 @@ dependencies = [
 
 [[package]]
 name = "librespot-protocol"
-version = "0.6.0-dev"
+version = "0.7.0"
 dependencies = [
  "protobuf",
  "protobuf-codegen",

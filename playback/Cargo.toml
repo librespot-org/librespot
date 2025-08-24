@@ -47,9 +47,9 @@ rustls-tls-webpki-roots = [
 ]
 
 [dependencies]
-librespot-audio.workspace = true
-librespot-core.workspace = true
-librespot-metadata.workspace = true
+librespot-audio = { version = "0.7.0", path = "../audio", default-features = false }
+librespot-core = { version = "0.7.0", path = "../core", default-features = false }
+librespot-metadata = { version = "0.7.0", path = "../metadata", default-features = false }
 
 portable-atomic = "1"
 futures-util = "0.3"

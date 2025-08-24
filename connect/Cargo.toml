@@ -18,9 +18,9 @@ rustls-tls-native-roots = ["librespot-core/rustls-tls-native-roots"]
 rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 
 [dependencies]
-librespot-core.workspace = true
-librespot-playback.workspace = true
-librespot-protocol.workspace = true
+librespot-core = { version = "0.7.0", path = "../core", default-features = false }
+librespot-playback = { version = "0.7.0", path = "../playback", default-features = false }
+librespot-protocol = { version = "0.7.0", path = "../protocol", default-features = false }
 
 futures-util = "0.3"
 log = "0.4"

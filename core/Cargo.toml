@@ -40,8 +40,8 @@ rustls-tls-webpki-roots = [
 __rustls = []
 
 [dependencies]
-librespot-oauth.workspace = true
-librespot-protocol.workspace = true
+librespot-oauth = { version = "0.7.0", path = "../oauth", default-features = false }
+librespot-protocol = { version = "0.7.0", path = "../protocol", default-features = false }
 
 aes = "0.8"
 base64 = "0.22"
