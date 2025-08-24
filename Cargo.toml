@@ -142,14 +142,14 @@ path = "src/main.rs"
 doc = false
 
 [workspace.dependencies]
-librespot-audio = { path = "audio", default-features = false }
-librespot-connect = { path = "connect", default-features = false }
-librespot-core = { path = "core", default-features = false }
-librespot-discovery = { path = "discovery", default-features = false }
-librespot-metadata = { path = "metadata", default-features = false }
-librespot-oauth = { path = "oauth", default-features = false }
-librespot-playback = { path = "playback", default-features = false }
-librespot-protocol = { path = "protocol", default-features = false }
+librespot-audio = { version = "0.7.0", path = "audio", default-features = false }
+librespot-connect = { version = "0.7.0", path = "connect", default-features = false }
+librespot-core = { version = "0.7.0", path = "core", default-features = false }
+librespot-discovery = { version = "0.7.0", path = "discovery", default-features = false }
+librespot-metadata = { version = "0.7.0", path = "metadata", default-features = false }
+librespot-oauth = { version = "0.7.0", path = "oauth", default-features = false }
+librespot-playback = { version = "0.7.0", path = "playback", default-features = false }
+librespot-protocol = { version = "0.7.0", path = "protocol", default-features = false }
 
 [dependencies]
 librespot-audio.workspace = true
