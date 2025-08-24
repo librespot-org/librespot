@@ -16,6 +16,7 @@ include = [
     "connect/**/*",
     "core/**/*",
     "discovery/**/*",
+    "examples/**/*",
     "metadata/**/*",
     "oauth/**/*",
     "playback/**/*",
