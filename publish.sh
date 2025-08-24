@@ -79,20 +79,6 @@ function get_crate_name {
   awk -v FS="name = " 'NF>1{print $2; exit}' Cargo.toml
 }
 
-function remoteWait() {
-  IFS=:
-  secs=${1}
-  crate_name=${2}
-  while [ $secs -gt 0 ]
-  do
-    sleep 1 &
-    printf "\rSleeping to allow %s to propagate on crates.io servers. Continuing in %2d second(s)." ${crate_name} ${secs}
-    secs=$(( $secs - 1 ))
-    wait
-  done
-  echo
-}
-
 function publishCrates {
   for CRATE in "${crates[@]}"
   do
@@ -123,7 +109,6 @@ function publishCrates {
       fi
     fi
     echo "Successfully published $crate_name to crates.io"
-    remoteWait 30 $crate_name
   done
 }
 
