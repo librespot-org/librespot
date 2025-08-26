@@ -552,6 +552,11 @@ impl SpircTask {
             }
         }
 
+        // this should clear the active session id, leaving an empty state
+        if let Err(why) = self.session.spclient().delete_connect_state_request().await {
+            error!("error during connect state deletion: {why}")
+        };
+
         self.session.dealer().close().await;
     }
 
@@ -1162,12 +1167,6 @@ impl SpircTask {
         self.notify().await?;
 
         self.connect_state.became_inactive(&self.session).await?;
-
-        // this should clear the active session id, leaving an empty state
-        self.session
-            .spclient()
-            .delete_connect_state_request()
-            .await?;
 
         self.player
             .emit_session_disconnected_event(self.session.connection_id(), self.session.username());
