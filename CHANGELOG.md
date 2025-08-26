@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [main] Use the config instead of the type default for values that are not provided by the user
+
 ### Security
 
 ## [0.7.0] - 2025-08-24
