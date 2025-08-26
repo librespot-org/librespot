@@ -489,9 +489,12 @@ impl SpClient {
             let token = self.session().login5().auth_token().await?;
 
             let headers_mut = request.headers_mut();
-            if let Some(ref hdrs) = headers {
-                *headers_mut = hdrs.clone();
+            if let Some(ref headers) = headers {
+                for (name, value) in headers {
+                    headers_mut.insert(name, value.clone());
+                }
             }
+
             headers_mut.insert(
                 AUTHORIZATION,
                 HeaderValue::from_str(&format!("{} {}", token.token_type, token.access_token,))?,

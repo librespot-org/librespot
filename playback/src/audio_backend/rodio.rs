@@ -193,7 +193,7 @@ fn create_sink(
         AudioFormat::S16 => cpal::SampleFormat::I16,
     };
 
-    let stream = match rodio::OutputStreamBuilder::default()
+    let mut stream = match rodio::OutputStreamBuilder::default()
         .with_device(cpal_device.clone())
         .with_config(&config.config())
         .with_sample_format(sample_format)
@@ -205,6 +205,9 @@ fn create_sink(
             rodio::OutputStreamBuilder::from_device(cpal_device)?.open_stream_or_fallback()?
         }
     };
+
+    // disable logging on stream drop
+    stream.log_on_drop(false);
 
     let sink = rodio::Sink::connect_new(stream.mixer());
     Ok((sink, stream))
