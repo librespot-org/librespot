@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [connect] Only deletes the connect state on dealer shutdown instead on disconnecting
+
 ### Security
 
 ## [0.7.0] - 2025-08-24
