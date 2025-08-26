@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [core] Fixed a problem where in `spclient` where a http 411 error was thrown because the header were set wrong 
+
 ### Security
 
 ## [0.7.0] - 2025-08-24
