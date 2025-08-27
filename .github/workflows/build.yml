@@ -12,7 +12,6 @@ name: build
       - "LICENSE"
       - "*.sh"
       - "**/Dockerfile*"
-      - "publish.sh"
       - "test.sh"
   pull_request:
     paths-ignore:
@@ -22,7 +21,6 @@ name: build
       - "LICENSE"
       - "*.sh"
       - "**/Dockerfile*"
-      - "publish.sh"
       - "test.sh"
   schedule:
     # Run CI every week
