@@ -1383,9 +1383,8 @@ async fn get_setup() -> Setup {
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
-        let name = opt_str(NAME).unwrap_or(connect_default_config.name);
-
-        if name.is_empty() {
+        let name = opt_str(NAME);
+        if matches!(name, Some(ref name) if name.is_empty()) {
             empty_string_error_msg(NAME, NAME_SHORT);
             exit(1);
         }
@@ -1393,11 +1392,13 @@ async fn get_setup() -> Setup {
         #[cfg(feature = "pulseaudio-backend")]
         {
             if env::var("PULSE_PROP_application.name").is_err() {
-                let pulseaudio_name = if name != connect_default_config.name {
-                    format!("{} - {}", connect_default_config.name, name)
-                } else {
-                    name.clone()
-                };
+                let op_pulseaudio_name = name
+                    .as_ref()
+                    .map(|name| format!("{} - {}", connect_default_config.name, name));
+
+                let pulseaudio_name = op_pulseaudio_name
+                    .as_deref()
+                    .unwrap_or(&connect_default_config.name);
 
                 set_env_var("PULSE_PROP_application.name", pulseaudio_name).await;
             }
@@ -1507,6 +1508,7 @@ async fn get_setup() -> Setup {
         let is_group = opt_present(DEVICE_IS_GROUP);
 
         // use config defaults if not provided
+        let name = name.unwrap_or(connect_default_config.name);
         let device_type = device_type.unwrap_or(connect_default_config.device_type);
         let initial_volume = initial_volume.unwrap_or(connect_default_config.initial_volume);
         let volume_steps = volume_steps.unwrap_or(connect_default_config.volume_steps);
