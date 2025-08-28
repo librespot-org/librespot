@@ -395,7 +395,7 @@ impl ConnectState {
         self.update_context_index(self.active_context, new_index + 1)?;
         self.fill_up_context = self.active_context;
 
-        if !self.current_track(|t| t.is_queue()) {
+        if !self.current_track(|t| t.is_queue() || self.is_skip_track(t, None)) {
             self.set_current_track(new_index)?;
         }
 

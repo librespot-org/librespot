@@ -44,17 +44,17 @@ impl ConnectState {
         self.set_repeat_context(repeat);
 
         if repeat {
-            self.set_shuffle(false);
-            self.reset_context(ResetContext::DefaultIndex);
-
+            if let ContextType::Autoplay = self.fill_up_context {
+                self.autoplay_context = None;
+                self.fill_up_context = ContextType::Default;
+            }
+            self.fill_up_next_tracks()
+        } else {
             let ctx = self.get_context(ContextType::Default)?;
             let current_track = ConnectState::find_index_in_context(ctx, |t| {
                 self.current_track(|t| &t.uri) == &t.uri
             })?;
             self.reset_playback_to_position(Some(current_track))
-        } else {
-            self.update_restrictions();
-            Ok(())
         }
     }
 }

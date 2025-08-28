@@ -124,7 +124,6 @@ impl<'ct> ConnectState {
                     continue;
                 }
                 Some(next) if next.is_unavailable() => continue,
-                Some(next) if self.is_skip_track(&next, None) => continue,
                 other => break other,
             };
         };

@@ -76,8 +76,10 @@ impl<T> ShuffleVec<T> {
         };
 
         for i in 1..self.vec.len() {
-            let n = indices[self.vec.len() - i - 1];
-            self.vec.swap(n, i);
+            match indices.get(self.vec.len() - i - 1) {
+                None => return,
+                Some(n) => self.vec.swap(*n, i),
+            }
         }
     }
 }
