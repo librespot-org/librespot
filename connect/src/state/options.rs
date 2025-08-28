@@ -65,8 +65,9 @@ impl ConnectState {
         self.reset_context(ResetContext::DefaultIndex);
         let ctx = self.get_context_mut(ContextType::Default)?;
 
-        // we don't need to include the current track, because it is already being played
-        ctx.skip_track = current_track;
+        if let Some(current_track) = current_track {
+            ctx.set_initial_track(current_track.uri);
+        }
 
         let seed =
             seed.unwrap_or_else(|| rand::rng().random_range(100_000_000_000..1_000_000_000_000));

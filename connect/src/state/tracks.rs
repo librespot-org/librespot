@@ -124,7 +124,7 @@ impl<'ct> ConnectState {
                     continue;
                 }
                 Some(next) if next.is_unavailable() => continue,
-                Some(next) if self.is_skip_track(&next) => continue,
+                Some(next) if self.is_skip_track(&next, None) => continue,
                 other => break other,
             };
         };
@@ -322,7 +322,11 @@ impl<'ct> ConnectState {
                     }
                 }
                 None => break,
-                Some(ct) if ct.is_unavailable() || self.is_skip_track(ct) => {
+                Some(ct) if ct.is_unavailable() || self.is_skip_track(ct, Some(iteration)) => {
+                    debug!(
+                        "skipped track {} during fillup as it's unavailable or should be skipped",
+                        ct.uri
+                    );
                     new_index += 1;
                     continue;
                 }
