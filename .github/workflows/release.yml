@@ -1,0 +1,101 @@
+name: release.yml
+on:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+
+jobs:
+  get-excluded-crates:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      excluded: ${{ steps.excluded-crates.outputs.EXCLUDE }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-tags: true
+
+      - name: Get excluded crates
+        id: excluded-crates
+        run: |
+          EXCLUDE=$(./.github/scripts/get-excluded-crates.sh)
+          echo "excluding [$EXCLUDE]"
+          echo EXCLUDE=$EXCLUDE >> ${GITHUB_OUTPUT}
+
+  publish-crates:
+    name: Publish crate librespot-${{ matrix.crate }}
+    needs: [ get-excluded-crates ]
+    runs-on: ubuntu-latest
+    permissions: 
+      contents: read
+    strategy:
+      max-parallel: 1 # for sequential execution because the order of publishing the crates is important
+      matrix:
+        # order is important
+        crate:
+          - protocol
+          - oauth
+          - core
+          - discovery
+          - audio
+          - metadata
+          - playback
+          - connect
+        # not all crates needs to be published all the time
+        exclude: ${{ fromJSON(needs.get-excluded-crates.outputs.excluded) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        if: ${{ contains('connect playback', matrix.crate ) }}  # only install the dep when the crate requires it
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - name: Verify librespot-${{ matrix.crate }}
+        run: cargo publish --package librespot-${{ matrix.crate }} --dry-run
+
+      - name: Publish librespot-${{ matrix.crate }}
+        if: ${{ !env.ACT }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ "${{ matrix.crate }}" = "protocol" ]; then
+            cargo publish --package librespot-${{ matrix.crate }} --no-verify
+          else
+            cargo publish --package librespot-${{ matrix.crate }}
+          fi
+
+  publish-binary:
+    name: publish librespot binary
+    needs: [ publish-crates ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - name: Verify librespot
+        run: cargo publish --dry-run --allow-dirty
+
+      - name: Publish librespot
+        if: ${{ !env.ACT }}
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}

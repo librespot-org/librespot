@@ -1,6 +1,6 @@
 [package]
 name = "librespot-playback"
-version.workspace = true
+version = "0.7.0"
 rust-version.workspace = true
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
 license.workspace = true

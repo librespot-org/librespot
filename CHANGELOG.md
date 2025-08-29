@@ -7,22 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-### Changed
-
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - [connect] Only deletes the connect state on dealer shutdown instead on disconnecting
 - [core] Fixed a problem where in `spclient` where a http 411 error was thrown because the header were set wrong 
 - [main] Use the config instead of the type default for values that are not provided by the user
 
-
-### Security
 
 ## [0.7.0] - 2025-08-24
 
@@ -139,7 +129,7 @@ will be well worth it.
 
 All these changes are likely to introduce new bugs as well as some regressions.
 We appreciate all your testing and contributions to the repository:
-https://github.com/librespot-org/librespot
+<https://github.com/librespot-org/librespot>
 
 ### Changed
 
