@@ -296,7 +296,8 @@ impl<'ct> ConnectState {
                     delimiter
                 }
                 None if !matches!(self.fill_up_context, ContextType::Autoplay)
-                    && self.autoplay_context.is_some() =>
+                    && self.autoplay_context.is_some()
+                    && !self.repeat_context() =>
                 {
                     self.update_context_index(self.fill_up_context, new_index)?;
 
