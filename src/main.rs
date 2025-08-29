@@ -1383,9 +1383,8 @@ async fn get_setup() -> Setup {
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
-        let name = opt_str(NAME).unwrap_or_else(|| connect_default_config.name.clone());
-
-        if name.is_empty() {
+        let name = opt_str(NAME);
+        if matches!(name, Some(ref name) if name.is_empty()) {
             empty_string_error_msg(NAME, NAME_SHORT);
             exit(1);
         }
@@ -1393,11 +1392,13 @@ async fn get_setup() -> Setup {
         #[cfg(feature = "pulseaudio-backend")]
         {
             if env::var("PULSE_PROP_application.name").is_err() {
-                let pulseaudio_name = if name != connect_default_config.name {
-                    format!("{} - {}", connect_default_config.name, name)
-                } else {
-                    name.clone()
-                };
+                let op_pulseaudio_name = name
+                    .as_ref()
+                    .map(|name| format!("{} - {}", connect_default_config.name, name));
+
+                let pulseaudio_name = op_pulseaudio_name
+                    .as_deref()
+                    .unwrap_or(&connect_default_config.name);
 
                 set_env_var("PULSE_PROP_application.name", pulseaudio_name).await;
             }
@@ -1467,50 +1468,50 @@ async fn get_setup() -> Setup {
                 } else {
                     cache.as_ref().and_then(Cache::volume)
                 }
-            })
-            .unwrap_or_default();
+            });
 
-        let device_type = opt_str(DEVICE_TYPE)
-            .as_deref()
-            .map(|device_type| {
-                DeviceType::from_str(device_type).unwrap_or_else(|_| {
-                    invalid_error_msg(
-                        DEVICE_TYPE,
-                        DEVICE_TYPE_SHORT,
-                        device_type,
-                        "computer, tablet, smartphone, \
+        let device_type = opt_str(DEVICE_TYPE).as_deref().map(|device_type| {
+            DeviceType::from_str(device_type).unwrap_or_else(|_| {
+                invalid_error_msg(
+                    DEVICE_TYPE,
+                    DEVICE_TYPE_SHORT,
+                    device_type,
+                    "computer, tablet, smartphone, \
                         speaker, tv, avr, stb, audiodongle, \
                         gameconsole, castaudio, castvideo, \
                         automobile, smartwatch, chromebook, \
                         carthing",
-                        DeviceType::default().into(),
-                    );
+                    DeviceType::default().into(),
+                );
 
-                    exit(1);
-                })
+                exit(1);
             })
-            .unwrap_or_default();
+        });
 
-        let volume_steps = opt_str(VOLUME_STEPS)
-            .map(|steps| match steps.parse::<u16>() {
-                Ok(value) => value,
-                _ => {
-                    let default_value = &connect_default_config.volume_steps.to_string();
+        let volume_steps = opt_str(VOLUME_STEPS).map(|steps| match steps.parse::<u16>() {
+            Ok(value) => value,
+            _ => {
+                let default_value = &connect_default_config.volume_steps.to_string();
 
-                    invalid_error_msg(
-                        VOLUME_STEPS,
-                        VOLUME_STEPS_SHORT,
-                        &steps,
-                        "a positive whole number <= 65535",
-                        default_value,
-                    );
+                invalid_error_msg(
+                    VOLUME_STEPS,
+                    VOLUME_STEPS_SHORT,
+                    &steps,
+                    "a positive whole number <= 65535",
+                    default_value,
+                );
 
-                    exit(1);
-                }
-            })
-            .unwrap_or_else(|| connect_default_config.volume_steps);
+                exit(1);
+            }
+        });
 
         let is_group = opt_present(DEVICE_IS_GROUP);
+
+        // use config defaults if not provided
+        let name = name.unwrap_or(connect_default_config.name);
+        let device_type = device_type.unwrap_or(connect_default_config.device_type);
+        let initial_volume = initial_volume.unwrap_or(connect_default_config.initial_volume);
+        let volume_steps = volume_steps.unwrap_or(connect_default_config.volume_steps);
 
         ConnectConfig {
             name,

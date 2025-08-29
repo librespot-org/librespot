@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [connect] Only deletes the connect state on dealer shutdown instead on disconnecting
 - [core] Fixed a problem where in `spclient` where a http 411 error was thrown because the header were set wrong 
+- [main] Use the config instead of the type default for values that are not provided by the user
+
 
 ### Security
 
