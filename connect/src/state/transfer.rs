@@ -4,6 +4,7 @@ use crate::{
     state::{
         context::ContextType,
         metadata::Metadata,
+        options::ShuffleState,
         provider::{IsProvider, Provider},
         {ConnectState, StateError},
     },
@@ -54,6 +55,7 @@ impl ConnectState {
         }
 
         let mut shuffle_seed = None;
+        let mut initial_track = None;
         if let Some(session) = transfer.current_session.as_mut() {
             player.play_origin = session.play_origin.take().map(Into::into).into();
             player.suppressions = session.suppressions.take().map(Into::into).into();
@@ -72,6 +74,8 @@ impl ConnectState {
                 .get_shuffle_seed()
                 .and_then(|seed| seed.parse().ok());
 
+            initial_track = session.context.get_initial_track().cloned();
+
             if let Some(mut ctx) = session.context.take() {
                 player.restrictions = ctx.restrictions.take().map(Into::into).into();
                 for (key, value) in ctx.metadata {
@@ -89,7 +93,13 @@ impl ConnectState {
             }
         }
 
-        self.transfer_shuffle_seed = shuffle_seed;
+        self.transfer_shuffle = match (shuffle_seed, initial_track) {
+            (Some(seed), Some(initial_track)) => Some(ShuffleState {
+                seed,
+                initial_track,
+            }),
+            _ => None,
+        };
 
         self.clear_prev_track();
         self.clear_next_tracks();
@@ -163,8 +173,8 @@ impl ConnectState {
             self.set_current_track(current_index.unwrap_or_default())?;
             self.set_shuffle(true);
 
-            let previous_seed = self.transfer_shuffle_seed.take();
-            self.shuffle(previous_seed)?;
+            let shuffle = self.transfer_shuffle.take();
+            self.shuffle(shuffle)?;
         } else {
             self.reset_playback_to_position(current_index)?;
         }

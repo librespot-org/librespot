@@ -10,6 +10,12 @@ use crate::{
 use protobuf::MessageField;
 use rand::Rng;
 
+#[derive(Default, Debug)]
+pub(crate) struct ShuffleState {
+    pub seed: u64,
+    pub initial_track: String,
+}
+
 impl ConnectState {
     fn add_options_if_empty(&mut self) {
         if self.player().options.is_none() {
@@ -44,7 +50,7 @@ impl ConnectState {
         self.set_repeat_context(false);
     }
 
-    pub fn shuffle(&mut self, seed: Option<u64>) -> Result<(), Error> {
+    pub fn shuffle(&mut self, shuffle_state: Option<ShuffleState>) -> Result<(), Error> {
         if let Some(reason) = self
             .player()
             .restrictions
@@ -60,20 +66,31 @@ impl ConnectState {
         self.clear_prev_track();
         self.clear_next_tracks();
 
-        let current_track = self.current_track(|t| t.clone().take());
+        let (seed, initial_track) = match shuffle_state {
+            Some(state) => (state.seed, Some(state.initial_track)),
+            None => (
+                rand::rng().random_range(100_000_000_000..1_000_000_000_000),
+                None,
+            ),
+        };
+
+        let current_track = self.current_track(|t| t.uri.clone());
+        let first_track = initial_track.as_ref().unwrap_or(&current_track);
 
         self.reset_context(ResetContext::DefaultIndex);
+
         let ctx = self.get_context_mut(ContextType::Default)?;
-
-        if let Some(current_track) = current_track {
-            ctx.set_initial_track(current_track.uri);
-        }
-
-        let seed =
-            seed.unwrap_or_else(|| rand::rng().random_range(100_000_000_000..1_000_000_000_000));
-
-        ctx.tracks.shuffle_with_seed(seed);
+        ctx.tracks
+            .shuffle_with_seed(seed, |f| f.uri == *first_track);
+        ctx.set_initial_track(first_track);
         ctx.set_shuffle_seed(seed);
+
+        let start_at =
+            initial_track.and_then(|initial| ctx.tracks.iter().position(|t| t.uri == initial));
+
+        let start_at = start_at.unwrap_or_default();
+        self.update_current_index(|i| i.track = start_at as u32);
+        self.update_context_index(ContextType::Default, start_at + 1)?;
 
         self.set_active_context(ContextType::Default);
         self.fill_up_context = ContextType::Default;

@@ -8,6 +8,12 @@ use std::{
 pub struct ShuffleVec<T> {
     vec: Vec<T>,
     indices: Option<Vec<usize>>,
+    /// This is primarily necessary to ensure that shuffle does not behave out of place.
+    ///
+    /// For that reason we swap the first track with the currently playing track. By that we ensure
+    /// that the shuffle state is consistent between resets of the state because the first track is
+    /// always the track with which we started playing when switching to shuffle.
+    original_first_position: Option<usize>,
 }
 
 impl<T: PartialEq> PartialEq for ShuffleVec<T> {
@@ -41,16 +47,33 @@ impl<T> IntoIterator for ShuffleVec<T> {
 
 impl<T> From<Vec<T>> for ShuffleVec<T> {
     fn from(vec: Vec<T>) -> Self {
-        Self { vec, indices: None }
+        Self {
+            vec,
+            original_first_position: None,
+            indices: None,
+        }
     }
 }
 
 impl<T> ShuffleVec<T> {
-    pub fn shuffle_with_seed(&mut self, seed: u64) {
-        self.shuffle_with_rng(SmallRng::seed_from_u64(seed))
+    pub fn shuffle_with_seed<F: Fn(&T) -> bool>(
+        &mut self,
+        seed: u64,
+        is_first: F,
+    ) -> Option<usize> {
+        self.shuffle_with_rng(SmallRng::seed_from_u64(seed), is_first)
     }
 
-    pub fn shuffle_with_rng(&mut self, mut rng: impl Rng) {
+    pub fn shuffle_with_rng<F: Fn(&T) -> bool>(
+        &mut self,
+        mut rng: impl Rng,
+        is_first: F,
+    ) -> Option<usize> {
+        if self.vec.len() < 3 {
+            info!("skipped shuffling for less than three items");
+            return None;
+        }
+
         if self.indices.is_some() {
             self.unshuffle()
         }
@@ -66,7 +89,14 @@ impl<T> ShuffleVec<T> {
             self.vec.swap(i, rnd_ind);
         }
 
-        self.indices = Some(indices)
+        self.indices = Some(indices);
+
+        self.original_first_position = self.vec.iter().position(is_first);
+        if let Some(first_pos) = self.original_first_position {
+            self.vec.swap(0, first_pos)
+        }
+
+        self.original_first_position
     }
 
     pub fn unshuffle(&mut self) {
@@ -74,6 +104,11 @@ impl<T> ShuffleVec<T> {
             Some(indices) => indices,
             None => return,
         };
+
+        if let Some(first_pos) = self.original_first_position {
+            self.vec.swap(0, first_pos);
+            self.original_first_position = None;
+        }
 
         for i in 1..self.vec.len() {
             match indices.get(self.vec.len() - i - 1) {
@@ -97,10 +132,10 @@ mod test {
         let base_vec: ShuffleVec<i32> = vec.into();
 
         let mut shuffled_vec = base_vec.clone();
-        shuffled_vec.shuffle_with_seed(seed);
+        shuffled_vec.shuffle_with_seed(seed, |_| false);
 
         let mut different_shuffled_vec = base_vec.clone();
-        different_shuffled_vec.shuffle_with_seed(seed);
+        different_shuffled_vec.shuffle_with_seed(seed, |_| false);
 
         assert_eq!(shuffled_vec, different_shuffled_vec);
 

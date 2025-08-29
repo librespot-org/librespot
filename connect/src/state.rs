@@ -23,6 +23,7 @@ use crate::{
     },
     state::{
         context::{ContextType, ResetContext, StateContext},
+        options::ShuffleState,
         provider::{IsProvider, Provider},
     },
 };
@@ -123,7 +124,7 @@ pub(super) struct ConnectState {
     /// the context from which we play, is used to top up prev and next tracks
     context: Option<StateContext>,
     /// seed extracted in [ConnectState::handle_initial_transfer] and used in [ConnectState::finish_transfer]
-    transfer_shuffle_seed: Option<u64>,
+    transfer_shuffle: Option<ShuffleState>,
 
     /// a context to keep track of the autoplay context
     autoplay_context: Option<StateContext>,
