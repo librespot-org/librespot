@@ -194,7 +194,7 @@ impl ConnectState {
             error!("context didn't have any tracks: {context:#?}");
             Err(StateError::ContextHasNoTracks)?;
         } else if matches!(context.uri, Some(ref uri) if uri.starts_with(LOCAL_FILES_IDENTIFIER)) {
-            Err(StateError::UnsupportedLocalPlayBack)?;
+            Err(StateError::UnsupportedLocalPlayback)?;
         }
 
         let mut next_contexts = Vec::new();
