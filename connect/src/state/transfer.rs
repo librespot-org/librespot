@@ -173,8 +173,10 @@ impl ConnectState {
             self.set_current_track(current_index.unwrap_or_default())?;
             self.set_shuffle(true);
 
-            let shuffle = self.transfer_shuffle.take();
-            self.shuffle(shuffle)?;
+            match self.transfer_shuffle.take() {
+                None => self.shuffle_new(),
+                Some(state) => self.shuffle_restore(state),
+            }?
         } else {
             self.reset_playback_to_position(current_index)?;
         }

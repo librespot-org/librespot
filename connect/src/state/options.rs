@@ -50,7 +50,7 @@ impl ConnectState {
         self.set_repeat_context(false);
     }
 
-    pub fn shuffle(&mut self, shuffle_state: Option<ShuffleState>) -> Result<(), Error> {
+    fn validate_shuffle_allowed(&self) -> Result<(), Error> {
         if let Some(reason) = self
             .player()
             .restrictions
@@ -61,39 +61,39 @@ impl ConnectState {
                 action: "shuffle",
                 reason: reason.clone(),
             })?
+        } else {
+            Ok(())
         }
+    }
 
+    pub fn shuffle_restore(&mut self, shuffle_state: ShuffleState) -> Result<(), Error> {
+        self.validate_shuffle_allowed()?;
+
+        self.shuffle(shuffle_state.seed, &shuffle_state.initial_track)
+    }
+
+    pub fn shuffle_new(&mut self) -> Result<(), Error> {
+        self.validate_shuffle_allowed()?;
+
+        let new_seed = rand::rng().random_range(100_000_000_000..1_000_000_000_000);
+        let current_track = self.current_track(|t| t.uri.clone());
+
+        self.shuffle(new_seed, &current_track)
+    }
+
+    fn shuffle(&mut self, seed: u64, initial_track: &str) -> Result<(), Error> {
         self.clear_prev_track();
         self.clear_next_tracks();
-
-        let (seed, initial_track) = match shuffle_state {
-            Some(state) => (state.seed, Some(state.initial_track)),
-            None => (
-                rand::rng().random_range(100_000_000_000..1_000_000_000_000),
-                None,
-            ),
-        };
-
-        let current_track = self.current_track(|t| t.uri.clone());
-        let first_track = initial_track.as_ref().unwrap_or(&current_track);
 
         self.reset_context(ResetContext::DefaultIndex);
 
         let ctx = self.get_context_mut(ContextType::Default)?;
         ctx.tracks
-            .shuffle_with_seed(seed, |f| f.uri == *first_track);
-        ctx.set_initial_track(first_track);
+            .shuffle_with_seed(seed, |f| f.uri == initial_track);
+
+        ctx.set_initial_track(initial_track);
         ctx.set_shuffle_seed(seed);
 
-        let start_at =
-            initial_track.and_then(|initial| ctx.tracks.iter().position(|t| t.uri == initial));
-
-        let start_at = start_at.unwrap_or_default();
-        self.update_current_index(|i| i.track = start_at as u32);
-        self.update_context_index(ContextType::Default, start_at + 1)?;
-
-        self.set_active_context(ContextType::Default);
-        self.fill_up_context = ContextType::Default;
         self.fill_up_next_tracks()?;
 
         Ok(())

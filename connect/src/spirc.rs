@@ -1287,7 +1287,7 @@ impl SpircTask {
             if self.context_resolver.has_next() {
                 self.connect_state.update_queue_revision()
             } else {
-                self.connect_state.shuffle(None)?;
+                self.connect_state.shuffle_new()?;
                 self.add_autoplay_resolving_when_required();
             }
         } else {
