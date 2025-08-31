@@ -1,5 +1,5 @@
 use crate::{Error, SpotifyId};
-use std::fmt;
+use std::{borrow::Cow, fmt};
 use thiserror::Error;
 
 use librespot_protocol as protocol;
@@ -20,7 +20,6 @@ impl From<&str> for SpotifyItemType {
     fn from(v: &str) -> Self {
         match v {
             "album" => Self::Album,
-
             "artist" => Self::Artist,
             "episode" => Self::Episode,
             "playlist" => Self::Playlist,
@@ -91,7 +90,8 @@ pub enum SpotifyUri {
         duration: std::time::Duration,
     },
     Unknown {
-        id: SpotifyId,
+        kind: Cow<'static, str>,
+        id: String,
     },
 }
 
@@ -124,8 +124,7 @@ impl SpotifyUri {
             | SpotifyUri::Episode { id }
             | SpotifyUri::Playlist { id, .. }
             | SpotifyUri::Show { id }
-            | SpotifyUri::Track { id }
-            | SpotifyUri::Unknown { id } => id.to_base62(),
+            | SpotifyUri::Track { id } => id.to_base62(),
             SpotifyUri::Local {
                 artist,
                 album_title,
@@ -137,6 +136,7 @@ impl SpotifyUri {
                     "{artist}:{album_title}:{track_title}:{duration_secs}"
                 ))
             }
+            SpotifyUri::Unknown { id, .. } => Ok(id.clone()),
         }
     }
 
@@ -183,9 +183,9 @@ impl SpotifyUri {
             return Err(SpotifyUriError::InvalidRoot.into());
         }
 
-        let item_type = item_type.into();
+        let item_type_parsed = item_type.into();
 
-        match item_type {
+        match item_type_parsed {
             SpotifyItemType::Album => Ok(Self::Album {
                 id: SpotifyId::from_base62(name)?,
             }),
@@ -212,7 +212,8 @@ impl SpotifyUri {
                 duration: Default::default(),
             }),
             SpotifyItemType::Unknown => Ok(Self::Unknown {
-                id: SpotifyId::from_base62(name)?,
+                kind: item_type.to_owned().into(),
+                id: name.to_owned(),
             }),
         }
     }
@@ -221,8 +222,7 @@ impl SpotifyUri {
     ///
     /// `src` is expected to be 32 bytes long and encoded using valid characters.
     ///
-    /// This method cannot be used to create local file IDs; passing in `SpotifyItemType::Local`
-    /// will always yield an error.
+    /// item_type must not be SpotifyItemType::Local or SpotifyItemType::Unknown.
     ///
     /// Spotify URI: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn from_base16(src: &str, item_type: SpotifyItemType) -> SpotifyUriResult {
@@ -249,8 +249,7 @@ impl SpotifyUri {
     ///
     /// The resulting `SpotifyId` will have a type based on the value of `item_type`.
     ///
-    /// This method cannot be used to create local file IDs; passing in `SpotifyItemType::Local`
-    /// will always yield an error.
+    /// item_type must not be SpotifyItemType::Local or SpotifyItemType::Unknown.
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn from_raw(src: &[u8], item_type: SpotifyItemType) -> SpotifyUriResult {
@@ -267,8 +266,9 @@ impl SpotifyUri {
             SpotifyItemType::Playlist => Ok(Self::Playlist { id, user: None }),
             SpotifyItemType::Show => Ok(Self::Show { id }),
             SpotifyItemType::Track => Ok(Self::Track { id }),
-            SpotifyItemType::Unknown => Ok(Self::Unknown { id }),
-            SpotifyItemType::Local => Err(SpotifyUriError::InvalidFormat.into()),
+            SpotifyItemType::Local | SpotifyItemType::Unknown => {
+                Err(SpotifyUriError::InvalidFormat.into())
+            }
         }
     }
 
@@ -384,7 +384,8 @@ impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyUri {
     type Error = crate::Error;
     fn try_from(item: &protocol::playlist4_external::MetaItem) -> Result<Self, Self::Error> {
         Ok(Self::Unknown {
-            id: SpotifyId::try_from(item.revision())?,
+            kind: "MetaItem".into(),
+            id: SpotifyId::try_from(item.revision())?.to_base62()?,
         })
     }
 }
@@ -396,7 +397,8 @@ impl TryFrom<&protocol::playlist4_external::SelectedListContent> for SpotifyUri 
         playlist: &protocol::playlist4_external::SelectedListContent,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Unknown {
-            id: SpotifyId::try_from(playlist.revision())?,
+            kind: "SelectedListContent".into(),
+            id: SpotifyId::try_from(playlist.revision())?.to_base62()?,
         })
     }
 }
@@ -410,7 +412,8 @@ impl TryFrom<&protocol::playlist_annotate3::TranscodedPicture> for SpotifyUri {
         picture: &protocol::playlist_annotate3::TranscodedPicture,
     ) -> Result<Self, Self::Error> {
         Ok(Self::Unknown {
-            id: SpotifyId::from_base62(picture.uri())?,
+            kind: "TranscodedPicture".into(),
+            id: picture.uri().to_owned(),
         })
     }
 }
@@ -489,12 +492,12 @@ mod tests {
 
     static CONV_INVALID: [ConversionCase; 5] = [
         ConversionCase {
-            parsed: SpotifyUri::Unknown {
+            parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
             kind: SpotifyItemType::Unknown,
             // Invalid ID in the URI.
-            uri: "spotify:arbitrarywhatever:5sWHDYs0Bl0tH",
+            uri: "spotify:track:5sWHDYs0Bl0tH",
             base16: "ZZZZZ8081e1f4c54be38e8d6f9f12bb9",
             base62: "!!!!!Ys0csV6RS48xBl0tH",
             raw: &[
@@ -503,7 +506,7 @@ mod tests {
             ],
         },
         ConversionCase {
-            parsed: SpotifyUri::Unknown {
+            parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
             kind: SpotifyItemType::Unknown,
@@ -517,12 +520,12 @@ mod tests {
             ],
         },
         ConversionCase {
-            parsed: SpotifyUri::Unknown {
+            parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
             kind: SpotifyItemType::Unknown,
             // Uri too short
-            uri: "spotify:azb:aRS48xBl0tH",
+            uri: "spotify:track:aRS48xBl0tH",
             // too long, should return error but not panic overflow
             base16: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             // too long, should return error but not panic overflow
@@ -533,12 +536,12 @@ mod tests {
             ],
         },
         ConversionCase {
-            parsed: SpotifyUri::Unknown {
+            parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
             kind: SpotifyItemType::Unknown,
             // Uri too short
-            uri: "spotify:azb:aRS48xBl0tH",
+            uri: "spotify:track:aRS48xBl0tH",
             base16: "--------------------",
             // too short to encode a 128 bits int
             base62: "aa",
@@ -548,7 +551,7 @@ mod tests {
             ],
         },
         ConversionCase {
-            parsed: SpotifyUri::Unknown {
+            parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
             kind: SpotifyItemType::Unknown,
@@ -604,6 +607,20 @@ mod tests {
         for c in &CONV_INVALID {
             assert!(SpotifyUri::from_uri(c.uri).is_err());
         }
+    }
+
+    #[test]
+    fn from_invalid_type_uri() {
+        let actual =
+            SpotifyUri::from_uri("spotify:arbitrarywhatever:5sWHDYs0csV6RS48xBl0tH").unwrap();
+
+        assert_eq!(
+            actual,
+            SpotifyUri::Unknown {
+                kind: "arbitrarywhatever".into(),
+                id: "5sWHDYs0csV6RS48xBl0tH".to_owned()
+            }
+        )
     }
 
     #[test]
