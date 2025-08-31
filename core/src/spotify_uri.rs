@@ -307,19 +307,6 @@ impl SpotifyUri {
     pub fn to_base62(&self) -> Result<String, Error> {
         self.to_name()
     }
-
-    pub fn to_base16(&self) -> Result<String, Error> {
-        match self {
-            SpotifyUri::Album { id }
-            | SpotifyUri::Artist { id }
-            | SpotifyUri::Episode { id }
-            | SpotifyUri::Playlist { id, .. }
-            | SpotifyUri::Show { id, .. }
-            | SpotifyUri::Track { id, .. }
-            | SpotifyUri::Unknown { id, .. } => Ok(id.to_base16()?),
-            SpotifyUri::Local { .. } => Err(SpotifyUriError::InvalidFormat.into()),
-        }
-    }
 }
 
 impl fmt::Debug for SpotifyUri {
@@ -602,13 +589,6 @@ mod tests {
 
         for c in &CONV_INVALID {
             assert!(SpotifyId::from_base16(c.base16).is_err(),);
-        }
-    }
-
-    #[test]
-    fn to_base16() {
-        for c in &CONV_VALID {
-            assert_eq!(c.parsed.to_base16().unwrap(), c.base16);
         }
     }
 
