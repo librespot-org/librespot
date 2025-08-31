@@ -23,6 +23,7 @@ use crate::{
     },
     state::{
         context::{ContextType, ResetContext, StateContext},
+        options::ShuffleState,
         provider::{IsProvider, Provider},
     },
 };
@@ -55,7 +56,7 @@ pub(super) enum StateError {
     #[error("the provided context has no tracks")]
     ContextHasNoTracks,
     #[error("playback of local files is not supported")]
-    UnsupportedLocalPlayBack,
+    UnsupportedLocalPlayback,
     #[error("track uri <{0:?}> contains invalid characters")]
     InvalidTrackUri(Option<String>),
 }
@@ -69,7 +70,7 @@ impl From<StateError> for Error {
             | CanNotFindTrackInContext(_, _)
             | ContextHasNoTracks
             | InvalidTrackUri(_) => Error::failed_precondition(err),
-            CurrentlyDisallowed { .. } | UnsupportedLocalPlayBack => Error::unavailable(err),
+            CurrentlyDisallowed { .. } | UnsupportedLocalPlayback => Error::unavailable(err),
         }
     }
 }
@@ -123,7 +124,7 @@ pub(super) struct ConnectState {
     /// the context from which we play, is used to top up prev and next tracks
     context: Option<StateContext>,
     /// seed extracted in [ConnectState::handle_initial_transfer] and used in [ConnectState::finish_transfer]
-    transfer_shuffle_seed: Option<u64>,
+    transfer_shuffle: Option<ShuffleState>,
 
     /// a context to keep track of the autoplay context
     autoplay_context: Option<StateContext>,
@@ -395,7 +396,7 @@ impl ConnectState {
         self.update_context_index(self.active_context, new_index + 1)?;
         self.fill_up_context = self.active_context;
 
-        if !self.current_track(|t| t.is_queue()) {
+        if !self.current_track(|t| t.is_queue() || self.is_skip_track(t, None)) {
             self.set_current_track(new_index)?;
         }
 

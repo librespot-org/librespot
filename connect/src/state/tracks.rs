@@ -124,7 +124,6 @@ impl<'ct> ConnectState {
                     continue;
                 }
                 Some(next) if next.is_unavailable() => continue,
-                Some(next) if self.is_skip_track(&next) => continue,
                 other => break other,
             };
         };
@@ -297,7 +296,8 @@ impl<'ct> ConnectState {
                     delimiter
                 }
                 None if !matches!(self.fill_up_context, ContextType::Autoplay)
-                    && self.autoplay_context.is_some() =>
+                    && self.autoplay_context.is_some()
+                    && !self.repeat_context() =>
                 {
                     self.update_context_index(self.fill_up_context, new_index)?;
 
@@ -322,7 +322,11 @@ impl<'ct> ConnectState {
                     }
                 }
                 None => break,
-                Some(ct) if ct.is_unavailable() || self.is_skip_track(ct) => {
+                Some(ct) if ct.is_unavailable() || self.is_skip_track(ct, Some(iteration)) => {
+                    debug!(
+                        "skipped track {} during fillup as it's unavailable or should be skipped",
+                        ct.uri
+                    );
                     new_index += 1;
                     continue;
                 }
