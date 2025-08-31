@@ -528,7 +528,7 @@ impl Player {
     #[deprecated(since = "0.8.0", note = "use load_uri instead")]
     pub fn load(&self, track_id: SpotifyId, start_playing: bool, position_ms: u32) {
         self.command(PlayerCommand::Load {
-            track_id: track_id.into(),
+            track_id: SpotifyUri::Track { id: track_id },
             play: start_playing,
             position_ms,
         });
@@ -545,7 +545,7 @@ impl Player {
     #[deprecated(since = "0.8.0", note = "use preload_uri instead")]
     pub fn preload(&self, track_id: SpotifyId) {
         self.command(PlayerCommand::Preload {
-            track_id: track_id.into(),
+            track_id: SpotifyUri::Track { id: track_id },
         });
     }
 
