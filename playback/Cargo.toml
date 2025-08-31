@@ -66,7 +66,7 @@ tokio = { version = "1", features = [
 zerocopy = { version = "0.8", features = ["derive"] }
 
 # Backends
-alsa = { version = "0.9", optional = true }
+alsa = { version = "0.10", optional = true }
 jack = { version = "0.13", optional = true }
 portaudio-rs = { version = "0.3", optional = true }
 sdl2 = { version = "0.38", optional = true }
