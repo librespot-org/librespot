@@ -322,12 +322,6 @@ impl SpotifyUri {
     }
 }
 
-impl From<SpotifyId> for SpotifyUri {
-    fn from(id: SpotifyId) -> Self {
-        Self::Unknown { id }
-    }
-}
-
 impl fmt::Debug for SpotifyUri {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("SpotifyUri")
