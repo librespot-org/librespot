@@ -23,7 +23,7 @@ rustls-tls-native-roots = ["librespot-core/rustls-tls-native-roots"]
 rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 
 [dependencies]
-librespot-core = { version = "0.7.0", path = "../core", default-features = false }
+librespot-core = { version = "0.7.1", path = "../core", default-features = false }
 
 aes = "0.8"
 base64 = "0.22"

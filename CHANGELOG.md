@@ -5,27 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) since v0.2.0.
 
-## [Unreleased]
-
-### Added
+## [v0.7.1] - 2025-08-31
 
 ### Changed
 
 - [connect] Shuffling was adjusted, so that shuffle and repeat can be used combined
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
-- [connect] Repeat context will not go into autoplay anymore and triggering autoplay while shuffling shouldn't reshuffle anymore 
+- [connect] Repeat context will not go into autoplay anymore and triggering autoplay while shuffling shouldn't reshuffle anymore
 - [connect] Only deletes the connect state on dealer shutdown instead on disconnecting
-- [core] Fixed a problem where in `spclient` where an http 411 error was thrown because the header were set wrong
+- [core] Fixed a problem where in `spclient` where an HTTP/411 error was thrown because the header was set wrong
 - [main] Use the config instead of the type default for values that are not provided by the user
-
-
-### Security
 
 ## [0.7.0] - 2025-08-24
 
@@ -425,7 +416,8 @@ v0.4.x as a stable branch until then.
 
 ## [0.1.0] - 2019-11-06
 
-[unreleased]: https://github.com/librespot-org/librespot/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/librespot-org/librespot/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/librespot-org/librespot/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/librespot-org/librespot/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/librespot-org/librespot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/librespot-org/librespot/compare/v0.4.2...v0.5.0
