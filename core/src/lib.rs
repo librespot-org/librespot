@@ -32,6 +32,7 @@ mod socket;
 #[allow(dead_code)]
 pub mod spclient;
 pub mod spotify_id;
+pub mod spotify_uri;
 pub mod token;
 #[doc(hidden)]
 pub mod util;
@@ -42,3 +43,4 @@ pub use error::Error;
 pub use file_id::FileId;
 pub use session::Session;
 pub use spotify_id::SpotifyId;
+pub use spotify_uri::SpotifyUri;
