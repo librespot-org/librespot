@@ -420,11 +420,82 @@ mod tests {
         },
     ];
 
+    struct ItemTypeCase {
+        uri: SpotifyUri,
+        expected_type: &'static str,
+    }
+
+    static ITEM_TYPES: [ItemTypeCase; 6] = [
+        ItemTypeCase {
+            uri: SpotifyUri::Album {
+                id: SpotifyId { id: 0 },
+            },
+            expected_type: "album",
+        },
+        ItemTypeCase {
+            uri: SpotifyUri::Artist {
+                id: SpotifyId { id: 0 },
+            },
+            expected_type: "artist",
+        },
+        ItemTypeCase {
+            uri: SpotifyUri::Episode {
+                id: SpotifyId { id: 0 },
+            },
+            expected_type: "episode",
+        },
+        ItemTypeCase {
+            uri: SpotifyUri::Playlist {
+                user: None,
+                id: SpotifyId { id: 0 },
+            },
+            expected_type: "playlist",
+        },
+        ItemTypeCase {
+            uri: SpotifyUri::Show {
+                id: SpotifyId { id: 0 },
+            },
+            expected_type: "show",
+        },
+        ItemTypeCase {
+            uri: SpotifyUri::Track {
+                id: SpotifyId { id: 0 },
+            },
+            expected_type: "track",
+        },
+    ];
+
     #[test]
-    fn to_name() {
+    fn to_id() {
         for c in &CONV_VALID {
             assert_eq!(c.parsed.to_id().unwrap(), c.base62);
         }
+    }
+
+    #[test]
+    fn item_type() {
+        for i in &ITEM_TYPES {
+            assert_eq!(i.uri.item_type(), i.expected_type);
+        }
+
+        // These need to use methods that can't be used in the static context like to_owned() and
+        // into().
+
+        let local_file = SpotifyUri::Local {
+            artist: "".to_owned(),
+            album_title: "".to_owned(),
+            track_title: "".to_owned(),
+            duration: Default::default(),
+        };
+
+        assert_eq!(local_file.item_type(), "local");
+
+        let unknown = SpotifyUri::Unknown {
+            kind: "not used".into(),
+            id: "".to_owned(),
+        };
+
+        assert_eq!(unknown.item_type(), "unknown");
     }
 
     #[test]
@@ -492,5 +563,15 @@ mod tests {
         for c in &CONV_VALID {
             assert_eq!(c.parsed.to_uri().unwrap(), c.uri);
         }
+    }
+
+    #[test]
+    fn to_named_uri() {
+        let string = "spotify:user:spotify:playlist:37i9dQZF1DWSw8liJZcPOI";
+
+        let actual =
+            SpotifyUri::from_uri("spotify:user:spotify:playlist:37i9dQZF1DWSw8liJZcPOI").unwrap();
+
+        assert_eq!(actual.to_uri().unwrap(), string);
     }
 }
