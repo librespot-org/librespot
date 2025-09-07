@@ -41,7 +41,7 @@ hyper-util = { version = "0.1", features = [
     "server-graceful",
     "service",
 ] }
-libmdns = { version = "0.9", optional = true }
+libmdns = { version = "0.10", optional = true }
 log = "0.4"
 rand = "0.9"
 serde = { version = "1", default-features = false, features = [
