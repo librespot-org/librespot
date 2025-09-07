@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
 - [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
-- [player] `load()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri`
-- [player] `preload()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri`
+- [player] `load()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [player] `preload()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
 
 ### Deprecated
 
