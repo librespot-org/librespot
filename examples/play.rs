@@ -43,7 +43,7 @@ async fn main() {
         backend(None, audio_format)
     });
 
-    player.load_uri(track, true, 0);
+    player.load(track, true, 0);
 
     println!("Playing...");
 

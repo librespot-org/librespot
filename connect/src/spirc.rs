@@ -1494,7 +1494,7 @@ impl SpircTask {
         }
 
         if let Some(track_id) = self.connect_state.preview_next_track() {
-            self.player.preload_uri(track_id);
+            self.player.preload(track_id);
         }
     }
 
@@ -1705,7 +1705,7 @@ impl SpircTask {
 
         let current_uri = self.connect_state.current_track(|t| &t.uri);
         let id = SpotifyUri::from_uri(current_uri)?;
-        self.player.load_uri(id, start_playing, position_ms);
+        self.player.load(id, start_playing, position_ms);
 
         self.connect_state
             .update_position(position_ms, self.now_ms());

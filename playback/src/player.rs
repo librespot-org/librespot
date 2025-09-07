@@ -525,16 +525,7 @@ impl Player {
         }
     }
 
-    #[deprecated(since = "0.8.0", note = "use load_uri instead")]
-    pub fn load(&self, track_id: SpotifyId, start_playing: bool, position_ms: u32) {
-        self.command(PlayerCommand::Load {
-            track_id: SpotifyUri::Track { id: track_id },
-            play: start_playing,
-            position_ms,
-        });
-    }
-
-    pub fn load_uri(&self, track_id: SpotifyUri, start_playing: bool, position_ms: u32) {
+    pub fn load(&self, track_id: SpotifyUri, start_playing: bool, position_ms: u32) {
         self.command(PlayerCommand::Load {
             track_id,
             play: start_playing,
@@ -542,14 +533,7 @@ impl Player {
         });
     }
 
-    #[deprecated(since = "0.8.0", note = "use preload_uri instead")]
-    pub fn preload(&self, track_id: SpotifyId) {
-        self.command(PlayerCommand::Preload {
-            track_id: SpotifyUri::Track { id: track_id },
-        });
-    }
-
-    pub fn preload_uri(&self, track_id: SpotifyUri) {
+    pub fn preload(&self, track_id: SpotifyUri) {
         self.command(PlayerCommand::Preload { track_id });
     }
 
@@ -959,9 +943,8 @@ impl PlayerTrackLoader {
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
         match track_uri {
-            SpotifyUri::Track { id: track_id } => {
-                self.load_remote_track(track_uri, track_id, position_ms)
-                    .await
+            SpotifyUri::Track { .. } | SpotifyUri::Episode { .. } => {
+                self.load_remote_track(track_uri, position_ms).await
             }
             _ => {
                 error!("Cannot handle load of track with URI: <{track_uri:?}>",);
@@ -973,9 +956,10 @@ impl PlayerTrackLoader {
     async fn load_remote_track(
         &self,
         track_uri: SpotifyUri,
-        track_id: SpotifyId,
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
+        let track_id: SpotifyId = (&track_uri).try_into().ok()?;
+
         let audio_item = match AudioItem::get_file(&self.session, track_uri).await {
             Ok(audio) => match self.find_available_alternative(audio).await {
                 Some(audio) => audio,

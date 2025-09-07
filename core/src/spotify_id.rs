@@ -2,7 +2,7 @@ use std::fmt;
 
 use thiserror::Error;
 
-use crate::Error;
+use crate::{Error, SpotifyUri};
 
 // re-export FileId for historic reasons, when it was part of this mod
 pub use crate::FileId;
@@ -199,6 +199,23 @@ impl TryFrom<&Vec<u8>> for SpotifyId {
     type Error = crate::Error;
     fn try_from(src: &Vec<u8>) -> Result<Self, Self::Error> {
         Self::try_from(src.as_slice())
+    }
+}
+
+impl TryFrom<&SpotifyUri> for SpotifyId {
+    type Error = crate::Error;
+    fn try_from(value: &SpotifyUri) -> Result<Self, Self::Error> {
+        match value {
+            SpotifyUri::Album { id }
+            | SpotifyUri::Artist { id }
+            | SpotifyUri::Episode { id }
+            | SpotifyUri::Playlist { id, .. }
+            | SpotifyUri::Show { id }
+            | SpotifyUri::Track { id } => Ok(*id),
+            SpotifyUri::Local { .. } | SpotifyUri::Unknown { .. } => {
+                Err(SpotifyIdError::InvalidFormat.into())
+            }
+        }
     }
 }
 

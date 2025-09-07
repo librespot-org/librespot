@@ -9,23 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- [playback] Add `load_uri()` function to load a `SpotifyUri`
-- [playback] Add `preload_uri()` function to load a `SpotifyUri`
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
 
 ### Changed
 
-- [connect] Changed `track_id` parameter in `SpircTask::handle_unavailable` from `SpotifyId` to `&SpotifyUri` (breaking)
-- [connect] Changed return type of `ConnectState::preview_next_track` from `Option<SpotifyId>` to
-  `Option<SpotifyUri>` (breaking)
-- [connect] Changed type of `id` parameter `ConnectState::mark_unavailable` from `SpotifyId` to `&SpotifyUri` (breaking)
 - [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
 - [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
+- [player] `load()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri`
+- [player] `preload()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri`
 
 ### Deprecated
 
-- [player] `load()` function marked for deprecation
-- [player] `preload()` function marked for deprecation
 
 ### Removed
 

@@ -82,9 +82,9 @@ impl SpotifyUri {
         }
     }
 
-    /// Gets the name of this URI. The resource name is the component of the URI that identifies
+    /// Gets the ID of this URI. The resource ID is the component of the URI that identifies
     /// the resource after its type label. If `self` is a named ID, the user will be omitted.
-    pub fn to_name(&self) -> Result<String, Error> {
+    pub fn to_id(&self) -> Result<String, Error> {
         match &self {
             SpotifyUri::Album { id }
             | SpotifyUri::Artist { id }
@@ -115,9 +115,6 @@ impl SpotifyUri {
     ///  - For most item types, a 22-character long, base62 encoded Spotify ID is expected.
     ///  - For local files, an arbitrary length string with the fields
     ///    `{artist}:{album_title}:{track_title}:{duration_in_seconds}` is expected.
-    ///
-    /// Note that this should not be used for playlists, which have the form of
-    /// `spotify:playlist:{id}`.
     ///
     /// Spotify URI: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn from_uri(src: &str) -> SpotifyUriResult {
@@ -196,7 +193,7 @@ impl SpotifyUri {
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn to_uri(&self) -> Result<String, Error> {
         let item_type = self.item_type();
-        let name = self.to_name()?;
+        let name = self.to_id()?;
 
         if let SpotifyUri::Playlist {
             id,
@@ -213,10 +210,10 @@ impl SpotifyUri {
     /// the resource after its type label. If `self` is a named ID, the user will be omitted.
     ///
     /// Deprecated: not all IDs can be represented in Base62, so this function has been renamed to
-    /// [SpotifyUri::to_name], which this implementation forwards to.
+    /// [SpotifyUri::to_id], which this implementation forwards to.
     #[deprecated(since = "0.8.0", note = "use to_name instead")]
     pub fn to_base62(&self) -> Result<String, Error> {
-        self.to_name()
+        self.to_id()
     }
 }
 
@@ -426,7 +423,7 @@ mod tests {
     #[test]
     fn to_name() {
         for c in &CONV_VALID {
-            assert_eq!(c.parsed.to_name().unwrap(), c.base62);
+            assert_eq!(c.parsed.to_id().unwrap(), c.base62);
         }
     }
 
