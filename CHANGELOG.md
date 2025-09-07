@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- [core] Removed `SpotifyItemType` enum; the new `SpotifyUri` is an enum over all item types and so which variant it is 
+  describes its item type (breaking)
+
 ### Fixed
 
 ### Security

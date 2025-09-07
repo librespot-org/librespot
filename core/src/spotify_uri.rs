@@ -4,47 +4,14 @@ use thiserror::Error;
 
 use librespot_protocol as protocol;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SpotifyItemType {
-    Album,
-    Artist,
-    Episode,
-    Playlist,
-    Show,
-    Track,
-    Local,
-    Unknown,
-}
-
-impl From<&str> for SpotifyItemType {
-    fn from(v: &str) -> Self {
-        match v {
-            "album" => Self::Album,
-            "artist" => Self::Artist,
-            "episode" => Self::Episode,
-            "playlist" => Self::Playlist,
-            "show" => Self::Show,
-            "track" => Self::Track,
-            "local" => Self::Local,
-            _ => Self::Unknown,
-        }
-    }
-}
-
-impl From<SpotifyItemType> for &str {
-    fn from(item_type: SpotifyItemType) -> &'static str {
-        match item_type {
-            SpotifyItemType::Album => "album",
-            SpotifyItemType::Artist => "artist",
-            SpotifyItemType::Episode => "episode",
-            SpotifyItemType::Playlist => "playlist",
-            SpotifyItemType::Show => "show",
-            SpotifyItemType::Track => "track",
-            SpotifyItemType::Local => "local",
-            _ => "unknown",
-        }
-    }
-}
+const SPOTIFY_ITEM_TYPE_ALBUM: &str = "album";
+const SPOTIFY_ITEM_TYPE_ARTIST: &str = "artist";
+const SPOTIFY_ITEM_TYPE_EPISODE: &str = "episode";
+const SPOTIFY_ITEM_TYPE_PLAYLIST: &str = "playlist";
+const SPOTIFY_ITEM_TYPE_SHOW: &str = "show";
+const SPOTIFY_ITEM_TYPE_TRACK: &str = "track";
+const SPOTIFY_ITEM_TYPE_LOCAL: &str = "local";
+const SPOTIFY_ITEM_TYPE_UNKNOWN: &str = "unknown";
 
 #[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
 pub enum SpotifyUriError {
@@ -101,17 +68,17 @@ impl SpotifyUri {
         matches!(self, SpotifyUri::Episode { .. } | SpotifyUri::Track { .. })
     }
 
-    /// Gets the item type of this URI as a [SpotifyItemType] value.
-    pub fn item_type(&self) -> SpotifyItemType {
+    /// Gets the item type of this URI as a static string
+    pub fn item_type(&self) -> &'static str {
         match &self {
-            SpotifyUri::Album { .. } => SpotifyItemType::Album,
-            SpotifyUri::Artist { .. } => SpotifyItemType::Artist,
-            SpotifyUri::Episode { .. } => SpotifyItemType::Episode,
-            SpotifyUri::Playlist { .. } => SpotifyItemType::Playlist,
-            SpotifyUri::Show { .. } => SpotifyItemType::Show,
-            SpotifyUri::Track { .. } => SpotifyItemType::Track,
-            SpotifyUri::Local { .. } => SpotifyItemType::Local,
-            SpotifyUri::Unknown { .. } => SpotifyItemType::Unknown,
+            SpotifyUri::Album { .. } => SPOTIFY_ITEM_TYPE_ALBUM,
+            SpotifyUri::Artist { .. } => SPOTIFY_ITEM_TYPE_ARTIST,
+            SpotifyUri::Episode { .. } => SPOTIFY_ITEM_TYPE_EPISODE,
+            SpotifyUri::Playlist { .. } => SPOTIFY_ITEM_TYPE_PLAYLIST,
+            SpotifyUri::Show { .. } => SPOTIFY_ITEM_TYPE_SHOW,
+            SpotifyUri::Track { .. } => SPOTIFY_ITEM_TYPE_TRACK,
+            SpotifyUri::Local { .. } => SPOTIFY_ITEM_TYPE_LOCAL,
+            SpotifyUri::Unknown { .. } => SPOTIFY_ITEM_TYPE_UNKNOWN,
         }
     }
 
@@ -183,92 +150,36 @@ impl SpotifyUri {
             return Err(SpotifyUriError::InvalidRoot.into());
         }
 
-        let item_type_parsed = item_type.into();
-
-        match item_type_parsed {
-            SpotifyItemType::Album => Ok(Self::Album {
+        match item_type {
+            SPOTIFY_ITEM_TYPE_ALBUM => Ok(Self::Album {
                 id: SpotifyId::from_base62(name)?,
             }),
-            SpotifyItemType::Artist => Ok(Self::Artist {
+            SPOTIFY_ITEM_TYPE_ARTIST => Ok(Self::Artist {
                 id: SpotifyId::from_base62(name)?,
             }),
-            SpotifyItemType::Episode => Ok(Self::Episode {
+            SPOTIFY_ITEM_TYPE_EPISODE => Ok(Self::Episode {
                 id: SpotifyId::from_base62(name)?,
             }),
-            SpotifyItemType::Playlist => Ok(Self::Playlist {
+            SPOTIFY_ITEM_TYPE_PLAYLIST => Ok(Self::Playlist {
                 id: SpotifyId::from_base62(name)?,
                 user: username,
             }),
-            SpotifyItemType::Show => Ok(Self::Show {
+            SPOTIFY_ITEM_TYPE_SHOW => Ok(Self::Show {
                 id: SpotifyId::from_base62(name)?,
             }),
-            SpotifyItemType::Track => Ok(Self::Track {
+            SPOTIFY_ITEM_TYPE_TRACK => Ok(Self::Track {
                 id: SpotifyId::from_base62(name)?,
             }),
-            SpotifyItemType::Local => Ok(Self::Local {
+            SPOTIFY_ITEM_TYPE_LOCAL => Ok(Self::Local {
                 artist: "unimplemented".to_owned(),
                 album_title: "unimplemented".to_owned(),
                 track_title: "unimplemented".to_owned(),
                 duration: Default::default(),
             }),
-            SpotifyItemType::Unknown => Ok(Self::Unknown {
+            _ => Ok(Self::Unknown {
                 kind: item_type.to_owned().into(),
                 id: name.to_owned(),
             }),
-        }
-    }
-
-    /// Parses a base16 (hex) encoded Spotify ID into a `SpotifyUri`.
-    ///
-    /// `src` is expected to be 32 bytes long and encoded using valid characters.
-    ///
-    /// item_type must not be SpotifyItemType::Local or SpotifyItemType::Unknown.
-    ///
-    /// Spotify URI: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
-    pub fn from_base16(src: &str, item_type: SpotifyItemType) -> SpotifyUriResult {
-        let id = SpotifyId::from_base16(src)?;
-
-        Self::from_id_and_type(id, item_type)
-    }
-
-    /// Parses a base62 encoded [Spotify ID] into a `u128`.
-    ///
-    /// `src` is expected to be 22 bytes long and encoded using valid characters.
-    ///
-    /// This method cannot be used to create local file IDs; passing in `SpotifyItemType::Local`
-    /// will always yield an error.
-    ///
-    /// Spotify URI: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
-    pub fn from_base62(src: &str, item_type: SpotifyItemType) -> SpotifyUriResult {
-        let id = SpotifyId::from_base62(src)?;
-
-        Self::from_id_and_type(id, item_type)
-    }
-
-    /// Creates a `u128` from a copy of `SpotifyId::SIZE` (16) bytes in big-endian order.
-    ///
-    /// The resulting `SpotifyId` will have a type based on the value of `item_type`.
-    ///
-    /// item_type must not be SpotifyItemType::Local or SpotifyItemType::Unknown.
-    ///
-    /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
-    pub fn from_raw(src: &[u8], item_type: SpotifyItemType) -> SpotifyUriResult {
-        let id = SpotifyId::from_raw(src)?;
-
-        Self::from_id_and_type(id, item_type)
-    }
-
-    fn from_id_and_type(id: SpotifyId, item_type: SpotifyItemType) -> SpotifyUriResult {
-        match item_type {
-            SpotifyItemType::Album => Ok(Self::Album { id }),
-            SpotifyItemType::Artist => Ok(Self::Artist { id }),
-            SpotifyItemType::Episode => Ok(Self::Episode { id }),
-            SpotifyItemType::Playlist => Ok(Self::Playlist { id, user: None }),
-            SpotifyItemType::Show => Ok(Self::Show { id }),
-            SpotifyItemType::Track => Ok(Self::Track { id }),
-            SpotifyItemType::Local | SpotifyItemType::Unknown => {
-                Err(SpotifyUriError::InvalidFormat.into())
-            }
         }
     }
 
@@ -284,7 +195,7 @@ impl SpotifyUri {
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn to_uri(&self) -> Result<String, Error> {
-        let item_type: &str = self.item_type().into();
+        let item_type = self.item_type();
         let name = self.to_name()?;
 
         if let SpotifyUri::Playlist {
@@ -424,11 +335,8 @@ mod tests {
 
     struct ConversionCase {
         parsed: SpotifyUri,
-        kind: SpotifyItemType,
         uri: &'static str,
-        base16: &'static str,
         base62: &'static str,
-        raw: &'static [u8],
     }
 
     static CONV_VALID: [ConversionCase; 4] = [
@@ -438,13 +346,8 @@ mod tests {
                     id: 238762092608182713602505436543891614649,
                 },
             },
-            kind: SpotifyItemType::Track,
             uri: "spotify:track:5sWHDYs0csV6RS48xBl0tH",
-            base16: "b39fe8081e1f4c54be38e8d6f9f12bb9",
             base62: "5sWHDYs0csV6RS48xBl0tH",
-            raw: &[
-                179, 159, 232, 8, 30, 31, 76, 84, 190, 56, 232, 214, 249, 241, 43, 185,
-            ],
         },
         ConversionCase {
             parsed: SpotifyUri::Track {
@@ -452,13 +355,8 @@ mod tests {
                     id: 204841891221366092811751085145916697048,
                 },
             },
-            kind: SpotifyItemType::Track,
             uri: "spotify:track:4GNcXTGWmnZ3ySrqvol3o4",
-            base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
-            raw: &[
-                154, 27, 28, 251, 198, 242, 68, 86, 154, 224, 53, 108, 119, 187, 233, 216,
-            ],
         },
         ConversionCase {
             parsed: SpotifyUri::Episode {
@@ -466,13 +364,8 @@ mod tests {
                     id: 204841891221366092811751085145916697048,
                 },
             },
-            kind: SpotifyItemType::Episode,
             uri: "spotify:episode:4GNcXTGWmnZ3ySrqvol3o4",
-            base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
-            raw: &[
-                154, 27, 28, 251, 198, 242, 68, 86, 154, 224, 53, 108, 119, 187, 233, 216,
-            ],
         },
         ConversionCase {
             parsed: SpotifyUri::Show {
@@ -480,13 +373,8 @@ mod tests {
                     id: 204841891221366092811751085145916697048,
                 },
             },
-            kind: SpotifyItemType::Show,
             uri: "spotify:show:4GNcXTGWmnZ3ySrqvol3o4",
-            base16: "9a1b1cfbc6f244569ae0356c77bbe9d8",
             base62: "4GNcXTGWmnZ3ySrqvol3o4",
-            raw: &[
-                154, 27, 28, 251, 198, 242, 68, 86, 154, 224, 53, 108, 119, 187, 233, 216,
-            ],
         },
     ];
 
@@ -495,87 +383,45 @@ mod tests {
             parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
-            kind: SpotifyItemType::Unknown,
             // Invalid ID in the URI.
             uri: "spotify:track:5sWHDYs0Bl0tH",
-            base16: "ZZZZZ8081e1f4c54be38e8d6f9f12bb9",
             base62: "!!!!!Ys0csV6RS48xBl0tH",
-            raw: &[
-                // Invalid length.
-                154, 27, 28, 251, 198, 242, 68, 86, 154, 224, 5, 3, 108, 119, 187, 233, 216, 255,
-            ],
         },
         ConversionCase {
             parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
-            kind: SpotifyItemType::Unknown,
             // Missing colon between ID and type.
             uri: "spotify:arbitrarywhatever5sWHDYs0csV6RS48xBl0tH",
-            base16: "--------------------",
             base62: "....................",
-            raw: &[
-                // Invalid length.
-                154, 27, 28, 251,
-            ],
         },
         ConversionCase {
             parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
-            kind: SpotifyItemType::Unknown,
             // Uri too short
             uri: "spotify:track:aRS48xBl0tH",
-            // too long, should return error but not panic overflow
-            base16: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             // too long, should return error but not panic overflow
             base62: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            raw: &[
-                // Invalid length.
-                154, 27, 28, 251,
-            ],
         },
         ConversionCase {
             parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
-            kind: SpotifyItemType::Unknown,
             // Uri too short
             uri: "spotify:track:aRS48xBl0tH",
-            base16: "--------------------",
             // too short to encode a 128 bits int
             base62: "aa",
-            raw: &[
-                // Invalid length.
-                154, 27, 28, 251,
-            ],
         },
         ConversionCase {
             parsed: SpotifyUri::Track {
                 id: SpotifyId { id: 0 },
             },
-            kind: SpotifyItemType::Unknown,
             uri: "cleary invalid uri",
-            base16: "--------------------",
             // too high of a value, this would need a 132 bits int
             base62: "ZZZZZZZZZZZZZZZZZZZZZZ",
-            raw: &[
-                // Invalid length.
-                154, 27, 28, 251,
-            ],
         },
     ];
-
-    #[test]
-    fn from_base62() {
-        for c in &CONV_VALID {
-            assert_eq!(SpotifyUri::from_base62(c.base62, c.kind).unwrap(), c.parsed,);
-        }
-
-        for c in &CONV_INVALID {
-            assert!(SpotifyId::from_base62(c.base62).is_err(),);
-        }
-    }
 
     #[test]
     fn to_name() {
@@ -585,23 +431,11 @@ mod tests {
     }
 
     #[test]
-    fn from_base16() {
-        for c in &CONV_VALID {
-            assert_eq!(SpotifyUri::from_base16(c.base16, c.kind).unwrap(), c.parsed);
-        }
-
-        for c in &CONV_INVALID {
-            assert!(SpotifyId::from_base16(c.base16).is_err(),);
-        }
-    }
-
-    #[test]
     fn from_uri() {
         for c in &CONV_VALID {
             let actual = SpotifyUri::from_uri(c.uri).unwrap();
 
             assert_eq!(actual, c.parsed);
-            assert_eq!(actual.item_type(), c.kind);
         }
 
         for c in &CONV_INVALID {
@@ -647,7 +481,6 @@ mod tests {
             panic!("wrong id type");
         };
 
-        assert_eq!(actual.item_type(), SpotifyItemType::Playlist);
         assert_eq!(*user, Some("spotify".to_owned()));
         assert_eq!(
             id,
@@ -661,17 +494,6 @@ mod tests {
     fn to_uri() {
         for c in &CONV_VALID {
             assert_eq!(c.parsed.to_uri().unwrap(), c.uri);
-        }
-    }
-
-    #[test]
-    fn from_raw() {
-        for c in &CONV_VALID {
-            assert_eq!(SpotifyUri::from_raw(c.raw, c.kind).unwrap(), c.parsed);
-        }
-
-        for c in &CONV_INVALID {
-            assert!(SpotifyUri::from_raw(c.raw, c.kind).is_err());
         }
     }
 }

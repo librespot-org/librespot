@@ -7,9 +7,6 @@ use crate::Error;
 // re-export FileId for historic reasons, when it was part of this mod
 pub use crate::FileId;
 
-// re-export SpotifyItemType for similar reasons
-pub use crate::spotify_uri::SpotifyItemType;
-
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SpotifyId {
     pub id: u128,
