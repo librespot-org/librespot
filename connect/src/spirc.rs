@@ -1056,7 +1056,7 @@ impl SpircTask {
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         let mut ctx_uri = match transfer.current_session.context.uri {
             None => Err(SpircError::NoUri("transfer context"))?,
-            // can apparently happen when a state is transferred stared with "uris" via the api
+            // can apparently happen when a state is transferred and was started with "uris" via the api
             Some(ref uri) if uri == "-" => String::new(),
             Some(ref uri) => uri.clone(),
         };
@@ -1088,16 +1088,21 @@ impl SpircTask {
                 ContextAction::Replace,
             ));
         } else {
-            self.load_context_from_tracks(
-                transfer
-                    .current_session
-                    .context
-                    .pages
-                    .iter()
-                    .cloned()
-                    .flat_map(|p| p.tracks)
-                    .collect::<Vec<_>>(),
-            )?
+            let all_tracks = transfer
+                .current_session
+                .context
+                .pages
+                .iter()
+                .cloned()
+                .flat_map(|p| p.tracks)
+                .collect::<Vec<_>>();
+
+            if !all_tracks.is_empty() {
+                self.load_context_from_tracks(all_tracks)?
+            } else {
+                warn!("tried to transfer with an invalid state, using fallback ({fallback})");
+                ctx_uri = fallback.clone();
+            }
         }
 
         self.context_resolver.add(ResolveContext::from_uri(
@@ -1148,11 +1153,18 @@ impl SpircTask {
         if load_from_context_uri {
             self.transfer_state = Some(transfer);
         } else {
-            let ctx = self.connect_state.get_context(ContextType::Default)?;
-            let idx = ConnectState::find_index_in_context(ctx, |pt| {
-                self.connect_state.current_track(|t| pt.uri == t.uri)
-            })?;
-            self.connect_state.reset_playback_to_position(Some(idx))?;
+            match self.connect_state.get_context(ContextType::Default) {
+                Err(_) => {
+                    self.transfer_state = Some(transfer);
+                    warn!("no context to reset with, continuing transfer after context resolved");
+                }
+                Ok(ctx) => {
+                    let idx = ConnectState::find_index_in_context(ctx, |pt| {
+                        self.connect_state.current_track(|t| pt.uri == t.uri)
+                    })?;
+                    self.connect_state.reset_playback_to_position(Some(idx))?;
+                }
+            }
         }
 
         self.load_track(is_playing, position.try_into()?)

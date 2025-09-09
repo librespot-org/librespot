@@ -17,8 +17,10 @@ impl ConnectState {
         transfer: &TransferState,
     ) -> Result<ProvidedTrack, Error> {
         let track = if transfer.queue.is_playing_queue.unwrap_or_default() {
+            debug!("transfer track was used from the queue");
             transfer.queue.tracks.first()
         } else {
+            debug!("transfer track was the current track");
             transfer.playback.current_track.as_ref()
         }
         .ok_or(StateError::CouldNotResolveTrackFromTransfer)?;
