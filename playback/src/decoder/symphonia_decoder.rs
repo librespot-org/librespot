@@ -1,6 +1,8 @@
 use std::{io, time::Duration};
 
 use symphonia::{
+    core::meta::{Metadata, MetadataOptions},
+    core::probe::{Hint, ProbedMetadata},
     core::{
         audio::SampleBuffer,
         codecs::{Decoder, DecoderOptions},
@@ -27,6 +29,18 @@ pub struct SymphoniaDecoder {
     format: Box<dyn FormatReader>,
     decoder: Box<dyn Decoder>,
     sample_buffer: Option<SampleBuffer<f64>>,
+    probed_metadata: Option<ProbedMetadata>,
+}
+
+#[derive(Default)]
+pub(crate) struct LocalFileMetadata {
+    pub name: String,
+    pub language: String,
+    pub album: String,
+    pub artists: String,
+    pub album_artists: String,
+    pub number: u32,
+    pub disc_number: u32,
 }
 
 impl SymphoniaDecoder {
@@ -98,20 +112,62 @@ impl SymphoniaDecoder {
             // We set the sample buffer when decoding the first full packet,
             // whose duration is also the ideal sample buffer size.
             sample_buffer: None,
+
+            probed_metadata: None,
+        })
+    }
+
+    pub(crate) fn new_with_probe<R>(src: R, extension: Option<&str>) -> DecoderResult<Self>
+    where
+        R: MediaSource + 'static,
+    {
+        let mss = MediaSourceStream::new(Box::new(src), Default::default());
+
+        let mut hint = Hint::new();
+
+        if let Some(extension) = extension {
+            hint.with_extension(extension);
+        }
+
+        let format_opts: FormatOptions = Default::default();
+        let metadata_opts: MetadataOptions = Default::default();
+        let decoder_opts: DecoderOptions = Default::default();
+
+        let probed =
+            symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts)?;
+
+        let format = probed.format;
+
+        let track = format.default_track().ok_or_else(|| {
+            DecoderError::SymphoniaDecoder("Could not retrieve default track".into())
+        })?;
+
+        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &decoder_opts)?;
+
+        let rate = decoder.codec_params().sample_rate.ok_or_else(|| {
+            DecoderError::SymphoniaDecoder("Could not retrieve sample rate".into())
+        })?;
+
+        // TODO: The official client supports local files with sample rates other than 44,100 kHz.
+        // To play these accurately, we need to either resample the input audio, or introduce a way
+        // to change the player's current sample rate (likely by closing and re-opening the sink
+        // with new parameters).
+        if rate != SAMPLE_RATE {
+            return Err(DecoderError::SymphoniaDecoder(format!(
+                "Unsupported sample rate: {rate}. Local files must have a sample rate of {SAMPLE_RATE} Hz."
+            )));
+        }
+
+        Ok(Self {
+            format,
+            decoder,
+            sample_buffer: None,
+            probed_metadata: Some(probed.metadata),
         })
     }
 
     pub fn normalisation_data(&mut self) -> Option<NormalisationData> {
-        let mut metadata = self.format.metadata();
-
-        // Advance to the latest metadata revision.
-        // None means we hit the latest.
-        loop {
-            if metadata.pop().is_none() {
-                break;
-            }
-        }
-
+        let metadata = self.metadata()?;
         let tags = metadata.current()?.tags();
 
         if tags.is_empty() {
@@ -133,6 +189,70 @@ impl SymphoniaDecoder {
 
             Some(data)
         }
+    }
+
+    pub(crate) fn local_file_metadata(&mut self) -> Option<LocalFileMetadata> {
+        let metadata = self.metadata()?;
+        let tags = metadata.current()?.tags();
+        let mut metadata = LocalFileMetadata::default();
+
+        for tag in tags {
+            if let Value::String(value) = &tag.value {
+                match tag.std_key {
+                    // We could possibly use mem::take here to avoid cloning, but that risks leaving
+                    // the audio item metadata in a bad state.
+                    Some(StandardTagKey::TrackTitle) => metadata.name = value.clone(),
+                    Some(StandardTagKey::Language) => metadata.language = value.clone(),
+                    Some(StandardTagKey::Artist) => metadata.artists = value.clone(),
+                    Some(StandardTagKey::AlbumArtist) => metadata.album_artists = value.clone(),
+                    Some(StandardTagKey::Album) => metadata.album = value.clone(),
+                    Some(StandardTagKey::TrackNumber) => {
+                        metadata.number = value.parse::<u32>().unwrap_or_default()
+                    }
+                    Some(StandardTagKey::DiscNumber) => {
+                        metadata.disc_number = value.parse::<u32>().unwrap_or_default()
+                    }
+                    _ => (),
+                }
+            } else if let Value::UnsignedInt(value) = &tag.value {
+                match tag.std_key {
+                    Some(StandardTagKey::TrackNumber) => metadata.number = *value as u32,
+                    Some(StandardTagKey::DiscNumber) => metadata.disc_number = *value as u32,
+                    _ => (),
+                }
+            } else if let Value::SignedInt(value) = &tag.value {
+                match tag.std_key {
+                    Some(StandardTagKey::TrackNumber) => metadata.number = *value as u32,
+                    Some(StandardTagKey::DiscNumber) => metadata.disc_number = *value as u32,
+                    _ => (),
+                }
+            }
+        }
+
+        Some(metadata)
+    }
+
+    fn metadata(&mut self) -> Option<Metadata> {
+        let mut metadata = self.format.metadata();
+
+        // If we can't get metadata from the container, fall back to other tags found by probing.
+        // Note that this is only relevant for local files.
+        if metadata.current().is_none()
+            && let Some(ref mut probe_metadata) = self.probed_metadata
+            && let Some(inner_probe_metadata) = probe_metadata.get()
+        {
+            metadata = inner_probe_metadata;
+        }
+
+        // Advance to the latest metadata revision.
+        // None means we hit the latest.
+        loop {
+            if metadata.pop().is_none() {
+                break;
+            }
+        }
+
+        Some(metadata)
     }
 
     #[inline]
