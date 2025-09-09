@@ -1116,7 +1116,7 @@ impl SpircTask {
 
         let timestamp = self.now_ms();
         let state = &mut self.connect_state;
-        state.handle_initial_transfer(&mut transfer);
+        state.handle_initial_transfer(&mut transfer, ctx_uri.clone());
 
         // adjust active context, so resolve knows for which context it should set up the state
         state.active_context = if autoplay {

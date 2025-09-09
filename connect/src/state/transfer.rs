@@ -39,7 +39,7 @@ impl ConnectState {
     }
 
     /// handles the initially transferable data
-    pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState) {
+    pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState, ctx_uri: String) {
         let current_context_metadata = self.context.as_ref().map(|c| c.metadata.clone());
         let player = self.player_mut();
 
@@ -86,8 +86,8 @@ impl ConnectState {
             }
         }
 
-        player.context_url.clear();
-        player.context_uri.clear();
+        player.context_url = format!("context://{ctx_uri}");
+        player.context_uri = ctx_uri;
 
         if let Some(metadata) = current_context_metadata {
             for (key, value) in metadata {
