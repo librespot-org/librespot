@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [core] Add method `transfer` to `SpClient`
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
 - [discovery] Add support for [device aliases](https://developer.spotify.com/documentation/commercial-hardware/implementation/guides/zeroconf#device-aliases)
+- [main] `--local-file-dir` / `-l` option added to binary to specify local file directories to pull from
+- [metadata] `Local` variant added to `UniqueFields` enum (breaking)
+- [playback] Local files can now be played with the following caveats:
+  - They must be sampled at 44,100 Hz
+  - They cannot be played from a Connect device using the dedicated 'Local Files' playlist; they must be added to another playlist first
+- [playback] `local_file_directories` field added to `PlayerConfig` struct (breaking)
+  
 
 ### Changed
 
@@ -81,13 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [connect] Add `volume_steps` to `ConnectConfig` (breaking)
 - [connect] Add and enforce rustdoc
-- [connect] Add `audio/local` to the `supported_types` field of the device capabilities.
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [playback] Add `PlayerEvent::PositionChanged` event to notify about the current playback position
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
 - [core] Add `try_get_urls` to `CdnUrl`
 - [oauth] Add `OAuthClient` and `OAuthClientBuilder` structs to achieve a more customizable login process
-
 
 ### Fixed
 
