@@ -124,6 +124,11 @@ impl SpotifyUri {
         let mut parts = src.split(':');
 
         let scheme = parts.next().ok_or(SpotifyUriError::InvalidFormat)?;
+
+        if scheme != "spotify" {
+            return Err(SpotifyUriError::InvalidRoot.into());
+        }
+
         let mut username: Option<String> = None;
 
         let item_type = {
@@ -142,11 +147,6 @@ impl SpotifyUri {
         };
 
         let name = parts.next().ok_or(SpotifyUriError::InvalidFormat)?;
-
-        if scheme != "spotify" {
-            return Err(SpotifyUriError::InvalidRoot.into());
-        }
-
         match item_type {
             SPOTIFY_ITEM_TYPE_ALBUM => Ok(Self::Album {
                 id: SpotifyId::from_base62(name)?,
@@ -222,6 +222,12 @@ impl fmt::Debug for SpotifyUri {
         f.debug_tuple("SpotifyUri")
             .field(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
             .finish()
+    }
+}
+
+impl fmt::Display for SpotifyUri {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
     }
 }
 

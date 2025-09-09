@@ -1,5 +1,5 @@
 use crate::{
-    core::{Error, SpotifyUri},
+    core::{Error, SpotifyId, SpotifyUri},
     protocol::{
         context::Context,
         context_page::ContextPage,
@@ -14,7 +14,6 @@ use crate::{
         provider::{IsProvider, Provider},
     },
 };
-use librespot_core::SpotifyId;
 use protobuf::MessageField;
 use std::collections::HashMap;
 use uuid::Uuid;

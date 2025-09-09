@@ -947,7 +947,7 @@ impl PlayerTrackLoader {
                 self.load_remote_track(track_uri, position_ms).await
             }
             _ => {
-                error!("Cannot handle load of track with URI: <{track_uri:?}>",);
+                error!("Cannot handle load of track with URI: <{track_uri}>",);
                 None
             }
         }
@@ -958,7 +958,13 @@ impl PlayerTrackLoader {
         track_uri: SpotifyUri,
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
-        let track_id: SpotifyId = (&track_uri).try_into().ok()?;
+        let track_id: SpotifyId = match (&track_uri).try_into() {
+            Ok(id) => id,
+            Err(_) => {
+                warn!("<{track_uri}> could not be converted to a base62 ID");
+                return None;
+            }
+        };
 
         let audio_item = match AudioItem::get_file(&self.session, track_uri).await {
             Ok(audio) => match self.find_available_alternative(audio).await {

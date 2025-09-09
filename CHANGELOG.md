@@ -18,17 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [player] `load()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
 - [player] `preload()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
 
-### Deprecated
-
-
 ### Removed
 
 - [core] Removed `SpotifyItemType` enum; the new `SpotifyUri` is an enum over all item types and so which variant it is 
   describes its item type (breaking)
-
-### Fixed
-
-### Security
 
 ## [v0.7.1] - 2025-08-31
 
