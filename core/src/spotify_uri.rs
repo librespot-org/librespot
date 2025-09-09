@@ -1,5 +1,5 @@
 use crate::{Error, SpotifyId};
-use std::{borrow::Cow, fmt};
+use std::{borrow::Cow, fmt, str::FromStr, time::Duration};
 use thiserror::Error;
 
 use librespot_protocol as protocol;
@@ -65,7 +65,10 @@ pub enum SpotifyUri {
 impl SpotifyUri {
     /// Returns whether this `SpotifyUri` is for a playable audio item, if known.
     pub fn is_playable(&self) -> bool {
-        matches!(self, SpotifyUri::Episode { .. } | SpotifyUri::Track { .. })
+        matches!(
+            self,
+            SpotifyUri::Episode { .. } | SpotifyUri::Track { .. } | SpotifyUri::Local { .. }
+        )
     }
 
     /// Gets the item type of this URI as a static string
@@ -147,6 +150,7 @@ impl SpotifyUri {
         };
 
         let name = parts.next().ok_or(SpotifyUriError::InvalidFormat)?;
+
         match item_type {
             SPOTIFY_ITEM_TYPE_ALBUM => Ok(Self::Album {
                 id: SpotifyId::from_base62(name)?,
@@ -167,12 +171,23 @@ impl SpotifyUri {
             SPOTIFY_ITEM_TYPE_TRACK => Ok(Self::Track {
                 id: SpotifyId::from_base62(name)?,
             }),
-            SPOTIFY_ITEM_TYPE_LOCAL => Ok(Self::Local {
-                artist: "unimplemented".to_owned(),
-                album_title: "unimplemented".to_owned(),
-                track_title: "unimplemented".to_owned(),
-                duration: Default::default(),
-            }),
+            SPOTIFY_ITEM_TYPE_LOCAL => {
+                let artist = name;
+                let album_title = parts.next().unwrap_or_default();
+                // enforce track_title exists; spotify:local:::<duration> is a silly URI
+                let track_title = parts.next().ok_or(SpotifyUriError::InvalidFormat)?;
+                let duration_secs = parts
+                    .next()
+                    .and_then(|f| u64::from_str(f).ok())
+                    .ok_or(SpotifyUriError::InvalidFormat)?;
+
+                Ok(Self::Local {
+                    artist: artist.to_owned(),
+                    album_title: album_title.to_owned(),
+                    track_title: track_title.to_owned(),
+                    duration: Duration::from_secs(duration_secs),
+                })
+            }
             _ => Ok(Self::Unknown {
                 kind: item_type.to_owned().into(),
                 id: name.to_owned(),
@@ -533,15 +548,33 @@ mod tests {
 
     #[test]
     fn from_local_uri() {
-        let actual = SpotifyUri::from_uri("spotify:local:xyz:123").unwrap();
+        let actual = SpotifyUri::from_uri(
+            "spotify:local:David+Wise:Donkey+Kong+Country%3A+Tropical+Freeze:Snomads+Island:127",
+        )
+        .unwrap();
 
         assert_eq!(
             actual,
             SpotifyUri::Local {
-                artist: "unimplemented".to_owned(),
-                album_title: "unimplemented".to_owned(),
-                track_title: "unimplemented".to_owned(),
-                duration: Default::default(),
+                artist: "David+Wise".to_owned(),
+                album_title: "Donkey+Kong+Country%3A+Tropical+Freeze".to_owned(),
+                track_title: "Snomads+Island".to_owned(),
+                duration: Duration::from_secs(127),
+            }
+        );
+    }
+
+    #[test]
+    fn from_local_uri_missing_fields() {
+        let actual = SpotifyUri::from_uri("spotify:local:::Snomads+Island:127").unwrap();
+
+        assert_eq!(
+            actual,
+            SpotifyUri::Local {
+                artist: "".to_owned(),
+                album_title: "".to_owned(),
+                track_title: "Snomads+Island".to_owned(),
+                duration: Duration::from_secs(127),
             }
         );
     }
