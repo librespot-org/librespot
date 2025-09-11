@@ -1,5 +1,5 @@
 use crate::{
-    core::{Error, SpotifyId},
+    core::{Error, SpotifyUri},
     protocol::player::ProvidedTrack,
     state::{
         ConnectState, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE, StateError,
@@ -352,14 +352,14 @@ impl<'ct> ConnectState {
         Ok(())
     }
 
-    pub fn preview_next_track(&mut self) -> Option<SpotifyId> {
+    pub fn preview_next_track(&mut self) -> Option<SpotifyUri> {
         let next = if self.repeat_track() {
             self.current_track(|t| &t.uri)
         } else {
             &self.next_tracks().first()?.uri
         };
 
-        SpotifyId::from_uri(next).ok()
+        SpotifyUri::from_uri(next).ok()
     }
 
     pub fn has_next_tracks(&self, min: Option<usize>) -> bool {
@@ -381,7 +381,7 @@ impl<'ct> ConnectState {
         prev
     }
 
-    pub fn mark_unavailable(&mut self, id: SpotifyId) -> Result<(), Error> {
+    pub fn mark_unavailable(&mut self, id: &SpotifyUri) -> Result<(), Error> {
         let uri = id.to_uri()?;
 
         debug!("marking {uri} as unavailable");
