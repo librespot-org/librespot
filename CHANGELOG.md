@@ -15,13 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
 - [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
-- [player] `load()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
-- [player] `preload()` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [player] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [spclient] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+
 
 ### Removed
 
 - [core] Removed `SpotifyItemType` enum; the new `SpotifyUri` is an enum over all item types and so which variant it is 
   describes its item type (breaking)
+- [core] Removed `NamedSpotifyId` struct; it was made obsolete by `SpotifyUri` (breaking)
+- [core] The following methods have been removed from `SpotifyId` and moved to `SpotifyUri` (breaking):
+  - `is_playable`
+  - `from_uri`
+  - `to_uri`
 
 ## [v0.7.1] - 2025-08-31
 
