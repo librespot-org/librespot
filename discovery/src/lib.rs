@@ -406,12 +406,7 @@ fn launch_libmdns(
             }
             .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?;
 
-            let svc = responder.register(
-                DNS_SD_SERVICE_NAME.to_owned(),
-                name.into_owned(),
-                port,
-                &TXT_RECORD,
-            );
+            let svc = responder.register(&DNS_SD_SERVICE_NAME, &name, port, &TXT_RECORD);
 
             let _ = shutdown_rx.blocking_recv();
 
