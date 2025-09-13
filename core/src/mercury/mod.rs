@@ -11,7 +11,7 @@ use futures_util::FutureExt;
 use protobuf::Message;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{packet::PacketType, protocol, util::SeqGenerator, Error};
+use crate::{Error, packet::PacketType, protocol, util::SeqGenerator};
 
 mod types;
 pub use self::types::*;
@@ -131,12 +131,12 @@ impl MercuryManager {
                                 Ok(mut sub) => {
                                     let sub_uri = sub.take_uri();
 
-                                    debug!("subscribed sub_uri={}", sub_uri);
+                                    debug!("subscribed sub_uri={sub_uri}");
 
                                     inner.subscriptions.push((sub_uri, tx.clone()));
                                 }
                                 Err(e) => {
-                                    error!("could not subscribe to {}: {}", uri, e);
+                                    error!("could not subscribe to {uri}: {e}");
                                 }
                             }
                         }
@@ -163,7 +163,7 @@ impl MercuryManager {
 
             manager.lock(move |inner| {
                 if !inner.invalid {
-                    debug!("listening to uri={}", uri);
+                    debug!("listening to uri={uri}");
                     inner.subscriptions.push((uri, tx));
                 }
             });
@@ -283,14 +283,14 @@ impl MercuryManager {
                 Ok(())
             } else {
                 debug!("unknown subscription uri={}", &response.uri);
-                trace!("response pushed over Mercury: {:?}", response);
+                trace!("response pushed over Mercury: {response:?}");
                 Err(MercuryError::Response(response).into())
             }
         } else if let Some(cb) = pending.callback {
             cb.send(Ok(response)).map_err(|_| MercuryError::Channel)?;
             Ok(())
         } else {
-            error!("can't handle Mercury response: {:?}", response);
+            error!("can't handle Mercury response: {response:?}");
             Err(MercuryError::Response(response).into())
         }
     }

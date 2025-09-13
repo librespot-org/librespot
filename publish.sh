@@ -49,7 +49,7 @@ function updateVersion {
     fi
     crate_path="$WORKINGDIR/$CRATE_DIR/Cargo.toml"
     crate_path=${crate_path//\/\///}
-    $(replace_in_file "s/^version.*/version = \"$1\"/g" "$crate_path")
+    $(replace_in_file "s/^version =.*/version = \"$1\"/g" "$crate_path")
     echo "Path is $crate_path"
     if [ "$CRATE" = "librespot" ]
     then
@@ -77,20 +77,6 @@ function commitAndTag {
 
 function get_crate_name {
   awk -v FS="name = " 'NF>1{print $2; exit}' Cargo.toml
-}
-
-function remoteWait() {
-  IFS=:
-  secs=${1}
-  crate_name=${2}
-  while [ $secs -gt 0 ]
-  do
-    sleep 1 &
-    printf "\rSleeping to allow %s to propagate on crates.io servers. Continuing in %2d second(s)." ${crate_name} ${secs}
-    secs=$(( $secs - 1 ))
-    wait
-  done
-  echo
 }
 
 function publishCrates {
@@ -123,7 +109,6 @@ function publishCrates {
       fi
     fi
     echo "Successfully published $crate_name to crates.io"
-    remoteWait 30 $crate_name
   done
 }
 

@@ -33,10 +33,7 @@ impl MappedCtrl for VolumeCtrl {
             }
         } else {
             // Ensure not to return -inf or NaN due to division by zero.
-            error!(
-                "{:?} does not work with 0 dB range, using linear mapping instead",
-                self
-            );
+            error!("{self:?} does not work with 0 dB range, using linear mapping instead");
             normalized_volume
         };
 
@@ -67,10 +64,7 @@ impl MappedCtrl for VolumeCtrl {
             }
         } else {
             // Ensure not to return -inf or NaN due to division by zero.
-            error!(
-                "{:?} does not work with 0 dB range, using linear mapping instead",
-                self
-            );
+            error!("{self:?} does not work with 0 dB range, using linear mapping instead");
             mapped_volume
         };
 
@@ -87,11 +81,11 @@ impl MappedCtrl for VolumeCtrl {
 
     fn set_db_range(&mut self, new_db_range: f64) {
         match self {
-            Self::Cubic(ref mut db_range) | Self::Log(ref mut db_range) => *db_range = new_db_range,
-            _ => error!("Invalid to set dB range for volume control type {:?}", self),
+            Self::Cubic(db_range) | Self::Log(db_range) => *db_range = new_db_range,
+            _ => error!("Invalid to set dB range for volume control type {self:?}"),
         }
 
-        debug!("Volume control is now {:?}", self)
+        debug!("Volume control is now {self:?}")
     }
 
     fn range_ok(&self) -> bool {

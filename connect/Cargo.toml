@@ -1,32 +1,33 @@
 [package]
 name = "librespot-connect"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
-description = "The discovery and Spotify Connect logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+license.workspace = true
+description = "The Spotify Connect logic for librespot"
+repository.workspace = true
+edition.workspace = true
+
+[features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["native-tls"]
+
+# TLS backend propagation
+native-tls = ["librespot-core/native-tls"]
+rustls-tls-native-roots = ["librespot-core/rustls-tls-native-roots"]
+rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 
 [dependencies]
+librespot-core = { version = "0.7.1", path = "../core", default-features = false }
+librespot-playback = { version = "0.7.1", path = "../playback", default-features = false }
+librespot-protocol = { version = "0.7.1", path = "../protocol", default-features = false }
+
 futures-util = "0.3"
 log = "0.4"
-protobuf = "3.5"
-rand = { version = "0.8", default-features = false, features = ["small_rng"] }
+protobuf = "3.7"
+rand = { version = "0.9", default-features = false, features = ["small_rng"] }
 serde_json = "1.0"
-thiserror = "2.0"
+thiserror = "2"
 tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }
 tokio-stream = "0.1"
-uuid = { version = "1.11.0", features = ["v4"] }
-
-[dependencies.librespot-core]
-path = "../core"
-version = "0.6.0-dev"
-
-[dependencies.librespot-playback]
-path = "../playback"
-version = "0.6.0-dev"
-
-[dependencies.librespot-protocol]
-path = "../protocol"
-version = "0.6.0-dev"
+uuid = { version = "1.18", features = ["v4"] }

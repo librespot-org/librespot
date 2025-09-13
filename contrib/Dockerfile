@@ -40,10 +40,10 @@ RUN dpkg --add-architecture arm64 && \
 	libpulse0:arm64 \
 	libpulse0:armel \
 	libpulse0:armhf \
-	pkg-config 
+	pkg-config
 
 ENV PATH="/root/.cargo/bin/:${PATH}"
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.81 -y && \
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.85 -y && \
 	rustup target add aarch64-unknown-linux-gnu && \
 	rustup target add arm-unknown-linux-gnueabi && \
 	rustup target add arm-unknown-linux-gnueabihf && \

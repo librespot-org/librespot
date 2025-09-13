@@ -1,9 +1,9 @@
 use crate::{
-    core::{dealer::protocol::SetQueueCommand, Error},
+    core::{Error, dealer::protocol::SetQueueCommand},
     state::{
+        ConnectState,
         context::{ContextType, ResetContext},
         metadata::Metadata,
-        ConnectState,
     },
 };
 use protobuf::MessageField;
@@ -13,7 +13,7 @@ impl ConnectState {
         self.set_shuffle(shuffle);
 
         if shuffle {
-            return self.shuffle(None);
+            return self.shuffle_new();
         }
 
         self.reset_context(ResetContext::DefaultIndex);
@@ -44,17 +44,14 @@ impl ConnectState {
         self.set_repeat_context(repeat);
 
         if repeat {
-            self.set_shuffle(false);
-            self.reset_context(ResetContext::DefaultIndex);
-
-            let ctx = self.get_context(ContextType::Default)?;
-            let current_track = ConnectState::find_index_in_context(ctx, |t| {
-                self.current_track(|t| &t.uri) == &t.uri
-            })?;
-            self.reset_playback_to_position(Some(current_track))
-        } else {
-            self.update_restrictions();
-            Ok(())
+            if let ContextType::Autoplay = self.fill_up_context {
+                self.fill_up_context = ContextType::Default;
+            }
         }
+
+        let ctx = self.get_context(ContextType::Default)?;
+        let current_track =
+            ConnectState::find_index_in_context(ctx, |t| self.current_track(|t| &t.uri) == &t.uri)?;
+        self.reset_playback_to_position(Some(current_track))
     }
 }

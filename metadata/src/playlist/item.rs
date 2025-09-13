@@ -10,7 +10,7 @@ use super::{
     permission::Capabilities,
 };
 
-use librespot_core::{date::Date, SpotifyId};
+use librespot_core::{SpotifyUri, date::Date};
 
 use librespot_protocol as protocol;
 use protocol::playlist4_external::Item as PlaylistItemMessage;
@@ -19,7 +19,7 @@ use protocol::playlist4_external::MetaItem as PlaylistMetaItemMessage;
 
 #[derive(Debug, Clone)]
 pub struct PlaylistItem {
-    pub id: SpotifyId,
+    pub id: SpotifyUri,
     pub attributes: PlaylistItemAttributes,
 }
 
@@ -38,7 +38,7 @@ pub struct PlaylistItemList {
 
 #[derive(Debug, Clone)]
 pub struct PlaylistMetaItem {
-    pub revision: SpotifyId,
+    pub revision: SpotifyUri,
     pub attributes: PlaylistAttributes,
     pub length: i32,
     pub timestamp: Date,

@@ -1,6 +1,6 @@
 use std::{mem, str::FromStr, time::Duration};
 
-pub use crate::dither::{mk_ditherer, DithererBuilder, TriangularDitherer};
+pub use crate::dither::{DithererBuilder, TriangularDitherer, mk_ditherer};
 use crate::{convert::i24, player::duration_to_coefficient};
 
 #[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]

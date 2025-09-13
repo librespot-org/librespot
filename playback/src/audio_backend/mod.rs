@@ -46,6 +46,7 @@ fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat
 // reuse code for various backends
 macro_rules! sink_as_bytes {
     () => {
+        #[inline]
         fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {
             use crate::convert::i24;
             use zerocopy::IntoBytes;

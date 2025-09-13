@@ -1,4 +1,5 @@
-use rand::{distributions::Alphanumeric, Rng};
+use rand::Rng;
+use rand_distr::Alphanumeric;
 use vergen_gitcl::{BuildBuilder, Emitter, GitclBuilder};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Unable to generate the cargo keys!");
     let build_id = match std::env::var("SOURCE_DATE_EPOCH") {
         Ok(val) => val,
-        Err(_) => rand::thread_rng()
+        Err(_) => rand::rng()
             .sample_iter(Alphanumeric)
             .take(8)
             .map(char::from)

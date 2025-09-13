@@ -2,13 +2,19 @@ use crate::{
     core::Error,
     protocol::player::ContextPlayerOptions,
     state::{
+        ConnectState, StateError,
         context::{ContextType, ResetContext},
         metadata::Metadata,
-        ConnectState, StateError,
     },
 };
 use protobuf::MessageField;
 use rand::Rng;
+
+#[derive(Default, Debug)]
+pub(crate) struct ShuffleState {
+    pub seed: u64,
+    pub initial_track: String,
+}
 
 impl ConnectState {
     fn add_options_if_empty(&mut self) {
@@ -44,7 +50,7 @@ impl ConnectState {
         self.set_repeat_context(false);
     }
 
-    pub fn shuffle(&mut self, seed: Option<u64>) -> Result<(), Error> {
+    fn validate_shuffle_allowed(&self) -> Result<(), Error> {
         if let Some(reason) = self
             .player()
             .restrictions
@@ -55,27 +61,39 @@ impl ConnectState {
                 action: "shuffle",
                 reason: reason.clone(),
             })?
+        } else {
+            Ok(())
         }
+    }
 
+    pub fn shuffle_restore(&mut self, shuffle_state: ShuffleState) -> Result<(), Error> {
+        self.validate_shuffle_allowed()?;
+
+        self.shuffle(shuffle_state.seed, &shuffle_state.initial_track)
+    }
+
+    pub fn shuffle_new(&mut self) -> Result<(), Error> {
+        self.validate_shuffle_allowed()?;
+
+        let new_seed = rand::rng().random_range(100_000_000_000..1_000_000_000_000);
+        let current_track = self.current_track(|t| t.uri.clone());
+
+        self.shuffle(new_seed, &current_track)
+    }
+
+    fn shuffle(&mut self, seed: u64, initial_track: &str) -> Result<(), Error> {
         self.clear_prev_track();
         self.clear_next_tracks();
 
-        let current_track = self.current_track(|t| t.clone().take());
-
         self.reset_context(ResetContext::DefaultIndex);
+
         let ctx = self.get_context_mut(ContextType::Default)?;
+        ctx.tracks
+            .shuffle_with_seed(seed, |f| f.uri == initial_track);
 
-        // we don't need to include the current track, because it is already being played
-        ctx.skip_track = current_track;
-
-        let seed = seed
-            .unwrap_or_else(|| rand::thread_rng().gen_range(100_000_000_000..1_000_000_000_000));
-
-        ctx.tracks.shuffle_with_seed(seed);
+        ctx.set_initial_track(initial_track);
         ctx.set_shuffle_seed(seed);
 
-        self.set_active_context(ContextType::Default);
-        self.fill_up_context = ContextType::Default;
         self.fill_up_next_tracks()?;
 
         Ok(())

@@ -211,7 +211,9 @@ async fn avahi_task(
                     break 'wait_avahi;
                 }
             }
-            log::warn!("Failed to connect to Avahi, zeroconf discovery will not work until avahi-daemon is started. Check that it is installed and running");
+            log::warn!(
+                "Failed to connect to Avahi, zeroconf discovery will not work until avahi-daemon is started. Check that it is installed and running"
+            );
 
             // If it didn't, wait for the signal
             match stream.next().await {
@@ -404,12 +406,7 @@ fn launch_libmdns(
             }
             .map_err(|e| DiscoveryError::DnsSdError(Box::new(e)))?;
 
-            let svc = responder.register(
-                DNS_SD_SERVICE_NAME.to_owned(),
-                name.into_owned(),
-                port,
-                &TXT_RECORD,
-            );
+            let svc = responder.register(&DNS_SD_SERVICE_NAME, &name, port, &TXT_RECORD);
 
             let _ = shutdown_rx.blocking_recv();
 
@@ -419,7 +416,7 @@ fn launch_libmdns(
         };
 
         if let Err(e) = inner() {
-            log::error!("libmdns error: {}", e);
+            log::error!("libmdns error: {e}");
             let _ = status_tx.send(DiscoveryEvent::ZeroconfError(e));
         }
     });

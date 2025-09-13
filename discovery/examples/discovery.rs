@@ -16,6 +16,6 @@ async fn main() {
             .unwrap();
 
     while let Some(x) = server.next().await {
-        println!("Received {:?}", x);
+        println!("Received {x:?}");
     }
 }

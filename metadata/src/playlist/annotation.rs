@@ -3,13 +3,12 @@ use std::fmt::Debug;
 use protobuf::Message;
 
 use crate::{
+    Metadata,
     image::TranscodedPictures,
     request::{MercuryRequest, RequestResult},
-    Metadata,
 };
 
-use librespot_core::{Error, Session, SpotifyId};
-
+use librespot_core::{Error, Session, SpotifyId, SpotifyUri};
 use librespot_protocol as protocol;
 pub use protocol::playlist_annotate3::AbuseReportState;
 
@@ -26,12 +25,20 @@ pub struct PlaylistAnnotation {
 impl Metadata for PlaylistAnnotation {
     type Message = protocol::playlist_annotate3::PlaylistAnnotation;
 
-    async fn request(session: &Session, playlist_id: &SpotifyId) -> RequestResult {
+    async fn request(session: &Session, playlist_uri: &SpotifyUri) -> RequestResult {
         let current_user = session.username();
+
+        let SpotifyUri::Playlist {
+            id: playlist_id, ..
+        } = playlist_uri
+        else {
+            return Err(Error::invalid_argument("playlist_uri"));
+        };
+
         Self::request_for_user(session, &current_user, playlist_id).await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {
         Ok(Self {
             description: msg.description().to_owned(),
             picture: msg.picture().to_owned(), // TODO: is this a URL or Spotify URI?
@@ -60,11 +67,18 @@ impl PlaylistAnnotation {
     async fn get_for_user(
         session: &Session,
         username: &str,
-        playlist_id: &SpotifyId,
+        playlist_uri: &SpotifyUri,
     ) -> Result<Self, Error> {
+        let SpotifyUri::Playlist {
+            id: playlist_id, ..
+        } = playlist_uri
+        else {
+            return Err(Error::invalid_argument("playlist_uri"));
+        };
+
         let response = Self::request_for_user(session, username, playlist_id).await?;
         let msg = <Self as Metadata>::Message::parse_from_bytes(&response)?;
-        Self::parse(&msg, playlist_id)
+        Self::parse(&msg, playlist_uri)
     }
 }
 

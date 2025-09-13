@@ -1,11 +1,11 @@
 use crate::{
-    core::{Error, SpotifyId},
+    core::{Error, SpotifyUri},
     protocol::player::ProvidedTrack,
     state::{
+        ConnectState, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE, StateError,
         context::ContextType,
         metadata::Metadata,
         provider::{IsProvider, Provider},
-        ConnectState, StateError, SPOTIFY_MAX_NEXT_TRACKS_SIZE, SPOTIFY_MAX_PREV_TRACKS_SIZE,
     },
 };
 use protobuf::MessageField;
@@ -69,7 +69,7 @@ impl<'ct> ConnectState {
 
     pub fn set_current_track_random(&mut self) -> Result<(), Error> {
         let max_tracks = self.get_context(self.active_context)?.tracks.len();
-        let rng_track = rand::thread_rng().gen_range(0..max_tracks);
+        let rng_track = rand::rng().random_range(0..max_tracks);
         self.set_current_track(rng_track)
     }
 
@@ -124,7 +124,6 @@ impl<'ct> ConnectState {
                     continue;
                 }
                 Some(next) if next.is_unavailable() => continue,
-                Some(next) if self.is_skip_track(&next) => continue,
                 other => break other,
             };
         };
@@ -297,7 +296,8 @@ impl<'ct> ConnectState {
                     delimiter
                 }
                 None if !matches!(self.fill_up_context, ContextType::Autoplay)
-                    && self.autoplay_context.is_some() =>
+                    && self.autoplay_context.is_some()
+                    && !self.repeat_context() =>
                 {
                     self.update_context_index(self.fill_up_context, new_index)?;
 
@@ -322,7 +322,11 @@ impl<'ct> ConnectState {
                     }
                 }
                 None => break,
-                Some(ct) if ct.is_unavailable() || self.is_skip_track(ct) => {
+                Some(ct) if ct.is_unavailable() || self.is_skip_track(ct, Some(iteration)) => {
+                    debug!(
+                        "skipped track {} during fillup as it's unavailable or should be skipped",
+                        ct.uri
+                    );
                     new_index += 1;
                     continue;
                 }
@@ -348,14 +352,14 @@ impl<'ct> ConnectState {
         Ok(())
     }
 
-    pub fn preview_next_track(&mut self) -> Option<SpotifyId> {
+    pub fn preview_next_track(&mut self) -> Option<SpotifyUri> {
         let next = if self.repeat_track() {
             self.current_track(|t| &t.uri)
         } else {
             &self.next_tracks().first()?.uri
         };
 
-        SpotifyId::from_uri(next).ok()
+        SpotifyUri::from_uri(next).ok()
     }
 
     pub fn has_next_tracks(&self, min: Option<usize>) -> bool {
@@ -377,7 +381,7 @@ impl<'ct> ConnectState {
         prev
     }
 
-    pub fn mark_unavailable(&mut self, id: SpotifyId) -> Result<(), Error> {
+    pub fn mark_unavailable(&mut self, id: &SpotifyUri) -> Result<(), Error> {
         let uri = id.to_uri()?;
 
         debug!("marking {uri} as unavailable");

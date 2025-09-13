@@ -5,7 +5,7 @@ use bytes::Bytes;
 use thiserror::Error;
 use tokio::sync::oneshot;
 
-use crate::{packet::PacketType, util::SeqGenerator, Error, FileId, SpotifyId};
+use crate::{Error, FileId, SpotifyId, packet::PacketType, util::SeqGenerator};
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub struct AudioKey(pub [u8; 16]);
@@ -70,11 +70,7 @@ impl AudioKeyManager {
                     .map_err(|_| AudioKeyError::Channel)?
             }
             _ => {
-                trace!(
-                    "Did not expect {:?} AES key packet with data {:#?}",
-                    cmd,
-                    data
-                );
+                trace!("Did not expect {cmd:?} AES key packet with data {data:#?}");
                 return Err(AudioKeyError::Packet(cmd as u8).into());
             }
         }

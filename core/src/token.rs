@@ -86,8 +86,7 @@ impl TokenProvider {
         }
 
         trace!(
-            "Requested token in scopes {:?} unavailable or expired, requesting new token.",
-            scopes
+            "Requested token in scopes {scopes:?} unavailable or expired, requesting new token."
         );
 
         let query_uri = format!(
@@ -100,7 +99,7 @@ impl TokenProvider {
         let response = request.await?;
         let data = response.payload.first().ok_or(TokenError::Empty)?.to_vec();
         let token = Token::from_json(String::from_utf8(data)?)?;
-        trace!("Got token: {:#?}", token);
+        trace!("Got token: {token:#?}");
         self.lock(|inner| inner.tokens.push(token.clone()));
         Ok(token)
     }

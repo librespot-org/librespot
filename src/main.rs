@@ -5,18 +5,18 @@ use librespot::playback::mixer::alsamixer::AlsaMixer;
 use librespot::{
     connect::{ConnectConfig, Spirc},
     core::{
-        authentication::Credentials, cache::Cache, config::DeviceType, version, Session,
-        SessionConfig,
+        Session, SessionConfig, authentication::Credentials, cache::Cache, config::DeviceType,
+        version,
     },
     discovery::DnsSdServiceBuilder,
     playback::{
-        audio_backend::{self, SinkBuilder, BACKENDS},
+        audio_backend::{self, BACKENDS, SinkBuilder},
         config::{
             AudioFormat, Bitrate, NormalisationMethod, NormalisationType, PlayerConfig, VolumeCtrl,
         },
         dither,
         mixer::{self, MixerConfig, MixerFn},
-        player::{coefficient_to_duration, duration_to_coefficient, Player},
+        player::{Player, coefficient_to_duration, duration_to_coefficient},
     },
 };
 use librespot_oauth::OAuthClientBuilder;
@@ -24,6 +24,7 @@ use log::{debug, error, info, trace, warn};
 use sha1::{Digest, Sha1};
 use std::{
     env,
+    ffi::OsStr,
     fs::create_dir_all,
     ops::RangeInclusive,
     path::{Path, PathBuf},
@@ -34,10 +35,11 @@ use std::{
 };
 use sysinfo::{ProcessesToUpdate, System};
 use thiserror::Error;
+use tokio::sync::Semaphore;
 use url::Url;
 
 mod player_event_handler;
-use player_event_handler::{run_program_on_sink_events, EventHandler};
+use player_event_handler::{EventHandler, run_program_on_sink_events};
 
 fn device_id(name: &str) -> String {
     HEXLOWER.encode(&Sha1::digest(name.as_bytes()))
@@ -75,7 +77,9 @@ fn setup_logging(quiet: bool, verbose: bool) {
             builder.init();
 
             if verbose && quiet {
-                warn!("`--verbose` and `--quiet` are mutually exclusive. Logging can not be both verbose and quiet. Using verbose mode.");
+                warn!(
+                    "`--verbose` and `--quiet` are mutually exclusive. Logging can not be both verbose and quiet. Using verbose mode."
+                );
             }
         }
     }
@@ -219,7 +223,7 @@ struct Setup {
     zeroconf_backend: Option<DnsSdServiceBuilder>,
 }
 
-fn get_setup() -> Setup {
+async fn get_setup() -> Setup {
     const VALID_INITIAL_VOLUME_RANGE: RangeInclusive<u16> = 0..=100;
     const VALID_VOLUME_RANGE: RangeInclusive<f64> = 0.0..=100.0;
     const VALID_NORMALISATION_KNEE_RANGE: RangeInclusive<f64> = 0.0..=10.0;
@@ -810,7 +814,9 @@ fn get_setup() -> Setup {
         ALSA_MIXER_CONTROL,
     ] {
         if opt_present(a) {
-            warn!("Alsa specific options have no effect if the alsa backend is not enabled at build time.");
+            warn!(
+                "Alsa specific options have no effect if the alsa backend is not enabled at build time."
+            );
             break;
         }
     }
@@ -1114,7 +1120,7 @@ fn get_setup() -> Setup {
     let tmp_dir = opt_str(TEMP_DIR).map_or(SessionConfig::default().tmp_dir, |p| {
         let tmp_dir = PathBuf::from(p);
         if let Err(e) = create_dir_all(&tmp_dir) {
-            error!("could not create or access specified tmp directory: {}", e);
+            error!("could not create or access specified tmp directory: {e}");
             exit(1);
         }
         tmp_dir
@@ -1164,15 +1170,14 @@ fn get_setup() -> Setup {
 
         if audio_dir.is_none() && opt_present(CACHE_SIZE_LIMIT) {
             warn!(
-                "Without a `--{}` / `-{}` path, and/or if the `--{}` / `-{}` flag is set, `--{}` / `-{}` has no effect.",
-                CACHE, CACHE_SHORT, DISABLE_AUDIO_CACHE, DISABLE_AUDIO_CACHE_SHORT, CACHE_SIZE_LIMIT, CACHE_SIZE_LIMIT_SHORT
+                "Without a `--{CACHE}` / `-{CACHE_SHORT}` path, and/or if the `--{DISABLE_AUDIO_CACHE}` / `-{DISABLE_AUDIO_CACHE_SHORT}` flag is set, `--{CACHE_SIZE_LIMIT}` / `-{CACHE_SIZE_LIMIT_SHORT}` has no effect."
             );
         }
 
         let cache = match Cache::new(cred_dir.clone(), volume_dir, audio_dir, limit) {
             Ok(cache) => Some(cache),
             Err(e) => {
-                warn!("Cannot create cache: {}", e);
+                warn!("Cannot create cache: {e}");
                 None
             }
         };
@@ -1197,7 +1202,9 @@ fn get_setup() -> Setup {
                 empty_string_error_msg(USERNAME, USERNAME_SHORT);
             }
             if opt_present(PASSWORD) {
-                error!("Invalid `--{PASSWORD}` / `-{PASSWORD_SHORT}`: Password authentication no longer supported, use OAuth");
+                error!(
+                    "Invalid `--{PASSWORD}` / `-{PASSWORD_SHORT}`: Password authentication no longer supported, use OAuth"
+                );
                 exit(1);
             }
             match cached_creds {
@@ -1240,8 +1247,7 @@ fn get_setup() -> Setup {
     let oauth_port = if opt_present(OAUTH_PORT) {
         if !enable_oauth {
             warn!(
-                "Without the `--{}` / `-{}` flag set `--{}` / `-{}` has no effect.",
-                ENABLE_OAUTH, ENABLE_OAUTH_SHORT, OAUTH_PORT, OAUTH_PORT_SHORT
+                "Without the `--{ENABLE_OAUTH}` / `-{ENABLE_OAUTH_SHORT}` flag set `--{OAUTH_PORT}` / `-{OAUTH_PORT_SHORT}` has no effect."
             );
         }
         opt_str(OAUTH_PORT)
@@ -1267,10 +1273,7 @@ fn get_setup() -> Setup {
 
     if let Some(reason) = no_discovery_reason.as_deref() {
         if opt_present(ZEROCONF_PORT) {
-            warn!(
-                "With {} `--{}` / `-{}` has no effect.",
-                reason, ZEROCONF_PORT, ZEROCONF_PORT_SHORT
-            );
+            warn!("With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect.");
         }
     }
 
@@ -1348,8 +1351,7 @@ fn get_setup() -> Setup {
     if let Some(reason) = no_discovery_reason.as_deref() {
         if opt_present(ZEROCONF_BACKEND) {
             warn!(
-                "With {} `--{}` / `-{}` has no effect.",
-                reason, ZEROCONF_BACKEND, ZEROCONF_BACKEND_SHORT
+                "With {reason} `--{ZEROCONF_BACKEND}` / `-{ZEROCONF_BACKEND_SHORT}` has no effect."
             );
         }
     }
@@ -1381,9 +1383,8 @@ fn get_setup() -> Setup {
     let connect_config = {
         let connect_default_config = ConnectConfig::default();
 
-        let name = opt_str(NAME).unwrap_or_else(|| connect_default_config.name.clone());
-
-        if name.is_empty() {
+        let name = opt_str(NAME);
+        if matches!(name, Some(ref name) if name.is_empty()) {
             empty_string_error_msg(NAME, NAME_SHORT);
             exit(1);
         }
@@ -1391,37 +1392,39 @@ fn get_setup() -> Setup {
         #[cfg(feature = "pulseaudio-backend")]
         {
             if env::var("PULSE_PROP_application.name").is_err() {
-                let pulseaudio_name = if name != connect_default_config.name {
-                    format!("{} - {}", connect_default_config.name, name)
-                } else {
-                    name.clone()
-                };
+                let op_pulseaudio_name = name
+                    .as_ref()
+                    .map(|name| format!("{} - {}", connect_default_config.name, name));
 
-                env::set_var("PULSE_PROP_application.name", pulseaudio_name);
+                let pulseaudio_name = op_pulseaudio_name
+                    .as_deref()
+                    .unwrap_or(&connect_default_config.name);
+
+                set_env_var("PULSE_PROP_application.name", pulseaudio_name).await;
             }
 
             if env::var("PULSE_PROP_application.version").is_err() {
-                env::set_var("PULSE_PROP_application.version", version::SEMVER);
+                set_env_var("PULSE_PROP_application.version", version::SEMVER).await;
             }
 
             if env::var("PULSE_PROP_application.icon_name").is_err() {
-                env::set_var("PULSE_PROP_application.icon_name", "audio-x-generic");
+                set_env_var("PULSE_PROP_application.icon_name", "audio-x-generic").await;
             }
 
             if env::var("PULSE_PROP_application.process.binary").is_err() {
-                env::set_var("PULSE_PROP_application.process.binary", "librespot");
+                set_env_var("PULSE_PROP_application.process.binary", "librespot").await;
             }
 
             if env::var("PULSE_PROP_stream.description").is_err() {
-                env::set_var("PULSE_PROP_stream.description", "Spotify Connect endpoint");
+                set_env_var("PULSE_PROP_stream.description", "Spotify Connect endpoint").await;
             }
 
             if env::var("PULSE_PROP_media.software").is_err() {
-                env::set_var("PULSE_PROP_media.software", "Spotify");
+                set_env_var("PULSE_PROP_media.software", "Spotify").await;
             }
 
             if env::var("PULSE_PROP_media.role").is_err() {
-                env::set_var("PULSE_PROP_media.role", "music");
+                set_env_var("PULSE_PROP_media.role", "music").await;
             }
         }
 
@@ -1465,50 +1468,50 @@ fn get_setup() -> Setup {
                 } else {
                     cache.as_ref().and_then(Cache::volume)
                 }
-            })
-            .unwrap_or_default();
+            });
 
-        let device_type = opt_str(DEVICE_TYPE)
-            .as_deref()
-            .map(|device_type| {
-                DeviceType::from_str(device_type).unwrap_or_else(|_| {
-                    invalid_error_msg(
-                        DEVICE_TYPE,
-                        DEVICE_TYPE_SHORT,
-                        device_type,
-                        "computer, tablet, smartphone, \
+        let device_type = opt_str(DEVICE_TYPE).as_deref().map(|device_type| {
+            DeviceType::from_str(device_type).unwrap_or_else(|_| {
+                invalid_error_msg(
+                    DEVICE_TYPE,
+                    DEVICE_TYPE_SHORT,
+                    device_type,
+                    "computer, tablet, smartphone, \
                         speaker, tv, avr, stb, audiodongle, \
                         gameconsole, castaudio, castvideo, \
                         automobile, smartwatch, chromebook, \
                         carthing",
-                        DeviceType::default().into(),
-                    );
+                    DeviceType::default().into(),
+                );
 
-                    exit(1);
-                })
+                exit(1);
             })
-            .unwrap_or_default();
+        });
 
-        let volume_steps = opt_str(VOLUME_STEPS)
-            .map(|steps| match steps.parse::<u16>() {
-                Ok(value) => value,
-                _ => {
-                    let default_value = &connect_default_config.volume_steps.to_string();
+        let volume_steps = opt_str(VOLUME_STEPS).map(|steps| match steps.parse::<u16>() {
+            Ok(value) => value,
+            _ => {
+                let default_value = &connect_default_config.volume_steps.to_string();
 
-                    invalid_error_msg(
-                        VOLUME_STEPS,
-                        VOLUME_STEPS_SHORT,
-                        &steps,
-                        "a positive whole number <= 65535",
-                        default_value,
-                    );
+                invalid_error_msg(
+                    VOLUME_STEPS,
+                    VOLUME_STEPS_SHORT,
+                    &steps,
+                    "a positive whole number <= 65535",
+                    default_value,
+                );
 
-                    exit(1);
-                }
-            })
-            .unwrap_or_else(|| connect_default_config.volume_steps);
+                exit(1);
+            }
+        });
 
         let is_group = opt_present(DEVICE_IS_GROUP);
+
+        // use config defaults if not provided
+        let name = name.unwrap_or(connect_default_config.name);
+        let device_type = device_type.unwrap_or(connect_default_config.device_type);
+        let initial_volume = initial_volume.unwrap_or(connect_default_config.initial_volume);
+        let volume_steps = volume_steps.unwrap_or(connect_default_config.volume_steps);
 
         ConnectConfig {
             name,
@@ -1534,7 +1537,7 @@ fn get_setup() -> Setup {
                         url
                     },
                     Err(e) => {
-                        error!("Invalid proxy URL: \"{}\", only URLs in the format \"http(s)://host:port\" are allowed", e);
+                        error!("Invalid proxy URL: \"{e}\", only URLs in the format \"http(s)://host:port\" are allowed");
                         exit(1);
                     }
                 }
@@ -1591,8 +1594,7 @@ fn get_setup() -> Setup {
             ] {
                 if opt_present(a) {
                     warn!(
-                        "Without the `--{}` / `-{}` flag normalisation options have no effect.",
-                        ENABLE_VOLUME_NORMALISATION, ENABLE_VOLUME_NORMALISATION_SHORT,
+                        "Without the `--{ENABLE_VOLUME_NORMALISATION}` / `-{ENABLE_VOLUME_NORMALISATION_SHORT}` flag normalisation options have no effect.",
                     );
                     break;
                 }
@@ -1774,7 +1776,7 @@ fn get_setup() -> Setup {
                 "none" => None,
                 _ => match format {
                     AudioFormat::F64 | AudioFormat::F32 => {
-                        error!("Dithering is not available with format: {:?}.", format);
+                        error!("Dithering is not available with format: {format:?}.");
                         exit(1);
                     }
                     _ => Some(dither::find_ditherer(ditherer_name).unwrap_or_else(|| {
@@ -1844,6 +1846,23 @@ fn get_setup() -> Setup {
     }
 }
 
+// Initialize a static semaphore with only one permit, which is used to
+// prevent setting environment variables from running in parallel.
+static PERMIT: Semaphore = Semaphore::const_new(1);
+async fn set_env_var<K: AsRef<OsStr>, V: AsRef<OsStr>>(key: K, value: V) {
+    let permit = PERMIT
+        .acquire()
+        .await
+        .expect("Failed to acquire semaphore permit");
+
+    // SAFETY: This is safe because setting the environment variable will wait if the permit is
+    // already acquired by other callers.
+    unsafe { env::set_var(key, value) }
+
+    // Drop the permit manually, so the compiler doesn't optimize it away as unused variable.
+    drop(permit);
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     const RUST_BACKTRACE: &str = "RUST_BACKTRACE";
@@ -1852,10 +1871,10 @@ async fn main() {
     const RECONNECT_RATE_LIMIT: usize = 5;
 
     if env::var(RUST_BACKTRACE).is_err() {
-        env::set_var(RUST_BACKTRACE, "full")
+        set_env_var(RUST_BACKTRACE, "full").await;
     }
 
-    let setup = get_setup();
+    let setup = get_setup().await;
 
     let mut last_credentials = None;
     let mut spirc: Option<Spirc> = None;
@@ -1987,7 +2006,7 @@ async fn main() {
 
                         if let Some(spirc) = spirc.take() {
                             if let Err(e) = spirc.shutdown() {
-                                error!("error sending spirc shutdown message: {}", e);
+                                error!("error sending spirc shutdown message: {e}");
                             }
                         }
                         if let Some(spirc_task) = spirc_task.take() {
@@ -2021,7 +2040,7 @@ async fn main() {
                                                                 mixer.clone()).await {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
                     Err(e) => {
-                        error!("could not initialize spirc: {}", e);
+                        error!("could not initialize spirc: {e}");
                         exit(1);
                     }
                 };
@@ -2073,7 +2092,7 @@ async fn main() {
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
         if let Err(e) = spirc.shutdown() {
-            error!("error sending spirc shutdown message: {}", e);
+            error!("error sending spirc shutdown message: {e}");
         }
 
         if let Some(spirc_task) = spirc_task {

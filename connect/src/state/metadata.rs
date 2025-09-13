@@ -14,6 +14,7 @@ const ITERATION: &str = "iteration";
 
 const CUSTOM_CONTEXT_INDEX: &str = "context_index";
 const CUSTOM_SHUFFLE_SEED: &str = "shuffle_seed";
+const CUSTOM_INITIAL_TRACK: &str = "initial_track";
 
 macro_rules! metadata_entry {
     ( $get:ident, $set:ident, $clear:ident ($key:ident: $entry:ident)) => {
@@ -63,6 +64,7 @@ pub(super) trait Metadata {
     metadata_entry!(get_entity_uri, set_entity_uri, remove_entity_uri (entity_uri: ENTITY_URI));
     metadata_entry!(get_iteration, set_iteration, remove_iteration (iteration: ITERATION));
     metadata_entry!(get_shuffle_seed, set_shuffle_seed, remove_shuffle_seed (shuffle_seed: CUSTOM_SHUFFLE_SEED));
+    metadata_entry!(get_initial_track, set_initial_track, remove_initial_track (initial_track: CUSTOM_INITIAL_TRACK));
 }
 
 macro_rules! impl_metadata {

@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    Metadata,
     audio::file::AudioFiles,
     availability::Availabilities,
     content_rating::ContentRatings,
@@ -12,17 +13,16 @@ use crate::{
     restriction::Restrictions,
     util::{impl_deref_wrapped, impl_try_from_repeated},
     video::VideoFiles,
-    Metadata,
 };
 
-use librespot_core::{date::Date, Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyUri, date::Date};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::episode::EpisodeType;
 
 #[derive(Debug, Clone)]
 pub struct Episode {
-    pub id: SpotifyId,
+    pub id: SpotifyUri,
     pub name: String,
     pub duration: i32,
     pub audio: AudioFiles,
@@ -49,19 +49,23 @@ pub struct Episode {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Episodes(pub Vec<SpotifyId>);
+pub struct Episodes(pub Vec<SpotifyUri>);
 
-impl_deref_wrapped!(Episodes, Vec<SpotifyId>);
+impl_deref_wrapped!(Episodes, Vec<SpotifyUri>);
 
 #[async_trait]
 impl Metadata for Episode {
     type Message = protocol::metadata::Episode;
 
-    async fn request(session: &Session, episode_id: &SpotifyId) -> RequestResult {
+    async fn request(session: &Session, episode_uri: &SpotifyUri) -> RequestResult {
+        let SpotifyUri::Episode { id: episode_id } = episode_uri else {
+            return Err(Error::invalid_argument("episode_uri"));
+        };
+
         session.spclient().get_episode_metadata(episode_id).await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

@@ -4,9 +4,9 @@ use std::{
 };
 
 use crate::{
+    Metadata,
     request::RequestResult,
     util::{impl_deref_wrapped, impl_from_repeated_copy, impl_try_from_repeated},
-    Metadata,
 };
 
 use super::{
@@ -14,12 +14,7 @@ use super::{
     permission::Capabilities,
 };
 
-use librespot_core::{
-    date::Date,
-    spotify_id::{NamedSpotifyId, SpotifyId},
-    Error, Session,
-};
-
+use librespot_core::{Error, Session, SpotifyUri, date::Date, spotify_id::SpotifyId};
 use librespot_protocol as protocol;
 use protocol::playlist4_external::GeoblockBlockingType as Geoblock;
 
@@ -30,7 +25,7 @@ impl_deref_wrapped!(Geoblocks, Vec<Geoblock>);
 
 #[derive(Debug, Clone)]
 pub struct Playlist {
-    pub id: NamedSpotifyId,
+    pub id: SpotifyUri,
     pub revision: Vec<u8>,
     pub length: i32,
     pub attributes: PlaylistAttributes,
@@ -72,16 +67,13 @@ pub struct SelectedListContent {
 }
 
 impl Playlist {
-    pub fn tracks(&self) -> impl ExactSizeIterator<Item = &SpotifyId> {
+    pub fn tracks(&self) -> impl ExactSizeIterator<Item = &SpotifyUri> {
         let tracks = self.contents.items.iter().map(|item| &item.id);
 
         let length = tracks.len();
         let expected_length = self.length as usize;
         if length != expected_length {
-            warn!(
-                "Got {} tracks, but the list should contain {} tracks.",
-                length, expected_length,
-            );
+            warn!("Got {length} tracks, but the list should contain {expected_length} tracks.",);
         }
 
         tracks
@@ -96,17 +88,35 @@ impl Playlist {
 impl Metadata for Playlist {
     type Message = protocol::playlist4_external::SelectedListContent;
 
-    async fn request(session: &Session, playlist_id: &SpotifyId) -> RequestResult {
+    async fn request(session: &Session, playlist_uri: &SpotifyUri) -> RequestResult {
+        let SpotifyUri::Playlist {
+            id: playlist_id, ..
+        } = playlist_uri
+        else {
+            return Err(Error::invalid_argument("playlist_uri"));
+        };
+
         session.spclient().get_playlist(playlist_id).await
     }
 
-    fn parse(msg: &Self::Message, id: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, uri: &SpotifyUri) -> Result<Self, Error> {
+        let SpotifyUri::Playlist {
+            id: playlist_id, ..
+        } = uri
+        else {
+            return Err(Error::invalid_argument("playlist_uri"));
+        };
+
         // the playlist proto doesn't contain the id so we decorate it
         let playlist = SelectedListContent::try_from(msg)?;
-        let id = NamedSpotifyId::from_spotify_id(*id, &playlist.owner_username);
+
+        let new_uri = SpotifyUri::Playlist {
+            id: *playlist_id,
+            user: Some(playlist.owner_username),
+        };
 
         Ok(Self {
-            id,
+            id: new_uri,
             revision: playlist.revision,
             length: playlist.length,
             attributes: playlist.attributes,

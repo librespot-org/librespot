@@ -1,8 +1,8 @@
 use std::{fmt::Debug, ops::Deref};
 
 use time::{
-    error::ComponentRange, format_description::well_known::Iso8601, Date as _Date, OffsetDateTime,
-    PrimitiveDateTime, Time,
+    Date as _Date, OffsetDateTime, PrimitiveDateTime, Time, error::ComponentRange,
+    format_description::well_known::Iso8601,
 };
 
 use crate::Error;

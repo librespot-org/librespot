@@ -6,7 +6,7 @@ extern crate async_trait;
 
 use protobuf::Message;
 
-use librespot_core::{Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyUri};
 
 pub mod album;
 pub mod artist;
@@ -44,15 +44,15 @@ pub trait Metadata: Send + Sized + 'static {
     type Message: protobuf::Message + std::fmt::Debug;
 
     // Request a protobuf
-    async fn request(session: &Session, id: &SpotifyId) -> RequestResult;
+    async fn request(session: &Session, id: &SpotifyUri) -> RequestResult;
 
     // Request a metadata struct
-    async fn get(session: &Session, id: &SpotifyId) -> Result<Self, Error> {
+    async fn get(session: &Session, id: &SpotifyUri) -> Result<Self, Error> {
         let response = Self::request(session, id).await?;
         let msg = Self::Message::parse_from_bytes(&response)?;
-        trace!("Received metadata: {:#?}", msg);
+        trace!("Received metadata: {msg:#?}");
         Self::parse(&msg, id)
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error>;
+    fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error>;
 }

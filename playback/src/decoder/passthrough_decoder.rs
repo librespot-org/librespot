@@ -10,8 +10,8 @@ use ogg::{OggReadError, Packet, PacketReader, PacketWriteEndInfo, PacketWriter};
 use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
 
 use crate::{
-    metadata::audio::{AudioFileFormat, AudioFiles},
     MS_PER_PAGE, PAGES_PER_MS,
+    metadata::audio::{AudioFileFormat, AudioFiles},
 };
 
 fn get_header<T>(code: u8, rdr: &mut PacketReader<T>) -> DecoderResult<Vec<u8>>

@@ -1,49 +1,62 @@
 [package]
 name = "librespot-discovery"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
+license.workspace = true
 description = "The discovery logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
+
+[features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["with-libmdns", "native-tls"]
+
+# Discovery backends
+with-avahi = ["dep:serde", "dep:zbus"]
+with-dns-sd = ["dep:dns-sd"]
+with-libmdns = ["dep:libmdns"]
+
+# TLS backend propagation
+native-tls = ["librespot-core/native-tls"]
+rustls-tls-native-roots = ["librespot-core/rustls-tls-native-roots"]
+rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 
 [dependencies]
+librespot-core = { version = "0.7.1", path = "../core", default-features = false }
+
 aes = "0.8"
 base64 = "0.22"
 bytes = "1"
 ctr = "0.9"
-dns-sd = { version = "0.1.3", optional = true }
-form_urlencoded = "1.0"
+dns-sd = { version = "0.1", optional = true }
+form_urlencoded = "1.2"
 futures-core = "0.3"
 futures-util = "0.3"
 hmac = "0.12"
-hyper = { version = "1.3", features = ["http1"] }
-hyper-util = { version = "0.1", features = ["server-auto", "server-graceful", "service"] }
-http-body-util = "0.1.1"
-libmdns = { version = "0.9", optional = true }
+http-body-util = "0.1"
+hyper = { version = "1.6", features = ["http1"] }
+hyper-util = { version = "0.1", features = [
+    "server-auto",
+    "server-graceful",
+    "service",
+] }
+libmdns = { version = "0.10", optional = true }
 log = "0.4"
-rand = "0.8"
-serde = { version = "1", default-features = false, features = ["derive"], optional = true }
+rand = "0.9"
+serde = { version = "1", default-features = false, features = [
+    "derive",
+], optional = true }
 serde_repr = "0.1"
 serde_json = "1.0"
 sha1 = "0.10"
-thiserror = "2.0"
+thiserror = "2"
 tokio = { version = "1", features = ["parking_lot", "sync", "rt"] }
-zbus = { version = "5", default-features = false, features = ["tokio"], optional = true }
-
-[dependencies.librespot-core]
-path = "../core"
-version = "0.6.0-dev"
+zbus = { version = "5", default-features = false, features = [
+    "tokio",
+], optional = true }
 
 [dev-dependencies]
 futures = "0.3"
 hex = "0.4"
 tokio = { version = "1", features = ["macros", "parking_lot", "rt"] }
-
-[features]
-with-avahi = ["zbus", "serde"]
-with-dns-sd = ["dns-sd"]
-with-libmdns = ["libmdns"]
-
-default = ["with-libmdns"]

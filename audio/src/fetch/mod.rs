@@ -5,21 +5,21 @@ use std::{
     fs,
     io::{self, Read, Seek, SeekFrom},
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, OnceLock,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
-use futures_util::{future::IntoStream, StreamExt, TryFutureExt};
-use hyper::{body::Incoming, header::CONTENT_RANGE, Response, StatusCode};
+use futures_util::{StreamExt, TryFutureExt, future::IntoStream};
+use hyper::{Response, StatusCode, body::Incoming, header::CONTENT_RANGE};
 use hyper_util::client::legacy::ResponseFuture;
 use parking_lot::{Condvar, Mutex};
 use tempfile::NamedTempFile;
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot, Semaphore};
+use tokio::sync::{Semaphore, mpsc, oneshot};
 
-use librespot_core::{cdn_url::CdnUrl, Error, FileId, Session};
+use librespot_core::{Error, FileId, Session, cdn_url::CdnUrl};
 
 use self::receive::audio_file_fetch;
 
@@ -162,7 +162,7 @@ impl StreamLoaderController {
     }
 
     pub fn range_available(&self, range: Range) -> bool {
-        let available = if let Some(ref shared) = self.stream_shared {
+        if let Some(ref shared) = self.stream_shared {
             let download_status = shared.download_status.lock();
 
             range.length
@@ -171,9 +171,7 @@ impl StreamLoaderController {
                     .contained_length_from_value(range.start)
         } else {
             range.length <= self.len() - range.start
-        };
-
-        available
+        }
     }
 
     pub fn range_to_end_available(&self) -> bool {
@@ -366,11 +364,11 @@ impl AudioFile {
         bytes_per_second: usize,
     ) -> Result<AudioFile, Error> {
         if let Some(file) = session.cache().and_then(|cache| cache.file(file_id)) {
-            debug!("File {} already in cache", file_id);
+            debug!("File {file_id} already in cache");
             return Ok(AudioFile::Cached(file));
         }
 
-        debug!("Downloading file {}", file_id);
+        debug!("Downloading file {file_id}");
 
         let (complete_tx, complete_rx) = oneshot::channel();
 
@@ -379,14 +377,14 @@ impl AudioFile {
 
         let session_ = session.clone();
         session.spawn(complete_rx.map_ok(move |mut file| {
-            debug!("Downloading file {} complete", file_id);
+            debug!("Downloading file {file_id} complete");
 
             if let Some(cache) = session_.cache() {
                 if let Some(cache_id) = cache.file_path(file_id) {
                     if let Err(e) = cache.save_file(file_id, &mut file) {
-                        error!("Error caching file {} to {:?}: {}", file_id, cache_id, e);
+                        error!("Error caching file {file_id} to {cache_id:?}: {e}");
                     } else {
-                        debug!("File {} cached to {:?}", file_id, cache_id);
+                        debug!("File {file_id} cached to {cache_id:?}");
                     }
                 }
             }
@@ -397,12 +395,12 @@ impl AudioFile {
 
     pub fn get_stream_loader_controller(&self) -> Result<StreamLoaderController, Error> {
         let controller = match self {
-            AudioFile::Streaming(ref stream) => StreamLoaderController {
+            AudioFile::Streaming(stream) => StreamLoaderController {
                 channel_tx: Some(stream.stream_loader_command_tx.clone()),
                 stream_shared: Some(stream.shared.clone()),
                 file_size: stream.shared.file_size,
             },
-            AudioFile::Cached(ref file) => StreamLoaderController {
+            AudioFile::Cached(file) => StreamLoaderController {
                 channel_tx: None,
                 stream_shared: None,
                 file_size: file.metadata()?.len() as usize,
@@ -465,14 +463,11 @@ impl AudioFileStreaming {
             )));
         };
 
-        trace!("Streaming from {}", url);
+        trace!("Streaming from {url}");
 
         let code = response.status();
         if code != StatusCode::PARTIAL_CONTENT {
-            debug!(
-                "Opening audio file expected partial content but got: {}",
-                code
-            );
+            debug!("Opening audio file expected partial content but got: {code}");
             return Err(AudioFileError::StatusCode(code).into());
         }
 

@@ -2,7 +2,7 @@ use std::fmt;
 
 use librespot_protocol as protocol;
 
-use crate::{spotify_id::to_base16, Error};
+use crate::{Error, spotify_id::to_base16};
 
 const RAW_LEN: usize = 20;
 

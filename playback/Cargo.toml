@@ -1,69 +1,101 @@
 [package]
 name = "librespot-playback"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
+license.workspace = true
 description = "The audio playback logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
 
-[dependencies.librespot-audio]
-path = "../audio"
-version = "0.6.0-dev"
+[features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["rodio-backend", "native-tls"]
 
-[dependencies.librespot-core]
-path = "../core"
-version = "0.6.0-dev"
+# Audio backends
+alsa-backend = ["dep:alsa"]
+gstreamer-backend = [
+    "dep:gstreamer",
+    "dep:gstreamer-app",
+    "dep:gstreamer-audio",
+]
+jackaudio-backend = ["dep:jack"]
+portaudio-backend = ["dep:portaudio-rs"]
+pulseaudio-backend = ["dep:libpulse-binding", "dep:libpulse-simple-binding"]
+rodio-backend = ["dep:cpal", "dep:rodio"]
+rodiojack-backend = ["dep:rodio", "cpal/jack"]
+sdl-backend = ["dep:sdl2"]
 
-[dependencies.librespot-metadata]
-path = "../metadata"
-version = "0.6.0-dev"
+# Audio processing features
+passthrough-decoder = ["dep:ogg"]
+
+# TLS backend propagation
+native-tls = [
+    "librespot-core/native-tls",
+    "librespot-audio/native-tls",
+    "librespot-metadata/native-tls",
+]
+rustls-tls-native-roots = [
+    "librespot-core/rustls-tls-native-roots",
+    "librespot-audio/rustls-tls-native-roots",
+    "librespot-metadata/rustls-tls-native-roots",
+]
+rustls-tls-webpki-roots = [
+    "librespot-core/rustls-tls-webpki-roots",
+    "librespot-audio/rustls-tls-webpki-roots",
+    "librespot-metadata/rustls-tls-webpki-roots",
+]
 
 [dependencies]
+librespot-audio = { version = "0.7.1", path = "../audio", default-features = false }
+librespot-core = { version = "0.7.1", path = "../core", default-features = false }
+librespot-metadata = { version = "0.7.1", path = "../metadata", default-features = false }
+
 portable-atomic = "1"
 futures-util = "0.3"
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 shell-words = "1.1"
-thiserror = "2.0"
-tokio = { version = "1", features = ["parking_lot", "rt", "rt-multi-thread", "sync"] }
-zerocopy = { version = "0.8.13", features = ["derive"] }
+thiserror = "2"
+tokio = { version = "1", features = [
+    "parking_lot",
+    "rt",
+    "rt-multi-thread",
+    "sync",
+] }
+zerocopy = { version = "0.8", features = ["derive"] }
 
 # Backends
-alsa            = { version = "0.9.0", optional = true }
-portaudio-rs    = { version = "0.3", optional = true }
-libpulse-binding        = { version = "2", optional = true, default-features = false }
+alsa = { version = "0.10", optional = true }
+jack = { version = "0.13", optional = true }
+portaudio-rs = { version = "0.3", optional = true }
+sdl2 = { version = "0.38", optional = true }
+
+# GStreamer dependencies
+gstreamer = { version = "0.24", optional = true }
+gstreamer-app = { version = "0.24", optional = true }
+gstreamer-audio = { version = "0.24", optional = true }
+
+# PulseAudio dependencies
+libpulse-binding = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
-jack            = { version = "0.13", optional = true }
-sdl2            = { version = "0.37", optional = true }
-gstreamer       = { version = "0.23.1", optional = true }
-gstreamer-app   = { version = "0.23.0", optional = true }
-gstreamer-audio = { version = "0.23.0", optional = true }
-glib            = { version = "0.20.3", optional = true }
 
 # Rodio dependencies
-rodio           = { version = "0.20.1", optional = true, default-features = false }
-cpal            = { version = "0.15.1", optional = true }
+cpal = { version = "0.16", optional = true }
+rodio = { version = "0.21", optional = true, default-features = false, features = [
+    "playback",
+] }
 
 # Container and audio decoder
-symphonia = { version = "0.5", default-features = false, features = ["mp3", "ogg", "vorbis"] }
+symphonia = { version = "0.5", default-features = false, features = [
+    "mp3",
+    "ogg",
+    "vorbis",
+] }
 
 # Legacy Ogg container decoder for the passthrough decoder
 ogg = { version = "0.9", optional = true }
 
 # Dithering
-rand = { version = "0.8", features = ["small_rng"] }
-rand_distr = "0.4"
-
-[features]
-alsa-backend = ["alsa"]
-portaudio-backend = ["portaudio-rs"]
-pulseaudio-backend = ["libpulse-binding", "libpulse-simple-binding"]
-jackaudio-backend = ["jack"]
-rodio-backend = ["rodio", "cpal"]
-rodiojack-backend = ["rodio", "cpal/jack"]
-sdl-backend = ["sdl2"]
-gstreamer-backend = ["gstreamer", "gstreamer-app", "gstreamer-audio"]
-
-passthrough-decoder = ["ogg"]
+rand = { version = "0.9", features = ["small_rng"] }
+rand_distr = "0.5"

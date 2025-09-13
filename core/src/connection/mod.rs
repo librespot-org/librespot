@@ -13,7 +13,7 @@ use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use url::Url;
 
-use crate::{authentication::Credentials, packet::PacketType, version, Error};
+use crate::{Error, authentication::Credentials, packet::PacketType, version};
 
 use crate::protocol::keyexchange::{APLoginFailed, ErrorCode};
 
@@ -186,11 +186,7 @@ pub async fn authenticate(
             Err(error_data.into())
         }
         _ => {
-            trace!(
-                "Did not expect {:?} AES key packet with data {:#?}",
-                cmd,
-                data
-            );
+            trace!("Did not expect {cmd:?} AES key packet with data {data:#?}");
             Err(AuthenticationError::Packet(cmd))
         }
     };

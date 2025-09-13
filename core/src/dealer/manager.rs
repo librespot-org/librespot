@@ -1,21 +1,21 @@
 use futures_core::Stream;
 use futures_util::StreamExt;
-use std::{cell::OnceCell, pin::Pin, str::FromStr};
+use std::{pin::Pin, str::FromStr, sync::OnceLock};
 use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use url::Url;
 
 use super::{
-    protocol::Message, Builder, Dealer, GetUrlResult, Request, RequestHandler, Responder, Response,
-    Subscription,
+    Builder, Dealer, GetUrlResult, Request, RequestHandler, Responder, Response, Subscription,
+    protocol::Message,
 };
 use crate::{Error, Session};
 
 component! {
     DealerManager: DealerManagerInner {
-        builder: OnceCell<Builder> = OnceCell::from(Builder::new()),
-        dealer: OnceCell<Dealer> = OnceCell::new(),
+        builder: OnceLock<Builder> = OnceLock::from(Builder::new()),
+        dealer: OnceLock<Dealer> = OnceLock::new(),
     }
 }
 

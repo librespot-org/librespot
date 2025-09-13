@@ -1,11 +1,11 @@
 use std::fmt::Debug;
 
 use crate::{
-    availability::Availabilities, copyright::Copyrights, episode::Episodes, image::Images,
-    restriction::Restrictions, Metadata, RequestResult,
+    Metadata, RequestResult, availability::Availabilities, copyright::Copyrights,
+    episode::Episodes, image::Images, restriction::Restrictions,
 };
 
-use librespot_core::{Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyUri};
 
 use librespot_protocol as protocol;
 pub use protocol::metadata::show::ConsumptionOrder as ShowConsumptionOrder;
@@ -13,7 +13,7 @@ pub use protocol::metadata::show::MediaType as ShowMediaType;
 
 #[derive(Debug, Clone)]
 pub struct Show {
-    pub id: SpotifyId,
+    pub id: SpotifyUri,
     pub name: String,
     pub description: String,
     pub publisher: String,
@@ -27,7 +27,7 @@ pub struct Show {
     pub media_type: ShowMediaType,
     pub consumption_order: ShowConsumptionOrder,
     pub availability: Availabilities,
-    pub trailer_uri: Option<SpotifyId>,
+    pub trailer_uri: Option<SpotifyUri>,
     pub has_music_and_talk: bool,
     pub is_audiobook: bool,
 }
@@ -36,11 +36,15 @@ pub struct Show {
 impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
-    async fn request(session: &Session, show_id: &SpotifyId) -> RequestResult {
+    async fn request(session: &Session, show_uri: &SpotifyUri) -> RequestResult {
+        let SpotifyUri::Show { id: show_id } = show_uri else {
+            return Err(Error::invalid_argument("show_uri"));
+        };
+
         session.spclient().get_show_metadata(show_id).await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }
@@ -67,7 +71,7 @@ impl TryFrom<&<Self as Metadata>::Message> for Show {
                 .trailer_uri
                 .as_deref()
                 .filter(|s| !s.is_empty())
-                .map(SpotifyId::from_uri)
+                .map(SpotifyUri::from_uri)
                 .transpose()?,
             has_music_and_talk: show.music_and_talk(),
             is_audiobook: show.is_audiobook(),

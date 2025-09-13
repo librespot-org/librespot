@@ -1,27 +1,34 @@
 [package]
 name = "librespot-audio"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
+license.workspace = true
 description = "The audio fetching logic for librespot"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
 
-[dependencies.librespot-core]
-path = "../core"
-version = "0.6.0-dev"
+[features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["native-tls"]
+
+# TLS backend propagation
+native-tls = ["librespot-core/native-tls"]
+rustls-tls-native-roots = ["librespot-core/rustls-tls-native-roots"]
+rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 
 [dependencies]
+librespot-core = { version = "0.7.1", path = "../core", default-features = false }
+
 aes = "0.8"
 bytes = "1"
 ctr = "0.9"
 futures-util = "0.3"
-hyper = { version = "1.3", features = [] }
-hyper-util = { version = "0.1", features = ["client"] }
-http-body-util = "0.1.1"
+http-body-util = "0.1"
+hyper = { version = "1.6", features = ["http1", "http2"] }
+hyper-util = { version = "0.1", features = ["client", "http2"] }
 log = "0.4"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 tempfile = "3"
-thiserror = "2.0"
+thiserror = "2"
 tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }

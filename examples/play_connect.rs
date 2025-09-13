@@ -1,7 +1,7 @@
 use librespot::{
     connect::{ConnectConfig, LoadRequest, LoadRequestOptions, Spirc},
     core::{
-        authentication::Credentials, cache::Cache, config::SessionConfig, session::Session, Error,
+        Error, authentication::Credentials, cache::Cache, config::SessionConfig, session::Session,
     },
     playback::mixer::MixerConfig,
     playback::{

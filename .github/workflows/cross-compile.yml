@@ -1,0 +1,78 @@
+---
+name: cross-compile
+
+"on":
+  push:
+    branches: [dev, master]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "contrib/**"
+      - "LICENSE"
+      - "*.sh"
+      - "**/Dockerfile*"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "contrib/**"
+      - "LICENSE"
+      - "*.sh"
+      - "**/Dockerfile*"
+
+env:
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: -D warnings
+
+jobs:
+  cross-compile:
+    name: cross +${{ matrix.toolchain }} build ${{ matrix.platform.target }}
+    runs-on: ${{ matrix.platform.runs-on }}
+    continue-on-error: false
+    strategy:
+      matrix:
+        platform:
+          - arch: armv7
+            runs-on: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+
+          - arch: aarch64
+            runs-on: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+
+          - arch: riscv64gc
+            runs-on: ubuntu-latest
+            target: riscv64gc-unknown-linux-gnu
+
+        toolchain:
+          - "1.85" # MSRV (Minimum Supported Rust Version)
+          - stable
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Build binary with default features
+        if: matrix.platform.target != 'riscv64gc-unknown-linux-gnu'
+        uses: houseabsolute/actions-rust-cross@v1
+        with:
+          command: build
+          target: ${{ matrix.platform.target }}
+          toolchain: ${{ matrix.toolchain }}
+          args: --locked --verbose
+
+      - name: Build binary without system dependencies
+        if: matrix.platform.target == 'riscv64gc-unknown-linux-gnu'
+        uses: houseabsolute/actions-rust-cross@v1
+        with:
+          command: build
+          target: ${{ matrix.platform.target }}
+          toolchain: ${{ matrix.toolchain }}
+          args: --locked --verbose --no-default-features --features rustls-tls-webpki-roots
+
+      - name: Upload debug artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: librespot-${{ matrix.platform.runs-on }}-${{ matrix.platform.arch }}-${{ matrix.toolchain }} # yamllint disable-line rule:line-length
+          path: target/${{ matrix.platform.target }}/debug/librespot
+          if-no-files-found: error

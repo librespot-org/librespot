@@ -9,12 +9,12 @@ use std::{
 use byteorder::{BigEndian, ByteOrder};
 use bytes::Bytes;
 use futures_core::Stream;
-use futures_util::{lock::BiLock, ready, StreamExt};
+use futures_util::{StreamExt, lock::BiLock, ready};
 use num_traits::FromPrimitive;
 use thiserror::Error;
 use tokio::sync::mpsc;
 
-use crate::{packet::PacketType, util::SeqGenerator, Error};
+use crate::{Error, packet::PacketType, util::SeqGenerator};
 
 component! {
     ChannelManager : ChannelManagerInner {

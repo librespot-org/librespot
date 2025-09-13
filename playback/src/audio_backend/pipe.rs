@@ -44,11 +44,13 @@ pub struct StdoutSink {
 impl Open for StdoutSink {
     fn open(file: Option<String>, format: AudioFormat) -> Self {
         if let Some("?") = file.as_deref() {
-            println!("\nUsage:\n\nOutput to stdout:\n\n\t--backend pipe\n\nOutput to file:\n\n\t--backend pipe --device {{filename}}\n");
+            println!(
+                "\nUsage:\n\nOutput to stdout:\n\n\t--backend pipe\n\nOutput to file:\n\n\t--backend pipe --device {{filename}}\n"
+            );
             exit(0);
         }
 
-        info!("Using StdoutSink (pipe) with format: {:?}", format);
+        info!("Using StdoutSink (pipe) with format: {format:?}");
 
         Self {
             output: None,
@@ -94,6 +96,7 @@ impl Sink for StdoutSink {
 }
 
 impl SinkAsBytes for StdoutSink {
+    #[inline]
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()> {
         self.output
             .as_deref_mut()

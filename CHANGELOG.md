@@ -2,16 +2,55 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) since v0.2.0.
 
-## [Unreleased] - YYYY-MM-DD
+## [Unreleased]
+
+### Added
+
+- [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
 
 ### Changed
 
-- [core] MSRV is now 1.81 (breaking)
+- [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
+- [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
+- [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [player] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [spclient] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+
+
+### Removed
+
+- [core] Removed `SpotifyItemType` enum; the new `SpotifyUri` is an enum over all item types and so which variant it is 
+  describes its item type (breaking)
+- [core] Removed `NamedSpotifyId` struct; it was made obsolete by `SpotifyUri` (breaking)
+- [core] The following methods have been removed from `SpotifyId` and moved to `SpotifyUri` (breaking):
+  - `is_playable`
+  - `from_uri`
+  - `to_uri`
+
+## [v0.7.1] - 2025-08-31
+
+### Changed
+
+- [connect] Shuffling was adjusted, so that shuffle and repeat can be used combined
+
+### Fixed
+
+- [connect] Repeat context will not go into autoplay anymore and triggering autoplay while shuffling shouldn't reshuffle anymore
+- [connect] Only deletes the connect state on dealer shutdown instead on disconnecting
+- [core] Fixed a problem where in `spclient` where an HTTP/411 error was thrown because the header was set wrong
+- [main] Use the config instead of the type default for values that are not provided by the user
+
+## [0.7.0] - 2025-08-24
+
+### Changed
+
+- [core] MSRV is now 1.85 with Rust edition 2024 (breaking)
 - [core] AP connect and handshake have a combined 5 second timeout.
-- [core] `stream_from_cdn` now accepts the URL as a `&str` instead of `CdnUrl` (breaking)
+- [core] `stream_from_cdn` now accepts the URL as `TryInto<Uri>` instead of `CdnUrl` (breaking)
+- [core] Add TLS backend selection with native-tls and rustls-tls options, defaulting to native-tls
 - [connect] Replaced `has_volume_ctrl` with `disable_volume` in `ConnectConfig` (breaking)
 - [connect] Changed `initial_volume` from `Option<u16>` to `u16` in `ConnectConfig` (breaking)
 - [connect] Replaced `SpircLoadCommand` with `LoadRequest`, `LoadRequestOptions` and `LoadContextOptions` (breaking)
@@ -20,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [metadata] Replaced `AudioFileFormat` with own enum. (breaking)
 - [playback] Changed trait `Mixer::open` to return `Result<Self, Error>` instead of `Self` (breaking)
 - [playback] Changed type alias `MixerFn` to return `Result<Arc<dyn Mixer>, Error>` instead of `Arc<dyn Mixer>` (breaking)
+- [playback] Optimize audio conversion to always dither at 16-bit level, and improve performance
+- [playback] Normalizer maintains better stereo imaging, while also being faster
+- [oauth] Remove loopback address requirement from `redirect_uri` when spawning callback handling server versus using stdin.
 
 ### Added
 
@@ -53,6 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Correctly apply playing/paused state when transferring playback
 - [player] Saturate invalid seek positions to track duration
 - [audio] Fall back to other URLs in case of a failure when downloading from CDN
+- [core] Metadata requests failing with 500 Internal Server Error
+- [player] Rodio backend did not honor audio output format request
 
 ### Deprecated
 
@@ -399,7 +443,9 @@ v0.4.x as a stable branch until then.
 
 ## [0.1.0] - 2019-11-06
 
-[unreleased]: https://github.com/librespot-org/librespot/compare/v0.6.0...HEAD
+[unreleased]: https://github.com/librespot-org/librespot/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/librespot-org/librespot/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/librespot-org/librespot/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/librespot-org/librespot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/librespot-org/librespot/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/librespot-org/librespot/compare/v0.4.1...v0.4.2

@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    Metadata,
     artist::Artists,
     availability::Availabilities,
     copyright::Copyrights,
@@ -14,18 +15,17 @@ use crate::{
     sale_period::SalePeriods,
     track::Tracks,
     util::{impl_deref_wrapped, impl_try_from_repeated},
-    Metadata,
 };
 
-use librespot_core::{date::Date, Error, Session, SpotifyId};
+use librespot_core::{Error, Session, SpotifyUri, date::Date};
 
 use librespot_protocol as protocol;
-pub use protocol::metadata::album::Type as AlbumType;
 use protocol::metadata::Disc as DiscMessage;
+pub use protocol::metadata::album::Type as AlbumType;
 
 #[derive(Debug, Clone)]
 pub struct Album {
-    pub id: SpotifyId,
+    pub id: SpotifyUri,
     pub name: String,
     pub artists: Artists,
     pub album_type: AlbumType,
@@ -48,9 +48,9 @@ pub struct Album {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Albums(pub Vec<SpotifyId>);
+pub struct Albums(pub Vec<SpotifyUri>);
 
-impl_deref_wrapped!(Albums, Vec<SpotifyId>);
+impl_deref_wrapped!(Albums, Vec<SpotifyUri>);
 
 #[derive(Debug, Clone)]
 pub struct Disc {
@@ -65,7 +65,7 @@ pub struct Discs(pub Vec<Disc>);
 impl_deref_wrapped!(Discs, Vec<Disc>);
 
 impl Album {
-    pub fn tracks(&self) -> impl Iterator<Item = &SpotifyId> {
+    pub fn tracks(&self) -> impl Iterator<Item = &SpotifyUri> {
         self.discs.iter().flat_map(|disc| disc.tracks.iter())
     }
 }
@@ -74,11 +74,15 @@ impl Album {
 impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
-    async fn request(session: &Session, album_id: &SpotifyId) -> RequestResult {
+    async fn request(session: &Session, album_uri: &SpotifyUri) -> RequestResult {
+        let SpotifyUri::Album { id: album_id } = album_uri else {
+            return Err(Error::invalid_argument("album_uri"));
+        };
+
         session.spclient().get_album_metadata(album_id).await
     }
 
-    fn parse(msg: &Self::Message, _: &SpotifyId) -> Result<Self, Error> {
+    fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {
         Self::try_from(msg)
     }
 }

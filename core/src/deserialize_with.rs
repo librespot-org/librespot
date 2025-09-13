@@ -1,5 +1,5 @@
-use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use protobuf::MessageFull;
 use serde::de::{Error, Unexpected};
 use serde::{Deserialize, Deserializer};

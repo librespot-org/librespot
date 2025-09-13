@@ -1,20 +1,50 @@
 [package]
 name = "librespot-oauth"
-version = "0.6.0-dev"
+version.workspace = true
 rust-version.workspace = true
 authors = ["Nick Steel <nick@nsteel.co.uk>"]
+license.workspace = true
 description = "OAuth authorization code flow with PKCE for obtaining a Spotify access token"
-license = "MIT"
-repository = "https://github.com/librespot-org/librespot"
-edition = "2021"
+repository.workspace = true
+edition.workspace = true
+
+[features]
+# Refer to the workspace Cargo.toml for the list of features
+default = ["native-tls"]
+
+# TLS backends (mutually exclusive - compile-time checks in src/lib.rs)
+native-tls = ["oauth2/native-tls", "reqwest/native-tls"]
+rustls-tls-native-roots = [
+    "__rustls",
+    "oauth2/rustls-tls",
+    "reqwest/rustls-tls-native-roots",
+]
+rustls-tls-webpki-roots = [
+    "__rustls",
+    "oauth2/rustls-tls",
+    "reqwest/rustls-tls-webpki-roots",
+]
+
+# Internal features - these are not meant to be used by end users
+__rustls = []
 
 [dependencies]
 log = "0.4"
-oauth2 = "4.4"
+oauth2 = { version = "5.0", default-features = false, features = [
+    "reqwest",
+    "reqwest-blocking",
+] }
 open = "5.3"
-thiserror = "2.0"
-url = "2.2"
+reqwest = { version = "0.12", default-features = false, features = [
+    "system-proxy",
+] }
+thiserror = "2"
+url = "2.5"
 
 [dev-dependencies]
-env_logger =  { version = "0.11.2", default-features = false, features = ["color", "humantime", "auto-color"] }
-tokio = { version = "1.43.0", features = ["rt-multi-thread", "macros"] }
+env_logger = { version = "0.11", default-features = false, features = [
+    "color",
+    "humantime",
+    "auto-color",
+] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
