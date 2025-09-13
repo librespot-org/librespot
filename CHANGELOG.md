@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [connect] Add method `transfer` to `Spirc` to automatically transfer the playback to ourselves
+- [core] Add method `transfer` to `SpClient`
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
 
 ### Changed
@@ -69,12 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [connect] Add support for `seek_to`, `repeat_track` and `autoplay` for `Spirc` loading
 - [connect] Add `pause` parameter to `Spirc::disconnect` method (breaking)
 - [connect] Add `volume_steps` to `ConnectConfig` (breaking)
-- [connect] Add method `transfer` to `Spirc` to automatically transfer the playback to ourselves
 - [connect] Add and enforce rustdoc
 - [playback] Add `track` field to `PlayerEvent::RepeatChanged` (breaking)
 - [playback] Add `PlayerEvent::PositionChanged` event to notify about the current playback position
 - [core] Add `request_with_options` and `request_with_protobuf_and_options` to `SpClient`
-- [connect] Add `transfer` to `SpClient`
 - [core] Add `try_get_urls` to `CdnUrl`
 - [oauth] Add `OAuthClient` and `OAuthClientBuilder` structs to achieve a more customizable login process
 
