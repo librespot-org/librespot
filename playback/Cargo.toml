@@ -91,6 +91,7 @@ symphonia = { version = "0.5", default-features = false, features = [
     "mp3",
     "ogg",
     "vorbis",
+    "flac"
 ] }
 
 # Legacy Ogg container decoder for the passthrough decoder
