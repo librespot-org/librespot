@@ -1212,17 +1212,14 @@ impl PlayerTrackLoader {
         track_uri: SpotifyUri,
         position_ms: u32,
     ) -> Option<PlayerLoadedTrackData> {
+        info!("Loading local file with Spotify URI <{}>", track_uri);
+
         let entry = self.local_file_lookup.get(&track_uri);
 
         let Some(path) = entry else {
             error!("Unable to find file path for local file <{track_uri}>");
             return None;
         };
-
-        debug!(
-            "Located file path '{}' for local file <{track_uri}>",
-            path.display()
-        );
 
         let src = match File::open(path) {
             Ok(src) => src,
@@ -1276,6 +1273,12 @@ impl PlayerTrackLoader {
                 return None;
             }
         };
+
+        info!(
+            "Loaded <{}> from path <{}>",
+            local_file_metadata.name,
+            path.display()
+        );
 
         Some(PlayerLoadedTrackData {
             decoder,
