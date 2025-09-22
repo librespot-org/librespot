@@ -237,11 +237,12 @@ impl SymphoniaDecoder {
 
         // If we can't get metadata from the container, fall back to other tags found by probing.
         // Note that this is only relevant for local files.
-        if metadata.current().is_none()
-            && let Some(ref mut probe_metadata) = self.probed_metadata
-            && let Some(inner_probe_metadata) = probe_metadata.get()
-        {
-            metadata = inner_probe_metadata;
+        if metadata.current().is_none() {
+            if let Some(ref mut probe_metadata) = self.probed_metadata {
+                if let Some(inner_probe_metadata) = probe_metadata.get() {
+                    metadata = inner_probe_metadata;
+                }
+            }
         }
 
         // Advance to the latest metadata revision.
