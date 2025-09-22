@@ -232,7 +232,7 @@ impl SymphoniaDecoder {
         Some(metadata)
     }
 
-    fn metadata(&mut self) -> Option<Metadata> {
+    fn metadata(&mut self) -> Option<Metadata<'_>> {
         let mut metadata = self.format.metadata();
 
         // If we can't get metadata from the container, fall back to other tags found by probing.
