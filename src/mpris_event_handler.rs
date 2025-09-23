@@ -317,7 +317,7 @@ struct MprisPlayerService {
     repeat: LoopStatus,
     shuffle: bool,
     playback_status: PlaybackStatus,
-    volume: f64,
+    volume: u16,
     metadata: HashMap<String, zbus::zvariant::OwnedValue>,
 }
 
@@ -622,7 +622,7 @@ impl MprisPlayerService {
     // an error.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn volume(&self) -> Volume {
-        self.volume
+        self.volume as f64 / u16::MAX as f64
     }
 
     #[zbus(property)]
@@ -849,7 +849,7 @@ impl MprisEventHandler {
             repeat: LoopStatus::None,
             shuffle: false,
             playback_status: PlaybackStatus::Stopped,
-            volume: 1.0,
+            volume: u16::MAX,
             metadata: HashMap::new(),
         };
 
@@ -1166,11 +1166,13 @@ impl MprisTask {
                 }
             },
             PlayerEvent::Unavailable { .. } => {}
-            PlayerEvent::VolumeChanged {
-                // volume
-                ..
-            } => {
-                // TODO: Handle volume
+            PlayerEvent::VolumeChanged { volume, .. } => {
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
+                if iface.volume != volume {
+                    iface.volume = volume;
+                    iface.volume_changed(iface_ref.signal_context()).await?;
+                }
             }
             PlayerEvent::Seeked {
                 track_id,
