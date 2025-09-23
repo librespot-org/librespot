@@ -516,7 +516,6 @@ impl MprisPlayerService {
 
     #[zbus(property)]
     async fn set_loop_status(&mut self, value: LoopStatus) -> zbus::fdo::Result<()> {
-        // TODO: implement, notify change
         match value {
             LoopStatus::None => {
                 if let Some(spirc) = &self.spirc {
