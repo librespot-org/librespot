@@ -2163,7 +2163,51 @@ impl PlayerInternal {
 
             PlayerCommand::SetSession(session) => self.session = session,
 
-            PlayerCommand::AddEventSender(sender) => self.event_senders.push(sender),
+            PlayerCommand::AddEventSender(sender) => {
+                // Send current player state to new event listener
+                match self.state {
+                    PlayerState::Loading {
+                        ref track_id,
+                        play_request_id,
+                        ..
+                    } => {
+                        let _ = sender.send(PlayerEvent::Loading {
+                            play_request_id,
+                            track_id: track_id.clone(),
+                            position_ms: 0, // TODO
+                        });
+                    }
+                    PlayerState::Paused {
+                        ref track_id,
+                        play_request_id,
+                        stream_position_ms,
+                        ..
+                    } => {
+                        let _ = sender.send(PlayerEvent::Paused {
+                            play_request_id,
+                            track_id: track_id.clone(),
+                            position_ms: stream_position_ms,
+                        });
+                    }
+                    PlayerState::Playing { ref audio_item, .. } => {
+                        let audio_item = Box::new(audio_item.clone());
+                        let _ = sender.send(PlayerEvent::TrackChanged { audio_item });
+                    }
+                    PlayerState::EndOfTrack {
+                        play_request_id,
+                        ref track_id,
+                        ..
+                    } => {
+                        let _ = sender.send(PlayerEvent::EndOfTrack {
+                            play_request_id,
+                            track_id: track_id.clone(),
+                        });
+                    }
+                    _ => (),
+                }
+
+                self.event_senders.push(sender);
+            }
 
             PlayerCommand::SetSinkEventCallback(callback) => self.sink_event_callback = callback,
 
