@@ -844,7 +844,8 @@ impl MprisEventHandler {
         };
         let mpris_player_service = MprisPlayerService {
             spirc: None,
-            // FIXME: obtain current values from Player
+            // Values are updated upon reception of first player state, right after MprisTask event
+            // handler registration
             repeat: LoopStatus::None,
             shuffle: false,
             playback_status: PlaybackStatus::Stopped,
