@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, process, sync::Arc};
 
 use librespot_connect::Spirc;
 use log::{debug, warn};
@@ -838,11 +838,9 @@ pub struct MprisEventHandler {
 }
 
 impl MprisEventHandler {
-    pub async fn spawn(player: Arc<Player>, name: &str) -> Result<MprisEventHandler, MprisError> {
-        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
-
+    fn connection_builder<'a>(identity: &str, name: &str) -> zbus::Result<connection::Builder<'a>> {
         let mpris_service = MprisService {
-            identity: name.to_string(),
+            identity: identity.to_string(),
         };
         let mpris_player_service = MprisPlayerService {
             spirc: None,
@@ -854,14 +852,28 @@ impl MprisEventHandler {
             metadata: HashMap::new(),
         };
 
-        let connection = connection::Builder::session()?
-            // FIXME: retry with "org.mpris.MediaPlayer2.librespot.instance<pid>"
-            // on error
-            .name("org.mpris.MediaPlayer2.librespot")?
+        connection::Builder::session()?
+            .name(name.to_string())?
             .serve_at("/org/mpris/MediaPlayer2", mpris_service)?
-            .serve_at("/org/mpris/MediaPlayer2", mpris_player_service)?
+            .serve_at("/org/mpris/MediaPlayer2", mpris_player_service)
+    }
+
+    pub async fn spawn(player: Arc<Player>, name: &str) -> Result<MprisEventHandler, MprisError> {
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+
+        let connection = Self::connection_builder(name, "org.mpris.MediaPlayer2.librespot")?
             .build()
-            .await?;
+            .await;
+        let connection = match connection {
+            Err(zbus::Error::NameTaken) => {
+                let pid_name =
+                    format!("org.mpris.MediaPlayer2.librespot.instance{}", process::id());
+                log::warn!("MPRIS: zbus name taken, trying with pid specific name: {pid_name}");
+
+                Self::connection_builder(name, &pid_name)?.build().await
+            }
+            _ => connection,
+        }?;
 
         let mpris_task = MprisTask {
             player,
