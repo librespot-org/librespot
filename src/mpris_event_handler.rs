@@ -626,11 +626,17 @@ impl MprisPlayerService {
     }
 
     #[zbus(property)]
-    async fn set_volume(&mut self, _value: Volume) -> zbus::fdo::Result<()> {
-        // TODO: implement
-        Err(zbus::fdo::Error::NotSupported(
-            "Player control not implemented".to_owned(),
-        ))
+    async fn set_volume(&mut self, value: Volume) -> zbus::fdo::Result<()> {
+        if let Some(spirc) = &self.spirc {
+            // As of rust 1.45, cast is guaranteed to round to 0 and saturate.
+            // MPRIS volume is expected to range between 0 and 1, see
+            // https://specifications.freedesktop.org/mpris-spec/latest/Player_Interface.html#Simple-Type:Volume
+            let mapped_volume = (value * (u16::MAX as f64)).round() as u16;
+            spirc
+                .set_volume(mapped_volume)
+                .map_err(|err| zbus::fdo::Error::Failed(format!("{err}")))?;
+        }
+        Ok(())
     }
 
     // The current track position in microseconds, between 0 and the 'mpris:length' metadata entry
