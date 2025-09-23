@@ -653,14 +653,6 @@ impl MprisPlayerService {
         Ok(0)
     }
 
-    // Note that the `Position` property is not writable intentionally, see
-    // the `set_position` method above.
-    // #[zbus(property)]
-    // async fn set_position(&self, _value: TimeInUs) -> zbus::fdo::Result<()> {
-    //     // TODO: implement
-    //     Err(zbus::fdo::Error::NotSupported("Player control not implemented".to_owned()))
-    // }
-
     // The minimum value which the `Rate` property can take. Clients should not attempt to set the
     // `Rate` property below this value.
     //
