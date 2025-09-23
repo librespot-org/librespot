@@ -662,7 +662,7 @@ impl MprisPlayerService {
     // This value should always be 1.0 or less.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn minimum_rate(&self) -> PlaybackRate {
-        // TODO: implement
+        // Setting minimum and maximum rate to 1 disallow client to set rate.
         1.0
     }
 
@@ -672,7 +672,7 @@ impl MprisPlayerService {
     // This value should always be 1.0 or greater.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn maximum_rate(&self) -> PlaybackRate {
-        // TODO: implement
+        // Setting minimum and maximum rate to 1 disallow client to set rate.
         1.0
     }
 
