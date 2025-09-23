@@ -150,7 +150,9 @@ type Volume = f64;
 // Time in microseconds.
 type TimeInUs = i64;
 
-struct MprisService {}
+struct MprisService {
+    identity: String,
+}
 
 #[zbus::interface(name = "org.mpris.MediaPlayer2")]
 impl MprisService {
@@ -259,8 +261,7 @@ impl MprisService {
     #[zbus(property)]
     async fn identity(&self) -> String {
         debug!("org.mpris.MediaPlayer2::Identity");
-        // TOOD: use name from config
-        "Librespot".to_owned()
+        self.identity.clone()
     }
 
     // The basename of an installed .desktop file which complies with the
@@ -831,10 +832,12 @@ pub struct MprisEventHandler {
 }
 
 impl MprisEventHandler {
-    pub async fn spawn(player: Arc<Player>) -> Result<MprisEventHandler, MprisError> {
+    pub async fn spawn(player: Arc<Player>, name: &str) -> Result<MprisEventHandler, MprisError> {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
-        let mpris_service = MprisService {};
+        let mpris_service = MprisService {
+            identity: name.to_string(),
+        };
         let mpris_player_service = MprisPlayerService {
             spirc: None,
             // FIXME: obtain current values from Player
