@@ -11,8 +11,8 @@ if [ "$fragment" = "patch" ]; then
   last_tag=$(git describe --tags --abbrev=0)
   awk_crates=$(echo "$allowed_crates" | tr ' ' '|')
   diff_crates=$(git diff $last_tag... --stat --name-only \
-    | awk '/(rs|proto)$/{print}' \
-    | awk "/($awk_crates)/{print}" \
+    | awk '/\.(rs|proto)$/{print}' \
+    | awk "/($awk_crates)\//{print}" \
     | cut -d '/' -f 1 \
     | uniq \
     | tr \\n '\ ' \

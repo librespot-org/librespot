@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 allowed_crates="protocol oauth core discovery audio metadata playback connect"
 
 current_tag=$(git describe --abbrev=0)
@@ -31,8 +33,8 @@ fi
 # if we go through here, we build a patch version and only want to update the crates that have changed
 awk_crates=$(echo "$allowed_crates" | tr ' ' '|')
 diff_crates=$(git diff $last_tag... --stat --name-only \
-  | awk '/(rs|proto)$/{print}' \
-  | awk "/($awk_crates)/{print}" \
+  | awk '/\.(rs|proto)$/{print}' \
+  | awk "/($awk_crates)\//{print}" \
   | cut -d '/' -f 1 \
   | uniq \
   | tr '\n' ' ' \
