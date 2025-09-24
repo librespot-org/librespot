@@ -1,6 +1,6 @@
 ---
 # test with
-# act --job bump-crate-version --eventpath ./.github/example/prepare-release.event
+# act --job prepare-release --eventpath ./.github/example/prepare-release.event
 name: prepare release
 on:
   workflow_dispatch:

@@ -19,9 +19,9 @@ this can also be done manually if so desired. The workflow does:
 
 After everything is prepared for the new version. A [new release can be created](https://github.com/librespot-org/librespot/releases/new) 
 from the ui. The tag will not be available as it isn't set by the prepare workflow, so a new tag needs to be created.
-The tag should be named like `v<version>` where `version` is the version of the binary.
 
-> insert convention what the release title and release notes should be and what checkboxes to check etc.
+The tag and name of the release should be named like `v<version>` where `version` is the version of the binary to be
+published. As release notes, copy the entries from the changelog for this release.
 
 The release should be created as draft, which will trigger the workflow that will publish the changed crates and binary.
 The workflow will:
