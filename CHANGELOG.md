@@ -7,10 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
+
+### Changed
+
+- [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
+- [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
+- [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [player] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [spclient] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+
+
+### Removed
+
+- [core] Removed `SpotifyItemType` enum; the new `SpotifyUri` is an enum over all item types and so which variant it is 
+  describes its item type (breaking)
+- [core] Removed `NamedSpotifyId` struct; it was made obsolete by `SpotifyUri` (breaking)
+- [core] The following methods have been removed from `SpotifyId` and moved to `SpotifyUri` (breaking):
+  - `is_playable`
+  - `from_uri`
+  - `to_uri`
+
+## [v0.7.1] - 2025-08-31
+
+### Changed
+
+- [connect] Shuffling was adjusted, so that shuffle and repeat can be used combined
+
 ### Fixed
 
+- [connect] Repeat context will not go into autoplay anymore and triggering autoplay while shuffling shouldn't reshuffle anymore
 - [connect] Only deletes the connect state on dealer shutdown instead on disconnecting
-- [core] Fixed a problem where in `spclient` where a http 411 error was thrown because the header were set wrong 
+- [core] Fixed a problem where in `spclient` where an HTTP/411 error was thrown because the header was set wrong
+- [main] Use the config instead of the type default for values that are not provided by the user
 
 ## [0.7.0] - 2025-08-24
 
@@ -410,7 +441,8 @@ v0.4.x as a stable branch until then.
 
 ## [0.1.0] - 2019-11-06
 
-[unreleased]: https://github.com/librespot-org/librespot/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/librespot-org/librespot/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/librespot-org/librespot/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/librespot-org/librespot/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/librespot-org/librespot/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/librespot-org/librespot/compare/v0.4.2...v0.5.0

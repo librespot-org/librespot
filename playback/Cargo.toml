@@ -1,6 +1,6 @@
 [package]
 name = "librespot-playback"
-version = "0.7.0"
+version = "0.7.1"
 rust-version.workspace = true
 authors = ["Sasha Hilton <sashahilton00@gmail.com>"]
 license.workspace = true
@@ -47,26 +47,20 @@ rustls-tls-webpki-roots = [
 ]
 
 [dependencies]
-librespot-audio = { version = "0.7.0", path = "../audio", default-features = false }
-librespot-core = { version = "0.7.0", path = "../core", default-features = false }
-librespot-metadata = { version = "0.7.0", path = "../metadata", default-features = false }
+librespot-audio = { version = "0.7.1", path = "../audio", default-features = false }
+librespot-core = { version = "0.7.1", path = "../core", default-features = false }
+librespot-metadata = { version = "0.7.1", path = "../metadata", default-features = false }
 
-portable-atomic = "1"
-futures-util = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 log = "0.4"
-parking_lot = { version = "0.12", features = ["deadlock_detection"] }
+portable-atomic = "1"
 shell-words = "1.1"
 thiserror = "2"
-tokio = { version = "1", features = [
-    "parking_lot",
-    "rt",
-    "rt-multi-thread",
-    "sync",
-] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 zerocopy = { version = "0.8", features = ["derive"] }
 
 # Backends
-alsa = { version = "0.9", optional = true }
+alsa = { version = "0.10", optional = true }
 jack = { version = "0.13", optional = true }
 portaudio-rs = { version = "0.3", optional = true }
 sdl2 = { version = "0.38", optional = true }
@@ -97,5 +91,5 @@ symphonia = { version = "0.5", default-features = false, features = [
 ogg = { version = "0.9", optional = true }
 
 # Dithering
-rand = { version = "0.9", features = ["small_rng"] }
+rand = { version = "0.9", default-features = false, features = ["small_rng"] }
 rand_distr = "0.5"

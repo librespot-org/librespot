@@ -1,6 +1,6 @@
 [package]
 name = "librespot-audio"
-version = "0.7.0"
+version = "0.7.1"
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
 license.workspace = true
@@ -18,17 +18,16 @@ rustls-tls-native-roots = ["librespot-core/rustls-tls-native-roots"]
 rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 
 [dependencies]
-librespot-core = { version = "0.7.0", path = "../core", default-features = false }
+librespot-core = { version = "0.7.1", path = "../core", default-features = false }
 
 aes = "0.8"
 bytes = "1"
 ctr = "0.9"
-futures-util = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 http-body-util = "0.1"
 hyper = { version = "1.6", features = ["http1", "http2"] }
 hyper-util = { version = "0.1", features = ["client", "http2"] }
 log = "0.4"
-parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 tempfile = "3"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "parking_lot", "sync"] }
+tokio = { version = "1", features = ["macros", "sync"] }

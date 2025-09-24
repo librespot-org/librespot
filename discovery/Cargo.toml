@@ -1,6 +1,6 @@
 [package]
 name = "librespot-discovery"
-version = "0.7.0"
+version = "0.7.1"
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
 license.workspace = true
@@ -23,7 +23,7 @@ rustls-tls-native-roots = ["librespot-core/rustls-tls-native-roots"]
 rustls-tls-webpki-roots = ["librespot-core/rustls-tls-webpki-roots"]
 
 [dependencies]
-librespot-core = { version = "0.7.0", path = "../core", default-features = false }
+librespot-core = { version = "0.7.1", path = "../core", default-features = false }
 
 aes = "0.8"
 base64 = "0.22"
@@ -32,7 +32,7 @@ ctr = "0.9"
 dns-sd = { version = "0.1", optional = true }
 form_urlencoded = "1.2"
 futures-core = "0.3"
-futures-util = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
 hmac = "0.12"
 http-body-util = "0.1"
 hyper = { version = "1.6", features = ["http1"] }
@@ -41,9 +41,9 @@ hyper-util = { version = "0.1", features = [
     "server-graceful",
     "service",
 ] }
-libmdns = { version = "0.9", optional = true }
+libmdns = { version = "0.10", optional = true }
 log = "0.4"
-rand = "0.9"
+rand = { version = "0.9", default-features = false, features = ["thread_rng"] }
 serde = { version = "1", default-features = false, features = [
     "derive",
 ], optional = true }
@@ -51,7 +51,7 @@ serde_repr = "0.1"
 serde_json = "1.0"
 sha1 = "0.10"
 thiserror = "2"
-tokio = { version = "1", features = ["parking_lot", "sync", "rt"] }
+tokio = { version = "1", features = ["sync", "rt"] }
 zbus = { version = "5", default-features = false, features = [
     "tokio",
 ], optional = true }
@@ -59,4 +59,4 @@ zbus = { version = "5", default-features = false, features = [
 [dev-dependencies]
 futures = "0.3"
 hex = "0.4"
-tokio = { version = "1", features = ["macros", "parking_lot", "rt"] }
+tokio = { version = "1", features = ["macros", "rt"] }
