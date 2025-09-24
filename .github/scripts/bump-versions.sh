@@ -31,11 +31,11 @@ export GITHUB_OUTPUT="version.txt"
 # https://github.com/christian-draeger/increment-semantic-version/tree/1.2.3
 increment_semver=$(curl https://raw.githubusercontent.com/christian-draeger/increment-semantic-version/refs/tags/1.2.3/entrypoint.sh)
 
-for crate in $diff_crates ; do
-  if [ "$crate" = "bin" ]; then
+for diff_crate in $diff_crates ; do
+  if [ "$diff_crate" = "bin" ]; then
     toml="./Cargo.toml"
   else
-    toml="./$crate/Cargo.toml"
+    toml="./$diff_crate/Cargo.toml"
   fi
 
   from="$(cat $toml | awk "/version/{print; exit}" | cut -d\" -f 2)"
@@ -45,23 +45,23 @@ for crate in $diff_crates ; do
   to=$(cat $GITHUB_OUTPUT | cut -d= -f 2)
   rm $GITHUB_OUTPUT
 
-  echo "upgrading [librespot-$crate] from [$from] to [$to]"
+  echo "upgrading [librespot-$diff_crate] from [$from] to [$to]"
 
-  # replace version in associated crate toml
+  # replace version in associated diff_crate toml
   sed -i "0,/$from/{s/$from/$to/}" $toml
 
-  if [ "$crate" = "bin" ]; then
+  if [ "$diff_crate" = "bin" ]; then
     continue
   fi
 
   # update workspace dependency in root toml
-  sed -i "/librespot-$crate/{s/$from/$to/}" ./Cargo.toml
+  sed -i "/librespot-$diff_crate/{s/$from/$to/}" ./Cargo.toml
 
-  # update related dependencies in crate
-  for crate in $allowed_crates ; do
-    cat $toml | grep librespot-$crate > /dev/null
+  # update related dependencies in diff_crate
+  for allowed_crate in $allowed_crates ; do
+    cat ./$allowed_crate/Cargo.toml | grep librespot-$diff_crate > /dev/null
     if [ $? = 0 ]; then
-      sed -i "/librespot-$crate/{s/$from/$to/}" $toml
+      sed -i "/librespot-$diff_crate/{s/$from/$to/}" ./$allowed_crate/Cargo.toml
     fi
   done
 done
