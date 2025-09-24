@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish-crates:
-    name: Publish crate librespot-${{ matrix.crate }}
+    name: Publish librespot
     runs-on: ubuntu-latest
     permissions: 
       contents: read
@@ -22,7 +22,6 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install dependencies
-        if: ${{ contains('connect playback', matrix.crate ) }}  # only install the dep when the crate requires it
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
       - name: Verify librespot workspace
