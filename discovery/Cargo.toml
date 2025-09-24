@@ -13,7 +13,7 @@ edition.workspace = true
 default = ["with-libmdns", "native-tls"]
 
 # Discovery backends
-with-avahi = ["dep:serde", "dep:zbus"]
+with-avahi = ["dep:serde", "dep:zbus", "futures-util/async-await-macro"]
 with-dns-sd = ["dep:dns-sd"]
 with-libmdns = ["dep:libmdns"]
 
