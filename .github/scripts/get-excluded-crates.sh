@@ -1,12 +1,12 @@
-CRATES="protocol oauth core discovery audio metadata playback connect"
+allowed_crates="protocol oauth core discovery audio metadata playback connect"
 
-CURRENT_TAG=$(git describe --abbrev=0)
-LAST_TAG=$(git describe --abbrev=0 $CURRENT_TAG^)
+current_tag=$(git describe --abbrev=0)
+last_tag=$(git describe --abbrev=0 $current_tag^)
 
-BIN_VERSION=$(cat ./Cargo.toml | awk "/version/{print; exit}" | cut -d\" -f 2)
+bin_version=$(cat ./Cargo.toml | awk "/version/{print; exit}" | cut -d\" -f 2)
 
-SIMPLE_VERSION_REGEX="^v?([0-9]+)\.([0-9]+)\.([0-9]+)$"
-if [[ $LAST_TAG =~ $SIMPLE_VERSION_REGEX ]]; then
+simple_version_regex="^v?([0-9]+)\.([0-9]+)\.([0-9]+)$"
+if [[ $last_tag =~ $simple_version_regex ]]; then
   last_major="${BASH_REMATCH[1]}"
   last_minor="${BASH_REMATCH[2]}"
   last_patch="${BASH_REMATCH[3]}"
@@ -15,7 +15,7 @@ else
   exit 1
 fi
 
-if [[ $BIN_VERSION =~ $SIMPLE_VERSION_REGEX ]]; then
+if [[ $bin_version =~ $simple_version_regex ]]; then
   if [ "$last_major" != "${BASH_REMATCH[1]}" ] || [ "$last_minor" != "${BASH_REMATCH[2]}" ]; then
     echo "[]"
     exit 0
@@ -29,21 +29,21 @@ else
 fi
 
 # if we go through here, we build a patch version and only want to update the crates that have changed
-AWK_CRATES=$(echo "$CRATES" | tr ' ' '|')
-DIFF_CRATES=$(git diff $LAST_TAG... --stat --name-only \
+awk_crates=$(echo "$allowed_crates" | tr ' ' '|')
+diff_crates=$(git diff $last_tag... --stat --name-only \
   | awk '/(rs|proto)$/{print}' \
-  | awk "/($AWK_CRATES)/{print}" \
+  | awk "/($awk_crates)/{print}" \
   | cut -d '/' -f 1 \
   | uniq \
   | tr '\n' ' ' \
   | xargs \
   | tr ' ' '|' )
 
-EXCLUDED_DIFF=$(echo $CRATES \
+excluded_diff=$(echo $allowed_crates \
   | tr ' ' '\n' \
-  | awk "!/($DIFF_CRATES)/{print}" \
+  | awk "!/($diff_crates)/{print}" \
   | tr '\n' ' ' \
   | xargs \
   | sed "s/ /\" }\, { \"crate\": \"/g")
 
-echo "[ { \"crate\": \"$EXCLUDED_DIFF\" } ]"
+echo "[ { \"crate\": \"$excluded_diff\" } ]"

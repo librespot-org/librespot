@@ -31,7 +31,7 @@ jobs:
 
       - name: Bump versions
         env:
-          FRAGMENT: ${{ github.event.inputs.versionBump }}
+          fragment: ${{ github.event.inputs.versionBump }}
         run: ./.github/scripts/bump-versions.sh
 
       - name: Update Cargo.lock
