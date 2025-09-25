@@ -1226,9 +1226,15 @@ impl MprisTask {
                 meta.mpris.track_id = Some(audio_item.track_id);
                 meta.xesam.title = Some(audio_item.name);
 
-                // TODO: Select image by size
-                let url = &audio_item.covers[0].url;
-                meta.mpris.art_url = Some(String::from(url));
+                // Choose biggest cover
+                if let Some(url) = audio_item
+                    .covers
+                    .iter()
+                    .max_by(|a, b| (a.size as u8).cmp(&(b.size as u8)))
+                    .map(|cover| &cover.url)
+                {
+                    meta.mpris.art_url = Some(String::from(url));
+                }
 
                 meta.mpris.length = Some(audio_item.duration_ms as i64 * 1000);
 
