@@ -1306,12 +1306,19 @@ impl MprisTask {
             PlayerEvent::Loading { .. } => {}
             PlayerEvent::Preloading { .. } => {}
             PlayerEvent::TimeToPreloadNextTrack { .. } => {}
-            PlayerEvent::EndOfTrack { track_id, .. } => match track_id.to_id() {
-                Err(e) => warn!("PlayerEvent::EndOfTrack: Invalid track id: {e}"),
-                Ok(_id) => {
-                    // TODO: ?
+            PlayerEvent::EndOfTrack { track_id, .. } => {
+                // TODO: Update position
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
+                let meta = &mut iface.metadata;
+
+                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                    *meta = Metadata::default();
+                    meta.mpris.track_id = Some(track_id);
+                    warn!("Missed TrackChanged event, metadata missing");
+                    iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
-            },
+            }
             PlayerEvent::Unavailable { .. } => {}
             PlayerEvent::VolumeChanged { volume, .. } => {
                 let iface_ref = self.mpris_player_iface().await;
@@ -1326,7 +1333,7 @@ impl MprisTask {
                 // position_ms,
                 ..
             } => {
-                // TODO: Update position + track_id
+                // TODO: Update position
                 let iface_ref = self.mpris_player_iface().await;
                 let mut iface = iface_ref.get_mut().await;
                 let meta = &mut iface.metadata;
