@@ -8,7 +8,8 @@ use tokio::sync::mpsc;
 use zbus::connection;
 
 use librespot::{
-    core::Error,
+    core::date::Date,
+    core::{Error, SpotifyUri},
     metadata::audio::UniqueFields,
     playback::player::{Player, PlayerEvent},
 };
@@ -312,13 +313,257 @@ impl MprisService {
     }
 }
 
+/// MPRIS-specific metadata
+#[derive(Default, Clone)]
+struct MprisMetadata {
+    /// D-Bus path: A unique identity for this track within the context of an MPRIS object (eg: tracklist).
+    track_id: Option<SpotifyUri>,
+    /// 64-bit integer: The duration of the track in microseconds.
+    length: Option<i64>,
+    /// URI: The location of an image representing the track or album. Clients should not assume this will continue to exist when the media player stops giving out the URL.
+    art_url: Option<String>,
+}
+
+/// Common audio properties from the Xesam specification
+#[derive(Default, Clone)]
+struct XesamMetadata {
+    /// String: The album name.
+    album: Option<String>,
+    /// List of Strings: The album artist(s).
+    album_artist: Option<Vec<String>>,
+    /// List of Strings: The track artist(s).
+    artist: Option<Vec<String>>,
+    /// String: The track lyrics.
+    as_text: Option<String>,
+    /// Integer: The speed of the music, in beats per minute.
+    audio_bpm: Option<u32>,
+    /// Float: An automatically-generated rating, based on things such as how often it has been played. This should be in the range 0.0 to 1.0.
+    auto_rating: Option<f64>,
+    /// List of Strings: A (list of) freeform comment(s).
+    comment: Option<Vec<String>>,
+    /// List of Strings: The composer(s) of the track.
+    composer: Option<Vec<String>>,
+    /// Date/Time: When the track was created. Usually only the year component will be useful.
+    content_created: Option<Date>,
+    /// Integer: The disc number on the album that this track is from.
+    disc_number: Option<i32>,
+    /// Date/Time: When the track was first played.
+    first_used: Option<Date>,
+    /// List of Strings: The genre(s) of the track.
+    genre: Option<Vec<String>>,
+    /// Date/Time: When the track was last played.
+    last_used: Option<Date>,
+    /// List of Strings: The lyricist(s) of the track.
+    lyricist: Option<Vec<String>>,
+    /// String: The track title.
+    title: Option<String>,
+    /// Integer: The track number on the album disc.
+    track_number: Option<i32>,
+    /// URI: The location of the media file.
+    url: Option<String>,
+    /// Integer: The number of times the track has been played.
+    use_count: Option<u16>,
+    /// Float: A user-specified rating. This should be in the range 0.0 to 1.0.
+    user_rating: Option<f64>,
+}
+
+impl From<UniqueFields> for XesamMetadata {
+    fn from(value: UniqueFields) -> Self {
+        let mut xesam = Self::default();
+
+        match value {
+            UniqueFields::Track {
+                artists,
+                album,
+                album_date,
+                album_artists,
+                popularity: _,
+                number,
+                disc_number,
+            } => {
+                let artists = artists
+                    .0
+                    .into_iter()
+                    .map(|a| a.name)
+                    .collect::<Vec<String>>();
+                xesam.artist = Some(artists);
+                xesam.album_artist = Some(album_artists);
+                xesam.album = Some(album);
+                xesam.track_number = Some(number as i32);
+                xesam.disc_number = Some(disc_number as i32);
+                xesam.content_created = Some(album_date);
+            }
+            UniqueFields::Episode {
+                description,
+                publish_time,
+                show_name,
+            } => {
+                xesam.album = Some(show_name);
+                xesam.comment = Some(vec![description]);
+                xesam.content_created = Some(publish_time);
+            }
+        }
+
+        xesam
+    }
+}
+
+#[derive(Default, Clone)]
+struct Metadata {
+    mpris: MprisMetadata,
+    xesam: XesamMetadata,
+}
+
+impl TryInto<HashMap<String, zbus::zvariant::OwnedValue>> for Metadata {
+    type Error = zbus::Error;
+
+    fn try_into(self) -> Result<HashMap<String, zbus::zvariant::OwnedValue>, Self::Error> {
+        let mut meta: HashMap<String, zbus::zvariant::OwnedValue> = HashMap::new();
+
+        let track_id = self.mpris.track_id.map(|track_id| {
+            track_id
+                .to_id()
+                .map(|id| format!("/org/librespot/track/{id}"))
+                .ok()
+        });
+        let track_id = track_id
+            .flatten()
+            .unwrap_or(" /org/mpris/MediaPlayer2/TrackList/NoTrack".to_string());
+        meta.insert(
+            String::from("mpris:trackId"),
+            zvariant::ObjectPath::try_from(track_id)?.into(),
+        );
+
+        if let Some(length) = self.mpris.length {
+            meta.insert(String::from("mpris:length"), length.into());
+        }
+        if let Some(art_url) = self.mpris.art_url {
+            meta.insert(
+                String::from("mpris:artUrl"),
+                zvariant::Str::from(art_url).into(),
+            );
+        }
+
+        if let Some(album) = self.xesam.album {
+            meta.insert(
+                String::from("xesam:album"),
+                zvariant::Str::from(album).into(),
+            );
+        }
+        if let Some(album_artist) = self.xesam.album_artist {
+            meta.insert(
+                String::from("xesam:albumArtist"),
+                zvariant::Array::from(album_artist).try_into()?,
+            );
+        }
+        if let Some(artist) = self.xesam.artist {
+            meta.insert(
+                String::from("xesam:artist"),
+                zvariant::Array::from(artist).try_into()?,
+            );
+        }
+        if let Some(as_text) = self.xesam.as_text {
+            meta.insert(
+                String::from("xesam:asText"),
+                zvariant::Str::from(as_text).into(),
+            );
+        }
+        if let Some(audio_bpm) = self.xesam.audio_bpm {
+            meta.insert(String::from("xesam:audioBPM"), audio_bpm.into());
+        }
+        if let Some(auto_rating) = self.xesam.auto_rating {
+            meta.insert(String::from("xesam:autoRating"), auto_rating.into());
+        }
+        if let Some(comment) = self.xesam.comment {
+            meta.insert(
+                String::from("xesam:comment"),
+                zvariant::Array::from(comment).try_into()?,
+            );
+        }
+        if let Some(composer) = self.xesam.composer {
+            meta.insert(
+                String::from("xesam:composer"),
+                zvariant::Array::from(composer).try_into()?,
+            );
+        }
+        if let Some(content_created) = self.xesam.content_created {
+            meta.insert(
+                String::from("xesam:contentCreated"),
+                zvariant::Str::from(
+                    content_created
+                        .format(&Iso8601::DEFAULT)
+                        .map_err(|err| zvariant::Error::Message(format!("{err}")))?,
+                )
+                .into(),
+            );
+        }
+        if let Some(disc_number) = self.xesam.disc_number {
+            meta.insert(String::from("xesam:discNumber"), disc_number.into());
+        }
+        if let Some(first_used) = self.xesam.first_used {
+            meta.insert(
+                String::from("xesam:firstUsed"),
+                zvariant::Str::from(
+                    first_used
+                        .format(&Iso8601::DEFAULT)
+                        .map_err(|err| zvariant::Error::Message(format!("{err}")))?,
+                )
+                .into(),
+            );
+        }
+        if let Some(genre) = self.xesam.genre {
+            meta.insert(
+                String::from("xesam:genre"),
+                zvariant::Array::from(genre).try_into()?,
+            );
+        }
+        if let Some(last_used) = self.xesam.last_used {
+            meta.insert(
+                String::from("xesam:lastUsed"),
+                zvariant::Str::from(
+                    last_used
+                        .format(&Iso8601::DEFAULT)
+                        .map_err(|err| zvariant::Error::Message(format!("{err}")))?,
+                )
+                .into(),
+            );
+        }
+        if let Some(lyricist) = self.xesam.lyricist {
+            meta.insert(
+                String::from("xesam:lyricist"),
+                zvariant::Array::from(lyricist).try_into()?,
+            );
+        }
+        if let Some(title) = self.xesam.title {
+            meta.insert(
+                String::from("xesam:title"),
+                zvariant::Str::from(title).into(),
+            );
+        }
+        if let Some(track_number) = self.xesam.track_number {
+            meta.insert(String::from("xesam:trackNumber"), track_number.into());
+        }
+        if let Some(url) = self.xesam.url {
+            meta.insert(String::from("xesam:url"), zvariant::Str::from(url).into());
+        }
+        if let Some(use_count) = self.xesam.use_count {
+            meta.insert(String::from("xesam:useCount"), use_count.into());
+        }
+        if let Some(user_rating) = self.xesam.user_rating {
+            meta.insert(String::from("xesam:userRating"), user_rating.into());
+        }
+
+        Ok(meta)
+    }
+}
+
 struct MprisPlayerService {
     spirc: Option<Spirc>,
     repeat: LoopStatus,
     shuffle: bool,
     playback_status: PlaybackStatus,
     volume: u16,
-    metadata: HashMap<String, zbus::zvariant::OwnedValue>,
+    metadata: Metadata,
 }
 
 // This interface implements the methods for querying and providing basic
@@ -597,20 +842,10 @@ impl MprisPlayerService {
     async fn metadata(
         &self,
     ) -> zbus::fdo::Result<std::collections::HashMap<String, zbus::zvariant::OwnedValue>> {
-        let meta = if self.metadata.is_empty() {
-            let mut meta = HashMap::new();
-            meta.insert(
-                "mpris:trackid".to_owned(),
-                zvariant::Str::from(" /org/mpris/MediaPlayer2/TrackList/NoTrack").into(),
-            );
-            meta
-        } else {
-            self.metadata
-                .iter()
-                .map(|(k, v)| (k.clone(), v.try_clone().unwrap()))
-                .collect()
-        };
-        Ok(meta)
+        self.metadata
+            .clone()
+            .try_into()
+            .map_err(zbus::fdo::Error::ZBus)
     }
 
     // The volume level.
@@ -725,7 +960,7 @@ impl MprisPlayerService {
     //     "current track".
     #[zbus(property(emits_changed_signal = "true"))]
     async fn can_play(&self) -> bool {
-        !self.metadata.is_empty()
+        self.metadata.mpris.track_id.is_some()
     }
 
     // Whether playback can be paused using `Pause` or `PlayPause`.
@@ -743,7 +978,7 @@ impl MprisPlayerService {
     //     streamed media, for example.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn can_pause(&self) -> bool {
-        !self.metadata.is_empty()
+        self.metadata.mpris.track_id.is_some()
     }
 
     // Whether the client can control the playback position using `Seek` and `SetPosition`.  This
@@ -841,7 +1076,7 @@ impl MprisEventHandler {
             shuffle: false,
             playback_status: PlaybackStatus::Stopped,
             volume: u16::MAX,
-            metadata: HashMap::new(),
+            metadata: Metadata::default(),
         };
 
         connection::Builder::session()?
@@ -954,199 +1189,86 @@ impl MprisTask {
         match event {
             PlayerEvent::PlayRequestIdChanged { play_request_id: _ } => {}
             PlayerEvent::TrackChanged { audio_item } => {
-                match audio_item.track_id.to_id() {
-                    Err(e) => {
-                        warn!("PlayerEvent::TrackChanged: Invalid track id: {e}")
-                    }
-                    Ok(track_id) => {
-                        let iface_ref = self.mpris_player_iface().await;
-                        let mut iface = iface_ref.get_mut().await;
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
 
-                        let meta = &mut iface.metadata;
-                        meta.clear();
+                let meta = &mut iface.metadata;
+                *meta = Metadata::default();
 
-                        let mut trackid = String::new();
-                        trackid.push_str("/org/librespot/track/");
-                        trackid.push_str(&track_id);
-                        meta.insert(
-                            "mpris:trackid".into(),
-                            zvariant::ObjectPath::try_from(trackid).unwrap().into(),
-                        );
+                meta.mpris.track_id = Some(audio_item.track_id);
+                meta.xesam.title = Some(audio_item.name);
 
-                        meta.insert(
-                            "xesam:title".into(),
-                            zvariant::Str::from(audio_item.name).into(),
-                        );
+                // TODO: Select image by size
+                let url = &audio_item.covers[0].url;
+                meta.mpris.art_url = Some(String::from(url));
 
-                        if audio_item.covers.is_empty() {
-                            meta.remove("mpris:artUrl");
-                        } else {
-                            // TODO: Select image by size
-                            let url = &audio_item.covers[0].url;
-                            meta.insert("mpris.artUrl".into(), zvariant::Str::from(url).into());
-                        }
+                meta.mpris.length = Some(audio_item.duration_ms as i64 * 1000);
 
-                        meta.insert(
-                            "mpris:length".into(),
-                            (audio_item.duration_ms as i64 * 1000).into(),
-                        );
+                meta.xesam = audio_item.unique_fields.into();
 
-                        match audio_item.unique_fields {
-                            UniqueFields::Track {
-                                artists,
-                                album,
-                                album_date,
-                                album_artists,
-                                popularity: _,
-                                number,
-                                disc_number,
-                            } => {
-                                let artists = artists
-                                    .0
-                                    .into_iter()
-                                    .map(|a| a.name)
-                                    .collect::<Vec<String>>();
-                                meta.insert(
-                                    "xesam:artist".into(),
-                                    // try_to_owned only fails if the Value contains file
-                                    // descriptors, so the unwrap never panics here
-                                    zvariant::Value::from(artists).try_to_owned().unwrap(),
-                                );
-
-                                meta.insert(
-                                    "xesam:albumArtist".into(),
-                                    // try_to_owned only fails if the Value contains file
-                                    // descriptors, so the unwrap never panics here
-                                    zvariant::Value::from(&album_artists)
-                                        .try_to_owned()
-                                        .unwrap(),
-                                );
-
-                                meta.insert(
-                                    "xesam:album".into(),
-                                    zvariant::Str::from(album).into(),
-                                );
-
-                                meta.insert("xesam:trackNumber".into(), (number as i32).into());
-
-                                meta.insert("xesam:discNumber".into(), (disc_number as i32).into());
-
-                                meta.insert(
-                                    "xesam:contentCreated".into(),
-                                    zvariant::Str::from(
-                                        album_date.0.format(&Iso8601::DATE).unwrap(),
-                                    )
-                                    .into(),
-                                );
-                            }
-                            UniqueFields::Episode {
-                                description,
-                                publish_time,
-                                show_name,
-                            } => {
-                                meta.insert(
-                                    "xesam:album".into(),
-                                    zvariant::Str::from(show_name).into(),
-                                );
-
-                                meta.insert(
-                                    "xesam:comment".into(),
-                                    zvariant::Str::from(description).into(),
-                                );
-
-                                meta.insert(
-                                    "xesam:contentCreated".into(),
-                                    zvariant::Str::from(
-                                        publish_time.0.format(&Iso8601::DATE).unwrap(),
-                                    )
-                                    .into(),
-                                );
-                            }
-                        }
-
-                        iface.metadata_changed(iface_ref.signal_context()).await?;
-                    }
-                }
+                iface.metadata_changed(iface_ref.signal_context()).await?;
             }
-            PlayerEvent::Stopped { track_id, .. } => match track_id.to_id() {
-                Err(e) => warn!("PlayerEvent::Stopped: Invalid track id: {e}"),
-                Ok(track_id) => {
-                    let iface_ref = self.mpris_player_iface().await;
-                    let mut iface = iface_ref.get_mut().await;
-                    let meta = &mut iface.metadata;
+            PlayerEvent::Stopped { track_id, .. } => {
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
+                let meta = &mut iface.metadata;
 
-                    // TODO: Check if metadata changed, if so clear
-                    let mut trackid = String::new();
-                    trackid.push_str("/org/librespot/track/");
-                    trackid.push_str(&track_id);
-                    meta.insert(
-                        "mpris:trackid".into(),
-                        zvariant::ObjectPath::try_from(trackid).unwrap().into(),
-                    );
+                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                    *meta = Metadata::default();
+                    meta.mpris.track_id = Some(track_id);
+                    // TODO: Fetch all metadata from AudioItem
                     iface.metadata_changed(iface_ref.signal_context()).await?;
-
-                    iface.playback_status = PlaybackStatus::Stopped;
-                    iface
-                        .playback_status_changed(iface_ref.signal_context())
-                        .await?;
                 }
-            },
+
+                iface.playback_status = PlaybackStatus::Stopped;
+                iface
+                    .playback_status_changed(iface_ref.signal_context())
+                    .await?;
+            }
             PlayerEvent::Playing {
                 track_id,
                 // position_ms,
                 ..
-            } => match track_id.to_id() {
-                Err(e) => warn!("PlayerEvent::Playing: Invalid track id: {e}"),
-                Ok(track_id) => {
-                    // TODO: update position
-                    let iface_ref = self.mpris_player_iface().await;
-                    let mut iface = iface_ref.get_mut().await;
-                    let meta = &mut iface.metadata;
+            } => {
+                // TODO: update position
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
+                let meta = &mut iface.metadata;
 
-                    // TODO: Check if metadata changed, if so clear
-                    let mut trackid = String::new();
-                    trackid.push_str("/org/librespot/track/");
-                    trackid.push_str(&track_id);
-                    meta.insert(
-                        "mpris:trackid".into(),
-                        zvariant::ObjectPath::try_from(trackid).unwrap().into(),
-                    );
+                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                    *meta = Metadata::default();
+                    meta.mpris.track_id = Some(track_id);
+                    // TODO: Fetch all metadata from AudioItem
                     iface.metadata_changed(iface_ref.signal_context()).await?;
-
-                    iface.playback_status = PlaybackStatus::Playing;
-                    iface
-                        .playback_status_changed(iface_ref.signal_context())
-                        .await?;
                 }
-            },
+
+                iface.playback_status = PlaybackStatus::Playing;
+                iface
+                    .playback_status_changed(iface_ref.signal_context())
+                    .await?;
+            }
             PlayerEvent::Paused {
                 track_id,
                 // position_ms,
                 ..
-            } => match track_id.to_id() {
-                Err(e) => warn!("PlayerEvent::Paused: Invalid track id: {e}"),
-                Ok(track_id) => {
-                    // TODO: update position
-                    let iface_ref = self.mpris_player_iface().await;
-                    let mut iface = iface_ref.get_mut().await;
-                    let meta = &mut iface.metadata;
+            } => {
+                // TODO: update position
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
+                let meta = &mut iface.metadata;
 
-                    // TODO: Check if metadata changed, if so clear
-                    let mut trackid = String::new();
-                    trackid.push_str("/org/librespot/track/");
-                    trackid.push_str(&track_id);
-                    meta.insert(
-                        "mpris:trackid".into(),
-                        zvariant::ObjectPath::try_from(trackid).unwrap().into(),
-                    );
+                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                    *meta = Metadata::default();
+                    meta.mpris.track_id = Some(track_id);
+                    // TODO: Fetch all metadata from AudioItem
                     iface.metadata_changed(iface_ref.signal_context()).await?;
-
-                    iface.playback_status = PlaybackStatus::Paused;
-                    iface
-                        .playback_status_changed(iface_ref.signal_context())
-                        .await?;
                 }
-            },
+
+                iface.playback_status = PlaybackStatus::Paused;
+                iface
+                    .playback_status_changed(iface_ref.signal_context())
+                    .await?;
+            }
             PlayerEvent::Loading { .. } => {}
             PlayerEvent::Preloading { .. } => {}
             PlayerEvent::TimeToPreloadNextTrack { .. } => {}
@@ -1169,39 +1291,46 @@ impl MprisTask {
                 track_id,
                 // position_ms,
                 ..
-            } => match track_id.to_id() {
-                Err(e) => warn!("PlayerEvent::Seeked: Invalid track id: {e}"),
-                Ok(track_id) => {
-                    // TODO: Update position + track_id
-                    let iface_ref = self.mpris_player_iface().await;
-                    let mut iface = iface_ref.get_mut().await;
-                    let meta = &mut iface.metadata;
+            } => {
+                // TODO: Update position + track_id
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
+                let meta = &mut iface.metadata;
 
-                    // TODO: Check if metadata changed, if so clear
-                    let mut trackid = String::new();
-                    trackid.push_str("/org/librespot/track/");
-                    trackid.push_str(&track_id);
-                    meta.insert(
-                        "mpris:trackid".into(),
-                        zvariant::ObjectPath::try_from(trackid).unwrap().into(),
-                    );
+                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                    *meta = Metadata::default();
+                    meta.mpris.track_id = Some(track_id);
+                    // TODO: Fetch all metadata from AudioItem
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
-            },
+            }
             PlayerEvent::PositionCorrection {
                 track_id,
                 // position_ms,
                 ..
-            } => match track_id.to_id() {
-                Err(e) => {
-                    warn!("PlayerEvent::PositionCorrection: Invalid track id: {e}")
+            } => {
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
+                let meta = &mut iface.metadata;
+
+                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                    *meta = Metadata::default();
+                    meta.mpris.track_id = Some(track_id);
+                    // TODO: Fetch all metadata from AudioItem
+                    iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
-                Ok(_id) => {
-                    // TODO: Update position + track_id
+            }
+            PlayerEvent::PositionChanged { track_id, .. } => {
+                let iface_ref = self.mpris_player_iface().await;
+                let mut iface = iface_ref.get_mut().await;
+                let meta = &mut iface.metadata;
+
+                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                    *meta = Metadata::default();
+                    meta.mpris.track_id = Some(track_id);
+                    // TODO: Fetch all metadata from AudioItem
+                    iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
-            },
-            PlayerEvent::PositionChanged { .. } => {
-                // TODO
             }
             PlayerEvent::SessionConnected { .. } => {}
             PlayerEvent::SessionDisconnected { .. } => {}
