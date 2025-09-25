@@ -592,6 +592,7 @@ impl MprisPlayerService {
     ///
     /// If self.can_go_next is `false`, attempting to call this method should have no effect.
     async fn next(&self) {
+        log::debug!("org.mpris.MediaPlayer2.Player::Next");
         if let Some(spirc) = &self.spirc {
             let _ = spirc.next();
         }
@@ -606,6 +607,7 @@ impl MprisPlayerService {
     //
     // If `self.can_go_previous` is `false`, attempting to call this method should have no effect.
     async fn previous(&self) {
+        log::debug!("org.mpris.MediaPlayer2.Player::Previous");
         if let Some(spirc) = &self.spirc {
             let _ = spirc.prev();
         }
@@ -619,6 +621,7 @@ impl MprisPlayerService {
     //
     // If `self.can_pause` is `false`, attempting to call this method should have no effect.
     async fn pause(&self) {
+        debug!("org.mpris.MediaPlayer2.Player::Pause");
         // FIXME: This should return an error if can_pause is false
         if let Some(spirc) = &self.spirc {
             let _ = spirc.pause();
@@ -634,6 +637,7 @@ impl MprisPlayerService {
     // If `self.can_pause` is `false`, attempting to call this method should have no effect and
     // raise an error.
     async fn play_pause(&self) {
+        debug!("org.mpris.MediaPlayer2.Player::PlayPause");
         // FIXME: This should return an error if can_pause is false
         if let Some(spirc) = &self.spirc {
             let _ = spirc.play_pause();
@@ -650,6 +654,7 @@ impl MprisPlayerService {
     // If `CanControl` is `false`, attempting to call this method should have no effect and raise
     // an error.
     async fn stop(&self) {
+        debug!("org.mpris.MediaPlayer2.Player::Stop");
         // FIXME: This should return an error if can_control is false
         if let Some(spirc) = &self.spirc {
             let _ = spirc.pause();
@@ -667,6 +672,7 @@ impl MprisPlayerService {
     //
     // If `self.can_play` is `false`, attempting to call this method should have no effect.
     async fn play(&self) {
+        debug!("org.mpris.MediaPlayer2.Player::Play");
         if let Some(spirc) = &self.spirc {
             let _ = spirc.activate();
             let _ = spirc.play();
@@ -687,6 +693,7 @@ impl MprisPlayerService {
     //
     // * `offset`: The number of microseconds to seek forward.
     async fn seek(&self, offset: TimeInUs) {
+        debug!("org.mpris.MediaPlayer2.Player::Seek({offset:?})");
         if let Some(spirc) = &self.spirc {
             let _ = spirc.seek_offset((offset / 1000) as i32);
         }
@@ -714,7 +721,8 @@ impl MprisPlayerService {
     //               `/org/mpris/MediaPlayer2/TrackList/NoTrack` is _not_ a valid value for this
     //               argument.
     // * `position`: Track position in microseconds. This must be between 0 and `track_length`.
-    async fn set_position(&self, _track_id: zbus::zvariant::ObjectPath<'_>, position: TimeInUs) {
+    async fn set_position(&self, track_id: zbus::zvariant::ObjectPath<'_>, position: TimeInUs) {
+        debug!("org.mpris.MediaPlayer2.Player::SetPosition({track_id:?}, {position:?})");
         // FIXME: handle track_id
         if position < 0 {
             return;
@@ -745,7 +753,8 @@ impl MprisPlayerService {
     // * `uri`: Uri of the track to load. Its uri scheme should be an element of the
     //          `org.mpris.MediaPlayer2.SupportedUriSchemes` property and the mime-type should
     //          match one of the elements of the `org.mpris.MediaPlayer2.SupportedMimeTypes`.
-    async fn open_uri(&self, _uri: &str) -> zbus::fdo::Result<()> {
+    async fn open_uri(&self, uri: &str) -> zbus::fdo::Result<()> {
+        debug!("org.mpris.MediaPlayer2.Player::OpenUri({uri:?})");
         Err(zbus::fdo::Error::NotSupported(
             "OpenUri not supported".to_owned(),
         ))
@@ -756,6 +765,7 @@ impl MprisPlayerService {
     // May be "Playing", "Paused" or "Stopped".
     #[zbus(property(emits_changed_signal = "true"))]
     async fn playback_status(&self) -> PlaybackStatus {
+        debug!("org.mpris.MediaPlayer2.Player::PlaybackStatus");
         self.playback_status
     }
 
@@ -771,11 +781,13 @@ impl MprisPlayerService {
     //
     #[zbus(property(emits_changed_signal = "true"))]
     async fn loop_status(&self) -> LoopStatus {
+        debug!("org.mpris.MediaPlayer2.Player::LoopStatus");
         self.repeat
     }
 
     #[zbus(property)]
     async fn set_loop_status(&mut self, value: LoopStatus) -> zbus::fdo::Result<()> {
+        debug!("org.mpris.MediaPlayer2.Player::LoopStatus({value:?})");
         match value {
             LoopStatus::None => {
                 if let Some(spirc) = &self.spirc {
@@ -821,11 +833,13 @@ impl MprisPlayerService {
     //     position.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn rate(&self) -> PlaybackRate {
+        debug!("org.mpris.MediaPlayer2.Player::Rate");
         1.0
     }
 
     #[zbus(property)]
-    async fn set_rate(&mut self, _value: PlaybackRate) {
+    async fn set_rate(&mut self, value: PlaybackRate) {
+        debug!("org.mpris.MediaPlayer2.Player::Rate({value:?})");
         // ignore
     }
 
@@ -837,11 +851,13 @@ impl MprisPlayerService {
     //
     #[zbus(property(emits_changed_signal = "true"))]
     async fn shuffle(&self) -> bool {
+        debug!("org.mpris.MediaPlayer2.Player::Shuffle");
         self.shuffle
     }
 
     #[zbus(property)]
     async fn set_shuffle(&mut self, value: bool) {
+        debug!("org.mpris.MediaPlayer2.Player::Shuffle({value:?})");
         if let Some(spirc) = &self.spirc {
             let _ = spirc.shuffle(value);
         }
@@ -857,6 +873,7 @@ impl MprisPlayerService {
     async fn metadata(
         &self,
     ) -> zbus::fdo::Result<std::collections::HashMap<String, zbus::zvariant::OwnedValue>> {
+        debug!("org.mpris.MediaPlayer2.Player::Metadata");
         self.metadata
             .clone()
             .try_into()
@@ -871,11 +888,13 @@ impl MprisPlayerService {
     // an error.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn volume(&self) -> Volume {
+        debug!("org.mpris.MediaPlayer2.Player::Volume");
         self.volume as f64 / u16::MAX as f64
     }
 
     #[zbus(property)]
     async fn set_volume(&mut self, value: Volume) -> zbus::fdo::Result<()> {
+        debug!("org.mpris.MediaPlayer2.Player::Volume({value})");
         if let Some(spirc) = &self.spirc {
             // As of rust 1.45, cast is guaranteed to round to 0 and saturate.
             // MPRIS volume is expected to range between 0 and 1, see
@@ -899,6 +918,7 @@ impl MprisPlayerService {
     // `Seeked` signal is emited.
     #[zbus(property(emits_changed_signal = "false"))]
     async fn position(&self) -> zbus::fdo::Result<TimeInUs> {
+        debug!("org.mpris.MediaPlayer2.Player::Position");
         // todo!("fetch up-to-date position from player")
         Ok(0)
     }
@@ -912,6 +932,7 @@ impl MprisPlayerService {
     // This value should always be 1.0 or less.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn minimum_rate(&self) -> PlaybackRate {
+        debug!("org.mpris.MediaPlayer2.Player::MinimumRate");
         // Setting minimum and maximum rate to 1 disallow client to set rate.
         1.0
     }
@@ -922,6 +943,7 @@ impl MprisPlayerService {
     // This value should always be 1.0 or greater.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn maximum_rate(&self) -> PlaybackRate {
+        debug!("org.mpris.MediaPlayer2.Player::MaximumRate");
         // Setting minimum and maximum rate to 1 disallow client to set rate.
         1.0
     }
@@ -940,6 +962,7 @@ impl MprisPlayerService {
     //     always be a next track to move to.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn can_go_next(&self) -> bool {
+        debug!("org.mpris.MediaPlayer2.Player::CanGoNext");
         true
     }
 
@@ -957,6 +980,7 @@ impl MprisPlayerService {
     //     always be a next previous to move to.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn can_go_previous(&self) -> bool {
+        debug!("org.mpris.MediaPlayer2.Player::CanGoPrevious");
         true
     }
 
@@ -975,6 +999,7 @@ impl MprisPlayerService {
     //     "current track".
     #[zbus(property(emits_changed_signal = "true"))]
     async fn can_play(&self) -> bool {
+        debug!("org.mpris.MediaPlayer2.Player::CanPlay");
         self.metadata.mpris.track_id.is_some()
     }
 
@@ -993,6 +1018,7 @@ impl MprisPlayerService {
     //     streamed media, for example.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn can_pause(&self) -> bool {
+        debug!("org.mpris.MediaPlayer2.Player::CanPause");
         self.metadata.mpris.track_id.is_some()
     }
 
@@ -1007,6 +1033,7 @@ impl MprisPlayerService {
     //     playing some streamed media, for example.
     #[zbus(property(emits_changed_signal = "true"))]
     async fn can_seek(&self) -> bool {
+        debug!("org.mpris.MediaPlayer2.Player::CanSeek");
         true
     }
 
@@ -1025,6 +1052,7 @@ impl MprisPlayerService {
     //     advance of attempting to call methods and write to properties.
     #[zbus(property(emits_changed_signal = "const"))]
     async fn can_control(&self) -> bool {
+        debug!("org.mpris.MediaPlayer2.Player::CanControl");
         true
     }
 
@@ -1110,7 +1138,7 @@ impl MprisEventHandler {
             Err(zbus::Error::NameTaken) => {
                 let pid_name =
                     format!("org.mpris.MediaPlayer2.librespot.instance{}", process::id());
-                log::warn!("MPRIS: zbus name taken, trying with pid specific name: {pid_name}");
+                warn!("zbus name taken, trying with pid specific name: {pid_name}");
 
                 Self::connection_builder(name, &pid_name)?.build().await
             }
@@ -1231,7 +1259,7 @@ impl MprisTask {
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
-                    // TODO: Fetch all metadata from AudioItem
+                    warn!("Missed TrackChanged event, metadata missing");
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
 
@@ -1253,7 +1281,7 @@ impl MprisTask {
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
-                    // TODO: Fetch all metadata from AudioItem
+                    warn!("Missed TrackChanged event, metadata missing");
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
 
@@ -1275,7 +1303,7 @@ impl MprisTask {
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
-                    // TODO: Fetch all metadata from AudioItem
+                    warn!("Missed TrackChanged event, metadata missing");
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
 
@@ -1315,7 +1343,7 @@ impl MprisTask {
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
-                    // TODO: Fetch all metadata from AudioItem
+                    warn!("Missed TrackChanged event, metadata missing");
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
             }
@@ -1331,7 +1359,7 @@ impl MprisTask {
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
-                    // TODO: Fetch all metadata from AudioItem
+                    warn!("Missed TrackChanged event, metadata missing");
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
             }
@@ -1343,7 +1371,7 @@ impl MprisTask {
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
-                    // TODO: Fetch all metadata from AudioItem
+                    warn!("Missed TrackChanged event, metadata missing");
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
             }
