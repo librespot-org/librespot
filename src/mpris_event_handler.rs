@@ -621,11 +621,16 @@ impl MprisPlayerService {
     // Calling Play after this should cause playback to start again from the same position.
     //
     // If `self.can_pause` is `false`, attempting to call this method should have no effect.
-    async fn pause(&self) {
+    async fn pause(&self) -> zbus::fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::Pause");
-        // FIXME: This should return an error if can_pause is false
-        if let Some(spirc) = &self.spirc {
-            let _ = spirc.pause();
+        match (&self.spirc, &self.metadata.mpris.track_id) {
+            (Some(spirc), Some(_)) => spirc
+                .pause()
+                .map_err(|err| zbus::fdo::Error::Failed(format!("{err}"))),
+            (Some(_), None) => {
+                zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("No track")))
+            }
+            _ => zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("Can't play/pause"))),
         }
     }
 
@@ -637,11 +642,16 @@ impl MprisPlayerService {
     //
     // If `self.can_pause` is `false`, attempting to call this method should have no effect and
     // raise an error.
-    async fn play_pause(&self) {
+    async fn play_pause(&self) -> zbus::fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::PlayPause");
-        // FIXME: This should return an error if can_pause is false
-        if let Some(spirc) = &self.spirc {
-            let _ = spirc.play_pause();
+        match (&self.spirc, &self.metadata.mpris.track_id) {
+            (Some(spirc), Some(_)) => spirc
+                .play_pause()
+                .map_err(|err| zbus::fdo::Error::Failed(format!("{err}"))),
+            (Some(_), None) => {
+                zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("No track")))
+            }
+            _ => zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("Can't play/pause"))),
         }
     }
 
@@ -656,7 +666,6 @@ impl MprisPlayerService {
     // an error.
     async fn stop(&self) {
         debug!("org.mpris.MediaPlayer2.Player::Stop");
-        // FIXME: This should return an error if can_control is false
         if let Some(spirc) = &self.spirc {
             let _ = spirc.pause();
             let _ = spirc.set_position_ms(0);
@@ -672,11 +681,24 @@ impl MprisPlayerService {
     // If there is no track to play, this has no effect.
     //
     // If `self.can_play` is `false`, attempting to call this method should have no effect.
-    async fn play(&self) {
+    async fn play(&self) -> zbus::fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::Play");
         if let Some(spirc) = &self.spirc {
             let _ = spirc.activate();
             let _ = spirc.play();
+        }
+        match (&self.spirc, &self.metadata.mpris.track_id) {
+            (Some(spirc), Some(_)) => {
+                let result: Result<(), Error> = (|| {
+                    spirc.activate()?;
+                    spirc.play()
+                })();
+                result.map_err(|err| zbus::fdo::Error::Failed(format!("{err}")))
+            }
+            (Some(_), None) => {
+                zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("No track")))
+            }
+            _ => zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("Can't play/pause"))),
         }
     }
 
