@@ -1122,7 +1122,6 @@ impl MprisPlayerService {
     // * `position`: The new position, in microseconds.
     #[zbus(signal)]
     async fn seeked(signal_ctxt: &zbus::SignalContext<'_>, position: TimeInUs) -> zbus::Result<()>;
-    // FIXME: signal on appropriate player events!
 }
 
 #[derive(Debug, Error)]
@@ -1424,8 +1423,10 @@ impl MprisTask {
 
                 iface.position = Some(Position::from(position_ms));
 
-                let meta = &mut iface.metadata;
+                MprisPlayerService::seeked(iface_ref.signal_context(), position_ms as i64 * 1000)
+                    .await?;
 
+                let meta = &mut iface.metadata;
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
@@ -1443,8 +1444,10 @@ impl MprisTask {
 
                 iface.position = Some(Position::from(position_ms));
 
-                let meta = &mut iface.metadata;
+                MprisPlayerService::seeked(iface_ref.signal_context(), position_ms as i64 * 1000)
+                    .await?;
 
+                let meta = &mut iface.metadata;
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
@@ -1462,8 +1465,10 @@ impl MprisTask {
 
                 iface.position = Some(Position::from(position_ms));
 
-                let meta = &mut iface.metadata;
+                MprisPlayerService::seeked(iface_ref.signal_context(), position_ms as i64 * 1000)
+                    .await?;
 
+                let meta = &mut iface.metadata;
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
