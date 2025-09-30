@@ -1207,7 +1207,6 @@ impl MprisTask {
                 cmd = self.cmd_rx.recv() => {
                     match cmd {
                         Some(MprisCommand::SetSpirc(spirc)) => {
-                            // TODO: Update playback status, metadata, etc (?)
                             self.mpris_player_iface().await
                                 .get_mut().await
                                 .spirc = Some(spirc);
