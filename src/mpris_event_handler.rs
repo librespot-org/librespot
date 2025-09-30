@@ -1,7 +1,7 @@
 use std::{collections::HashMap, process, sync::Arc, time::Instant};
 
 use librespot_connect::Spirc;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use thiserror::Error;
 use time::format_description::well_known::Iso8601;
 use tokio::sync::mpsc;
@@ -723,12 +723,21 @@ impl MprisPlayerService {
     // * `position`: Track position in microseconds. This must be between 0 and `track_length`.
     async fn set_position(&self, track_id: zbus::zvariant::ObjectPath<'_>, position: TimeInUs) {
         debug!("org.mpris.MediaPlayer2.Player::SetPosition({track_id:?}, {position:?})");
-        // FIXME: handle track_id
         if position < 0 {
             return;
         }
         if let Some(spirc) = &self.spirc {
-            let _ = spirc.set_position_ms((position / 1000) as u32);
+            let current_track_id = self.metadata.mpris.track_id.as_ref().and_then(|track_id| {
+                track_id
+                    .to_id()
+                    .ok()
+                    .map(|id| format!("/org/librespot/track/{id}"))
+            });
+            if current_track_id.as_deref() == Some(track_id.as_str()) {
+                let _ = spirc.set_position_ms((position / 1000) as u32);
+            } else {
+                info!("SetPosition on wrong trackId, ignoring as stale");
+            }
         }
     }
 
