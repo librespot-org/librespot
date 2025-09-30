@@ -275,6 +275,7 @@ async fn get_setup() -> Setup {
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
     const PASSWORD: &str = "password";
+    const POSITION_UPDATE: &str = "position-update";
     const PROXY: &str = "proxy";
     const QUIET: &str = "quiet";
     const SYSTEM_CACHE: &str = "system-cache";
@@ -320,6 +321,7 @@ async fn get_setup() -> Setup {
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH_SHORT: &str = "P";
     const PASSWORD_SHORT: &str = "p";
+    const POSITION_UPDATE_SHORT: &str = ""; // no short flag
     const EMIT_SINK_EVENTS_SHORT: &str = "Q";
     const QUIET_SHORT: &str = "q";
     const INITIAL_VOLUME_SHORT: &str = "R";
@@ -629,6 +631,12 @@ async fn get_setup() -> Setup {
         NORMALISATION_KNEE,
         "Knee width (dB) of the dynamic limiter from 0.0 to 10.0. Defaults to 5.0.",
         "KNEE",
+    )
+    .optopt(
+        POSITION_UPDATE_SHORT,
+        POSITION_UPDATE,
+        "Update position interval in ms",
+        "POSITION_UPDATE",
     )
     .optopt(
         ZEROCONF_PORT_SHORT,
@@ -1805,6 +1813,22 @@ async fn get_setup() -> Setup {
             },
         };
 
+        let position_update_interval = opt_str(POSITION_UPDATE).as_deref().map(|position_update| {
+            match position_update.parse::<u64>() {
+                Ok(value) => Duration::from_millis(value),
+                _ => {
+                    invalid_error_msg(
+                        POSITION_UPDATE,
+                        POSITION_UPDATE_SHORT,
+                        position_update,
+                        "Integer value in ms",
+                        "None",
+                    );
+                    exit(1);
+                }
+            }
+        });
+
         #[cfg(feature = "passthrough-decoder")]
         let passthrough = opt_present(PASSTHROUGH);
         #[cfg(not(feature = "passthrough-decoder"))]
@@ -1823,7 +1847,7 @@ async fn get_setup() -> Setup {
             normalisation_release_cf,
             normalisation_knee_db,
             ditherer,
-            position_update_interval: None,
+            position_update_interval,
         }
     };
 
