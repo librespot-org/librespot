@@ -153,6 +153,7 @@ type TimeInUs = i64;
 
 struct MprisService {
     identity: String,
+    desktop_entry: Option<String>,
 }
 
 #[zbus::interface(name = "org.mpris.MediaPlayer2")]
@@ -277,7 +278,7 @@ impl MprisService {
         debug!("org.mpris.MediaPlayer2::DesktopEntry");
         // FIXME: The spec doesn't say anything about the case when there is no .desktop.
         // Is there any convention? Any value that common clients handle in a sane way?
-        "".to_owned()
+        self.desktop_entry.clone().unwrap_or_default()
     }
 
     // The URI schemes supported by the media player.
@@ -1123,9 +1124,14 @@ pub struct MprisEventHandler {
 }
 
 impl MprisEventHandler {
-    fn connection_builder<'a>(identity: &str, name: &str) -> zbus::Result<connection::Builder<'a>> {
+    fn connection_builder<'a>(
+        identity: &str,
+        name: &str,
+        desktop_entry: Option<&str>,
+    ) -> zbus::Result<connection::Builder<'a>> {
         let mpris_service = MprisService {
             identity: identity.to_string(),
+            desktop_entry: desktop_entry.map(|desktop_entry| desktop_entry.to_string()),
         };
         let mpris_player_service = MprisPlayerService {
             spirc: None,
@@ -1145,19 +1151,26 @@ impl MprisEventHandler {
             .serve_at("/org/mpris/MediaPlayer2", mpris_player_service)
     }
 
-    pub async fn spawn(player: Arc<Player>, name: &str) -> Result<MprisEventHandler, MprisError> {
+    pub async fn spawn(
+        player: Arc<Player>,
+        name: &str,
+        desktop_entry: Option<&str>,
+    ) -> Result<MprisEventHandler, MprisError> {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
-        let connection = Self::connection_builder(name, "org.mpris.MediaPlayer2.librespot")?
-            .build()
-            .await;
+        let connection =
+            Self::connection_builder(name, "org.mpris.MediaPlayer2.librespot", desktop_entry)?
+                .build()
+                .await;
         let connection = match connection {
             Err(zbus::Error::NameTaken) => {
                 let pid_name =
                     format!("org.mpris.MediaPlayer2.librespot.instance{}", process::id());
                 warn!("zbus name taken, trying with pid specific name: {pid_name}");
 
-                Self::connection_builder(name, &pid_name)?.build().await
+                Self::connection_builder(name, &pid_name, desktop_entry)?
+                    .build()
+                    .await
             }
             _ => connection,
         }?;
