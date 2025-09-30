@@ -1,4 +1,4 @@
-use std::{collections::HashMap, process, sync::Arc};
+use std::{collections::HashMap, process, sync::Arc, time::Instant};
 
 use librespot_connect::Spirc;
 use log::{debug, warn};
@@ -568,12 +568,27 @@ impl TryInto<HashMap<String, zbus::zvariant::OwnedValue>> for Metadata {
     }
 }
 
+struct Position {
+    ms: u32,
+    last_update: Instant,
+}
+
+impl From<u32> for Position {
+    fn from(value: u32) -> Self {
+        Self {
+            ms: value,
+            last_update: Instant::now(),
+        }
+    }
+}
+
 struct MprisPlayerService {
     spirc: Option<Spirc>,
     repeat: LoopStatus,
     shuffle: bool,
     playback_status: PlaybackStatus,
     volume: u16,
+    position: Option<Position>,
     metadata: Metadata,
 }
 
@@ -915,8 +930,15 @@ impl MprisPlayerService {
     #[zbus(property(emits_changed_signal = "false"))]
     async fn position(&self) -> zbus::fdo::Result<TimeInUs> {
         debug!("org.mpris.MediaPlayer2.Player::Position");
-        // todo!("fetch up-to-date position from player")
-        Ok(0)
+
+        self.position
+            .as_ref()
+            .map(|position| {
+                let corrected = (position.ms as u128)
+                    .saturating_add(position.last_update.elapsed().as_millis());
+                corrected as i64 * 1000
+            })
+            .ok_or(zbus::fdo::Error::Failed(String::from("Got no position")))
     }
 
     // The minimum value which the `Rate` property can take. Clients should not attempt to set the
@@ -1115,6 +1137,7 @@ impl MprisEventHandler {
             shuffle: false,
             playback_status: PlaybackStatus::Stopped,
             volume: u16::MAX,
+            position: None,
             metadata: Metadata::default(),
         };
 
@@ -1272,12 +1295,14 @@ impl MprisTask {
             }
             PlayerEvent::Playing {
                 track_id,
-                // position_ms,
+                position_ms,
                 ..
             } => {
-                // TODO: update position
                 let iface_ref = self.mpris_player_iface().await;
                 let mut iface = iface_ref.get_mut().await;
+
+                iface.position = Some(Position::from(position_ms));
+
                 let meta = &mut iface.metadata;
 
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
@@ -1294,12 +1319,14 @@ impl MprisTask {
             }
             PlayerEvent::Paused {
                 track_id,
-                // position_ms,
+                position_ms,
                 ..
             } => {
-                // TODO: update position
                 let iface_ref = self.mpris_player_iface().await;
                 let mut iface = iface_ref.get_mut().await;
+
+                iface.position = Some(Position::from(position_ms));
+
                 let meta = &mut iface.metadata;
 
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
@@ -1318,15 +1345,20 @@ impl MprisTask {
             PlayerEvent::Preloading { .. } => {}
             PlayerEvent::TimeToPreloadNextTrack { .. } => {}
             PlayerEvent::EndOfTrack { track_id, .. } => {
-                // TODO: Update position
                 let iface_ref = self.mpris_player_iface().await;
                 let mut iface = iface_ref.get_mut().await;
                 let meta = &mut iface.metadata;
 
-                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                if meta.mpris.track_id.as_ref() == Some(&track_id) {
+                    iface.position = meta
+                        .mpris
+                        .length
+                        .map(|length| Position::from((length as f64 / 1000.) as u32));
+                } else {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
                     warn!("Missed TrackChanged event, metadata missing");
+                    iface.position = None;
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
             }
@@ -1341,12 +1373,14 @@ impl MprisTask {
             }
             PlayerEvent::Seeked {
                 track_id,
-                // position_ms,
+                position_ms,
                 ..
             } => {
-                // TODO: Update position
                 let iface_ref = self.mpris_player_iface().await;
                 let mut iface = iface_ref.get_mut().await;
+
+                iface.position = Some(Position::from(position_ms));
+
                 let meta = &mut iface.metadata;
 
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
@@ -1358,11 +1392,14 @@ impl MprisTask {
             }
             PlayerEvent::PositionCorrection {
                 track_id,
-                // position_ms,
+                position_ms,
                 ..
             } => {
                 let iface_ref = self.mpris_player_iface().await;
                 let mut iface = iface_ref.get_mut().await;
+
+                iface.position = Some(Position::from(position_ms));
+
                 let meta = &mut iface.metadata;
 
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
@@ -1372,9 +1409,16 @@ impl MprisTask {
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
             }
-            PlayerEvent::PositionChanged { track_id, .. } => {
+            PlayerEvent::PositionChanged {
+                track_id,
+                position_ms,
+                ..
+            } => {
                 let iface_ref = self.mpris_player_iface().await;
                 let mut iface = iface_ref.get_mut().await;
+
+                iface.position = Some(Position::from(position_ms));
+
                 let meta = &mut iface.metadata;
 
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
