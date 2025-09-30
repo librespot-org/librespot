@@ -2021,7 +2021,7 @@ async fn main() {
     }
 
     #[cfg(feature = "with-mpris")]
-    let mpris = MprisEventHandler::spawn(player.clone(), &setup.connect_config.name)
+    let mpris = MprisEventHandler::spawn(player.clone(), &setup.connect_config.name, None)
         .await
         .unwrap_or_else(|e| {
             error!("could not initialize MPRIS: {e}");
