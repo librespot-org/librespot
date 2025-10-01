@@ -1301,9 +1301,9 @@ impl MprisTask {
                 let mut iface = iface_ref.get_mut().await;
                 let meta = &mut iface.metadata;
 
-                if meta.mpris.track_id.as_ref() != Some(&track_id) {
+                if meta.mpris.track_id.as_ref() != track_id.as_ref() {
                     *meta = Metadata::default();
-                    meta.mpris.track_id = Some(track_id);
+                    meta.mpris.track_id = track_id;
                     warn!("Missed TrackChanged event, metadata missing");
                     iface.metadata_changed(iface_ref.signal_context()).await?;
                 }
