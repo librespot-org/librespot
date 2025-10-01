@@ -123,7 +123,9 @@ impl EventHandler {
                             }
                             PlayerEvent::Stopped { track_id, .. } => {
                                 env_vars.insert("PLAYER_EVENT", "stopped".to_string());
-                                env_vars.insert("TRACK_ID", track_id.to_id());
+                                if let Some(track_id) = track_id {
+                                    env_vars.insert("TRACK_ID", track_id.to_id());
+                                }
                             }
                             PlayerEvent::Playing {
                                 track_id,
