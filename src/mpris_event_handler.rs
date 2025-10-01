@@ -5,7 +5,7 @@ use log::{debug, info, warn};
 use thiserror::Error;
 use time::format_description::well_known::Iso8601;
 use tokio::sync::mpsc;
-use zbus::connection;
+use zbus::{connection, fdo};
 
 use librespot::{
     core::date::Date,
@@ -621,16 +621,14 @@ impl MprisPlayerService {
     // Calling Play after this should cause playback to start again from the same position.
     //
     // If `self.can_pause` is `false`, attempting to call this method should have no effect.
-    async fn pause(&self) -> zbus::fdo::Result<()> {
+    async fn pause(&self) -> fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::Pause");
         match (&self.spirc, &self.metadata.mpris.track_id) {
             (Some(spirc), Some(_)) => spirc
                 .pause()
-                .map_err(|err| zbus::fdo::Error::Failed(format!("{err}"))),
-            (Some(_), None) => {
-                zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("No track")))
-            }
-            _ => zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("Can't play/pause"))),
+                .map_err(|err| fdo::Error::Failed(format!("{err}"))),
+            (Some(_), None) => fdo::Result::Err(fdo::Error::Failed(String::from("No track"))),
+            _ => fdo::Result::Err(fdo::Error::Failed(String::from("Can't play/pause"))),
         }
     }
 
@@ -642,16 +640,14 @@ impl MprisPlayerService {
     //
     // If `self.can_pause` is `false`, attempting to call this method should have no effect and
     // raise an error.
-    async fn play_pause(&self) -> zbus::fdo::Result<()> {
+    async fn play_pause(&self) -> fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::PlayPause");
         match (&self.spirc, &self.metadata.mpris.track_id) {
             (Some(spirc), Some(_)) => spirc
                 .play_pause()
-                .map_err(|err| zbus::fdo::Error::Failed(format!("{err}"))),
-            (Some(_), None) => {
-                zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("No track")))
-            }
-            _ => zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("Can't play/pause"))),
+                .map_err(|err| fdo::Error::Failed(format!("{err}"))),
+            (Some(_), None) => fdo::Result::Err(fdo::Error::Failed(String::from("No track"))),
+            _ => fdo::Result::Err(fdo::Error::Failed(String::from("Can't play/pause"))),
         }
     }
 
@@ -681,7 +677,7 @@ impl MprisPlayerService {
     // If there is no track to play, this has no effect.
     //
     // If `self.can_play` is `false`, attempting to call this method should have no effect.
-    async fn play(&self) -> zbus::fdo::Result<()> {
+    async fn play(&self) -> fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::Play");
         if let Some(spirc) = &self.spirc {
             let _ = spirc.activate();
@@ -693,12 +689,10 @@ impl MprisPlayerService {
                     spirc.activate()?;
                     spirc.play()
                 })();
-                result.map_err(|err| zbus::fdo::Error::Failed(format!("{err}")))
+                result.map_err(|err| fdo::Error::Failed(format!("{err}")))
             }
-            (Some(_), None) => {
-                zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("No track")))
-            }
-            _ => zbus::fdo::Result::Err(zbus::fdo::Error::Failed(String::from("Can't play/pause"))),
+            (Some(_), None) => fdo::Result::Err(fdo::Error::Failed(String::from("No track"))),
+            _ => fdo::Result::Err(fdo::Error::Failed(String::from("Can't play/pause"))),
         }
     }
 
@@ -785,11 +779,9 @@ impl MprisPlayerService {
     // * `uri`: Uri of the track to load. Its uri scheme should be an element of the
     //          `org.mpris.MediaPlayer2.SupportedUriSchemes` property and the mime-type should
     //          match one of the elements of the `org.mpris.MediaPlayer2.SupportedMimeTypes`.
-    async fn open_uri(&self, uri: &str) -> zbus::fdo::Result<()> {
+    async fn open_uri(&self, uri: &str) -> fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::OpenUri({uri:?})");
-        Err(zbus::fdo::Error::NotSupported(
-            "OpenUri not supported".to_owned(),
-        ))
+        Err(fdo::Error::NotSupported("OpenUri not supported".to_owned()))
     }
 
     // The current playback status.
@@ -818,7 +810,7 @@ impl MprisPlayerService {
     }
 
     #[zbus(property)]
-    async fn set_loop_status(&mut self, value: LoopStatus) -> zbus::fdo::Result<()> {
+    async fn set_loop_status(&mut self, value: LoopStatus) -> fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::LoopStatus({value:?})");
         match value {
             LoopStatus::None => {
@@ -904,12 +896,9 @@ impl MprisPlayerService {
     #[zbus(property(emits_changed_signal = "true"))]
     async fn metadata(
         &self,
-    ) -> zbus::fdo::Result<std::collections::HashMap<String, zbus::zvariant::OwnedValue>> {
+    ) -> fdo::Result<std::collections::HashMap<String, zbus::zvariant::OwnedValue>> {
         debug!("org.mpris.MediaPlayer2.Player::Metadata");
-        self.metadata
-            .clone()
-            .try_into()
-            .map_err(zbus::fdo::Error::ZBus)
+        self.metadata.clone().try_into().map_err(fdo::Error::ZBus)
     }
 
     // The volume level.
@@ -925,7 +914,7 @@ impl MprisPlayerService {
     }
 
     #[zbus(property)]
-    async fn set_volume(&mut self, value: Volume) -> zbus::fdo::Result<()> {
+    async fn set_volume(&mut self, value: Volume) -> fdo::Result<()> {
         debug!("org.mpris.MediaPlayer2.Player::Volume({value})");
         if let Some(spirc) = &self.spirc {
             // As of rust 1.45, cast is guaranteed to round to 0 and saturate.
@@ -934,7 +923,7 @@ impl MprisPlayerService {
             let mapped_volume = (value * (u16::MAX as f64)).round() as u16;
             spirc
                 .set_volume(mapped_volume)
-                .map_err(|err| zbus::fdo::Error::Failed(format!("{err}")))?;
+                .map_err(|err| fdo::Error::Failed(format!("{err}")))?;
         }
         Ok(())
     }
@@ -949,7 +938,7 @@ impl MprisPlayerService {
     // If the playback progresses in a way that is inconstistant with the `Rate` property, the
     // `Seeked` signal is emited.
     #[zbus(property(emits_changed_signal = "false"))]
-    async fn position(&self) -> zbus::fdo::Result<TimeInUs> {
+    async fn position(&self) -> fdo::Result<TimeInUs> {
         debug!("org.mpris.MediaPlayer2.Player::Position");
 
         self.position
@@ -959,7 +948,7 @@ impl MprisPlayerService {
                     .saturating_add(position.last_update.elapsed().as_millis());
                 corrected as i64 * 1000
             })
-            .ok_or(zbus::fdo::Error::Failed(String::from("Got no position")))
+            .ok_or(fdo::Error::Failed(String::from("Got no position")))
     }
 
     // The minimum value which the `Rate` property can take. Clients should not attempt to set the
