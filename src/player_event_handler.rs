@@ -109,13 +109,18 @@ impl EventHandler {
                                     }
                                 }
                             }
-                            PlayerEvent::Stopped { track_id, .. } => match track_id.to_id() {
-                                Err(e) => warn!("PlayerEvent::Stopped: Invalid track id: {e}"),
-                                Ok(id) => {
-                                    env_vars.insert("PLAYER_EVENT", "stopped".to_string());
-                                    env_vars.insert("TRACK_ID", id);
+                            PlayerEvent::Stopped { track_id, .. } => {
+                                env_vars.insert("PLAYER_EVENT", "stopped".to_string());
+                                match track_id.map(|track_id| track_id.to_id()) {
+                                    Some(Err(e)) => {
+                                        warn!("PlayerEvent::Stopped: Invalid track id: {e}")
+                                    }
+                                    Some(Ok(id)) => {
+                                        env_vars.insert("TRACK_ID", id);
+                                    }
+                                    None => {}
                                 }
-                            },
+                            }
                             PlayerEvent::Playing {
                                 track_id,
                                 position_ms,

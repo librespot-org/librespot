@@ -142,8 +142,8 @@ pub enum PlayerEvent {
     },
     // Fired when the player is stopped (e.g. by issuing a "stop" command to the player).
     Stopped {
-        play_request_id: u64,
-        track_id: SpotifyUri,
+        play_request_id: Option<u64>,
+        track_id: Option<SpotifyUri>,
     },
     // The player is delayed by loading a track.
     Loading {
@@ -267,7 +267,8 @@ impl PlayerEvent {
                 play_request_id, ..
             }
             | Stopped {
-                play_request_id, ..
+                play_request_id: Some(play_request_id),
+                ..
             }
             | PositionCorrection {
                 play_request_id, ..
@@ -1541,8 +1542,8 @@ impl PlayerInternal {
 
                 self.ensure_sink_stopped(false);
                 self.send_event(PlayerEvent::Stopped {
-                    track_id,
-                    play_request_id,
+                    track_id: Some(track_id),
+                    play_request_id: Some(play_request_id),
                 });
                 self.state = PlayerState::Stopped;
             }
@@ -2203,7 +2204,12 @@ impl PlayerInternal {
                             track_id: track_id.clone(),
                         });
                     }
-                    _ => (),
+                    PlayerState::Invalid | PlayerState::Stopped => {
+                        let _ = sender.send(PlayerEvent::Stopped {
+                            play_request_id: None,
+                            track_id: None,
+                        });
+                    }
                 }
 
                 self.event_senders.push(sender);
