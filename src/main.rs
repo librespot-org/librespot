@@ -275,7 +275,7 @@ async fn get_setup() -> Setup {
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
     const PASSWORD: &str = "password";
-    const POSITION_UPDATE: &str = "position-update";
+    const POSITION_UPDATE_INTERVAL: &str = "position-update-interval";
     const PROXY: &str = "proxy";
     const QUIET: &str = "quiet";
     const SYSTEM_CACHE: &str = "system-cache";
@@ -321,7 +321,7 @@ async fn get_setup() -> Setup {
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH_SHORT: &str = "P";
     const PASSWORD_SHORT: &str = "p";
-    const POSITION_UPDATE_SHORT: &str = ""; // no short flag
+    const POSITION_UPDATE_INTERVAL_SHORT: &str = ""; // no short flag
     const EMIT_SINK_EVENTS_SHORT: &str = "Q";
     const QUIET_SHORT: &str = "q";
     const INITIAL_VOLUME_SHORT: &str = "R";
@@ -633,9 +633,9 @@ async fn get_setup() -> Setup {
         "KNEE",
     )
     .optopt(
-        POSITION_UPDATE_SHORT,
-        POSITION_UPDATE,
-        "Update position interval in ms",
+        POSITION_UPDATE_INTERVAL_SHORT,
+        POSITION_UPDATE_INTERVAL,
+        "Maximum interval in ms for player to send a position event. Defaults to no forced position update.",
         "POSITION_UPDATE",
     )
     .optopt(
@@ -1813,21 +1813,21 @@ async fn get_setup() -> Setup {
             },
         };
 
-        let position_update_interval = opt_str(POSITION_UPDATE).as_deref().map(|position_update| {
-            match position_update.parse::<u64>() {
+        let position_update_interval = opt_str(POSITION_UPDATE_INTERVAL).as_deref().map(
+            |position_update| match position_update.parse::<u64>() {
                 Ok(value) => Duration::from_millis(value),
                 _ => {
                     invalid_error_msg(
-                        POSITION_UPDATE,
-                        POSITION_UPDATE_SHORT,
+                        POSITION_UPDATE_INTERVAL,
+                        POSITION_UPDATE_INTERVAL_SHORT,
                         position_update,
                         "Integer value in ms",
                         "None",
                     );
                     exit(1);
                 }
-            }
-        });
+            },
+        );
 
         #[cfg(feature = "passthrough-decoder")]
         let passthrough = opt_present(PASSTHROUGH);
