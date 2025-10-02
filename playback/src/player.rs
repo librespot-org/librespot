@@ -729,6 +729,7 @@ enum PlayerState {
         play_request_id: u64,
         start_playback: bool,
         loader: Pin<Box<dyn FusedFuture<Output = Result<PlayerLoadedTrackData, ()>> + Send>>,
+        position_ms: u32,
     },
     Paused {
         track_id: SpotifyUri,
@@ -1382,6 +1383,7 @@ impl Future for PlayerInternal {
                 ref track_id,
                 start_playback,
                 play_request_id,
+                ..
             } = self.state
             {
                 // The loader may be terminated if we are trying to load the same track
@@ -2176,6 +2178,7 @@ impl PlayerInternal {
             play_request_id,
             start_playback: play,
             loader,
+            position_ms,
         };
 
         Ok(())
@@ -2325,12 +2328,13 @@ impl PlayerInternal {
                     PlayerState::Loading {
                         ref track_id,
                         play_request_id,
+                        position_ms,
                         ..
                     } => {
                         let _ = sender.send(PlayerEvent::Loading {
                             play_request_id,
                             track_id: track_id.clone(),
-                            position_ms: 0, // TODO
+                            position_ms,
                         });
                     }
                     PlayerState::Paused {
