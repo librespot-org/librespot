@@ -5,7 +5,8 @@ use log::{debug, info, warn};
 use thiserror::Error;
 use time::format_description::well_known::Iso8601;
 use tokio::sync::mpsc;
-use zbus::{connection, fdo};
+use zbus::{connection, fdo, object_server::SignalEmitter};
+use zvariant::Type;
 
 use librespot::{
     core::date::Date,
@@ -15,7 +16,7 @@ use librespot::{
 };
 
 /// A playback state.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Type)]
 enum PlaybackStatus {
     /// A track is currently playing.
     Playing,
@@ -25,12 +26,6 @@ enum PlaybackStatus {
 
     /// There is no track currently playing.
     Stopped,
-}
-
-impl zvariant::Type for PlaybackStatus {
-    fn signature() -> zvariant::Signature<'static> {
-        zvariant::Signature::try_from("s").unwrap()
-    }
 }
 
 impl TryFrom<zvariant::Value<'_>> for PlaybackStatus {
@@ -63,7 +58,7 @@ impl From<PlaybackStatus> for zvariant::Value<'_> {
 }
 
 /// A repeat / loop status
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Type)]
 enum LoopStatus {
     /// The playback will stop when there are no more tracks to play
     None,
@@ -73,12 +68,6 @@ enum LoopStatus {
 
     /// The playback loops through a list of tracks
     Playlist,
-}
-
-impl zvariant::Type for LoopStatus {
-    fn signature() -> zvariant::Signature<'static> {
-        zvariant::Signature::try_from("s").unwrap()
-    }
 }
 
 impl TryFrom<zvariant::Value<'_>> for LoopStatus {
@@ -1099,7 +1088,7 @@ impl MprisPlayerService {
     //
     // * `position`: The new position, in microseconds.
     #[zbus(signal)]
-    async fn seeked(signal_ctxt: &zbus::SignalContext<'_>, position: TimeInUs) -> zbus::Result<()>;
+    async fn seeked(signal_emitter: &SignalEmitter<'_>, position: TimeInUs) -> zbus::Result<()>;
 }
 
 #[derive(Debug, Error)]
@@ -1294,7 +1283,7 @@ impl MprisTask {
 
                 meta.xesam = audio_item.unique_fields.into();
 
-                iface.metadata_changed(iface_ref.signal_context()).await?;
+                iface.metadata_changed(iface_ref.signal_emitter()).await?;
             }
             PlayerEvent::Stopped { track_id, .. } => {
                 let iface_ref = self.mpris_player_iface().await;
@@ -1305,12 +1294,12 @@ impl MprisTask {
                     *meta = Metadata::default();
                     meta.mpris.track_id = track_id;
                     warn!("Missed TrackChanged event, metadata missing");
-                    iface.metadata_changed(iface_ref.signal_context()).await?;
+                    iface.metadata_changed(iface_ref.signal_emitter()).await?;
                 }
 
                 iface.playback_status = PlaybackStatus::Stopped;
                 iface
-                    .playback_status_changed(iface_ref.signal_context())
+                    .playback_status_changed(iface_ref.signal_emitter())
                     .await?;
             }
             PlayerEvent::Playing {
@@ -1329,12 +1318,12 @@ impl MprisTask {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
                     warn!("Missed TrackChanged event, metadata missing");
-                    iface.metadata_changed(iface_ref.signal_context()).await?;
+                    iface.metadata_changed(iface_ref.signal_emitter()).await?;
                 }
 
                 iface.playback_status = PlaybackStatus::Playing;
                 iface
-                    .playback_status_changed(iface_ref.signal_context())
+                    .playback_status_changed(iface_ref.signal_emitter())
                     .await?;
             }
             PlayerEvent::Paused {
@@ -1353,12 +1342,12 @@ impl MprisTask {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
                     warn!("Missed TrackChanged event, metadata missing");
-                    iface.metadata_changed(iface_ref.signal_context()).await?;
+                    iface.metadata_changed(iface_ref.signal_emitter()).await?;
                 }
 
                 iface.playback_status = PlaybackStatus::Paused;
                 iface
-                    .playback_status_changed(iface_ref.signal_context())
+                    .playback_status_changed(iface_ref.signal_emitter())
                     .await?;
             }
             PlayerEvent::Loading { .. } => {}
@@ -1379,7 +1368,7 @@ impl MprisTask {
                     meta.mpris.track_id = Some(track_id);
                     warn!("Missed TrackChanged event, metadata missing");
                     iface.position = None;
-                    iface.metadata_changed(iface_ref.signal_context()).await?;
+                    iface.metadata_changed(iface_ref.signal_emitter()).await?;
                 }
             }
             PlayerEvent::Unavailable { .. } => {}
@@ -1388,7 +1377,7 @@ impl MprisTask {
                 let mut iface = iface_ref.get_mut().await;
                 if iface.volume != volume {
                     iface.volume = volume;
-                    iface.volume_changed(iface_ref.signal_context()).await?;
+                    iface.volume_changed(iface_ref.signal_emitter()).await?;
                 }
             }
             PlayerEvent::Seeked {
@@ -1401,7 +1390,7 @@ impl MprisTask {
 
                 iface.position = Some(Position::from(position_ms));
 
-                MprisPlayerService::seeked(iface_ref.signal_context(), position_ms as i64 * 1000)
+                MprisPlayerService::seeked(iface_ref.signal_emitter(), position_ms as i64 * 1000)
                     .await?;
 
                 let meta = &mut iface.metadata;
@@ -1409,7 +1398,7 @@ impl MprisTask {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
                     warn!("Missed TrackChanged event, metadata missing");
-                    iface.metadata_changed(iface_ref.signal_context()).await?;
+                    iface.metadata_changed(iface_ref.signal_emitter()).await?;
                 }
             }
             PlayerEvent::PositionCorrection {
@@ -1422,7 +1411,7 @@ impl MprisTask {
 
                 iface.position = Some(Position::from(position_ms));
 
-                MprisPlayerService::seeked(iface_ref.signal_context(), position_ms as i64 * 1000)
+                MprisPlayerService::seeked(iface_ref.signal_emitter(), position_ms as i64 * 1000)
                     .await?;
 
                 let meta = &mut iface.metadata;
@@ -1430,7 +1419,7 @@ impl MprisTask {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
                     warn!("Missed TrackChanged event, metadata missing");
-                    iface.metadata_changed(iface_ref.signal_context()).await?;
+                    iface.metadata_changed(iface_ref.signal_emitter()).await?;
                 }
             }
             PlayerEvent::PositionChanged {
@@ -1443,15 +1432,14 @@ impl MprisTask {
 
                 iface.position = Some(Position::from(position_ms));
 
-                MprisPlayerService::seeked(iface_ref.signal_context(), position_ms as i64 * 1000)
-                    .await?;
+                iface_ref.seeked(position_ms as i64 * 1000).await?;
 
                 let meta = &mut iface.metadata;
                 if meta.mpris.track_id.as_ref() != Some(&track_id) {
                     *meta = Metadata::default();
                     meta.mpris.track_id = Some(track_id);
                     warn!("Missed TrackChanged event, metadata missing");
-                    iface.metadata_changed(iface_ref.signal_context()).await?;
+                    iface.metadata_changed(iface_ref.signal_emitter()).await?;
                 }
             }
             PlayerEvent::SessionConnected { .. } => {}
@@ -1461,7 +1449,7 @@ impl MprisTask {
                 let iface_ref = self.mpris_player_iface().await;
                 let mut iface = iface_ref.get_mut().await;
                 iface.shuffle = shuffle;
-                iface.shuffle_changed(iface_ref.signal_context()).await?;
+                iface.shuffle_changed(iface_ref.signal_emitter()).await?;
             }
             PlayerEvent::RepeatChanged { context, track } => {
                 let iface_ref = self.mpris_player_iface().await;
@@ -1474,7 +1462,7 @@ impl MprisTask {
                     iface.repeat = LoopStatus::None;
                 }
                 iface
-                    .loop_status_changed(iface_ref.signal_context())
+                    .loop_status_changed(iface_ref.signal_emitter())
                     .await?;
             }
             PlayerEvent::AutoPlayChanged { .. } => {}
