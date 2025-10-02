@@ -187,8 +187,8 @@ tokio = { version = "1", features = [
 ] }
 time = { version = "0.3", features = ["formatting"] }
 url = "2.2"
-zbus = { version = "4", default-features = false, features = ["tokio"], optional = true }
-zvariant = { version = "4", default-features = false, optional = true }
+zbus = { version = "5", default-features = false, features = ["tokio"], optional = true }
+zvariant = { version = "5", default-features = false, optional = true }
 
 [package.metadata.deb]
 maintainer = "Librespot Organization <noreply@github.com>"
