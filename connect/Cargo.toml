@@ -1,6 +1,6 @@
 [package]
 name = "librespot-connect"
-version.workspace = true
+version = "0.7.1"
 rust-version.workspace = true
 authors = ["Paul Lietar <paul@lietar.net>"]
 license.workspace = true

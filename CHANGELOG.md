@@ -158,7 +158,7 @@ will be well worth it.
 
 All these changes are likely to introduce new bugs as well as some regressions.
 We appreciate all your testing and contributions to the repository:
-https://github.com/librespot-org/librespot
+<https://github.com/librespot-org/librespot>
 
 ### Changed
 
