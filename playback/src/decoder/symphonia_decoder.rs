@@ -10,8 +10,8 @@ use symphonia::{
         meta::{StandardTagKey, Value},
     },
     default::{
-        codecs::{MpaDecoder, VorbisDecoder},
-        formats::{MpaReader, OggReader},
+        codecs::{FlacDecoder, MpaDecoder, VorbisDecoder},
+        formats::{FlacReader, MpaReader, OggReader},
     },
 };
 
@@ -48,6 +48,8 @@ impl SymphoniaDecoder {
             Box::new(OggReader::try_new(mss, &format_opts)?)
         } else if AudioFiles::is_mp3(file_format) {
             Box::new(MpaReader::try_new(mss, &format_opts)?)
+        } else if AudioFiles::is_flac(file_format) {
+            Box::new(FlacReader::try_new(mss, &format_opts)?)
         } else {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported format: {file_format:?}"
@@ -63,6 +65,8 @@ impl SymphoniaDecoder {
             Box::new(VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?)
         } else if AudioFiles::is_mp3(file_format) {
             Box::new(MpaDecoder::try_new(&track.codec_params, &decoder_opts)?)
+        } else if AudioFiles::is_flac(file_format) {
+            Box::new(FlacDecoder::try_new(&track.codec_params, &decoder_opts)?)
         } else {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported decoder: {file_format:?}"
