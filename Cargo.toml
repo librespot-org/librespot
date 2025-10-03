@@ -37,7 +37,7 @@ repository = "https://github.com/librespot-org/librespot"
 edition = "2024"
 
 [features]
-default = ["native-tls", "rodio-backend", "with-libmdns"]
+default = ["native-tls", "rodio-backend", "with-libmdns", "with-mpris"]
 
 # TLS backends (mutually exclusive - compile-time checks in oauth/src/lib.rs)
 # Note: Feature validation is in oauth crate since it's compiled first in the dependency tree.
@@ -133,6 +133,10 @@ with-dns-sd = ["librespot-discovery/with-dns-sd"]
 # data.
 passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
+# MPRIS: Allow external tool to have access to playback
+# status, metadata and to control the player.
+with-mpris = ["dep:zbus", "dep:zvariant"]
+
 [lib]
 name = "librespot"
 path = "src/lib.rs"
@@ -181,7 +185,10 @@ tokio = { version = "1", features = [
     "sync",
     "process",
 ] }
+time = { version = "0.3", features = ["formatting"] }
 url = "2.2"
+zbus = { version = "5", default-features = false, features = ["tokio"], optional = true }
+zvariant = { version = "5", default-features = false, optional = true }
 
 [package.metadata.deb]
 maintainer = "Librespot Organization <noreply@github.com>"

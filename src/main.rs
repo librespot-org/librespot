@@ -41,6 +41,11 @@ use url::Url;
 mod player_event_handler;
 use player_event_handler::{EventHandler, run_program_on_sink_events};
 
+#[cfg(feature = "with-mpris")]
+mod mpris_event_handler;
+#[cfg(feature = "with-mpris")]
+use mpris_event_handler::MprisEventHandler;
+
 fn device_id(name: &str) -> String {
     HEXLOWER.encode(&Sha1::digest(name.as_bytes()))
 }
@@ -270,6 +275,7 @@ async fn get_setup() -> Setup {
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
     const PASSWORD: &str = "password";
+    const POSITION_UPDATE_INTERVAL: &str = "position-update-interval";
     const PROXY: &str = "proxy";
     const QUIET: &str = "quiet";
     const SYSTEM_CACHE: &str = "system-cache";
@@ -315,6 +321,7 @@ async fn get_setup() -> Setup {
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH_SHORT: &str = "P";
     const PASSWORD_SHORT: &str = "p";
+    const POSITION_UPDATE_INTERVAL_SHORT: &str = ""; // no short flag
     const EMIT_SINK_EVENTS_SHORT: &str = "Q";
     const QUIET_SHORT: &str = "q";
     const INITIAL_VOLUME_SHORT: &str = "R";
@@ -624,6 +631,12 @@ async fn get_setup() -> Setup {
         NORMALISATION_KNEE,
         "Knee width (dB) of the dynamic limiter from 0.0 to 10.0. Defaults to 5.0.",
         "KNEE",
+    )
+    .optopt(
+        POSITION_UPDATE_INTERVAL_SHORT,
+        POSITION_UPDATE_INTERVAL,
+        "Maximum interval in ms for player to send a position event. Defaults to no forced position update.",
+        "POSITION_UPDATE",
     )
     .optopt(
         ZEROCONF_PORT_SHORT,
@@ -1800,6 +1813,22 @@ async fn get_setup() -> Setup {
             },
         };
 
+        let position_update_interval = opt_str(POSITION_UPDATE_INTERVAL).as_deref().map(
+            |position_update| match position_update.parse::<u64>() {
+                Ok(value) => Duration::from_millis(value),
+                _ => {
+                    invalid_error_msg(
+                        POSITION_UPDATE_INTERVAL,
+                        POSITION_UPDATE_INTERVAL_SHORT,
+                        position_update,
+                        "Integer value in ms",
+                        "None",
+                    );
+                    exit(1);
+                }
+            },
+        );
+
         #[cfg(feature = "passthrough-decoder")]
         let passthrough = opt_present(PASSTHROUGH);
         #[cfg(not(feature = "passthrough-decoder"))]
@@ -1818,7 +1847,7 @@ async fn get_setup() -> Setup {
             normalisation_release_cf,
             normalisation_knee_db,
             ditherer,
-            position_update_interval: None,
+            position_update_interval,
         }
     };
 
@@ -1991,6 +2020,14 @@ async fn main() {
         }
     }
 
+    #[cfg(feature = "with-mpris")]
+    let mpris = MprisEventHandler::spawn(player.clone(), &setup.connect_config.name, None)
+        .await
+        .unwrap_or_else(|e| {
+            error!("could not initialize MPRIS: {e}");
+            exit(1);
+        });
+
     loop {
         tokio::select! {
             credentials = async {
@@ -2044,6 +2081,10 @@ async fn main() {
                         exit(1);
                     }
                 };
+
+                #[cfg(feature = "with-mpris")]
+                mpris.set_spirc(spirc_.clone());
+
                 spirc = Some(spirc_);
                 spirc_task = Some(Box::pin(spirc_task_));
 
@@ -2088,6 +2129,9 @@ async fn main() {
     info!("Gracefully shutting down");
 
     let mut shutdown_tasks = tokio::task::JoinSet::new();
+
+    #[cfg(feature = "with-mpris")]
+    shutdown_tasks.spawn(mpris.quit_and_join());
 
     // Shutdown spirc if necessary
     if let Some(spirc) = spirc {
