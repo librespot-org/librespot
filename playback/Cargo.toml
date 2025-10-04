@@ -20,6 +20,7 @@ gstreamer-backend = [
     "dep:gstreamer-audio",
 ]
 jackaudio-backend = ["dep:jack"]
+pipewire-backend = ["dep:pipewire", "dep:libspa"]
 portaudio-backend = ["dep:portaudio-rs"]
 pulseaudio-backend = ["dep:libpulse-binding", "dep:libpulse-simple-binding"]
 rodio-backend = ["dep:cpal", "dep:rodio"]
@@ -62,6 +63,8 @@ zerocopy = { version = "0.8", features = ["derive"] }
 # Backends
 alsa = { version = "0.10", optional = true }
 jack = { version = "0.13", optional = true }
+libspa = { version = "0.9", optional = true }
+pipewire = { version = "0.9", optional = true }
 portaudio-rs = { version = "0.3", optional = true }
 sdl2 = { version = "0.38", optional = true }
 
