@@ -87,6 +87,28 @@ impl EventHandler {
                                                 env_vars
                                                     .insert("DISC_NUMBER", disc_number.to_string());
                                             }
+                                            UniqueFields::Local {
+                                                artists,
+                                                album,
+                                                album_artists,
+                                                number,
+                                                disc_number,
+                                                path,
+                                            } => {
+                                                env_vars.insert("ITEM_TYPE", "Track".to_string());
+                                                env_vars.insert("ARTISTS", artists);
+                                                env_vars.insert("ALBUM_ARTISTS", album_artists);
+                                                env_vars.insert("ALBUM", album);
+                                                env_vars.insert("NUMBER", number.to_string());
+                                                env_vars
+                                                    .insert("DISC_NUMBER", disc_number.to_string());
+                                                env_vars.insert(
+                                                    "LOCAL_FILE_PATH",
+                                                    path.into_os_string()
+                                                        .into_string()
+                                                        .unwrap_or_default(),
+                                                );
+                                            }
                                             UniqueFields::Episode {
                                                 description,
                                                 publish_time,
