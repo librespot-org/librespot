@@ -62,14 +62,14 @@ fn visit_dir(dir: &Path, accumulator: &mut LocalFileLookup) -> io::Result<()> {
         if path.is_dir() {
             visit_dir(&path, accumulator)?;
         } else {
-            let Some(extension) = path.extension().and_then(|e| e.to_str()) else {
+            let Some(file_extension) = path.extension().and_then(|e| e.to_str()) else {
                 continue;
             };
 
-            let lowercase_extension = extension.to_lowercase();
+            let lowercase_extension = file_extension.to_lowercase();
 
             if SUPPORTED_FILE_EXTENSIONS.contains(&lowercase_extension.as_str()) {
-                let uri = match get_uri_from_file(path.as_path(), extension) {
+                let uri = match get_uri_from_file(path.as_path(), file_extension) {
                     Ok(uri) => uri,
                     Err(e) => {
                         warn!(
@@ -89,12 +89,12 @@ fn visit_dir(dir: &Path, accumulator: &mut LocalFileLookup) -> io::Result<()> {
     Ok(())
 }
 
-fn get_uri_from_file(audio_path: &Path, extension: &str) -> Result<SpotifyUri, Error> {
+fn get_uri_from_file(audio_path: &Path, file_extension: &str) -> Result<SpotifyUri, Error> {
     let src = File::open(audio_path)?;
     let mss = MediaSourceStream::new(Box::new(src), Default::default());
 
     let mut hint = Hint::new();
-    hint.with_extension(extension);
+    hint.with_extension(file_extension);
 
     let meta_opts: MetadataOptions = Default::default();
     let fmt_opts: FormatOptions = Default::default();
