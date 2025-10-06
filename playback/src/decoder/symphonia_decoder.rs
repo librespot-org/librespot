@@ -11,19 +11,11 @@ use symphonia::{
         io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
         meta::{StandardTagKey, Value},
     },
-    default::{
-        codecs::{FlacDecoder, MpaDecoder, VorbisDecoder},
-        formats::{FlacReader, MpaReader, OggReader},
-    },
 };
 
 use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
 
-use crate::{
-    NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE,
-    metadata::audio::{AudioFileFormat, AudioFiles},
-    player::NormalisationData,
-};
+use crate::{NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE, player::NormalisationData};
 
 pub struct SymphoniaDecoder {
     format: Box<dyn FormatReader>,
@@ -39,12 +31,12 @@ pub(crate) struct LocalFileMetadata {
     pub album: String,
     pub artists: String,
     pub album_artists: String,
-    pub number: u32,
-    pub disc_number: u32,
+    pub number: Option<u32>,
+    pub disc_number: Option<u32>,
 }
 
 impl SymphoniaDecoder {
-    pub fn new<R>(input: R, file_format: AudioFileFormat) -> DecoderResult<Self>
+    pub fn new<R>(input: R, hint: Hint) -> DecoderResult<Self>
     where
         R: MediaSource + 'static,
     {
@@ -57,39 +49,29 @@ impl SymphoniaDecoder {
             enable_gapless: true,
             ..Default::default()
         };
+        let metadata_opts: MetadataOptions = Default::default();
 
-        let format: Box<dyn FormatReader> = if AudioFiles::is_ogg_vorbis(file_format) {
-            Box::new(OggReader::try_new(mss, &format_opts)?)
-        } else if AudioFiles::is_mp3(file_format) {
-            Box::new(MpaReader::try_new(mss, &format_opts)?)
-        } else if AudioFiles::is_flac(file_format) {
-            Box::new(FlacReader::try_new(mss, &format_opts)?)
-        } else {
-            return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported format: {file_format:?}"
-            )));
-        };
+        let probed =
+            symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts)?;
+
+        let format = probed.format;
 
         let track = format.default_track().ok_or_else(|| {
             DecoderError::SymphoniaDecoder("Could not retrieve default track".into())
         })?;
 
         let decoder_opts: DecoderOptions = Default::default();
-        let decoder: Box<dyn Decoder> = if AudioFiles::is_ogg_vorbis(file_format) {
-            Box::new(VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?)
-        } else if AudioFiles::is_mp3(file_format) {
-            Box::new(MpaDecoder::try_new(&track.codec_params, &decoder_opts)?)
-        } else if AudioFiles::is_flac(file_format) {
-            Box::new(FlacDecoder::try_new(&track.codec_params, &decoder_opts)?)
-        } else {
-            return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported decoder: {file_format:?}"
-            )));
-        };
+
+        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &decoder_opts)?;
 
         let rate = decoder.codec_params().sample_rate.ok_or_else(|| {
             DecoderError::SymphoniaDecoder("Could not retrieve sample rate".into())
         })?;
+
+        // TODO: The official client supports local files with sample rates other than 44,100 kHz.
+        // To play these accurately, we need to either resample the input audio, or introduce a way
+        // to change the player's current sample rate (likely by closing and re-opening the sink
+        // with new parameters).
         if rate != SAMPLE_RATE {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported sample rate: {rate}"
@@ -108,59 +90,8 @@ impl SymphoniaDecoder {
         Ok(Self {
             format,
             decoder,
-
             // We set the sample buffer when decoding the first full packet,
             // whose duration is also the ideal sample buffer size.
-            sample_buffer: None,
-
-            probed_metadata: None,
-        })
-    }
-
-    pub(crate) fn new_with_probe<R>(src: R, extension: Option<&str>) -> DecoderResult<Self>
-    where
-        R: MediaSource + 'static,
-    {
-        let mss = MediaSourceStream::new(Box::new(src), Default::default());
-
-        let mut hint = Hint::new();
-
-        if let Some(extension) = extension {
-            hint.with_extension(extension);
-        }
-
-        let format_opts: FormatOptions = Default::default();
-        let metadata_opts: MetadataOptions = Default::default();
-        let decoder_opts: DecoderOptions = Default::default();
-
-        let probed =
-            symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts)?;
-
-        let format = probed.format;
-
-        let track = format.default_track().ok_or_else(|| {
-            DecoderError::SymphoniaDecoder("Could not retrieve default track".into())
-        })?;
-
-        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &decoder_opts)?;
-
-        let rate = decoder.codec_params().sample_rate.ok_or_else(|| {
-            DecoderError::SymphoniaDecoder("Could not retrieve sample rate".into())
-        })?;
-
-        // TODO: The official client supports local files with sample rates other than 44,100 kHz.
-        // To play these accurately, we need to either resample the input audio, or introduce a way
-        // to change the player's current sample rate (likely by closing and re-opening the sink
-        // with new parameters).
-        if rate != SAMPLE_RATE {
-            return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported sample rate: {rate}. Local files must have a sample rate of {SAMPLE_RATE} Hz."
-            )));
-        }
-
-        Ok(Self {
-            format,
-            decoder,
             sample_buffer: None,
             probed_metadata: Some(probed.metadata),
         })
@@ -207,23 +138,23 @@ impl SymphoniaDecoder {
                     Some(StandardTagKey::AlbumArtist) => metadata.album_artists = value.clone(),
                     Some(StandardTagKey::Album) => metadata.album = value.clone(),
                     Some(StandardTagKey::TrackNumber) => {
-                        metadata.number = value.parse::<u32>().unwrap_or_default()
+                        metadata.number = value.parse::<u32>().ok()
                     }
                     Some(StandardTagKey::DiscNumber) => {
-                        metadata.disc_number = value.parse::<u32>().unwrap_or_default()
+                        metadata.disc_number = value.parse::<u32>().ok()
                     }
                     _ => (),
                 }
             } else if let Value::UnsignedInt(value) = &tag.value {
                 match tag.std_key {
-                    Some(StandardTagKey::TrackNumber) => metadata.number = *value as u32,
-                    Some(StandardTagKey::DiscNumber) => metadata.disc_number = *value as u32,
+                    Some(StandardTagKey::TrackNumber) => metadata.number = Some(*value as u32),
+                    Some(StandardTagKey::DiscNumber) => metadata.disc_number = Some(*value as u32),
                     _ => (),
                 }
             } else if let Value::SignedInt(value) = &tag.value {
                 match tag.std_key {
-                    Some(StandardTagKey::TrackNumber) => metadata.number = *value as u32,
-                    Some(StandardTagKey::DiscNumber) => metadata.disc_number = *value as u32,
+                    Some(StandardTagKey::TrackNumber) => metadata.number = Some(*value as u32),
+                    Some(StandardTagKey::DiscNumber) => metadata.disc_number = Some(*value as u32),
                     _ => (),
                 }
             }

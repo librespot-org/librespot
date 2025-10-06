@@ -99,9 +99,18 @@ impl EventHandler {
                                                 env_vars.insert("ARTISTS", artists);
                                                 env_vars.insert("ALBUM_ARTISTS", album_artists);
                                                 env_vars.insert("ALBUM", album);
-                                                env_vars.insert("NUMBER", number.to_string());
-                                                env_vars
-                                                    .insert("DISC_NUMBER", disc_number.to_string());
+                                                env_vars.insert(
+                                                    "NUMBER",
+                                                    number
+                                                        .map(|n: u32| n.to_string())
+                                                        .unwrap_or_default(),
+                                                );
+                                                env_vars.insert(
+                                                    "DISC_NUMBER",
+                                                    disc_number
+                                                        .map(|n: u32| n.to_string())
+                                                        .unwrap_or_default(),
+                                                );
                                                 env_vars.insert(
                                                     "LOCAL_FILE_PATH",
                                                     path.into_os_string()

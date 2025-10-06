@@ -145,10 +145,26 @@ fn get_uri_from_file(audio_path: &Path, extension: &str) -> Result<SpotifyUri, E
 
     let time = time_base.calc_time(num_frames);
 
+    fn url_encode(input: &str) -> String {
+        static ENCODE_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"[#$&'()*+,/:;=?@\[\]\s]").unwrap());
+
+        ENCODE_REGEX
+            .replace_all(input, |caps: &Captures| match &caps[0] {
+                " " => "+".to_owned(),
+                _ => format!("%{:X}", &caps[0].as_bytes()[0]),
+            })
+            .into_owned()
+    }
+
+    fn format_uri_part(input: Option<String>) -> String {
+        input.as_deref().map(url_encode).unwrap_or("".to_owned())
+    }
+
     Ok(SpotifyUri::Local {
-        artist: format_uri_component(artist),
-        album_title: format_uri_component(album_title),
-        track_title: format_uri_component(track_title),
+        artist: format_uri_part(artist),
+        album_title: format_uri_part(album_title),
+        track_title: format_uri_part(track_title),
         duration: Duration::from_secs(time.seconds),
     })
 }
@@ -163,20 +179,4 @@ fn get_tags(probed: &mut ProbeResult) -> Option<Vec<Tag>> {
     }
 
     None
-}
-
-fn url_encode(input: &str) -> String {
-    static ENCODE_REGEX: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"[#$&'()*+,/:;=?@\[\]\s]").unwrap());
-
-    ENCODE_REGEX
-        .replace_all(input, |caps: &Captures| match &caps[0] {
-            " " => "+".to_owned(),
-            _ => format!("%{:X}", &caps[0].as_bytes()[0]),
-        })
-        .into_owned()
-}
-
-fn format_uri_component(input: Option<String>) -> String {
-    input.as_deref().map(url_encode).unwrap_or("".to_owned())
 }

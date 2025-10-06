@@ -56,8 +56,8 @@ pub enum UniqueFields {
         artists: String,
         album: String,
         album_artists: String,
-        number: u32,
-        disc_number: u32,
+        number: Option<u32>,
+        disc_number: Option<u32>,
         path: PathBuf,
     },
     Episode {

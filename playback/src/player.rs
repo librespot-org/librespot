@@ -37,6 +37,7 @@ use futures_util::{
 use librespot_metadata::{audio::UniqueFields, track::Tracks};
 
 use symphonia::core::io::MediaSource;
+use symphonia::core::probe::Hint;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::SAMPLES_PER_SECOND;
@@ -1126,7 +1127,14 @@ impl PlayerTrackLoader {
             };
 
             #[cfg(not(feature = "passthrough-decoder"))]
-            let decoder_type = symphonia_decoder(audio_file, format);
+            let decoder_type = {
+                let mut hint = Hint::new();
+                if let Some(mime_type) = AudioFiles::mime_type(format) {
+                    hint.mime_type(mime_type);
+                }
+
+                symphonia_decoder(audio_file, hint)
+            };
 
             let normalisation_data = normalisation_data.unwrap_or_else(|| {
                 warn!("Unable to get normalisation data, continuing with defaults.");
@@ -1214,6 +1222,11 @@ impl PlayerTrackLoader {
     ) -> Option<PlayerLoadedTrackData> {
         info!("Loading local file with Spotify URI <{}>", track_uri);
 
+        let SpotifyUri::Local { duration, .. } = track_uri else {
+            error!("Unable to determine track duration for local file: not a local file URI");
+            return None;
+        };
+
         let entry = self.local_file_lookup.get(&track_uri);
 
         let Some(path) = entry else {
@@ -1229,10 +1242,12 @@ impl PlayerTrackLoader {
             }
         };
 
-        let decoder = match SymphoniaDecoder::new_with_probe(
-            src,
-            path.extension().and_then(|e| e.to_str()),
-        ) {
+        let mut hint = Hint::new();
+        if let Some(file_extension) = path.extension().and_then(|e| e.to_str()) {
+            hint.with_extension(file_extension);
+        }
+
+        let decoder = match SymphoniaDecoder::new(src, hint) {
             Ok(decoder) => decoder,
             Err(e) => {
                 error!("Error decoding local file: {e}");
@@ -1258,21 +1273,10 @@ impl PlayerTrackLoader {
             }
         };
 
-        let SpotifyUri::Local { duration, .. } = track_uri else {
-            error!("Unable to determine track duration for local file: not a local file URI");
-            return None;
-        };
-
         let file_size = fs::metadata(path).ok()?.len();
         let bytes_per_second = (file_size / duration.as_secs()) as usize;
 
-        let stream_loader_controller = match StreamLoaderController::from_local_file(file_size) {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Unable to create local StreamLoaderController: {e}");
-                return None;
-            }
-        };
+        let stream_loader_controller = StreamLoaderController::from_local_file(file_size);
 
         info!(
             "Loaded <{}> from path <{}>",
