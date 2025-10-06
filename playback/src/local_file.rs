@@ -1,6 +1,4 @@
 use librespot_core::{Error, SpotifyUri};
-use regex::{Captures, Regex};
-use std::sync::LazyLock;
 use std::{
     collections::HashMap,
     fs,
@@ -145,20 +143,14 @@ fn get_uri_from_file(audio_path: &Path, file_extension: &str) -> Result<SpotifyU
 
     let time = time_base.calc_time(num_frames);
 
-    fn url_encode(input: &str) -> String {
-        static ENCODE_REGEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"[#$&'()*+,/:;=?@\[\]\s]").unwrap());
-
-        ENCODE_REGEX
-            .replace_all(input, |caps: &Captures| match &caps[0] {
-                " " => "+".to_owned(),
-                _ => format!("%{:X}", &caps[0].as_bytes()[0]),
-            })
-            .into_owned()
-    }
-
     fn format_uri_part(input: Option<String>) -> String {
-        input.as_deref().map(url_encode).unwrap_or("".to_owned())
+        input
+            .map(|s| {
+                let bytes = s.into_bytes();
+                let encoded = form_urlencoded::byte_serialize(bytes.as_slice());
+                encoded.collect::<String>()
+            })
+            .unwrap_or("".to_owned())
     }
 
     Ok(SpotifyUri::Local {

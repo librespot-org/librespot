@@ -2024,6 +2024,7 @@ version = "0.7.1"
 dependencies = [
  "alsa 0.10.0",
  "cpal",
+ "form_urlencoded",
  "futures-util",
  "gstreamer",
  "gstreamer-app",
@@ -2040,7 +2041,6 @@ dependencies = [
  "portaudio-rs",
  "rand 0.9.2",
  "rand_distr",
- "regex",
  "rodio",
  "sdl2",
  "shell-words",
