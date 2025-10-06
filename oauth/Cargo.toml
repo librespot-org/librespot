@@ -1,6 +1,6 @@
 [package]
 name = "librespot-oauth"
-version.workspace = true
+version = "0.7.1"
 rust-version.workspace = true
 authors = ["Nick Steel <nick@nsteel.co.uk>"]
 license.workspace = true
