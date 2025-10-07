@@ -13,6 +13,7 @@ pub mod dither;
 mod local_file;
 pub mod mixer;
 pub mod player;
+mod symphonia_util;
 
 pub const SAMPLE_RATE: u32 = 44100;
 pub const NUM_CHANNELS: u8 = 2;

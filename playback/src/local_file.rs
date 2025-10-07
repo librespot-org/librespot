@@ -1,3 +1,4 @@
+use crate::symphonia_util;
 use librespot_core::{Error, SpotifyUri};
 use std::{
     collections::HashMap,
@@ -7,11 +8,11 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use symphonia::{
-    core::formats::FormatOptions,
-    core::io::MediaSourceStream,
-    core::meta::{MetadataOptions, StandardTagKey, Tag},
-    core::probe::{Hint, ProbeResult},
+use symphonia::core::{
+    formats::FormatOptions,
+    io::MediaSourceStream,
+    meta::{MetadataOptions, StandardTagKey, Tag},
+    probe::{Hint, ProbeResult},
 };
 
 // "Spotify supports .mp3, .mp4, and .m4p files. It doesn’t support .mp4 files that contain video,
@@ -105,9 +106,13 @@ fn get_uri_from_file(audio_path: &Path, file_extension: &str) -> Result<SpotifyU
     let mut album_title: Option<String> = None;
     let mut track_title: Option<String> = None;
 
-    let tags = get_tags(&mut probed).ok_or(Error::internal("Failed to probe audio tags"))?;
+    fn get_tags(probed: &mut ProbeResult) -> Option<Vec<Tag>> {
+        let metadata = symphonia_util::get_latest_metadata(probed)?;
+        let metadata_rev = metadata.current()?;
+        Some(metadata_rev.tags().to_vec())
+    }
 
-    for tag in tags {
+    for tag in get_tags(&mut probed).ok_or(Error::internal("Failed to probe audio tags"))? {
         if let Some(std_key) = tag.std_key {
             match std_key {
                 StandardTagKey::Album => {
@@ -159,16 +164,4 @@ fn get_uri_from_file(audio_path: &Path, file_extension: &str) -> Result<SpotifyU
         track_title: format_uri_part(track_title),
         duration: Duration::from_secs(time.seconds),
     })
-}
-
-fn get_tags(probed: &mut ProbeResult) -> Option<Vec<Tag>> {
-    if let Some(metadata_rev) = probed.format.metadata().current() {
-        return Some(metadata_rev.tags().to_vec());
-    }
-
-    if let Some(metadata_rev) = probed.metadata.get().as_ref().and_then(|m| m.current()) {
-        return Some(metadata_rev.tags().to_vec());
-    }
-
-    None
 }

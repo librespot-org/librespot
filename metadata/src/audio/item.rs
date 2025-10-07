@@ -53,9 +53,9 @@ pub enum UniqueFields {
     Local {
         // artists / album_artists can't be a Vec here, they are retrieved from metadata as a String,
         // and we cannot make any assumptions about them being e.g. comma-separated
-        artists: String,
-        album: String,
-        album_artists: String,
+        artists: Option<String>,
+        album: Option<String>,
+        album_artists: Option<String>,
         number: Option<u32>,
         disc_number: Option<u32>,
         path: PathBuf,

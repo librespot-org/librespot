@@ -1278,11 +1278,9 @@ impl PlayerTrackLoader {
 
         let stream_loader_controller = StreamLoaderController::from_local_file(file_size);
 
-        info!(
-            "Loaded <{}> from path <{}>",
-            local_file_metadata.name,
-            path.display()
-        );
+        let name = local_file_metadata.name.unwrap_or_default();
+
+        info!("Loaded <{name}> from path <{}>", path.display());
 
         Some(PlayerLoadedTrackData {
             decoder,
@@ -1297,10 +1295,13 @@ impl PlayerTrackLoader {
                 uri: track_uri.to_uri().unwrap_or_default(),
                 track_id: track_uri,
                 files: Default::default(),
-                name: local_file_metadata.name,
+                name,
                 // We can't get a CoverImage.URL for the track image, applications will have to parse the file metadata themselves using unique_fields.path
                 covers: vec![],
-                language: vec![local_file_metadata.language],
+                language: local_file_metadata
+                    .language
+                    .map(|val| vec![val])
+                    .unwrap_or_default(),
                 is_explicit: false,
                 availability: Ok(()),
                 alternatives: None,

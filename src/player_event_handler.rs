@@ -96,9 +96,13 @@ impl EventHandler {
                                                 path,
                                             } => {
                                                 env_vars.insert("ITEM_TYPE", "Track".to_string());
-                                                env_vars.insert("ARTISTS", artists);
-                                                env_vars.insert("ALBUM_ARTISTS", album_artists);
-                                                env_vars.insert("ALBUM", album);
+                                                env_vars
+                                                    .insert("ARTISTS", artists.unwrap_or_default());
+                                                env_vars.insert(
+                                                    "ALBUM_ARTISTS",
+                                                    album_artists.unwrap_or_default(),
+                                                );
+                                                env_vars.insert("ALBUM", album.unwrap_or_default());
                                                 env_vars.insert(
                                                     "NUMBER",
                                                     number
