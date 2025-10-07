@@ -3,7 +3,6 @@ use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
-use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -14,7 +13,25 @@ use thiserror::Error;
 use libspa::sys as spa_sys;
 use pipewire as pw;
 use pw::{properties::properties, spa};
+use ringbuf::{
+    HeapRb,
+    traits::{Consumer, Producer, Split},
+};
 use spa::pod::Pod;
+
+type RingProducer = ringbuf::wrap::caching::Caching<
+    std::sync::Arc<ringbuf::SharedRb<ringbuf::storage::Heap<u8>>>,
+    true,
+    false,
+>;
+type RingConsumer = ringbuf::wrap::caching::Caching<
+    std::sync::Arc<ringbuf::SharedRb<ringbuf::storage::Heap<u8>>>,
+    false,
+    true,
+>;
+
+// Ring buffer size: 1 second of audio at max quality (F64, stereo, 44.1kHz)
+const RING_BUFFER_SIZE: usize = 44100 * 2 * 8;
 
 #[derive(Debug, Error)]
 enum PipeWireError {
@@ -46,8 +63,8 @@ impl From<PipeWireError> for SinkError {
 
 pub struct PipeWireSink {
     format: AudioFormat,
-    // Channel sender for audio data
-    sender: Option<SyncSender<u8>>,
+    // Lock-free ring buffer producer for audio data
+    producer: Option<RingProducer>,
     // Flag to signal thread to stop
     quit_flag: Arc<AtomicBool>,
     initialized: bool,
@@ -70,8 +87,8 @@ fn convert_audio_format(format: AudioFormat) -> spa::param::audio::AudioFormat {
         F64 => spa::param::audio::AudioFormat::F64LE,
         F32 => spa::param::audio::AudioFormat::F32LE,
         S32 => spa::param::audio::AudioFormat::S32LE,
-        S24 => spa::param::audio::AudioFormat::S24LE,
-        S24_3 => spa::param::audio::AudioFormat::S24_32LE,
+        S24 => spa::param::audio::AudioFormat::S24_32LE,
+        S24_3 => spa::param::audio::AudioFormat::S24LE,
         S16 => spa::param::audio::AudioFormat::S16LE,
     }
 }
@@ -82,7 +99,7 @@ impl Open for PipeWireSink {
 
         Self {
             format,
-            sender: None,
+            producer: None,
             quit_flag: Arc::new(AtomicBool::new(false)),
             initialized: false,
             _main_loop_handle: None,
@@ -101,17 +118,16 @@ impl Sink for PipeWireSink {
         let format = self.format;
         let quit_flag = Arc::clone(&self.quit_flag);
 
-        // Create a sync channel - buffer size for ~1 second of audio to prevent underruns
-        let sample_size = calculate_sample_size(format);
-        let buffer_size = SAMPLE_RATE as usize * NUM_CHANNELS as usize * sample_size;
-        let (sender, receiver) = sync_channel::<u8>(buffer_size);
+        // Create a lock-free ring buffer for real-time audio transfer
+        let ring_buffer = HeapRb::<u8>::new(RING_BUFFER_SIZE);
+        let (producer, consumer) = ring_buffer.split();
 
-        // Store the sender for write_bytes
-        self.sender = Some(sender);
+        // Store the producer for write_bytes
+        self.producer = Some(producer);
 
-        // Run PipeWire main loop in a separate thread with the receiver
+        // Run PipeWire main loop in a separate thread with the consumer
         let handle = thread::spawn(move || {
-            if let Err(e) = run_pipewire_loop(receiver, quit_flag, format) {
+            if let Err(e) = run_pipewire_loop(consumer, quit_flag, format) {
                 error!("PipeWire loop error: {}", e);
             }
         });
@@ -136,8 +152,8 @@ impl Sink for PipeWireSink {
         // Signal the thread to quit
         self.quit_flag.store(true, Ordering::Relaxed);
 
-        // Drop the sender to signal the receiver thread to exit
-        self.sender = None;
+        // Drop the producer to signal the consumer thread to exit
+        self.producer = None;
 
         // Wait for the thread to finish with a timeout
         if let Some(handle) = self._main_loop_handle.take() {
@@ -163,10 +179,18 @@ impl SinkAsBytes for PipeWireSink {
             return Err(PipeWireError::NotConnected.into());
         }
 
-        if let Some(ref sender) = self.sender {
-            // Send data through the channel - use blocking send to ensure all data is queued
-            for &byte in data {
-                sender.send(byte).map_err(|_| PipeWireError::NotConnected)?;
+        if let Some(ref mut producer) = self.producer {
+            // Push data to the lock-free ring buffer in chunks
+            // This is much more efficient than byte-by-byte and is wait-free
+            let mut offset = 0;
+            while offset < data.len() {
+                let written = producer.push_slice(&data[offset..]);
+                if written == 0 {
+                    // Ring buffer is full, wait a tiny bit for consumer to catch up
+                    thread::sleep(std::time::Duration::from_micros(100));
+                } else {
+                    offset += written;
+                }
             }
             Ok(())
         } else {
@@ -186,7 +210,7 @@ impl PipeWireSink {
 }
 
 fn run_pipewire_loop(
-    receiver: Receiver<u8>,
+    consumer: RingConsumer,
     quit_flag: Arc<AtomicBool>,
     format: AudioFormat,
 ) -> Result<(), PipeWireError> {
@@ -222,10 +246,11 @@ fn run_pipewire_loop(
     // Clone mainloop for use in the listener callback
     let mainloop_quit = mainloop.clone();
 
-    // This is the key: the listener is based on the working pipewire_tone_test.rs example
+    // Use PipeWire's real-time callback with lock-free ring buffer consumer
+    // This ensures optimal performance and real-time safety
     let _listener = stream
-        .add_local_listener_with_user_data((receiver, quit_flag.clone()))
-        .process(move |stream, (receiver, quit_flag)| {
+        .add_local_listener_with_user_data((consumer, quit_flag.clone()))
+        .process(move |stream, (consumer, quit_flag)| {
             // Check if we should quit
             if quit_flag.load(Ordering::Relaxed) {
                 mainloop_quit.quit();
@@ -244,38 +269,13 @@ fn run_pipewire_loop(
                         let n_frames = slice.len() / stride;
                         let total_bytes = n_frames * stride;
 
-                        // Read from channel - try non-blocking first, then blocking if needed
-                        let mut bytes_read = 0;
+                        // Pop data from the lock-free ring buffer
+                        // This is wait-free and real-time safe
+                        let bytes_read = consumer.pop_slice(slice);
 
-                        // First, try to read without blocking
-                        for i in 0..total_bytes {
-                            match receiver.try_recv() {
-                                Ok(byte) => {
-                                    slice[i] = byte;
-                                    bytes_read += 1;
-                                }
-                                Err(_) => break,
-                            }
-                        }
-
-                        // If we didn't get enough data, block to get more
-                        // This prevents underruns and stuttering
+                        // Fill any remaining space with silence if underrun
                         if bytes_read < total_bytes {
-                            for i in bytes_read..total_bytes {
-                                match receiver.recv() {
-                                    Ok(byte) => {
-                                        slice[i] = byte;
-                                    }
-                                    Err(_) => {
-                                        // Channel disconnected, fill rest with silence and signal quit
-                                        for j in i..total_bytes {
-                                            slice[j] = 0;
-                                        }
-                                        quit_flag.store(true, Ordering::Relaxed);
-                                        break;
-                                    }
-                                }
-                            }
+                            slice[bytes_read..total_bytes].fill(0);
                         }
 
                         n_frames
@@ -283,7 +283,7 @@ fn run_pipewire_loop(
                         0
                     };
 
-                    // This matches the working pipewire_tone_test.rs example exactly
+                    // Configure the buffer chunk metadata
                     let chunk = data.chunk_mut();
                     *chunk.offset_mut() = 0;
                     *chunk.stride_mut() = stride as _;

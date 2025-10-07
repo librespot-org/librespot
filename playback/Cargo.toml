@@ -20,7 +20,7 @@ gstreamer-backend = [
     "dep:gstreamer-audio",
 ]
 jackaudio-backend = ["dep:jack"]
-pipewire-backend = ["dep:pipewire", "dep:libspa"]
+pipewire-backend = ["dep:pipewire", "dep:libspa", "dep:ringbuf"]
 portaudio-backend = ["dep:portaudio-rs"]
 pulseaudio-backend = ["dep:libpulse-binding", "dep:libpulse-simple-binding"]
 rodio-backend = ["dep:cpal", "dep:rodio"]
@@ -78,6 +78,7 @@ libpulse-simple-binding = { version = "2", optional = true, default-features = f
 # Pipewire dependencies
 libspa = { version = "0.9", optional = true }
 pipewire = { version = "0.9", optional = true }
+ringbuf = { version = "0.4", optional = true }
 
 
 # Rodio dependencies
