@@ -102,6 +102,11 @@ alsa-backend = ["librespot-playback/alsa-backend"]
 # Integrates with the PulseAudio sound server for advanced audio routing.
 pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
 
+# pipewire-backend: PipeWire backend (Linux only).
+# Modern audio server that provides low-latency audio with advanced routing capabilities.
+# Designed as a replacement for both PulseAudio and JACK.
+pipewire-backend = ["librespot-playback/pipewire-backend"]
+
 # jackaudio-backend: JACK Audio Connection Kit backend.
 # Professional audio backend for low-latency, high-quality audio routing.
 jackaudio-backend = ["librespot-playback/jackaudio-backend"]
