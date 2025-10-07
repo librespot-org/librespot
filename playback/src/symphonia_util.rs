@@ -1,7 +1,7 @@
 use symphonia::core::meta::Metadata;
 use symphonia::core::probe::ProbeResult;
 
-pub fn get_latest_metadata(probe_result: &mut ProbeResult) -> Option<Metadata> {
+pub fn get_latest_metadata(probe_result: &mut ProbeResult) -> Option<Metadata<'_>> {
     let mut metadata = probe_result.format.metadata();
 
     // If we can't get metadata from the container, fall back to other tags found by probing.
