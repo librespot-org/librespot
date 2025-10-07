@@ -173,8 +173,7 @@ impl SpotifyUri {
             }),
             SPOTIFY_ITEM_TYPE_LOCAL => {
                 let artist = name;
-                let album_title = parts.next().unwrap_or_default();
-                // enforce track_title exists; spotify:local:::<duration> is a silly URI
+                let album_title = parts.next().ok_or(SpotifyUriError::InvalidFormat)?;
                 let track_title = parts.next().ok_or(SpotifyUriError::InvalidFormat)?;
                 let duration_secs = parts
                     .next()
