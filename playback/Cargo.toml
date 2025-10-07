@@ -63,8 +63,6 @@ zerocopy = { version = "0.8", features = ["derive"] }
 # Backends
 alsa = { version = "0.10", optional = true }
 jack = { version = "0.13", optional = true }
-libspa = { version = "0.9", optional = true }
-pipewire = { version = "0.9", optional = true }
 portaudio-rs = { version = "0.3", optional = true }
 sdl2 = { version = "0.38", optional = true }
 
@@ -76,6 +74,11 @@ gstreamer-audio = { version = "0.24", optional = true }
 # PulseAudio dependencies
 libpulse-binding = { version = "2", optional = true, default-features = false }
 libpulse-simple-binding = { version = "2", optional = true, default-features = false }
+
+# Pipewire dependencies
+libspa = { version = "0.9", optional = true }
+pipewire = { version = "0.9", optional = true }
+
 
 # Rodio dependencies
 cpal = { version = "0.16", optional = true }
