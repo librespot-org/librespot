@@ -3,15 +3,18 @@ use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
-use std::sync::mpsc::{sync_channel, SyncSender, Receiver};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::thread;
 use thiserror::Error;
 
+use libspa::sys as spa_sys;
 use pipewire as pw;
 use pw::{properties::properties, spa};
 use spa::pod::Pod;
-use libspa::sys as spa_sys;
 
 #[derive(Debug, Error)]
 enum PipeWireError {
@@ -92,33 +95,33 @@ impl Sink for PipeWireSink {
         if self.initialized {
             return Ok(());
         }
-        
+
         info!("Starting PipeWire sink...");
-        
+
         let format = self.format;
         let quit_flag = Arc::clone(&self.quit_flag);
-        
+
         // Create a sync channel - buffer size for ~1 second of audio to prevent underruns
         let sample_size = calculate_sample_size(format);
         let buffer_size = SAMPLE_RATE as usize * NUM_CHANNELS as usize * sample_size;
         let (sender, receiver) = sync_channel::<u8>(buffer_size);
-        
+
         // Store the sender for write_bytes
         self.sender = Some(sender);
-        
+
         // Run PipeWire main loop in a separate thread with the receiver
         let handle = thread::spawn(move || {
             if let Err(e) = run_pipewire_loop(receiver, quit_flag, format) {
                 error!("PipeWire loop error: {}", e);
             }
         });
-        
+
         self._main_loop_handle = Some(handle);
         self.initialized = true;
-        
+
         // Give the thread a moment to initialize
         thread::sleep(std::time::Duration::from_millis(100));
-        
+
         info!("PipeWire sink started successfully");
         Ok(())
     }
@@ -129,10 +132,10 @@ impl Sink for PipeWireSink {
         }
 
         info!("Stopping PipeWire sink...");
-        
+
         // Signal the thread to quit
         self.quit_flag.store(true, Ordering::Relaxed);
-        
+
         // Drop the sender to signal the receiver thread to exit
         self.sender = None;
 
@@ -189,14 +192,15 @@ fn run_pipewire_loop(
 ) -> Result<(), PipeWireError> {
     // Initialize PipeWire
     pw::init();
-    
+
     let mainloop = pw::main_loop::MainLoopRc::new(None)
         .map_err(|e| PipeWireError::MainLoopCreation(format!("{:?}", e)))?;
-    
+
     let context = pw::context::ContextRc::new(&mainloop, None)
         .map_err(|e| PipeWireError::MainLoopCreation(format!("{:?}", e)))?;
-        
-    let core = context.connect_rc(None)
+
+    let core = context
+        .connect_rc(None)
         .map_err(|e| PipeWireError::MainLoopCreation(format!("{:?}", e)))?;
 
     let stream = pw::stream::StreamBox::new(
@@ -214,10 +218,10 @@ fn run_pipewire_loop(
 
     let sample_size = calculate_sample_size(format);
     let stride = sample_size * NUM_CHANNELS as usize;
-    
+
     // Clone mainloop for use in the listener callback
     let mainloop_quit = mainloop.clone();
-    
+
     // This is the key: the listener is based on the working pipewire_tone_test.rs example
     let _listener = stream
         .add_local_listener_with_user_data((receiver, quit_flag.clone()))
@@ -227,7 +231,7 @@ fn run_pipewire_loop(
                 mainloop_quit.quit();
                 return;
             }
-            
+
             match stream.dequeue_buffer() {
                 None => {
                     // No buffer available, this is normal
@@ -235,14 +239,14 @@ fn run_pipewire_loop(
                 Some(mut buffer) => {
                     let datas = buffer.datas_mut();
                     let data = &mut datas[0];
-                    
+
                     let n_frames = if let Some(slice) = data.data() {
                         let n_frames = slice.len() / stride;
                         let total_bytes = n_frames * stride;
-                        
+
                         // Read from channel - try non-blocking first, then blocking if needed
                         let mut bytes_read = 0;
-                        
+
                         // First, try to read without blocking
                         for i in 0..total_bytes {
                             match receiver.try_recv() {
@@ -253,7 +257,7 @@ fn run_pipewire_loop(
                                 Err(_) => break,
                             }
                         }
-                        
+
                         // If we didn't get enough data, block to get more
                         // This prevents underruns and stuttering
                         if bytes_read < total_bytes {
@@ -273,12 +277,12 @@ fn run_pipewire_loop(
                                 }
                             }
                         }
-                        
+
                         n_frames
                     } else {
                         0
                     };
-                    
+
                     // This matches the working pipewire_tone_test.rs example exactly
                     let chunk = data.chunk_mut();
                     *chunk.offset_mut() = 0;
@@ -295,7 +299,7 @@ fn run_pipewire_loop(
     audio_info.set_format(convert_audio_format(format));
     audio_info.set_rate(SAMPLE_RATE);
     audio_info.set_channels(NUM_CHANNELS as u32);
-    
+
     let mut position = [0; spa::param::audio::MAX_CHANNELS];
     position[0] = spa_sys::SPA_AUDIO_CHANNEL_FL;
     position[1] = spa_sys::SPA_AUDIO_CHANNEL_FR;
@@ -316,15 +320,16 @@ fn run_pipewire_loop(
     let mut params = [Pod::from_bytes(&values).unwrap()];
 
     // Connect stream - matches pipewire_tone_test.rs
-    stream.connect(
-        spa::utils::Direction::Output,
-        None,
-        pw::stream::StreamFlags::AUTOCONNECT
-            | pw::stream::StreamFlags::MAP_BUFFERS
-            | pw::stream::StreamFlags::RT_PROCESS,
-        &mut params,
-    )
-    .map_err(|e| PipeWireError::StreamConnect(format!("{:?}", e)))?;
+    stream
+        .connect(
+            spa::utils::Direction::Output,
+            None,
+            pw::stream::StreamFlags::AUTOCONNECT
+                | pw::stream::StreamFlags::MAP_BUFFERS
+                | pw::stream::StreamFlags::RT_PROCESS,
+            &mut params,
+        )
+        .map_err(|e| PipeWireError::StreamConnect(format!("{:?}", e)))?;
 
     // Run the main loop
     mainloop.run();
