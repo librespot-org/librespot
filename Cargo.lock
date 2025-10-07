@@ -2024,6 +2024,7 @@ version = "0.7.1"
 dependencies = [
  "alsa 0.10.0",
  "cpal",
+ "form_urlencoded",
  "futures-util",
  "gstreamer",
  "gstreamer-app",

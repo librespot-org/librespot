@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, path::PathBuf};
 
 use crate::{
     Metadata,
@@ -49,6 +49,16 @@ pub enum UniqueFields {
         popularity: u8,
         number: u32,
         disc_number: u32,
+    },
+    Local {
+        // artists / album_artists can't be a Vec here, they are retrieved from metadata as a String,
+        // and we cannot make any assumptions about them being e.g. comma-separated
+        artists: Option<String>,
+        album: Option<String>,
+        album_artists: Option<String>,
+        number: Option<u32>,
+        disc_number: Option<u32>,
+        path: PathBuf,
     },
     Episode {
         description: String,

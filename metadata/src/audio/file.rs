@@ -103,6 +103,18 @@ impl AudioFiles {
     pub fn is_flac(format: AudioFileFormat) -> bool {
         matches!(format, AudioFileFormat::FLAC_FLAC)
     }
+
+    pub fn mime_type(format: AudioFileFormat) -> Option<&'static str> {
+        if Self::is_ogg_vorbis(format) {
+            Some("audio/ogg")
+        } else if Self::is_mp3(format) {
+            Some("audio/mpeg")
+        } else if Self::is_flac(format) {
+            Some("audio/flac")
+        } else {
+            None
+        }
+    }
 }
 
 impl From<&[AudioFileMessage]> for AudioFiles {

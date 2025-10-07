@@ -1,36 +1,38 @@
 use std::{io, time::Duration};
 
-use symphonia::{
-    core::{
-        audio::SampleBuffer,
-        codecs::{Decoder, DecoderOptions},
-        errors::Error,
-        formats::{FormatOptions, FormatReader, SeekMode, SeekTo},
-        io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
-        meta::{StandardTagKey, Value},
-    },
-    default::{
-        codecs::{FlacDecoder, MpaDecoder, VorbisDecoder},
-        formats::{FlacReader, MpaReader, OggReader},
-    },
+use symphonia::core::{
+    audio::SampleBuffer,
+    codecs::{Decoder, DecoderOptions},
+    errors::Error,
+    formats::{FormatOptions, SeekMode, SeekTo},
+    io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
+    meta::{MetadataOptions, StandardTagKey, Value},
+    probe::{Hint, ProbeResult},
 };
 
 use super::{AudioDecoder, AudioPacket, AudioPacketPosition, DecoderError, DecoderResult};
 
-use crate::{
-    NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE,
-    metadata::audio::{AudioFileFormat, AudioFiles},
-    player::NormalisationData,
-};
+use crate::{NUM_CHANNELS, PAGES_PER_MS, SAMPLE_RATE, player::NormalisationData, symphonia_util};
 
 pub struct SymphoniaDecoder {
-    format: Box<dyn FormatReader>,
+    probe_result: ProbeResult,
     decoder: Box<dyn Decoder>,
     sample_buffer: Option<SampleBuffer<f64>>,
 }
 
+#[derive(Default)]
+pub(crate) struct LocalFileMetadata {
+    pub name: Option<String>,
+    pub language: Option<String>,
+    pub album: Option<String>,
+    pub artists: Option<String>,
+    pub album_artists: Option<String>,
+    pub number: Option<u32>,
+    pub disc_number: Option<u32>,
+}
+
 impl SymphoniaDecoder {
-    pub fn new<R>(input: R, file_format: AudioFileFormat) -> DecoderResult<Self>
+    pub fn new<R>(input: R, hint: Hint) -> DecoderResult<Self>
     where
         R: MediaSource + 'static,
     {
@@ -43,39 +45,29 @@ impl SymphoniaDecoder {
             enable_gapless: true,
             ..Default::default()
         };
+        let metadata_opts: MetadataOptions = Default::default();
 
-        let format: Box<dyn FormatReader> = if AudioFiles::is_ogg_vorbis(file_format) {
-            Box::new(OggReader::try_new(mss, &format_opts)?)
-        } else if AudioFiles::is_mp3(file_format) {
-            Box::new(MpaReader::try_new(mss, &format_opts)?)
-        } else if AudioFiles::is_flac(file_format) {
-            Box::new(FlacReader::try_new(mss, &format_opts)?)
-        } else {
-            return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported format: {file_format:?}"
-            )));
-        };
+        let probe_result =
+            symphonia::default::get_probe().format(&hint, mss, &format_opts, &metadata_opts)?;
+
+        let format = &probe_result.format;
 
         let track = format.default_track().ok_or_else(|| {
             DecoderError::SymphoniaDecoder("Could not retrieve default track".into())
         })?;
 
         let decoder_opts: DecoderOptions = Default::default();
-        let decoder: Box<dyn Decoder> = if AudioFiles::is_ogg_vorbis(file_format) {
-            Box::new(VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?)
-        } else if AudioFiles::is_mp3(file_format) {
-            Box::new(MpaDecoder::try_new(&track.codec_params, &decoder_opts)?)
-        } else if AudioFiles::is_flac(file_format) {
-            Box::new(FlacDecoder::try_new(&track.codec_params, &decoder_opts)?)
-        } else {
-            return Err(DecoderError::SymphoniaDecoder(format!(
-                "Unsupported decoder: {file_format:?}"
-            )));
-        };
+
+        let decoder = symphonia::default::get_codecs().make(&track.codec_params, &decoder_opts)?;
 
         let rate = decoder.codec_params().sample_rate.ok_or_else(|| {
             DecoderError::SymphoniaDecoder("Could not retrieve sample rate".into())
         })?;
+
+        // TODO: The official client supports local files with sample rates other than 44,100 kHz.
+        // To play these accurately, we need to either resample the input audio, or introduce a way
+        // to change the player's current sample rate (likely by closing and re-opening the sink
+        // with new parameters).
         if rate != SAMPLE_RATE {
             return Err(DecoderError::SymphoniaDecoder(format!(
                 "Unsupported sample rate: {rate}"
@@ -92,9 +84,8 @@ impl SymphoniaDecoder {
         }
 
         Ok(Self {
-            format,
+            probe_result,
             decoder,
-
             // We set the sample buffer when decoding the first full packet,
             // whose duration is also the ideal sample buffer size.
             sample_buffer: None,
@@ -102,16 +93,7 @@ impl SymphoniaDecoder {
     }
 
     pub fn normalisation_data(&mut self) -> Option<NormalisationData> {
-        let mut metadata = self.format.metadata();
-
-        // Advance to the latest metadata revision.
-        // None means we hit the latest.
-        loop {
-            if metadata.pop().is_none() {
-                break;
-            }
-        }
-
+        let metadata = symphonia_util::get_latest_metadata(&mut self.probe_result)?;
         let tags = metadata.current()?.tags();
 
         if tags.is_empty() {
@@ -133,6 +115,49 @@ impl SymphoniaDecoder {
 
             Some(data)
         }
+    }
+
+    pub(crate) fn local_file_metadata(&mut self) -> Option<LocalFileMetadata> {
+        let metadata = symphonia_util::get_latest_metadata(&mut self.probe_result)?;
+        let tags = metadata.current()?.tags();
+        let mut metadata = LocalFileMetadata::default();
+
+        for tag in tags {
+            if let Value::String(value) = &tag.value {
+                match tag.std_key {
+                    // We could possibly use mem::take here to avoid cloning, but that risks leaving
+                    // the audio item metadata in a bad state.
+                    Some(StandardTagKey::TrackTitle) => metadata.name = Some(value.clone()),
+                    Some(StandardTagKey::Language) => metadata.language = Some(value.clone()),
+                    Some(StandardTagKey::Artist) => metadata.artists = Some(value.clone()),
+                    Some(StandardTagKey::AlbumArtist) => {
+                        metadata.album_artists = Some(value.clone())
+                    }
+                    Some(StandardTagKey::Album) => metadata.album = Some(value.clone()),
+                    Some(StandardTagKey::TrackNumber) => {
+                        metadata.number = value.parse::<u32>().ok()
+                    }
+                    Some(StandardTagKey::DiscNumber) => {
+                        metadata.disc_number = value.parse::<u32>().ok()
+                    }
+                    _ => (),
+                }
+            } else if let Value::UnsignedInt(value) = &tag.value {
+                match tag.std_key {
+                    Some(StandardTagKey::TrackNumber) => metadata.number = Some(*value as u32),
+                    Some(StandardTagKey::DiscNumber) => metadata.disc_number = Some(*value as u32),
+                    _ => (),
+                }
+            } else if let Value::SignedInt(value) = &tag.value {
+                match tag.std_key {
+                    Some(StandardTagKey::TrackNumber) => metadata.number = Some(*value as u32),
+                    Some(StandardTagKey::DiscNumber) => metadata.disc_number = Some(*value as u32),
+                    _ => (),
+                }
+            }
+        }
+
+        Some(metadata)
     }
 
     #[inline]
@@ -161,7 +186,7 @@ impl AudioDecoder for SymphoniaDecoder {
         }
 
         // `track_id: None` implies the default track ID (of the container, not of Spotify).
-        let seeked_to_ts = self.format.seek(
+        let seeked_to_ts = self.probe_result.format.seek(
             SeekMode::Accurate,
             SeekTo::Time {
                 time: target.into(),
@@ -180,7 +205,7 @@ impl AudioDecoder for SymphoniaDecoder {
         let mut skipped = false;
 
         loop {
-            let packet = match self.format.next_packet() {
+            let packet = match self.probe_result.format.next_packet() {
                 Ok(packet) => packet,
                 Err(Error::IoError(err)) => {
                     if err.kind() == io::ErrorKind::UnexpectedEof {

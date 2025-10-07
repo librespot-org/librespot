@@ -10,7 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
-
+- [main] `--local-file-dir` / `-l` option added to binary to specify local file directories to pull from
+- [metadata] `Local` variant added to `UniqueFields` enum (breaking)
+- [playback] Local files can now be played with the following caveats:
+  - They must be sampled at 44,100 Hz
+  - They cannot be played from a Connect device using the dedicated 'Local Files' playlist; they must be added to another playlist first
+- [playback] `local_file_directories` field added to `PlayerConfig` struct (breaking)
+  
 ### Changed
 
 - [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
@@ -18,7 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
 - [player] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
 - [spclient] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
-
 
 ### Removed
 

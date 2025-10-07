@@ -300,6 +300,14 @@ impl StreamLoaderController {
         // terminate stream loading and don't load any more data for this file.
         self.send_stream_loader_command(StreamLoaderCommand::Close);
     }
+
+    pub fn from_local_file(file_size: u64) -> Self {
+        Self {
+            channel_tx: None,
+            stream_shared: None,
+            file_size: file_size as usize,
+        }
+    }
 }
 
 pub struct AudioFileStreaming {
