@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
+- [dbus/mpris] Add dbus/mpris support to allow controlling player
 
 ### Changed
 
