@@ -35,6 +35,7 @@ use hyper::{
 use hyper_util::client::legacy::ResponseFuture;
 use protobuf::{Enum, Message, MessageFull};
 use rand::RngCore;
+use serde::Serialize;
 use sysinfo::System;
 use thiserror::Error;
 
@@ -105,6 +106,11 @@ impl Default for RequestOptions {
             base_url: None,
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct TransferRequest {
+    pub transfer_options: TransferOptions,
 }
 
 impl SpClient {
@@ -912,13 +918,9 @@ impl SpClient {
         &self,
         from_device_id: &str,
         to_device_id: &str,
-        transfer_options: Option<&TransferOptions>,
+        transfer_request: Option<&TransferRequest>,
     ) -> SpClientResult {
-        let transfer_options = transfer_options
-            .as_ref()
-            .map(serde_json::to_string)
-            .transpose()?;
-        let body = transfer_options.map(|op| format!(r#"{{ "transfer_options": {op} }}"#));
+        let body = transfer_request.map(serde_json::to_string).transpose()?;
 
         let endpoint =
             format!("/connect-state/v1/connect/transfer/from/{from_device_id}/to/{to_device_id}");

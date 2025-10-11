@@ -6,9 +6,10 @@ use crate::{
         authentication::Credentials,
         dealer::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
-            protocol::{Command, FallbackWrapper, Message, Request, TransferOptions},
+            protocol::{Command, FallbackWrapper, Message, Request},
         },
         session::UserAttributes,
+        spclient::TransferRequest,
     },
     model::{LoadRequest, PlayingTrack, SpircPlayStatus},
     playback::{
@@ -129,7 +130,7 @@ enum SpircCommand {
     SetPosition(u32),
     SetVolume(u16),
     Activate,
-    Transfer(Option<TransferOptions>),
+    Transfer(Option<TransferRequest>),
     Load(LoadRequest),
 }
 
@@ -404,10 +405,10 @@ impl Spirc {
     /// Acquires the control as active connect device over the transfer flow.
     ///
     /// Does nothing if we are not the active device.
-    pub fn transfer(&self, transfer_options: Option<TransferOptions>) -> Result<(), Error> {
+    pub fn transfer(&self, transfer_request: Option<TransferRequest>) -> Result<(), Error> {
         Ok(self
             .commands
-            .send(SpircCommand::Transfer(transfer_options))?)
+            .send(SpircCommand::Transfer(transfer_request))?)
     }
 }
 
@@ -634,11 +635,11 @@ impl SpircTask {
                     rx.close()
                 }
             }
-            SpircCommand::Transfer(options) if !self.connect_state.is_active() => {
+            SpircCommand::Transfer(request) if !self.connect_state.is_active() => {
                 let device_id = self.session.device_id();
                 self.session
                     .spclient()
-                    .transfer(device_id, device_id, options.as_ref())
+                    .transfer(device_id, device_id, request.as_ref())
                     .await?;
                 return Ok(());
             }
