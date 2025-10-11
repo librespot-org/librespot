@@ -1002,8 +1002,7 @@ impl SpircTask {
                     .options
                     .skip_to
                     .as_ref()
-                    .and_then(|s| s.track_index)
-                    .map(|i| i as usize);
+                    .map(|skip| PlayingTrack::from_index(skip, &play.context.pages));
 
                 self.handle_load(
                     LoadRequest {
@@ -1011,7 +1010,9 @@ impl SpircTask {
                         options: LoadRequestOptions {
                             start_playing: true,
                             seek_to: play.options.seek_to.unwrap_or_default(),
-                            playing_track: play.options.skip_to.and_then(|s| s.try_into().ok()),
+                            playing_track: play.options.skip_to.and_then(|s| {
+                                PlayingTrack::from_skip_to(s, &play.context.pages).ok()
+                            }),
                             context_options,
                         },
                     },
