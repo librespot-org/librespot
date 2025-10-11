@@ -1056,13 +1056,17 @@ impl SpircTask {
     fn handle_transfer(&mut self, mut transfer: TransferState) -> Result<(), Error> {
         let mut ctx_uri = match transfer.current_session.context.uri {
             None => Err(SpircError::NoUri("transfer context"))?,
-            // can apparently happen when a state is transferred stared with "uris" via the api
-            Some(ref uri) if uri == "-" => String::new(),
-            Some(ref uri) => uri.clone(),
+            // can apparently happen when a state is transferred and was started with "uris" via the api
+            Some(ref uri) if uri == "-" || uri.is_empty() => None,
+            Some(ref uri) => Some(uri.clone()),
         };
 
-        self.connect_state
-            .reset_context(ResetContext::WhenDifferent(&ctx_uri));
+        self.connect_state.reset_context(
+            ctx_uri
+                .as_deref()
+                .map(ResetContext::WhenDifferent)
+                .unwrap_or(ResetContext::Completely),
+        );
 
         match self.connect_state.current_track_from_transfer(&transfer) {
             Err(why) => warn!("didn't find initial track: {why}"),
@@ -1074,44 +1078,47 @@ impl SpircTask {
 
         let autoplay = self.connect_state.current_track(|t| t.is_autoplay());
         if autoplay {
-            ctx_uri = ctx_uri.replace("station:", "");
+            ctx_uri = ctx_uri.map(|c| c.replace("station:", ""));
         }
 
         let fallback = self.connect_state.current_track(|t| &t.uri).clone();
-        let load_from_context_uri = !ctx_uri.is_empty();
+        let load_from_context_uri = ctx_uri.is_some();
 
-        if load_from_context_uri {
-            self.context_resolver.add(ResolveContext::from_uri(
-                ctx_uri.clone(),
-                &fallback,
-                ContextType::Default,
-                ContextAction::Replace,
-            ));
-        } else {
-            self.load_context_from_tracks(
-                transfer
+        match ctx_uri {
+            Some(ref uri) => {
+                self.context_resolver.add(ResolveContext::from_uri(
+                    uri.clone(),
+                    &fallback,
+                    ContextType::Default,
+                    ContextAction::Replace,
+                ));
+            }
+            None => {
+                let all_tracks = transfer
                     .current_session
                     .context
                     .pages
                     .iter()
                     .cloned()
                     .flat_map(|p| p.tracks)
-                    .collect::<Vec<_>>(),
-            )?
-        }
+                    .collect::<Vec<_>>();
 
-        self.context_resolver.add(ResolveContext::from_uri(
-            ctx_uri.clone(),
-            &fallback,
-            ContextType::Default,
-            ContextAction::Replace,
-        ));
+                if !all_tracks.is_empty() {
+                    self.load_context_from_tracks(all_tracks)?;
+                } else {
+                    warn!(
+                        "tried to transfer with an invalid state, using fallback as ctx_uri ({fallback})"
+                    );
+                    ctx_uri = Some(fallback.clone())
+                }
+            }
+        };
 
         self.handle_activate();
 
         let timestamp = self.now_ms();
         let state = &mut self.connect_state;
-        state.handle_initial_transfer(&mut transfer);
+        state.handle_initial_transfer(&mut transfer, ctx_uri.clone());
 
         // adjust active context, so resolve knows for which context it should set up the state
         state.active_context = if autoplay {
@@ -1135,24 +1142,34 @@ impl SpircTask {
         let is_playing = !transfer.playback.is_paused();
 
         if self.connect_state.current_track(|t| t.is_autoplay()) || autoplay {
-            debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
-
-            self.context_resolver.add(ResolveContext::from_uri(
-                ctx_uri,
-                fallback,
-                ContextType::Autoplay,
-                ContextAction::Replace,
-            ))
+            if let Some(ctx_uri) = ctx_uri {
+                debug!("currently in autoplay context, async resolving autoplay for {ctx_uri}");
+                self.context_resolver.add(ResolveContext::from_uri(
+                    ctx_uri,
+                    fallback,
+                    ContextType::Autoplay,
+                    ContextAction::Replace,
+                ))
+            } else {
+                warn!("couldn't resolve autoplay context without a context uri");
+            }
         }
 
         if load_from_context_uri {
             self.transfer_state = Some(transfer);
         } else {
-            let ctx = self.connect_state.get_context(ContextType::Default)?;
-            let idx = ConnectState::find_index_in_context(ctx, |pt| {
-                self.connect_state.current_track(|t| pt.uri == t.uri)
-            })?;
-            self.connect_state.reset_playback_to_position(Some(idx))?;
+            match self.connect_state.get_context(ContextType::Default) {
+                Err(why) => {
+                    warn!("continuing transfer in an unknown state. {why}");
+                    self.transfer_state = Some(transfer);
+                }
+                Ok(ctx) => {
+                    let idx = ConnectState::find_index_in_context(ctx, |pt| {
+                        self.connect_state.current_track(|t| pt.uri == t.uri)
+                    })?;
+                    self.connect_state.reset_playback_to_position(Some(idx))?;
+                }
+            }
         }
 
         self.load_track(is_playing, position.try_into()?)
@@ -1357,6 +1374,9 @@ impl SpircTask {
 
     fn load_context_from_tracks(&mut self, tracks: impl Into<ContextPage>) -> Result<(), Error> {
         let ctx = Context {
+            // by providing values for uri/url the player in the official client's isn't frozen
+            uri: Some(String::from("spotify:web-api")),
+            url: Some(String::from("context://spotify:web-api")),
             pages: vec![tracks.into()],
             ..Default::default()
         };

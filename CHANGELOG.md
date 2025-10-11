@@ -13,12 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
 - [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
-- [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
-- [player] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
-- [spclient] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
+- [playback] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [playback] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [core] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
 
+### Fixed
+
+- [connect] Fixed failed transferring with transfer data that had an empty context uri and no tracks
 
 ### Removed
 
