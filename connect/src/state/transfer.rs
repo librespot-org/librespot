@@ -39,7 +39,11 @@ impl ConnectState {
     }
 
     /// handles the initially transferable data
-    pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState, ctx_uri: String) {
+    pub fn handle_initial_transfer(
+        &mut self,
+        transfer: &mut TransferState,
+        ctx_uri: Option<String>,
+    ) {
         let current_context_metadata = self.context.as_ref().map(|c| c.metadata.clone());
         let player = self.player_mut();
 
@@ -86,8 +90,14 @@ impl ConnectState {
             }
         }
 
-        player.context_url = format!("context://{ctx_uri}");
-        player.context_uri = ctx_uri;
+        if let Some(ctx_uri) = ctx_uri {
+            player.context_url = format!("context://{ctx_uri}");
+            player.context_uri = ctx_uri;
+        } else {
+            // it's important to always set the url/uri to a value so that the player is active
+            player.context_url = String::from("context://spotify:unknown");
+            player.context_uri = String::from("spotify:unknown");
+        }
 
         if let Some(metadata) = current_context_metadata {
             for (key, value) in metadata {
