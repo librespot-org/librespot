@@ -200,6 +200,7 @@ pub struct OptionsOptions {
 pub struct SkipTo {
     pub track_uid: Option<String>,
     pub track_uri: Option<String>,
+    pub page_index: Option<u32>,
     pub track_index: Option<u32>,
 }
 

@@ -1,5 +1,6 @@
 use crate::{
-    core::dealer::protocol::SkipTo, protocol::context_player_options::ContextPlayerOptionOverrides,
+    core::dealer::protocol::SkipTo,
+    protocol::{context_page::ContextPage, context_player_options::ContextPlayerOptionOverrides},
 };
 
 use std::ops::Deref;
@@ -129,21 +130,32 @@ pub enum PlayingTrack {
     Uid(String),
 }
 
-impl TryFrom<SkipTo> for PlayingTrack {
-    type Error = ();
-
-    fn try_from(value: SkipTo) -> Result<Self, Self::Error> {
+impl PlayingTrack {
+    pub(crate) fn from_skip_to(value: SkipTo, pages: &[ContextPage]) -> Result<Self, ()> {
         // order of checks is important, as the index can be 0, but still has an uid or uri provided,
         // so we only use the index as last resort
         if let Some(uri) = value.track_uri {
             Ok(PlayingTrack::Uri(uri))
         } else if let Some(uid) = value.track_uid {
             Ok(PlayingTrack::Uid(uid))
-        } else if let Some(index) = value.track_index {
-            Ok(PlayingTrack::Index(index))
+        } else if value.track_index.is_some() || value.page_index.is_some() {
+            Ok(PlayingTrack::Index(
+                PlayingTrack::from_index(&value, pages) as u32
+            ))
         } else {
             Err(())
         }
+    }
+
+    pub(crate) fn from_index(value: &SkipTo, pages: &[ContextPage]) -> usize {
+        let page_index = value.track_index.unwrap_or_default() as usize;
+        let track_index = value.page_index.unwrap_or_default() as usize;
+
+        (0..page_index).fold(track_index, |t, p| {
+            let page_size = pages.get(p).map(|p| p.tracks.len()).unwrap_or_default();
+
+            t + page_size
+        })
     }
 }
 

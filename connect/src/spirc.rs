@@ -651,7 +651,7 @@ impl SpircTask {
             SpircCommand::RepeatTrack(repeat) => self.handle_repeat_track(repeat),
             SpircCommand::SetPosition(position) => self.handle_seek(position),
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
-            SpircCommand::Load(command) => self.handle_load(command, None).await?,
+            SpircCommand::Load(command) => self.handle_load(command, None, None).await?,
         };
 
         self.notify().await
@@ -998,17 +998,26 @@ impl SpircTask {
                     .map(Into::into)
                     .map(LoadContextOptions::Options);
 
+                let fallback_index = play
+                    .options
+                    .skip_to
+                    .as_ref()
+                    .map(|skip| PlayingTrack::from_index(skip, &play.context.pages));
+
                 self.handle_load(
                     LoadRequest {
                         context,
                         options: LoadRequestOptions {
                             start_playing: true,
                             seek_to: play.options.seek_to.unwrap_or_default(),
-                            playing_track: play.options.skip_to.and_then(|s| s.try_into().ok()),
+                            playing_track: play.options.skip_to.and_then(|s| {
+                                PlayingTrack::from_skip_to(s, &play.context.pages).ok()
+                            }),
                             context_options,
                         },
                     },
                     play.context.pages.pop(),
+                    fallback_index,
                 )
                 .await?;
 
@@ -1217,6 +1226,7 @@ impl SpircTask {
         &mut self,
         cmd: LoadRequest,
         page: Option<ContextPage>,
+        fallback_index: Option<usize>,
     ) -> Result<(), Error> {
         self.connect_state
             .reset_context(if let PlayContext::Uri(ref uri) = cmd.context {
@@ -1253,17 +1263,26 @@ impl SpircTask {
         let index = match cmd_options.playing_track {
             None => None,
             Some(ref playing_track) => Some(match playing_track {
-                PlayingTrack::Index(i) => *i as usize,
+                PlayingTrack::Index(i) => Ok(*i as usize),
                 PlayingTrack::Uri(uri) => {
                     let ctx = self.connect_state.get_context(ContextType::Default)?;
-                    ConnectState::find_index_in_context(ctx, |t| &t.uri == uri)?
+                    ConnectState::find_index_in_context(ctx, |t| &t.uri == uri)
                 }
                 PlayingTrack::Uid(uid) => {
                     let ctx = self.connect_state.get_context(ContextType::Default)?;
-                    ConnectState::find_index_in_context(ctx, |t| &t.uid == uid)?
+                    ConnectState::find_index_in_context(ctx, |t| &t.uid == uid)
                 }
             }),
-        };
+        }
+        .map(|i| {
+            i.unwrap_or_else(|why| {
+                warn!(
+                    "Failed to resolve index by {:?}, using fallback index: {:?} (Error: {why})",
+                    cmd_options.playing_track, fallback_index
+                );
+                fallback_index.unwrap_or_default()
+            })
+        });
 
         if let Some(LoadContextOptions::Options(ref options)) = cmd_options.context_options {
             debug!(
