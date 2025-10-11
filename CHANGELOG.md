@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [connect] Add method `transfer` to `Spirc` to automatically transfer the playback to ourselves
+- [core] Add method `transfer` to `SpClient`
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
 
 ### Changed

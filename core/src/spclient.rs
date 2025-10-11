@@ -8,6 +8,7 @@ use crate::{
     Error, FileId, SpotifyId, SpotifyUri,
     apresolve::SocketAddress,
     config::SessionConfig,
+    dealer::protocol::TransferOptions,
     error::ErrorKind,
     protocol::{
         autoplay_context_request::AutoplayContextRequest,
@@ -34,6 +35,7 @@ use hyper::{
 use hyper_util::client::legacy::ResponseFuture;
 use protobuf::{Enum, Message, MessageFull};
 use rand::RngCore;
+use serde::Serialize;
 use sysinfo::System;
 use thiserror::Error;
 
@@ -104,6 +106,11 @@ impl Default for RequestOptions {
             base_url: None,
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct TransferRequest {
+    pub transfer_options: TransferOptions,
 }
 
 impl SpClient {
@@ -901,5 +908,29 @@ impl SpClient {
         );
 
         self.request(&Method::GET, &endpoint, None, None).await
+    }
+
+    /// Triggers the transfers of the playback from one device to another
+    ///
+    /// Using the same `device_id` for `from_device_id` and `to_device_id`, initiates the transfer
+    /// from the currently active device.
+    pub async fn transfer(
+        &self,
+        from_device_id: &str,
+        to_device_id: &str,
+        transfer_request: Option<&TransferRequest>,
+    ) -> SpClientResult {
+        let body = transfer_request.map(serde_json::to_string).transpose()?;
+
+        let endpoint =
+            format!("/connect-state/v1/connect/transfer/from/{from_device_id}/to/{to_device_id}");
+        self.request_with_options(
+            &Method::POST,
+            &endpoint,
+            None,
+            body.as_deref().map(|s| s.as_bytes()),
+            &NO_METRICS_AND_SALT,
+        )
+        .await
     }
 }
