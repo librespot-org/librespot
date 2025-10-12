@@ -87,6 +87,41 @@ impl EventHandler {
                                                 env_vars
                                                     .insert("DISC_NUMBER", disc_number.to_string());
                                             }
+                                            UniqueFields::Local {
+                                                artists,
+                                                album,
+                                                album_artists,
+                                                number,
+                                                disc_number,
+                                                path,
+                                            } => {
+                                                env_vars.insert("ITEM_TYPE", "Track".to_string());
+                                                env_vars
+                                                    .insert("ARTISTS", artists.unwrap_or_default());
+                                                env_vars.insert(
+                                                    "ALBUM_ARTISTS",
+                                                    album_artists.unwrap_or_default(),
+                                                );
+                                                env_vars.insert("ALBUM", album.unwrap_or_default());
+                                                env_vars.insert(
+                                                    "NUMBER",
+                                                    number
+                                                        .map(|n: u32| n.to_string())
+                                                        .unwrap_or_default(),
+                                                );
+                                                env_vars.insert(
+                                                    "DISC_NUMBER",
+                                                    disc_number
+                                                        .map(|n: u32| n.to_string())
+                                                        .unwrap_or_default(),
+                                                );
+                                                env_vars.insert(
+                                                    "LOCAL_FILE_PATH",
+                                                    path.into_os_string()
+                                                        .into_string()
+                                                        .unwrap_or_default(),
+                                                );
+                                            }
                                             UniqueFields::Episode {
                                                 description,
                                                 publish_time,

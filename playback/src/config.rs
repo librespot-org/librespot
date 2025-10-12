@@ -1,4 +1,4 @@
-use std::{mem, str::FromStr, time::Duration};
+use std::{mem, path::PathBuf, str::FromStr, time::Duration};
 
 pub use crate::dither::{DithererBuilder, TriangularDitherer, mk_ditherer};
 use crate::{convert::i24, player::duration_to_coefficient};
@@ -136,6 +136,8 @@ pub struct PlayerConfig {
     pub normalisation_release_cf: f64,
     pub normalisation_knee_db: f64,
 
+    pub local_file_directories: Vec<PathBuf>,
+
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
     // (thereby circumventing Send bounds that they might not satisfy)
     pub ditherer: Option<DithererBuilder>,
@@ -160,6 +162,7 @@ impl Default for PlayerConfig {
             passthrough: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),
             position_update_interval: None,
+            local_file_directories: Vec::new(),
         }
     }
 }

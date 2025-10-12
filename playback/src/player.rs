@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
-    fmt,
+    fmt, fs,
+    fs::File,
     future::Future,
     io::{self, Read, Seek, SeekFrom},
     mem,
@@ -25,6 +26,7 @@ use crate::{
     convert::Converter,
     core::{Error, Session, SpotifyId, SpotifyUri, util::SeqGenerator},
     decoder::{AudioDecoder, AudioPacket, AudioPacketPosition, SymphoniaDecoder},
+    local_file::{LocalFileLookup, create_local_file_lookup},
     metadata::audio::{AudioFileFormat, AudioFiles, AudioItem},
     mixer::VolumeGetter,
 };
@@ -32,8 +34,10 @@ use futures_util::{
     StreamExt, TryFutureExt, future, future::FusedFuture,
     stream::futures_unordered::FuturesUnordered,
 };
-use librespot_metadata::track::Tracks;
+use librespot_metadata::{audio::UniqueFields, track::Tracks};
+
 use symphonia::core::io::MediaSource;
+use symphonia::core::probe::Hint;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::SAMPLES_PER_SECOND;
@@ -89,6 +93,8 @@ struct PlayerInternal {
     player_id: usize,
     play_request_id_generator: SeqGenerator<u64>,
     last_progress_update: Instant,
+
+    local_file_lookup: Arc<LocalFileLookup>,
 }
 
 static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -471,6 +477,12 @@ impl Player {
             let converter = Converter::new(config.ditherer);
             let normalisation_knee_factor = 1.0 / (8.0 * config.normalisation_knee_db);
 
+            // TODO: it would be neat if we could watch for added or modified files in the
+            // specified directories, and dynamically update the lookup. Currently, a new player
+            // must be created for any new local files to be playable.
+            let local_file_lookup =
+                create_local_file_lookup(config.local_file_directories.as_slice());
+
             let internal = PlayerInternal {
                 session,
                 config,
@@ -496,6 +508,8 @@ impl Player {
                 player_id,
                 play_request_id_generator: SeqGenerator::new(0),
                 last_progress_update: Instant::now(),
+
+                local_file_lookup: Arc::new(local_file_lookup),
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -885,6 +899,7 @@ impl PlayerState {
 struct PlayerTrackLoader {
     session: Session,
     config: PlayerConfig,
+    local_file_lookup: Arc<LocalFileLookup>,
 }
 
 impl PlayerTrackLoader {
@@ -948,6 +963,7 @@ impl PlayerTrackLoader {
             SpotifyUri::Track { .. } | SpotifyUri::Episode { .. } => {
                 self.load_remote_track(track_uri, position_ms).await
             }
+            SpotifyUri::Local { .. } => self.load_local_track(track_uri, position_ms).await,
             _ => {
                 error!("Cannot handle load of track with URI: <{track_uri}>",);
                 None
@@ -1111,7 +1127,14 @@ impl PlayerTrackLoader {
             };
 
             #[cfg(not(feature = "passthrough-decoder"))]
-            let decoder_type = symphonia_decoder(audio_file, format);
+            let decoder_type = {
+                let mut hint = Hint::new();
+                if let Some(mime_type) = AudioFiles::mime_type(format) {
+                    hint.mime_type(mime_type);
+                }
+
+                symphonia_decoder(audio_file, hint)
+            };
 
             let normalisation_data = normalisation_data.unwrap_or_else(|| {
                 warn!("Unable to get normalisation data, continuing with defaults.");
@@ -1190,6 +1213,108 @@ impl PlayerTrackLoader {
                 is_explicit,
             });
         }
+    }
+
+    async fn load_local_track(
+        &self,
+        track_uri: SpotifyUri,
+        position_ms: u32,
+    ) -> Option<PlayerLoadedTrackData> {
+        info!("Loading local file with Spotify URI <{}>", track_uri);
+
+        let SpotifyUri::Local { duration, .. } = track_uri else {
+            error!("Unable to determine track duration for local file: not a local file URI");
+            return None;
+        };
+
+        let entry = self.local_file_lookup.get(&track_uri);
+
+        let Some(path) = entry else {
+            error!("Unable to find file path for local file <{track_uri}>");
+            return None;
+        };
+
+        let src = match File::open(path) {
+            Ok(src) => src,
+            Err(e) => {
+                error!("Failed to open local file: {e}");
+                return None;
+            }
+        };
+
+        let mut hint = Hint::new();
+        if let Some(file_extension) = path.extension().and_then(|e| e.to_str()) {
+            hint.with_extension(file_extension);
+        }
+
+        let decoder = match SymphoniaDecoder::new(src, hint) {
+            Ok(decoder) => decoder,
+            Err(e) => {
+                error!("Error decoding local file: {e}");
+                return None;
+            }
+        };
+
+        let mut decoder = Box::new(decoder);
+        let normalisation_data = decoder.normalisation_data().unwrap_or_else(|| {
+            warn!("Unable to get normalisation data, continuing with defaults.");
+            NormalisationData::default()
+        });
+
+        let local_file_metadata = decoder.local_file_metadata().unwrap_or_default();
+
+        let stream_position_ms = match decoder.seek(position_ms) {
+            Ok(new_position_ms) => new_position_ms,
+            Err(e) => {
+                error!(
+                    "PlayerTrackLoader::load_local_track error seeking to starting position {position_ms}: {e}"
+                );
+                return None;
+            }
+        };
+
+        let file_size = fs::metadata(path).ok()?.len();
+        let bytes_per_second = (file_size / duration.as_secs()) as usize;
+
+        let stream_loader_controller = StreamLoaderController::from_local_file(file_size);
+
+        let name = local_file_metadata.name.unwrap_or_default();
+
+        info!("Loaded <{name}> from path <{}>", path.display());
+
+        Some(PlayerLoadedTrackData {
+            decoder,
+            normalisation_data,
+            stream_loader_controller,
+            bytes_per_second,
+            duration_ms: duration.as_millis() as u32,
+            stream_position_ms,
+            is_explicit: false,
+            audio_item: AudioItem {
+                duration_ms: duration.as_millis() as u32,
+                uri: track_uri.to_uri().unwrap_or_default(),
+                track_id: track_uri,
+                files: Default::default(),
+                name,
+                // We can't get a CoverImage.URL for the track image, applications will have to parse the file metadata themselves using unique_fields.path
+                covers: vec![],
+                language: local_file_metadata
+                    .language
+                    .map(|val| vec![val])
+                    .unwrap_or_default(),
+                is_explicit: false,
+                availability: Ok(()),
+                alternatives: None,
+                unique_fields: UniqueFields::Local {
+                    artists: local_file_metadata.artists,
+                    album: local_file_metadata.album,
+                    album_artists: local_file_metadata.album_artists,
+                    number: local_file_metadata.number,
+                    disc_number: local_file_metadata.disc_number,
+                    path: path.to_path_buf(),
+                },
+            },
+        })
     }
 }
 
@@ -2270,6 +2395,7 @@ impl PlayerInternal {
         let loader = PlayerTrackLoader {
             session: self.session.clone(),
             config: self.config.clone(),
+            local_file_lookup: self.local_file_lookup.clone(),
         };
 
         let (result_tx, result_rx) = oneshot::channel();
