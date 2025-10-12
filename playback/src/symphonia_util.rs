@@ -12,13 +12,7 @@ pub fn get_latest_metadata(probe_result: &mut ProbeResult) -> Option<Metadata<'_
         }
     }
 
-    // Advance to the latest metadata revision.
-    // None means we hit the latest.
-    loop {
-        if metadata.pop().is_none() {
-            break;
-        }
-    }
+    _ = metadata.skip_to_latest();
 
     Some(metadata)
 }
