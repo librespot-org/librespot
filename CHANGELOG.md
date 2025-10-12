@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
+- [discovery] Add support for [device aliases](https://developer.spotify.com/documentation/commercial-hardware/implementation/guides/zeroconf#device-aliases)
 
 ### Changed
 

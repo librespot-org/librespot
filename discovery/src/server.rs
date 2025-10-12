@@ -31,12 +31,19 @@ type Aes128Ctr = ctr::Ctr128BE<aes::Aes128>;
 
 type Params<'a> = BTreeMap<Cow<'a, str>, Cow<'a, str>>;
 
+pub struct Alias {
+    pub name: Cow<'static, str>,
+    pub id: u32,
+    pub is_group: bool,
+}
+
 pub struct Config {
     pub name: Cow<'static, str>,
     pub device_type: DeviceType,
     pub device_id: String,
     pub is_group: bool,
     pub client_id: String,
+    pub aliases: Vec<Alias>,
 }
 
 struct RequestHandler {
@@ -110,6 +117,13 @@ impl RequestHandler {
             // undocumented but should still work
             "accountReq": "PREMIUM",
             "activeUser": active_user,
+            "aliases": self.config.aliases.iter().map(|alias| {
+                json!({
+                    "name": alias.name,
+                    "id": alias.id.to_string(),
+                    "isGroup": alias.is_group.to_string(),
+                })
+            }).collect::<Vec<_>>(),
             // others seen-in-the-wild:
             // - "deviceAPI_isGroup": False
         })
