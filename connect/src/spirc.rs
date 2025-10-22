@@ -1373,10 +1373,11 @@ impl SpircTask {
     }
 
     fn load_context_from_tracks(&mut self, tracks: impl Into<ContextPage>) -> Result<(), Error> {
+        const WEB_API_URI: &str = "spotify:web-api";
         let ctx = Context {
             // by providing values for uri/url the player in the official client's isn't frozen
-            uri: Some(String::from("spotify:web-api")),
-            url: Some(String::from("context://spotify:web-api")),
+            uri: Some(WEB_API_URI.into()),
+            url: Some(format!("context://{WEB_API_URI}")),
             pages: vec![tracks.into()],
             ..Default::default()
         };

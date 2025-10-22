@@ -90,14 +90,13 @@ impl ConnectState {
             }
         }
 
-        if let Some(ctx_uri) = ctx_uri {
-            player.context_url = format!("context://{ctx_uri}");
-            player.context_uri = ctx_uri;
-        } else {
-            // it's important to always set the url/uri to a value so that the player is active
-            player.context_url = String::from("context://spotify:unknown");
-            player.context_uri = String::from("spotify:unknown");
-        }
+        const UNKNOWN_URI: &str = "spotify:unknown";
+        // it's important to always set the url/uri to a value
+        // so that the player doesn't go into an inactive state
+        let uri = ctx_uri.unwrap_or(UNKNOWN_URI.into());
+
+        player.context_url = format!("context://{uri}");
+        player.context_uri = uri;
 
         if let Some(metadata) = current_context_metadata {
             for (key, value) in metadata {
