@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
+- [oauth] Add `--oauth-host` parameter to specify custom redirect host for OAuth flow
 
 ### Changed
 
+- [oauth] OAuth callback server now binds to `0.0.0.0` to support Docker/WSL2 port forwarding
 - [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
 - [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
 - [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)

@@ -216,6 +216,7 @@ struct Setup {
     credentials: Option<Credentials>,
     enable_oauth: bool,
     oauth_port: Option<u16>,
+    oauth_host: Option<String>,
     zeroconf_port: u16,
     player_event_program: Option<String>,
     emit_sink_events: bool,
@@ -266,6 +267,7 @@ async fn get_setup() -> Setup {
     const NORMALISATION_RELEASE: &str = "normalisation-release";
     const NORMALISATION_THRESHOLD: &str = "normalisation-threshold";
     const OAUTH_PORT: &str = "oauth-port";
+    const OAUTH_HOST: &str = "oauth-host";
     const ONEVENT: &str = "onevent";
     #[cfg(feature = "passthrough-decoder")]
     const PASSTHROUGH: &str = "passthrough";
@@ -305,6 +307,7 @@ async fn get_setup() -> Setup {
     const ZEROCONF_INTERFACE_SHORT: &str = "i";
     const ENABLE_OAUTH_SHORT: &str = "j";
     const OAUTH_PORT_SHORT: &str = "K";
+    const OAUTH_HOST_SHORT: &str = "J";
     const ACCESS_TOKEN_SHORT: &str = "k";
     const CACHE_SIZE_LIMIT_SHORT: &str = "M";
     const MIXER_TYPE_SHORT: &str = "m";
@@ -516,6 +519,12 @@ async fn get_setup() -> Setup {
         ACCESS_TOKEN,
         "Spotify access token to sign in with.",
         "TOKEN",
+    )
+    .optopt(
+        OAUTH_HOST_SHORT,
+        OAUTH_HOST,
+        "The host for the oauth redirect server. Defaults to 127.0.0.1.",
+        "HOST",
     )
     .optopt(
         OAUTH_PORT_SHORT,
@@ -1271,6 +1280,17 @@ async fn get_setup() -> Setup {
         Some(5588)
     };
 
+    let oauth_host = if opt_present(OAUTH_HOST) {
+        if !enable_oauth {
+            warn!(
+                "Without the `--{ENABLE_OAUTH}` / `-{ENABLE_OAUTH_SHORT}` flag set `--{OAUTH_HOST}` / `-{OAUTH_HOST_SHORT}` has no effect."
+            );
+        }
+        opt_str(OAUTH_HOST)
+    } else {
+        None
+    };
+
     if let Some(reason) = no_discovery_reason.as_deref() {
         if opt_present(ZEROCONF_PORT) {
             warn!("With {reason} `--{ZEROCONF_PORT}` / `-{ZEROCONF_PORT_SHORT}` has no effect.");
@@ -1838,6 +1858,7 @@ async fn get_setup() -> Setup {
         credentials,
         enable_oauth,
         oauth_port,
+        oauth_host,
         zeroconf_port,
         player_event_program,
         emit_sink_events,
@@ -1936,9 +1957,10 @@ async fn main() {
             Some(port) => format!(":{port}"),
             _ => String::new(),
         };
+        let host = setup.oauth_host.as_deref().unwrap_or("127.0.0.1");
         let client = OAuthClientBuilder::new(
             &setup.session_config.client_id,
-            &format!("http://127.0.0.1{port_str}/login"),
+            &format!("http://{host}{port_str}/login"),
             OAUTH_SCOPES.to_vec(),
         )
         .open_in_browser()

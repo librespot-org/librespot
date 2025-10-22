@@ -170,6 +170,7 @@ fn get_authcode_stdin() -> Result<AuthorizationCode, OAuthError> {
 fn get_authcode_listener(
     socket_address: SocketAddr,
     message: String,
+    redirect_host: &str,
 ) -> Result<AuthorizationCode, OAuthError> {
     let listener =
         TcpListener::bind(socket_address).map_err(|e| OAuthError::AuthCodeListenerBind {
@@ -194,7 +195,7 @@ fn get_authcode_listener(
         .split_whitespace()
         .nth(1)
         .ok_or(OAuthError::AuthCodeListenerParse)?;
-    let code = get_code(&("http://localhost".to_string() + redirect_url));
+    let code = get_code(&(format!("http://{redirect_host}") + redirect_url));
 
     let response = format!(
         "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
@@ -210,15 +211,20 @@ fn get_authcode_listener(
 
 // If the specified `redirect_uri` is HTTP and contains a port,
 // then the corresponding socket address is returned.
+//
+// Always binds to 0.0.0.0 to support scenarios where the public-facing
+// redirect host differs from the local bind address (e.g. Docker port forwarding).
 fn get_socket_address(redirect_uri: &str) -> Option<SocketAddr> {
     let url = match Url::parse(redirect_uri) {
         Ok(u) if u.scheme() == "http" && u.port().is_some() => u,
         _ => return None,
     };
-    match url.socket_addrs(|| None) {
-        Ok(mut addrs) => addrs.pop(),
-        _ => None,
-    }
+
+    let port = url.port()?;
+    Some(SocketAddr::new(
+        std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)),
+        port,
+    ))
 }
 
 /// Struct that handle obtaining and refreshing access tokens.
@@ -286,7 +292,13 @@ impl OAuthClient {
         let pkce_verifier = self.set_auth_url();
 
         let code = match get_socket_address(&self.redirect_uri) {
-            Some(addr) => get_authcode_listener(addr, self.message.clone()),
+            Some(addr) => {
+                let redirect_host = Url::parse(&self.redirect_uri)
+                    .ok()
+                    .and_then(|u| u.host_str().map(|h| h.to_string()))
+                    .unwrap_or_else(|| "localhost".to_string());
+                get_authcode_listener(addr, self.message.clone(), &redirect_host)
+            }
             _ => get_authcode_stdin(),
         }?;
         trace!("Exchange {code:?} for access token");
@@ -328,7 +340,13 @@ impl OAuthClient {
         let pkce_verifier = self.set_auth_url();
 
         let code = match get_socket_address(&self.redirect_uri) {
-            Some(addr) => get_authcode_listener(addr, self.message.clone()),
+            Some(addr) => {
+                let redirect_host = Url::parse(&self.redirect_uri)
+                    .ok()
+                    .and_then(|u| u.host_str().map(|h| h.to_string()))
+                    .unwrap_or_else(|| "localhost".to_string());
+                get_authcode_listener(addr, self.message.clone(), &redirect_host)
+            }
             _ => get_authcode_stdin(),
         }?;
         trace!("Exchange {code:?} for access token");
@@ -470,7 +488,17 @@ pub fn get_access_token(
     println!("Browse to: {auth_url}");
 
     let code = match get_socket_address(redirect_uri) {
-        Some(addr) => get_authcode_listener(addr, String::from("Go back to your terminal :)")),
+        Some(addr) => {
+            let redirect_host = Url::parse(redirect_uri)
+                .ok()
+                .and_then(|u| u.host_str().map(|h| h.to_string()))
+                .unwrap_or_else(|| "localhost".to_string());
+            get_authcode_listener(
+                addr,
+                String::from("Go back to your terminal :)"),
+                &redirect_host,
+            )
+        }
         _ => get_authcode_stdin(),
     }?;
     trace!("Exchange {code:?} for access token");
