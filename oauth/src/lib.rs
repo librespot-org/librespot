@@ -557,33 +557,25 @@ mod test {
 
     #[test]
     fn get_socket_address_some() {
-        let localhost_v4 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
-        let localhost_v6 = SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8888);
-        let addr_v4 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)), 1234);
-        let addr_v6 = SocketAddr::new(
-            IpAddr::V6(Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888)),
-            8888,
-        );
+        let any_v4_1234 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 1234);
+        let any_v4_8888 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 8888);
 
-        // Loopback addresses
         assert_eq!(
             get_socket_address("http://127.0.0.1:1234/foo"),
-            Some(localhost_v4)
+            Some(any_v4_1234)
         );
+        assert_eq!(get_socket_address("http://8.8.8.8:1234/foo"), Some(any_v4_1234));
         assert_eq!(
             get_socket_address("http://[0:0:0:0:0:0:0:1]:8888/foo"),
-            Some(localhost_v6)
+            Some(any_v4_8888)
         );
         assert_eq!(
             get_socket_address("http://[::1]:8888/foo"),
-            Some(localhost_v6)
+            Some(any_v4_8888)
         );
-
-        // Non-loopback addresses
-        assert_eq!(get_socket_address("http://8.8.8.8:1234/foo"), Some(addr_v4));
         assert_eq!(
             get_socket_address("http://[2001:4860:4860::8888]:8888/foo"),
-            Some(addr_v6)
+            Some(any_v4_8888)
         );
     }
 }
