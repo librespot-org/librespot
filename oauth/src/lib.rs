@@ -541,7 +541,7 @@ pub fn get_access_token(
 
 #[cfg(test)]
 mod test {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     use super::*;
 
@@ -564,7 +564,10 @@ mod test {
             get_socket_address("http://127.0.0.1:1234/foo"),
             Some(any_v4_1234)
         );
-        assert_eq!(get_socket_address("http://8.8.8.8:1234/foo"), Some(any_v4_1234));
+        assert_eq!(
+            get_socket_address("http://8.8.8.8:1234/foo"),
+            Some(any_v4_1234)
+        );
         assert_eq!(
             get_socket_address("http://[0:0:0:0:0:0:0:1]:8888/foo"),
             Some(any_v4_8888)
