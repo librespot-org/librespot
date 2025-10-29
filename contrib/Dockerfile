@@ -8,16 +8,12 @@
 # The compiled binaries will be located in /tmp/librespot-build
 #
 # If only one architecture is desired, cargo can be invoked directly with the appropriate options :
-# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --no-default-features --features "alsa-backend with-libmdns rustls-tls-native-roots"
-# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features "alsa-backend with-libmdns rustls-tls-native-roots"
-# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabi --no-default-features --features "alsa-backend with-libmdns rustls-tls-native-roots"
-# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target aarch64-unknown-linux-gnu --no-default-features --features "alsa-backend with-libmdns rustls-tls-native-roots"
+# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --no-default-features --features "alsa-backend with-libmdns native-tls"
+# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features "alsa-backend with-libmdns native-tls"
+# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target arm-unknown-linux-gnueabi --no-default-features --features "alsa-backend with-libmdns native-tls"
+# $ docker run -v /tmp/librespot-build:/build librespot-cross cargo build --release --target aarch64-unknown-linux-gnu --no-default-features --features "alsa-backend with-libmdns native-tls"
 
-FROM debian:bookworm
-
-RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list && \
-	echo "deb http://deb.debian.org/debian bookworm-updates main" >> /etc/apt/sources.list && \
-	echo "deb http://deb.debian.org/debian-security bookworm-security main" >> /etc/apt/sources.list
+FROM debian:trixie
 
 RUN dpkg --add-architecture arm64 && \
 	dpkg --add-architecture armhf && \
@@ -40,10 +36,15 @@ RUN dpkg --add-architecture arm64 && \
 	libpulse0:arm64 \
 	libpulse0:armel \
 	libpulse0:armhf \
-	pkg-config
+	libssl-dev \
+	libssl-dev:arm64 \
+	libssl-dev:armel \
+	libssl-dev:armhf \
+	pkg-config \
+	rustup
 
 ENV PATH="/root/.cargo/bin/:${PATH}"
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.85 -y && \
+RUN rustup default stable && \
 	rustup target add aarch64-unknown-linux-gnu && \
 	rustup target add arm-unknown-linux-gnueabi && \
 	rustup target add arm-unknown-linux-gnueabihf && \

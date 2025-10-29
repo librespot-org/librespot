@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- [compilation] Switched contrib/Dockerfile to new Debian stable (trixie)
 - [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
 - [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
 - [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
@@ -38,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [core] Fix issue where building with native-tls would fail
 - [connect] Repeat context will not go into autoplay anymore and triggering autoplay while shuffling shouldn't reshuffle anymore
 - [connect] Only deletes the connect state on dealer shutdown instead on disconnecting
 - [core] Fixed a problem where in `spclient` where an HTTP/411 error was thrown because the header was set wrong
