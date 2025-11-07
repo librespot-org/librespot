@@ -89,6 +89,13 @@ jobs:
           --include-features rustls-tls-native-roots
           --exclude-features native-tls,rustls-tls-webpki-roots
 
+      - name: Check discovery features (Linux only)
+        if: runner.os == 'Linux'
+        run: >
+          cargo hack check -p librespot-discovery --each-feature --exclude-all-features
+          --include-features native-tls
+          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots
+
       - name: Build binary with default features
         run: cargo build --frozen
 
