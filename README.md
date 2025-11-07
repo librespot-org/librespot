@@ -120,3 +120,4 @@ This is a non exhaustive list of projects that either use or have modified libre
 - [Spot](https://github.com/xou816/spot) - Gtk/Rust native Spotify client for the GNOME desktop.
 - [Snapcast](https://github.com/badaix/snapcast) - synchronised multi-room audio player that uses librespot as its source for Spotify content
 - [MuPiBox](https://mupibox.de/) - Portable music box for Spotify and local media based on Raspberry Pi. Operated via touchscreen. Suitable for children and older people.
+- [RoPieee](https://ropieee.org) - An easy-to-use Raspberry Pi image for network audio streaming solutions.

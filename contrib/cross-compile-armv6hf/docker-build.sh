@@ -14,4 +14,4 @@ PI1_LIB_DIRS=(
 export RUSTFLAGS="-C linker=$PI1_TOOLS_DIR/bin/arm-linux-gnueabihf-gcc ${PI1_LIB_DIRS[*]/#/-L}"
 export BINDGEN_EXTRA_CLANG_ARGS=--sysroot=$PI1_TOOLS_SYSROOT_DIR
 
-cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features "alsa-backend with-libmdns"
+cargo build --release --target arm-unknown-linux-gnueabihf --no-default-features --features "alsa-backend with-libmdns rustls-tls-native-roots"

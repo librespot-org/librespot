@@ -1,0 +1,8 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+-   repo: https://github.com/doublify/pre-commit-rust
+    rev: master
+    hooks:
+    -   id: fmt
+    -   id: clippy

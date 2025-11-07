@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::OnceLock,
     time::{Duration, Instant},
 };
@@ -7,7 +6,8 @@ use std::{
 use bytes::Bytes;
 use futures_util::{FutureExt, future::IntoStream};
 use governor::{
-    Quota, RateLimiter, clock::MonotonicClock, middleware::NoOpMiddleware, state::InMemoryState,
+    Quota, RateLimiter, clock::MonotonicClock, middleware::NoOpMiddleware,
+    state::keyed::DefaultKeyedStateStore,
 };
 use http::{Uri, header::HeaderValue};
 use http_body_util::{BodyExt, Full};
@@ -18,7 +18,6 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 use nonzero_ext::nonzero;
-use parking_lot::Mutex;
 use thiserror::Error;
 use url::Url;
 
@@ -100,10 +99,8 @@ pub struct HttpClient {
     proxy_url: Option<Url>,
     hyper_client: OnceLock<HyperClient>,
 
-    // while the DashMap variant is more performant, our level of concurrency
-    // is pretty low so we can save pulling in that extra dependency
     rate_limiter:
-        RateLimiter<String, Mutex<HashMap<String, InMemoryState>>, MonotonicClock, NoOpMiddleware>,
+        RateLimiter<String, DefaultKeyedStateStore<String>, MonotonicClock, NoOpMiddleware>,
 }
 
 impl HttpClient {

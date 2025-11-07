@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG alpine_version=alpine3.19
+ARG alpine_version=alpine3.20
 ARG rust_version=1.85.0
 FROM rust:${rust_version}-${alpine_version}
 
@@ -15,6 +15,7 @@ RUN apk add --no-cache \
         pkgconf \
         musl-dev \
         # developer dependencies
+        openssl-dev \
         libunwind-dev \
         pulseaudio-dev \
         portaudio-dev \

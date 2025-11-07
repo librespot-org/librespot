@@ -9,6 +9,7 @@ use crate::{
             protocol::{Command, FallbackWrapper, Message, Request},
         },
         session::UserAttributes,
+        spclient::TransferRequest,
     },
     model::{LoadRequest, PlayingTrack, SpircPlayStatus},
     playback::{
@@ -73,6 +74,7 @@ struct SpircTask {
 
     /// the state management object
     connect_state: ConnectState,
+    connect_established: bool,
 
     play_request_id: Option<u64>,
     play_status: SpircPlayStatus,
@@ -128,6 +130,7 @@ enum SpircCommand {
     SetPosition(u32),
     SetVolume(u16),
     Activate,
+    Transfer(Option<TransferRequest>),
     Load(LoadRequest),
 }
 
@@ -225,6 +228,7 @@ impl Spirc {
             mixer,
 
             connect_state,
+            connect_established: false,
 
             play_request_id: None,
             play_status: SpircPlayStatus::Stopped,
@@ -393,9 +397,18 @@ impl Spirc {
 
     /// Acquires the control as active connect device.
     ///
-    /// Does nothing if we are not the active device.
+    /// Does not [Spirc::transfer] the playback. Does nothing if we are not the active device.
     pub fn activate(&self) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Activate)?)
+    }
+
+    /// Acquires the control as active connect device over the transfer flow.
+    ///
+    /// Does nothing if we are not the active device.
+    pub fn transfer(&self, transfer_request: Option<TransferRequest>) -> Result<(), Error> {
+        Ok(self
+            .commands
+            .send(SpircCommand::Transfer(transfer_request))?)
     }
 }
 
@@ -489,7 +502,7 @@ impl SpircTask {
                     session_update,
                     match |session_update| self.handle_session_update(session_update)
                 },
-                cmd = async { commands?.recv().await }, if commands.is_some() => if let Some(cmd) = cmd {
+                cmd = async { commands?.recv().await }, if commands.is_some() && self.connect_established => if let Some(cmd) = cmd {
                     if let Err(e) = self.handle_command(cmd).await {
                         debug!("could not dispatch command: {e}");
                     }
@@ -622,12 +635,20 @@ impl SpircTask {
                     rx.close()
                 }
             }
+            SpircCommand::Transfer(request) if !self.connect_state.is_active() => {
+                let device_id = self.session.device_id();
+                self.session
+                    .spclient()
+                    .transfer(device_id, device_id, request.as_ref())
+                    .await?;
+                return Ok(());
+            }
             SpircCommand::Activate if !self.connect_state.is_active() => {
                 trace!("Received SpircCommand::{cmd:?}");
                 self.handle_activate();
                 return self.notify().await;
             }
-            SpircCommand::Activate => {
+            SpircCommand::Transfer(..) | SpircCommand::Activate => {
                 warn!("SpircCommand::{cmd:?} will be ignored while already active")
             }
             _ if !self.connect_state.is_active() => {
@@ -651,7 +672,7 @@ impl SpircTask {
             SpircCommand::RepeatTrack(repeat) => self.handle_repeat_track(repeat),
             SpircCommand::SetPosition(position) => self.handle_seek(position),
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
-            SpircCommand::Load(command) => self.handle_load(command, None).await?,
+            SpircCommand::Load(command) => self.handle_load(command, None, None).await?,
         };
 
         self.notify().await
@@ -811,6 +832,8 @@ impl SpircTask {
             "successfully put connect state for {} with connection-id {connection_id}",
             self.session.device_id()
         );
+
+        self.connect_established = true;
 
         let same_session = cluster.player_state.session_id == self.session.session_id()
             || cluster.player_state.session_id.is_empty();
@@ -998,6 +1021,13 @@ impl SpircTask {
                     .map(Into::into)
                     .map(LoadContextOptions::Options);
 
+                let fallback_index = play
+                    .options
+                    .skip_to
+                    .as_ref()
+                    .and_then(|s| s.track_index)
+                    .map(|i| i as usize);
+
                 self.handle_load(
                     LoadRequest {
                         context,
@@ -1009,6 +1039,7 @@ impl SpircTask {
                         },
                     },
                     play.context.pages.pop(),
+                    fallback_index,
                 )
                 .await?;
 
@@ -1234,6 +1265,7 @@ impl SpircTask {
         &mut self,
         cmd: LoadRequest,
         page: Option<ContextPage>,
+        fallback_index: Option<usize>,
     ) -> Result<(), Error> {
         self.connect_state
             .reset_context(if let PlayContext::Uri(ref uri) = cmd.context {
@@ -1270,17 +1302,26 @@ impl SpircTask {
         let index = match cmd_options.playing_track {
             None => None,
             Some(ref playing_track) => Some(match playing_track {
-                PlayingTrack::Index(i) => *i as usize,
+                PlayingTrack::Index(i) => Ok(*i as usize),
                 PlayingTrack::Uri(uri) => {
                     let ctx = self.connect_state.get_context(ContextType::Default)?;
-                    ConnectState::find_index_in_context(ctx, |t| &t.uri == uri)?
+                    ConnectState::find_index_in_context(ctx, |t| &t.uri == uri)
                 }
                 PlayingTrack::Uid(uid) => {
                     let ctx = self.connect_state.get_context(ContextType::Default)?;
-                    ConnectState::find_index_in_context(ctx, |t| &t.uid == uid)?
+                    ConnectState::find_index_in_context(ctx, |t| &t.uid == uid)
                 }
             }),
-        };
+        }
+        .map(|i| {
+            i.unwrap_or_else(|why| {
+                warn!(
+                    "Failed to resolve index by {:?}, using fallback index: {:?} (Error: {why})",
+                    cmd_options.playing_track, fallback_index
+                );
+                fallback_index.unwrap_or_default()
+            })
+        });
 
         if let Some(LoadContextOptions::Options(ref options)) = cmd_options.context_options {
             debug!(

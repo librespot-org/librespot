@@ -33,6 +33,7 @@ enum ReceivedData {
 }
 
 const ONE_SECOND: Duration = Duration::from_secs(1);
+const DOWNLOAD_STATUS_POISON_MSG: &str = "audio download status mutex should not be poisoned";
 
 async fn receive_data(
     shared: Arc<AudioFileShared>,
@@ -124,7 +125,10 @@ async fn receive_data(
     if bytes_remaining > 0 {
         {
             let missing_range = Range::new(offset, bytes_remaining);
-            let mut download_status = shared.download_status.lock();
+            let mut download_status = shared
+                .download_status
+                .lock()
+                .expect(DOWNLOAD_STATUS_POISON_MSG);
             download_status.requested.subtract_range(&missing_range);
             shared.cond.notify_all();
         }
@@ -189,7 +193,11 @@ impl AudioFileFetch {
         // The iteration that follows spawns streamers fast, without awaiting them,
         // so holding the lock for the entire scope of this function should be faster
         // then locking and unlocking multiple times.
-        let mut download_status = self.shared.download_status.lock();
+        let mut download_status = self
+            .shared
+            .download_status
+            .lock()
+            .expect(DOWNLOAD_STATUS_POISON_MSG);
 
         ranges_to_request.subtract_range_set(&download_status.downloaded);
         ranges_to_request.subtract_range_set(&download_status.requested);
@@ -227,7 +235,11 @@ impl AudioFileFetch {
         let mut missing_data = RangeSet::new();
         missing_data.add_range(&Range::new(0, self.shared.file_size));
         {
-            let download_status = self.shared.download_status.lock();
+            let download_status = self
+                .shared
+                .download_status
+                .lock()
+                .expect(DOWNLOAD_STATUS_POISON_MSG);
             missing_data.subtract_range_set(&download_status.downloaded);
             missing_data.subtract_range_set(&download_status.requested);
         }
@@ -349,7 +361,11 @@ impl AudioFileFetch {
                 let received_range = Range::new(data.offset, data.data.len());
 
                 let full = {
-                    let mut download_status = self.shared.download_status.lock();
+                    let mut download_status = self
+                        .shared
+                        .download_status
+                        .lock()
+                        .expect(DOWNLOAD_STATUS_POISON_MSG);
                     download_status.downloaded.add_range(&received_range);
                     self.shared.cond.notify_all();
 
@@ -415,7 +431,10 @@ pub(super) async fn audio_file_fetch(
             initial_request.offset + initial_request.length,
         );
 
-        let mut download_status = shared.download_status.lock();
+        let mut download_status = shared
+            .download_status
+            .lock()
+            .expect(DOWNLOAD_STATUS_POISON_MSG);
         download_status.requested.add_range(&requested_range);
     }
 
@@ -466,7 +485,11 @@ pub(super) async fn audio_file_fetch(
 
         if fetch.shared.is_download_streaming() && fetch.has_download_slots_available() {
             let bytes_pending: usize = {
-                let download_status = fetch.shared.download_status.lock();
+                let download_status = fetch
+                    .shared
+                    .download_status
+                    .lock()
+                    .expect(DOWNLOAD_STATUS_POISON_MSG);
 
                 download_status
                     .requested
