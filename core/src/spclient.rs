@@ -574,9 +574,13 @@ impl SpClient {
         &self,
         request: BatchedEntityRequest,
     ) -> Result<BatchedExtensionResponse, Error> {
-        let endpoint = "/extended-metadata/v0/extended-metadata";
         let res = self
-            .request_with_protobuf(&Method::POST, endpoint, None, &request)
+            .request_with_protobuf(
+                &Method::POST,
+                "/extended-metadata/v0/extended-metadata",
+                None,
+                &request,
+            )
             .await?;
         Ok(BatchedExtensionResponse::parse_from_bytes(&res)?)
     }
@@ -802,11 +806,11 @@ impl SpClient {
 
     // Audio preview in 96 kbps MP3, unencrypted
     pub async fn get_audio_preview(&self, preview_id: &FileId) -> SpClientResult {
-        let attribute = "audio-preview-url-template";
+        const ATTRIBUTE: &str = "audio-preview-url-template";
         let template = self
             .session()
-            .get_user_attribute(attribute)
-            .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
+            .get_user_attribute(ATTRIBUTE)
+            .ok_or_else(|| SpClientError::Attribute(ATTRIBUTE.to_string()))?;
 
         let mut url = template.replace("{id}", &preview_id.to_base16()?);
         let separator = match url.find('?') {
@@ -820,11 +824,11 @@ impl SpClient {
 
     // The first 128 kB of a track, unencrypted
     pub async fn get_head_file(&self, file_id: &FileId) -> SpClientResult {
-        let attribute = "head-files-url";
+        const ATTRIBUTE: &str = "head-files-url";
         let template = self
             .session()
-            .get_user_attribute(attribute)
-            .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
+            .get_user_attribute(ATTRIBUTE)
+            .ok_or_else(|| SpClientError::Attribute(ATTRIBUTE.to_string()))?;
 
         let url = template.replace("{file_id}", &file_id.to_base16()?);
 
@@ -832,11 +836,11 @@ impl SpClient {
     }
 
     pub async fn get_image(&self, image_id: &FileId) -> SpClientResult {
-        let attribute = "image-url";
+        const ATTRIBUTE: &str = "image-url";
         let template = self
             .session()
-            .get_user_attribute(attribute)
-            .ok_or_else(|| SpClientError::Attribute(attribute.to_string()))?;
+            .get_user_attribute(ATTRIBUTE)
+            .ok_or_else(|| SpClientError::Attribute(ATTRIBUTE.to_string()))?;
         let url = template.replace("{file_id}", &image_id.to_base16()?);
 
         self.request_url(&url).await
