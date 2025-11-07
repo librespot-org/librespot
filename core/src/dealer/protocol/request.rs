@@ -7,7 +7,7 @@ use crate::{
         transfer_state::TransferState,
     },
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::{Display, Formatter};
 
@@ -165,12 +165,16 @@ pub struct GenericCommand {
     pub logging_params: LoggingParams,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TransferOptions {
-    pub restore_paused: String,
-    pub restore_position: String,
-    pub restore_track: String,
-    pub retain_session: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restore_paused: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restore_position: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restore_track: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retain_session: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

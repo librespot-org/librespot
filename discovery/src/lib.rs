@@ -437,6 +437,7 @@ impl Builder {
                 is_group: false,
                 device_id: device_id.into(),
                 client_id: client_id.into(),
+                aliases: Vec::new(),
             },
             port: 0,
             zeroconf_ip: vec![],
@@ -459,6 +460,21 @@ impl Builder {
     /// Sets whether the device is a group. This affects the icon in Spotify clients. Default is `false`.
     pub fn is_group(mut self, is_group: bool) -> Self {
         self.server_config.is_group = is_group;
+        self
+    }
+
+    /// Adds an alias for this device. Multiple aliases can be added by calling this method multiple times.
+    pub fn add_alias(
+        mut self,
+        alias: impl Into<Cow<'static, str>>,
+        id: u32,
+        is_group: bool,
+    ) -> Self {
+        self.server_config.aliases.push(server::Alias {
+            name: alias.into(),
+            id,
+            is_group,
+        });
         self
     }
 
