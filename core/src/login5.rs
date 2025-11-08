@@ -16,7 +16,7 @@ use librespot_protocol::{
 };
 use protobuf::well_known_types::duration::Duration as ProtoDuration;
 use protobuf::{Message, MessageField};
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
 use thiserror::Error;
 use tokio::time::sleep;
 
@@ -264,7 +264,7 @@ impl Login5Manager {
             expires_in: Duration::from_secs(expires_in.try_into().unwrap_or(3600)),
             token_type: "Bearer".to_string(),
             scopes: vec![],
-            timestamp: Instant::now(),
+            timestamp: SystemTime::now(),
         }
     }
 }

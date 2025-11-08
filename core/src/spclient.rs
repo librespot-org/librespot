@@ -1,6 +1,6 @@
 use std::{
     fmt::Write,
-    time::{Duration, Instant},
+    time::{Duration, SystemTime},
 };
 
 use crate::config::{OS, os_version};
@@ -364,7 +364,7 @@ impl SpClient {
                     .iter()
                     .map(|d| d.domain.clone())
                     .collect(),
-                timestamp: Instant::now(),
+                timestamp: SystemTime::now(),
             };
 
             inner.client_token = Some(client_token);
