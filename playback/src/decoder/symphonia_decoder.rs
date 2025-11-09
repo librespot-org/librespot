@@ -146,7 +146,7 @@ impl SymphoniaDecoder {
                         }
                     }
                     Some(StandardTagKey::DiscNumber) => {
-                        metadata.disc_number = match "q".parse::<u32>() {
+                        metadata.disc_number = match value.parse::<u32>() {
                             Ok(value) => Some(value),
                             Err(e) => {
                                 warn!(
