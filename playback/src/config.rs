@@ -1,11 +1,12 @@
-use std::{mem, str::FromStr, time::Duration};
+use std::{mem, path::PathBuf, str::FromStr, time::Duration};
 
 pub use crate::dither::{DithererBuilder, TriangularDitherer, mk_ditherer};
 use crate::{convert::i24, player::duration_to_coefficient};
 
-#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq, Default)]
 pub enum Bitrate {
     Bitrate96,
+    #[default]
     Bitrate160,
     Bitrate320,
 }
@@ -22,19 +23,14 @@ impl FromStr for Bitrate {
     }
 }
 
-impl Default for Bitrate {
-    fn default() -> Self {
-        Self::Bitrate160
-    }
-}
-
-#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq, Default)]
 pub enum AudioFormat {
     F64,
     F32,
     S32,
     S24,
     S24_3,
+    #[default]
     S16,
 }
 
@@ -53,12 +49,6 @@ impl FromStr for AudioFormat {
     }
 }
 
-impl Default for AudioFormat {
-    fn default() -> Self {
-        Self::S16
-    }
-}
-
 impl AudioFormat {
     // not used by all backends
     #[allow(dead_code)]
@@ -73,10 +63,11 @@ impl AudioFormat {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum NormalisationType {
     Album,
     Track,
+    #[default]
     Auto,
 }
 
@@ -92,15 +83,10 @@ impl FromStr for NormalisationType {
     }
 }
 
-impl Default for NormalisationType {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum NormalisationMethod {
     Basic,
+    #[default]
     Dynamic,
 }
 
@@ -112,12 +98,6 @@ impl FromStr for NormalisationMethod {
             "dynamic" => Ok(Self::Dynamic),
             _ => Err(()),
         }
-    }
-}
-
-impl Default for NormalisationMethod {
-    fn default() -> Self {
-        Self::Dynamic
     }
 }
 
@@ -135,6 +115,8 @@ pub struct PlayerConfig {
     pub normalisation_attack_cf: f64,
     pub normalisation_release_cf: f64,
     pub normalisation_knee_db: f64,
+
+    pub local_file_directories: Vec<PathBuf>,
 
     // pass function pointers so they can be lazily instantiated *after* spawning a thread
     // (thereby circumventing Send bounds that they might not satisfy)
@@ -160,6 +142,7 @@ impl Default for PlayerConfig {
             passthrough: false,
             ditherer: Some(mk_ditherer::<TriangularDitherer>),
             position_update_interval: None,
+            local_file_directories: Vec::new(),
         }
     }
 }

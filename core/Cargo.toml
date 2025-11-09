@@ -104,7 +104,7 @@ tokio = { version = "1", features = [
     "time",
 ] }
 tokio-stream = { version = "0.1", default-features = false }
-tokio-tungstenite = { version = "0.27", default-features = false }
+tokio-tungstenite = { version = "0.28", default-features = false }
 tokio-util = { version = "0.7", default-features = false }
 url = "2"
 uuid = { version = "1", default-features = false, features = ["v4"] }

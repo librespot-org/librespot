@@ -17,8 +17,10 @@ impl ConnectState {
         transfer: &TransferState,
     ) -> Result<ProvidedTrack, Error> {
         let track = if transfer.queue.is_playing_queue.unwrap_or_default() {
+            debug!("transfer track was used from the queue");
             transfer.queue.tracks.first()
         } else {
+            debug!("transfer track was the current track");
             transfer.playback.current_track.as_ref()
         }
         .ok_or(StateError::CouldNotResolveTrackFromTransfer)?;
@@ -37,7 +39,11 @@ impl ConnectState {
     }
 
     /// handles the initially transferable data
-    pub fn handle_initial_transfer(&mut self, transfer: &mut TransferState) {
+    pub fn handle_initial_transfer(
+        &mut self,
+        transfer: &mut TransferState,
+        ctx_uri: Option<String>,
+    ) {
         let current_context_metadata = self.context.as_ref().map(|c| c.metadata.clone());
         let player = self.player_mut();
 
@@ -84,8 +90,13 @@ impl ConnectState {
             }
         }
 
-        player.context_url.clear();
-        player.context_uri.clear();
+        const UNKNOWN_URI: &str = "spotify:unknown";
+        // it's important to always set the url/uri to a value
+        // so that the player doesn't go into an inactive state
+        let uri = ctx_uri.unwrap_or(UNKNOWN_URI.into());
+
+        player.context_url = format!("context://{uri}");
+        player.context_uri = uri;
 
         if let Some(metadata) = current_context_metadata {
             for (key, value) in metadata {

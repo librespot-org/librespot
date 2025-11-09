@@ -161,7 +161,11 @@ impl ConnectState {
                 supports_gzip_pushes: true,
                 // todo: enable after logout handling is implemented, see spirc logout_request
                 supports_logout: false,
-                supported_types: vec!["audio/episode".into(), "audio/track".into()],
+                supported_types: vec![
+                    "audio/episode".into(),
+                    "audio/track".into(),
+                    "audio/local".into(),
+                ],
                 supports_playlist_v2: true,
                 supports_transfer_command: true,
                 supports_command_request: true,

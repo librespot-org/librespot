@@ -66,6 +66,7 @@ impl Credentials {
         }
     }
 
+    #[expect(deprecated)]
     pub fn with_blob(
         username: impl Into<String>,
         encrypted_blob: impl AsRef<[u8]>,

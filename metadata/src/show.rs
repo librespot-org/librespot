@@ -37,11 +37,11 @@ impl Metadata for Show {
     type Message = protocol::metadata::Show;
 
     async fn request(session: &Session, show_uri: &SpotifyUri) -> RequestResult {
-        let SpotifyUri::Show { id: show_id } = show_uri else {
+        let SpotifyUri::Show { .. } = show_uri else {
             return Err(Error::invalid_argument("show_uri"));
         };
 
-        session.spclient().get_show_metadata(show_id).await
+        session.spclient().get_show_metadata(show_uri).await
     }
 
     fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {

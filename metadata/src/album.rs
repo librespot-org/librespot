@@ -75,11 +75,11 @@ impl Metadata for Album {
     type Message = protocol::metadata::Album;
 
     async fn request(session: &Session, album_uri: &SpotifyUri) -> RequestResult {
-        let SpotifyUri::Album { id: album_id } = album_uri else {
+        let SpotifyUri::Album { .. } = album_uri else {
             return Err(Error::invalid_argument("album_uri"));
         };
 
-        session.spclient().get_album_metadata(album_id).await
+        session.spclient().get_album_metadata(album_uri).await
     }
 
     fn parse(msg: &Self::Message, _: &SpotifyUri) -> Result<Self, Error> {

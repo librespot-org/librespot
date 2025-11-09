@@ -9,17 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- [connect] Add method `transfer` to `Spirc` to automatically transfer the playback to ourselves
+- [core] Add method `transfer` to `SpClient`
 - [core] Add `SpotifyUri` type to represent more types of URI than `SpotifyId` can
+- [discovery] Add support for [device aliases](https://developer.spotify.com/documentation/commercial-hardware/implementation/guides/zeroconf#device-aliases)
+- [main] `--local-file-dir` / `-l` option added to binary to specify local file directories to pull from
+- [metadata] `Local` variant added to `UniqueFields` enum (breaking)
+- [playback] Local files can now be played with the following caveats:
+  - They must be sampled at 44,100 Hz
+  - They cannot be played from a Connect device using the dedicated 'Local Files' playlist; they must be added to another playlist first
+- [playback] `local_file_directories` field added to `PlayerConfig` struct (breaking)
+  
 
 ### Changed
 
-- [compilation] Switched contrib/Dockerfile to new Debian stable (trixie)
-- [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
+- [contrib] Switched contrib/Dockerfile to new Debian stable (trixie)
+- [core] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [core] Changed return type of `get_extended_metadata` to return `BatchedExtensionResponse` (breaking)
+- [core] Changed parameter of `get_<item>_metadata` from `SpotifyId` to `SpotifyUri` (breaking)
 - [metadata] Changed arguments for `Metadata` trait from `&SpotifyId` to `&SpotifyUri` (breaking)
-- [player] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
-- [player] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
-- [spclient] `get_radio_for_track` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [playback] Changed type of `SpotifyId` fields in `PlayerEvent` members to `SpotifyUri` (breaking)
+- [playback] `load` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
+- [playback] `preload` function changed from accepting a `SpotifyId` to accepting a `SpotifyUri` (breaking)
 
+### Fixed
+
+- [connect] Fixed failed transferring with transfer data that had an empty context uri and no tracks
+- [connect] Use the provided index or the first as fallback value to always play a track on loading
+- [core] Fixed a problem where the metadata didn't include the audio file by switching to `get_extended_metadata`
+- [core] Fixed connection issues after system suspend on Linux
 
 ### Removed
 

@@ -8,7 +8,7 @@
 //   user-library-modify, user-library-read, user-follow-modify, user-follow-read, streaming,
 //   app-remote-control
 
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
 
 use serde::Deserialize;
 use thiserror::Error;
@@ -39,7 +39,7 @@ pub struct Token {
     pub expires_in: Duration,
     pub token_type: String,
     pub scopes: Vec<String>,
-    pub timestamp: Instant,
+    pub timestamp: SystemTime,
 }
 
 #[derive(Deserialize)]
@@ -115,12 +115,12 @@ impl Token {
             expires_in: Duration::from_secs(data.expires_in),
             token_type: data.token_type,
             scopes: data.scope,
-            timestamp: Instant::now(),
+            timestamp: SystemTime::now(),
         })
     }
 
     pub fn is_expired(&self) -> bool {
-        self.timestamp + (self.expires_in.saturating_sub(Self::EXPIRY_THRESHOLD)) < Instant::now()
+        self.timestamp + self.expires_in.saturating_sub(Self::EXPIRY_THRESHOLD) < SystemTime::now()
     }
 
     pub fn in_scope(&self, scope: &str) -> bool {
