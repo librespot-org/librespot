@@ -1119,22 +1119,20 @@ impl PlayerTrackLoader {
                 })
             };
 
+            let mut hint = Hint::new();
+            if let Some(mime_type) = AudioFiles::mime_type(format) {
+                hint.mime_type(mime_type);
+            }
+
             #[cfg(feature = "passthrough-decoder")]
             let decoder_type = if self.config.passthrough {
                 PassthroughDecoder::new(audio_file, format).map(|x| Box::new(x) as Decoder)
             } else {
-                symphonia_decoder(audio_file, format)
+                symphonia_decoder(audio_file, hint)
             };
 
             #[cfg(not(feature = "passthrough-decoder"))]
-            let decoder_type = {
-                let mut hint = Hint::new();
-                if let Some(mime_type) = AudioFiles::mime_type(format) {
-                    hint.mime_type(mime_type);
-                }
-
-                symphonia_decoder(audio_file, hint)
-            };
+            let decoder_type = { symphonia_decoder(audio_file, hint) };
 
             let normalisation_data = normalisation_data.unwrap_or_else(|| {
                 warn!("Unable to get normalisation data, continuing with defaults.");
