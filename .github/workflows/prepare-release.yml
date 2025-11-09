@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -49,9 +50,11 @@ jobs:
           tag: v${{ steps.get-version.outputs.VERSION }}
           version: ${{ steps.get-version.outputs.VERSION }}
 
-      - name: Commit version prepare
-        uses: stefanzweifel/git-auto-commit-action@v6
-        if: ${{ !env.ACT }}
+      - name: Create PR to review automated changes
+        uses: peter-evans/create-pull-request@v7
         with:
-          commit_message: 'Prepare for v${{ steps.get-version.outputs.VERSION }} release'
-          file_pattern: '*.md *.toml *.lock'
+          commit-message: 'Preparations for v${{ steps.get-version.outputs.VERSION }}'
+          title: "Preparations for v${{ steps.get-version.outputs.VERSION }}"
+          branch: "prepare-release/v${{ steps.get-version.outputs.VERSION }}"
+          assignees: ${{ github.actor }}
+          body: "General preparations for the next ${{ github.event.inputs.versionBump }} release v${{ steps.get-version.outputs.VERSION }}"
