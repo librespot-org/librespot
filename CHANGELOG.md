@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-11-10
+
 ### Added
 
 - [connect] Add method `transfer` to `Spirc` to automatically transfer the playback to ourselves
@@ -19,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - They must be sampled at 44,100 Hz
   - They cannot be played from a Connect device using the dedicated 'Local Files' playlist; they must be added to another playlist first
 - [playback] `local_file_directories` field added to `PlayerConfig` struct (breaking)
-  
 
 ### Changed
 
@@ -461,7 +462,8 @@ v0.4.x as a stable branch until then.
 
 ## [0.1.0] - 2019-11-06
 
-[unreleased]: https://github.com/librespot-org/librespot/compare/v0.7.1...HEAD
+[unreleased]: https://github.com/librespot-org/librespot/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/librespot-org/librespot/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/librespot-org/librespot/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/librespot-org/librespot/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/librespot-org/librespot/compare/v0.5.0...v0.6.0
