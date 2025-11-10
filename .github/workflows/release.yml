@@ -1,4 +1,4 @@
-name: release.yml
+name: publish on release creation
 on:
   release:
     types:
@@ -31,4 +31,4 @@ jobs:
         if: ${{ !env.ACT }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --workspace --no-verify
+        run: cargo publish --workspace

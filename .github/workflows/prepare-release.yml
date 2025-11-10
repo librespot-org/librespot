@@ -57,4 +57,24 @@ jobs:
           title: "Preparations for v${{ steps.get-version.outputs.VERSION }}"
           branch: "prepare-release/v${{ steps.get-version.outputs.VERSION }}"
           assignees: ${{ github.actor }}
-          body: "General preparations for the next ${{ github.event.inputs.versionBump }} release v${{ steps.get-version.outputs.VERSION }}"
+          body: |
+            This PR prepares for the next ${{ github.event.inputs.versionBump }} release v${{ github.event.inputs.versionBump }}.
+
+            **Files that should be automatically modified:**
+            - `Cargo.toml` (version bump)
+              - `<crate>/Cargo.toml` (version bump)
+              > for patch versions only the necessary crates will receive an update
+            - `Cargo.lock` (only bumps own crate versions)
+            - `CHANGELOG.md` (finalize changelog for upcomming version)
+            
+            **Review checklist:**
+            - [ ] Confirm the version bump in `Cargo.toml` is correct
+            - [ ] Ensure `Cargo.lock` did only update our crates
+            - [ ] Review the changelog for accuracy and completeness
+            
+            Please verify these changes before merging.
+            
+            ---
+            After merging, continue by creating a new release with the tag `v${{ github.event.inputs.versionBump }}`.
+
+            > See [PUBLISHING.md](https://github.com/librespot-org/librespot/blob/dev/PUBLISHING.md) for further infos.
