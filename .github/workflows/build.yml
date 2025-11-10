@@ -72,27 +72,17 @@ jobs:
       - name: Install cargo-hack
         uses: taiki-e/install-action@cargo-hack
 
-      - name: Check packages without TLS requirements
-        run: cargo hack check -p librespot-protocol --each-feature
-
-      - name: Check workspace with native-tls
+      - name: Check binary with any tls option
         run: >
-          cargo hack check -p librespot --each-feature --exclude-all-features
-          --include-features native-tls
-          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots
+          cargo hack check -p librespot --each-feature
+          --exclude-no-default-features --exclude-all-features
+          --include-features native-tls,rustls-tls-native-roots,rustls-tls-webpki-roots
 
-      - name: Check workspace with rustls-tls-native-roots
+      - name: Check binary with each-feature (native-tls)
         run: >
-          cargo hack check -p librespot --each-feature --exclude-all-features
-          --include-features rustls-tls-native-roots
-          --exclude-features native-tls,rustls-tls-webpki-roots
-
-      - name: Check discovery features (Linux only)
-        if: runner.os == 'Linux'
-        run: >
-          cargo hack check -p librespot-discovery --each-feature --exclude-all-features
-          --include-features native-tls
-          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots
+          cargo hack check -p librespot --each-feature
+          --exclude-no-default-features --exclude-all-features
+          --features native-tls --skip rustls-tls-native-roots,rustls-tls-webpki-roots
 
       - name: Build binary with default features
         run: cargo build --frozen
