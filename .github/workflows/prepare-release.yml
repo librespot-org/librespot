@@ -52,6 +52,7 @@ jobs:
 
       - name: Create PR to review automated changes
         uses: peter-evans/create-pull-request@v7
+        if: ${{ !env.ACT }}
         with:
           commit-message: 'Preparations for v${{ steps.get-version.outputs.VERSION }}'
           title: "Preparations for v${{ steps.get-version.outputs.VERSION }}"
