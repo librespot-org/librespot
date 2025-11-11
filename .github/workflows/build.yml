@@ -29,6 +29,7 @@ name: build
 env:
   RUST_BACKTRACE: 1
   RUSTFLAGS: -D warnings
+  LINUX_FEATURES: alsa-backend,pulseaudio-backend,jackaudio-backend,with-avahi
 
 jobs:
   test:
@@ -78,11 +79,18 @@ jobs:
           --exclude-no-default-features --exclude-all-features
           --include-features native-tls,rustls-tls-native-roots,rustls-tls-webpki-roots
 
-      - name: Check binary with each-feature (native-tls)
+      - name: Check binary features (platform independent)
         run: >
           cargo hack check -p librespot --each-feature
-          --exclude-no-default-features --exclude-all-features
-          --features native-tls --skip rustls-tls-native-roots,rustls-tls-webpki-roots
+          --exclude-no-default-features --exclude-all-features --features native-tls 
+          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots,${{ env.LINUX_FEATURES }}
+
+      - name: Check binary features (linux)
+        if: runner.os == 'Linux'
+        run: >
+          cargo hack check -p librespot --each-feature
+          --exclude-no-default-features --exclude-all-features --features native-tls
+          --include-features ${{ env.LINUX_FEATURES }}
 
       - name: Build binary with default features
         run: cargo build --frozen
