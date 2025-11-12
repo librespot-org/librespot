@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn to_id() {
         for c in &CONV_VALID {
-            assert_eq!(c.parsed.to_id().unwrap(), c.base62);
+            assert_eq!(c.parsed.to_id(), c.base62);
         }
     }
 

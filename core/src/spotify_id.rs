@@ -322,7 +322,7 @@ mod tests {
         for c in &CONV_VALID {
             let id = SpotifyId { id: c.id };
 
-            assert_eq!(id.to_base62().unwrap(), c.base62);
+            assert_eq!(id.to_base62(), c.base62);
         }
     }
 
@@ -342,7 +342,7 @@ mod tests {
         for c in &CONV_VALID {
             let id = SpotifyId { id: c.id };
 
-            assert_eq!(id.to_base16().unwrap(), c.base16);
+            assert_eq!(id.to_base16(), c.base16);
         }
     }
 
