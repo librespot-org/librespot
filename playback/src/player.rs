@@ -988,10 +988,7 @@ impl PlayerTrackLoader {
             Ok(audio) => match self.find_available_alternative(audio).await {
                 Some(audio) => audio,
                 None => {
-                    warn!(
-                        "spotify:track:<{}> is not available",
-                        track_id.to_base62().unwrap_or_default()
-                    );
+                    warn!("spotify:track:<{}> is not available", track_id.to_base62());
                     return None;
                 }
             },

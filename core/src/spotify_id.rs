@@ -111,7 +111,7 @@ impl SpotifyId {
     ///
     /// [canonically]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     #[allow(clippy::wrong_self_convention)]
-    pub fn to_base62(&self) -> Result<String, Error> {
+    pub fn to_base62(&self) -> String {
         let mut dst = [0u8; 22];
         let mut i = 0;
         let n = self.id;
@@ -143,13 +143,12 @@ impl SpotifyId {
             }
         }
 
-        for b in &mut dst {
-            *b = BASE62_DIGITS[*b as usize];
+        let mut s = String::with_capacity(dst.len());
+        for &b in dst.iter().rev() {
+            s.push(BASE62_DIGITS[b as usize] as char);
         }
 
-        dst.reverse();
-
-        String::from_utf8(dst.to_vec()).map_err(|_| SpotifyIdError::InvalidId.into())
+        s
     }
 
     /// Returns a copy of the `SpotifyId` as an array of `SpotifyId::SIZE` (16) bytes in
@@ -162,15 +161,13 @@ impl SpotifyId {
 
 impl fmt::Debug for SpotifyId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("SpotifyId")
-            .field(&self.to_base62().unwrap_or_else(|_| "invalid uri".into()))
-            .finish()
+        f.debug_tuple("SpotifyId").field(&self.to_base62()).finish()
     }
 }
 
 impl fmt::Display for SpotifyId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_base62().unwrap_or_else(|_| "invalid uri".into()))
+        f.write_str(&self.to_base62())
     }
 }
 

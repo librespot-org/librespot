@@ -87,7 +87,7 @@ impl SpotifyUri {
 
     /// Gets the ID of this URI. The resource ID is the component of the URI that identifies
     /// the resource after its type label. If `self` is a named ID, the user will be omitted.
-    pub fn to_id(&self) -> Result<String, Error> {
+    pub fn to_id(&self) -> String {
         match &self {
             SpotifyUri::Album { id }
             | SpotifyUri::Artist { id }
@@ -102,11 +102,9 @@ impl SpotifyUri {
                 duration,
             } => {
                 let duration_secs = duration.as_secs();
-                Ok(format!(
-                    "{artist}:{album_title}:{track_title}:{duration_secs}"
-                ))
+                format!("{artist}:{album_title}:{track_title}:{duration_secs}")
             }
-            SpotifyUri::Unknown { id, .. } => Ok(id.clone()),
+            SpotifyUri::Unknown { id, .. } => id.clone(),
         }
     }
 
@@ -207,7 +205,7 @@ impl SpotifyUri {
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
     pub fn to_uri(&self) -> Result<String, Error> {
         let item_type = self.item_type();
-        let name = self.to_id()?;
+        let name = self.to_id();
 
         if let SpotifyUri::Playlist {
             id,
@@ -226,7 +224,7 @@ impl SpotifyUri {
     /// Deprecated: not all IDs can be represented in Base62, so this function has been renamed to
     /// [SpotifyUri::to_id], which this implementation forwards to.
     #[deprecated(since = "0.8.0", note = "use to_name instead")]
-    pub fn to_base62(&self) -> Result<String, Error> {
+    pub fn to_base62(&self) -> String {
         self.to_id()
     }
 }
@@ -313,7 +311,7 @@ impl TryFrom<&protocol::playlist4_external::MetaItem> for SpotifyUri {
     fn try_from(item: &protocol::playlist4_external::MetaItem) -> Result<Self, Self::Error> {
         Ok(Self::Unknown {
             kind: "MetaItem".into(),
-            id: SpotifyId::try_from(item.revision())?.to_base62()?,
+            id: SpotifyId::try_from(item.revision())?.to_base62(),
         })
     }
 }
@@ -326,7 +324,7 @@ impl TryFrom<&protocol::playlist4_external::SelectedListContent> for SpotifyUri 
     ) -> Result<Self, Self::Error> {
         Ok(Self::Unknown {
             kind: "SelectedListContent".into(),
-            id: SpotifyId::try_from(playlist.revision())?.to_base62()?,
+            id: SpotifyId::try_from(playlist.revision())?.to_base62(),
         })
     }
 }
