@@ -29,6 +29,7 @@ name: build
 env:
   RUST_BACKTRACE: 1
   RUSTFLAGS: -D warnings
+  GSTREAMER_WIN_PATH: D:\gstreamer
   LINUX_FEATURES: alsa-backend,pulseaudio-backend,jackaudio-backend,with-avahi
 
 jobs:
@@ -61,6 +62,22 @@ jobs:
           gstreamer1.0-dev libgstreamer-plugins-base1.0-dev
           libavahi-compat-libdnssd-dev
 
+      - name: Install developer package dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install pkgconfiglite
+
+      - name: Cache gstreamer (Windows)
+        uses: actions/cache@v4
+        id: cache-gstreamer
+        if: runner.os == 'Windows'
+        with:
+          path: ${{ env.GSTREAMER_WIN_PATH }}
+          key: gstreamer-Windows-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install gstreamer (Windows)
+        if: ${{ runner.os == 'Windows' && !steps.cache-gstreamer.outputs.cache-hit }}
+        run: choco install gstreamer-devel
+
       - name: Fetch dependencies
         run: cargo fetch --locked
 
@@ -80,6 +97,8 @@ jobs:
           --include-features native-tls,rustls-tls-native-roots,rustls-tls-webpki-roots
 
       - name: Check binary features (platform independent)
+        env:
+          PKG_CONFIG_PATH: ${{ env.GSTREAMER_WIN_PATH }}\1.0\msvc_x86_64\lib\pkgconfig
         run: >
           cargo hack check -p librespot --each-feature
           --exclude-no-default-features --exclude-all-features --features native-tls 
