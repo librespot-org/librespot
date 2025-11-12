@@ -773,7 +773,7 @@ impl SpClient {
     pub async fn get_audio_storage(&self, file_id: &FileId) -> SpClientResult {
         let endpoint = format!(
             "/storage-resolve/files/audio/interactive/{}",
-            file_id.to_base16()?
+            file_id.to_base16()
         );
         self.request(&Method::GET, &endpoint, None, None).await
     }
@@ -819,7 +819,7 @@ impl SpClient {
             .get_user_attribute(ATTRIBUTE)
             .ok_or_else(|| SpClientError::Attribute(ATTRIBUTE.to_string()))?;
 
-        let mut url = template.replace("{id}", &preview_id.to_base16()?);
+        let mut url = template.replace("{id}", &preview_id.to_base16());
         let separator = match url.find('?') {
             Some(_) => "&",
             None => "?",
@@ -837,7 +837,7 @@ impl SpClient {
             .get_user_attribute(ATTRIBUTE)
             .ok_or_else(|| SpClientError::Attribute(ATTRIBUTE.to_string()))?;
 
-        let url = template.replace("{file_id}", &file_id.to_base16()?);
+        let url = template.replace("{file_id}", &file_id.to_base16());
 
         self.request_url(&url).await
     }
@@ -848,7 +848,7 @@ impl SpClient {
             .session()
             .get_user_attribute(ATTRIBUTE)
             .ok_or_else(|| SpClientError::Attribute(ATTRIBUTE.to_string()))?;
-        let url = template.replace("{file_id}", &image_id.to_base16()?);
+        let url = template.replace("{file_id}", &image_id.to_base16());
 
         self.request_url(&url).await
     }

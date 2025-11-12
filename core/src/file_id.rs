@@ -1,8 +1,6 @@
-use std::fmt;
+use std::fmt::{self, Write};
 
 use librespot_protocol as protocol;
-
-use crate::{Error, spotify_id::to_base16};
 
 const RAW_LEN: usize = 20;
 
@@ -21,8 +19,12 @@ impl FileId {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    pub fn to_base16(&self) -> Result<String, Error> {
-        to_base16(&self.0, &mut [0u8; 40])
+    pub fn to_base16(&self) -> String {
+        let mut s = String::new();
+        for b in &self.0 {
+            write!(&mut s, "{b:02x}").unwrap();
+        }
+        s
     }
 }
 
@@ -34,7 +36,7 @@ impl fmt::Debug for FileId {
 
 impl fmt::Display for FileId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_base16().unwrap_or_default())
+        f.write_str(&self.to_base16())
     }
 }
 
