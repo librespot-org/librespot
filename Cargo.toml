@@ -134,7 +134,7 @@ passthrough-decoder = ["librespot-playback/passthrough-decoder"]
 
 # MPRIS: Allow external tool to have access to playback
 # status, metadata and to control the player.
-with-mpris = ["dep:zbus", "dep:zvariant"]
+with-mpris = ["dep:zbus", "dep:zvariant", "dep:time"]
 
 [lib]
 name = "librespot"
@@ -184,7 +184,7 @@ tokio = { version = "1", features = [
     "sync",
     "process",
 ] }
-time = { version = "0.3", features = ["formatting"] }
+time = { version = "0.3", features = ["formatting"], optional = true }
 url = "2.2"
 zbus = { version = "5", default-features = false, features = ["tokio"], optional = true }
 zvariant = { version = "5", default-features = false, optional = true }
