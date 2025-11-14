@@ -78,9 +78,6 @@ rustls-tls-webpki-roots = [
 # on macOS.
 rodio-backend = ["librespot-playback/rodio-backend"]
 
-# rodiojack-backend: Rodio backend with JACK support for professional audio setups.
-rodiojack-backend = ["librespot-playback/rodiojack-backend"]
-
 # gstreamer-backend: Uses GStreamer multimedia framework for audio output.
 # Provides extensive audio processing capabilities.
 gstreamer-backend = ["librespot-playback/gstreamer-backend"]
@@ -104,6 +101,9 @@ pulseaudio-backend = ["librespot-playback/pulseaudio-backend"]
 # jackaudio-backend: JACK Audio Connection Kit backend.
 # Professional audio backend for low-latency, high-quality audio routing.
 jackaudio-backend = ["librespot-playback/jackaudio-backend"]
+
+# rodiojack-backend: Rodio backend with JACK support for professional audio setups. (not windows, yet)
+rodiojack-backend = ["librespot-playback/rodiojack-backend"]
 
 # Network discovery backends - choose one for Spotify Connect device discovery
 # See COMPILING.md for dependencies and platform support.

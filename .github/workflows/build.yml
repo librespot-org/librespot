@@ -30,7 +30,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTFLAGS: -D warnings
   GSTREAMER_WIN_PATH: D:\gstreamer
-  LINUX_FEATURES: alsa-backend,pulseaudio-backend,jackaudio-backend,with-avahi
+  NOT_WINDOWS_FEATURES: alsa-backend,pulseaudio-backend,jackaudio-backend,rodiojack-backend,with-avahi
 
 jobs:
   test:
@@ -102,14 +102,14 @@ jobs:
         run: >
           cargo hack check -p librespot --each-feature
           --exclude-no-default-features --exclude-all-features --features native-tls 
-          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots,${{ env.LINUX_FEATURES }}
+          --exclude-features rustls-tls-native-roots,rustls-tls-webpki-roots,${{ env.NOT_WINDOWS_FEATURES }}
 
       - name: Check binary features (linux)
         if: runner.os == 'Linux'
         run: >
           cargo hack check -p librespot --each-feature
           --exclude-no-default-features --exclude-all-features --features native-tls
-          --include-features ${{ env.LINUX_FEATURES }}
+          --include-features ${{ env.NOT_WINDOWS_FEATURES }}
 
       - name: Build binary with default features
         run: cargo build --frozen
