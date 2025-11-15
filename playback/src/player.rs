@@ -1287,7 +1287,7 @@ impl PlayerTrackLoader {
             is_explicit: false,
             audio_item: AudioItem {
                 duration_ms: duration.as_millis() as u32,
-                uri: track_uri.to_uri().unwrap_or_default(),
+                uri: track_uri.to_uri(),
                 track_id: track_uri,
                 files: Default::default(),
                 name,

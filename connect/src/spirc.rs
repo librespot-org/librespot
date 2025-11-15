@@ -806,7 +806,7 @@ impl SpircTask {
             }
             PlayerEvent::Unavailable { track_id, .. } => {
                 self.handle_unavailable(&track_id)?;
-                if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri()? {
+                if self.connect_state.current_track(|t| &t.uri) == &track_id.to_uri() {
                     self.handle_next(None)?
                 }
             }

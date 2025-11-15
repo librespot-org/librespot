@@ -595,7 +595,7 @@ impl SpClient {
     pub async fn get_metadata(&self, kind: ExtensionKind, id: &SpotifyUri) -> SpClientResult {
         let req = BatchedEntityRequest {
             entity_request: vec![EntityRequest {
-                entity_uri: id.to_uri()?,
+                entity_uri: id.to_uri(),
                 query: vec![ExtensionQuery {
                     extension_kind: EnumOrUnknown::new(kind),
                     ..Default::default()
@@ -716,7 +716,7 @@ impl SpClient {
     pub async fn get_radio_for_track(&self, track_uri: &SpotifyUri) -> SpClientResult {
         let endpoint = format!(
             "/inspiredby-mix/v2/seed_to_playlist/{}?response-format=json",
-            track_uri.to_uri()?
+            track_uri.to_uri()
         );
 
         self.request_as_json(&Method::GET, &endpoint, None, None)

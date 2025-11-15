@@ -456,7 +456,7 @@ impl ConnectState {
             _ => Err(StateError::InvalidTrackUri(None))?,
         };
 
-        let uri = id.to_uri()?.replace("unknown", "track");
+        let uri = id.to_uri().replace("unknown", "track");
 
         let provider = if self.unavailable_uri.contains(&uri) {
             Provider::Unavailable

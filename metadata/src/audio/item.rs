@@ -87,7 +87,7 @@ impl AudioItem {
                     return Err(Error::unavailable(MetadataError::ExplicitContentFiltered));
                 }
 
-                let uri_string = uri.to_uri()?;
+                let uri_string = uri.to_uri();
                 let album = track.album.name;
 
                 let album_artists = track
@@ -156,7 +156,7 @@ impl AudioItem {
                     return Err(Error::unavailable(MetadataError::ExplicitContentFiltered));
                 }
 
-                let uri_string = uri.to_uri()?;
+                let uri_string = uri.to_uri();
 
                 let covers = get_covers(episode.covers, image_url);
 

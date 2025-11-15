@@ -203,18 +203,18 @@ impl SpotifyUri {
     /// `spotify:user:{user}:{type}:{id}`.
     ///
     /// [Spotify URI]: https://developer.spotify.com/documentation/web-api/concepts/spotify-uris-ids
-    pub fn to_uri(&self) -> Result<String, Error> {
+    pub fn to_uri(&self) -> String {
         let item_type = self.item_type();
-        let name = self.to_id();
 
         if let SpotifyUri::Playlist {
             id,
             user: Some(user),
         } = self
         {
-            Ok(format!("spotify:user:{user}:{item_type}:{id}"))
+            format!("spotify:user:{user}:{item_type}:{id}")
         } else {
-            Ok(format!("spotify:{item_type}:{name}"))
+            let name = self.to_id();
+            format!("spotify:{item_type}:{name}")
         }
     }
 
@@ -231,15 +231,13 @@ impl SpotifyUri {
 
 impl fmt::Debug for SpotifyUri {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("SpotifyUri")
-            .field(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
-            .finish()
+        f.debug_tuple("SpotifyUri").field(&self.to_uri()).finish()
     }
 }
 
 impl fmt::Display for SpotifyUri {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_uri().unwrap_or_else(|_| "invalid uri".into()))
+        f.write_str(&self.to_uri())
     }
 }
 
@@ -597,7 +595,7 @@ mod tests {
     #[test]
     fn to_uri() {
         for c in &CONV_VALID {
-            assert_eq!(c.parsed.to_uri().unwrap(), c.uri);
+            assert_eq!(c.parsed.to_uri(), c.uri);
         }
     }
 
@@ -608,6 +606,6 @@ mod tests {
         let actual =
             SpotifyUri::from_uri("spotify:user:spotify:playlist:37i9dQZF1DWSw8liJZcPOI").unwrap();
 
-        assert_eq!(actual.to_uri().unwrap(), string);
+        assert_eq!(actual.to_uri(), string);
     }
 }

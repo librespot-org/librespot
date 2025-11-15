@@ -382,7 +382,7 @@ impl<'ct> ConnectState {
     }
 
     pub fn mark_unavailable(&mut self, id: &SpotifyUri) -> Result<(), Error> {
-        let uri = id.to_uri()?;
+        let uri = id.to_uri();
 
         debug!("marking {uri} as unavailable");
 
