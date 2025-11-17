@@ -1524,6 +1524,7 @@ async fn get_setup() -> Setup {
         let name = name.unwrap_or(connect_default_config.name);
         let device_type = device_type.unwrap_or(connect_default_config.device_type);
         let initial_volume = initial_volume.unwrap_or(connect_default_config.initial_volume);
+		let disable_volume = matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed);
         let volume_steps = volume_steps.unwrap_or(connect_default_config.volume_steps);
 
         ConnectConfig {
@@ -1531,6 +1532,7 @@ async fn get_setup() -> Setup {
             device_type,
             is_group,
             initial_volume,
+			disable_volume,
             volume_steps,
             ..connect_default_config
         }
