@@ -8,7 +8,7 @@ assignees: ''
 ---
 
 ### Look for similar bugs
-Please check if there's [already an issue](https://github.com/librespot-org/librespot/issues) for your problem.
+Please check if there's [already an issue](https://github.com/librespot-org/librespot/issues) for your problem, and you're running at least the [latest release](https://github.com/librespot-org/librespot/releases/latest).
 If you've only a "me too" comment to make, consider if a :+1: [reaction](https://github.blog/news-insights/product-news/add-reactions-to-pull-requests-issues-and-comments/)
 will suffice. 
 
