@@ -30,7 +30,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTFLAGS: -D warnings
   GSTREAMER_WIN_PATH: D:\gstreamer
-  NOT_WINDOWS_FEATURES: alsa-backend,pulseaudio-backend,jackaudio-backend,rodiojack-backend,with-avahi
+  NOT_WINDOWS_FEATURES: alsa-backend,pulseaudio-backend,jackaudio-backend,rodiojack-backend,with-avahi,with-dns-sd
 
 jobs:
   test:

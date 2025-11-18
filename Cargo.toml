@@ -119,7 +119,7 @@ with-libmdns = ["librespot-discovery/with-libmdns"]
 # libavahi-client-dev.
 with-avahi = ["librespot-discovery/with-avahi"]
 
-# with-dns-sd: Uses DNS Service Discovery (cross-platform).
+# with-dns-sd: Uses DNS Service Discovery (Linux and macOS only).
 # On macOS uses Bonjour, on Linux uses Avahi compatibility layer. Choose this for tight system
 # integration on macOS or when using Avahi's dns-sd compatibility mode on Linux.
 with-dns-sd = ["librespot-discovery/with-dns-sd"]
