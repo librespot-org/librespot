@@ -42,6 +42,12 @@ jobs:
         toolchain:
           - "1.85" # MSRV (Minimum supported rust version)
           - stable
+        isDefault:
+          - ${{ github.ref_name == github.event.repository.default_branch }}
+        exclude:
+          - isDefault: false
+            os: 'windows-latest'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -96,7 +102,7 @@ jobs:
           --exclude-no-default-features --exclude-all-features
           --include-features native-tls,rustls-tls-native-roots,rustls-tls-webpki-roots
 
-      - name: Check binary features (platform independent)
+      - name: Check binary features (cross-platform)
         env:
           PKG_CONFIG_PATH: ${{ env.GSTREAMER_WIN_PATH }}\1.0\msvc_x86_64\lib\pkgconfig
         run: >
