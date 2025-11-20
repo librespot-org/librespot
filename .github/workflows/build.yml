@@ -44,11 +44,11 @@ jobs:
           - "1.85" # MSRV (Minimum supported rust version)
           - stable
         isPR:
-          - ${{ github.event.pull_request }}
+          - ${{ github.event_name == 'pull_request' }}
         isCIWindows:
-          - ${{ github.event.pull_request && contains(github.event.pull_request.labels.*.name, 'CI:Windows') }}
+          - ${{ github.event.pull_request && contains(github.event.pull_request.labels.*.name, format('CI{0} Windows', ':')) }}
         exclude:
-          # excludes windows in a PR by default, unless labeled with 'CI:Windows'
+          # excludes windows in a PR by default, unless labeled with 'CI: Windows'
           - os: 'windows-latest'
             isPR: true
             isCIWindows: false
