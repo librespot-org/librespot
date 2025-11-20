@@ -14,6 +14,7 @@ name: build
       - "**/Dockerfile*"
       - "test.sh"
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -42,11 +43,15 @@ jobs:
         toolchain:
           - "1.85" # MSRV (Minimum supported rust version)
           - stable
-        isDefault:
-          - ${{ github.ref_name == github.event.repository.default_branch }}
+        isPR:
+          - ${{ github.event.pull_request }}
+        isCIWindows:
+          - ${{ github.event.pull_request && contains(github.event.pull_request.labels.*.name, 'CI:Windows') }}
         exclude:
-          - isDefault: false
-            os: 'windows-latest'
+          # excludes windows in a PR by default, unless labeled with 'CI:Windows'
+          - os: 'windows-latest'
+            isPR: true
+            isCIWindows: false
 
     steps:
       - name: Checkout code
