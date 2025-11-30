@@ -99,7 +99,7 @@ async fn receive_data(
         }
 
         let body = response.into_body();
-        let data = match body.collect().await.map(|b| b.to_bytes()) {
+        let data = match body.collect().await.map(http_body_util::Collected::to_bytes) {
             Ok(bytes) => bytes,
             Err(e) => break Err(e.into()),
         };

@@ -35,7 +35,7 @@ impl Restriction {
     fn parse_country_codes(country_codes: &str) -> Vec<String> {
         country_codes
             .chunks(2)
-            .map(|country_code| country_code.to_owned())
+            .map(std::borrow::ToOwned::to_owned)
             .collect()
     }
 }
@@ -58,7 +58,7 @@ impl From<&RestrictionMessage> for Restriction {
             catalogues: restriction
                 .catalogue
                 .iter()
-                .map(|c| c.enum_value_or_default())
+                .map(protobuf::EnumOrUnknown::enum_value_or_default)
                 .collect::<Vec<RestrictionCatalogue>>()
                 .as_slice()
                 .into(),

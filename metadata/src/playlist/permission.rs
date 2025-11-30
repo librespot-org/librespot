@@ -33,7 +33,7 @@ impl From<&CapabilitiesMessage> for Capabilities {
                 playlist
                     .grantable_level
                     .iter()
-                    .map(|l| l.enum_value_or_default())
+                    .map(protobuf::EnumOrUnknown::enum_value_or_default)
                     .collect(),
             ),
             can_edit_metadata: playlist.can_edit_metadata(),

@@ -169,7 +169,7 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
                 playlist
                     .resulting_revisions
                     .iter()
-                    .map(|p| p.try_into())
+                    .map(std::convert::TryInto::try_into)
                     .collect::<Result<Vec<SpotifyId>, Error>>()?,
             ),
             has_multiple_heads: playlist.multiple_heads(),
@@ -183,7 +183,7 @@ impl TryFrom<&<Playlist as Metadata>::Message> for SelectedListContent {
                 playlist
                     .geoblock
                     .iter()
-                    .map(|b| b.enum_value_or_default())
+                    .map(protobuf::EnumOrUnknown::enum_value_or_default)
                     .collect(),
             ),
         })

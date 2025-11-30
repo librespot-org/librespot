@@ -144,7 +144,7 @@ impl TryFrom<&PlaylistPartialAttributesMessage> for PlaylistPartialAttributes {
             no_value: attributes
                 .no_value
                 .iter()
-                .map(|v| v.enum_value_or_default())
+                .map(protobuf::EnumOrUnknown::enum_value_or_default)
                 .collect::<Vec<PlaylistAttributeKind>>()
                 .as_slice()
                 .into(),
@@ -160,7 +160,7 @@ impl TryFrom<&PlaylistPartialItemAttributesMessage> for PlaylistPartialItemAttri
             no_value: attributes
                 .no_value
                 .iter()
-                .map(|v| v.enum_value_or_default())
+                .map(protobuf::EnumOrUnknown::enum_value_or_default)
                 .collect::<Vec<PlaylistItemAttributeKind>>()
                 .as_slice()
                 .into(),

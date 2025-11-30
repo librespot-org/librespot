@@ -493,7 +493,7 @@ pub fn get_access_token(
 
     let token_scopes: Vec<String> = match token.scopes() {
         Some(s) => s.iter().map(|s| s.to_string()).collect(),
-        _ => scopes.into_iter().map(|s| s.to_string()).collect(),
+        _ => scopes.into_iter().map(std::string::ToString::to_string).collect(),
     };
     let refresh_token = match token.refresh_token() {
         Some(t) => t.secret().to_string(),
