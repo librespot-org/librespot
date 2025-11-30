@@ -242,7 +242,7 @@ impl HttpClient {
                 // strip the prefix from *.domain.tld (assume rate limit is per domain, not subdomain)
                 let mut parts = host
                     .split('.')
-                    .map(ToString::to_string)
+                    .map(Into::into)
                     .collect::<Vec<String>>();
                 let n = parts.len().saturating_sub(2);
                 parts.drain(n..).collect()
