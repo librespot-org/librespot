@@ -33,10 +33,7 @@ impl_deref_wrapped!(RestrictionCatalogues, Vec<RestrictionCatalogue>);
 
 impl Restriction {
     fn parse_country_codes(country_codes: &str) -> Vec<String> {
-        country_codes
-            .chunks(2)
-            .map(Into::into)
-            .collect()
+        country_codes.chunks(2).map(Into::into).collect()
     }
 }
 
