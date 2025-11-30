@@ -1138,7 +1138,7 @@ async fn get_setup() -> Setup {
     let cache = {
         let volume_dir = opt_str(SYSTEM_CACHE)
             .or_else(|| opt_str(CACHE))
-            .map(std::convert::Into::into);
+            .map(Into::into);
 
         let cred_dir = if opt_present(DISABLE_CREDENTIAL_CACHE) {
             None

@@ -749,7 +749,7 @@ impl SpClient {
 
         let previous_track_str = previous_tracks
             .iter()
-            .map(super::spotify_id::SpotifyId::to_base62)
+            .map(SpotifyId::to_base62)
             .collect::<Vec<_>>()
             .join(",");
         // better than checking `previous_tracks.len() > 0` because the `filter_map` could still return 0 items

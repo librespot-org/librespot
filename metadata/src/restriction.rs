@@ -35,7 +35,7 @@ impl Restriction {
     fn parse_country_codes(country_codes: &str) -> Vec<String> {
         country_codes
             .chunks(2)
-            .map(std::borrow::ToOwned::to_owned)
+            .map(ToOwned::to_owned)
             .collect()
     }
 }

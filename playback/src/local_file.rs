@@ -27,7 +27,7 @@ pub struct LocalFileLookup(HashMap<SpotifyUri, PathBuf>);
 
 impl LocalFileLookup {
     pub fn get(&self, uri: &SpotifyUri) -> Option<&Path> {
-        self.0.get(uri).map(std::path::PathBuf::as_path)
+        self.0.get(uri).map(PathBuf::as_path)
     }
 }
 
