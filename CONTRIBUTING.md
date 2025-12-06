@@ -34,6 +34,7 @@ Make any changes that you are going to make to the code, but do not commit yet.
 Unless your changes are negligible, please add an entry in the "Unreleased" section of `CHANGELOG.md`. Refer to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) for instructions on how this entry should look like. If your changes break the API such that downstream packages that depend on librespot need to update their source to still compile, you should mark your changes as `(breaking)`.
 
 Make sure that the code is correctly formatted by running:
+
 ```bash
 cargo fmt --all
 ```
@@ -45,6 +46,7 @@ cargo build
 ```
 
 Once it has built, check for common code mistakes by running:
+
 ```bash
 cargo clippy
 ```

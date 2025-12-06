@@ -40,16 +40,19 @@ We recently switched to using [Rodio](https://github.com/tomaka/rodio) for audio
 For Linux, you will need to run the additional commands below, depending on your distro.
 
 On Debian/Ubuntu, the following command will install these dependencies:
+
 ```shell
 sudo apt-get install build-essential libasound2-dev
 ```
 
 On Fedora systems, the following command will install these dependencies:
+
 ```shell
 sudo dnf install alsa-lib-devel make gcc
 ```
 
 librespot currently offers the following selection of [audio backends](https://github.com/librespot-org/librespot/wiki/Audio-Backends):
+
 ```
 Rodio (default)
 ALSA
@@ -62,9 +65,11 @@ SDL
 Pipe
 Subprocess
 ```
+
 Please check [COMPILING.md](COMPILING.md) for detailed information on TLS, audio, and discovery backend dependencies, or the [Compiling](https://github.com/librespot-org/librespot/wiki/Compiling#general-dependencies) entry on the wiki for additional backend specific dependencies.
 
 Once you've installed the dependencies and cloned this repository you can build *librespot* with the default features using Cargo.
+
 ```shell
 cargo build --release
 ```
@@ -80,14 +85,17 @@ librespot is also available via official package system on various operating sys
 ## Usage
 A sample program implementing a headless Spotify Connect receiver is provided.
 Once you've built *librespot*, run it using :
+
 ```shell
 target/release/librespot --name DEVICENAME
 ```
 
 The above is a minimal example. Here is a more fully fledged one:
+
 ```shell
 target/release/librespot -n "Librespot" -b 320 -c ./cache --enable-volume-normalisation --initial-volume 75 --device-type avr
 ```
+
 The above command will create a receiver named ```Librespot```, with bitrate set to 320 kbps, initial volume at 75%, with volume normalisation enabled, and the device displayed in the app as an Audio/Video Receiver. A folder named ```cache``` will be created/used in the current directory, and be used to cache audio data and credentials.
 
 A full list of runtime options is available [here](https://github.com/librespot-org/librespot/wiki/Options).

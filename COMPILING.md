@@ -9,24 +9,30 @@ The easiest, and recommended way to get Rust is to use [rustup](https://rustup.r
 
 #### Additional Rust tools - `rustfmt`
 To ensure a consistent codebase, we utilise [`rustfmt`](https://github.com/rust-lang/rustfmt) and [`clippy`](https://github.com/rust-lang/rust-clippy), which are installed by default with `rustup` these days, else they can be installed manually with:
+
 ```bash
 rustup component add rustfmt
 rustup component add clippy
 ```
+
 Using `cargo fmt` and `cargo clippy` is not optional, as our CI checks against this repo's rules.
 
 ### General dependencies
 Along with Rust, you will also require a C compiler.
 
 On Debian/Ubuntu, install with:
+
 ```shell
 sudo apt-get install build-essential
 
 ```
+
 On Fedora systems, install with:
+
 ```shell
 sudo dnf install gcc
 ```
+
 ### Audio library dependencies
 Depending on the chosen backend, specific development libraries are required.
 
@@ -47,11 +53,14 @@ Depending on the chosen backend, specific development libraries are required.
 ###### For example, to build an ALSA based backend, you would need to run the following to install the required dependencies:
 
 On Debian/Ubuntu:
+
 ```shell
 sudo apt-get install libasound2-dev pkg-config
 
 ```
+
 On Fedora systems:
+
 ```shell
 sudo dnf install alsa-lib-devel
 ```
@@ -86,11 +95,13 @@ This is the **default choice** and provides the best compatibility. It integrate
 
 **Dependencies:**
 On Debian/Ubuntu:
+
 ```shell
 sudo apt-get install libssl-dev pkg-config
 ```
 
 On Fedora:
+
 ```shell
 sudo dnf install openssl-devel pkg-config
 ```
@@ -119,6 +130,7 @@ Uses a Rust-based TLS implementation with certificate authority (CA) verificatio
 **No additional system dependencies required** - rustls is implemented in Rust (with some assembly for performance-critical cryptographic operations) and doesn't require external libraries like OpenSSL.
 
 #### Building with specific TLS backends
+
 ```bash
 # Default (native-tls)
 cargo build
