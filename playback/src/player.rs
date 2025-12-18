@@ -20,6 +20,7 @@ use std::{
 #[cfg(feature = "passthrough-decoder")]
 use crate::decoder::PassthroughDecoder;
 use crate::{
+    SAMPLE_RATE,
     audio::{AudioDecrypt, AudioFetchParams, AudioFile, StreamLoaderController},
     audio_backend::Sink,
     config::{Bitrate, NormalisationMethod, NormalisationType, PlayerConfig},
@@ -95,6 +96,8 @@ struct PlayerInternal {
     last_progress_update: Instant,
 
     local_file_lookup: Arc<LocalFileLookup>,
+
+    sink_sample_rate: u32,
 }
 
 static PLAYER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -530,6 +533,8 @@ impl Player {
                 last_progress_update: Instant::now(),
 
                 local_file_lookup: Arc::new(local_file_lookup),
+
+                sink_sample_rate: SAMPLE_RATE,
             };
 
             // While PlayerInternal is written as a future, it still contains blocking code.
@@ -705,6 +710,7 @@ struct PlayerLoadedTrackData {
     duration_ms: u32,
     stream_position_ms: u32,
     is_explicit: bool,
+    sample_rate: u32,
 }
 
 enum PlayerPreload {
@@ -742,6 +748,7 @@ enum PlayerState {
         stream_position_ms: u32,
         suggested_to_preload_next_track: bool,
         is_explicit: bool,
+        sample_rate: u32,
     },
     Playing {
         track_id: SpotifyUri,
@@ -757,6 +764,7 @@ enum PlayerState {
         reported_nominal_start_time: Option<Instant>,
         suggested_to_preload_next_track: bool,
         is_explicit: bool,
+        sample_rate: u32,
     },
     EndOfTrack {
         track_id: SpotifyUri,
@@ -823,6 +831,7 @@ impl PlayerState {
                 stream_position_ms,
                 is_explicit,
                 audio_item,
+                sample_rate,
                 ..
             } => {
                 *self = EndOfTrack {
@@ -837,6 +846,7 @@ impl PlayerState {
                         duration_ms,
                         stream_position_ms,
                         is_explicit,
+                        sample_rate,
                     },
                 };
             }
@@ -864,6 +874,7 @@ impl PlayerState {
                 stream_position_ms,
                 suggested_to_preload_next_track,
                 is_explicit,
+                sample_rate,
             } => {
                 *self = Playing {
                     track_id,
@@ -880,6 +891,7 @@ impl PlayerState {
                         .checked_sub(Duration::from_millis(stream_position_ms as u64)),
                     suggested_to_preload_next_track,
                     is_explicit,
+                    sample_rate,
                 };
             }
             _ => {
@@ -906,6 +918,7 @@ impl PlayerState {
                 stream_position_ms,
                 suggested_to_preload_next_track,
                 is_explicit,
+                sample_rate,
                 ..
             } => {
                 *self = Paused {
@@ -921,6 +934,7 @@ impl PlayerState {
                     stream_position_ms,
                     suggested_to_preload_next_track,
                     is_explicit,
+                    sample_rate,
                 };
             }
             _ => {
@@ -1241,6 +1255,7 @@ impl PlayerTrackLoader {
                 duration_ms,
                 stream_position_ms,
                 is_explicit,
+                sample_rate: SAMPLE_RATE,
             });
         }
     }
@@ -1303,6 +1318,14 @@ impl PlayerTrackLoader {
             }
         };
 
+        let sample_rate = match decoder.sample_rate() {
+            Ok(sample_rate) => sample_rate,
+            Err(e) => {
+                error!("Unable to determine track sample rate: {}", e);
+                return None;
+            }
+        };
+
         let file_size = fs::metadata(path).ok()?.len();
         let bytes_per_second = (file_size / duration.as_secs()) as usize;
 
@@ -1320,6 +1343,7 @@ impl PlayerTrackLoader {
             duration_ms: duration.as_millis() as u32,
             stream_position_ms,
             is_explicit: false,
+            sample_rate,
             audio_item: AudioItem {
                 duration_ms: duration.as_millis() as u32,
                 uri: track_uri.to_uri(),
@@ -1921,6 +1945,22 @@ impl PlayerInternal {
 
         if start_playback {
             self.ensure_sink_running();
+
+            if self.sink_sample_rate != loaded_track.sample_rate {
+                debug!(
+                    "Updating sink sample rate from {} Hz to {} Hz",
+                    self.sink_sample_rate, loaded_track.sample_rate
+                );
+
+                if let Err(e) = self.sink.update_sample_rate(loaded_track.sample_rate) {
+                    error!(
+                        "Failed to update sink sample rate: {e}. Track playback may be distorted."
+                    );
+                } else {
+                    self.sink_sample_rate = loaded_track.sample_rate;
+                }
+            }
+
             self.send_event(PlayerEvent::Playing {
                 track_id: track_id.clone(),
                 play_request_id,
@@ -1942,6 +1982,7 @@ impl PlayerInternal {
                     .checked_sub(Duration::from_millis(position_ms as u64)),
                 suggested_to_preload_next_track: false,
                 is_explicit: loaded_track.is_explicit,
+                sample_rate: loaded_track.sample_rate,
             };
         } else {
             self.ensure_sink_stopped(false);
@@ -1959,6 +2000,7 @@ impl PlayerInternal {
                 stream_position_ms: loaded_track.stream_position_ms,
                 suggested_to_preload_next_track: false,
                 is_explicit: loaded_track.is_explicit,
+                sample_rate: loaded_track.sample_rate,
             };
 
             self.send_event(PlayerEvent::Paused {
@@ -2063,6 +2105,7 @@ impl PlayerInternal {
                     duration_ms,
                     normalisation_data,
                     is_explicit,
+                    sample_rate,
                     ..
                 }
                 | PlayerState::Paused {
@@ -2074,6 +2117,7 @@ impl PlayerInternal {
                     duration_ms,
                     normalisation_data,
                     is_explicit,
+                    sample_rate,
                     ..
                 } = old_state
                 {
@@ -2086,6 +2130,7 @@ impl PlayerInternal {
                         duration_ms,
                         stream_position_ms,
                         is_explicit,
+                        sample_rate,
                     };
 
                     self.preload = PlayerPreload::None;
