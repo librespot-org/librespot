@@ -321,7 +321,7 @@ impl Cache {
             #[cfg(unix)]
             if file.metadata()?.mode() & 0o004 != 0 {
                 warn!(
-                    "credential file {location:?} is currently world readable, consider using  chmod 600 {location:?}  to fix this"
+                    "credential file {location:?} is currently world readable, consider using  chmod 600 {location:?} to fix this"
                 )
             }
             Ok(serde_json::from_reader(file)?)
