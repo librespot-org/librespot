@@ -266,11 +266,11 @@ impl OAuthClient {
             _ => self.scopes.clone(),
         };
         let refresh_token = match resp.refresh_token() {
-            Some(t) => t.secret().to_string(),
+            Some(t) => t.secret().clone(),
             _ => "".to_string(), // Spotify always provides a refresh token.
         };
         Ok(OAuthToken {
-            access_token: resp.access_token().secret().to_string(),
+            access_token: resp.access_token().secret().clone(),
             refresh_token,
             expires_at: Instant::now()
                 + resp
@@ -410,7 +410,7 @@ impl OAuthClientBuilder {
             }
         })?;
 
-        let client = BasicClient::new(ClientId::new(self.client_id.to_string()))
+        let client = BasicClient::new(ClientId::new(self.client_id.clone()))
             .set_auth_uri(auth_url)
             .set_token_uri(token_url)
             .set_redirect_uri(redirect_url);
@@ -496,11 +496,11 @@ pub fn get_access_token(
         _ => scopes.into_iter().map(Into::into).collect(),
     };
     let refresh_token = match token.refresh_token() {
-        Some(t) => t.secret().to_string(),
+        Some(t) => t.secret().clone(),
         _ => "".to_string(), // Spotify always provides a refresh token.
     };
     Ok(OAuthToken {
-        access_token: token.access_token().secret().to_string(),
+        access_token: token.access_token().secret().clone(),
         refresh_token,
         expires_at: Instant::now()
             + token

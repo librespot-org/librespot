@@ -27,7 +27,7 @@ pub trait MercuryRequest {
         let response = request.await?;
         match response.payload.first() {
             Some(data) => {
-                let data = data.to_vec().into();
+                let data = data.clone().into();
                 trace!("Received metadata: {data:?}");
                 Ok(data)
             }

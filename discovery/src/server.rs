@@ -156,7 +156,7 @@ impl RequestHandler {
 
         let encrypted_blob_len = encrypted_blob.len();
         if encrypted_blob_len < 16 {
-            return Err(DiscoveryError::HmacError(encrypted_blob.to_vec()).into());
+            return Err(DiscoveryError::HmacError(encrypted_blob.clone()).into());
         }
 
         let iv = &encrypted_blob[0..16];
