@@ -506,7 +506,7 @@ pub fn get_access_token(
             + token
                 .expires_in()
                 .unwrap_or_else(|| Duration::from_secs(3600)),
-        token_type: format!("{:?}", token.token_type()).to_string(), // Urgh!?
+        token_type: format!("{:?}", token.token_type()),
         scopes: token_scopes,
     })
 }
