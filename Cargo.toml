@@ -209,3 +209,9 @@ assets = [
     ["contrib/librespot.service", "lib/systemd/system/", "644"],
     ["contrib/librespot.user.service", "lib/systemd/user/", "644"],
 ]
+
+[workspace.lints]
+clippy.redundant_closure_for_method_calls = "warn"
+
+[lints]
+workspace = true
