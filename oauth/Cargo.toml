@@ -48,3 +48,6 @@ env_logger = { version = "0.11", default-features = false, features = [
     "auto-color",
 ] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[lints]
+workspace = true

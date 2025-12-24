@@ -118,3 +118,6 @@ vergen-gitcl = { version = "1.0", default-features = false, features = [
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }
+
+[lints]
+workspace = true
