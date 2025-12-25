@@ -169,14 +169,22 @@ mod test {
 
     #[test]
     fn test_shuffle_with_first() {
+        const MAX_VEC_RECREATION: usize = 20;
+
+        let mut prevent_running_indefinitely = 0;
         let (shuffled_without_first, shuffled_with_first) = loop {
             let (vec1, vec2) = get_shuffle_vec_without_and_with_first();
             if vec1 != vec2 {
                 break (vec1, vec2);
             }
-            // vec without and with first ist equal, aka the vec first item is the same value as
+
+            // vec without and with first is equal, aka the vec first item is the same value as
             // the randomly determined first values, we just create another set of two shuffled vec
-            println!("failed to retrieve two different vector")
+            assert!(
+                prevent_running_indefinitely < MAX_VEC_RECREATION,
+                "failed to retrieve two different vector after {MAX_VEC_RECREATION}"
+            );
+            prevent_running_indefinitely += 1;
         };
 
         let mut switched_positions = Vec::with_capacity(2);
