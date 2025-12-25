@@ -146,8 +146,7 @@ mod test {
         );
     }
 
-    #[test]
-    fn test_shuffle_with_first() {
+    fn get_shuffle_vec_without_and_with_first() -> (ShuffleVec<usize>, ShuffleVec<usize>) {
         const MAX_RANGE: usize = 200;
 
         let (base_vec, seed) = base(0..MAX_RANGE);
@@ -165,13 +164,28 @@ mod test {
         let mut shuffled_without_first = base_vec.clone();
         shuffled_without_first.shuffle_with_seed(seed, |_| false);
 
+        (shuffled_without_first, shuffled_with_first)
+    }
+
+    #[test]
+    fn test_shuffle_with_first() {
+        let (shuffled_without_first, shuffled_with_first) = loop {
+            let (vec1, vec2) = get_shuffle_vec_without_and_with_first();
+            if vec1 != vec2 {
+                break (vec1, vec2);
+            }
+            // vec without and with first ist equal, aka the vec first item is the same value as
+            // the randomly determined first values, we just create another set of two shuffled vec
+            println!("failed to retrieve two different vector")
+        };
+
         let mut switched_positions = Vec::with_capacity(2);
-        for (i, without_first_value) in shuffled_without_first.iter().enumerate() {
-            if without_first_value != &shuffled_with_first[i] {
+        for (i, shuffled_without_first_value) in shuffled_without_first.iter().enumerate() {
+            if shuffled_without_first_value != &shuffled_with_first[i] {
                 switched_positions.push(i);
             } else {
                 assert_eq!(
-                    without_first_value, &shuffled_with_first[i],
+                    shuffled_without_first_value, &shuffled_with_first[i],
                     "shuffling with the same seed has the same result"
                 );
             }
