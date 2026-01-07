@@ -1883,6 +1883,7 @@ async fn main() {
     const RUST_BACKTRACE: &str = "RUST_BACKTRACE";
     const RECONNECT_RATE_LIMIT_WINDOW: Duration = Duration::from_secs(600);
     const DISCOVERY_RETRY_TIMEOUT: Duration = Duration::from_secs(10);
+    const DISCOVERY_RETRY_UPTIME_LIMIT: Duration = Duration::from_secs(60);
     const RECONNECT_RATE_LIMIT: usize = 5;
 
     if env::var(RUST_BACKTRACE).is_err() {
@@ -1910,8 +1911,8 @@ async fn main() {
         // network-online.target but it requires that a wait-online.service is
         // also enabled which is not always the case since a wait-online.service
         // can potentially hang the boot process until it times out in certain situations.
-        // This allows for discovery to retry every 10 secs in the 1st min of uptime
-        // before giving up thus papering over the issue and not holding up the boot process.
+        // This allows for discovery to do periodic retries for an amount of time after system
+        // startup before giving up thus papering over the issue and not holding up the boot process.
 
         discovery = loop {
             let device_id = setup.session_config.device_id.clone();
@@ -1930,11 +1931,14 @@ async fn main() {
                 Err(e) => {
                     sys.refresh_processes(ProcessesToUpdate::All, true);
 
-                    if System::uptime() <= 1 {
+                    if Duration::from_secs(System::uptime()) <= DISCOVERY_RETRY_UPTIME_LIMIT {
                         debug!("Retrying to initialise discovery: {e}");
                         tokio::time::sleep(DISCOVERY_RETRY_TIMEOUT).await;
                     } else {
-                        debug!("System uptime > 1 min, not retrying to initialise discovery");
+                        debug!(
+                            "System uptime > {} secs, not retrying to initialise discovery",
+                            DISCOVERY_RETRY_UPTIME_LIMIT.as_secs()
+                        );
                         warn!("Could not initialise discovery: {e}");
                         break None;
                     }
