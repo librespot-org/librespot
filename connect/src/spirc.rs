@@ -20,6 +20,7 @@ use crate::{
         connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
         context::Context,
         explicit_content_pubsub::UserAttributesUpdate,
+        player::ProvidedTrack,
         playlist4_external::PlaylistModificationInfo,
         social_connect_v2::SessionUpdate,
         transfer_state::TransferState,
@@ -132,6 +133,7 @@ enum SpircCommand {
     Activate,
     Transfer(Option<TransferRequest>),
     Load(LoadRequest),
+    AddToQueue(String),
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
@@ -386,6 +388,15 @@ impl Spirc {
     /// Does not overwrite the queue.
     pub fn load(&self, command: LoadRequest) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Load(command))?)
+    }
+
+    /// Adds a track to the queue.
+    ///
+    /// Does nothing if we are not the active device.
+    ///
+    /// The `track_uri` should be a valid Spotify track URI (e.g., `spotify:track:...`).
+    pub fn add_to_queue(&self, track_uri: String) -> Result<(), Error> {
+        Ok(self.commands.send(SpircCommand::AddToQueue(track_uri))?)
     }
 
     /// Disconnects the current device and pauses the playback according the value.
@@ -679,6 +690,7 @@ impl SpircTask {
             SpircCommand::SetPosition(position) => self.handle_seek(position),
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
             SpircCommand::Load(command) => self.handle_load(command, None, None).await?,
+            SpircCommand::AddToQueue(track_uri) => self.handle_add_to_queue(track_uri),
         };
 
         self.notify().await
@@ -1543,6 +1555,14 @@ impl SpircTask {
         self.player
             .emit_repeat_changed_event(self.connect_state.repeat_context(), repeat);
         self.connect_state.set_repeat_track(repeat);
+    }
+
+    fn handle_add_to_queue(&mut self, track_uri: String) {
+        let track = ProvidedTrack {
+            uri: track_uri,
+            ..Default::default()
+        };
+        self.connect_state.add_to_queue(track, true);
     }
 
     fn handle_preload_next_track(&mut self) {
