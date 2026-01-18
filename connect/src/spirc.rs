@@ -133,7 +133,7 @@ enum SpircCommand {
     Activate,
     Transfer(Option<TransferRequest>),
     Load(LoadRequest),
-    AddToQueue(String),
+    AddToQueue(SpotifyUri),
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
@@ -394,9 +394,12 @@ impl Spirc {
     ///
     /// Does nothing if we are not the active device.
     ///
-    /// The `track_uri` should be a valid Spotify track URI (e.g., `spotify:track:...`).
-    pub fn add_to_queue(&self, track_uri: String) -> Result<(), Error> {
-        Ok(self.commands.send(SpircCommand::AddToQueue(track_uri))?)
+    /// Returns an error if the URI is not a track.
+    pub fn add_to_queue(&self, uri: SpotifyUri) -> Result<(), Error> {
+        let SpotifyUri::Track { .. } = uri else {
+            return Err(Error::invalid_argument("uri"));
+        };
+        Ok(self.commands.send(SpircCommand::AddToQueue(uri))?)
     }
 
     /// Disconnects the current device and pauses the playback according the value.
@@ -690,7 +693,7 @@ impl SpircTask {
             SpircCommand::SetPosition(position) => self.handle_seek(position),
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
             SpircCommand::Load(command) => self.handle_load(command, None, None).await?,
-            SpircCommand::AddToQueue(track_uri) => self.handle_add_to_queue(track_uri),
+            SpircCommand::AddToQueue(uri) => self.handle_add_to_queue(uri),
         };
 
         self.notify().await
@@ -1557,9 +1560,9 @@ impl SpircTask {
         self.connect_state.set_repeat_track(repeat);
     }
 
-    fn handle_add_to_queue(&mut self, track_uri: String) {
+    fn handle_add_to_queue(&mut self, uri: SpotifyUri) {
         let track = ProvidedTrack {
-            uri: track_uri,
+            uri: uri.to_uri(),
             ..Default::default()
         };
         self.connect_state.add_to_queue(track, true);
