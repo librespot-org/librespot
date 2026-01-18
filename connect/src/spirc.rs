@@ -390,15 +390,24 @@ impl Spirc {
         Ok(self.commands.send(SpircCommand::Load(command))?)
     }
 
-    /// Adds a track to the queue.
+    /// Adds a track, episode, album, playlist, artist, or show to the queue.
     ///
     /// Does nothing if we are not the active device.
     ///
-    /// Returns an error if the URI is not a track.
+    /// For albums, playlists, artists, and shows, all tracks/episodes are resolved
+    /// and added to the queue.
     pub fn add_to_queue(&self, uri: SpotifyUri) -> Result<(), Error> {
-        let SpotifyUri::Track { .. } = uri else {
+        if !matches!(
+            uri,
+            SpotifyUri::Track { .. }
+                | SpotifyUri::Episode { .. }
+                | SpotifyUri::Album { .. }
+                | SpotifyUri::Playlist { .. }
+                | SpotifyUri::Artist { .. }
+                | SpotifyUri::Show { .. }
+        ) {
             return Err(Error::invalid_argument("uri"));
-        };
+        }
         Ok(self.commands.send(SpircCommand::AddToQueue(uri))?)
     }
 
@@ -693,7 +702,7 @@ impl SpircTask {
             SpircCommand::SetPosition(position) => self.handle_seek(position),
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
             SpircCommand::Load(command) => self.handle_load(command, None, None).await?,
-            SpircCommand::AddToQueue(uri) => self.handle_add_to_queue(uri),
+            SpircCommand::AddToQueue(uri) => self.handle_add_to_queue(uri).await,
         };
 
         self.notify().await
@@ -1560,12 +1569,36 @@ impl SpircTask {
         self.connect_state.set_repeat_track(repeat);
     }
 
-    fn handle_add_to_queue(&mut self, uri: SpotifyUri) {
-        let track = ProvidedTrack {
-            uri: uri.to_uri(),
-            ..Default::default()
+    async fn handle_add_to_queue(&mut self, uri: SpotifyUri) {
+        let track_uris: Vec<String> = match uri {
+            SpotifyUri::Track { .. } | SpotifyUri::Episode { .. } => vec![uri.to_uri()],
+            SpotifyUri::Album { .. }
+            | SpotifyUri::Playlist { .. }
+            | SpotifyUri::Artist { .. }
+            | SpotifyUri::Show { .. } => {
+                match self.session.spclient().get_context(&uri.to_uri()).await {
+                    Ok(context) => context
+                        .pages
+                        .iter()
+                        .flat_map(|page| page.tracks.iter())
+                        .filter_map(|track| track.uri.clone())
+                        .collect(),
+                    Err(e) => {
+                        error!("failed to resolve context for {}: {e}", uri.item_type());
+                        return;
+                    }
+                }
+            }
+            _ => return,
         };
-        self.connect_state.add_to_queue(track, true);
+
+        for track_uri in track_uris {
+            let track = ProvidedTrack {
+                uri: track_uri,
+                ..Default::default()
+            };
+            self.connect_state.add_to_queue(track, true);
+        }
     }
 
     fn handle_preload_next_track(&mut self) {
