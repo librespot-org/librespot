@@ -403,8 +403,6 @@ impl Spirc {
                 | SpotifyUri::Episode { .. }
                 | SpotifyUri::Album { .. }
                 | SpotifyUri::Playlist { .. }
-                | SpotifyUri::Artist { .. }
-                | SpotifyUri::Show { .. }
         ) {
             return Err(Error::invalid_argument("uri"));
         }
