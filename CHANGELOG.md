@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums, playlists, artists, and shows to the queue
+- [playback] Add `AddedToQueue` player event, emitting when a track was added to the queue with `Spirc::add_to_queue`
 
 ### Changed
 
