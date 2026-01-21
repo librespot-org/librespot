@@ -394,8 +394,7 @@ impl Spirc {
     ///
     /// Does nothing if we are not the active device.
     ///
-    /// For albums, playlists, artists, and shows, all tracks/episodes are resolved
-    /// and added to the queue.
+    /// For albums and playlists, all tracks/episodes are resolved and added to the queue.
     pub fn add_to_queue(&self, uri: SpotifyUri) -> Result<(), Error> {
         if !matches!(
             uri,
