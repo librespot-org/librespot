@@ -390,7 +390,7 @@ impl Spirc {
         Ok(self.commands.send(SpircCommand::Load(command))?)
     }
 
-    /// Adds a track, episode, album, playlist, artist, or show to the queue.
+    /// Adds a track, episode, album or playlist to the queue.
     ///
     /// Does nothing if we are not the active device.
     ///
@@ -1576,10 +1576,7 @@ impl SpircTask {
     async fn handle_add_to_queue(&mut self, uri: SpotifyUri) {
         let track_uris: Vec<String> = match uri {
             SpotifyUri::Track { .. } | SpotifyUri::Episode { .. } => vec![uri.to_uri()],
-            SpotifyUri::Album { .. }
-            | SpotifyUri::Playlist { .. }
-            | SpotifyUri::Artist { .. }
-            | SpotifyUri::Show { .. } => {
+            SpotifyUri::Album { .. } | SpotifyUri::Playlist { .. } => {
                 match self.session.spclient().get_context(&uri.to_uri()).await {
                     Ok(context) => context
                         .pages
