@@ -20,6 +20,7 @@ use crate::{
         connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
         context::Context,
         explicit_content_pubsub::UserAttributesUpdate,
+        player::ProvidedTrack,
         playlist4_external::PlaylistModificationInfo,
         social_connect_v2::SessionUpdate,
         transfer_state::TransferState,
@@ -132,6 +133,7 @@ enum SpircCommand {
     Activate,
     Transfer(Option<TransferRequest>),
     Load(LoadRequest),
+    AddToQueue(SpotifyUri),
 }
 
 const CONTEXT_FETCH_THRESHOLD: usize = 2;
@@ -386,6 +388,24 @@ impl Spirc {
     /// Does not overwrite the queue.
     pub fn load(&self, command: LoadRequest) -> Result<(), Error> {
         Ok(self.commands.send(SpircCommand::Load(command))?)
+    }
+
+    /// Adds a track, episode, album or playlist to the queue.
+    ///
+    /// Does nothing if we are not the active device.
+    ///
+    /// For albums and playlists, all tracks/episodes are resolved and added to the queue.
+    pub fn add_to_queue(&self, uri: SpotifyUri) -> Result<(), Error> {
+        if !matches!(
+            uri,
+            SpotifyUri::Track { .. }
+                | SpotifyUri::Episode { .. }
+                | SpotifyUri::Album { .. }
+                | SpotifyUri::Playlist { .. }
+        ) {
+            return Err(Error::invalid_argument("uri"));
+        }
+        Ok(self.commands.send(SpircCommand::AddToQueue(uri))?)
     }
 
     /// Disconnects the current device and pauses the playback according the value.
@@ -679,6 +699,7 @@ impl SpircTask {
             SpircCommand::SetPosition(position) => self.handle_seek(position),
             SpircCommand::SetVolume(volume) => self.set_volume(volume),
             SpircCommand::Load(command) => self.handle_load(command, None, None).await?,
+            SpircCommand::AddToQueue(uri) => self.handle_add_to_queue(uri).await,
         };
 
         self.notify().await
@@ -1062,7 +1083,13 @@ impl SpircTask {
                 self.handle_repeat_context(repeat_context.value)?
             }
             SetRepeatingTrack(repeat_track) => self.handle_repeat_track(repeat_track.value),
-            AddToQueue(add_to_queue) => self.connect_state.add_to_queue(add_to_queue.track, true),
+            AddToQueue(add_to_queue) => {
+                let track = add_to_queue.track.clone();
+                self.connect_state.add_to_queue(add_to_queue.track, true);
+                if let Ok(uri) = SpotifyUri::from_uri(&track.uri) {
+                    self.player.emit_added_to_queue_event(uri);
+                }
+            }
             SetQueue(set_queue) => self.connect_state.handle_set_queue(set_queue),
             SetOptions(set_options) => {
                 if let Some(repeat_context) = set_options.repeating_context {
@@ -1543,6 +1570,39 @@ impl SpircTask {
         self.player
             .emit_repeat_changed_event(self.connect_state.repeat_context(), repeat);
         self.connect_state.set_repeat_track(repeat);
+    }
+
+    async fn handle_add_to_queue(&mut self, uri: SpotifyUri) {
+        let track_uris: Vec<String> = match uri {
+            SpotifyUri::Track { .. } | SpotifyUri::Episode { .. } => vec![uri.to_uri()],
+            SpotifyUri::Album { .. } | SpotifyUri::Playlist { .. } => {
+                match self.session.spclient().get_context(&uri.to_uri()).await {
+                    Ok(context) => context
+                        .pages
+                        .iter()
+                        .flat_map(|page| page.tracks.iter())
+                        .filter_map(|track| track.uri.clone())
+                        .collect(),
+                    Err(e) => {
+                        error!("failed to resolve context for {}: {e}", uri.item_type());
+                        return;
+                    }
+                }
+            }
+            _ => return,
+        };
+
+        for track_uri in track_uris {
+            let track = ProvidedTrack {
+                uri: track_uri.clone(),
+                ..Default::default()
+            };
+            self.connect_state.add_to_queue(track, true);
+
+            if let Ok(uri) = SpotifyUri::from_uri(&track_uri) {
+                self.player.emit_added_to_queue_event(uri);
+            }
+        }
     }
 
     fn handle_preload_next_track(&mut self) {

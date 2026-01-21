@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- [connect] Add method `add_to_queue` to `Spirc` to add tracks, episodes, albums and playlists to the queue
+- [playback] Add `AddedToQueue` player event, emitting when a track was added to the queue with `Spirc::add_to_queue`
+
 ### Changed
 
 - [core] Made `SpotifyId::to_base62`, `SpotifyId::to_base16`, `FileId::to_base16`, `SpotifyUri::to_id`, `SpotifyUri::to_uri` infallible (breaking)
