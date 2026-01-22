@@ -27,10 +27,6 @@ impl EventHandler {
                                     .insert("PLAYER_EVENT", "play_request_id_changed".to_string());
                                 env_vars.insert("PLAY_REQUEST_ID", play_request_id.to_string());
                             }
-                            PlayerEvent::AddedToQueue { track_id } => {
-                                env_vars.insert("PLAYER_EVENT", "added_to_queue".to_string());
-                                env_vars.insert("TRACK_ID", track_id.to_id());
-                            }
                             PlayerEvent::TrackChanged { audio_item } => {
                                 let id = audio_item.track_id.to_id();
                                 env_vars.insert("PLAYER_EVENT", "track_changed".to_string());

@@ -138,7 +138,6 @@ enum PlayerCommand {
         track: bool,
     },
     EmitAutoPlayChangedEvent(bool),
-    EmitAddedToQueueEvent(SpotifyUri),
     EmitSetQueueEvent {
         context_uri: String,
         current_track: Option<(String, String)>, // (uri, provider)
@@ -152,9 +151,6 @@ pub enum PlayerEvent {
     // Play request id changed
     PlayRequestIdChanged {
         play_request_id: u64,
-    },
-    AddedToQueue {
-        track_id: SpotifyUri,
     },
     // Fired when the player is stopped (e.g. by issuing a "stop" command to the player).
     Stopped {
@@ -663,10 +659,6 @@ impl Player {
 
     pub fn emit_auto_play_changed_event(&self, auto_play: bool) {
         self.command(PlayerCommand::EmitAutoPlayChangedEvent(auto_play));
-    }
-
-    pub fn emit_added_to_queue_event(&self, track_id: SpotifyUri) {
-        self.command(PlayerCommand::EmitAddedToQueueEvent(track_id));
     }
 
     pub fn emit_set_queue_event(
@@ -2371,10 +2363,6 @@ impl PlayerInternal {
                 self.auto_normalise_as_album = setting
             }
 
-            PlayerCommand::EmitAddedToQueueEvent(track_id) => {
-                self.send_event(PlayerEvent::AddedToQueue { track_id })
-            }
-
             PlayerCommand::EmitSetQueueEvent {
                 context_uri,
                 current_track,
@@ -2587,10 +2575,6 @@ impl fmt::Debug for PlayerCommand {
             PlayerCommand::EmitAutoPlayChangedEvent(auto_play) => f
                 .debug_tuple("EmitAutoPlayChangedEvent")
                 .field(&auto_play)
-                .finish(),
-            PlayerCommand::EmitAddedToQueueEvent(track_id) => f
-                .debug_tuple("EmitAddedToQueueEvent")
-                .field(&track_id)
                 .finish(),
             PlayerCommand::EmitSetQueueEvent {
                 context_uri,

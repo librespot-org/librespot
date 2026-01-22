@@ -1115,11 +1115,8 @@ impl SpircTask {
             }
             SetRepeatingTrack(repeat_track) => self.handle_repeat_track(repeat_track.value),
             AddToQueue(add_to_queue) => {
-                let track = add_to_queue.track.clone();
                 self.connect_state.add_to_queue(add_to_queue.track, true);
-                if let Ok(uri) = SpotifyUri::from_uri(&track.uri) {
-                    self.player.emit_added_to_queue_event(uri);
-                }
+                self.emit_set_queue_event();
             }
             SetQueue(set_queue) => {
                 // Extract track data before consuming set_queue
@@ -1660,10 +1657,7 @@ impl SpircTask {
                 ..Default::default()
             };
             self.connect_state.add_to_queue(track, true);
-
-            if let Ok(uri) = SpotifyUri::from_uri(&track_uri) {
-                self.player.emit_added_to_queue_event(uri);
-            }
+            self.emit_set_queue_event();
         }
     }
 
