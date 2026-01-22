@@ -234,6 +234,35 @@ impl EventHandler {
                                 );
                                 env_vars.insert("FILTER", filter.to_string());
                             }
+                            PlayerEvent::SetQueue {
+                                context_uri,
+                                current_track,
+                                next_tracks,
+                                prev_tracks,
+                            } => {
+                                env_vars.insert("PLAYER_EVENT", "set_queue".to_string());
+                                env_vars.insert("CONTEXT_URI", context_uri);
+                                if let Some((uri, provider)) = current_track {
+                                    env_vars
+                                        .insert("CURRENT_TRACK", format!("{uri}\t{provider}"));
+                                }
+                                env_vars.insert(
+                                    "NEXT_TRACKS",
+                                    next_tracks
+                                        .into_iter()
+                                        .map(|(uri, provider)| format!("{uri}\t{provider}"))
+                                        .collect::<Vec<String>>()
+                                        .join("\n"),
+                                );
+                                env_vars.insert(
+                                    "PREV_TRACKS",
+                                    prev_tracks
+                                        .into_iter()
+                                        .map(|(uri, provider)| format!("{uri}\t{provider}"))
+                                        .collect::<Vec<String>>()
+                                        .join("\n"),
+                                );
+                            }
                             // Ignore event irrelevant for standalone binary like PositionChanged
                             _ => {}
                         }

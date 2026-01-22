@@ -139,6 +139,12 @@ enum PlayerCommand {
     },
     EmitAutoPlayChangedEvent(bool),
     EmitAddedToQueueEvent(SpotifyUri),
+    EmitSetQueueEvent {
+        context_uri: String,
+        current_track: Option<(String, String)>, // (uri, provider)
+        next_tracks: Vec<(String, String)>,      // (uri, provider)
+        prev_tracks: Vec<(String, String)>,      // (uri, provider)
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -251,6 +257,13 @@ pub enum PlayerEvent {
     },
     FilterExplicitContentChanged {
         filter: bool,
+    },
+    /// Fired when the queue is set or context is loaded with its track list.
+    SetQueue {
+        context_uri: String,
+        current_track: Option<(String, String)>, // (uri, provider)
+        next_tracks: Vec<(String, String)>,      // (uri, provider)
+        prev_tracks: Vec<(String, String)>,      // (uri, provider)
     },
 }
 
@@ -654,6 +667,21 @@ impl Player {
 
     pub fn emit_added_to_queue_event(&self, track_id: SpotifyUri) {
         self.command(PlayerCommand::EmitAddedToQueueEvent(track_id));
+    }
+
+    pub fn emit_set_queue_event(
+        &self,
+        context_uri: String,
+        current_track: Option<(String, String)>,
+        next_tracks: Vec<(String, String)>,
+        prev_tracks: Vec<(String, String)>,
+    ) {
+        self.command(PlayerCommand::EmitSetQueueEvent {
+            context_uri,
+            current_track,
+            next_tracks,
+            prev_tracks,
+        });
     }
 }
 
@@ -2347,6 +2375,18 @@ impl PlayerInternal {
                 self.send_event(PlayerEvent::AddedToQueue { track_id })
             }
 
+            PlayerCommand::EmitSetQueueEvent {
+                context_uri,
+                current_track,
+                next_tracks,
+                prev_tracks,
+            } => self.send_event(PlayerEvent::SetQueue {
+                context_uri,
+                current_track,
+                next_tracks,
+                prev_tracks,
+            }),
+
             PlayerCommand::EmitFilterExplicitContentChangedEvent(filter) => {
                 self.send_event(PlayerEvent::FilterExplicitContentChanged { filter });
 
@@ -2551,6 +2591,17 @@ impl fmt::Debug for PlayerCommand {
             PlayerCommand::EmitAddedToQueueEvent(track_id) => f
                 .debug_tuple("EmitAddedToQueueEvent")
                 .field(&track_id)
+                .finish(),
+            PlayerCommand::EmitSetQueueEvent {
+                context_uri,
+                next_tracks,
+                prev_tracks,
+                ..
+            } => f
+                .debug_tuple("EmitSetQueueEvent")
+                .field(&context_uri)
+                .field(&next_tracks.len())
+                .field(&prev_tracks.len())
                 .finish(),
         }
     }

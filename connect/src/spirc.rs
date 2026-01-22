@@ -636,8 +636,39 @@ impl SpircTask {
             false
         };
 
+        // Fire set queue event if context was successfully loaded
+        if update_state {
+            self.emit_set_queue_event();
+        }
+
         self.context_resolver.remove_used_and_invalid();
         update_state
+    }
+
+    /// Emit set queue event via PlayerEvent
+    fn emit_set_queue_event(&self) {
+        let context_uri = self.connect_state.context_uri().clone();
+        let state_player = self.connect_state.player();
+
+        let current_track = state_player
+            .track
+            .as_ref()
+            .map(|t| (t.uri.clone(), t.provider.clone()));
+
+        let next_tracks: Vec<_> = state_player
+            .next_tracks
+            .iter()
+            .map(|t| (t.uri.clone(), t.provider.clone()))
+            .collect();
+
+        let prev_tracks: Vec<_> = state_player
+            .prev_tracks
+            .iter()
+            .map(|t| (t.uri.clone(), t.provider.clone()))
+            .collect();
+
+        self.player
+            .emit_set_queue_event(context_uri, current_track, next_tracks, prev_tracks);
     }
 
     // todo: is the time_delta still necessary?
@@ -1090,7 +1121,36 @@ impl SpircTask {
                     self.player.emit_added_to_queue_event(uri);
                 }
             }
-            SetQueue(set_queue) => self.connect_state.handle_set_queue(set_queue),
+            SetQueue(set_queue) => {
+                // Extract track data before consuming set_queue
+                let context_uri = self.connect_state.context_uri().clone();
+                let state_player = self.connect_state.player();
+
+                let current_track = state_player
+                    .track
+                    .as_ref()
+                    .map(|t| (t.uri.clone(), t.provider.clone()));
+
+                let next_tracks: Vec<(String, String)> = set_queue
+                    .next_tracks
+                    .iter()
+                    .map(|t| (t.uri.clone(), t.provider.clone()))
+                    .collect();
+
+                let prev_tracks: Vec<(String, String)> = set_queue
+                    .prev_tracks
+                    .iter()
+                    .map(|t| (t.uri.clone(), t.provider.clone()))
+                    .collect();
+
+                self.connect_state.handle_set_queue(set_queue);
+                self.player.emit_set_queue_event(
+                    context_uri,
+                    current_track,
+                    next_tracks,
+                    prev_tracks,
+                );
+            }
             SetOptions(set_options) => {
                 if let Some(repeat_context) = set_options.repeating_context {
                     self.handle_repeat_context(repeat_context)?
@@ -1459,6 +1519,8 @@ impl SpircTask {
         let _ = self
             .connect_state
             .update_context(ctx, ContextType::Default)?;
+
+        self.emit_set_queue_event();
 
         Ok(())
     }
