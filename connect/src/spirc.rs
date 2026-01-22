@@ -1119,7 +1119,7 @@ impl SpircTask {
                 self.emit_set_queue_event();
             }
             SetQueue(set_queue) => {
-                // Extract track data before consuming set_queue
+                // Extract current state and new queue data for the event before updating the state
                 let context_uri = self.connect_state.context_uri().clone();
                 let state_player = self.connect_state.player();
 
