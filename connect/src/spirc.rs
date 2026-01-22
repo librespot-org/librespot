@@ -1657,8 +1657,8 @@ impl SpircTask {
                 ..Default::default()
             };
             self.connect_state.add_to_queue(track, true);
-            self.emit_set_queue_event();
         }
+        self.emit_set_queue_event();
     }
 
     fn handle_preload_next_track(&mut self) {
