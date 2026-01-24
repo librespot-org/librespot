@@ -241,7 +241,7 @@ impl Sink for RodioSink {
     }
 
     fn update_sample_rate(&mut self, _new_sample_rate: u32) -> SinkResult<()> {
-        Err(SinkError::SampleRateChange("not implemented".into()))
+        Err(SinkError::SampleRateChangeNotSupported)
     }
 
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()> {

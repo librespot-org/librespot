@@ -15,8 +15,8 @@ pub enum SinkError {
     InvalidParams(String),
     #[error("Audio Sink Error Changing State: {0}")]
     StateChange(String),
-    #[error("Audio Sink Error Updating Sample Rate: {0}")]
-    SampleRateChange(String),
+    #[error("Audio Sink Error Updating Sample Rate: Not Supported")]
+    SampleRateChangeNotSupported,
 }
 
 pub type SinkResult<T> = Result<T, SinkError>;

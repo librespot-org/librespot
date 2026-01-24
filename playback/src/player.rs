@@ -37,11 +37,11 @@ use futures_util::{
 };
 use librespot_metadata::{audio::UniqueFields, track::Tracks};
 
+use crate::SAMPLES_PER_SECOND;
+use crate::audio_backend::SinkError;
 use symphonia::core::io::MediaSource;
 use symphonia::core::probe::Hint;
 use tokio::sync::{mpsc, oneshot};
-
-use crate::SAMPLES_PER_SECOND;
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
 pub const DB_VOLTAGE_RATIO: f64 = 20.0;
@@ -1952,12 +1952,41 @@ impl PlayerInternal {
                     self.sink_sample_rate, loaded_track.sample_rate
                 );
 
-                if let Err(e) = self.sink.update_sample_rate(loaded_track.sample_rate) {
-                    error!(
-                        "Failed to update sink sample rate: {e}. Track playback may be distorted."
-                    );
-                } else {
-                    self.sink_sample_rate = loaded_track.sample_rate;
+                match self.sink.update_sample_rate(loaded_track.sample_rate) {
+                    Ok(()) => {
+                        self.sink_sample_rate = loaded_track.sample_rate;
+                    }
+                    Err(e) => {
+                        error!("{e}");
+
+                        let reaction_event = match e {
+                            SinkError::SampleRateChangeNotSupported => {
+                                // The sink does not support changing its sample rate; this track
+                                // will never be playable.
+                                PlayerEvent::Unavailable {
+                                    track_id: track_id.clone(),
+                                    play_request_id,
+                                }
+                            }
+                            _ => {
+                                // Could be a transient error; try the next track
+                                PlayerEvent::EndOfTrack {
+                                    track_id: track_id.clone(),
+                                    play_request_id,
+                                }
+                            }
+                        };
+
+                        self.send_event(reaction_event);
+
+                        self.state = PlayerState::EndOfTrack {
+                            track_id,
+                            play_request_id,
+                            loaded_track,
+                        };
+
+                        return;
+                    }
                 }
             }
 
