@@ -1119,34 +1119,8 @@ impl SpircTask {
                 self.emit_set_queue_event();
             }
             SetQueue(set_queue) => {
-                // Extract current state and new queue data for the event before updating the state
-                let context_uri = self.connect_state.context_uri().clone();
-                let state_player = self.connect_state.player();
-
-                let current_track = state_player
-                    .track
-                    .as_ref()
-                    .map(|t| (t.uri.clone(), t.provider.clone()));
-
-                let next_tracks: Vec<(String, String)> = set_queue
-                    .next_tracks
-                    .iter()
-                    .map(|t| (t.uri.clone(), t.provider.clone()))
-                    .collect();
-
-                let prev_tracks: Vec<(String, String)> = set_queue
-                    .prev_tracks
-                    .iter()
-                    .map(|t| (t.uri.clone(), t.provider.clone()))
-                    .collect();
-
                 self.connect_state.handle_set_queue(set_queue);
-                self.player.emit_set_queue_event(
-                    context_uri,
-                    current_track,
-                    next_tracks,
-                    prev_tracks,
-                );
+                self.emit_set_queue_event();
             }
             SetOptions(set_options) => {
                 if let Some(repeat_context) = set_options.repeating_context {
