@@ -238,14 +238,17 @@ impl EventHandler {
                             } => {
                                 env_vars.insert("PLAYER_EVENT", "set_queue".to_string());
                                 env_vars.insert("CONTEXT_URI", context_uri);
-                                if let Some((uri, provider)) = current_track {
-                                    env_vars.insert("CURRENT_TRACK", format!("{uri}\t{provider}"));
+                                if let Some(track) = current_track {
+                                    env_vars.insert(
+                                        "CURRENT_TRACK",
+                                        format!("{}\t{}", track.uri, track.provider),
+                                    );
                                 }
                                 env_vars.insert(
                                     "NEXT_TRACKS",
                                     next_tracks
                                         .into_iter()
-                                        .map(|(uri, provider)| format!("{uri}\t{provider}"))
+                                        .map(|t| format!("{}\t{}", t.uri, t.provider))
                                         .collect::<Vec<String>>()
                                         .join("\n"),
                                 );
@@ -253,7 +256,7 @@ impl EventHandler {
                                     "PREV_TRACKS",
                                     prev_tracks
                                         .into_iter()
-                                        .map(|(uri, provider)| format!("{uri}\t{provider}"))
+                                        .map(|t| format!("{}\t{}", t.uri, t.provider))
                                         .collect::<Vec<String>>()
                                         .join("\n"),
                                 );

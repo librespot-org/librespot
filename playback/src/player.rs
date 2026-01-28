@@ -140,10 +140,17 @@ enum PlayerCommand {
     EmitAutoPlayChangedEvent(bool),
     EmitSetQueueEvent {
         context_uri: String,
-        current_track: Option<(String, String)>, // (uri, provider)
-        next_tracks: Vec<(String, String)>,      // (uri, provider)
-        prev_tracks: Vec<(String, String)>,      // (uri, provider)
+        current_track: Option<QueueTrack>,
+        next_tracks: Vec<QueueTrack>,
+        prev_tracks: Vec<QueueTrack>,
     },
+}
+
+/// Represents a track in the queue with its URI and provider.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QueueTrack {
+    pub uri: String,
+    pub provider: String,
 }
 
 #[derive(Debug, Clone)]
@@ -257,9 +264,9 @@ pub enum PlayerEvent {
     /// Fired when the queue is set or context is loaded with its track list.
     SetQueue {
         context_uri: String,
-        current_track: Option<(String, String)>, // (uri, provider)
-        next_tracks: Vec<(String, String)>,      // (uri, provider)
-        prev_tracks: Vec<(String, String)>,      // (uri, provider)
+        current_track: Option<QueueTrack>,
+        next_tracks: Vec<QueueTrack>,
+        prev_tracks: Vec<QueueTrack>,
     },
 }
 
@@ -664,9 +671,9 @@ impl Player {
     pub fn emit_set_queue_event(
         &self,
         context_uri: String,
-        current_track: Option<(String, String)>,
-        next_tracks: Vec<(String, String)>,
-        prev_tracks: Vec<(String, String)>,
+        current_track: Option<QueueTrack>,
+        next_tracks: Vec<QueueTrack>,
+        prev_tracks: Vec<QueueTrack>,
     ) {
         self.command(PlayerCommand::EmitSetQueueEvent {
             context_uri,

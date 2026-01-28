@@ -14,7 +14,7 @@ use crate::{
     model::{LoadRequest, PlayingTrack, SpircPlayStatus},
     playback::{
         mixer::Mixer,
-        player::{Player, PlayerEvent, PlayerEventChannel},
+        player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
     },
     protocol::{
         connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
@@ -650,21 +650,27 @@ impl SpircTask {
         let context_uri = self.connect_state.context_uri().clone();
         let state_player = self.connect_state.player();
 
-        let current_track = state_player
-            .track
-            .as_ref()
-            .map(|t| (t.uri.clone(), t.provider.clone()));
+        let current_track = state_player.track.as_ref().map(|t| QueueTrack {
+            uri: t.uri.clone(),
+            provider: t.provider.clone(),
+        });
 
         let next_tracks: Vec<_> = state_player
             .next_tracks
             .iter()
-            .map(|t| (t.uri.clone(), t.provider.clone()))
+            .map(|t| QueueTrack {
+                uri: t.uri.clone(),
+                provider: t.provider.clone(),
+            })
             .collect();
 
         let prev_tracks: Vec<_> = state_player
             .prev_tracks
             .iter()
-            .map(|t| (t.uri.clone(), t.provider.clone()))
+            .map(|t| QueueTrack {
+                uri: t.uri.clone(),
+                provider: t.provider.clone(),
+            })
             .collect();
 
         self.player
