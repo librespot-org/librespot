@@ -1908,6 +1908,7 @@ dependencies = [
  "tokio-util",
  "url",
  "uuid",
+ "vergen",
  "vergen-gitcl",
 ]
 
