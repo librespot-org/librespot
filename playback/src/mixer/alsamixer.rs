@@ -292,8 +292,6 @@ impl Mixer for AlsaMixer {
 }
 
 impl AlsaMixer {
-    pub const NAME: &'static str = "alsa";
-
     fn switched_off(&self) -> bool {
         if !self.has_switch {
             return false;

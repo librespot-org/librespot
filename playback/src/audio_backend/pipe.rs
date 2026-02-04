@@ -1,11 +1,14 @@
-use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-
-use std::fs::OpenOptions;
-use std::io::{self, Write};
-use std::process::exit;
+use crate::{
+    audio_backend::{Open, Sink, SinkAsBytes, SinkError, SinkResult},
+    config::AudioFormat,
+    convert::Converter,
+    decoder::AudioPacket,
+};
+use std::{
+    fs::OpenOptions,
+    io::{self, Write},
+    process::exit,
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -42,21 +45,20 @@ pub struct StdoutSink {
 }
 
 impl Open for StdoutSink {
-    fn open(file: Option<String>, format: AudioFormat) -> Self {
-        if let Some("?") = file.as_deref() {
-            println!(
-                "\nUsage:\n\nOutput to stdout:\n\n\t--backend pipe\n\nOutput to file:\n\n\t--backend pipe --device {{filename}}\n"
-            );
-            exit(0);
-        }
-
+    fn device_options() -> ! {
+        println!(
+            "\nUsage:\n\nOutput to stdout:\n\n\t--backend pipe\n\nOutput to file:\n\n\t--backend pipe --device {{filename}}\n"
+        );
+        exit(0)
+    }
+    fn open(file: Option<String>, format: AudioFormat) -> Box<Self> {
         info!("Using StdoutSink (pipe) with format: {format:?}");
 
-        Self {
+        Box::new(Self {
             output: None,
             file,
             format,
-        }
+        })
     }
 }
 
@@ -106,8 +108,4 @@ impl SinkAsBytes for StdoutSink {
 
         Ok(())
     }
-}
-
-impl StdoutSink {
-    pub const NAME: &'static str = "pipe";
 }

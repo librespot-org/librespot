@@ -1,8 +1,10 @@
-use super::{Open, Sink, SinkError, SinkResult};
-use crate::NUM_CHANNELS;
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
+use crate::{
+    NUM_CHANNELS,
+    audio_backend::{Open, Sink, SinkError, SinkResult},
+    config::AudioFormat,
+    convert::Converter,
+    decoder::AudioPacket,
+};
 use jack::{
     AsyncClient, AudioOut, Client, ClientOptions, Control, Port, ProcessHandler, ProcessScope,
 };
@@ -38,7 +40,7 @@ impl ProcessHandler for JackData {
 }
 
 impl Open for JackSink {
-    fn open(client_name: Option<String>, format: AudioFormat) -> Self {
+    fn open(client_name: Option<String>, format: AudioFormat) -> Box<Self> {
         if format != AudioFormat::F32 {
             warn!("JACK currently does not support {format:?} output");
         }
@@ -58,10 +60,10 @@ impl Open for JackSink {
         };
         let active_client = AsyncClient::new(client, (), jack_data).unwrap();
 
-        Self {
+        Box::new(Self {
             send: tx,
             active_client,
-        }
+        })
     }
 }
 
@@ -80,8 +82,4 @@ impl Sink for JackSink {
         }
         Ok(())
     }
-}
-
-impl JackSink {
-    pub const NAME: &'static str = "jackaudio";
 }

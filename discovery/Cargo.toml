@@ -8,12 +8,20 @@ description = "The discovery logic for librespot"
 repository.workspace = true
 edition.workspace = true
 
+[[example]]
+name = "discovery_group"
+required-features = ["default"]
+
+[[example]]
+name = "discovery"
+required-features = ["default"]
+
 [features]
 # Refer to the workspace Cargo.toml for the list of features
 default = ["with-libmdns", "native-tls"]
 
 # Discovery backends
-with-avahi = ["dep:serde", "dep:zbus", "futures-util/async-await-macro"]
+with-avahi = ["dep:zbus", "futures-util/async-await-macro"]
 with-dns-sd = ["dep:dns-sd"]
 with-libmdns = ["dep:libmdns"]
 
@@ -46,7 +54,7 @@ log = "0.4"
 rand = { version = "0.9", default-features = false, features = ["thread_rng"] }
 serde = { version = "1", default-features = false, features = [
     "derive",
-], optional = true }
+]}
 serde_repr = "0.1"
 serde_json = "1.0"
 sha1 = "0.10"
@@ -55,11 +63,16 @@ tokio = { version = "1", features = ["sync", "rt"] }
 zbus = { version = "5", default-features = false, features = [
     "tokio",
 ], optional = true }
+clap = { version = "4.5.54", default-features = false }
+enum-assoc = "1.2.4"
 
 [dev-dependencies]
 futures = "0.3"
 hex = "0.4"
 tokio = { version = "1", features = ["macros", "rt"] }
+
+[build-dependencies]
+cfg_aliases = "0.2.1"
 
 [lints]
 workspace = true

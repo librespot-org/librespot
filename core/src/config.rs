@@ -1,6 +1,8 @@
-use std::{fmt, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
+use clap::ValueEnum;
 use librespot_protocol::devices::DeviceType as ProtoDeviceType;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub(crate) const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
@@ -31,15 +33,21 @@ pub struct SessionConfig {
     pub autoplay: Option<bool>,
 }
 
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self::default_for_os(OS)
+    }
+}
+
 impl SessionConfig {
     pub(crate) fn default_for_os(os: &str) -> Self {
-        let device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
         let client_id = match os {
             "android" => ANDROID_CLIENT_ID,
             "ios" => IOS_CLIENT_ID,
             _ => KEYMASTER_CLIENT_ID,
         }
         .to_owned();
+        let device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
 
         Self {
             client_id,
@@ -52,13 +60,21 @@ impl SessionConfig {
     }
 }
 
-impl Default for SessionConfig {
-    fn default() -> Self {
-        Self::default_for_os(OS)
-    }
-}
-
-#[derive(Clone, Copy, Debug, Hash, PartialOrd, Ord, PartialEq, Eq, Default)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Default,
+    ValueEnum,
+    Serialize,
+    Deserialize,
+)]
+#[clap(rename_all = "lower")]
 pub enum DeviceType {
     Unknown = 0,
     Computer = 1,
@@ -81,67 +97,9 @@ pub enum DeviceType {
     Observer = 102,
 }
 
-impl FromStr for DeviceType {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use self::DeviceType::*;
-        match s.to_lowercase().as_ref() {
-            "computer" => Ok(Computer),
-            "tablet" => Ok(Tablet),
-            "smartphone" => Ok(Smartphone),
-            "speaker" => Ok(Speaker),
-            "tv" => Ok(Tv),
-            "avr" => Ok(Avr),
-            "stb" => Ok(Stb),
-            "audiodongle" => Ok(AudioDongle),
-            "gameconsole" => Ok(GameConsole),
-            "castaudio" => Ok(CastAudio),
-            "castvideo" => Ok(CastVideo),
-            "automobile" => Ok(Automobile),
-            "smartwatch" => Ok(Smartwatch),
-            "chromebook" => Ok(Chromebook),
-            "carthing" => Ok(CarThing),
-            _ => Err(()),
-        }
-    }
-}
-
-impl From<&DeviceType> for &str {
-    fn from(d: &DeviceType) -> &'static str {
-        use self::DeviceType::*;
-        match d {
-            Unknown => "Unknown",
-            Computer => "Computer",
-            Tablet => "Tablet",
-            Smartphone => "Smartphone",
-            Speaker => "Speaker",
-            Tv => "TV",
-            Avr => "AVR",
-            Stb => "STB",
-            AudioDongle => "AudioDongle",
-            GameConsole => "GameConsole",
-            CastAudio => "CastAudio",
-            CastVideo => "CastVideo",
-            Automobile => "Automobile",
-            Smartwatch => "Smartwatch",
-            Chromebook => "Chromebook",
-            UnknownSpotify => "UnknownSpotify",
-            CarThing => "CarThing",
-            Observer => "Observer",
-        }
-    }
-}
-
-impl From<DeviceType> for &str {
-    fn from(d: DeviceType) -> &'static str {
-        (&d).into()
-    }
-}
-
-impl fmt::Display for DeviceType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let str: &str = self.into();
-        f.write_str(str)
+impl From<DeviceType> for String {
+    fn from(value: DeviceType) -> Self {
+        format!("{value:?}")
     }
 }
 

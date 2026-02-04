@@ -1,11 +1,12 @@
-use super::{Open, Sink, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::{
+    NUM_CHANNELS, SAMPLE_RATE,
+    audio_backend::{Open, Sink, SinkError, SinkResult},
+    config::AudioFormat,
+    convert::Converter,
+    decoder::AudioPacket,
+};
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
-use std::thread;
-use std::time::Duration;
+use std::{process::exit, thread, time::Duration};
 
 pub enum SdlSink {
     F32(AudioQueue<f32>),
@@ -14,7 +15,11 @@ pub enum SdlSink {
 }
 
 impl Open for SdlSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
+    fn device_options() -> ! {
+        println!("SDL sink does not support specifying a device name");
+        exit(0)
+    }
+    fn open(device: Option<String>, format: AudioFormat) -> Box<Self> {
         info!("Using SDL sink with format: {:?}", format);
 
         if device.is_some() {
@@ -37,7 +42,7 @@ impl Open for SdlSink {
                 let queue: AudioQueue<$type> = audio
                     .open_queue(None, &desired_spec)
                     .expect("could not open SDL audio device");
-                $sink(queue)
+                Box::new($sink(queue))
             }};
         }
         match format {
@@ -114,8 +119,4 @@ impl Sink for SdlSink {
         };
         result.map_err(SinkError::OnWrite)
     }
-}
-
-impl SdlSink {
-    pub const NAME: &'static str = "sdl";
 }

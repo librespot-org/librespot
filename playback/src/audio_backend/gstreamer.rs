@@ -1,22 +1,20 @@
-use std::sync::{Arc, Mutex};
-
+use crate::{
+    NUM_CHANNELS, SAMPLE_RATE,
+    audio_backend::{Open, Sink, SinkAsBytes, SinkError, SinkResult},
+    config::AudioFormat,
+    convert::Converter,
+    decoder::AudioPacket,
+};
 use gstreamer::{
-    State,
+    self as gst, State,
     event::{FlushStart, FlushStop},
     prelude::*,
 };
-
-use gstreamer as gst;
 use gstreamer_app as gst_app;
 use gstreamer_audio as gst_audio;
+use std::sync::{Arc, Mutex};
 
 const GSTREAMER_ASYNC_ERROR_POISON_MSG: &str = "gstreamer async error mutex should not be poisoned";
-
-use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-
-use crate::{
-    NUM_CHANNELS, SAMPLE_RATE, config::AudioFormat, convert::Converter, decoder::AudioPacket,
-};
 
 pub struct GstreamerSink {
     appsrc: gst_app::AppSrc,
@@ -27,7 +25,7 @@ pub struct GstreamerSink {
 }
 
 impl Open for GstreamerSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
+    fn open(device: Option<String>, format: AudioFormat) -> Box<Self> {
         info!("Using GStreamer sink with format: {format:?}");
         gst::init().expect("failed to init GStreamer!");
 
@@ -131,13 +129,13 @@ impl Open for GstreamerSink {
             .set_state(State::Ready)
             .expect("unable to set the pipeline to the `Ready` state");
 
-        Self {
+        Box::new(Self {
             appsrc,
             bufferpool,
             pipeline,
             format,
             async_error,
-        }
+        })
     }
 }
 
@@ -209,8 +207,4 @@ impl SinkAsBytes for GstreamerSink {
 
         Ok(())
     }
-}
-
-impl GstreamerSink {
-    pub const NAME: &'static str = "gstreamer";
 }

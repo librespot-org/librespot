@@ -30,7 +30,7 @@ async fn main() {
         id: SpotifyId::from_base62(&args[2]).unwrap(),
     };
 
-    let backend = audio_backend::find(None).unwrap();
+    let backend_builder = audio_backend::AudioBackendBuilder::default();
 
     println!("Connecting...");
     let session = Session::new(session_config, None);
@@ -40,7 +40,7 @@ async fn main() {
     }
 
     let player = Player::new(player_config, session, Box::new(NoOpVolume), move || {
-        backend(None, audio_format)
+        backend_builder.build(None, audio_format)
     });
 
     player.load(track, true, 0);

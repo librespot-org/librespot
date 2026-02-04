@@ -1,3 +1,5 @@
+#![cfg(discovery)]
+
 //! Advertises this device to Spotify clients in the local network.
 //!
 //! This device will show up in the list of "available devices".
@@ -10,20 +12,20 @@
 mod avahi;
 mod server;
 
+use futures_core::Stream;
 use std::{
-    borrow::Cow,
     error::Error as StdError,
     pin::Pin,
     task::{Context, Poll},
 };
-
-use futures_core::Stream;
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 use self::server::DiscoveryServer;
+use std::borrow::Cow;
+use tokio::sync::oneshot;
 
-pub use crate::core::Error;
+use crate::core::Error;
 use librespot_core as core;
 
 /// Credentials to be used in [`librespot`](`librespot_core`).
@@ -31,6 +33,12 @@ pub use crate::core::authentication::Credentials;
 
 /// Determining the icon in the list of available devices.
 pub use crate::core::config::DeviceType;
+
+use clap::{Args, ValueEnum, value_parser};
+use enum_assoc::Assoc;
+use serde::{Deserialize, Serialize};
+
+use std::net::{AddrParseError, IpAddr};
 
 pub enum DiscoveryEvent {
     Credentials(Credentials),
@@ -63,77 +71,6 @@ impl DnsSdHandle {
     }
 }
 
-pub type DnsSdServiceBuilder = fn(
-    Cow<'static, str>,
-    Vec<std::net::IpAddr>,
-    u16,
-    mpsc::UnboundedSender<DiscoveryEvent>,
-) -> Result<DnsSdHandle, Error>;
-
-// Default goes first: This matches the behaviour when feature flags were exlusive, i.e. when there
-// was only `feature = "with-dns-sd"` or `not(feature = "with-dns-sd")`
-pub const BACKENDS: &[(
-    &str,
-    // If None, the backend is known but wasn't compiled.
-    Option<DnsSdServiceBuilder>,
-)] = &[
-    #[cfg(feature = "with-avahi")]
-    ("avahi", Some(launch_avahi)),
-    #[cfg(not(feature = "with-avahi"))]
-    ("avahi", None),
-    #[cfg(feature = "with-dns-sd")]
-    ("dns-sd", Some(launch_dns_sd)),
-    #[cfg(not(feature = "with-dns-sd"))]
-    ("dns-sd", None),
-    #[cfg(feature = "with-libmdns")]
-    ("libmdns", Some(launch_libmdns)),
-    #[cfg(not(feature = "with-libmdns"))]
-    ("libmdns", None),
-];
-
-pub fn find(name: Option<&str>) -> Result<DnsSdServiceBuilder, Error> {
-    if let Some(ref name) = name {
-        match BACKENDS.iter().find(|(id, _)| name == id) {
-            Some((_id, Some(launch_svc))) => Ok(*launch_svc),
-            Some((_id, None)) => Err(Error::unavailable(format!(
-                "librespot built without '{name}' support"
-            ))),
-            None => Err(Error::not_found(format!(
-                "unknown zeroconf backend '{name}'"
-            ))),
-        }
-    } else {
-        BACKENDS
-            .iter()
-            .find_map(|(_, launch_svc)| *launch_svc)
-            .ok_or(Error::unavailable(
-                "librespot built without zeroconf backends",
-            ))
-    }
-}
-
-/// Makes this device visible to Spotify clients in the local network.
-///
-/// `Discovery` implements the [`Stream`] trait. Every time this device
-/// is selected in the list of available devices, it yields [`Credentials`].
-pub struct Discovery {
-    server: DiscoveryServer,
-
-    /// An opaque handle to the DNS-SD service. Dropping this will unregister the service.
-    #[allow(unused)]
-    svc: DnsSdHandle,
-
-    event_rx: mpsc::UnboundedReceiver<DiscoveryEvent>,
-}
-
-/// A builder for [`Discovery`].
-pub struct Builder {
-    server_config: server::Config,
-    port: u16,
-    zeroconf_ip: Vec<std::net::IpAddr>,
-    zeroconf_backend: Option<DnsSdServiceBuilder>,
-}
-
 /// Errors that can occur while setting up a [`Discovery`] instance.
 #[derive(Debug, Error)]
 pub enum DiscoveryError {
@@ -151,6 +88,9 @@ pub enum DiscoveryError {
 
     #[error("Missing params for key {0}")]
     ParamsError(&'static str),
+
+    #[error("librespot compiled without zeroconf backend")]
+    NotCompiled,
 }
 
 #[cfg(feature = "with-avahi")]
@@ -168,13 +108,37 @@ impl From<DiscoveryError> for Error {
             DiscoveryError::HmacError(_) => Error::invalid_argument(err),
             DiscoveryError::HttpServerError(_) => Error::unavailable(err),
             DiscoveryError::ParamsError(_) => Error::invalid_argument(err),
+            DiscoveryError::NotCompiled => Error::do_not_use(err),
         }
     }
 }
 
-#[allow(unused)]
+#[derive(Clone, Copy, Debug, Default, ValueEnum, Assoc, Serialize, Deserialize)]
+#[
+    func(pub fn launch(&self,
+            name: Cow<'static, str>,
+            zeroconf_ip: Vec<std::net::IpAddr>,
+            port: u16,
+            status_tx: mpsc::UnboundedSender<DiscoveryEvent>
+        ) -> Result<DnsSdHandle, Error>
+    )
+]
+pub enum ZeroconfBackend {
+    #[cfg(feature = "with-avahi")]
+    #[default]
+    #[assoc(launch = launch_avahi(name, zeroconf_ip, port, status_tx))]
+    Avahi,
+    #[cfg(feature = "with-dns-sd")]
+    #[cfg_attr(not(feature = "with-avahi"), default)]
+    #[assoc(launch = launch_dns_sd(name, zeroconf_ip, port, status_tx))]
+    DnsSd,
+    #[cfg(feature = "with-libmdns")]
+    #[cfg_attr(not(any(feature = "with-dns-sd", feature = "with-avahi")), default)]
+    #[assoc(launch = launch_libmdns(name, zeroconf_ip, port, status_tx))]
+    Libmdns,
+}
+
 const DNS_SD_SERVICE_NAME: &str = "_spotify-connect._tcp";
-#[allow(unused)]
 const TXT_RECORD: [&str; 2] = ["VERSION=1.0", "CPath=/"];
 
 #[cfg(feature = "with-avahi")]
@@ -427,12 +391,49 @@ fn launch_libmdns(
     })
 }
 
-impl Builder {
+pub fn zeroconf_inteface_parser(value: &str) -> Result<IpAddr, AddrParseError> {
+    value.trim().parse::<IpAddr>()
+}
+
+#[derive(Serialize, Deserialize, Args)]
+pub struct DiscoveryConfig {
+    /// The port the internal server advertises over zeroconf 1 - 65535.
+    /// Ports bellow 1025 may require root privileges.
+    /// Value 0 means any port
+    #[arg(long, short='z', verbatim_doc_comment, value_parser=value_parser!(u16), default_value_t=0, conflicts_with("disable_discovery"))]
+    pub zeroconf_port: u16,
+
+    /// Comma-separated interface IP addresses on which zeroconf will bind.
+    /// Defaults to all interfaces.
+    /// Ignored by DNS-SD.
+    #[arg(long, short = 'i', verbatim_doc_comment, value_delimiter(','), value_parser=zeroconf_inteface_parser, conflicts_with("disable_discovery"))]
+    pub zeroconf_interface: Vec<IpAddr>,
+
+    /// Zeroconf (MDNS/DNS-SD) backend to use.
+    #[arg(
+        long,
+        verbatim_doc_comment,
+        value_enum,
+        default_value_t,
+        conflicts_with("disable_discovery")
+    )]
+    pub zeroconf_backend: ZeroconfBackend,
+}
+
+/// A builder for [`Discovery`].
+pub struct DiscoveryBuilder {
+    server_config: server::Config,
+    port: u16,
+    zeroconf_ip: Vec<std::net::IpAddr>,
+    zeroconf_backend: Option<ZeroconfBackend>,
+}
+
+impl DiscoveryBuilder {
     /// Starts a new builder using the provided device and client IDs.
-    pub fn new<T: Into<String>>(device_id: T, client_id: T) -> Self {
+    pub fn new<T: Into<String>>(name: T, device_id: T, client_id: T) -> Self {
         Self {
             server_config: server::Config {
-                name: "Librespot".into(),
+                name: Cow::Owned(name.into()),
                 device_type: DeviceType::default(),
                 is_group: false,
                 device_id: device_id.into(),
@@ -445,11 +446,11 @@ impl Builder {
         }
     }
 
-    /// Sets the name to be displayed. Default is `"Librespot"`.
-    pub fn name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
-        self.server_config.name = name.into();
-        self
-    }
+    // /// Sets the name to be displayed. Default is `"Librespot"`.
+    // pub fn name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
+    //     self.server_config.name = name.into();
+    //     self
+    // }
 
     /// Sets the device type which is visible as icon in other Spotify clients. Default is `Speaker`.
     pub fn device_type(mut self, device_type: DeviceType) -> Self {
@@ -485,7 +486,7 @@ impl Builder {
     }
 
     /// Set the zeroconf (MDNS and DNS-SD) implementation to use.
-    pub fn zeroconf_backend(mut self, zeroconf_backend: DnsSdServiceBuilder) -> Self {
+    pub fn zeroconf_backend(mut self, zeroconf_backend: ZeroconfBackend) -> Self {
         self.zeroconf_backend = Some(zeroconf_backend);
         self
     }
@@ -501,17 +502,20 @@ impl Builder {
     ///
     /// # Errors
     /// If setting up the mdns service or creating the server fails, this function returns an error.
-    pub fn launch(self) -> Result<Discovery, Error> {
+    pub fn build(self) -> Result<Discovery, Error> {
         let name = self.server_config.name.clone();
-        let zeroconf_ip = self.zeroconf_ip;
+        let zeroconf_ip = self.zeroconf_ip.clone();
 
         let (event_tx, event_rx) = mpsc::unbounded_channel();
 
         let mut port = self.port;
+
         let server = DiscoveryServer::new(self.server_config, &mut port, event_tx.clone())?;
 
-        let launch_svc = self.zeroconf_backend.unwrap_or(find(None)?);
-        let svc = launch_svc(name, zeroconf_ip, port, event_tx)?;
+        let svc =
+            self.zeroconf_backend
+                .unwrap_or_default()
+                .launch(name, zeroconf_ip, port, event_tx)?;
         Ok(Discovery {
             server,
             svc,
@@ -520,19 +524,44 @@ impl Builder {
     }
 }
 
+/// Makes this device visible to Spotify clients in the local network.
+///
+/// `Discovery` implements the [`Stream`] trait. Every time this device
+/// is selected in the list of available devices, it yields [`Credentials`].
+pub struct Discovery {
+    server: DiscoveryServer,
+
+    /// An opaque handle to the DNS-SD service. Dropping this will unregister the service.
+    svc: DnsSdHandle,
+
+    event_rx: mpsc::UnboundedReceiver<DiscoveryEvent>,
+}
+
 impl Discovery {
     /// Starts a [`Builder`] with the provided device id.
-    pub fn builder<T: Into<String>>(device_id: T, client_id: T) -> Builder {
-        Builder::new(device_id, client_id)
+    pub fn builder<T: Into<String>>(
+        name: T,
+        device_id: T,
+        client_id: T,
+        config: Option<&DiscoveryConfig>,
+    ) -> DiscoveryBuilder {
+        let mut builder = DiscoveryBuilder::new(name, device_id, client_id);
+        if let Some(discovery_config) = config {
+            builder = builder
+                .port(discovery_config.zeroconf_port)
+                .zeroconf_ip(discovery_config.zeroconf_interface.clone())
+                .zeroconf_backend(discovery_config.zeroconf_backend)
+        };
+        builder
     }
 
     /// Create a new instance with the specified device id and default paramaters.
-    pub fn new<T: Into<String>>(device_id: T, client_id: T) -> Result<Self, Error> {
-        Self::builder(device_id, client_id).launch()
+    pub fn new<T: Into<String>>(name: T, device_id: T, client_id: T) -> Result<Self, Error> {
+        Self::builder(name, device_id, client_id, None).build()
     }
 
     pub async fn shutdown(self) {
-        tokio::join!(self.server.shutdown(), self.svc.shutdown(),);
+        tokio::join!(self.server.shutdown(), self.svc.shutdown());
     }
 }
 

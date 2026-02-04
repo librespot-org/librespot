@@ -1,10 +1,14 @@
-use super::{Open, Sink, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
-use portaudio_rs::device::{DeviceIndex, DeviceInfo, get_default_output_index};
-use portaudio_rs::stream::*;
+use crate::{
+    NUM_CHANNELS, SAMPLE_RATE,
+    audio_backend::{Open, Sink, SinkError, SinkResult},
+    config::AudioFormat,
+    convert::Converter,
+    decoder::AudioPacket,
+};
+use portaudio_rs::{
+    device::{DeviceIndex, DeviceInfo, get_default_output_index},
+    stream::{FRAMES_PER_BUFFER_UNSPECIFIED, Stream, StreamFlags, StreamParameters},
+};
 use std::process::exit;
 use std::time::Duration;
 
@@ -51,18 +55,19 @@ fn find_output(device: &str) -> Option<DeviceIndex> {
 }
 
 impl<'a> Open for PortAudioSink<'a> {
-    fn open(device: Option<String>, format: AudioFormat) -> PortAudioSink<'a> {
+    fn device_options() -> ! {
+        list_outputs();
+        exit(0)
+    }
+    fn open(device: Option<String>, format: AudioFormat) -> Box<PortAudioSink<'a>> {
         info!("Using PortAudio sink with format: {format:?}");
 
         portaudio_rs::initialize().unwrap();
 
-        let device_idx = match device.as_deref() {
-            Some("?") => {
-                list_outputs();
-                exit(0)
-            }
-            Some(device) => find_output(device),
-            None => get_default_output_index(),
+        let device_idx = if let Some(device) = device.as_deref() {
+            find_output(device)
+        } else {
+            get_default_output_index()
         }
         .expect("could not find device");
 
@@ -80,7 +85,7 @@ impl<'a> Open for PortAudioSink<'a> {
                     suggested_latency: latency,
                     data: 0.0 as $type,
                 };
-                $sink(None, params)
+                Box::new($sink(None, params))
             }};
         }
         match format {
@@ -179,8 +184,4 @@ impl Drop for PortAudioSink<'_> {
     fn drop(&mut self) {
         portaudio_rs::terminate().unwrap();
     }
-}
-
-impl PortAudioSink<'_> {
-    pub const NAME: &'static str = "portaudio";
 }

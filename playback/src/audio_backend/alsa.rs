@@ -1,11 +1,15 @@
-use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
-use alsa::device_name::HintIter;
-use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
-use alsa::{Direction, ValueOr};
+use crate::{
+    NUM_CHANNELS, SAMPLE_RATE,
+    audio_backend::{Open, Sink, SinkAsBytes, SinkError, SinkResult},
+    config::AudioFormat,
+    convert::Converter,
+    decoder::AudioPacket,
+};
+use alsa::{
+    Direction, ValueOr,
+    device_name::HintIter,
+    pcm::{Access, Format, Frames, HwParams, PCM},
+};
 use std::process::exit;
 use thiserror::Error;
 
@@ -386,30 +390,31 @@ fn open_device(dev_name: &str, format: AudioFormat) -> SinkResult<(PCM, usize)> 
 }
 
 impl Open for AlsaSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
-        let name = match device.as_deref() {
-            Some("?") => match list_compatible_devices() {
-                Ok(_) => {
-                    exit(0);
-                }
-                Err(e) => {
-                    error!("{e}");
-                    exit(1);
-                }
-            },
-            Some(device) => device,
-            None => "default",
+    fn device_options() -> ! {
+        if let Err(e) = list_compatible_devices() {
+            error!("{e}");
+            exit(1)
+        } else {
+            exit(0)
+        }
+    }
+
+    fn open(device: Option<String>, format: AudioFormat) -> Box<Self> {
+        let name = if let Some(device) = device.as_deref() {
+            device
+        } else {
+            "default"
         }
         .to_string();
 
         info!("Using AlsaSink with format: {format:?}");
 
-        Self {
+        Box::new(Self {
             pcm: None,
             format,
             device: name,
             period_buffer: vec![],
-        }
+        })
     }
 }
 
@@ -481,8 +486,6 @@ impl SinkAsBytes for AlsaSink {
 }
 
 impl AlsaSink {
-    pub const NAME: &'static str = "alsa";
-
     fn write_buf(&mut self) -> SinkResult<()> {
         if self.pcm.is_some() {
             let write_result = {

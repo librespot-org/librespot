@@ -1,7 +1,10 @@
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use rand_distr::{Distribution, Normal, Triangular, Uniform};
-use std::fmt;
+
+use clap::ValueEnum;
+use enum_assoc::Assoc;
+use serde::{Deserialize, Serialize};
 
 use crate::NUM_CHANNELS;
 
@@ -11,7 +14,7 @@ use crate::NUM_CHANNELS;
 //
 // Guidance:
 //
-//  * On S24, S24_3 and S24, the default is to use triangular dithering.
+//  * On S16, S24 and S24_3, the default is to use triangular dithering.
 //    Depending on personal preference you may use Gaussian dithering instead;
 //    it's not as good objectively, but it may be preferred subjectively if
 //    you are looking for a more "analog" sound akin to tape hiss.
@@ -28,18 +31,26 @@ use crate::NUM_CHANNELS;
 //    on S32 the noise level is so far down that it is simply inaudible even
 //    after volume normalisation and control.
 //
-pub trait Ditherer {
+
+#[derive(Default, Debug, Clone, Copy, Assoc, ValueEnum, Serialize, Deserialize)]
+#[func(pub fn build(&self) -> Option<Box<dyn Ditherer>>)]
+pub enum DithererBuilder {
+    #[default]
+    #[assoc(build = Box::new(TriangularDitherer::new()))]
+    Tpdf,
+    #[assoc(build = Box::new(GaussianDitherer::new()))]
+    Gpdf,
+    #[assoc(build = Box::new(HighPassDitherer::new()))]
+    TpdfHp,
+    None,
+}
+
+pub trait Ditherer: Send + Sync {
     fn new() -> Self
     where
         Self: Sized;
-    fn name(&self) -> &'static str;
-    fn noise(&mut self) -> f64;
-}
 
-impl fmt::Display for dyn Ditherer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name())
-    }
+    fn noise(&mut self) -> f64;
 }
 
 fn create_rng() -> SmallRng {
@@ -60,18 +71,10 @@ impl Ditherer for TriangularDitherer {
         }
     }
 
-    fn name(&self) -> &'static str {
-        Self::NAME
-    }
-
     #[inline]
     fn noise(&mut self) -> f64 {
         self.distribution.sample(&mut self.cached_rng)
     }
-}
-
-impl TriangularDitherer {
-    pub const NAME: &'static str = "tpdf";
 }
 
 pub struct GaussianDitherer {
@@ -95,18 +98,10 @@ impl Ditherer for GaussianDitherer {
         }
     }
 
-    fn name(&self) -> &'static str {
-        Self::NAME
-    }
-
     #[inline]
     fn noise(&mut self) -> f64 {
         self.distribution.sample(&mut self.cached_rng)
     }
-}
-
-impl GaussianDitherer {
-    pub const NAME: &'static str = "gpdf";
 }
 
 pub struct HighPassDitherer {
@@ -128,9 +123,9 @@ impl Ditherer for HighPassDitherer {
         }
     }
 
-    fn name(&self) -> &'static str {
-        Self::NAME
-    }
+    // fn name(&self) -> &'static str {
+    //     Self::NAME
+    // }
 
     #[inline]
     fn noise(&mut self) -> f64 {
@@ -139,24 +134,5 @@ impl Ditherer for HighPassDitherer {
         self.previous_noises[self.active_channel] = new_noise;
         self.active_channel ^= 1;
         high_passed_noise
-    }
-}
-
-impl HighPassDitherer {
-    pub const NAME: &'static str = "tpdf_hp";
-}
-
-pub fn mk_ditherer<D: Ditherer + 'static>() -> Box<dyn Ditherer> {
-    Box::new(D::new())
-}
-
-pub type DithererBuilder = fn() -> Box<dyn Ditherer>;
-
-pub fn find_ditherer(name: Option<String>) -> Option<DithererBuilder> {
-    match name.as_deref() {
-        Some(TriangularDitherer::NAME) => Some(mk_ditherer::<TriangularDitherer>),
-        Some(GaussianDitherer::NAME) => Some(mk_ditherer::<GaussianDitherer>),
-        Some(HighPassDitherer::NAME) => Some(mk_ditherer::<HighPassDitherer>),
-        _ => None,
     }
 }

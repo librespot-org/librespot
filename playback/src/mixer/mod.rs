@@ -1,23 +1,49 @@
-use crate::config::VolumeCtrl;
 use librespot_core::Error;
 use std::sync::Arc;
 
 pub mod mappings;
 use self::mappings::MappedCtrl;
 
+use clap::ValueEnum;
+use enum_assoc::Assoc;
+use serde::{Deserialize, Serialize};
+
 pub struct NoOpVolume;
 
-pub trait Mixer: Send + Sync {
-    fn open(config: MixerConfig) -> Result<Self, Error>
-    where
-        Self: Sized;
+/// Fields are intended for volume control range in dB
+#[derive(Default, Clone, Copy, Debug, ValueEnum, Assoc, Serialize, Deserialize)]
+#[func(pub fn build(&self, db_range: f64) -> VolumeCtrl)]
+pub enum VolumeCtrlBuilder {
+    #[assoc(build = VolumeCtrl::Fixed)]
+    Fixed,
+    #[assoc(build = VolumeCtrl::Linear)]
+    Linear,
+    #[assoc(build = VolumeCtrl::Cubic(db_range))]
+    Cubic,
+    #[default]
+    #[assoc(build = VolumeCtrl::Log(db_range))]
+    Log,
+}
 
-    fn volume(&self) -> u16;
-    fn set_volume(&self, volume: u16);
+#[derive(Clone, Copy, Debug)]
+pub enum VolumeCtrl {
+    Fixed,
+    Linear,
+    Cubic(f64),
+    Log(f64),
+}
 
-    fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
-        Box::new(NoOpVolume)
+impl Default for VolumeCtrl {
+    fn default() -> VolumeCtrl {
+        VolumeCtrl::Log(Self::DEFAULT_DB_RANGE)
     }
+}
+
+impl VolumeCtrl {
+    pub const MAX_VOLUME: u16 = u16::MAX;
+
+    // Taken from: https://www.dr-lex.be/info-stuff/volumecontrols.html
+    pub const DEFAULT_DB_RANGE: f64 = 60.0;
 }
 
 pub trait VolumeGetter {
@@ -31,15 +57,8 @@ impl VolumeGetter for NoOpVolume {
     }
 }
 
-pub mod softmixer;
-use self::softmixer::SoftMixer;
-
-#[cfg(feature = "alsa-backend")]
-pub mod alsamixer;
-#[cfg(feature = "alsa-backend")]
-use self::alsamixer::AlsaMixer;
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, derive_builder::Builder)]
+#[builder(default)]
 pub struct MixerConfig {
     pub device: String,
     pub control: String,
@@ -58,25 +77,41 @@ impl Default for MixerConfig {
     }
 }
 
-pub type MixerFn = fn(MixerConfig) -> Result<Arc<dyn Mixer>, Error>;
+pub trait Mixer: Send + Sync {
+    fn open(config: MixerConfig) -> Result<Self, Error>
+    where
+        Self: Sized;
+
+    fn volume(&self) -> u16;
+    fn set_volume(&self, volume: u16);
+
+    fn get_soft_volume(&self) -> Box<dyn VolumeGetter + Send> {
+        Box::new(NoOpVolume)
+    }
+}
 
 fn mk_sink<M: Mixer + 'static>(config: MixerConfig) -> Result<Arc<dyn Mixer>, Error> {
     Ok(Arc::new(M::open(config)?))
 }
 
-pub const MIXERS: &[(&str, MixerFn)] = &[
-    (SoftMixer::NAME, mk_sink::<SoftMixer>), // default goes first
-    #[cfg(feature = "alsa-backend")]
-    (AlsaMixer::NAME, mk_sink::<AlsaMixer>),
-];
+pub mod softmixer;
+use self::softmixer::SoftMixer;
 
-pub fn find(name: Option<&str>) -> Option<MixerFn> {
-    if let Some(name) = name {
-        MIXERS
-            .iter()
-            .find(|mixer| name == mixer.0)
-            .map(|mixer| mixer.1)
-    } else {
-        MIXERS.first().map(|mixer| mixer.1)
-    }
+#[cfg(feature = "alsa-backend")]
+pub mod alsamixer;
+#[cfg(feature = "alsa-backend")]
+use self::alsamixer::AlsaMixer;
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum, Assoc, Serialize, Deserialize)]
+#[func(pub fn build(&self, config: MixerConfig) -> Result<Arc<dyn Mixer>, Error>)]
+#[func(pub fn is_alsa(&self) -> bool)]
+pub enum MixerBuilder {
+    #[assoc(build=mk_sink::<SoftMixer>(config))]
+    #[assoc(is_alsa = false)]
+    #[default]
+    Softvol,
+    #[cfg(feature = "alsa-backend")]
+    #[assoc(build=mk_sink::<AlsaMixer>(config))]
+    #[assoc(is_alsa = true)]
+    Alsa,
 }

@@ -74,7 +74,7 @@ impl RequestHandler {
 
     fn handle_get_info(&self) -> Response<Full<Bytes>> {
         let public_key = BASE64.encode(self.keys.public_key());
-        let device_type: &str = self.config.device_type.into();
+        let device_type: String = self.config.device_type.into();
         let active_user = self.active_user();
 
         // options based on zeroconf guide, search for `groupStatus` on page

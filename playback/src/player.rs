@@ -43,8 +43,8 @@ use tokio::sync::{mpsc, oneshot};
 use crate::SAMPLES_PER_SECOND;
 
 const PRELOAD_NEXT_TRACK_BEFORE_END_DURATION_MS: u32 = 30000;
-pub const DB_VOLTAGE_RATIO: f64 = 20.0;
-pub const PCM_AT_0DBFS: f64 = 1.0;
+const DB_VOLTAGE_RATIO: f64 = 20.0;
+const PCM_AT_0DBFS: f64 = 1.0;
 
 // Spotify inserts a custom Ogg packet at the start with custom metadata values, that you would
 // otherwise expect in Vorbis comments. This packet isn't well-formed and players may balk at it.
@@ -474,7 +474,7 @@ impl Player {
             let player_id = PLAYER_COUNTER.fetch_add(1, Ordering::AcqRel);
             debug!("new Player [{player_id}]");
 
-            let converter = Converter::new(config.ditherer);
+            let converter = Converter::new(config.ditherer_builder);
             let normalisation_knee_factor = 1.0 / (8.0 * config.normalisation_knee_db);
 
             // TODO: it would be neat if we could watch for added or modified files in the

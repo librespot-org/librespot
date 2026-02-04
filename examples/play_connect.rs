@@ -30,8 +30,8 @@ async fn main() -> Result<(), Error> {
     let mixer_config = MixerConfig::default();
     let request_options = LoadRequestOptions::default();
 
-    let sink_builder = audio_backend::find(None).unwrap();
-    let mixer_builder = mixer::find(None).unwrap();
+    let sink_builder = audio_backend::AudioBackendBuilder::default();
+    let mixer_builder = mixer::MixerBuilder::default();
 
     let cache = Cache::new(Some(CACHE), Some(CACHE), Some(CACHE_FILES), None)?;
     let credentials = cache
@@ -50,13 +50,13 @@ async fn main() -> Result<(), Error> {
         })?;
 
     let session = Session::new(session_config, Some(cache));
-    let mixer = mixer_builder(mixer_config)?;
+    let mixer = mixer_builder.build(mixer_config)?;
 
     let player = Player::new(
         player_config,
         session.clone(),
         mixer.get_soft_volume(),
-        move || sink_builder(None, audio_format),
+        move || sink_builder.build(None, audio_format),
     );
 
     let (spirc, spirc_task) =

@@ -95,14 +95,23 @@ pub struct ConnectConfig {
 impl Default for ConnectConfig {
     fn default() -> Self {
         Self {
-            name: "librespot".to_string(),
-            device_type: DeviceType::Speaker,
+            name: ConnectConfig::DEFAULT_NAME.to_string(),
+            device_type: DeviceType::default(),
             is_group: false,
-            initial_volume: u16::MAX / 2,
+            initial_volume: ConnectConfig::DEFAULT_INITIAL_VOLUME,
             disable_volume: false,
-            volume_steps: 64,
+            volume_steps: ConnectConfig::DEFAULT_VOLUME_STEPS,
         }
     }
+}
+
+impl ConnectConfig {
+    /// Default name
+    pub const DEFAULT_NAME: &str = "librespot";
+    /// Default initial_volume
+    pub const DEFAULT_INITIAL_VOLUME: u16 = u16::MAX / 2;
+    /// Default volume_steps
+    pub const DEFAULT_VOLUME_STEPS: u16 = 64;
 }
 
 #[derive(Default, Debug)]

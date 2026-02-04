@@ -41,10 +41,6 @@ impl Mixer for SoftMixer {
     }
 }
 
-impl SoftMixer {
-    pub const NAME: &'static str = "softvol";
-}
-
 struct SoftVolume(Arc<AtomicU64>);
 
 impl VolumeGetter for SoftVolume {

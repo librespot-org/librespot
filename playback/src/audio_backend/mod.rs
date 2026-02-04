@@ -1,6 +1,11 @@
+use std::process::exit;
+
 use crate::config::AudioFormat;
 use crate::convert::Converter;
 use crate::decoder::AudioPacket;
+use clap::ValueEnum;
+use enum_assoc::Assoc;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -20,7 +25,11 @@ pub enum SinkError {
 pub type SinkResult<T> = Result<T, SinkError>;
 
 pub trait Open {
-    fn open(_: Option<String>, format: AudioFormat) -> Self;
+    fn device_options() -> ! {
+        println!("No device options available!");
+        exit(0)
+    }
+    fn open(_: Option<String>, format: AudioFormat) -> Box<Self>;
 }
 
 pub trait Sink {
@@ -33,14 +42,8 @@ pub trait Sink {
     fn write(&mut self, packet: AudioPacket, converter: &mut Converter) -> SinkResult<()>;
 }
 
-pub type SinkBuilder = fn(Option<String>, AudioFormat) -> Box<dyn Sink>;
-
 pub trait SinkAsBytes {
     fn write_bytes(&mut self, data: &[u8]) -> SinkResult<()>;
-}
-
-fn mk_sink<S: Sink + Open + 'static>(device: Option<String>, format: AudioFormat) -> Box<dyn Sink> {
-    Box::new(S::open(device, format))
 }
 
 // reuse code for various backends
@@ -82,38 +85,24 @@ macro_rules! sink_as_bytes {
 
 #[cfg(feature = "alsa-backend")]
 mod alsa;
-#[cfg(feature = "alsa-backend")]
-use self::alsa::AlsaSink;
 
 #[cfg(feature = "portaudio-backend")]
 mod portaudio;
-#[cfg(feature = "portaudio-backend")]
-use self::portaudio::PortAudioSink;
 
 #[cfg(feature = "pulseaudio-backend")]
 mod pulseaudio;
-#[cfg(feature = "pulseaudio-backend")]
-use self::pulseaudio::PulseAudioSink;
 
 #[cfg(feature = "jackaudio-backend")]
 mod jackaudio;
-#[cfg(feature = "jackaudio-backend")]
-use self::jackaudio::JackSink;
 
 #[cfg(feature = "gstreamer-backend")]
 mod gstreamer;
-#[cfg(feature = "gstreamer-backend")]
-use self::gstreamer::GstreamerSink;
 
 #[cfg(any(feature = "rodio-backend", feature = "rodiojack-backend"))]
 mod rodio;
-#[cfg(feature = "rodio-backend")]
-use self::rodio::RodioSink;
 
 #[cfg(feature = "sdl-backend")]
 mod sdl;
-#[cfg(feature = "sdl-backend")]
-use self::sdl::SdlSink;
 
 mod pipe;
 use self::pipe::StdoutSink;
@@ -121,34 +110,112 @@ use self::pipe::StdoutSink;
 mod subprocess;
 use self::subprocess::SubprocessSink;
 
-pub const BACKENDS: &[(&str, SinkBuilder)] = &[
+#[derive(Default, Clone, Copy, Debug, ValueEnum, Assoc, Serialize, Deserialize)]
+#[func(pub fn build(&self, device: Option<String>, format: AudioFormat) -> Box<dyn Sink>)]
+#[func(pub fn device_options(&self) -> !)]
+pub enum AudioBackendBuilder {
     #[cfg(feature = "rodio-backend")]
-    (RodioSink::NAME, rodio::mk_rodio), // default goes first
+    #[default]
+    #[assoc(build = rodio::open_rodio(device, format))]
+    #[assoc(device_options = rodio::rodio_device_options())]
+    Rodio,
     #[cfg(feature = "alsa-backend")]
-    (AlsaSink::NAME, mk_sink::<AlsaSink>),
+    #[cfg_attr(not(feature = "rodio-backend"), default)]
+    #[assoc(build = alsa::AlsaSink::open(device, format))]
+    #[assoc(device_options = alsa::AlsaSink::device_options())]
+    Alsa,
     #[cfg(feature = "portaudio-backend")]
-    (PortAudioSink::NAME, mk_sink::<PortAudioSink<'_>>),
+    #[cfg_attr(not(any(feature = "rodio-backend", feature = "alsa-backend")), default)]
+    #[assoc(build = portaudio::PortAudioSink::<'_>::open(device, format))]
+    #[assoc(device_options = portaudio::PortAudioSink::<'_>::device_options())]
+    Portaudio,
     #[cfg(feature = "pulseaudio-backend")]
-    (PulseAudioSink::NAME, mk_sink::<PulseAudioSink>),
+    #[cfg_attr(
+        not(any(
+            feature = "rodio-backend",
+            feature = "alsa-backend",
+            feature = "portaudio-backend"
+        )),
+        default
+    )]
+    #[assoc(build = pulseaudio::PulseAudioSink::open(device, format))]
+    #[assoc(device_options = pulseaudio::PulseAudioSink::device_options())]
+    Pulseaudio,
     #[cfg(feature = "jackaudio-backend")]
-    (JackSink::NAME, mk_sink::<JackSink>),
+    #[cfg_attr(
+        not(any(
+            feature = "rodio-backend",
+            feature = "alsa-backend",
+            feature = "portaudio-backend",
+            feature = "pulseaudio-backend"
+        )),
+        default
+    )]
+    #[assoc(build = jackaudio::JackSink::open(device, format))]
+    #[assoc(device_options = jackaudio::JackSink::device_options())]
+    Jackaudio,
     #[cfg(feature = "gstreamer-backend")]
-    (GstreamerSink::NAME, mk_sink::<GstreamerSink>),
+    #[cfg_attr(
+        not(any(
+            feature = "rodio-backend",
+            feature = "alsa-backend",
+            feature = "portaudio-backend",
+            feature = "pulseaudio-backend",
+            feature = "jackaudio-backend"
+        )),
+        default
+    )]
+    #[assoc(build = gstreamer::GstreamerSink::open(device, format))]
+    #[assoc(device_options = gstreamer::GstreamerSink::device_options())]
+    Gstreamer,
     #[cfg(feature = "rodiojack-backend")]
-    ("rodiojack", rodio::mk_rodiojack),
+    #[cfg_attr(
+        not(any(
+            feature = "rodio-backend",
+            feature = "alsa-backend",
+            feature = "portaudio-backend",
+            feature = "pulseaudio-backend",
+            feature = "jackaudio-backend",
+            feature = "gstreamer-backend"
+        )),
+        default
+    )]
+    #[assoc(build = rodio::open_rodiojack(device, format))]
+    #[assoc(device_options = rodio::rodiojack_device_options())]
+    Rodiojack,
     #[cfg(feature = "sdl-backend")]
-    (SdlSink::NAME, mk_sink::<SdlSink>),
-    (StdoutSink::NAME, mk_sink::<StdoutSink>),
-    (SubprocessSink::NAME, mk_sink::<SubprocessSink>),
-];
-
-pub fn find(name: Option<String>) -> Option<SinkBuilder> {
-    if let Some(name) = name {
-        BACKENDS
-            .iter()
-            .find(|backend| name == backend.0)
-            .map(|backend| backend.1)
-    } else {
-        BACKENDS.first().map(|backend| backend.1)
-    }
+    #[cfg_attr(
+        not(any(
+            feature = "rodio-backend",
+            feature = "alsa-backend",
+            feature = "portaudio-backend",
+            feature = "pulseaudio-backend",
+            feature = "jackaudio-backend",
+            feature = "gstreamer-backend",
+            feature = "rodiojack-backend"
+        )),
+        default
+    )]
+    #[assoc(build = sdl::SdlSink::open(device, format))]
+    #[assoc(device_options = sdl::SdlSink::device_options())]
+    Sdl,
+    #[cfg_attr(
+        not(any(
+            feature = "rodio-backend",
+            feature = "alsa-backend",
+            feature = "portaudio-backend",
+            feature = "pulseaudio-backend",
+            feature = "jackaudio-backend",
+            feature = "gstreamer-backend",
+            feature = "rodiojack-backend",
+            feature = "sdl-backend"
+        )),
+        default
+    )]
+    #[assoc(build = StdoutSink::open(device, format))]
+    #[assoc(device_options = StdoutSink::device_options())]
+    Pipe,
+    #[assoc(build = SubprocessSink::open(device, format))]
+    #[assoc(device_options = SubprocessSink::device_options())]
+    Subprocess,
 }

@@ -45,9 +45,20 @@ pub fn spotify_version() -> String {
     }
 }
 
-pub fn spotify_semantic_version() -> String {
+pub fn spotify_semantic_version() -> &'static str {
     match crate::config::OS {
-        "android" | "ios" => SPOTIFY_MOBILE_VERSION.to_owned(),
-        _ => SPOTIFY_SEMANTIC_VERSION.to_string(),
+        "android" | "ios" => SPOTIFY_MOBILE_VERSION,
+        _ => SPOTIFY_SEMANTIC_VERSION,
     }
+}
+
+pub fn libresport_version() -> String {
+    #[cfg(debug_assertions)]
+    const BUILD_PROFILE: &str = "debug";
+    #[cfg(not(debug_assertions))]
+    const BUILD_PROFILE: &str = "release";
+
+    format!(
+        "librespot {SEMVER} {SHA_SHORT} (Built on {BUILD_DATE}, Build ID: {BUILD_ID}, Profile: {BUILD_PROFILE})"
+    )
 }

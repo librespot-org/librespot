@@ -1,11 +1,14 @@
-use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
+use crate::{
+    audio_backend::{Open, Sink, SinkAsBytes, SinkError, SinkResult},
+    config::AudioFormat,
+    convert::Converter,
+    decoder::AudioPacket,
+};
 use shell_words::split;
-
-use std::io::{ErrorKind, Write};
-use std::process::{Child, Command, Stdio, exit};
+use std::{
+    io::{ErrorKind, Write},
+    process::{Child, Command, Stdio, exit},
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -66,21 +69,20 @@ pub struct SubprocessSink {
 }
 
 impl Open for SubprocessSink {
-    fn open(shell_command: Option<String>, format: AudioFormat) -> Self {
-        if let Some("?") = shell_command.as_deref() {
-            println!(
-                "\nUsage:\n\nOutput to a Subprocess:\n\n\t--backend subprocess --device {{shell_command}}\n"
-            );
-            exit(0);
-        }
-
+    fn device_options() -> ! {
+        println!(
+            "\nUsage:\n\nOutput to a Subprocess:\n\n\t--backend subprocess --device {{shell_command}}\n"
+        );
+        exit(0)
+    }
+    fn open(shell_command: Option<String>, format: AudioFormat) -> Box<Self> {
         info!("Using SubprocessSink with format: {format:?}");
 
-        Self {
+        Box::new(Self {
             shell_command,
             child: None,
             format,
-        }
+        })
     }
 }
 
@@ -192,8 +194,6 @@ impl SinkAsBytes for SubprocessSink {
 }
 
 impl SubprocessSink {
-    pub const NAME: &'static str = "subprocess";
-
     fn try_restart(&mut self, e: SubprocessError, restarted: &mut bool) -> SinkResult<()> {
         // If the restart fails throw the original error back.
         if !*restarted && self.stop().is_ok() && self.start().is_ok() {

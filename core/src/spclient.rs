@@ -176,7 +176,7 @@ impl SpClient {
 
         let client_data = request.mut_client_data();
 
-        client_data.client_version = spotify_semantic_version();
+        client_data.client_version = spotify_semantic_version().to_string();
 
         // Current state of affairs: keymaster ID works on all tested platforms, but may be phased out,
         // so it seems a good idea to mimick the real clients. `self.session().client_id()` returns the

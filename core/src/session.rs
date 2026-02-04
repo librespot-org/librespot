@@ -98,7 +98,7 @@ struct SessionData {
 }
 
 struct SessionInternal {
-    config: SessionConfig,
+    config: Arc<SessionConfig>,
     data: RwLock<SessionData>,
 
     http_client: HttpClient,
@@ -117,6 +117,44 @@ struct SessionInternal {
     handle: tokio::runtime::Handle,
 }
 
+impl Drop for SessionInternal {
+    fn drop(&mut self) {
+        debug!("drop Session");
+    }
+}
+
+impl SessionInternal {
+    pub fn new(config: Arc<SessionConfig>, cache: Option<Arc<Cache>>) -> Self {
+        let http_client = HttpClient::new(config.proxy.as_ref());
+
+        debug!("new Session");
+
+        let session_data = SessionData {
+            client_id: config.client_id.clone(),
+            // can be any guid, doesn't need to be simple
+            session_id: Uuid::new_v4().as_simple().to_string(),
+            ..SessionData::default()
+        };
+
+        Self {
+            config,
+            data: RwLock::new(session_data),
+            http_client,
+            tx_connection: OnceLock::new(),
+            cache,
+            apresolver: OnceLock::new(),
+            audio_key: OnceLock::new(),
+            channel: OnceLock::new(),
+            mercury: OnceLock::new(),
+            dealer: OnceLock::new(),
+            spclient: OnceLock::new(),
+            token_provider: OnceLock::new(),
+            login5: OnceLock::new(),
+            handle: tokio::runtime::Handle::current(),
+        }
+    }
+}
+
 /// A shared reference to a Spotify session.
 ///
 /// After instantiating, you need to login via [Session::connect].
@@ -131,33 +169,17 @@ pub struct Session(Arc<SessionInternal>);
 
 impl Session {
     pub fn new(config: SessionConfig, cache: Option<Cache>) -> Self {
-        let http_client = HttpClient::new(config.proxy.as_ref());
+        Self(Arc::new(SessionInternal::new(
+            Arc::new(config),
+            cache.map(Arc::new),
+        )))
+    }
 
-        debug!("new Session");
-
-        let session_data = SessionData {
-            client_id: config.client_id.clone(),
-            // can be any guid, doesn't need to be simple
-            session_id: Uuid::new_v4().as_simple().to_string(),
-            ..SessionData::default()
-        };
-
-        Self(Arc::new(SessionInternal {
-            config,
-            data: RwLock::new(session_data),
-            http_client,
-            tx_connection: OnceLock::new(),
-            cache: cache.map(Arc::new),
-            apresolver: OnceLock::new(),
-            audio_key: OnceLock::new(),
-            channel: OnceLock::new(),
-            mercury: OnceLock::new(),
-            dealer: OnceLock::new(),
-            spclient: OnceLock::new(),
-            token_provider: OnceLock::new(),
-            login5: OnceLock::new(),
-            handle: tokio::runtime::Handle::current(),
-        }))
+    pub fn renew(&self) -> Session {
+        Self(Arc::new(SessionInternal::new(
+            self.0.config.clone(),
+            self.0.cache.clone(),
+        )))
     }
 
     async fn connect_inner(
@@ -658,12 +680,6 @@ impl SessionWeak {
     pub(crate) fn upgrade(&self) -> Session {
         self.try_upgrade()
             .expect("session was dropped and so should have this component")
-    }
-}
-
-impl Drop for SessionInternal {
-    fn drop(&mut self) {
-        debug!("drop Session");
     }
 }
 

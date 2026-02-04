@@ -1,8 +1,10 @@
-use super::{Open, Sink, SinkAsBytes, SinkError, SinkResult};
-use crate::config::AudioFormat;
-use crate::convert::Converter;
-use crate::decoder::AudioPacket;
-use crate::{NUM_CHANNELS, SAMPLE_RATE};
+use crate::{
+    NUM_CHANNELS, SAMPLE_RATE,
+    audio_backend::{Open, Sink, SinkAsBytes, SinkError, SinkResult},
+    config::AudioFormat,
+    convert::Converter,
+    decoder::AudioPacket,
+};
 use libpulse_binding::{self as pulse, error::PAErr, stream::Direction};
 use libpulse_simple_binding::Simple;
 use std::env;
@@ -55,7 +57,7 @@ pub struct PulseAudioSink {
 }
 
 impl Open for PulseAudioSink {
-    fn open(device: Option<String>, format: AudioFormat) -> Self {
+    fn open(device: Option<String>, format: AudioFormat) -> Box<Self> {
         let app_name = env::var("PULSE_PROP_application.name").unwrap_or_default();
         let stream_desc = env::var("PULSE_PROP_stream.description").unwrap_or_default();
 
@@ -68,13 +70,13 @@ impl Open for PulseAudioSink {
 
         info!("Using PulseAudioSink with format: {actual_format:?}");
 
-        Self {
+        Box::new(Self {
             sink: None,
             device,
             app_name,
             stream_desc,
             format: actual_format,
-        }
+        })
     }
 }
 
@@ -145,8 +147,4 @@ impl SinkAsBytes for PulseAudioSink {
 
         Ok(())
     }
-}
-
-impl PulseAudioSink {
-    pub const NAME: &'static str = "pulseaudio";
 }

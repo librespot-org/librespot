@@ -108,6 +108,7 @@ tokio-tungstenite = { version = "0.28", default-features = false }
 tokio-util = { version = "0.7", default-features = false }
 url = "2"
 uuid = { version = "1", default-features = false, features = ["v4"] }
+clap = { version = "4.5.54", default-features = false }
 
 [build-dependencies]
 rand = { version = "0.9", default-features = false, features = ["thread_rng"] }

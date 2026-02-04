@@ -8,12 +8,11 @@ pub struct i24([u8; 3]);
 impl i24 {
     fn from_s24(sample: i32) -> Self {
         // trim the padding in the most significant byte
-        #[allow(unused_variables)]
-        let [a, b, c, d] = sample.to_ne_bytes();
         #[cfg(target_endian = "little")]
-        return Self([a, b, c]);
+        let [a, b, c, _] = sample.to_ne_bytes();
         #[cfg(target_endian = "big")]
-        return Self([b, c, d]);
+        let [_, a, b, c] = sample.to_ne_bytes();
+        Self([a, b, c])
     }
 }
 
@@ -22,16 +21,10 @@ pub struct Converter {
 }
 
 impl Converter {
-    pub fn new(dither_config: Option<DithererBuilder>) -> Self {
-        match dither_config {
-            Some(ditherer_builder) => {
-                let ditherer = (ditherer_builder)();
-                info!("Converting with ditherer: {}", ditherer.name());
-                Self {
-                    ditherer: Some(ditherer),
-                }
-            }
-            None => Self { ditherer: None },
+    pub fn new(ditherer_builder: DithererBuilder) -> Self {
+        info!("Converting with ditherer: {:?}", ditherer_builder);
+        Self {
+            ditherer: ditherer_builder.build(),
         }
     }
 
