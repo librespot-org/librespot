@@ -16,7 +16,7 @@ use librespot::{
         },
         dither,
         mixer::{self, MixerConfig, MixerFn},
-        player::{OptInPlayerEvents, Player, coefficient_to_duration, duration_to_coefficient},
+        player::{Player, coefficient_to_duration, duration_to_coefficient},
     },
 };
 use librespot_oauth::OAuthClientBuilder;
@@ -1534,6 +1534,7 @@ async fn get_setup() -> Setup {
             initial_volume,
             disable_volume,
             volume_steps,
+            ..ConnectConfig::default()
         }
     };
 
@@ -1994,9 +1995,8 @@ async fn main() {
     });
 
     if let Some(player_event_program) = setup.player_event_program.clone() {
-        let opt_in_events = OptInPlayerEvents { set_queue: true };
         _event_handler = Some(EventHandler::new(
-            player.get_player_event_channel_with(opt_in_events),
+            player.get_player_event_channel(),
             &player_event_program,
         ));
 

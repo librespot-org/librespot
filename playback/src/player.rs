@@ -80,7 +80,7 @@ struct PlayerInternal {
     sink_status: SinkStatus,
     sink_event_callback: Option<SinkEventCallback>,
     volume_getter: Box<dyn VolumeGetter + Send>,
-    event_senders: Vec<EventSubscriber>,
+    event_senders: Vec<mpsc::UnboundedSender<PlayerEvent>>,
     converter: Converter,
 
     normalisation_integrators: [f64; 2],
@@ -113,10 +113,7 @@ enum PlayerCommand {
     Stop,
     Seek(u32),
     SetSession(Session),
-    AddEventSender {
-        sender: mpsc::UnboundedSender<PlayerEvent>,
-        opt_in_events: OptInPlayerEvents,
-    },
+    AddEventSender(mpsc::UnboundedSender<PlayerEvent>),
     SetSinkEventCallback(Option<SinkEventCallback>),
     EmitVolumeChangedEvent(u16),
     SetAutoNormaliseAsAlbum(bool),
@@ -154,20 +151,6 @@ enum PlayerCommand {
 pub struct QueueTrack {
     pub uri: String,
     pub provider: String,
-}
-
-/// Opt-in player events that are not delivered to subscribers by default.
-///
-/// Use [`Player::get_player_event_channel_with`] to subscribe to these.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct OptInPlayerEvents {
-    /// Subscribe to [`PlayerEvent::SetQueue`] events.
-    pub set_queue: bool,
-}
-
-struct EventSubscriber {
-    sender: mpsc::UnboundedSender<PlayerEvent>,
-    opt_in_events: OptInPlayerEvents,
 }
 
 #[derive(Debug, Clone)]
@@ -319,14 +302,6 @@ impl PlayerEvent {
                 play_request_id, ..
             } => Some(*play_request_id),
             _ => None,
-        }
-    }
-
-    /// Whether this event should be sent to a subscriber with the given opt-in events.
-    fn should_send(&self, opt_in: &OptInPlayerEvents) -> bool {
-        match self {
-            PlayerEvent::SetQueue { .. } => opt_in.set_queue,
-            _ => true,
         }
     }
 }
@@ -619,18 +594,8 @@ impl Player {
     }
 
     pub fn get_player_event_channel(&self) -> PlayerEventChannel {
-        self.get_player_event_channel_with(OptInPlayerEvents::default())
-    }
-
-    pub fn get_player_event_channel_with(
-        &self,
-        opt_in_events: OptInPlayerEvents,
-    ) -> PlayerEventChannel {
         let (event_sender, event_receiver) = mpsc::unbounded_channel();
-        self.command(PlayerCommand::AddEventSender {
-            sender: event_sender,
-            opt_in_events,
-        });
+        self.command(PlayerCommand::AddEventSender(event_sender));
         event_receiver
     }
 
@@ -2353,15 +2318,7 @@ impl PlayerInternal {
 
             PlayerCommand::SetSession(session) => self.session = session,
 
-            PlayerCommand::AddEventSender {
-                sender,
-                opt_in_events,
-            } => {
-                self.event_senders.push(EventSubscriber {
-                    sender,
-                    opt_in_events,
-                });
-            }
+            PlayerCommand::AddEventSender(sender) => self.event_senders.push(sender),
 
             PlayerCommand::SetSinkEventCallback(callback) => self.sink_event_callback = callback,
 
@@ -2462,12 +2419,8 @@ impl PlayerInternal {
     }
 
     fn send_event(&mut self, event: PlayerEvent) {
-        self.event_senders.retain(|sub| {
-            if !event.should_send(&sub.opt_in_events) {
-                return true; // keep subscriber, skip this event
-            }
-            sub.sender.send(event.clone()).is_ok()
-        });
+        self.event_senders
+            .retain(|sender| sender.send(event.clone()).is_ok());
     }
 
     fn load_track(
@@ -2573,7 +2526,7 @@ impl fmt::Debug for PlayerCommand {
             PlayerCommand::Stop => f.debug_tuple("Stop").finish(),
             PlayerCommand::Seek(position) => f.debug_tuple("Seek").field(&position).finish(),
             PlayerCommand::SetSession(_) => f.debug_tuple("SetSession").finish(),
-            PlayerCommand::AddEventSender { .. } => f.debug_tuple("AddEventSender").finish(),
+            PlayerCommand::AddEventSender(_) => f.debug_tuple("AddEventSender").finish(),
             PlayerCommand::SetSinkEventCallback(_) => {
                 f.debug_tuple("SetSinkEventCallback").finish()
             }

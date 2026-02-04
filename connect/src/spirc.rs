@@ -95,6 +95,8 @@ struct SpircTask {
 
     context_resolver: ContextResolver,
 
+    emit_set_queue_events: bool,
+
     shutdown: bool,
     session: Session,
 
@@ -173,6 +175,7 @@ impl Spirc {
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Spirc[{spirc_id}]");
 
+        let emit_set_queue_events = config.emit_set_queue_events;
         let connect_state = ConnectState::new(config, &session);
 
         let connection_id_update = session
@@ -248,6 +251,8 @@ impl Spirc {
             player_events: Some(player_events),
 
             context_resolver: ContextResolver::new(session.clone()),
+
+            emit_set_queue_events,
 
             shutdown: false,
             session,
@@ -647,6 +652,10 @@ impl SpircTask {
 
     /// Emit set queue event via PlayerEvent
     fn emit_set_queue_event(&self) {
+        if !self.emit_set_queue_events {
+            return;
+        }
+
         let context_uri = self.connect_state.context_uri().clone();
         let state_player = self.connect_state.player();
 
