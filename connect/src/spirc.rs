@@ -656,7 +656,6 @@ impl SpircTask {
             return;
         }
 
-        let context_uri = self.connect_state.context_uri().clone();
         let state_player = self.connect_state.player();
 
         let current_track = state_player.track.as_ref().map(|t| QueueTrack {
@@ -681,6 +680,8 @@ impl SpircTask {
                 provider: t.provider.clone(),
             })
             .collect();
+
+        let context_uri = self.connect_state.context_uri().clone();
 
         self.player
             .emit_set_queue_event(context_uri, current_track, next_tracks, prev_tracks);
