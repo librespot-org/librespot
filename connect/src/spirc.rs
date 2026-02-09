@@ -14,7 +14,7 @@ use crate::{
     model::{LoadRequest, PlayingTrack, SpircPlayStatus},
     playback::{
         mixer::Mixer,
-        player::{Player, PlayerEvent, PlayerEventChannel},
+        player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
     },
     protocol::{
         connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
@@ -95,6 +95,8 @@ struct SpircTask {
 
     context_resolver: ContextResolver,
 
+    emit_set_queue_events: bool,
+
     shutdown: bool,
     session: Session,
 
@@ -173,6 +175,7 @@ impl Spirc {
         let spirc_id = SPIRC_COUNTER.fetch_add(1, Ordering::AcqRel);
         debug!("new Spirc[{spirc_id}]");
 
+        let emit_set_queue_events = config.emit_set_queue_events;
         let connect_state = ConnectState::new(config, &session);
 
         let connection_id_update = session
@@ -248,6 +251,8 @@ impl Spirc {
             player_events: Some(player_events),
 
             context_resolver: ContextResolver::new(session.clone()),
+
+            emit_set_queue_events,
 
             shutdown: false,
             session,
@@ -636,8 +641,50 @@ impl SpircTask {
             false
         };
 
+        // Fire set queue event if context was successfully loaded
+        if update_state {
+            self.emit_set_queue_event();
+        }
+
         self.context_resolver.remove_used_and_invalid();
         update_state
+    }
+
+    /// Emit set queue event via PlayerEvent
+    fn emit_set_queue_event(&self) {
+        if !self.emit_set_queue_events {
+            return;
+        }
+
+        let state_player = self.connect_state.player();
+
+        let current_track = state_player.track.as_ref().map(|t| QueueTrack {
+            uri: t.uri.clone(),
+            provider: t.provider.clone(),
+        });
+
+        let next_tracks: Vec<_> = state_player
+            .next_tracks
+            .iter()
+            .map(|t| QueueTrack {
+                uri: t.uri.clone(),
+                provider: t.provider.clone(),
+            })
+            .collect();
+
+        let prev_tracks: Vec<_> = state_player
+            .prev_tracks
+            .iter()
+            .map(|t| QueueTrack {
+                uri: t.uri.clone(),
+                provider: t.provider.clone(),
+            })
+            .collect();
+
+        let context_uri = self.connect_state.context_uri().clone();
+
+        self.player
+            .emit_set_queue_event(context_uri, current_track, next_tracks, prev_tracks);
     }
 
     // todo: is the time_delta still necessary?
@@ -1084,13 +1131,13 @@ impl SpircTask {
             }
             SetRepeatingTrack(repeat_track) => self.handle_repeat_track(repeat_track.value),
             AddToQueue(add_to_queue) => {
-                let track = add_to_queue.track.clone();
                 self.connect_state.add_to_queue(add_to_queue.track, true);
-                if let Ok(uri) = SpotifyUri::from_uri(&track.uri) {
-                    self.player.emit_added_to_queue_event(uri);
-                }
+                self.emit_set_queue_event();
             }
-            SetQueue(set_queue) => self.connect_state.handle_set_queue(set_queue),
+            SetQueue(set_queue) => {
+                self.connect_state.handle_set_queue(set_queue);
+                self.emit_set_queue_event();
+            }
             SetOptions(set_options) => {
                 if let Some(repeat_context) = set_options.repeating_context {
                     self.handle_repeat_context(repeat_context)?
@@ -1460,6 +1507,8 @@ impl SpircTask {
             .connect_state
             .update_context(ctx, ContextType::Default)?;
 
+        self.emit_set_queue_event();
+
         Ok(())
     }
 
@@ -1598,11 +1647,8 @@ impl SpircTask {
                 ..Default::default()
             };
             self.connect_state.add_to_queue(track, true);
-
-            if let Ok(uri) = SpotifyUri::from_uri(&track_uri) {
-                self.player.emit_added_to_queue_event(uri);
-            }
         }
+        self.emit_set_queue_event();
     }
 
     fn handle_preload_next_track(&mut self) {

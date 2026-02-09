@@ -27,10 +27,6 @@ impl EventHandler {
                                     .insert("PLAYER_EVENT", "play_request_id_changed".to_string());
                                 env_vars.insert("PLAY_REQUEST_ID", play_request_id.to_string());
                             }
-                            PlayerEvent::AddedToQueue { track_id } => {
-                                env_vars.insert("PLAYER_EVENT", "added_to_queue".to_string());
-                                env_vars.insert("TRACK_ID", track_id.to_id());
-                            }
                             PlayerEvent::TrackChanged { audio_item } => {
                                 let id = audio_item.track_id.to_id();
                                 env_vars.insert("PLAYER_EVENT", "track_changed".to_string());
@@ -233,6 +229,37 @@ impl EventHandler {
                                     "filter_explicit_content_changed".to_string(),
                                 );
                                 env_vars.insert("FILTER", filter.to_string());
+                            }
+                            PlayerEvent::SetQueue {
+                                context_uri,
+                                current_track,
+                                next_tracks,
+                                prev_tracks,
+                            } => {
+                                env_vars.insert("PLAYER_EVENT", "set_queue".to_string());
+                                env_vars.insert("CONTEXT_URI", context_uri);
+                                if let Some(track) = current_track {
+                                    env_vars.insert(
+                                        "CURRENT_TRACK",
+                                        format!("{}\t{}", track.uri, track.provider),
+                                    );
+                                }
+                                env_vars.insert(
+                                    "NEXT_TRACKS",
+                                    next_tracks
+                                        .into_iter()
+                                        .map(|t| format!("{}\t{}", t.uri, t.provider))
+                                        .collect::<Vec<String>>()
+                                        .join("\n"),
+                                );
+                                env_vars.insert(
+                                    "PREV_TRACKS",
+                                    prev_tracks
+                                        .into_iter()
+                                        .map(|t| format!("{}\t{}", t.uri, t.provider))
+                                        .collect::<Vec<String>>()
+                                        .join("\n"),
+                                );
                             }
                             // Ignore event irrelevant for standalone binary like PositionChanged
                             _ => {}
