@@ -113,9 +113,11 @@ clap = { version = "4.5.54", default-features = false }
 [build-dependencies]
 rand = { version = "0.9", default-features = false, features = ["thread_rng"] }
 rand_distr = "0.5"
-vergen-gitcl = { version = "1.0", default-features = false, features = [
+vergen-gitcl = { version = "1.0.8", default-features = false, features = [
     "build",
 ] }
+# fix for https://github.com/rustyhorde/vergen/issues/478#issuecomment-3769340357
+vergen = "=9.0.6"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros"] }

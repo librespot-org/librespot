@@ -148,11 +148,7 @@ pub struct Config {
 
     #[cfg(discovery)]
     /// Disable zeroconf discovery mode.
-    #[arg(
-        long,
-        short = 'O',
-        verbatim_doc_comment
-    )]
+    #[arg(long, short = 'O', verbatim_doc_comment)]
     disable_discovery: bool,
 
     #[cfg(discovery)]
@@ -422,11 +418,25 @@ struct PlayerConfigClap {
 #[derive(Args, Serialize, Deserialize)]
 struct NormalizationConfig {
     /// Specify the normalisation gain type to use.
-    #[arg(long, short = 'W', verbatim_doc_comment, value_enum, default_value_t, requires("enable_volume_normalisation"))]
+    #[arg(
+        long,
+        short = 'W',
+        verbatim_doc_comment,
+        value_enum,
+        default_value_t,
+        requires("enable_volume_normalisation")
+    )]
     normalisation_gain_type: NormalisationType,
 
     /// Specify the normalisation method to use.
-    #[arg(long, short = 'X', verbatim_doc_comment, value_enum, default_value_t, requires("enable_volume_normalisation"))]
+    #[arg(
+        long,
+        short = 'X',
+        verbatim_doc_comment,
+        value_enum,
+        default_value_t,
+        requires("enable_volume_normalisation")
+    )]
     normalisation_method: NormalisationMethod,
 
     /// Pregain (dB) applied by volume normalisation from -10.0 to 10.0.
@@ -720,6 +730,7 @@ impl Config {
                 initial_volume,
                 disable_volume: matches!(mixer_config.volume_ctrl, VolumeCtrl::Fixed),
                 volume_steps: conf.connect_config.volume_steps,
+                emit_set_queue_events: false,
             }
         };
 
