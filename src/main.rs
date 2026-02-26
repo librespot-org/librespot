@@ -31,6 +31,7 @@ use std::{
     pin::Pin,
     process::exit,
     str::FromStr,
+    sync::{Arc, atomic::AtomicBool},
     time::{Duration, Instant},
 };
 use sysinfo::{ProcessesToUpdate, System};
@@ -1895,9 +1896,11 @@ async fn main() {
     let mut last_credentials = None;
     let mut spirc: Option<Spirc> = None;
     let mut spirc_task: Option<Pin<_>> = None;
+    let was_playing = Arc::new(AtomicBool::new(false));
     let mut auto_connect_times: Vec<Instant> = vec![];
     let mut discovery = None;
     let mut connecting = false;
+    let mut has_been_connected = false;
     let mut _event_handler: Option<EventHandler> = None;
 
     let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
@@ -2030,7 +2033,7 @@ async fn main() {
                             tokio::spawn(spirc_task);
                         }
                         if !session.is_invalid() {
-                            session.shutdown();
+                            session.shutdown("new credentials received");
                         }
 
                         connecting = true;
@@ -2043,17 +2046,26 @@ async fn main() {
             },
             _ = async {}, if connecting && last_credentials.is_some() => {
                 if session.is_invalid() {
+                    let old_session_id = session.session_id();
                     session = Session::new(setup.session_config.clone(), setup.cache.clone());
+                    if !old_session_id.is_empty() {
+                        session.set_session_id(&old_session_id);
+                        info!("Preserved session_id across reconnection: {old_session_id}");
+                    }
                     player.set_session(session.clone());
                 }
 
-                let connect_config = setup.connect_config.clone();
+                let mut connect_config = setup.connect_config.clone();
+                if has_been_connected {
+                    connect_config.initial_volume = mixer.volume();
+                }
 
                 let (spirc_, spirc_task_) = match Spirc::new(connect_config,
                                                                 session.clone(),
                                                                 last_credentials.clone().unwrap_or_default(),
                                                                 player.clone(),
-                                                                mixer.clone()).await {
+                                                                mixer.clone(),
+                                                                was_playing.clone()).await {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
                     Err(e) => {
                         error!("could not initialize spirc: {e}");
@@ -2064,6 +2076,7 @@ async fn main() {
                 spirc_task = Some(Box::pin(spirc_task_));
 
                 connecting = false;
+                has_been_connected = true;
             },
             _ = async {
                 if let Some(task) = spirc_task.as_mut() {
@@ -2082,7 +2095,7 @@ async fn main() {
                 if last_credentials.is_some() && !reconnect_exceeds_rate_limit() {
                     auto_connect_times.push(Instant::now());
                     if !session.is_invalid() {
-                        session.shutdown();
+                        session.shutdown("spirc shut down unexpectedly");
                     }
                     connecting = true;
                 } else {
