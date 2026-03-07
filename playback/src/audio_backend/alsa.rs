@@ -4,7 +4,7 @@ use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use alsa::device_name::HintIter;
-use alsa::pcm::{Access, Format, Frames, HwParams, PCM};
+use alsa::pcm::{Access, Format, Frames, HwParams, State, PCM};
 use alsa::{Direction, ValueOr};
 use std::process::exit;
 use thiserror::Error;
@@ -442,7 +442,14 @@ impl Sink for AlsaSink {
 
             let pcm = self.pcm.take().ok_or(AlsaError::NotConnected)?;
 
-            pcm.drain().map_err(AlsaError::DrainFailure)?;
+            // Only drain if the PCM is in Running state. After a write error,
+            // try_recover() leaves the PCM in Prepared state, and calling drain()
+            // on a Prepared-state USB PCM can deadlock the kernel driver
+            // (confirmed on Raspberry Pi 3 with the dwc_otg USB controller).
+            // In that case, dropping the PCM is sufficient to release resources.
+            if pcm.state() == State::Running {
+                pcm.drain().map_err(AlsaError::DrainFailure)?;
+            }
         }
 
         Ok(())
