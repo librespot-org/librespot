@@ -4,7 +4,7 @@ use crate::convert::Converter;
 use crate::decoder::AudioPacket;
 use crate::{NUM_CHANNELS, SAMPLE_RATE};
 use alsa::device_name::HintIter;
-use alsa::pcm::{Access, Format, Frames, HwParams, State, PCM};
+use alsa::pcm::{Access, Format, Frames, HwParams, PCM, State};
 use alsa::{Direction, ValueOr};
 use std::process::exit;
 use thiserror::Error;
