@@ -447,8 +447,11 @@ impl Sink for AlsaSink {
             // on a Prepared-state USB PCM can deadlock the kernel driver
             // (confirmed on Raspberry Pi 3 with the dwc_otg USB controller).
             // In that case, dropping the PCM is sufficient to release resources.
-            if pcm.state() == State::Running {
+            let state = pcm.state();
+            if state == State::Running {
                 pcm.drain().map_err(AlsaError::DrainFailure)?;
+            } else {
+                debug!("PCM not in Running state ({state:?}), skipping drain and dropping PCM");
             }
         }
 
