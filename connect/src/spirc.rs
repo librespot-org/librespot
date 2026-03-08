@@ -458,6 +458,9 @@ impl SpircTask {
             };
         }
 
+        // Subscribe before start() so we can't miss a reconnect notification.
+        let mut reconnect_rx = self.session.dealer().reconnect_receiver();
+
         if let Err(why) = self.session.dealer().start().await {
             error!("starting dealer failed: {why}");
             return;
@@ -584,6 +587,12 @@ impl SpircTask {
                             error!("update after context resolving failed: {why}")
                         }
                     }
+                },
+                // dealer reconnected after a connection loss — our subscription
+                // streams are stale, so break out and let main.rs re-create spirc
+                Ok(()) = reconnect_rx.changed() => {
+                    warn!("Dealer reconnected; restarting spirc to refresh subscriptions.");
+                    break;
                 },
                 else => break
             }
