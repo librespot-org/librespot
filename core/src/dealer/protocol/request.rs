@@ -108,7 +108,7 @@ pub struct PauseCommand {
 #[derive(Clone, Debug, Deserialize)]
 pub struct SeekToCommand {
     pub value: u32,
-    pub position: u32,
+    pub position: i32,
     pub logging_params: LoggingParams,
 }
 
