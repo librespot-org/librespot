@@ -1899,6 +1899,7 @@ async fn main() {
     let mut discovery = None;
     let mut connecting = false;
     let mut _event_handler: Option<EventHandler> = None;
+    let mut saved_playback_state = None;
 
     let mut session = Session::new(setup.session_config.clone(), setup.cache.clone());
 
@@ -2020,6 +2021,10 @@ async fn main() {
                         last_credentials = Some(credentials.clone());
                         auto_connect_times.clear();
 
+                        // New account via Discovery — discard any saved
+                        // playback state from the previous account.
+                        saved_playback_state = None;
+
                         if let Some(spirc) = spirc.take() {
                             if let Err(e) = spirc.shutdown() {
                                 error!("error sending spirc shutdown message: {e}");
@@ -2049,11 +2054,14 @@ async fn main() {
 
                 let connect_config = setup.connect_config.clone();
 
-                let (spirc_, spirc_task_) = match Spirc::new(connect_config,
-                                                                session.clone(),
-                                                                last_credentials.clone().unwrap_or_default(),
-                                                                player.clone(),
-                                                                mixer.clone()).await {
+                let (spirc_, spirc_task_) = match Spirc::with_saved_state(
+                    connect_config,
+                    session.clone(),
+                    last_credentials.clone().unwrap_or_default(),
+                    player.clone(),
+                    mixer.clone(),
+                    saved_playback_state.take(),
+                ).await {
                     Ok((spirc_, spirc_task_)) => (spirc_, spirc_task_),
                     Err(e) => {
                         error!("could not initialize spirc: {e}");
@@ -2065,14 +2073,20 @@ async fn main() {
 
                 connecting = false;
             },
-            _ = async {
-                if let Some(task) = spirc_task.as_mut() {
-                    task.await;
+            saved = async {
+                match spirc_task.as_mut() {
+                    Some(task) => task.await,
+                    None => None,
                 }
             }, if spirc_task.is_some() && !connecting => {
                 spirc_task = None;
+                saved_playback_state = saved;
 
-                warn!("Spirc shut down unexpectedly");
+                if saved_playback_state.is_some() {
+                    info!("Spirc shut down with saved playback state, reconnecting");
+                } else {
+                    warn!("Spirc shut down unexpectedly");
+                }
 
                 let mut reconnect_exceeds_rate_limit = || {
                     auto_connect_times.retain(|&t| t.elapsed() < RECONNECT_RATE_LIMIT_WINDOW);
@@ -2112,7 +2126,7 @@ async fn main() {
         }
 
         if let Some(spirc_task) = spirc_task {
-            shutdown_tasks.spawn(spirc_task);
+            shutdown_tasks.spawn(async { let _ = spirc_task.await; });
         }
     }
 

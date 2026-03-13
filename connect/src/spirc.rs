@@ -11,7 +11,7 @@ use crate::{
         session::UserAttributes,
         spclient::TransferRequest,
     },
-    model::{LoadRequest, PlayingTrack, SpircPlayStatus},
+    model::{LoadRequest, PlayingTrack, SavedPlaybackState, SpircPlayStatus},
     playback::{
         mixer::Mixer,
         player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
@@ -37,6 +37,7 @@ use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
     future::Future,
+    mem,
     sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -163,7 +164,23 @@ impl Spirc {
         credentials: Credentials,
         player: Arc<Player>,
         mixer: Arc<dyn Mixer>,
-    ) -> Result<(Spirc, impl Future<Output = ()>), Error> {
+    ) -> Result<(Spirc, impl Future<Output = Option<SavedPlaybackState>>), Error> {
+        Self::with_saved_state(config, session, credentials, player, mixer, None).await
+    }
+
+    /// Like [`Spirc::new`], but restores playback state from a previous session.
+    ///
+    /// When `saved_state` is provided, the new SpircTask picks up where the
+    /// old one left off — same track, position, and connect state — so the
+    /// Player can continue without interruption after a session reconnect.
+    pub async fn with_saved_state(
+        config: ConnectConfig,
+        session: Session,
+        credentials: Credentials,
+        player: Arc<Player>,
+        mixer: Arc<dyn Mixer>,
+        saved_state: Option<SavedPlaybackState>,
+    ) -> Result<(Spirc, impl Future<Output = Option<SavedPlaybackState>>), Error> {
         fn extract_connection_id(msg: Message) -> Result<String, Error> {
             let connection_id = msg
                 .headers
@@ -176,7 +193,21 @@ impl Spirc {
         debug!("new Spirc[{spirc_id}]");
 
         let emit_set_queue_events = config.emit_set_queue_events;
-        let connect_state = ConnectState::new(config, &session);
+
+        let (connect_state, play_status, play_request_id) = match saved_state {
+            Some(saved) => {
+                info!("Spirc[{spirc_id}] restoring saved playback state");
+                let mut cs = saved.connect_state;
+                // Update to the new session's ID so Spotify sees us as the same device.
+                cs.set_session_id(session.session_id());
+                (cs, saved.play_status, saved.play_request_id)
+            }
+            None => (
+                ConnectState::new(config, &session),
+                SpircPlayStatus::Stopped,
+                None,
+            ),
+        };
 
         let connection_id_update = session
             .dealer()
@@ -235,8 +266,8 @@ impl Spirc {
             connect_state,
             connect_established: false,
 
-            play_request_id: None,
-            play_status: SpircPlayStatus::Stopped,
+            play_request_id,
+            play_status,
 
             connection_id_update,
             connect_state_update,
@@ -438,7 +469,7 @@ impl Spirc {
 }
 
 impl SpircTask {
-    async fn run(mut self) {
+    async fn run(mut self) -> Option<SavedPlaybackState> {
         // simplify unwrapping of received item or parsed result
         macro_rules! unwrap {
             ( $next:expr, |$some:ident| $use_some:expr ) => {
@@ -463,7 +494,7 @@ impl SpircTask {
 
         if let Err(why) = self.session.dealer().start().await {
             error!("starting dealer failed: {why}");
-            return;
+            return None;
         }
 
         while !self.session.is_invalid() && !self.shutdown {
@@ -606,12 +637,19 @@ impl SpircTask {
             }
         }
 
-        if self.session.is_invalid() {
-            // Session TCP connection died — skip server communication that
-            // would fail anyway. The Player continues playing from its
-            // buffer independently; main.rs will create a new session.
-            warn!("session lost, skipping server cleanup");
-            return;
+        if self.session.is_invalid() && !self.shutdown {
+            // Session TCP connection died unexpectedly — skip server
+            // communication that would fail anyway. The Player continues
+            // playing from its buffer; main.rs will create a new session.
+            warn!(
+                "session lost, saving playback state for recovery: {:?}",
+                self.play_status
+            );
+            return Some(SavedPlaybackState {
+                connect_state: mem::take(&mut self.connect_state),
+                play_status: mem::replace(&mut self.play_status, SpircPlayStatus::Stopped),
+                play_request_id: self.play_request_id.take(),
+            });
         }
 
         if !self.shutdown && self.connect_state.is_active() {
@@ -627,6 +665,7 @@ impl SpircTask {
         };
 
         self.session.dealer().close().await;
+        None
     }
 
     fn handle_next_context(&mut self, next_context: Result<Context, Error>) -> bool {
@@ -913,6 +952,22 @@ impl SpircTask {
     async fn handle_connection_id_update(&mut self, connection_id: String) -> Result<(), Error> {
         trace!("Received connection ID update: {connection_id:?}");
         self.session.set_connection_id(&connection_id);
+
+        // If we have active playback (e.g. restored from saved state),
+        // update the position before registering so Spotify sees the
+        // correct track position.
+        if !matches!(self.play_status, SpircPlayStatus::Stopped) {
+            info!(
+                "re-registering with active playback state: {:?}",
+                self.play_status
+            );
+            self.connect_state.set_status(&self.play_status);
+            if self.connect_state.is_playing() {
+                self.connect_state
+                    .update_position_in_relation(self.now_ms());
+            }
+            self.connect_state.set_now(self.now_ms() as u64);
+        }
 
         let cluster = match self
             .connect_state
