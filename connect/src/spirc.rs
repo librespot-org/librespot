@@ -606,6 +606,14 @@ impl SpircTask {
             }
         }
 
+        if self.session.is_invalid() {
+            // Session TCP connection died — skip server communication that
+            // would fail anyway. The Player continues playing from its
+            // buffer independently; main.rs will create a new session.
+            warn!("session lost, skipping server cleanup");
+            return;
+        }
+
         if !self.shutdown && self.connect_state.is_active() {
             warn!("unexpected shutdown");
             if let Err(why) = self.handle_disconnect().await {
