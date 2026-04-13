@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [main] Fixed `--volume-ctrl fixed` not disabling volume control
 - [core] Fix default permissions on credentials file and warn user if file is world readable
 - [core] Try all resolved addresses for the dealer connection instead of failing after the first one.
+- [discovery] Return an HTTP error response instead of panicking on malformed discovery login requests
 
 ## [0.8.0] - 2025-11-10
 
