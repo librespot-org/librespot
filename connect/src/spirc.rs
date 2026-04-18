@@ -1297,6 +1297,74 @@ impl SpircTask {
         );
 
         if let Some(mut cluster) = cluster_update.cluster.take() {
+            if let Ok(reason_enum) = reason {
+                match reason_enum {
+                    ServerClusterUpdateReason::DEVICE_NEW_CONNECTION
+                    | ServerClusterUpdateReason::NEW_DEVICE_APPEARED
+                    | ServerClusterUpdateReason::DEVICES_DISAPPEARED => {
+                        for device_id in &cluster_update.devices_that_changed {
+                            self.emit_cluster_update(ClusterUpdateEvent {
+                                reason: crate::spirc::ClusterUpdateReason::DeviceListChanged,
+                                device_id: device_id.clone(),
+                            });
+                        }
+                    }
+                    ServerClusterUpdateReason::DEVICE_ALIAS_CHANGED
+                    | ServerClusterUpdateReason::DEVICE_VOLUME_CHANGED => {
+                        for device_id in &cluster_update.devices_that_changed {
+                            self.emit_cluster_update(ClusterUpdateEvent {
+                                reason: crate::spirc::ClusterUpdateReason::DeviceInfoChanged,
+                                device_id: device_id.clone(),
+                            });
+                        }
+                    }
+                    ServerClusterUpdateReason::DEVICE_STATE_CHANGED => {
+                        for device_id in &cluster_update.devices_that_changed {
+                            self.emit_cluster_update(ClusterUpdateEvent {
+                                reason: crate::spirc::ClusterUpdateReason::DeviceStateChanged,
+                                device_id: device_id.clone(),
+                            });
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Check for active device changes
+            let new_active_device_id = cluster.active_device_id.clone();
+            if Some(new_active_device_id.clone()) != self.last_active_device_id {
+                self.emit_cluster_update(ClusterUpdateEvent {
+                    reason: crate::spirc::ClusterUpdateReason::ActiveDeviceChanged,
+                    device_id: new_active_device_id.clone(),
+                });
+                self.last_active_device_id = Some(new_active_device_id);
+            }
+
+            // Sync device state to cluster_state_sender (after emitting events)
+            let devices: HashMap<String, DeviceInfo> = cluster
+                .device
+                .iter()
+                .map(|(_, device)| {
+                    let info = DeviceInfo {
+                        device_id: device.device_id.clone(),
+                        device_alias: device.name.clone(),
+                        device_type: format!("{:?}", device.device_type),
+                        volume: device.volume as u32,
+                        is_active: device.device_id == cluster.active_device_id,
+                    };
+                    (info.device_id.clone(), info)
+                })
+                .collect();
+
+            let _ = self.cluster_state_sender.send(ClusterState {
+                devices,
+                active_device_id: if cluster.active_device_id.is_empty() {
+                    None
+                } else {
+                    Some(cluster.active_device_id.clone())
+                },
+            });
+
             let became_inactive = self.connect_state.is_active()
                 && cluster.active_device_id != self.session.device_id();
             if became_inactive {
