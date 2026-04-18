@@ -152,8 +152,6 @@ pub struct QueueUpdateEvent {
 pub enum PlayerUpdateReason {
     /// Track changed
     TrackChanged,
-    /// Position changed
-    PositionChanged,
     /// Play/pause state changed
     PlayPauseChanged,
     /// Shuffle mode changed
@@ -162,6 +160,8 @@ pub enum PlayerUpdateReason {
     RepeatChanged,
     /// Context changed
     ContextChanged,
+    /// Seek detected
+    SeekChanged,
     /// Other state change
     Other,
 }
@@ -1244,11 +1244,18 @@ impl SpircTask {
             }
 
             // Detect seek: position jump (not just natural progress)
-            let position_diff =
-                (state.position_as_of_timestamp - last.position_as_of_timestamp).abs();
-            if position_diff > 5000 {
-                // threshold: 5 seconds
-                PlayerUpdateReason::PositionChanged
+            let time_diff = state.timestamp.saturating_sub(last.timestamp);
+            let expected_position = if state.is_playing {
+                // Account for natural progression if playing
+                last.position_as_of_timestamp + time_diff
+            } else {
+                // If paused, position shouldn't change
+                last.position_as_of_timestamp
+            };
+
+            let position_delta = (state.position_as_of_timestamp as i64 - expected_position as i64).abs();
+            if position_delta > 5000 {
+                PlayerUpdateReason::SeekChanged
             } else {
                 // No significant change detected
                 PlayerUpdateReason::Other
