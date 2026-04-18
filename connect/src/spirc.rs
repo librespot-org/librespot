@@ -1338,13 +1338,17 @@ impl SpircTask {
             }
 
             // Check for active device changes
-            let new_active_device_id = cluster.active_device_id.clone();
-            if Some(new_active_device_id.clone()) != self.last_active_device_id {
+            let new_active_device_id = if cluster.active_device_id.is_empty() {
+                None
+            } else {
+                Some(cluster.active_device_id.clone())
+            };
+            if new_active_device_id != self.last_active_device_id {
                 self.emit_cluster_update(ClusterUpdateEvent {
                     reason: crate::spirc::ClusterUpdateReason::ActiveDeviceChanged,
-                    device_id: new_active_device_id.clone(),
+                    device_id: new_active_device_id.clone().unwrap_or_default(),
                 });
-                self.last_active_device_id = Some(new_active_device_id);
+                self.last_active_device_id = new_active_device_id;
             }
 
             // Sync device state to cluster_state_sender (after emitting events)
