@@ -1161,14 +1161,126 @@ impl SpircTask {
         }
     }
 
-    fn emit_state_update(&self, state: Option<PlayerState>) {
-        if self.state_sender.receiver_count() == 0 {
+    fn emit_player_update(&self, state: Option<PlayerState>, last_state: Option<&PlayerState>) {
+        if self.player_update_sender.receiver_count() == 0
+            && self.player_state_sender.receiver_count() == 0
+        {
             return;
         }
 
         let state = state.unwrap_or_else(|| self.connect_state.player().clone());
-        if let Err(why) = self.state_sender.send(state) {
-            warn!("couldn't emit state because: {why}")
+
+        // Determine the reason for the update by diffing with last state
+        let reason = if let Some(last) = last_state {
+            // Check in priority order: track > play/pause > shuffle > repeat > seek
+            let new_track_uri = state
+                .track
+                .as_ref()
+                .map(|t| t.uri.clone())
+                .unwrap_or_default();
+            let old_track_uri = last
+                .track
+                .as_ref()
+                .map(|t| t.uri.clone())
+                .unwrap_or_default();
+            if new_track_uri != old_track_uri {
+                let _ = self.player_state_sender.send(Some(state));
+                let _ = self.player_update_sender.send(PlayerUpdateEvent {
+                    reason: PlayerUpdateReason::TrackChanged,
+                });
+                return;
+            }
+
+            let new_is_playing = state.is_playing && !state.is_paused;
+            let old_is_playing = last.is_playing && !last.is_paused;
+            if new_is_playing != old_is_playing {
+                let _ = self.player_state_sender.send(Some(state));
+                let _ = self.player_update_sender.send(PlayerUpdateEvent {
+                    reason: PlayerUpdateReason::PlayPauseChanged,
+                });
+                return;
+            }
+
+            let new_shuffle = state
+                .options
+                .as_ref()
+                .map(|o| o.shuffling_context)
+                .unwrap_or(false);
+            let old_shuffle = last
+                .options
+                .as_ref()
+                .map(|o| o.shuffling_context)
+                .unwrap_or(false);
+            if new_shuffle != old_shuffle {
+                let _ = self.player_state_sender.send(Some(state));
+                let _ = self.player_update_sender.send(PlayerUpdateEvent {
+                    reason: PlayerUpdateReason::ShuffleChanged,
+                });
+                return;
+            }
+
+            let new_repeat = state
+                .options
+                .as_ref()
+                .map(|o| (o.repeating_context, o.repeating_track));
+            let old_repeat = last
+                .options
+                .as_ref()
+                .map(|o| (o.repeating_context, o.repeating_track));
+            if new_repeat != old_repeat {
+                let _ = self.player_state_sender.send(Some(state));
+                let _ = self.player_update_sender.send(PlayerUpdateEvent {
+                    reason: PlayerUpdateReason::RepeatChanged,
+                });
+                return;
+            }
+
+            if state.context_uri != last.context_uri {
+                let _ = self.player_state_sender.send(Some(state));
+                let _ = self.player_update_sender.send(PlayerUpdateEvent {
+                    reason: PlayerUpdateReason::ContextChanged,
+                });
+                return;
+            }
+
+            // Detect seek: position jump (not just natural progress)
+            let position_diff =
+                (state.position_as_of_timestamp - last.position_as_of_timestamp).abs();
+            if position_diff > 5000 {
+                // threshold: 5 seconds
+                PlayerUpdateReason::PositionChanged
+            } else {
+                // No significant change detected
+                PlayerUpdateReason::Other
+            }
+        } else {
+            // No previous state (initial state)
+            PlayerUpdateReason::Other
+        };
+
+        let _ = self.player_state_sender.send(Some(state));
+        if let Err(why) = self.player_update_sender.send(PlayerUpdateEvent { reason }) {
+            warn!("couldn't emit player update because: {why}")
+        }
+    }
+
+    fn emit_cluster_update(&self, event: ClusterUpdateEvent) {
+        if self.cluster_update_sender.receiver_count() == 0 {
+            return;
+        }
+
+        if let Err(why) = self.cluster_update_sender.send(event) {
+            warn!("couldn't emit cluster transition because: {why}")
+        }
+    }
+
+    fn emit_queue_update(&self, event: QueueUpdateEvent) {
+        if self.queue_update_sender.receiver_count() == 0 {
+            return;
+        }
+
+        if let Err(why) = self.queue_update_sender.send(event) {
+            warn!("couldn't emit queue update because: {why}")
         }
     }
 
