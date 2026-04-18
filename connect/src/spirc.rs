@@ -1276,7 +1276,7 @@ impl SpircTask {
             };
 
             let position_delta =
-                (state.position_as_of_timestamp as i64 - expected_position as i64).abs();
+                (state.position_as_of_timestamp - expected_position).abs();
             if position_delta > 5000 {
                 PlayerUpdateReason::SeekChanged
             } else {
@@ -1377,13 +1377,13 @@ impl SpircTask {
             // Sync device state to cluster_state_sender (after emitting events)
             let devices: HashMap<String, DeviceInfo> = cluster
                 .device
-                .iter()
-                .map(|(_, device)| {
+                .values()
+                .map(|device| {
                     let info = DeviceInfo {
                         device_id: device.device_id.clone(),
                         device_alias: device.name.clone(),
                         device_type: format!("{:?}", device.device_type),
-                        volume: device.volume as u32,
+                        volume: device.volume,
                         is_active: device.device_id == cluster.active_device_id,
                     };
                     (info.device_id.clone(), info)
