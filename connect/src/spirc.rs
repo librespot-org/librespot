@@ -1405,6 +1405,12 @@ impl SpircTask {
                             });
                         }
                     }
+                } else {
+                    let queue_list = QueueList {
+                        prev_tracks: state.prev_tracks.iter().map(|t| t.uri.clone()).collect(),
+                        next_tracks: state.next_tracks.iter().map(|t| t.uri.clone()).collect(),
+                    };
+                    let _ = self.queue_list_sender.send(queue_list);
                 }
                 self.emit_player_update(Some(state.clone()), self.last_player_state.as_ref());
                 self.last_player_state = Some(state);
