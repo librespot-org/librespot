@@ -392,9 +392,9 @@ impl Spirc {
             update_volume: false,
             update_state: false,
 
-            player_update_sender: player_update_tx.clone(),
-            cluster_update_sender: cluster_update_tx.clone(),
-            queue_update_sender: queue_update_tx.clone(),
+            player_update_sender: player_update_sender_tx.clone(),
+            cluster_update_sender: cluster_update_sender_tx.clone(),
+            queue_update_sender: queue_update_sender_tx.clone(),
             player_state_sender: player_state_sender_tx.clone(),
             cluster_state_sender: cluster_state_sender_tx.clone(),
             queue_list_sender: queue_list_sender_tx.clone(),
@@ -406,9 +406,9 @@ impl Spirc {
 
         let spirc = Spirc {
             commands: cmd_tx,
-            player_update_sender: player_update_tx,
-            cluster_update_sender: cluster_update_tx,
-            queue_update_sender: queue_update_tx,
+            player_update_sender: player_update_sender_tx,
+            cluster_update_sender: cluster_update_sender_tx,
+            queue_update_sender: queue_update_sender_tx,
             player_state_sender: player_state_sender_tx,
             cluster_state_sender: cluster_state_sender_tx,
             queue_list_sender: queue_list_sender_tx,
