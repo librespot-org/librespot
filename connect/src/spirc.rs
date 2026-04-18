@@ -1275,7 +1275,8 @@ impl SpircTask {
                 last.position_as_of_timestamp
             };
 
-            let position_delta = (state.position_as_of_timestamp as i64 - expected_position as i64).abs();
+            let position_delta =
+                (state.position_as_of_timestamp as i64 - expected_position as i64).abs();
             if position_delta > 5000 {
                 PlayerUpdateReason::SeekChanged
             } else {
