@@ -1377,7 +1377,30 @@ impl SpircTask {
                 //  tried: providing session_id, playback_id, track-metadata "track_player"
                 self.update_state = true;
             } else if let Some(state) = cluster.player_state.take() {
-                self.emit_state_update(Some(state))
+                if let Some(last_state) = &self.last_player_state {
+                    let prev_changed = state.prev_tracks != last_state.prev_tracks;
+                    let next_changed = state.next_tracks != last_state.next_tracks;
+                    if prev_changed || next_changed {
+                        let queue_list = QueueList {
+                            prev_tracks: state.prev_tracks.iter().map(|t| t.uri.clone()).collect(),
+                            next_tracks: state.next_tracks.iter().map(|t| t.uri.clone()).collect(),
+                        };
+                        let _ = self.queue_list_sender.send(queue_list);
+
+                        if prev_changed {
+                            self.emit_queue_update(QueueUpdateEvent {
+                                reason: QueueUpdateReason::PrevTracksChanged,
+                            });
+                        }
+                        if next_changed {
+                            self.emit_queue_update(QueueUpdateEvent {
+                                reason: QueueUpdateReason::NextTracksChanged,
+                            });
+                        }
+                    }
+                }
+                self.emit_player_update(Some(state.clone()), self.last_player_state.as_ref());
+                self.last_player_state = Some(state);
             }
         } else if self.connect_state.is_active() {
             self.connect_state.became_inactive(&self.session).await?;
