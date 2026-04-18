@@ -215,7 +215,14 @@ struct SpircTask {
     /// when no other future resolves, otherwise resets the delay
     update_state: bool,
 
-    state_sender: broadcast::Sender<PlayerState>,
+    player_update_sender: broadcast::Sender<PlayerUpdateEvent>,
+    cluster_update_sender: broadcast::Sender<ClusterUpdateEvent>,
+    queue_update_sender: broadcast::Sender<QueueUpdateEvent>,
+    player_state_sender: watch::Sender<Option<PlayerState>>,
+    cluster_state_sender: watch::Sender<ClusterState>,
+    queue_list_sender: watch::Sender<QueueList>,
+    last_active_device_id: Option<String>,
+    last_player_state: Option<PlayerState>,
 
     spirc_id: usize,
 }
@@ -254,7 +261,12 @@ const UPDATE_STATE_DELAY: Duration = Duration::from_millis(200);
 /// The spotify connect handle
 pub struct Spirc {
     commands: mpsc::UnboundedSender<SpircCommand>,
-    state_sender: broadcast::Sender<PlayerState>,
+    player_update_sender: broadcast::Sender<PlayerUpdateEvent>,
+    cluster_update_sender: broadcast::Sender<ClusterUpdateEvent>,
+    queue_update_sender: broadcast::Sender<QueueUpdateEvent>,
+    player_state_sender: watch::Sender<Option<PlayerState>>,
+    cluster_state_sender: watch::Sender<ClusterState>,
+    queue_list_sender: watch::Sender<QueueList>,
 }
 
 impl Spirc {
@@ -332,7 +344,18 @@ impl Spirc {
         let _ = session.login5().auth_token().await?;
 
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
-        let (state_tx, _) = broadcast::channel(1);
+        let (player_update_sender_tx, _) = broadcast::channel(1);
+        let (cluster_update_sender_tx, _) = broadcast::channel(1);
+        let (queue_update_sender_tx, _) = broadcast::channel(1);
+        let (player_state_sender_tx, _) = watch::channel(None);
+        let (cluster_state_sender_tx, _) = watch::channel(ClusterState {
+            devices: HashMap::new(),
+            active_device_id: None,
+        });
+        let (queue_list_sender_tx, _) = watch::channel(QueueList {
+            prev_tracks: Vec::new(),
+            next_tracks: Vec::new(),
+        });
 
         let player_events = player.get_player_event_channel();
 
@@ -369,14 +392,26 @@ impl Spirc {
             update_volume: false,
             update_state: false,
 
-            state_sender: state_tx.clone(),
+            player_update_sender: player_update_tx.clone(),
+            cluster_update_sender: cluster_update_tx.clone(),
+            queue_update_sender: queue_update_tx.clone(),
+            player_state_sender: player_state_sender_tx.clone(),
+            cluster_state_sender: cluster_state_sender_tx.clone(),
+            queue_list_sender: queue_list_sender_tx.clone(),
+            last_active_device_id: None,
+            last_player_state: None,
 
             spirc_id,
         };
 
         let spirc = Spirc {
             commands: cmd_tx,
-            state_sender: state_tx,
+            player_update_sender: player_update_tx,
+            cluster_update_sender: cluster_update_tx,
+            queue_update_sender: queue_update_tx,
+            player_state_sender: player_state_sender_tx,
+            cluster_state_sender: cluster_state_sender_tx,
+            queue_list_sender: queue_list_sender_tx,
         };
 
         let initial_volume = task.connect_state.device_info().volume;
@@ -549,12 +584,34 @@ impl Spirc {
             .send(SpircCommand::Transfer(transfer_request))?)
     }
 
-    /// Get a channel which sends the [PlayerState] whenever it changes.
-    ///
-    /// Forwards the internal [PlayerState] when we are the active device. When we are only
-    /// a spectator, forwards any [PlayerState] update from the active player.
-    pub fn get_state_update_channel(&self) -> broadcast::Receiver<PlayerState> {
-        self.state_sender.subscribe()
+    /// Get a channel which sends lightweight playback state updates.
+    pub fn get_player_update_channel(&self) -> broadcast::Receiver<PlayerUpdateEvent> {
+        self.player_update_sender.subscribe()
+    }
+
+    /// Get a channel which sends device topology changes (devices appearing/disappearing, active device changes).
+    pub fn get_cluster_update_channel(&self) -> broadcast::Receiver<ClusterUpdateEvent> {
+        self.cluster_update_sender.subscribe()
+    }
+
+    /// Get a channel which sends queue change events when prev/next tracks differ.
+    pub fn get_queue_update_channel(&self) -> broadcast::Receiver<QueueUpdateEvent> {
+        self.queue_update_sender.subscribe()
+    }
+
+    /// Watch the current player state (full PlayerState)
+    pub fn watch_player_state(&self) -> watch::Receiver<Option<PlayerState>> {
+        self.player_state_sender.subscribe()
+    }
+
+    /// Watch the current cluster state (all devices and active device)
+    pub fn watch_cluster_state(&self) -> watch::Receiver<ClusterState> {
+        self.cluster_state_sender.subscribe()
+    }
+
+    /// Watch the current queue list (previous and next tracks)
+    pub fn watch_queue_list(&self) -> watch::Receiver<QueueList> {
+        self.queue_list_sender.subscribe()
     }
 }
 
