@@ -17,7 +17,10 @@ use crate::{
         player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
     },
     protocol::{
-        connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
+        connect::{
+            Cluster, ClusterUpdate, ClusterUpdateReason as ServerClusterUpdateReason,
+            LogoutCommand, SetVolumeCommand,
+        },
         context::Context,
         explicit_content_pubsub::UserAttributesUpdate,
         player::ProvidedTrack,
@@ -36,6 +39,7 @@ use crate::{
 use futures_util::StreamExt;
 use protobuf::MessageField;
 use std::{
+    collections::HashMap,
     future::Future,
     sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
@@ -43,7 +47,7 @@ use std::{
 };
 use thiserror::Error;
 use tokio::{
-    sync::{broadcast, mpsc},
+    sync::{broadcast, mpsc, watch},
     time::sleep,
 };
 
@@ -70,6 +74,103 @@ impl From<SpircError> for Error {
             UnknownEndpoint(_) => Error::unimplemented(err),
         }
     }
+}
+
+/// Information about a device in the cluster
+#[derive(Debug, Clone)]
+pub struct DeviceInfo {
+    /// Unique device identifier
+    pub device_id: String,
+    /// Human-readable device name
+    pub device_alias: String,
+    /// Device type (e.g., "Speaker", "Phone")
+    pub device_type: String,
+    /// Volume level 0-100
+    pub volume: u32,
+    /// Whether this is the currently active device
+    pub is_active: bool,
+}
+
+/// Current state of the device cluster (all known devices)
+#[derive(Debug, Clone)]
+pub struct ClusterState {
+    /// Map of all known devices by device_id
+    pub devices: HashMap<String, DeviceInfo>,
+    /// Currently active device ID (if any)
+    pub active_device_id: Option<String>,
+}
+
+/// Queue information (previous and next tracks)
+#[derive(Debug, Clone)]
+pub struct QueueList {
+    /// Previous tracks in the queue (as URIs)
+    pub prev_tracks: Vec<String>,
+    /// Next tracks in the queue (as URIs)
+    pub next_tracks: Vec<String>,
+}
+
+/// Semantic reason for cluster updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClusterUpdateReason {
+    /// Device list changed
+    DeviceListChanged,
+    /// Active device switched
+    ActiveDeviceChanged,
+    /// Device state changed
+    DeviceStateChanged,
+    /// Device info changed
+    DeviceInfoChanged,
+}
+
+/// Event emitted when cluster state changes
+#[derive(Debug, Clone)]
+pub struct ClusterUpdateEvent {
+    /// Device ID that changed
+    pub device_id: String,
+    /// Reason for the update
+    pub reason: ClusterUpdateReason,
+}
+
+/// Semantic reasons for queue updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QueueUpdateReason {
+    /// Previous tracks changed
+    PrevTracksChanged,
+    /// Next tracks changed
+    NextTracksChanged,
+}
+
+/// Event emitted when queue changes
+#[derive(Debug, Clone)]
+pub struct QueueUpdateEvent {
+    /// Reason for the queue update
+    pub reason: QueueUpdateReason,
+}
+
+/// Semantic reasons for player state updates
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayerUpdateReason {
+    /// Track changed
+    TrackChanged,
+    /// Position changed
+    PositionChanged,
+    /// Play/pause state changed
+    PlayPauseChanged,
+    /// Shuffle mode changed
+    ShuffleChanged,
+    /// Repeat mode changed
+    RepeatChanged,
+    /// Context changed
+    ContextChanged,
+    /// Other state change
+    Other,
+}
+
+/// Emitted when player state changes
+#[derive(Debug, Clone)]
+pub struct PlayerUpdateEvent {
+    /// Reason for the player update
+    pub reason: PlayerUpdateReason,
 }
 
 struct SpircTask {
