@@ -1060,6 +1060,28 @@ impl SpircTask {
         }
 
         self.update_state = true;
+
+        // Emit local player state to watch channels if this device is active
+        if self.connect_state.is_active() {
+            let player_state = self.connect_state.player().clone();
+            let _ = self.player_state_sender.send(Some(player_state.clone()));
+
+            // Also update queue list from local state
+            let queue_list = QueueList {
+                prev_tracks: player_state
+                    .prev_tracks
+                    .iter()
+                    .map(|t| t.uri.clone())
+                    .collect(),
+                next_tracks: player_state
+                    .next_tracks
+                    .iter()
+                    .map(|t| t.uri.clone())
+                    .collect(),
+            };
+            let _ = self.queue_list_sender.send(queue_list);
+        }
+
         Ok(())
     }
 
