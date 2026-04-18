@@ -2297,7 +2297,6 @@ impl SpircTask {
 
         self.connect_state.set_now(self.now_ms() as u64);
 
-        self.emit_state_update(None);
 
         self.connect_state
             .send_state(&self.session)
