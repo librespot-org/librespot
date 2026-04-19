@@ -179,33 +179,39 @@ fn get_authcode_listener(
     info!("OAuth server listening on {socket_address:?}");
 
     // The server will terminate itself after collecting the first code.
-    let mut stream = listener
-        .incoming()
-        .flatten()
-        .next()
-        .ok_or(OAuthError::AuthCodeListenerTerminated)?;
-    let mut reader = BufReader::new(&stream);
-    let mut request_line = String::new();
-    reader
-        .read_line(&mut request_line)
-        .map_err(|_| OAuthError::AuthCodeListenerRead)?;
+    for incoming in listener.incoming() {
+        let mut stream = match incoming {
+            Ok(stream) => stream,
+            Err(_) => continue,
+        };
 
-    let redirect_url = request_line
-        .split_whitespace()
-        .nth(1)
-        .ok_or(OAuthError::AuthCodeListenerParse)?;
-    let code = get_code(&("http://localhost".to_string() + redirect_url));
+        let mut reader = BufReader::new(&stream);
+        let mut request_line = String::new();
+        reader
+            .read_line(&mut request_line)
+            .map_err(|_| OAuthError::AuthCodeListenerRead)?;
 
-    let response = format!(
-        "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
-        message.len(),
-        message
-    );
-    stream
-        .write_all(response.as_bytes())
-        .map_err(|_| OAuthError::AuthCodeListenerWrite)?;
+        if request_line.trim().is_empty() {
+            continue; // Skip empty lines
+        }
 
-    code
+        let redirect_url = request_line
+            .split_whitespace()
+            .nth(1)
+            .ok_or(OAuthError::AuthCodeListenerParse)?;
+        let code = get_code(&("http://localhost".to_string() + redirect_url));
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{}",
+            message.len(),
+            message
+        );
+        stream
+            .write_all(response.as_bytes())
+            .map_err(|_| OAuthError::AuthCodeListenerWrite)?;
+        return code;
+    }
+    Err(OAuthError::AuthCodeListenerTerminated)
 }
 
 // If the specified `redirect_uri` is HTTP and contains a port,
