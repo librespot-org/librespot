@@ -194,7 +194,7 @@ impl AudioItem {
 fn get_covers(covers: Images, image_url: String) -> Vec<CoverImage> {
     let mut covers = covers;
 
-    covers.sort_by(|a, b| b.width.cmp(&a.width));
+    covers.sort_by_key(|cover| std::cmp::Reverse(cover.width));
 
     covers
         .iter()
