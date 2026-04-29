@@ -21,6 +21,7 @@ pub mod deserialize_with;
 #[doc(hidden)]
 pub mod diffie_hellman;
 pub mod error;
+pub mod event_service;
 pub mod file_id;
 pub mod http_client;
 pub mod login5;

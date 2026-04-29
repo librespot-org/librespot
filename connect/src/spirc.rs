@@ -8,6 +8,7 @@ use crate::{
             manager::{BoxedStream, BoxedStreamResult, Reply, RequestReply},
             protocol::{Command, FallbackWrapper, Message, Request},
         },
+        event_service,
         session::UserAttributes,
         spclient::TransferRequest,
     },
@@ -15,6 +16,10 @@ use crate::{
     playback::{
         mixer::Mixer,
         player::{Player, PlayerEvent, PlayerEventChannel, QueueTrack},
+    },
+    playback_metrics::{
+        EndReason, PlaybackMetrics, build_new_playback_id_event,
+        build_new_session_id_event, build_track_transition_event, generate_session_id,
     },
     protocol::{
         connect::{Cluster, ClusterUpdate, LogoutCommand, SetVolumeCommand},
@@ -36,6 +41,7 @@ use futures_util::StreamExt;
 use librespot_protocol::context_page::ContextPage;
 use protobuf::MessageField;
 use std::{
+    collections::HashMap,
     future::Future,
     sync::Arc,
     sync::atomic::{AtomicUsize, Ordering},
@@ -99,6 +105,19 @@ struct SpircTask {
 
     shutdown: bool,
     session: Session,
+
+    /// Active per-track playback metrics keyed by `play_request_id`. Populated
+    /// on `TrackChanged`, drained on `EndOfTrack` to send the
+    /// `TrackTransition` event used by Spotify's play-count statistics.
+    metrics: HashMap<u64, PlaybackMetrics>,
+    /// End reason applied to the next finalized metrics record. Set by skip /
+    /// disconnect / logout handlers before they trigger the playback stop;
+    /// `None` means the track ended naturally and the reason defaults to
+    /// `TrackDone`.
+    pending_end_reason: Option<EndReason>,
+    /// Spotify Connect playback session id (hex UUID). Generated lazily on
+    /// first track load and reused across playbacks until shutdown.
+    event_session_id: Option<String>,
 
     /// is set when transferring, and used after resolving the contexts to finish the transfer
     pub transfer_state: Option<TransferState>,
@@ -256,6 +275,10 @@ impl Spirc {
 
             shutdown: false,
             session,
+
+            metrics: HashMap::new(),
+            pending_end_reason: None,
+            event_session_id: None,
 
             transfer_state: None,
             update_volume: false,
@@ -701,6 +724,7 @@ impl SpircTask {
         match cmd {
             SpircCommand::Shutdown => {
                 trace!("Received SpircCommand::Shutdown");
+                self.pending_end_reason = Some(EndReason::EndPlay);
                 self.handle_pause();
                 self.handle_disconnect().await?;
                 self.shutdown = true;
@@ -731,13 +755,20 @@ impl SpircTask {
                 if pause {
                     self.handle_pause()
                 }
+                self.pending_end_reason = Some(EndReason::Remote);
                 return self.handle_disconnect().await;
             }
             SpircCommand::Play => self.handle_play(),
             SpircCommand::PlayPause => self.handle_play_pause(),
             SpircCommand::Pause => self.handle_pause(),
-            SpircCommand::Prev => self.handle_prev()?,
-            SpircCommand::Next => self.handle_next(None)?,
+            SpircCommand::Prev => {
+                self.pending_end_reason = Some(EndReason::BackBtn);
+                self.handle_prev()?
+            }
+            SpircCommand::Next => {
+                self.pending_end_reason = Some(EndReason::FwdBtn);
+                self.handle_next(None)?
+            }
             SpircCommand::VolumeUp => self.handle_volume_up(),
             SpircCommand::VolumeDown => self.handle_volume_down(),
             SpircCommand::Shuffle(shuffle) => self.handle_shuffle(shuffle)?,
@@ -756,6 +787,22 @@ impl SpircTask {
         if let PlayerEvent::TrackChanged { audio_item } = event {
             self.connect_state.update_duration(audio_item.duration_ms);
             self.update_state = true;
+            // The play_request_id has already been updated by the preceding
+            // PlayRequestIdChanged event. Start a metrics record for the new
+            // track so that subsequent Playing/Paused/Seeked/EndOfTrack
+            // events can populate it.
+            if let Some(prid) = self.play_request_id {
+                let track_id_hex = match &audio_item.track_id {
+                    SpotifyUri::Track { id } | SpotifyUri::Episode { id } => id.to_base16(),
+                    _ => String::new(),
+                };
+                self.start_playback_metrics(
+                    prid,
+                    audio_item.uri.clone(),
+                    track_id_hex,
+                    audio_item.duration_ms,
+                );
+            }
             return Ok(());
         }
 
@@ -763,6 +810,51 @@ impl SpircTask {
         if let PlayerEvent::PlayRequestIdChanged { play_request_id } = event {
             self.play_request_id = Some(play_request_id);
             return Ok(());
+        }
+
+        // Update intervals before any short-circuit so a stale-but-late
+        // Playing/Paused for a track that's already advanced still gets
+        // recorded into its (now archived) metrics record.
+        match &event {
+            PlayerEvent::Playing {
+                position_ms,
+                play_request_id,
+                ..
+            } => {
+                if let Some(m) = self.metrics.get_mut(play_request_id) {
+                    m.start_interval(*position_ms);
+                }
+            }
+            PlayerEvent::Paused {
+                position_ms,
+                play_request_id,
+                ..
+            } => {
+                if let Some(m) = self.metrics.get_mut(play_request_id) {
+                    m.end_interval(*position_ms);
+                }
+            }
+            PlayerEvent::Seeked {
+                position_ms,
+                play_request_id,
+                ..
+            } => {
+                if let Some(m) = self.metrics.get_mut(play_request_id) {
+                    m.end_interval(*position_ms);
+                    m.start_interval(*position_ms);
+                }
+            }
+            _ => {}
+        }
+
+        // Finalize metrics regardless of whether this is the current track —
+        // EndOfTrack for an old track must still be reported even if a skip
+        // already advanced play_request_id.
+        if let PlayerEvent::EndOfTrack {
+            play_request_id, ..
+        } = &event
+        {
+            self.finalize_playback_metrics(*play_request_id);
         }
 
         let is_current_track = matches! {
@@ -883,6 +975,94 @@ impl SpircTask {
 
         self.update_state = true;
         Ok(())
+    }
+
+    /// Lazily generate the event-service playback session id and emit a
+    /// `NewSessionId` event for it. Called from `start_playback_metrics` when
+    /// the first track of a session loads.
+    fn ensure_event_session_id(&mut self) -> String {
+        if let Some(id) = &self.event_session_id {
+            return id.clone();
+        }
+        let id = generate_session_id();
+        self.event_session_id = Some(id.clone());
+        let context_uri = self.connect_state.player().context_uri.clone();
+        let context_url = self.connect_state.player().context_url.clone();
+        // We don't currently surface context size from connect state; use 0
+        // until we plumb it through. Spotify treats this as informational.
+        let event = build_new_session_id_event(&id, &context_uri, 0, &context_url);
+        if let Err(e) = event_service::send_event(&self.session, event) {
+            warn!("event-service NewSessionId send failed: {e}");
+        }
+        id
+    }
+
+    /// Begin a per-track metrics record for the given `play_request_id` and
+    /// emit a `NewPlaybackId` event. Called on `TrackChanged`.
+    fn start_playback_metrics(
+        &mut self,
+        play_request_id: u64,
+        track_uri: String,
+        track_id_hex: String,
+        duration_ms: u32,
+    ) {
+        let session_id = self.ensure_event_session_id();
+        let playback_id = PlaybackMetrics::generate_playback_id();
+
+        let new_playback_event = build_new_playback_id_event(&session_id, &playback_id);
+        if let Err(e) = event_service::send_event(&self.session, new_playback_event) {
+            warn!("event-service NewPlaybackId send failed: {e}");
+        }
+
+        let context_uri = self.connect_state.player().context_uri.clone();
+
+        let metrics = PlaybackMetrics::new(
+            playback_id,
+            track_uri,
+            track_id_hex,
+            context_uri,
+            String::new(),
+            String::new(),
+            duration_ms,
+            0, // bitrate — pipeline metric we don't track yet
+            "vorbis".to_string(),
+            "harmony".to_string(),
+            EndReason::ClickRow,
+        );
+        self.metrics.insert(play_request_id, metrics);
+    }
+
+    /// Finalize the metrics record for the given `play_request_id` and emit a
+    /// `TrackTransition` event. Called on `EndOfTrack`. The end reason
+    /// defaults to `TrackDone` unless a skip / disconnect / shutdown handler
+    /// set [`Self::pending_end_reason`] beforehand.
+    fn finalize_playback_metrics(&mut self, play_request_id: u64) {
+        let mut metrics = match self.metrics.remove(&play_request_id) {
+            Some(m) => m,
+            None => return,
+        };
+
+        // Close any open interval at the last known position.
+        let last_pos = self.connect_state.player().position_as_of_timestamp as u32;
+        metrics.end_interval(last_pos);
+
+        let reason = self.pending_end_reason.take().unwrap_or(EndReason::TrackDone);
+        metrics.ended_how(reason, "harmony");
+
+        let device_id = self.session.device_id().to_string();
+        let event = build_track_transition_event(&metrics, &device_id, &device_id);
+        if let Err(e) = event_service::send_event(&self.session, event) {
+            warn!("event-service TrackTransition send failed: {e}");
+        } else {
+            debug!(
+                "event-service TrackTransition queued: track={} reason={} listened={}ms",
+                metrics.track_uri,
+                reason.as_wire(),
+                metrics
+                    .last_value()
+                    .saturating_sub(metrics.first_value()),
+            );
+        }
     }
 
     async fn handle_connection_id_update(&mut self, connection_id: String) -> Result<(), Error> {

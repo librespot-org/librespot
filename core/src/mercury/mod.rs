@@ -82,6 +82,7 @@ impl MercuryManager {
             uri: uri.into(),
             content_type: None,
             payload: Vec::new(),
+            user_fields: Vec::new(),
         })
     }
 
@@ -95,6 +96,25 @@ impl MercuryManager {
             uri: uri.into(),
             content_type: None,
             payload: vec![data],
+            user_fields: Vec::new(),
+        })
+    }
+
+    /// Send a Mercury POST including user-defined header fields. Used by
+    /// `event-service` calls which require `Accept-Language` and
+    /// `X-ClientTimeStamp` to be set on the request header.
+    pub fn send_with_fields<T: Into<String>>(
+        &self,
+        uri: T,
+        data: Vec<u8>,
+        user_fields: Vec<(String, Vec<u8>)>,
+    ) -> Result<MercuryFuture<MercuryResponse>, Error> {
+        self.request(MercuryRequest {
+            method: MercuryMethod::Send,
+            uri: uri.into(),
+            content_type: None,
+            payload: vec![data],
+            user_fields,
         })
     }
 
@@ -113,6 +133,7 @@ impl MercuryManager {
             uri: uri.clone(),
             content_type: None,
             payload: Vec::new(),
+            user_fields: Vec::new(),
         });
 
         let manager = self.clone();

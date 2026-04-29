@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>librespot · play-count fix dashboard</title>
+  <style>
+    :root {
+      --bg: #0e1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --fg: #e6edf3;
+      --muted: #8b949e;
+      --accent: #1db954;
+      --warn: #d29922;
+      --err:  #f85149;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+    header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+    header .tag { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    main { padding: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 1400px; margin: 0 auto; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; min-height: 200px; }
+    .panel h2 { font-size: 13px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+    .panel .span2 { grid-column: span 2; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .row + .row { margin-top: 10px; }
+    button { background: #21262d; color: var(--fg); border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    button:hover { background: #30363d; }
+    button.primary { background: var(--accent); color: #06210f; border-color: transparent; font-weight: 600; }
+    button.danger { background: #6e1f2a; border-color: #8e2435; color: #ffd5db; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-family: var(--mono); border: 1px solid var(--border); }
+    .pill.ok { color: #7ee787; border-color: #2ea04340; background: #2ea04318; }
+    .pill.warn { color: #e3b341; border-color: #d2992240; background: #d2992218; }
+    .pill.err { color: #ffa198; border-color: #f8514940; background: #f8514918; }
+    .pill.muted { color: var(--muted); }
+    pre, .log { font-family: var(--mono); font-size: 11px; background: #0a0d12; border: 1px solid var(--border); border-radius: 6px; padding: 10px; max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+    .log .ev { color: var(--accent); }
+    .track { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid #21262d; }
+    .track:last-child { border: 0; }
+    .track img { width: 36px; height: 36px; border-radius: 4px; }
+    .track .meta { line-height: 1.3; }
+    .track .name { font-weight: 600; font-size: 13px; }
+    .track .artist { color: var(--muted); font-size: 11px; }
+    .track .when { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+    .kv { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+    .kv b { color: var(--fg); font-weight: 600; }
+    .grid-mini { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+    @media (max-width: 1000px) { main { grid-template-columns: 1fr; } .panel.span2 { grid-column: auto; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>librespot · play-count fix</h1>
+    <span class="tag">issue #913 · feat/play-count-reporting</span>
+    <span class="tag" id="clock"></span>
+  </header>
+
+  <main>
+
+    <section class="panel" id="panel-auth">
+      <h2>1 · Spotify account</h2>
+      <div class="row">
+        <span class="pill muted" id="auth-status">checking…</span>
+        <span class="kv" id="auth-me"></span>
+      </div>
+      <div class="row">
+        <button class="primary" id="btn-login">Connect Spotify</button>
+        <button id="btn-logout">Sign out</button>
+      </div>
+      <div class="row kv" id="auth-scopes"></div>
+    </section>
+
+    <section class="panel" id="panel-current">
+      <h2>2 · Currently playing (Web API)</h2>
+      <div id="current-content" class="kv">—</div>
+    </section>
+
+    <section class="panel span2" id="panel-recent">
+      <h2>3 · Recently played (ground truth — must include test track within ~1 min)</h2>
+      <div class="row">
+        <button id="btn-refresh-recent">Refresh now</button>
+        <span class="kv" id="recent-meta">—</span>
+      </div>
+      <div id="recent-list" style="margin-top: 10px;"></div>
+    </section>
+
+    <section class="panel" id="panel-build">
+      <h2>4 · Our librespot fork — build</h2>
+      <div class="row">
+        <span class="pill muted" id="ls-status">idle</span>
+        <button class="primary" id="btn-build">cargo build --release</button>
+      </div>
+      <pre class="log" id="build-log">—</pre>
+    </section>
+
+    <section class="panel" id="panel-run">
+      <h2>5 · Our librespot fork — run</h2>
+      <div class="row">
+        <button class="primary" id="btn-start">Start librespot</button>
+        <button class="danger" id="btn-stop">Stop</button>
+        <span class="kv" id="run-meta">—</span>
+      </div>
+      <pre class="log" id="run-log">—</pre>
+    </section>
+
+    <section class="panel span2" id="panel-mercury">
+      <h2>6 · Captured event-service traffic (the play-count events we send)</h2>
+      <pre class="log" id="mercury-log">No events yet. Start librespot, play a track ≥30s, let it end naturally.</pre>
+    </section>
+
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    function pill(el, kind, text) { el.className = 'pill ' + kind; el.textContent = text; }
+    setInterval(() => $('clock').textContent = new Date().toLocaleTimeString(), 500);
+
+    async function getJSON(url) {
+      const r = await fetch(url);
+      if (!r.ok && r.status !== 401) throw new Error(r.status);
+      return r.json();
+    }
+    async function postJSON(url) {
+      const r = await fetch(url, { method: 'POST' });
+      return r.json();
+    }
+
+    async function refreshAuth() {
+      try {
+        const a = await getJSON('/auth/status');
+        if (a.authenticated) {
+          pill($('auth-status'), 'ok', 'connected');
+          $('auth-me').innerHTML = a.me ? `<b>${a.me.display_name || a.me.id}</b> — ${a.me.product}` : '';
+          $('auth-scopes').textContent = 'scopes: ' + (a.scopes || []).join(' ');
+        } else {
+          pill($('auth-status'), 'warn', 'not connected');
+          $('auth-me').textContent = '';
+          $('auth-scopes').textContent = '';
+        }
+        return a.authenticated;
+      } catch (e) {
+        pill($('auth-status'), 'err', 'error: ' + e.message);
+        return false;
+      }
+    }
+
+    async function refreshCurrent() {
+      try {
+        const r = await fetch('/api/currently-playing');
+        if (r.status === 204) { $('current-content').textContent = 'Nothing playing'; return; }
+        if (r.status === 401) { $('current-content').textContent = 'Sign in first'; return; }
+        const j = await r.json();
+        if (!j || !j.item) { $('current-content').textContent = 'Nothing playing'; return; }
+        const it = j.item;
+        $('current-content').innerHTML = `
+          <b>${it.name}</b> — ${it.artists.map(a=>a.name).join(', ')}<br/>
+          device: <b>${j.device?.name || '?'}</b> · pos ${(j.progress_ms/1000).toFixed(0)}/${(it.duration_ms/1000).toFixed(0)}s · ${j.is_playing ? 'playing' : 'paused'}
+        `;
+      } catch (e) {
+        $('current-content').textContent = 'error: ' + e.message;
+      }
+    }
+
+    function timeAgo(ts) {
+      const s = Math.round((Date.now() - new Date(ts).getTime()) / 1000);
+      if (s < 60) return s + 's ago';
+      if (s < 3600) return Math.round(s/60) + 'm ago';
+      if (s < 86400) return Math.round(s/3600) + 'h ago';
+      return Math.round(s/86400) + 'd ago';
+    }
+    async function refreshRecent() {
+      try {
+        const r = await fetch('/api/recently-played');
+        if (r.status === 401) { $('recent-list').textContent = 'Sign in first'; return; }
+        const j = await r.json();
+        const items = j.items || [];
+        $('recent-meta').textContent = `${items.length} tracks · newest ${items[0] ? timeAgo(items[0].played_at) : '—'}`;
+        $('recent-list').innerHTML = items.map(it => {
+          const t = it.track;
+          const img = t.album.images.slice(-1)[0]?.url;
+          return `<div class="track">
+            ${img ? `<img src="${img}" />` : '<div></div>'}
+            <div class="meta">
+              <div class="name">${t.name}</div>
+              <div class="artist">${t.artists.map(a=>a.name).join(', ')}</div>
+            </div>
+            <div class="when" title="${it.played_at}">${timeAgo(it.played_at)}</div>
+          </div>`;
+        }).join('') || '<div class="kv">No recent plays. Try playing something for ≥30s.</div>';
+      } catch (e) {
+        $('recent-list').textContent = 'error: ' + e.message;
+      }
+    }
+
+    async function refreshLibrespot() {
+      try {
+        const r = await getJSON('/librespot/status');
+        const cls = r.status === 'running' ? 'ok' : (r.status === 'crashed' ? 'err' : 'muted');
+        pill($('ls-status'), cls, r.status);
+        $('run-meta').textContent = r.pid ? `pid ${r.pid} · up ${Math.round((Date.now()-r.started_at)/1000)}s` : '—';
+        $('run-log').textContent = r.log_tail.join('\n') || '—';
+        $('build-log').textContent = r.build_log_tail.join('\n') || '—';
+        $('mercury-log').textContent = r.mercury_events.join('\n') || 'No events yet.';
+        $('run-log').scrollTop = $('run-log').scrollHeight;
+        $('mercury-log').scrollTop = $('mercury-log').scrollHeight;
+      } catch (e) { /* ignore */ }
+    }
+
+    $('btn-login').onclick = () => { window.location.href = '/auth/start'; };
+    $('btn-logout').onclick = async () => { await postJSON('/auth/logout'); refreshAuth(); };
+    $('btn-refresh-recent').onclick = refreshRecent;
+    $('btn-build').onclick = async () => { await postJSON('/librespot/build'); refreshLibrespot(); };
+    $('btn-start').onclick = async () => { await postJSON('/librespot/start'); refreshLibrespot(); };
+    $('btn-stop').onclick  = async () => { await postJSON('/librespot/stop');  refreshLibrespot(); };
+
+    (async function init() {
+      await refreshAuth();
+      await refreshCurrent();
+      await refreshRecent();
+      await refreshLibrespot();
+      setInterval(refreshAuth, 30_000);
+      setInterval(refreshCurrent, 5_000);
+      setInterval(refreshRecent, 15_000);
+      setInterval(refreshLibrespot, 2_000);
+    })();
+  </script>
+</body>
+</html>

@@ -20,6 +20,10 @@ pub struct MercuryRequest {
     pub uri: String,
     pub content_type: Option<String>,
     pub payload: Vec<Vec<u8>>,
+    /// Extra user fields written into the Mercury Header (proto field 0x06).
+    /// Used for endpoints like `event-service` that expect `Accept-Language`
+    /// and `X-ClientTimeStamp`.
+    pub user_fields: Vec<(String, Vec<u8>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +90,13 @@ impl MercuryRequest {
 
         if let Some(ref content_type) = self.content_type {
             header.set_content_type(content_type.clone());
+        }
+
+        for (key, value) in &self.user_fields {
+            let mut field = protocol::mercury::UserField::new();
+            field.set_key(key.clone());
+            field.set_value(value.clone());
+            header.user_fields.push(field);
         }
 
         packet.write_u16::<BigEndian>(header.compute_size() as u16)?;

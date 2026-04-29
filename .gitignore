@@ -8,3 +8,10 @@ spotify_appkey.key
 .cache
 *.save
 *.*~
+
+# Dev dashboard scaffolding (not part of the librespot crate ship)
+_dashboard/node_modules/
+_dashboard/package-lock.json
+_dashboard/.tokens.json
+_reference/
+.claude/launch.json
