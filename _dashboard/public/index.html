@@ -57,6 +57,7 @@
     <h1>librespot · play-count fix</h1>
     <span class="tag">issue #913 · feat/play-count-reporting</span>
     <span class="tag" id="clock"></span>
+    <span class="pill" id="rate-pill" style="margin-left: auto; display: none;"></span>
   </header>
 
   <main>
@@ -70,6 +71,7 @@
       <div class="row">
         <button class="primary" id="btn-login">Connect Spotify</button>
         <button id="btn-logout">Sign out</button>
+        <button id="btn-hard-reset" title="Logs out of Spotify globally then re-auths — needed when the account picker shows the wrong account">Force re-auth (clear Spotify session)</button>
       </div>
       <div class="row kv" id="auth-scopes"></div>
     </section>
@@ -110,6 +112,41 @@
     <section class="panel span2" id="panel-mercury">
       <h2>6 · Captured event-service traffic (the play-count events we send)</h2>
       <pre class="log" id="mercury-log">No events yet. Start librespot, play a track ≥30s, let it end naturally.</pre>
+    </section>
+
+    <section class="panel span2" id="panel-e2e">
+      <h2>7 · End-to-end test runner</h2>
+      <div class="row">
+        <button class="primary" id="btn-e2e">Run automated E2E test</button>
+        <span class="kv" id="e2e-status">Idle. Auto sequence uses Spotify Web API: transfer + play + wait 45s + poll recently-played.</span>
+      </div>
+      <pre class="log" id="e2e-log" style="max-height: 220px;">—</pre>
+      <div class="kv" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #21262d;">
+        <b>Web API rate-limited?</b> Use the manual path — it doesn't need /me/player/play at all:
+        <ol style="margin: 6px 0 0 18px; padding: 0; line-height: 1.6;">
+          <li>Make sure panel 5 shows librespot is <b>running</b>.</li>
+          <li>Open the Spotify app on your phone or <a href="https://open.spotify.com" target="_blank" style="color: var(--accent);">open.spotify.com</a> in another tab — same Spotify account.</li>
+          <li>Start any track (≥45 seconds long).</li>
+          <li>Tap the <b>"Devices"</b> icon (bottom right of Now Playing on mobile, or the speaker icon on web) and pick <b>librespot-playcount-test</b>.</li>
+          <li>Music should now come out of <b>this</b> machine. Let it play for at least 45 seconds and let the track end naturally — don't skip.</li>
+          <li>Watch panel 6 below — you should see <code>NEW_SESSION_ID</code>, <code>NEW_PLAYBACK_ID</code>, and finally <code>TrackTransition queued: ... reason=trackdone</code>. If the transition shows status=200 from the response logs, Spotify accepted the play-count event.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-devices">
+      <h2>8 · Spotify devices</h2>
+      <div class="row"><button id="btn-refresh-devices">Refresh devices</button></div>
+      <div id="devices-list" style="margin-top: 10px;" class="kv">—</div>
+    </section>
+
+    <section class="panel" id="panel-manual-play">
+      <h2>9 · Manual playback control</h2>
+      <div class="row">
+        <input id="track-uri" type="text" value="spotify:track:4uLU6hMCjMI75M1A2tKUQC" style="flex: 1; min-width: 220px; background: #0a0d12; color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-family: var(--mono); font-size: 12px;" />
+        <button class="primary" id="btn-play">Play on librespot</button>
+      </div>
+      <div class="kv" id="play-result" style="margin-top: 10px;">Playback control requires Spotify Premium.</div>
     </section>
 
   </main>
@@ -210,22 +247,86 @@
       } catch (e) { /* ignore */ }
     }
 
+    async function refreshDevices() {
+      try {
+        const r = await fetch('/api/devices');
+        if (r.status === 401) { $('devices-list').textContent = 'Sign in first'; return; }
+        const j = await r.json();
+        const ds = j.devices || [];
+        if (!ds.length) { $('devices-list').textContent = 'No devices visible. Start librespot or open Spotify on another device.'; return; }
+        $('devices-list').innerHTML = ds.map(d => `
+          <div style="padding: 4px 0;">
+            <b>${d.name}</b> <span class="pill ${d.is_active ? 'ok' : 'muted'}">${d.is_active ? 'active' : 'idle'}</span>
+            <br/><span style="font-size: 11px;">${d.type} · ${d.id}</span>
+          </div>`).join('');
+      } catch (e) { $('devices-list').textContent = 'error: ' + e.message; }
+    }
+
+    async function runE2E() {
+      $('btn-e2e').disabled = true;
+      $('e2e-status').textContent = 'Running… (will take ~75s)';
+      $('e2e-log').textContent = 'Starting…';
+      try {
+        const r = await fetch('/api/run-e2e', { method: 'POST' });
+        const j = await r.json();
+        $('e2e-log').textContent = (j.log || []).join('\n');
+        if (j.ok) { $('e2e-status').textContent = `PASS — track in recently-played at ${j.played_at}`; }
+        else if (j.error === 'librespot_not_found') { $('e2e-status').textContent = 'FAIL — librespot device not visible. Start it first.'; }
+        else if (j.error === 'play_failed') { $('e2e-status').textContent = `FAIL — play API rejected: ${JSON.stringify(j.detail)}`; }
+        else { $('e2e-status').textContent = `INCONCLUSIVE — ${j.reason || j.error}`; }
+      } catch (e) {
+        $('e2e-status').textContent = 'error: ' + e.message;
+      } finally {
+        $('btn-e2e').disabled = false;
+      }
+    }
+
+    async function manualPlay() {
+      const uri = $('track-uri').value.trim();
+      const devs = await (await fetch('/api/devices')).json();
+      const ours = (devs.devices || []).find(d => /librespot-playcount-test/i.test(d.name));
+      if (!ours) { $('play-result').textContent = 'librespot device not visible. Start it first.'; return; }
+      const r = await fetch('/api/play', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ device_id: ours.id, track_uri: uri }) });
+      const j = await r.json();
+      $('play-result').textContent = r.status >= 400 ? `error ${r.status}: ${JSON.stringify(j)}` : `playing on ${ours.name}`;
+    }
+
     $('btn-login').onclick = () => { window.location.href = '/auth/start'; };
     $('btn-logout').onclick = async () => { await postJSON('/auth/logout'); refreshAuth(); };
+    $('btn-hard-reset').onclick = () => { window.location.href = '/auth/hard-reset'; };
     $('btn-refresh-recent').onclick = refreshRecent;
     $('btn-build').onclick = async () => { await postJSON('/librespot/build'); refreshLibrespot(); };
     $('btn-start').onclick = async () => { await postJSON('/librespot/start'); refreshLibrespot(); };
     $('btn-stop').onclick  = async () => { await postJSON('/librespot/stop');  refreshLibrespot(); };
+    $('btn-refresh-devices').onclick = refreshDevices;
+    $('btn-e2e').onclick = runE2E;
+    $('btn-play').onclick = manualPlay;
+
+    async function refreshRateLimit() {
+      try {
+        const j = await getJSON('/api/rate-limit');
+        const s = j.seconds_until_allowed || 0;
+        const el = $('rate-pill');
+        if (s > 0) {
+          el.style.display = '';
+          el.className = 'pill warn';
+          el.textContent = `Spotify rate-limited — ${s}s remaining`;
+        } else {
+          el.style.display = 'none';
+        }
+      } catch {}
+    }
+    setInterval(refreshRateLimit, 1_000);
 
     (async function init() {
+      // Single auth probe so the UI knows whether you're signed in. After
+      // that, nothing in this dashboard hits Spotify on a timer — every
+      // outbound call is user-initiated. This keeps the per-user rate limit
+      // budget free for the E2E runner.
       await refreshAuth();
-      await refreshCurrent();
-      await refreshRecent();
       await refreshLibrespot();
-      setInterval(refreshAuth, 30_000);
-      setInterval(refreshCurrent, 5_000);
-      setInterval(refreshRecent, 15_000);
-      setInterval(refreshLibrespot, 2_000);
+      refreshRateLimit();
+      setInterval(refreshLibrespot, 2_000); // local only
     })();
   </script>
 </body>

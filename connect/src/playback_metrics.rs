@@ -284,3 +284,199 @@ pub fn build_new_playback_id_event(session_id: &str, playback_id: &str) -> Event
 pub fn generate_session_id() -> String {
     uuid_hex()
 }
+
+#[cfg(test)]
+mod tests {
+    //! Byte-format regression tests. The wire format of these events is not
+    //! part of any public Spotify spec — it was reverse-engineered by
+    //! librespot-java's maintainer (devgianlu, see librespot-org/librespot
+    //! discussion #626). These tests pin the exact field layout we send so
+    //! that future refactors don't silently break play-count reporting.
+    //!
+    //! The fixtures here mirror the hand-traced output of librespot-java's
+    //! `TrackTransitionEvent.build()`, `NewSessionIdEvent.build()` and
+    //! `NewPlaybackIdEvent.build()` for known input. We compare with `|`
+    //! substituted for the `0x09` tab delimiter for readability.
+    use super::*;
+    use std::sync::atomic::Ordering;
+
+    fn fixed_metrics() -> PlaybackMetrics {
+        let mut m = PlaybackMetrics::new(
+            "11111111111111111111111111111111".to_string(),
+            "spotify:track:4uLU6hMCjMI75M1A2tKUQC".to_string(),
+            "23a82593c0204e9c952a37094c83fb3a".to_string(),
+            "spotify:playlist:foo".to_string(),
+            "16.18.0".to_string(),
+            "spotify_desktop".to_string(),
+            213_000,
+            160,
+            "vorbis".to_string(),
+            "harmony".to_string(),
+            EndReason::ClickRow,
+        );
+        // Pin timestamp so the snapshot is deterministic.
+        m.timestamp_ms = 1_700_000_000_000;
+        m.start_interval(0);
+        m.end_interval(45_000);
+        m.ended_how(EndReason::TrackDone, "harmony");
+        m
+    }
+
+    #[test]
+    fn new_session_id_layout() {
+        let e = build_new_session_id_event(
+            "ssss-ssss",
+            "spotify:playlist:foo",
+            42,
+            "context://spotify:playlist:foo",
+        );
+        let body = EventBuilder::debug_string(&e.into_bytes());
+        // The 4th positional field is now-millis at build time, which is
+        // wall-clock; we only assert the static structure around it.
+        let parts: Vec<&str> = body.split('|').collect();
+        assert_eq!(parts[0], "557");
+        assert_eq!(parts[1], "3");
+        assert_eq!(parts[2], "ssss-ssss");
+        assert_eq!(parts[3], "spotify:playlist:foo");
+        assert_eq!(parts[4], "spotify:playlist:foo");
+        assert!(parts[5].chars().all(|c| c.is_ascii_digit()));
+        assert_eq!(parts[6], "");
+        assert_eq!(parts[7], "42");
+        assert_eq!(parts[8], "context://spotify:playlist:foo");
+        assert_eq!(parts.len(), 9);
+    }
+
+    #[test]
+    fn new_playback_id_layout() {
+        let e = build_new_playback_id_event("sess-id", "play-id");
+        let body = EventBuilder::debug_string(&e.into_bytes());
+        let parts: Vec<&str> = body.split('|').collect();
+        assert_eq!(parts[0], "558");
+        assert_eq!(parts[1], "1");
+        assert_eq!(parts[2], "play-id");
+        assert_eq!(parts[3], "sess-id");
+        assert!(parts[4].chars().all(|c| c.is_ascii_digit()));
+        assert_eq!(parts.len(), 5);
+    }
+
+    #[test]
+    fn track_transition_layout_matches_java() {
+        // Pin the global incremental counter to a known value for this test.
+        // We can't reset an atomic without races against other tests in the
+        // same binary, so we instead capture the current value and compute
+        // the expected one rather than asserting a literal.
+        let pre = TRANSITION_INCREMENTAL.load(Ordering::Relaxed);
+
+        let m = fixed_metrics();
+        let e = build_track_transition_event(&m, "device-A", "device-B");
+        let body = EventBuilder::debug_string(&e.into_bytes());
+        let p: Vec<&str> = body.split('|').collect();
+
+        // Header: type + sub_type.
+        assert_eq!(p[0], "12");
+        assert_eq!(p[1], "38");
+        // Then incremental counter — exact value depends on test order, but
+        // it must be the value that was current when build was called.
+        assert_eq!(p[2], pre.to_string());
+        assert_eq!(p[3], "device-A");
+        assert_eq!(p[4], "11111111111111111111111111111111");
+        assert_eq!(p[5], "00000000000000000000000000000000");
+        assert_eq!(p[6], "harmony"); // source_start
+        assert_eq!(p[7], "clickrow"); // reason_start
+        assert_eq!(p[8], "harmony"); // source_end
+        assert_eq!(p[9], "trackdone"); // reason_end
+        assert_eq!(p[10], "0"); // decoded_length
+        assert_eq!(p[11], "0"); // size
+        assert_eq!(p[12], "45000"); // when
+        assert_eq!(p[13], "45000"); // when
+        assert_eq!(p[14], "213000"); // duration
+        assert_eq!(p[15], "0"); // decrypt_time
+        assert_eq!(p[16], "0"); // fade_overlap
+        assert_eq!(p[17], "0");
+        assert_eq!(p[18], "0");
+        assert_eq!(p[19], "0"); // first_value_trigger (intervals start at 0)
+        assert_eq!(p[20], "0"); // first_value
+        assert_eq!(p[21], "0");
+        assert_eq!(p[22], "-1");
+        assert_eq!(p[23], "context");
+        assert_eq!(p[24], "0"); // audio_key_time
+        assert_eq!(p[25], "0");
+        assert_eq!(p[26], "0"); // preloaded_audio_key
+        assert_eq!(p[27], "0");
+        assert_eq!(p[28], "0");
+        assert_eq!(p[29], "0");
+        assert_eq!(p[30], "45000"); // when (repeat)
+        assert_eq!(p[31], "45000"); // when (repeat)
+        assert_eq!(p[32], "0");
+        assert_eq!(p[33], "160"); // bitrate
+        assert_eq!(p[34], "spotify:playlist:foo"); // context_uri
+        assert_eq!(p[35], "vorbis"); // encoding
+        assert_eq!(p[36], "23a82593c0204e9c952a37094c83fb3a"); // hex track id
+        assert_eq!(p[37], ""); // trailing empty field
+        assert_eq!(p[38], "0");
+        assert_eq!(p[39], "1700000000000"); // timestamp
+        assert_eq!(p[40], "0");
+        assert_eq!(p[41], "context");
+        assert_eq!(p[42], "spotify_desktop"); // referrer_identifier
+        assert_eq!(p[43], "16.18.0"); // feature_version
+        assert_eq!(p[44], "com.spotify");
+        assert_eq!(p[45], "none"); // transition
+        assert_eq!(p[46], "none");
+        assert_eq!(p[47], "device-B"); // last_command_sent_by_device_id
+        assert_eq!(p[48], "na");
+        assert_eq!(p[49], "none");
+        assert_eq!(p.len(), 50);
+    }
+
+    #[test]
+    fn end_reason_wire_strings() {
+        // Spotify only counts a play when reason_end is "trackdone". This
+        // pins the wire strings — drift here would silently break royalty
+        // crediting.
+        assert_eq!(EndReason::TrackDone.as_wire(), "trackdone");
+        assert_eq!(EndReason::TrackError.as_wire(), "trackerror");
+        assert_eq!(EndReason::FwdBtn.as_wire(), "fwdbtn");
+        assert_eq!(EndReason::BackBtn.as_wire(), "backbtn");
+        assert_eq!(EndReason::EndPlay.as_wire(), "endplay");
+        assert_eq!(EndReason::PlayBtn.as_wire(), "playbtn");
+        assert_eq!(EndReason::ClickRow.as_wire(), "clickrow");
+        assert_eq!(EndReason::Logout.as_wire(), "logout");
+        assert_eq!(EndReason::AppLoad.as_wire(), "appload");
+        assert_eq!(EndReason::Remote.as_wire(), "remote");
+    }
+
+    #[test]
+    fn intervals_track_listened_time() {
+        let mut m = fixed_metrics();
+        // Reset intervals from fixture, then construct a paused-mid-play
+        // scenario: play 0..15s, pause, resume from 15s, play to 50s.
+        m = PlaybackMetrics::new(
+            m.playback_id,
+            m.track_uri,
+            m.track_id_hex,
+            m.context_uri,
+            m.feature_version,
+            m.referrer_identifier,
+            m.duration_ms,
+            m.bitrate,
+            m.encoding,
+            m.source_start,
+            m.reason_start,
+        );
+        m.start_interval(0);
+        m.end_interval(15_000);
+        m.start_interval(15_000);
+        m.end_interval(50_000);
+        // last_value reports the latest interval-end (drives the `when` field).
+        assert_eq!(m.last_value(), 50_000);
+        assert_eq!(m.first_value(), 0);
+    }
+
+    #[test]
+    fn type_ids_match_librespot_java() {
+        // Wire IDs are NOT documented; pinning them prevents silent drift.
+        assert_eq!(EventType::NewSessionId.ids(), ("557", "3"));
+        assert_eq!(EventType::NewPlaybackId.ids(), ("558", "1"));
+        assert_eq!(EventType::TrackTransition.ids(), ("12", "38"));
+    }
+}

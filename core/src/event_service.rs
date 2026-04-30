@@ -45,7 +45,7 @@ pub enum EventType {
 }
 
 impl EventType {
-    fn ids(self) -> (&'static str, &'static str) {
+    pub fn ids(self) -> (&'static str, &'static str) {
         match self {
             EventType::NewSessionId => ("557", "3"),
             EventType::NewPlaybackId => ("558", "1"),
