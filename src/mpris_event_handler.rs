@@ -425,15 +425,11 @@ impl TryInto<HashMap<String, zbus::zvariant::OwnedValue>> for Metadata {
     fn try_into(self) -> Result<HashMap<String, zbus::zvariant::OwnedValue>, Self::Error> {
         let mut meta: HashMap<String, zbus::zvariant::OwnedValue> = HashMap::new();
 
-        let track_id = self.mpris.track_id.map(|track_id| {
-            track_id
-                .to_id()
-                .map(|id| format!("/org/librespot/track/{id}"))
-                .ok()
-        });
-        let track_id = track_id
-            .flatten()
-            .unwrap_or(" /org/mpris/MediaPlayer2/TrackList/NoTrack".to_string());
+        let track_id = self
+            .mpris
+            .track_id
+            .map(|track_id| format!("/org/librespot/track/{}", track_id.to_id()));
+        let track_id = track_id.unwrap_or(" /org/mpris/MediaPlayer2/TrackList/NoTrack".to_string());
         meta.insert(
             String::from("mpris:trackId"),
             zvariant::ObjectPath::try_from(track_id)?.into(),
