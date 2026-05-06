@@ -1482,6 +1482,7 @@ impl MprisTask {
             }
             PlayerEvent::AutoPlayChanged { .. } => {}
             PlayerEvent::FilterExplicitContentChanged { .. } => {}
+            PlayerEvent::SetQueue { .. } => {}
         }
 
         Ok(())
